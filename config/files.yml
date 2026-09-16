@@ -7,6 +7,11 @@ zaiko:
   header_row: 1          # header ở dòng 1 (khác file báo cáo)
   min_rows: 50           # dưới ngưỡng này coi là xuất một phần → cổng 3 chặn
   keys: [product_code, warehouse_code]
+  # Ngưỡng cảnh báo cổng 4. Tồn kho là snapshot ổn định nên đặt chặt.
+  # File giao dịch theo ngày cần nới rộng hơn (xem Task 10).
+  warn_row_drop_ratio: 0.5    # số dòng rơi dưới 50% so lần trước -> cảnh báo
+  warn_total_spike: 3.0       # tổng tiền tăng quá 3 lần -> cảnh báo
+  warn_total_drop: 0.34       # tổng tiền còn dưới 34% -> cảnh báo
   columns:
     商品コード:     product_code
     商品名:         product_name

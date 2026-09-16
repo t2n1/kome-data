@@ -33,8 +33,16 @@ def check(
     dup = df.duplicated(subset=spec.keys).sum()
     if dup:
         blockers.append(Blocker(3, f"{dup} dòng trùng khoá {spec.keys}"))
+
+    # Khoá rỗng ở BẤT KỲ dòng nào -> chặn (làm hỏng upsert)
+    for col in spec.keys:
+        n = int((df[col].astype(str).str.strip() == "").sum())
+        if n:
+            blockers.append(Blocker(3, f"{n} dòng có khoá {col} rỗng"))
+
+    # Cột mã rỗng TOÀN BỘ -> chặn (nghi chọn sai mẫu xuất)
     for col in spec.code_columns:
-        if (df[col] == "").all():
+        if len(df) and (df[col].astype(str).str.strip() == "").all():
             blockers.append(Blocker(3, f"Cột mã {col} rỗng toàn bộ"))
 
     # Cổng 4 — so với lần nạp trước
@@ -43,9 +51,9 @@ def check(
     if previous:
         prev_rows = previous.get("row_count") or 0
         prev_total = previous.get("total") or 0
-        if prev_rows and len(df) < prev_rows * 0.5:
+        if prev_rows and len(df) < prev_rows * spec.warn_row_drop_ratio:
             warnings.append(Warning_(4, f"Số dòng rơi từ {prev_rows} xuống {len(df)}"))
-        if prev_total and (total > prev_total * 3 or total < prev_total * 0.34):
+        if prev_total and (total > prev_total * spec.warn_total_spike or total < prev_total * spec.warn_total_drop):
             warnings.append(Warning_(4, f"Tổng tiền lệch mạnh: {prev_total:,} → {total:,}"))
 
     # Cổng 5 — đối chiếu tích
