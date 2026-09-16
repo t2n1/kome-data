@@ -1,0 +1,21 @@
+<!-- kome/web/templates/upload.html -->
+<!doctype html><meta charset="utf-8"><title>KOME — nạp dữ liệu</title>
+<style>
+ body{font:16px/1.6 system-ui;max-width:760px;margin:2rem auto;padding:0 1rem}
+ .drop{border:2px dashed #999;border-radius:12px;padding:3rem;text-align:center}
+ .ok{color:#0a7} .warn{color:#b70} .err{color:#c00}
+ li{margin:.4rem 0}
+</style>
+<h1>Nạp dữ liệu OBC</h1>
+<form method="post" action="/upload" enctype="multipart/form-data">
+  <div class="drop">Kéo thả file Excel vào đây<br><input type="file" name="files" multiple required></div>
+  <p><button type="submit">Nạp</button> · <a href="/health">Kiểm tra sức khoẻ</a></p>
+</form>
+{% if results %}<h2>Kết quả</h2><ul>
+{% for r in results %}<li>
+  {% if r.skipped %}<span class="ok">⏭️ {{ r.spec_name }} — file này đã nạp rồi, bỏ qua</span>
+  {% elif r.ok %}<span class="ok">✅ {{ r.spec_name }} — {{ "{:,}".format(r.row_count) }} dòng · ¥{{ "{:,}".format(r.total) }}</span>
+  {% else %}<span class="err">❌ {{ r.spec_name or "?" }} — KHÔNG nạp</span>{% endif %}
+  {% for b in r.blockers %}<div class="err">Cổng {{ b.gate }}: {{ b.message }}</div>{% endfor %}
+  {% for w in r.warnings %}<div class="warn">⚠️ Cổng {{ w.gate }}: {{ w.message }}</div>{% endfor %}
+</li>{% endfor %}</ul>{% endif %}
