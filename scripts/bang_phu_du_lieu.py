@@ -28,22 +28,10 @@ from pathlib import Path
 
 import psycopg
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from kome.env import nap_env
 
-def nap_env() -> None:
-    """Đọc .env ở thư mục dự án. Để chạy được mà không cần nạp biến môi trường trước.
 
-    Tìm ngược lên từ vị trí script, nên chạy từ thư mục con cũng được.
-    """
-    for thu_muc in [Path(__file__).resolve().parent, *Path(__file__).resolve().parents]:
-        f = thu_muc / ".env"
-        if f.exists():
-            for dong in f.read_text(encoding="utf-8").splitlines():
-                dong = dong.strip()
-                if dong and not dong.startswith("#") and "=" in dong:
-                    k, v = dong.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip())
-            return
-    sys.exit("Không tìm thấy file .env — hãy chạy từ trong thư mục dự án kome-data.")
 
 # Kỳ kế toán công ty: 1/8 → 31/7. Dữ liệu bán bắt đầu 2025-03-03 (xem đặc tả §2.2.1).
 DAU_DU_LIEU = date(2025, 3, 1)

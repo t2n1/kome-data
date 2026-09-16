@@ -102,3 +102,19 @@ def prune(out_dir: Path, keep_daily: int = 30, keep_monthly: int = 12) -> list[P
         if f not in keep:
             f.unlink()
     return sorted(keep)
+
+
+# --- Chạy trực tiếp: python -m ops.backup -------------------------------------
+# Tự đọc .env nên chạy được ở PowerShell, Git Bash, và cả Windows Task Scheduler
+# (nơi môi trường trống rỗng — xem kome/env.py).
+if __name__ == "__main__":
+    import os, sys
+    from kome.env import nap_env
+
+    nap_env()
+    thu_muc = Path(os.environ.get("BACKUP_DIR", "./backups"))
+    url = os.environ["DATABASE_URL_TEST" if "--test" in sys.argv else "DATABASE_URL"]
+    f = dump(url, thu_muc)
+    giu = prune(thu_muc)
+    print(f"Đã sao lưu: {f}")
+    print(f"Giữ lại {len(giu)} bản trong {thu_muc}")

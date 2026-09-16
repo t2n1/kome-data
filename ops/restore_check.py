@@ -98,3 +98,22 @@ def verify(zip_path: Path, scratch_url: str) -> dict:
     actual = restore(zip_path, scratch_url)
     bad = {t: (expected[t], actual.get(t)) for t in expected if expected[t] != actual.get(t)}
     return {"ok": not bad, "mismatches": bad, "counts": actual}
+
+
+# --- Chạy trực tiếp: python -m ops.restore_check ------------------------------
+# Kiểm tra khôi phục bản sao lưu mới nhất. CHỈ chạy trên CSDL thử nghiệm —
+# restore() sẽ từ chối nếu bị trỏ vào DATABASE_URL.
+if __name__ == "__main__":
+    import os
+    from kome.env import nap_env
+
+    nap_env()
+    thu_muc = Path(os.environ.get("BACKUP_DIR", "./backups"))
+    ban = sorted(thu_muc.glob("kome_*.zip"))
+    if not ban:
+        raise SystemExit(f"Không có bản sao lưu nào trong {thu_muc}")
+    kq = verify(ban[-1], os.environ["DATABASE_URL_TEST"])
+    print(f"Bản sao lưu: {ban[-1].name}")
+    print("KẾT QUẢ: KHÔI PHỤC ĐƯỢC" if kq["ok"] else f"KẾT QUẢ: LỆCH — {kq['mismatches']}")
+    for bang, n in sorted(kq["counts"].items()):
+        print(f"   {bang:34s} {n:>9,} dòng")

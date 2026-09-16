@@ -5,13 +5,16 @@ gặp và **lệnh chép–dán được** để xử lý. Nếu làm theo mà v
 chụp lại toàn bộ màn hình (kể cả dòng lỗi màu đỏ) và gửi cho người phụ trách
 kỹ thuật (AI bảo trì / đơn vị hỗ trợ) — đừng thử thêm cách khác.
 
-**Chuẩn bị chung cho mọi lệnh bên dưới** (mở Git Bash tại thư mục dự án
-`C:\Antigravity\kome-data`, chạy một lần đầu mỗi phiên làm việc):
+**Chuẩn bị chung cho mọi lệnh bên dưới** — chỉ một dòng, và chạy được ở **cả
+PowerShell lẫn Git Bash**:
 
 ```bash
-cd /c/Antigravity/kome-data
-set -a; source .env; set +a
+cd C:\Antigravity\kome-data
 ```
+
+Không cần nạp biến môi trường, không cần dán chuỗi kết nối vào đâu cả: mọi
+lệnh dưới đây **tự đọc file `.env`**. Mỗi lệnh đều có thêm tuỳ chọn `--test`
+để chạy thử trên cơ sở dữ liệu thử nghiệm trước khi làm thật.
 
 ---
 
@@ -73,11 +76,10 @@ dòng vi phạm — do đúng cái lỗi cũ mà 010 sinh ra để chặn: xuấ
 ngày thì phiên bản cũ bị đóng bằng `ngày hôm trước`, thành khoảng thời gian âm
 — thì 010 sẽ **báo lỗi và không chạy được**.
 
-Chạy lệnh sau bằng **chuỗi kết nối `postgres`** (chính chuỗi dùng để chạy
-migration), thay `<CHUOI_KET_NOI_POSTGRES>`:
+Chạy:
 
 ```bash
-python -c "from kome.db import connect; [print(r) for r in connect('<CHUOI_KET_NOI_POSTGRES>').execute('SELECT customer_sk, customer_code, valid_from, valid_to FROM core.dim_customer WHERE valid_to < valid_from').fetchall()] or print('OK: khong co dong nao vi pham')"
+python scripts/kiem_truoc_migration.py
 ```
 
 - **Không in ra dòng nào** (thấy `OK: khong co dong nao vi pham`) → chạy
@@ -91,28 +93,22 @@ python -c "from kome.db import connect; [print(r) for r in connect('<CHUOI_KET_N
 qua bước này, các bước sau có xoá dòng):
 
 ```bash
-python -c "from ops.backup import dump; import os, pathlib; print(dump(os.environ['DATABASE_URL'], pathlib.Path('backups')))"
+python -m ops.backup
 ```
 
-**Bước 2 — xem từng dòng vi phạm đã có bản thay thế chưa.** Cột cuối
-`co_ban_thay_the` phải là `True` cho **mọi** dòng:
+**Bước 2 — xem từng dòng vi phạm đã có bản thay thế chưa.** Chính lệnh kiểm ở
+trên đã in sẵn cột **"Đã có bản thay thế?"** cho từng dòng.
+
+- Nếu có dòng nào **KHÔNG** → **dừng lại**, chụp màn hình gửi người phụ trách
+  kỹ thuật. Dòng đó là phiên bản duy nhất của khách, không được đụng vào.
+
+**Bước 3 — dọn các dòng chết.** Chỉ chạy khi bước 2 cho **CÓ** hết. Những dòng
+này không có ngày nào đọc ra được và đều đã có bản thay thế, nên xoá đi không
+mất thông tin nào đang dùng được — đây là ngoại lệ duy nhất của luật "không bao
+giờ xoá dòng trong `core.dim_customer`", làm một lần khi vá lỗi cũ:
 
 ```bash
-python -c "from kome.db import connect; [print(r) for r in connect('<CHUOI_KET_NOI_POSTGRES>').execute('SELECT d.customer_sk, d.customer_code, d.valid_from, d.valid_to, EXISTS (SELECT 1 FROM core.dim_customer x WHERE x.customer_code = d.customer_code AND x.customer_sk <> d.customer_sk AND x.valid_from >= d.valid_from) AS co_ban_thay_the FROM core.dim_customer d WHERE d.valid_to < d.valid_from').fetchall()]"
-```
-
-- Nếu có dòng nào `False` → **dừng lại**, chụp màn hình gửi AI bảo trì. Dòng
-  đó là phiên bản duy nhất của khách, không được đụng vào.
-
-**Bước 3 — dọn các dòng chết.** Chỉ chạy khi bước 2 cho `True` hết. Những dòng
-này **không có ngày nào đọc ra được** (mọi truy vấn lịch sử dạng
-`valid_from <= ngày AND (valid_to IS NULL OR valid_to >= ngày)` đều bỏ qua
-chúng) và đều đã có bản thay thế, nên xoá đi không mất thông tin nào đang
-dùng được — đây cũng là ngoại lệ duy nhất của luật "không bao giờ xoá dòng
-trong `core.dim_customer`", làm một lần khi vá lỗi cũ:
-
-```bash
-python -c "from kome.db import connect; c = connect('<CHUOI_KET_NOI_POSTGRES>'); n = c.execute('DELETE FROM core.dim_customer d WHERE d.valid_to < d.valid_from AND EXISTS (SELECT 1 FROM core.dim_customer x WHERE x.customer_code = d.customer_code AND x.customer_sk <> d.customer_sk AND x.valid_from >= d.valid_from)').rowcount; c.commit(); print(f'da don {n} dong chet')"
+python scripts/kiem_truoc_migration.py --don
 ```
 
 Chạy lại câu kiểm ở đầu mục này (phải ra `OK: khong co dong nao vi pham`), rồi
@@ -122,12 +118,12 @@ mới chạy migration.
 
 | Sự cố | Dấu hiệu nhận biết | Cách xử lý (chép–dán từng khối, theo thứ tự) | Thời gian |
 |---|---|---|---|
-| **Nạp nhầm file** (nhầm ngày, nhầm file, nạp trùng) | Vào trang `/health` thấy số dòng hoặc tổng tiền sai ngay sau khi vừa nạp | 1) Tìm lần nạp vừa rồi:<br>`python -c "from kome.db import connect; [print(r) for r in connect().execute(\"SELECT batch_id, spec_name, source_file, loaded_at FROM meta.ingest_batch WHERE undone_at IS NULL ORDER BY loaded_at DESC LIMIT 5\").fetchall()]"`<br>2) Ghi lại `batch_id` của lần nạp sai, rồi hoàn tác (thay `123` bằng số đó):<br>`python -c "from kome.db import connect; from kome.pipeline import undo_batch; c = connect(); undo_batch(c, 123); print('da hoan tac')"`<br>3) Nạp lại đúng file qua trang nội bộ như bình thường | ~10 giây tìm + hoàn tác |
+| **Nạp nhầm file** (nhầm ngày, nhầm file, nạp trùng) | Vào trang `/health` thấy số dòng hoặc tổng tiền sai ngay sau khi vừa nạp | 1) Xem các lần nạp gần nhất:<br>`python scripts/hoan_tac.py`<br>2) Ghi số lô của lần nạp sai rồi hoàn tác (thay `123`):<br>`python scripts/hoan_tac.py 123`<br>3) Nạp lại đúng file qua trang nội bộ như bình thường | ~10 giây tìm + hoàn tác |
 | **Thiếu một ngày dữ liệu** (hôm đó không ai kéo–thả: nghỉ ốm, quên, máy hỏng) | Vào trang `/health` thấy dải **vàng** `⚠️ Thiếu N ngày làm việc` kèm danh sách ngày | 1) Xem ngày bị liệt kê có phải ngày nghỉ lễ Nhật / công ty nghỉ không — nếu đúng thì bỏ qua, hệ thống chỉ biết thứ Bảy–Chủ nhật, không biết ngày lễ<br>2) Nếu là ngày làm việc thật: mở OBC, xuất lại `売上伝票データ` của **đúng ngày đó**, kéo–thả vào trang nạp như bình thường<br>3) Tải lại `/health`, dải vàng phải biến mất | ~3 phút/ngày |
 | **OBC đổi tên cột** (nạp file báo lỗi "thiếu cột" / cổng 2 chặn) | Trang nạp báo đỏ, nêu rõ tên cột thiếu | 1) Mở file cấu hình bằng Notepad, ví dụ:<br>`notepad config/files.yml`<br>2) Sửa tên cột OBC mới cho khớp cột hệ thống đang có (không đổi tên cột hệ thống, chỉ đổi tên cột OBC bên trái dấu `:`), lưu lại<br>3) Chạy lại toàn bộ kiểm tra để chắc chắn không hỏng gì khác:<br>`python -m pytest tests/ -v`<br>4) Nếu không chắc sửa đúng chỗ, đừng tự sửa — gửi ảnh chụp lỗi kèm file Excel mới cho AI bảo trì | ~5 phút (tự sửa) |
 | **Số không khớp OBC** (báo cáo trong app lệch số so với sổ OBC) | Đối chiếu cuối tháng thấy tổng tiền lệch | Không cần xoá gì cả — xuất lại **đúng file đó** (cả kỳ, không xuất riêng phần lệch) từ OBC rồi kéo–thả lại vào trang nội bộ. Hệ thống tự nhận theo mã băm nội dung: file y hệt cũ → tự bỏ qua; file có sửa → tự ghi đè đúng dòng thay đổi | ~2 phút |
 | **CSDL đầy 500 MB** (Supabase báo "storage full", trang nạp báo lỗi ghi dữ liệu) | Nạp file báo lỗi kết nối/ghi dữ liệu, hoặc email cảnh báo từ Supabase | 1) Đăng nhập https://supabase.com/dashboard bằng tài khoản công ty<br>2) Chọn dự án KOME → **Settings → Billing** → nâng cấp lên gói trả phí<br>**Không tự ý xoá dữ liệu để giải phóng chỗ** — dữ liệu kế toán không được xoá | ~5 phút (cần thẻ thanh toán công ty) |
-| **Mất sạch CSDL** (Supabase báo dự án bị xoá/hỏng, hoặc không kết nối được nữa) | Mọi trang trong app đều báo lỗi kết nối CSDL | 1) Tạo CSDL Postgres mới trên Supabase (chọn **Session Pooler**, IPv4, cổng **5432** — không dùng cổng 6543), lấy chuỗi kết nối mới<br>2) Dựng lại cấu trúc bảng trên CSDL mới:<br>`python -c "from kome.db import connect; from db.migrate import apply_all; from pathlib import Path; [print(x) for x in apply_all(connect('<CHUOI_KET_NOI_MOI>'), Path('db/migrations'))]"`<br>3) Nếu có bản sao lưu gần nhất trong thư mục `backups/` (hoặc trên OneDrive), đổ dữ liệu vào CSDL mới đó — **luôn dùng chuỗi kết nối MỚI**, không phải `DATABASE_URL` cũ:<br>`python -c "from ops.restore_check import restore; print(restore('backups/kome_YYYYMMDD.zip', '<CHUOI_KET_NOI_MOI>'))"`<br>(đổi `kome_YYYYMMDD.zip` thành tên file sao lưu mới nhất, xem trong thư mục `backups/`)<br>4) Kiểm tra kết quả `restore()` in ra khớp số dòng kỳ vọng, rồi mới cập nhật `DATABASE_URL` trong `.env` thành chuỗi kết nối mới<br>5) Nếu **không có** bản sao lưu nào, nạp lại từ đầu bằng toàn bộ file Excel gốc đã lưu trên OneDrive, theo đúng thứ tự ngày, qua trang nội bộ như nạp bình thường | ~1 giờ (có sao lưu) |
+| **Mất sạch CSDL** (Supabase báo dự án bị xoá/hỏng, hoặc không kết nối được nữa) | Mọi trang trong app đều báo lỗi kết nối CSDL | 1) Tạo CSDL Postgres mới trên Supabase (chọn **Session Pooler**, IPv4, cổng **5432** — không dùng cổng 6543), lấy chuỗi kết nối mới<br>2) **Sửa `DATABASE_URL` trong file `.env`** thành chuỗi kết nối mới — làm bước này TRƯỚC thì mọi lệnh sau chạy được như bình thường, không phải dán chuỗi vào đâu cả<br>3) Dựng lại cấu trúc bảng:<br>`python db/migrate.py`<br>4) Nếu có bản sao lưu trong `backups/`, đổ dữ liệu vào:<br>`python -m ops.restore_check` (kiểm tra khôi phục được trước), rồi khôi phục thật theo hướng dẫn cuối sổ tay<br>5) Nếu **không có** bản sao lưu nào, nạp lại từ đầu bằng toàn bộ file Excel gốc đã lưu trên OneDrive, theo đúng thứ tự ngày, qua trang nội bộ như nạp bình thường | ~1 giờ (có sao lưu) |
 | **Web app không truy cập được** (trang nạp/health không mở được) | Trình duyệt báo không kết nối được tới trang nội bộ | **Không làm gì với việc nạp dữ liệu** — việc xuất file từ OBC và lưu trên OneDrive vẫn diễn ra bình thường, không phụ thuộc web app. Báo cho AI bảo trì để khởi động lại máy chủ web; công việc kế toán không bị gián đoạn | — |
 
 ---
@@ -164,7 +160,7 @@ Chạy hằng đêm (thủ công hoặc qua lịch hẹn giờ Windows), giữ 3
 theo ngày + 12 bản cuối tháng (ngày lớn nhất trong tháng, khớp với chốt sổ):
 
 ```bash
-python -c "from ops.backup import dump, prune; import os, pathlib; dump(os.environ['DATABASE_URL'], pathlib.Path('backups')); prune(pathlib.Path('backups'))"
+python -m ops.backup
 ```
 
 File sao lưu nằm trong thư mục `backups/` (không đưa vào git — xem
@@ -189,7 +185,7 @@ lần duy nhất** (tạo tác vụ chạy mỗi ngày lúc 19:00 — sau giờ 
 file 13:30 là an toàn, đổi `19:00` nếu muốn giờ khác):
 
 ```bash
-schtasks /create /sc daily /st 19:00 /tn KomeBackup /tr "cmd /c cd /d C:\Antigravity\kome-data && python -c \"from ops.backup import dump, prune; import os, pathlib; dump(os.environ['DATABASE_URL'], pathlib.Path('backups')); prune(pathlib.Path('backups'))\""
+schtasks /create /sc daily /st 19:00 /tn KomeBackup /tr "cmd /c cd /d C:\Antigravity\kome-data && python -m ops.backup"
 ```
 
 Kiểm tra tác vụ đã tạo đúng chưa:
@@ -222,7 +218,7 @@ có thật sự chạy hay không.
 không bao giờ vào CSDL thật:
 
 ```bash
-python -c "from ops.restore_check import verify; import os, pathlib; print(verify(sorted(pathlib.Path('backups').glob('*.zip'))[-1], os.environ['DATABASE_URL_TEST']))"
+python -m ops.restore_check
 ```
 
 Kết quả phải là `{'ok': True, 'mismatches': {}, ...}`. Một bản sao lưu chưa
