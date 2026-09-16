@@ -39,7 +39,7 @@ giờ gọi `restore()` thẳng vào `DATABASE_URL` hiện có.
 ## Sao lưu hằng đêm
 
 Chạy hằng đêm (thủ công hoặc qua lịch hẹn giờ Windows), giữ 30 bản gần nhất
-theo ngày + 12 bản đầu tháng:
+theo ngày + 12 bản cuối tháng (ngày lớn nhất trong tháng, khớp với chốt sổ):
 
 ```bash
 python -c "from ops.backup import dump, prune; import os, pathlib; dump(os.environ['DATABASE_URL'], pathlib.Path('backups')); prune(pathlib.Path('backups'))"
@@ -48,6 +48,53 @@ python -c "from ops.backup import dump, prune; import os, pathlib; dump(os.envir
 File sao lưu nằm trong thư mục `backups/` (không đưa vào git — xem
 `.gitignore`). Chép thư mục này lên OneDrive định kỳ để có bản sao ở nơi
 khác.
+
+**Trang `/health` tự cảnh báo nếu quên sao lưu**: nếu bản sao lưu mới nhất
+cũ hơn 36 giờ (hoặc chưa có bản nào), đầu trang hiện dải đỏ
+`⚠️ Chưa sao lưu ... — chạy sao lưu ngay` kèm sẵn lệnh ở trên để chép–dán.
+Còn mới thì hiện dòng xanh `✅ Sao lưu gần nhất: ...`. Mở trang này mỗi ngày
+là đủ để biết sao lưu có đang chạy thật hay không — không cần nhớ, không
+cần dò log.
+
+### Bật sao lưu tự động (khuyến nghị — chạy một lần)
+
+Việc chạy tay mỗi đêm rất dễ quên. Windows có sẵn tiện ích **Task Scheduler**
+để tự chạy lệnh sao lưu vào một giờ cố định, không cần cài thêm gì. Bật một
+lần rồi thôi — không cần đụng lại trừ khi máy đổi vị trí thư mục dự án.
+
+Mở **Git Bash** hoặc **PowerShell** tại thư mục dự án, chạy lệnh sau **một
+lần duy nhất** (tạo tác vụ chạy mỗi ngày lúc 19:00 — sau giờ kế toán xuất
+file 13:30 là an toàn, đổi `19:00` nếu muốn giờ khác):
+
+```bash
+schtasks /create /sc daily /st 19:00 /tn KomeBackup /tr "cmd /c cd /d C:\Antigravity\kome-data && python -c \"from ops.backup import dump, prune; import os, pathlib; dump(os.environ['DATABASE_URL'], pathlib.Path('backups')); prune(pathlib.Path('backups'))\""
+```
+
+Kiểm tra tác vụ đã tạo đúng chưa:
+
+```bash
+schtasks /query /tn KomeBackup
+```
+
+Muốn chạy thử ngay để xem có lỗi không (không cần đợi tới giờ hẹn):
+
+```bash
+schtasks /run /tn KomeBackup
+```
+
+Muốn tắt hẳn (ví dụ đổi cách sao lưu khác sau này):
+
+```bash
+schtasks /delete /tn KomeBackup /f
+```
+
+**Lưu ý quan trọng cho người không rành kỹ thuật:** Task Scheduler chỉ chạy
+được khi **máy tính đang bật và không ở chế độ ngủ (sleep)** vào đúng giờ
+hẹn — nó không tự đánh thức máy dậy để chạy. Nếu máy tắt hoặc ngủ lúc 19:00,
+sao lưu hôm đó sẽ không chạy và không có gì báo cho biết ngay lúc đó. Đây
+chính là lý do dải cảnh báo trên trang `/health` (ở trên) vẫn cần thiết dù
+đã bật lịch tự động: mở trang mỗi ngày là cách duy nhất để biết chắc sao lưu
+có thật sự chạy hay không.
 
 **Mỗi quý phải thử khôi phục một lần** vào CSDL thử nghiệm (`DATABASE_URL_TEST`),
 không bao giờ vào CSDL thật:

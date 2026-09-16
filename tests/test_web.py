@@ -1,3 +1,5 @@
+import os
+import time
 from pathlib import Path
 from fastapi.testclient import TestClient
 from db.migrate import apply_all
@@ -9,6 +11,29 @@ def test_trang_suc_khoe_mo_duoc(conn, test_db_url):
     r = client.get("/health")
     assert r.status_code == 200
     assert "在庫一覧" in r.text
+
+def test_health_canh_bao_khi_sao_luu_qua_han(conn, test_db_url, tmp_path, monkeypatch):
+    """Trang /health phải tự cảnh báo nếu bản sao lưu mới nhất cũ hơn 36 giờ,
+    và hết cảnh báo khi có bản mới — sai phải hiện ngay lúc người ta còn ngồi đó."""
+    apply_all(conn, Path("db/migrations"))
+    monkeypatch.setenv("BACKUP_DIR", str(tmp_path))
+    client = TestClient(create_app(db_url=test_db_url))
+
+    z = tmp_path / "kome_20260101.zip"
+    z.write_bytes(b"x")
+    old = time.time() - 40 * 3600          # 40 giờ trước -> quá hạn
+    os.utime(z, (old, old))
+
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert "Chưa sao lưu" in r.text
+
+    new = time.time() - 1 * 3600           # 1 giờ trước -> còn mới
+    os.utime(z, (new, new))
+
+    r = client.get("/health")
+    assert "Chưa sao lưu" not in r.text
+    assert "Sao lưu gần nhất" in r.text
 
 def test_upload_file_hong_tra_ve_loi_de_hieu(conn, test_db_url):
     apply_all(conn, Path("db/migrations"))

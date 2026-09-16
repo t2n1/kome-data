@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from kome.db import connect
 from kome.pipeline import ingest, undo_batch, SPECS
+from ops.backup import backup_status
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -13,6 +14,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
     """db_url=None => lấy DATABASE_URL. Test LUÔN truyền DATABASE_URL_TEST."""
     app = FastAPI(title="KOME — nạp dữ liệu")
     archive_dir = Path(os.environ.get("ARCHIVE_DIR", "./raw_archive"))
+    backup_dir = Path(os.environ.get("BACKUP_DIR", "./backups"))
     open_conn = lambda: connect(db_url)
 
     @app.get("/", response_class=HTMLResponse)
@@ -46,7 +48,10 @@ def create_app(db_url: str | None = None) -> FastAPI:
              "total": seen[k][3] if k in seen else 0}
             for k, s in SPECS.items()
         ]
-        return TEMPLATES.TemplateResponse(request, "health.html", {"status": status})
+        backup = backup_status(backup_dir)
+        return TEMPLATES.TemplateResponse(
+            request, "health.html", {"status": status, "backup": backup}
+        )
 
     @app.post("/undo/{batch_id}")
     def undo(batch_id: int):

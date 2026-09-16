@@ -62,8 +62,29 @@ def dump(database_url: str, out_dir: Path) -> Path:
     return path
 
 
+def backup_status(out_dir: Path, max_age_hours: float = 36) -> dict:
+    """Trạng thái sao lưu mới nhất trong out_dir — dùng cho dải cảnh báo trên
+    trang /health.
+
+    'Mới nhất' xét theo thời điểm sửa đổi file (mtime), không theo ngày mã
+    hoá trong tên file `kome_YYYYMMDD.zip` — file có thể được chép lại/ghi đè
+    mà không đổi tên. Trả về {"stale": bool, "last": datetime | None}.
+    """
+    out_dir = Path(out_dir)
+    files = (
+        sorted(out_dir.glob("kome_*.zip"), key=lambda p: p.stat().st_mtime)
+        if out_dir.exists() else []
+    )
+    if not files:
+        return {"stale": True, "last": None}
+    last = datetime.fromtimestamp(files[-1].stat().st_mtime, tz=timezone.utc)
+    age_hours = (datetime.now(timezone.utc) - last).total_seconds() / 3600
+    return {"stale": age_hours > max_age_hours, "last": last}
+
+
 def prune(out_dir: Path, keep_daily: int = 30, keep_monthly: int = 12) -> list[Path]:
-    """Giữ N bản gần nhất theo ngày + bản đầu mỗi tháng trong M tháng. Xoá phần còn lại."""
+    """Giữ N bản gần nhất theo ngày + bản CUỐI mỗi tháng (ngày lớn nhất trong
+    tháng, khớp với chốt sổ) trong M tháng. Xoá phần còn lại."""
     files = sorted(Path(out_dir).glob("kome_*.zip"), reverse=True)
     keep = set(files[:keep_daily])
     seen_months: dict[str, Path] = {}
