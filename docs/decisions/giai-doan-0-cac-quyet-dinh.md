@@ -202,3 +202,46 @@ theo sổ tay.
 **Ruling AN: đưa câu kiểm CHECK vào runbook, không chỉ để trong báo cáo sửa lỗi.**
 Vì: migration 010 có thể thất bại trên CSDL thật nếu ở đó đã có dòng valid_to < valid_from. Người chạy
 migration đọc runbook chứ không đọc báo cáo nội bộ của agent.
+
+---
+
+## Sau Giai đoạn 0 — đưa trang lên mạng (2026-09-17)
+
+**Ruling AO: Vercel chỉ chạy bản CHỈ ĐỌC; nạp dữ liệu ở lại máy trong công ty.**
+Chủ sở hữu đã cân nhắc rồi quyết định giữ nguyên kiến trúc này.
+
+Số đo thật, từ 17 tháng dữ liệu trong `core.fact_sales_line`, quy đổi kích thước file theo
+`売上伝票データ_2026年5月~7月` = 101 MB / 92.824 dòng thô (OBC xuất mỗi dòng nghiệp vụ HAI lần:
+`出荷内訳` + `明細按分`):
+
+| Trường hợp | Số dòng | File ước tính | Qua giới hạn 4,5 MB của Vercel? |
+|---|---:|---:|---|
+| Ngày trung bình | 812 | 1,8 MB | ✅ lọt |
+| Ngày bận nhất (2025-04-28) | 2.486 | 5,4 MB | ❌ |
+| Ngày bận nhì (2025-07-28) | 2.344 | 5,1 MB | ❌ |
+| Đối soát tháng (2025-07) | 26.369 | ~57 MB | ❌ gấp 13 lần |
+
+Vì: đề xuất "xuất theo ngày thì file nhẹ, nạp thẳng trên Vercel được" đúng với ngày THƯỜNG nhưng
+sai ở hai chỗ, và cả hai đều sai vào đúng lúc tệ nhất:
+  1. Ngày đông nhất rơi vào CUỐI THÁNG (28/4, 28/7, 21/7) — tức hệ thống chạy ngon 20 ngày rồi
+     hỏng đúng ngày chốt sổ, và người nạp sẽ tưởng mình thao tác sai.
+  2. Đối soát tháng (~57 MB) là cái lưới DUY NHẤT bắt phiếu đỏ và phiếu bị sửa sau. Không có
+     đường nào lách giới hạn cho nó.
+  3. Ổ đĩa serverless là tạm → lớp `raw` (giữ nguyên file Excel gốc để đối chiếu về sau) không
+     tồn tại được, bất kể file to hay nhỏ.
+
+Lý lẽ thực tế đứng sau quyết định: file Excel SINH RA trên máy có cài OBC, và người xuất file lúc
+13:30 đang ngồi ngay tại máy đó. Nạp từ xa chỉ có ích nếu muốn người khác nạp thay ở máy khác —
+hiện không có nhu cầu đó.
+
+Giá nếu sai: nếu sau này cần nạp từ xa thật, đường đi đã rõ — dựng cả ứng dụng lên VPS Vultr sẵn có
+(ổ đĩa thật, không giới hạn 4,5 MB, không giới hạn thời gian chạy) rồi bỏ Vercel. Mã nguồn KHÔNG phải
+sửa dòng nào: bỏ biến `VERCEL` là phần nạp tự hiện lại. Xem `docs/trien-khai-vercel.md` mục 6.
+
+**Ruling AP: một mật khẩu chung, không phải tài khoản riêng từng người.**
+Vì: mối nguy thật ở bước này là người lạ dò trúng địa chỉ, và mật khẩu chung chặn đúng mối nguy đó
+mà không đẻ ra một bảng người dùng phải quản lý trong công ty không có nhân sự IT. Vé đăng nhập không
+có kho phiên ở máy chủ (bắt buộc, để chạy được trên serverless), nên ĐỔI MẬT KHẨU là cách duy nhất
+chặn người đã nghỉ việc — đã ghi vào `docs/runbook.md` và `docs/trien-khai-vercel.md` mục 5.
+Giá nếu sai: khi cần biết AI đã xem gì (nhật ký truy cập, phân quyền theo vai trò) thì phải làm lại
+phần đăng nhập. Chấp nhận được — hiện chưa ai cần.
