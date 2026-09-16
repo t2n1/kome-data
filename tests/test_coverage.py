@@ -76,7 +76,9 @@ def test_nhom_theo_ky_cong_ty_khong_phai_nam_tai_chinh_nhat(conn):
     assert fy["2025-07"] == 2025        # tháng chốt của kỳ trước
     assert fy["2025-08"] == 2026        # ngày đầu kỳ mới
     assert [k.company_fy for k in bang.ky] == [2025, 2026, 2027]
-    assert _ky(bang, 2026).nhan == "Kỳ 2026-07"
+    # Nhãn dùng SỐ KỲ theo cách công ty tự gọi (第7期), không phải năm kết thúc —
+    # xem db/migrations/013_so_ky_ke_toan.sql. Kỳ 7 = 2025-08-01 → 2026-07-31.
+    assert _ky(bang, 2026).nhan == "Kỳ 7 (2025-08 → 2026-07)"
     assert (_ky(bang, 2026).dau, _ky(bang, 2026).cuoi) == (
         date(2025, 8, 1), date(2026, 7, 31))
 

@@ -150,7 +150,8 @@ def test_trang_phu_du_lieu_mo_duoc_va_nhom_theo_ky_cong_ty(conn, test_db_url):
     r = client.get("/phu-du-lieu")
     assert r.status_code == 200
     assert "Bảng phủ dữ liệu" in r.text
-    assert "Kỳ 2026-07" in r.text
+    # Trang phải gọi kỳ theo SỐ mà công ty tự dùng (Kỳ 7), không phải năm kết thúc
+    assert "Kỳ 7 (2025-08 → 2026-07)" in r.text
     assert "1/8 → 31/7" in r.text
     assert "在庫一覧" in r.text and "売上伝票データ" in r.text
     # Tổng kết kỳ
