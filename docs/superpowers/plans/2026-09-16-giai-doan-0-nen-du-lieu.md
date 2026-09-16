@@ -834,7 +834,7 @@ git commit -m "feat: nhật ký nạp, lưu trữ file gốc làm lớp raw, nh�
 ## Task 6: Bảng ngày (`dim_date`) với năm tài chính Nhật
 
 **Files:**
-- Create: `db/migrations/003_dim_date.sql`, `tests/test_dim_date.py`
+- Create: `db/migrations/004_dim_date.sql`, `tests/test_dim_date.py`
 
 **Interfaces:**
 - Produces: bảng `core.dim_date (date_key date PK, year, month, day, fiscal_year, fiscal_quarter, iso_week, day_of_week, is_weekend)`
@@ -869,7 +869,7 @@ Expected: FAIL — `relation "core.dim_date" does not exist`
 - [ ] **Step 3: Viết migration**
 
 ```sql
--- db/migrations/003_dim_date.sql
+-- db/migrations/004_dim_date.sql
 CREATE TABLE core.dim_date (
     date_key       date    PRIMARY KEY,
     year           integer NOT NULL,
@@ -908,7 +908,7 @@ Expected: 2 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add db/migrations/003_dim_date.sql tests/test_dim_date.py
+git add db/migrations/004_dim_date.sql tests/test_dim_date.py
 git commit -m "feat: dim_date với năm tài chính Nhật (4月-3月)"
 ```
 
@@ -919,7 +919,7 @@ git commit -m "feat: dim_date với năm tài chính Nhật (4月-3月)"
 Đây là fact đơn giản nhất và **có mốc đối chiếu thật ¥137.839.071**, nên làm trước để kiểm chứng toàn bộ đường ống.
 
 **Files:**
-- Create: `db/migrations/004_inventory.sql`, `kome/loaders/__init__.py`, `kome/loaders/inventory.py`, `tests/test_load_inventory.py`
+- Create: `db/migrations/005_inventory.sql`, `kome/loaders/__init__.py`, `kome/loaders/inventory.py`, `tests/test_load_inventory.py`
 
 **Interfaces:**
 - Consumes: `kome.reader.read`, `kome.config.FileSpec`
@@ -985,7 +985,7 @@ Expected: FAIL — `relation "core.fact_inventory_daily" does not exist`
 - [ ] **Step 3: Viết migration**
 
 ```sql
--- db/migrations/004_inventory.sql
+-- db/migrations/005_inventory.sql
 CREATE TABLE core.dim_warehouse (
     warehouse_code text PRIMARY KEY,
     warehouse_name text NOT NULL,
@@ -1072,7 +1072,7 @@ Expected: 4 passed — **¥137.839.071 khớp**
 - [ ] **Step 6: Commit**
 
 ```bash
-git add db/migrations/004_inventory.sql kome/loaders/ tests/test_load_inventory.py
+git add db/migrations/005_inventory.sql kome/loaders/ tests/test_load_inventory.py
 git commit -m "feat: nạp tồn kho, khớp mốc ¥137.839.071 trên 177 dòng / 2 kho"
 ```
 
@@ -1351,7 +1351,7 @@ git commit -m "feat: trang kéo-thả, trang kiểm tra sức khoẻ, hoàn tác
 > **⚠️ CHẶN:** task này cần file mẫu `得意先全情報` bản **đầy đủ 317 cột** xuất theo mẫu hằng ngày (A1 trong đặc tả). Chưa có file thì không làm được ánh xạ cột.
 
 **Files:**
-- Create: `db/migrations/005_dim_customer.sql`, `kome/loaders/customer.py`, `tests/test_load_customer.py`
+- Create: `db/migrations/006_dim_customer.sql`, `kome/loaders/customer.py`, `tests/test_load_customer.py`
 - Modify: `config/files.yml` (thêm mục `tokuisaki`)
 
 **Interfaces:**
@@ -1431,7 +1431,7 @@ Expected: FAIL — `relation "core.dim_customer" does not exist`
 - [ ] **Step 3: Viết migration**
 
 ```sql
--- db/migrations/005_dim_customer.sql
+-- db/migrations/006_dim_customer.sql
 CREATE TABLE core.dim_customer (
     customer_sk           bigserial PRIMARY KEY,
     customer_code         text NOT NULL,
@@ -1534,7 +1534,7 @@ Expected: ~2.080 dòng; chạy lại cùng file → `skipped`; nạp bản thán
 - [ ] **Step 8: Commit**
 
 ```bash
-git add db/migrations/005_dim_customer.sql kome/loaders/customer.py tests/test_load_customer.py config/files.yml
+git add db/migrations/006_dim_customer.sql kome/loaders/customer.py tests/test_load_customer.py config/files.yml
 git commit -m "feat: dim_customer SCD2, giữ lịch sử đổi hạng và đổi người phụ trách"
 ```
 
@@ -1545,7 +1545,7 @@ git commit -m "feat: dim_customer SCD2, giữ lịch sử đổi hạng và đ�
 > **⚠️ CHẶN:** cần file mẫu `売上伝票データ` xuất theo mẫu hằng ngày (A1).
 
 **Files:**
-- Create: `db/migrations/006_fact_sales.sql`, `kome/loaders/sales.py`, `tests/test_load_sales.py`
+- Create: `db/migrations/007_fact_sales.sql`, `kome/loaders/sales.py`, `tests/test_load_sales.py`
 - Modify: `config/files.yml`, `kome/pipeline.py`
 
 **Interfaces:**
@@ -1613,7 +1613,7 @@ Expected: FAIL — `relation "core.fact_sales_line" does not exist`
 - [ ] **Step 3: Viết migration**
 
 ```sql
--- db/migrations/006_fact_sales.sql
+-- db/migrations/007_fact_sales.sql
 CREATE TABLE core.fact_sales_line (
     slip_no               text          NOT NULL,
     line_seq              integer       NOT NULL,
@@ -1715,7 +1715,7 @@ Expected: `doanh_thu = 390126850`, `lai_gop = 114315334`
 - [ ] **Step 7: Commit**
 
 ```bash
-git add db/migrations/006_fact_sales.sql kome/loaders/sales.py tests/test_load_sales.py config/files.yml kome/pipeline.py
+git add db/migrations/007_fact_sales.sql kome/loaders/sales.py tests/test_load_sales.py config/files.yml kome/pipeline.py
 git commit -m "feat: nạp fact_sales_line, khớp mốc quý ¥390.126.850 / lãi gộp ¥114.315.334"
 ```
 
@@ -1724,7 +1724,7 @@ git commit -m "feat: nạp fact_sales_line, khớp mốc quý ¥390.126.850 / l�
 ## Task 11: Master data còn lại (loader chung theo cấu hình)
 
 **Files:**
-- Create: `db/migrations/007_masters.sql`, `kome/loaders/master.py`, `tests/test_load_master.py`
+- Create: `db/migrations/008_masters.sql`, `kome/loaders/master.py`, `tests/test_load_master.py`
 - Modify: `config/files.yml` (thêm `shohin`, `shiiresaki`, `chokusousaki`, `tanka`)
 
 **Interfaces:**
@@ -1765,10 +1765,10 @@ def test_ma_giu_so_khong_dau(conn):
 Run: `pytest tests/test_load_master.py -v`
 Expected: FAIL — `relation "core.dim_supplier" does not exist`
 
-- [ ] **Step 3: Viết migration `007_masters.sql`**
+- [ ] **Step 3: Viết migration `008_masters.sql`**
 
 ```sql
--- db/migrations/007_masters.sql
+-- db/migrations/008_masters.sql
 CREATE TABLE core.dim_supplier (
     supplier_code text PRIMARY KEY,
     supplier_name text,
@@ -1870,7 +1870,7 @@ Expected: `商品データ` 232 dòng · `仕入先` 50 · `直送先` 1.833 · 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add db/migrations/007_masters.sql kome/loaders/master.py tests/test_load_master.py config/files.yml kome/pipeline.py
+git add db/migrations/008_masters.sql kome/loaders/master.py tests/test_load_master.py config/files.yml kome/pipeline.py
 git commit -m "feat: loader chung cho master data điều khiển bằng YAML"
 ```
 
@@ -2010,7 +2010,7 @@ git commit -m "feat: sao lưu hằng đêm, dọn bản cũ, và kiểm tra khô
 Yêu cầu §9.7 của đặc tả. Làm **cuối cùng** vì cần biết đủ tên bảng.
 
 **Files:**
-- Create: `db/migrations/008_roles.sql`, `tests/test_roles.py`
+- Create: `db/migrations/009_roles.sql`, `tests/test_roles.py`
 
 **Interfaces:**
 - Produces: 4 vai trò `kome_ingest`, `kome_app`, `kome_report`, và quyền tương ứng
@@ -2047,7 +2047,7 @@ Expected: FAIL — `role "kome_report" does not exist`
 - [ ] **Step 3: Viết migration**
 
 ```sql
--- db/migrations/008_roles.sql
+-- db/migrations/009_roles.sql
 -- Vai trò KHÔNG có mật khẩu ở đây. Mật khẩu đặt riêng bằng ALTER ROLE
 -- trên bảng điều khiển Supabase, không bao giờ nằm trong git (luật #8).
 DO $$
@@ -2105,7 +2105,7 @@ Rồi đổi `DATABASE_URL` trong `.env` sang `kome_ingest_user`. Tài khoản `
 - [ ] **Step 6: Commit**
 
 ```bash
-git add db/migrations/008_roles.sql tests/test_roles.py
+git add db/migrations/009_roles.sql tests/test_roles.py
 git commit -m "feat: phân quyền 4 tài khoản CSDL, app không ghi được vào core"
 ```
 
