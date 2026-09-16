@@ -37,11 +37,14 @@ Gợi ý: ghép 4 từ tiếng Việt không dấu, ví dụ `bancom-muagao-than
 
 ### b) Chuỗi kết nối CSDL — dùng **cổng 6543**, không phải 5432
 
-Vào Supabase → **Connect** → **Transaction pooler**, chép chuỗi có dạng:
+**Cách nhanh nhất, không cần vào Supabase:** mở file `.env` trong
+`C:\Antigravity\kome-data` bằng Notepad, chép dòng `DATABASE_URL=...`, rồi
+**đổi đúng một chỗ: `:5432` thành `:6543`**. Giữ nguyên mọi thứ khác.
 
-```
-postgresql://postgres.<mã-dự-án>:<mật-khẩu>@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres
-```
+Đã kiểm chứng ngày 2026-09-16 rằng chuỗi đổi kiểu này chạy đúng: hai cổng dùng
+chung một máy chủ và một tên đăng nhập, chỉ khác cách giữ kết nối.
+
+(Nếu muốn lấy từ nguồn: Supabase → **Connect** → **Transaction pooler**.)
 
 Vì sao khác với máy ở công ty (cổng 5432):
 
@@ -50,8 +53,9 @@ Vì sao khác với máy ở công ty (cổng 5432):
 - **6543** trả kết nối lại sau mỗi giao dịch — hợp với Vercel, nơi mỗi lần có
   người mở trang là một tiến trình mới.
 
-Dùng 5432 cho Vercel thì sau vài chục lượt xem sẽ hết chỗ kết nối và trang
-báo lỗi. `kome/db.py` tự tắt câu lệnh chuẩn bị sẵn khi thấy cổng `6543`.
+Dùng sai cổng thì trang hỏng, và hỏng theo kiểu khó đoán nhất: **thử ở máy
+mình thì êm, lên Vercel là lỗi ngay từ lượt xem thứ hai**. `kome/db.py` tự tắt
+câu lệnh chuẩn bị sẵn khi thấy cổng `6543` — đã đo thật, xem ghi chú trong file.
 
 ### c) Tài khoản dùng riêng cho trang web (nên làm)
 
