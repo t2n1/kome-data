@@ -240,6 +240,7 @@ File Excel gốc được lưu trữ làm **lớp `raw`** — xem §6.1.
 | `dim_salesperson` | tách từ đơn bán | **Chỉ 5 `担当者` của OBC** — không gồm người nhập đơn, xem §12.1 |
 | `dim_shipto` | `直送先` | 1.833 điểm |
 | `dim_supplier` | `仕入先` | 50 NCC |
+| `dim_warehouse` | `在庫一覧` | 2 kho — xem §6.7 |
 | `dim_date` | tự sinh | Có 年度 Nhật (4月→3月), tuần, ngày lễ |
 
 **Bảng sự kiện:**
@@ -247,7 +248,7 @@ File Excel gốc được lưu trữ làm **lớp `raw`** — xem §6.1.
 | Bảng | Độ hạt | Ước tính 5 năm |
 |---|---|---:|
 | `fact_sales_line` | 1 dòng = 1 明細 của 1 伝票 | ~1.080.000 dòng |
-| `fact_inventory_daily` | 1 sản phẩm × 1 ngày | ~297.000 dòng |
+| `fact_inventory_daily` | 1 sản phẩm × **1 kho** × 1 ngày | ~230.000 dòng |
 | `fact_payment` | 1 明細 phiếu thu | ~50.000 dòng |
 | `fact_price_list` | 1 sản phẩm × quy cách × mức giá | ~2.000 dòng, có lịch sử |
 
@@ -298,6 +299,33 @@ OBC cho phép sửa và huỷ phiếu cũ. Nếu chỉ xuất `売上日付 = h�
 *(Phương án thay thế nếu OBC hỗ trợ lọc theo `更新日`: xuất theo ngày cập nhật sẽ bắt được cả phiếu cũ vừa sửa — cần kiểm tra.)*
 
 **赤伝 (phiếu đỏ / hàng trả lại):** giữ nguyên số âm, cộng dồn tự nhiên, **không lọc bỏ**. Báo cáo tách riêng chỉ số "hàng trả lại" để nhìn thấy được.
+
+### 6.7 Dữ liệu tồn kho (`在庫一覧`)
+
+Mẫu xuất: `在庫一覧_YYYYMMDD.xlsx`, sheet `在庫一覧表`, **13 cột, header ở dòng 1** (khác file báo cáo — không có 5 dòng rác). Đã khảo sát bản `20260916`: 177 dòng, 142 mã hàng.
+
+| Cột |
+|---|
+| `商品コード` · `商品名` · `荷姿区分コード` · `荷姿区分名` · `倉庫コード` · `倉庫名` · `日本語` · `単位` · `賞味期限` · `売上出荷数量` · `在庫残数` · `在庫単価` · `在庫金額` |
+
+**Độ hạt: `商品コード` + `倉庫コード`** (đã kiểm chứng: 177 khoá, 0 trùng). Thêm `荷姿区分` hoặc `賞味期限` vào khoá cũng không đổi kết quả.
+
+**Hai kho:**
+
+| Mã | Tên | Dòng | Giá trị |
+|---|---|---:|---:|
+| `0001` | 茨城第１倉庫（出荷専用） | 142 | ¥90.460.039 |
+| `1002` | 新・賞味期限用 | 35 | ¥47.379.032 |
+
+Tổng tồn kho ngày 2026-09-16: **¥137.839.071** ≈ **32 ngày giá vốn**.
+
+**Ba luật bắt buộc rút ra từ dữ liệu thật:**
+
+1. **`在庫残数` là số thập phân** (20/177 dòng có phần lẻ, ví dụ `83.75` ケース). Số lượng dùng kiểu `NUMERIC`, **không được ép số nguyên**. Luật bất biến #3 chỉ áp cho *tiền*, không áp cho *số lượng*.
+2. **`在庫残数 × 在庫単価 = 在庫金額` khớp tuyệt đối** trên toàn bộ 177 dòng → dùng luôn làm công thức đối chiếu cho cổng kiểm tra 5.
+3. **`賞味期限` có sẵn ở mức từng lô** → cho phép cảnh báo rủi ro hạn sử dụng theo tiền, xem §8.3 ③.
+
+**Cần xác nhận:** ý nghĩa cột `売上出荷数量` — là số xuất *trong ngày*, hay *luỹ kế*? Ảnh hưởng tới cách tính vòng quay kho.
 
 ---
 
@@ -388,7 +416,7 @@ Quý vừa rồi có **882 khách trong danh bạ không phát sinh đơn nào**
 
 Chỉ làm khi hai báo cáo đầu chứng minh có người dùng hằng ngày:
 
-- **③ Sản phẩm và giá** — ABC theo lãi gộp; mặt hàng tỷ suất đang tụt; **độ phân tán giá bán cùng một mã hàng giữa các khách** (hệ thống có 10 mức `売価No.`, gần như chắc chắn đang có hàng bán dưới mức lẽ ra phải bán); hàng chết ghép tồn kho → vốn đọng.
+- **③ Sản phẩm, giá và tồn kho** — ABC theo lãi gộp; mặt hàng tỷ suất đang tụt; **độ phân tán giá bán cùng một mã hàng giữa các khách** (hệ thống có 10 mức `売価No.`, gần như chắc chắn đang có hàng bán dưới mức lẽ ra phải bán). Phần tồn kho (¥137,8 triệu ≈ 32 ngày giá vốn) gồm: **cảnh báo rủi ro hạn sử dụng theo tiền** (phân nhóm còn <3 / 3-6 / 6-12 / >12 tháng, theo dõi xu hướng hằng ngày để phát hiện lô đang trôi về vùng nguy hiểm); **hàng chết** — còn tồn nhưng không bán được N tháng → vốn đọng; số ngày tồn kho theo từng mã.
 - **④ Người bán hàng** — doanh thu/lãi gộp theo `担当者` kèm **độ phủ**: trong danh sách được giao, bao nhiêu khách thực sự có đơn? Con số 1.119 khách của LAN THANH chỉ có ý nghĩa khi biết bao nhiêu chưa từng được chạm tới.
 - **⑤ Hiệu quả app đặt hàng** — so sánh **258 đang dùng · 855 đã bỏ · phần còn lại** về doanh thu/khách, tần suất, số dòng mỗi đơn, tỷ suất. Nhờ SCD2, so sánh được **chính khách đó trước và sau khi bật app**. Báo cáo này quyết định có nên đầu tư Giai đoạn 3 hay không.
 
@@ -552,7 +580,7 @@ Cũng không nên đặt chung với `sale1.komejapan.com` vì nó đang phục 
 | # | Vấn đề | Ảnh hưởng | Cách xử lý |
 |---|---|---|---|
 | A1 | **Mẫu xuất hằng ngày chưa được chốt trong OBC** | Cao — quyết định toàn bộ ánh xạ cột | Xuất thử 1 ngày, đối chiếu với `config/*.yml` trước khi viết code |
-| A2 | **Mẫu xuất tồn kho chưa khảo sát** | Trung bình | Chưa thấy file mẫu; cần một bản xuất thử |
+| A2 | ~~Mẫu xuất tồn kho chưa khảo sát~~ | — | **✅ ĐÃ GIẢI QUYẾT** — đã khảo sát `在庫一覧_20260916.xlsx`, xem §6.7. Còn một điểm nhỏ: ý nghĩa cột `売上出荷数量` |
 | A3 | OBC có hỗ trợ lọc theo `更新日` không | Thấp | Nếu có thì thay được đối soát tháng |
 | A4 | Đơn từ Apps Script đi vào pipeline Python theo đường nào | Thấp ở GĐ 0+1, cao ở GĐ 2+ | Cần xác nhận trước Giai đoạn 2 |
 | A5 | **Danh sách nhân viên bán hàng lệch giữa OBC và web lên đơn** | Trung bình | Xem bên dưới — cần một bảng ánh xạ |
@@ -603,6 +631,7 @@ Cũng không nên đặt chung với `sale1.komejapan.com` vì nó đang phục 
 - [ ] File hỏng thật (bản 201 dòng, bản 5 cột) bị cổng kiểm tra chặn
 - [ ] Nạp lại được toàn bộ dữ liệu lịch sử từ 2025-02 đến nay
 - [ ] Tổng doanh thu quý 2026-05→07 khớp **¥390.126.850**
+- [ ] Tổng tồn kho ngày 2026-09-16 khớp **¥137.839.071** trên **177 dòng / 2 kho**
 - [ ] Trang kiểm tra sức khoẻ hiển thị đúng kỳ dữ liệu và cảnh báo
 - [ ] Sao lưu hằng đêm chạy được, và **đã thử khôi phục thành công một lần**
 
