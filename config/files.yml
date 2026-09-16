@@ -124,3 +124,115 @@ uriage:
   qty_columns: [case_qty, qty]
   rate_columns: [gross_margin, tax_rate]
   date_columns: [sales_date, billing_date]
+
+shohin:
+  display_name: 商品データ
+  filename_pattern: '^商品データ_(?P<date>\d{8})\.xlsx$'
+  sheet: 商品データ作成
+  header_row: 1
+  min_rows: 100
+  keys: [product_code]
+  columns:
+    商品コード: product_code
+    商品名: product_name
+    日本語: name_ja
+    種別コード: kind_code
+    種別: kind_name
+    食品分類コード: food_category_code
+    食品分類名: food_category_name
+    商品ランク（年間）コード: rank_code
+    商品ランク（年間）名: rank_name
+    独占or競合商品コード: compete_code
+    バーコード: barcode
+    単位: unit
+    入数: case_qty
+    棚番コード: shelf_code
+    導入日（西暦　年　月）: introduced_on
+  code_columns: [product_code, kind_code, food_category_code, rank_code, compete_code, barcode, shelf_code]
+  money_columns: []
+  qty_columns: [case_qty]
+  rate_columns: []
+
+shiiresaki:
+  display_name: 仕入先
+  filename_pattern: '^仕入先_(?P<date>\d{8})\.xlsx$'
+  sheet: 仕入先データ作成
+  header_row: 1
+  min_rows: 20
+  keys: [supplier_code]
+  columns:
+    仕入先コード: supplier_code
+    仕入先名: supplier_name
+  code_columns: [supplier_code]
+  money_columns: []
+  qty_columns: []
+  rate_columns: []
+
+chokusousaki:
+  display_name: 直送先
+  filename_pattern: '^直送先_(?P<date>\d{8})\.xlsx$'
+  sheet: 直送先データ作成
+  header_row: 1
+  min_rows: 500
+  keys: [shipto_code]
+  columns:
+    直送先コード: shipto_code
+    直送先名: shipto_name
+    得意先コード: customer_code
+    郵便番号: postcode
+    都道府県: prefecture
+    市区町村: city
+    番地: address
+    電話番号: phone
+    受注納品期日コード: lead_time_code
+  # 得意先コード CÓ THỂ RỖNG (xem docs/data-linkage.md §3.3) — không phải khoá
+  # nên cổng 3 không chặn, và migration không đặt NOT NULL cho cột này.
+  code_columns: [shipto_code, customer_code, postcode, lead_time_code]
+  money_columns: []
+  qty_columns: []
+  rate_columns: []
+
+# 取引単価データ có 20 cột giá NẰM NGANG (売価No.１..10) — bảng đích
+# core.fact_price_list là DỌC. reader.read() chỉ đổi tên cột theo mapping
+# 1-1 dưới đây (không xoay trục); kome/loaders/price.py mới là nơi xoay
+# ngang -> dọc, nên spec này KHÔNG dùng chung make_loader() với 3 spec trên.
+tanka:
+  display_name: 取引単価データ
+  filename_pattern: '^取引単価データ_(?P<date>\d{8})\.xlsx$'
+  sheet: 取引単価データ作成
+  header_row: 1
+  min_rows: 300
+  keys: [product_code, pack_code]
+  columns:
+    商品コード: product_code
+    荷姿区分コード: pack_code
+    単位原価: unit_cost
+    売価No.１（税抜）: price_ex_01
+    売価No.１（税込）: price_in_01
+    売価No.２（税抜）: price_ex_02
+    売価No.２（税込）: price_in_02
+    売価No.３（税抜）: price_ex_03
+    売価No.３（税込）: price_in_03
+    売価No.４（税抜）: price_ex_04
+    売価No.４（税込）: price_in_04
+    売価No.５（税抜）: price_ex_05
+    売価No.５（税込）: price_in_05
+    売価No.６（税抜）: price_ex_06
+    売価No.６（税込）: price_in_06
+    売価No.７（税抜）: price_ex_07
+    売価No.７（税込）: price_in_07
+    売価No.８（税抜）: price_ex_08
+    売価No.８（税込）: price_in_08
+    売価No.９（税抜）: price_ex_09
+    売価No.９（税込）: price_in_09
+    売価No.10（税抜）: price_ex_10
+    売価No.10（税込）: price_in_10
+  code_columns: [product_code, pack_code]
+  money_columns: [unit_cost,
+                   price_ex_01, price_in_01, price_ex_02, price_in_02,
+                   price_ex_03, price_in_03, price_ex_04, price_in_04,
+                   price_ex_05, price_in_05, price_ex_06, price_in_06,
+                   price_ex_07, price_in_07, price_ex_08, price_in_08,
+                   price_ex_09, price_in_09, price_ex_10, price_in_10]
+  qty_columns: []
+  rate_columns: []

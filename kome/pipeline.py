@@ -6,10 +6,32 @@ import re
 from kome import archive, gates
 from kome.config import load_specs, FileSpec
 from kome.reader import read, ColumnMismatch
-from kome.loaders import inventory, customer, sales
+from kome.loaders import inventory, customer, sales, master, price
 
 SPECS = load_specs(Path("config/files.yml"))
-LOADERS = {"zaiko": inventory.load, "tokuisaki": customer.load, "uriage": sales.load}
+
+# shohin/shiiresaki/chokusousaki: upsert đơn giản theo khoá, không giữ lịch sử
+# -> một loader chung điều khiển bằng cấu hình (kome/loaders/master.py).
+# tanka (取引単価データ) KHÔNG dùng chung được: nguồn có 20 cột giá NẰM NGANG,
+# bảng đích core.fact_price_list là DỌC -> cần loader riêng biết xoay trục
+# (kome/loaders/price.py). Xem ghi chú trong config/files.yml.
+LOADERS = {
+    "zaiko": inventory.load,
+    "tokuisaki": customer.load,
+    "uriage": sales.load,
+    "shohin": master.make_loader(
+        "core.dim_product", ["product_code"],
+        ["product_code", "product_name", "name_ja", "kind_code", "kind_name",
+         "food_category_code", "food_category_name", "rank_code", "rank_name",
+         "compete_code", "barcode", "unit", "case_qty", "shelf_code", "introduced_on"]),
+    "shiiresaki": master.make_loader(
+        "core.dim_supplier", ["supplier_code"], ["supplier_code", "supplier_name"]),
+    "chokusousaki": master.make_loader(
+        "core.dim_shipto", ["shipto_code"],
+        ["shipto_code", "shipto_name", "customer_code", "postcode", "prefecture",
+         "city", "address", "phone", "lead_time_code"]),
+    "tanka": price.load,
+}
 
 # Bảng nào cần dọn khi hoàn tác một lô, theo từng loại file.
 # Thêm loader mới thì BẮT BUỘC thêm mục ở đây, nếu không hoàn tác sẽ sót bảng.
@@ -17,6 +39,10 @@ UNDO_TABLES = {
     "zaiko": ["core.fact_inventory_daily"],
     "tokuisaki": ["core.dim_customer"],
     "uriage": ["core.fact_sales_line"],
+    "shohin": ["core.dim_product"],
+    "shiiresaki": ["core.dim_supplier"],
+    "chokusousaki": ["core.dim_shipto"],
+    "tanka": ["core.fact_price_list"],
 }
 
 # Bảng SCD2: hoàn tác phải mở lại phiên bản trước đó, không chỉ xoá phiên bản
