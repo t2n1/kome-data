@@ -21,9 +21,9 @@ Công ty dùng phần mềm kế toán **OBC 奉行** làm sổ cái chính th�
 | Số dòng bán/ngày | ~843 |
 | Khách trong danh bạ | 2.080 |
 | Khách có phát sinh trong quý | 1.198 |
-| Mã hàng | 232 |
-| Nhà cung cấp | 50 |
-| Điểm giao thẳng (直送先) | 1.833 |
+| Mã hàng | 231 |
+| Nhà cung cấp | 49 |
+| Điểm giao thẳng (直送先) | 1.832 |
 
 Quy mô năm ước tính **¥1,5–1,6 tỷ**.
 
@@ -95,11 +95,11 @@ Thư mục hiện tại: `OneDrive - 株式会社KOME/Desktop/データバック
 
 | File | Kích thước | Ghi chú |
 |---|---|---|
-| `得意先全情報` | 2.081 dòng × **317 cột** | Chứa đủ thuộc tính CRM |
-| `商品データ` | 232 dòng × 194 cột | |
-| `直送先` | 1.833 dòng × 29 cột | |
-| `取引単価データ` | 396 dòng × 44 cột | 10 mức giá + giá vốn |
-| `仕入先` | 50 dòng × 2 cột | |
+| `得意先全情報` | 2.080 dòng × **317 cột** | Chứa đủ thuộc tính CRM |
+| `商品データ` | 231 dòng × 194 cột | |
+| `直送先` | 1.832 dòng × 29 cột | |
+| `取引単価データ` | 395 dòng × 44 cột | 10 mức giá + giá vốn |
+| `仕入先` | 49 dòng × 2 cột | |
 
 **Xuất hằng quý** (`２．３か月ごと/`):
 
