@@ -23,3 +23,8 @@ def test_quantity_keeps_decimals():
 def test_money_is_integer():
     df = read(Path("tests/fixtures/zaiko_ok.xlsx"), SPECS["zaiko"])
     assert df["stock_value"].dtype.kind in "iu"
+
+def test_ma_rong_thanh_chuoi_rong_khong_phai_nan():
+    df = read(Path("tests/fixtures/zaiko_ma_rong.xlsx"), SPECS["zaiko"])
+    assert (df["warehouse_code"] == "").sum() >= 2
+    assert df["warehouse_code"].isna().sum() == 0   # phải là chuỗi rỗng, không phải NaN
