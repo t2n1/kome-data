@@ -8,6 +8,7 @@
   {% if not chi_doc %}
   <a href="/"{% if trang == 'nap' %} class="dang-xem" aria-current="page"{% endif %}>📥 Nạp dữ liệu</a>
   {% endif %}
+  <a href="/bao-cao"{% if trang == 'bao-cao' %} class="dang-xem" aria-current="page"{% endif %}>📊 Báo cáo</a>
   <a href="/health"{% if trang == 'suc-khoe' %} class="dang-xem" aria-current="page"{% endif %}>🩺 Sức khoẻ dữ liệu</a>
   <a href="/phu-du-lieu"{% if trang == 'phu' %} class="dang-xem" aria-current="page"{% endif %}>🗓️ Bảng phủ dữ liệu</a>
   {% if co_mat_khau %}

@@ -6,6 +6,7 @@ from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from kome.config import SPECS
+from kome.bao_cao import tinh_bao_cao, ve_bieu_do
 from kome.coverage import tinh_bang_phu
 from kome.db import connect
 from kome.env import nap_env
@@ -246,6 +247,22 @@ def create_app(db_url: str | None = None) -> FastAPI:
                         "trang": "suc-khoe"})
         except Exception as e:
             return _loi(request, "mở trang sức khoẻ dữ liệu", e, chung)
+
+    @app.get("/bao-cao", response_class=HTMLResponse)
+    def bao_cao(request: Request, ky: int | None = None):
+        """Bảng điều khiển bán hàng. `?ky=` là company_fy (năm KẾT THÚC kỳ),
+        bỏ trống thì lấy kỳ gần nhất có dữ liệu.
+
+        Mọi định nghĩa chỉ số nằm ở schema `mart` (migration 014) — trang này
+        chỉ hiển thị. Xem ghi chú đầu kome/bao_cao.py.
+        """
+        try:
+            with open_conn() as conn:
+                bc = tinh_bao_cao(conn, ky)
+            return _ve(request, "bao_cao.html",
+                       {"bc": bc, "bd": ve_bieu_do(bc.thang), "trang": "bao-cao"})
+        except Exception as e:
+            return _loi(request, "mở trang báo cáo", e, chung)
 
     @app.get("/phu-du-lieu", response_class=HTMLResponse)
     def phu_du_lieu(request: Request):
