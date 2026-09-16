@@ -1,6 +1,9 @@
 from datetime import date
+from pathlib import Path
 import pandas as pd
+from db.migrate import apply_all
 from kome.loaders import customer
+from kome.pipeline import undo_batch
 
 D1 = date(2026, 9, 16)
 D2 = date(2026, 9, 17)
@@ -80,3 +83,61 @@ def test_gia_tri_rong_on_dinh_qua_cac_lan_nap(conn, batch):
     row2.loc[0, "address"] = float("nan")
     r2 = customer.load(conn, row2, D2, batch(2))
     assert r2["inserted"] == 0 and r2["unchanged"] == 1
+
+
+def _batch_tokuisaki(conn, n: int) -> int:
+    """Như fixture batch(), nhưng spec_name='tokuisaki' — UNDO_SCD2 tra theo
+    spec_name nên test hoàn tác cần lô thật của loại file này, không dùng
+    spec_name='test' mặc định của fixture batch() trong conftest.py."""
+    row = conn.execute(
+        """INSERT INTO meta.ingest_batch
+             (spec_name, source_file, digest, archived_to, row_count)
+           VALUES ('tokuisaki', 'tokuisaki_test.xlsx', %s, '/tmp/tokuisaki_test.xlsx', 0)
+           RETURNING batch_id""",
+        (f"tokuisaki-digest-{n}",),
+    ).fetchone()
+    conn.commit()
+    return row[0]
+
+
+def _two_df(rank_a="0003"):
+    df = pd.concat([_df(rank=rank_a), _df()], ignore_index=True)
+    df.loc[1, "customer_code"] = "000000000002"
+    return df
+
+
+def test_hoan_tac_lo_scd2_mo_lai_phien_ban_truoc(conn):
+    """Hoàn tác lô SCD2 phải mở lại phiên bản trước đó (is_current=true,
+    valid_to=NULL) — không chỉ xoá phiên bản mới, nếu không khách sẽ mất
+    hẳn dòng is_current và biến mất khỏi báo cáo."""
+    apply_all(conn, Path("db/migrations"))
+    b1 = _batch_tokuisaki(conn, 1)
+    b2 = _batch_tokuisaki(conn, 2)
+    customer.load(conn, _df(rank="0003"), D1, b1)
+    customer.load(conn, _df(rank="0001"), D2, b2)
+    undo_batch(conn, b2)
+    rows = conn.execute(
+        """SELECT rank_code, is_current, valid_to FROM core.dim_customer
+           WHERE customer_code = '000000009292'"""
+    ).fetchall()
+    assert len(rows) == 1                # phiên bản mới đã bị xoá
+    assert rows[0][0] == "0003"           # quay về hạng cũ
+    assert rows[0][1] is True             # đã mở lại
+    assert rows[0][2] is None             # valid_to đã xoá
+
+
+def test_hoan_tac_khong_lam_mat_hoac_trung_is_current(conn):
+    """Một lô vừa đóng khách A (đổi hạng) vừa để khách B không đổi. Sau khi
+    hoàn tác, mỗi khách phải có ĐÚNG MỘT dòng is_current=true — không khách
+    nào mất phiên bản hiện hành, không khách nào có hai."""
+    apply_all(conn, Path("db/migrations"))
+    b1 = _batch_tokuisaki(conn, 1)
+    b2 = _batch_tokuisaki(conn, 2)
+    customer.load(conn, _two_df(rank_a="0003"), D1, b1)
+    customer.load(conn, _two_df(rank_a="0001"), D2, b2)   # A đổi hạng, B không đổi
+    undo_batch(conn, b2)
+    rows = conn.execute(
+        """SELECT customer_code, count(*) FROM core.dim_customer
+           WHERE is_current GROUP BY customer_code ORDER BY 1"""
+    ).fetchall()
+    assert rows == [("000000000002", 1), ("000000009292", 1)]

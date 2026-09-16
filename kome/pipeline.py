@@ -13,10 +13,15 @@ LOADERS = {"zaiko": inventory.load, "tokuisaki": customer.load}
 
 # Bảng nào cần dọn khi hoàn tác một lô, theo từng loại file.
 # Thêm loader mới thì BẮT BUỘC thêm mục ở đây, nếu không hoàn tác sẽ sót bảng.
-# Lưu ý dim_customer là SCD2 (luật #6): undo_batch() chỉ DELETE các dòng có
-# batch_id = lô vừa nạp (tức các dòng MỚI được insert ở lô đó); nó không phục
-# hồi lại is_current của các dòng đã bị đóng valid_to trong cùng lô đó.
 UNDO_TABLES = {"zaiko": ["core.fact_inventory_daily"], "tokuisaki": ["core.dim_customer"]}
+
+# Bảng SCD2: hoàn tác phải mở lại phiên bản trước đó, không chỉ xoá phiên bản
+# mới — nếu không, khách bị đóng valid_to ở lô đó sẽ mất hẳn is_current=true
+# và biến mất khỏi mọi báo cáo. Dạng: spec_name -> (tên bảng, cột khoá nghiệp vụ).
+# Bảng nào có mặt ở đây thì undo_batch() xử lý riêng, KHÔNG xoá lại theo
+# UNDO_TABLES nữa (tránh xoá hai lần) — nhưng vẫn giữ trong UNDO_TABLES để
+# test lưới an toàn set(LOADERS) == set(UNDO_TABLES) còn đúng.
+UNDO_SCD2 = {"tokuisaki": ("core.dim_customer", "customer_code")}
 
 @dataclass
 class IngestResult:
@@ -66,15 +71,45 @@ def undo_batch(conn, batch_id: int) -> int:
     """Xoá dữ liệu của một lô rồi đánh dấu lô đã huỷ. Trả về số dòng đã xoá.
 
     KHÔNG xoá dòng trong meta.ingest_batch — chỉ đặt undone_at (luật bất biến #6).
+
+    Bảng SCD2 (UNDO_SCD2) được xử lý riêng theo 3 bước: (1) lấy trước danh sách
+    khoá nghiệp vụ bị đụng tới ở lô này, (2) xoá phiên bản mới do lô này tạo,
+    (3) mở lại phiên bản còn lại mới nhất của từng khoá đó (is_current=true,
+    valid_to=NULL) — nếu không, khách bị đóng ở lô này sẽ mất hẳn is_current
+    và biến mất khỏi báo cáo mà không ai biết.
     """
     row = conn.execute(
         "SELECT spec_name FROM meta.ingest_batch WHERE batch_id = %s", (batch_id,)
     ).fetchone()
     if row is None:
         return 0
+    spec_name = row[0]
     deleted = 0
-    for table in UNDO_TABLES.get(row[0], []):
+
+    scd2 = UNDO_SCD2.get(spec_name)
+    if scd2:
+        table, key = scd2
+        codes = [
+            r[0] for r in conn.execute(
+                f"SELECT DISTINCT {key} FROM {table} WHERE batch_id = %s", (batch_id,)
+            ).fetchall()
+        ]
         cur = conn.execute(f"DELETE FROM {table} WHERE batch_id = %s", (batch_id,))
         deleted += cur.rowcount
+        if codes:
+            conn.execute(
+                f"""UPDATE {table} d SET is_current = true, valid_to = NULL
+                    FROM (SELECT {key} AS k, max(valid_from) AS vf FROM {table}
+                          WHERE {key} = ANY(%s) GROUP BY {key}) latest
+                    WHERE d.{key} = latest.k AND d.valid_from = latest.vf""",
+                (codes,),
+            )
+
+    for table in UNDO_TABLES.get(spec_name, []):
+        if scd2 and table == scd2[0]:
+            continue   # đã xử lý ở nhánh SCD2 phía trên
+        cur = conn.execute(f"DELETE FROM {table} WHERE batch_id = %s", (batch_id,))
+        deleted += cur.rowcount
+
     archive.undo(conn, batch_id)
     return deleted

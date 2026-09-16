@@ -58,12 +58,11 @@ tokuisaki:
     電話番号: phone
     インボイス登録番号: invoice_reg_no
     スポット区分コード: spot_flag
-  # 郵便番号 không thuộc code_columns: tên cột không kết thúc bằng "コード" (luật #4
-  # chỉ áp cho *コード), và reader.py đã đọc dtype=str nên vẫn giữ TEXT. Fixture ẩn
-  # danh xoá trắng toàn bộ cột này (cùng lô với điện thoại/địa chỉ) — nếu liệt vào
-  # code_columns, cổng 3 "cột mã rỗng toàn bộ" sẽ chặn nhầm bản xuất hợp lệ.
+  # 郵便番号 (postcode) PHẢI là TEXT: mã bưu chính Nhật có số 0 đầu (vùng Hokkaido
+  # bắt đầu bằng 0) — OBC đã có sẵn lỗi mất số 0 đầu ở một số dòng, ép kiểu số sẽ
+  # làm hỏng thêm. code_columns đảm bảo strip + không bị coerce sang số.
   code_columns: [customer_code, rank_code, category_code, order_app_code, salesperson_code,
-                 price_level_code, closing_day_code, billing_customer_code, spot_flag]
+                 price_level_code, closing_day_code, billing_customer_code, spot_flag, postcode]
   money_columns: []
   qty_columns: []
   rate_columns: []
