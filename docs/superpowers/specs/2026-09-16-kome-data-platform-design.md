@@ -325,7 +325,7 @@ Tổng tồn kho ngày 2026-09-16: **¥137.839.071** ≈ **32 ngày giá vốn**
 2. **`在庫残数 × 在庫単価 = 在庫金額` khớp tuyệt đối** trên toàn bộ 177 dòng → dùng luôn làm công thức đối chiếu cho cổng kiểm tra 5.
 3. **`賞味期限` có sẵn ở mức từng lô** → cho phép cảnh báo rủi ro hạn sử dụng theo tiền, xem §8.3 ③.
 
-**Cần xác nhận:** ý nghĩa cột `売上出荷数量` — là số xuất *trong ngày*, hay *luỹ kế*? Ảnh hưởng tới cách tính vòng quay kho.
+**`売上出荷数量` = số xuất *trong ngày*** (đã xác nhận). Vì vậy tính được vòng quay kho trực tiếp từ chuỗi snapshot hằng ngày, không cần suy ra từ dữ liệu bán hàng.
 
 ---
 
