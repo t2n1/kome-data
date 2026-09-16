@@ -28,6 +28,23 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
 4. File báo cáo (`売上明細表`, `元帳`) có 5 dòng rác trước header. File master và `在庫一覧` thì header ở dòng 1.
 5. `担当者` của OBC (5 người) KHÁC người nhập đơn trên web (7 tài khoản, gồm 2 arubaito).
 
+## Bốn vai trò CSDL (Task 13, `db/migrations/009_roles.sql`)
+Luật số một ("OBC chỉ đọc") không chỉ là quy ước trong code — nó là ràng
+buộc của chính CSDL. Bốn vai trò cấp cụm (`NOLOGIN`, mật khẩu đặt tay ngoài
+git — xem `docs/runbook.md`):
+- `kome_ingest` — vai trò của tiến trình nạp dữ liệu. SELECT/INSERT/UPDATE
+  trên `core` và `meta`. Đây là vai trò DUY NHẤT được ghi vào `core`.
+- `kome_app` — vai trò của ứng dụng web. Chỉ SELECT trên `core`/`mart`;
+  đọc-ghi trên `app`. **Không có quyền UPDATE/DELETE trên `core`** — kể cả
+  nếu code lỡ viết nhầm câu lệnh, CSDL sẽ từ chối.
+- `kome_report` — chỉ SELECT, mọi schema (`core`, `mart`, `app`). Dùng cho
+  công cụ báo cáo/BI ngoài ứng dụng chính.
+- `postgres` (superuser hiện tại của Supabase) — chỉ dùng để chạy migration,
+  không dùng cho vận hành thường ngày.
+
+`ALTER DEFAULT PRIVILEGES` trong migration đảm bảo bảng tạo sau này cũng tự
+nhận đúng quyền, không cần GRANT tay mỗi lần thêm bảng mới.
+
 ## Không được tự ý sửa
 - File trong `db/migrations/` đã chạy rồi — chỉ thêm file mới
 - Luật bất biến trong kế hoạch/đặc tả

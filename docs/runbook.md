@@ -15,6 +15,42 @@ set -a; source .env; set +a
 
 ---
 
+## Tạo tài khoản đăng nhập cho từng vai trò
+
+Migration `db/migrations/009_roles.sql` chỉ tạo 4 **vai trò** (`kome_ingest`,
+`kome_app`, `kome_report`, và vai trò cấp quyền tương ứng) — không có mật
+khẩu, không đăng nhập được (`NOLOGIN`). Đây là chủ ý: mật khẩu **không bao
+giờ** được đặt trong file migration hay bất kỳ file nào đưa vào git.
+
+Muốn tài khoản đăng nhập thật (ví dụ để ứng dụng nạp dữ liệu hoặc trang web
+kết nối), làm **tay một lần** trên **SQL Editor của Supabase** (không chạy
+qua migration, không chạy qua psql với `.env`):
+
+```sql
+CREATE USER kome_ingest_user LOGIN PASSWORD '<mật khẩu mạnh>' IN ROLE kome_ingest;
+CREATE USER kome_app_user    LOGIN PASSWORD '<mật khẩu mạnh>' IN ROLE kome_app;
+CREATE USER kome_report_user LOGIN PASSWORD '<mật khẩu mạnh>' IN ROLE kome_report;
+```
+
+Lưu ý:
+
+- Đặt mật khẩu mạnh (sinh ngẫu nhiên, không tái dùng từ nơi khác). Mật khẩu
+  chỉ tồn tại trong bảng điều khiển Supabase và trong biến môi trường của
+  máy chạy ứng dụng — **không bao giờ commit vào git, không dán vào chat,
+  không ghi trong file nào của repo**.
+- Sau khi tạo xong, đổi `DATABASE_URL` trong `.env` sang chuỗi kết nối dùng
+  `kome_ingest_user` (vai trò ghi được vào `core`/`meta`) cho việc nạp dữ
+  liệu hằng ngày. Tài khoản `postgres` (superuser hiện tại) **chỉ dùng khi
+  chạy migration** (`python -m db.migrate` hoặc tương đương), không dùng cho
+  vận hành thường ngày.
+- `kome_app_user` dành cho ứng dụng web (đọc `core`/`mart`, đọc-ghi `app` —
+  **không ghi được vào `core`**, kể cả khi có bug trong code). `kome_report_user`
+  chỉ đọc, dùng cho công cụ báo cáo/BI bên ngoài nếu có.
+- Muốn đổi mật khẩu sau này: `ALTER USER kome_app_user PASSWORD '<mật khẩu mới>';`
+  chạy tay trên SQL Editor, rồi cập nhật biến môi trường tương ứng.
+
+---
+
 | Sự cố | Dấu hiệu nhận biết | Cách xử lý (chép–dán từng khối, theo thứ tự) | Thời gian |
 |---|---|---|---|
 | **Nạp nhầm file** (nhầm ngày, nhầm file, nạp trùng) | Vào trang `/health` thấy số dòng hoặc tổng tiền sai ngay sau khi vừa nạp | 1) Tìm lần nạp vừa rồi:<br>`python -c "from kome.db import connect; [print(r) for r in connect().execute(\"SELECT batch_id, spec_name, source_file, loaded_at FROM meta.ingest_batch WHERE undone_at IS NULL ORDER BY loaded_at DESC LIMIT 5\").fetchall()]"`<br>2) Ghi lại `batch_id` của lần nạp sai, rồi hoàn tác (thay `123` bằng số đó):<br>`python -c "from kome.db import connect; from kome.pipeline import undo_batch; c = connect(); undo_batch(c, 123); print('da hoan tac')"`<br>3) Nạp lại đúng file qua trang nội bộ như bình thường | ~10 giây tìm + hoàn tác |
