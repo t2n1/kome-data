@@ -10,3 +10,4 @@ venv/
 backups/
 raw_archive/
 .superpowers/
+*.egg-info/
