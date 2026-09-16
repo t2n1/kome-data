@@ -1897,11 +1897,26 @@ git commit -m "feat: loader chung cho master data điều khiển bằng YAML"
 
 **Interfaces:**
 - Produces:
-  - `ops.backup.dump(database_url, out_dir) -> Path`
+  - `ops.backup.dump(database_url, out_dir) -> Path` — ghi một file `.zip`
   - `ops.backup.prune(out_dir, keep_daily=30, keep_monthly=12) -> list[Path]`
-  - `ops.restore_check.verify(dump_path, scratch_url) -> dict`
+  - `ops.restore_check.verify(zip_path, scratch_url) -> dict`
 
 Gói Supabase Free **không có sao lưu tự động** → phần này không phải tuỳ chọn.
+
+> ### Không dùng `pg_dump` — dùng thuần Python
+>
+> Máy này **không có `pg_dump`, `psql`, `pg_restore`**, và cài PostgreSQL client chỉ để sao lưu
+> là thêm một thứ nữa phải bảo trì cho một công ty không có IT.
+>
+> Thay vào đó: **cấu trúc bảng đã nằm trong `db/migrations/*.sql` lưu git**, nên bản sao lưu
+> chỉ cần **dữ liệu**. Dùng `COPY ... TO STDOUT WITH CSV HEADER` của psycopg 3 ghi mỗi bảng
+> thành một CSV, gom vào một file `.zip` kèm `manifest.json` (thời điểm, phiên bản migration
+> cuối, số dòng từng bảng).
+>
+> Khôi phục = chạy `apply_all()` để dựng lại cấu trúc, rồi `COPY ... FROM STDIN` đổ dữ liệu về.
+>
+> Được ba thứ: không phụ thuộc chương trình ngoài, chạy được trên bất kỳ máy nào có Python,
+> và file sao lưu nhỏ hơn vì không lặp lại cấu trúc đã có trong git.
 
 - [ ] **Step 1: Viết test**
 
@@ -1912,7 +1927,7 @@ from datetime import date, timedelta
 from ops.backup import prune
 
 def _touch(d: Path, day: date):
-    p = d / f"kome_{day:%Y%m%d}.sql.gz"
+    p = d / f"kome_{day:%Y%m%d}.zip"
     p.write_bytes(b"x")
     return p
 
@@ -1922,7 +1937,36 @@ def test_giu_30_ban_ngay_va_12_ban_thang(tmp_path):
         _touch(tmp_path, today - timedelta(days=i))
     kept = prune(tmp_path, keep_daily=30, keep_monthly=12)
     assert len(kept) <= 42
-    assert (tmp_path / f"kome_{today:%Y%m%d}.sql.gz") in kept
+    assert (tmp_path / f"kome_{today:%Y%m%d}.zip") in kept
+```
+
+Thêm test đi trọn vòng (cần CSDL — chỉ dùng `DATABASE_URL_TEST`):
+
+```python
+def test_sao_luu_roi_khoi_phuc_ra_dung_so_dong(conn, batch, tmp_path):
+    """Nạp dữ liệu thật -> dump -> xoá sạch -> restore -> số dòng phải khớp."""
+    import os, json, zipfile
+    from pathlib import Path
+    from datetime import date
+    from kome.config import load_specs
+    from kome.reader import read
+    from kome.loaders import inventory
+    from ops.backup import dump
+    from ops.restore_check import verify
+
+    S = load_specs(Path("config/files.yml"))
+    df = read(Path("tests/fixtures/zaiko_ok.xlsx"), S["zaiko"])
+    inventory.load(conn, df, date(2026, 9, 16), batch(1))
+
+    url = os.environ["DATABASE_URL_TEST"]
+    z = dump(url, tmp_path)
+    with zipfile.ZipFile(z) as zf:
+        m = json.loads(zf.read("manifest.json"))
+    assert m["tables"]["core.fact_inventory_daily"] == 177
+
+    result = verify(z, url)          # khôi phục vào CHÍNH CSDL thử nghiệm
+    assert result["ok"], result["mismatches"]
+    assert result["counts"]["core.fact_inventory_daily"] == 177
 ```
 
 - [ ] **Step 2: Chạy test, xác nhận FAIL**
@@ -1934,24 +1978,54 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'ops'`
 
 ```python
 # ops/backup.py
-import gzip, shutil, subprocess
-from datetime import date
+import json, zipfile
+from datetime import date, datetime, timezone
 from pathlib import Path
+import psycopg
+
+SCHEMAS = ("core", "mart", "app", "meta")
+
+def list_tables(conn: psycopg.Connection) -> list[str]:
+    """Mọi bảng thật trong 4 schema, sắp theo tên để bản sao lưu ổn định."""
+    rows = conn.execute(
+        """SELECT table_schema || '.' || table_name
+           FROM information_schema.tables
+           WHERE table_schema = ANY(%s) AND table_type = 'BASE TABLE'
+           ORDER BY 1""",
+        (list(SCHEMAS),),
+    ).fetchall()
+    return [r[0] for r in rows]
 
 def dump(database_url: str, out_dir: Path) -> Path:
-    """pg_dump nén gzip. Trả về đường dẫn file vừa tạo."""
+    """Kết xuất DỮ LIỆU từng bảng ra CSV trong một file .zip.
+
+    Không dùng pg_dump: cấu trúc bảng đã nằm trong db/migrations/*.sql lưu git,
+    nên chỉ cần sao lưu dữ liệu. Khôi phục = apply_all() rồi COPY FROM.
+    """
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
-    raw = out_dir / f"kome_{date.today():%Y%m%d}.sql"
-    subprocess.run(["pg_dump", "--no-owner", "--file", str(raw), database_url], check=True)
-    gz = raw.with_suffix(".sql.gz")
-    with raw.open("rb") as fi, gzip.open(gz, "wb") as fo:
-        shutil.copyfileobj(fi, fo)
-    raw.unlink()
-    return gz
+    path = out_dir / f"kome_{date.today():%Y%m%d}.zip"
+    manifest = {"created_at": datetime.now(timezone.utc).isoformat(), "tables": {}}
+    with psycopg.connect(database_url) as conn, \
+         zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for table in list_tables(conn):
+            n = 0
+            with z.open(f"{table}.csv", "w") as out, \
+                 conn.cursor().copy(f"COPY {table} TO STDOUT WITH CSV HEADER") as cp:
+                for chunk in cp:
+                    out.write(bytes(chunk))
+                    n += bytes(chunk).count(b"\n")
+            manifest["tables"][table] = max(n - 1, 0)   # trừ dòng tiêu đề
+        manifest["migrations"] = [
+            r[0] for r in conn.execute(
+                "SELECT filename FROM meta.schema_migration ORDER BY filename"
+            ).fetchall()
+        ]
+        z.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
+    return path
 
 def prune(out_dir: Path, keep_daily: int = 30, keep_monthly: int = 12) -> list[Path]:
     """Giữ N bản gần nhất theo ngày + bản đầu mỗi tháng trong M tháng. Xoá phần còn lại."""
-    files = sorted(Path(out_dir).glob("kome_*.sql.gz"), reverse=True)
+    files = sorted(Path(out_dir).glob("kome_*.zip"), reverse=True)
     keep = set(files[:keep_daily])
     seen_months: dict[str, Path] = {}
     for f in files:
@@ -1969,27 +2043,51 @@ def prune(out_dir: Path, keep_daily: int = 30, keep_monthly: int = 12) -> list[P
 
 ```python
 # ops/restore_check.py
-import gzip, subprocess, tempfile
+import json, zipfile
 from pathlib import Path
 import psycopg
+from db.migrate import apply_all
 
-def verify(dump_path: Path, scratch_url: str) -> dict:
-    """Khôi phục bản sao lưu vào CSDL nháp rồi đếm dòng. Chạy mỗi quý.
+def restore(zip_path: Path, target_url: str) -> dict:
+    """Dựng lại cấu trúc từ migrations rồi đổ dữ liệu CSV về. Trả về số dòng từng bảng.
+
+    KHÔNG BAO GIỜ gọi hàm này trên CSDL thật — nó xoá sạch 4 schema trước khi dựng lại.
+    """
+    with zipfile.ZipFile(zip_path) as z:
+        manifest = json.loads(z.read("manifest.json"))
+        with psycopg.connect(target_url) as conn:
+            conn.execute("DROP SCHEMA IF EXISTS core, mart, app, meta CASCADE")
+            conn.commit()
+            apply_all(conn, Path("db/migrations"))
+            # Đổ theo đúng thứ tự trong manifest để khoá ngoại không vỡ:
+            # meta.ingest_batch trước, rồi dim_*, rồi fact_*
+            order = sorted(manifest["tables"], key=lambda t: (
+                0 if t.startswith("meta.") else 1 if ".dim_" in t else 2, t))
+            for table in order:
+                data = z.read(f"{table}.csv")
+                if data.count(b"\n") <= 1:
+                    continue                      # chỉ có dòng tiêu đề
+                with conn.cursor().copy(
+                    f"COPY {table} FROM STDIN WITH CSV HEADER"
+                ) as cp:
+                    cp.write(data)
+            conn.commit()
+            return {
+                t: conn.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
+                for t in manifest["tables"]
+            }
+
+def verify(zip_path: Path, scratch_url: str) -> dict:
+    """Khôi phục vào CSDL nháp rồi đối chiếu số dòng với manifest. Chạy mỗi quý.
 
     Một bản sao lưu chưa từng được thử khôi phục thì không phải bản sao lưu.
+    Trả về {"ok": bool, "mismatches": {...}, "counts": {...}}.
     """
-    with tempfile.NamedTemporaryFile(suffix=".sql", delete=False) as tmp:
-        with gzip.open(dump_path, "rb") as fi:
-            tmp.write(fi.read())
-        sql_path = Path(tmp.name)
-    subprocess.run(["psql", "--quiet", "--file", str(sql_path), scratch_url], check=True)
-    sql_path.unlink()
-    with psycopg.connect(scratch_url) as conn:
-        return {
-            "sales_lines": conn.execute("SELECT count(*) FROM core.fact_sales_line").fetchone()[0],
-            "customers":   conn.execute("SELECT count(*) FROM core.dim_customer WHERE is_current").fetchone()[0],
-            "inventory":   conn.execute("SELECT count(*) FROM core.fact_inventory_daily").fetchone()[0],
-        }
+    with zipfile.ZipFile(zip_path) as z:
+        expected = json.loads(z.read("manifest.json"))["tables"]
+    actual = restore(zip_path, scratch_url)
+    bad = {t: (expected[t], actual.get(t)) for t in expected if expected[t] != actual.get(t)}
+    return {"ok": not bad, "mismatches": bad, "counts": actual}
 ```
 
 - [ ] **Step 5: Chạy test, xác nhận PASS**
@@ -2000,11 +2098,16 @@ Expected: 1 passed
 - [ ] **Step 6: Chạy thử khôi phục thật một lần**
 
 ```bash
-python -c "from ops.backup import dump; import os,pathlib; print(dump(os.environ['DATABASE_URL'], pathlib.Path('backups')))"
-python -c "from ops.restore_check import verify; import os,pathlib,sys; print(verify(sorted(pathlib.Path('backups').glob('*.gz'))[-1], os.environ['DATABASE_URL_TEST']))"
+set -a; source .env; set +a
+python -c "from ops.backup import dump; import os,pathlib; print(dump(os.environ['DATABASE_URL_TEST'], pathlib.Path('backups')))"
+python -c "from ops.restore_check import verify; import os,pathlib; print(verify(sorted(pathlib.Path('backups').glob('*.zip'))[-1], os.environ['DATABASE_URL_TEST']))"
 ```
 
-Expected: số dòng khớp với CSDL thật. **Đây là tiêu chí hoàn thành bắt buộc của Giai đoạn 0.**
+Expected: `{"ok": True, "mismatches": {}, ...}` — số dòng sau khôi phục khớp manifest.
+**Đây là tiêu chí hoàn thành bắt buộc của Giai đoạn 0.**
+
+> ⚠️ `restore()` **xoá sạch 4 schema** trước khi dựng lại. Chỉ chạy nó trên `DATABASE_URL_TEST`.
+> Không bao giờ truyền `DATABASE_URL` vào `restore()` hay `verify()`.
 
 - [ ] **Step 7: Viết `docs/runbook.md`**
 
