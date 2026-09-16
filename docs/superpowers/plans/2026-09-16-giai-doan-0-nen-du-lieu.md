@@ -30,8 +30,22 @@ Sao chép nguyên văn từ đặc tả. **Mọi task đều ngầm chịu ràng
 | Mốc | Giá trị |
 |---|---|
 | Tồn kho 2026-09-16 | **¥137.839.071** trên **177 dòng / 2 kho / 142 mã hàng** |
-| Doanh thu quý 2026-05→07 | **¥390.126.850** |
-| Lãi gộp quý 2026-05→07 | **¥114.315.334** (29,3%) |
+| Lãi gộp quý 2026-05→07 (`sum(gross_profit)`) | **¥114.315.334** — khớp tuyệt đối |
+| Số dòng bán quý 2026-05→07 | **53.942** sau khi khử trùng |
+| Doanh thu quý (`sum(amount - tax_amount)`) | **¥390.130.067** |
+
+> **Khử trùng bắt buộc — nếu bỏ qua thì doanh thu sai gấp 2,16 lần.**
+> File `売上伝票データ` 271 cột xuất **mỗi dòng hàng hai lần**: một lần dưới mục `出荷内訳`
+> (chi tiết xuất kho), một lần dưới `明細按分` (phân bổ), mang cùng `金額` và cùng `粗利益`.
+> 92.824 dòng thô → **53.942** khoá `伝票No. + 明細行番号`. Cột `明細行番号` là số thứ tự dòng.
+
+> **Lưu ý về ¥3.217:** `売上明細表` báo doanh thu thuần quý là ¥390.126.850, còn tính từ
+> `売上伝票データ` ra ¥390.130.067 — **hai bản xuất của chính OBC lệch nhau ¥3.217** (0,0008%)
+> vì làm tròn thuế ở mức khác nhau: `売上明細表` có cột `税抜純売上高` do OBC làm tròn theo
+> hoá đơn, `売上伝票データ` chỉ có `金額` đã gồm thuế. **Không được tự tính lại rồi coi là đúng** —
+> lưu nguyên `金額` và `消費税額`, định nghĩa doanh thu thuần ở lớp `mart`.
+> Lấy `粗利益` của OBC làm chuẩn cho lợi nhuận vì nó khớp tuyệt đối; nó cũng lệch ¥6.434 so với
+> `(金額 − 消費税額) − 原価`, cùng lý do làm tròn.
 
 ---
 
@@ -2120,7 +2134,7 @@ Chạy `pytest -v` — toàn bộ phải xanh. Ngoài ra:
 - [ ] File hỏng thật (`得意先全情報` bản 201 dòng, bản 5 cột) bị cổng kiểm tra **chặn**
 - [ ] Nạp lại được toàn bộ lịch sử từ 2025-02 đến nay
 - [ ] Tổng tồn kho 2026-09-16 = **¥137.839.071** / 177 dòng / 2 kho
-- [ ] Doanh thu quý 2026-05→07 = **¥390.126.850**, lãi gộp **¥114.315.334**
+- [ ] Quý 2026-05→07: **53.942 dòng** sau khử trùng, `sum(gross_profit)` = **¥114.315.334**, `sum(amount - tax_amount)` = **¥390.130.067**
 - [ ] Trang sức khoẻ hiển thị đúng kỳ dữ liệu và cảnh báo khi thiếu ngày
 - [ ] Sao lưu chạy được và **đã thử khôi phục thành công một lần**
 
