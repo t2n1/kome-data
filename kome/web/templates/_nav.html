@@ -1,0 +1,7 @@
+{# Thanh điều hướng dùng chung. Biến `trang` ('nap' | 'suc-khoe' | 'phu') đánh
+   dấu trang đang xem; trang lỗi không truyền biến này nên không mục nào sáng. #}
+<nav class="dieu-huong">
+  <a href="/"{% if trang == 'nap' %} class="dang-xem" aria-current="page"{% endif %}>📥 Nạp dữ liệu</a>
+  <a href="/health"{% if trang == 'suc-khoe' %} class="dang-xem" aria-current="page"{% endif %}>🩺 Sức khoẻ dữ liệu</a>
+  <a href="/phu-du-lieu"{% if trang == 'phu' %} class="dang-xem" aria-current="page"{% endif %}>🗓️ Bảng phủ dữ liệu</a>
+</nav>

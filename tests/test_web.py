@@ -142,3 +142,118 @@ def test_loi_ngoai_du_kien_hien_tieng_viet_khong_lo_chuoi_ngoai_le(
     assert "connection reset by peer" not in r.text
     assert "RuntimeError" not in r.text
     assert "Traceback" not in r.text
+
+
+def test_trang_phu_du_lieu_mo_duoc_va_nhom_theo_ky_cong_ty(conn, test_db_url):
+    """Trang /phu-du-lieu: nhóm theo kỳ kế toán CỦA CÔNG TY (1/8 → 31/7)."""
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/phu-du-lieu")
+    assert r.status_code == 200
+    assert "Bảng phủ dữ liệu" in r.text
+    assert "Kỳ 2026-07" in r.text
+    assert "1/8 → 31/7" in r.text
+    assert "在庫一覧" in r.text and "売上伝票データ" in r.text
+    # Tổng kết kỳ
+    assert "Doanh thu thuần" in r.text and "Lãi gộp" in r.text
+    # Tháng chốt kỳ phải được đánh dấu
+    assert "chốt kỳ" in r.text
+    # Ràng buộc §2.2.1 và hạn chế của dấu "không có" phải viết ra rõ ràng
+    assert "2025-03-03" in r.text
+    assert "ngoài phạm vi" in r.text
+    assert "cổng kiểm tra chặn" in r.text
+
+
+def test_phu_du_lieu_phan_biet_bang_MAU_NEN_khong_chi_bang_ky_tu(conn, test_db_url):
+    """[IMPORTANT] Trang này để LIẾC MẮT là thấy. Nếu "có" và "không" chỉ khác
+    nhau ở một ký tự nhỏ thì người đọc phải dò từng ô — đúng lúc cần thấy
+    ngay thì lại không thấy."""
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/phu-du-lieu")
+    for lop in ("o-co", "o-khong", "o-ngoai"):
+        assert f"{lop}{{background:" in r.text.replace(" ", ""), f"thiếu màu nền cho .{lop}"
+    assert 'class="o o-ngoai"' in r.text     # tháng trước 2025-03 phải là "ngoài phạm vi"
+
+
+def test_phu_du_lieu_ton_trong_db_url_va_khong_lo_thong_tin_ket_noi(
+        conn, test_db_url, monkeypatch):
+    """[IMPORTANT] Route nào tự gọi connect() không tham số sẽ đọc CSDL THẬT
+    (291.436 dòng dữ liệu công ty) trong khi test tưởng mình đang ở CSDL thử
+    nghiệm. Đặt DATABASE_URL thành rác: trang vẫn phải mở được."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql://khong-ton-tai/khong-ton-tai")
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/phu-du-lieu")
+    assert r.status_code == 200
+    # Thông tin kết nối không được lọt ra HTML — kể cả tên CSDL.
+    assert "postgres" not in r.text
+    assert "kome_test" not in r.text
+    assert "khong-ton-tai" not in r.text
+
+
+def test_ba_trang_deu_co_thanh_dieu_huong_di_qua_lai(conn, test_db_url):
+    """Ba trang phải đi lại được với nhau. Trước đây mỗi trang chỉ có một link
+    lẻ ở cuối, và từ /health không có đường nào sang bảng phủ dữ liệu."""
+    client = TestClient(create_app(db_url=test_db_url))
+    for duong in ("/", "/health", "/phu-du-lieu"):
+        r = client.get(duong)
+        assert r.status_code == 200, duong
+        for link in ('href="/"', 'href="/health"', 'href="/phu-du-lieu"'):
+            assert link in r.text, f"{duong} thiếu {link}"
+
+
+def test_ba_trang_doc_duoc_o_che_do_toi(conn, test_db_url):
+    """[IMPORTANT] Không khai màu nền/màu chữ thì máy để giao diện TỐI sẽ vẽ
+    chữ sẫm trên nền sẫm — trang cảnh báo mà không đọc được thì không cảnh
+    báo được gì. Đã kiểm tận mắt."""
+    client = TestClient(create_app(db_url=test_db_url))
+    for duong in ("/", "/health", "/phu-du-lieu"):
+        text = client.get(duong).text.replace(" ", "")
+        assert 'name="color-scheme"' in client.get(duong).text, duong
+        assert "prefers-color-scheme:dark" in text, duong
+        assert "body{" in text and "background:var(--nen)" in text, duong
+        assert "color:var(--chu)" in text, duong
+
+
+def test_trang_loi_cung_doc_duoc_o_che_do_toi(conn, test_db_url, monkeypatch):
+    import kome.web.app as W
+
+    def no_tung(*a, **kw):
+        raise RuntimeError("hỏng")
+
+    monkeypatch.setattr(W, "ingest", no_tung)
+    client = TestClient(create_app(db_url=test_db_url), raise_server_exceptions=False)
+    with open("tests/fixtures/zaiko_ok.xlsx", "rb") as f:
+        r = client.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", f)})
+    assert r.status_code == 500
+    assert 'name="color-scheme"' in r.text
+    assert "prefers-color-scheme:dark" in r.text.replace(" ", "")
+
+
+def test_health_hien_gach_ngang_thay_vi_yen_0_cho_file_khong_mang_tien(
+        conn, test_db_url):
+    """[IMPORTANT] 商品データ / 仕入先 / 取引単価データ không mang giá trị tiền:
+    total_column để trống CÓ CHỦ Ý. Hiện "¥0" ở cột Tổng tiền đúng về kỹ thuật
+    nhưng người đọc tưởng hệ thống đếm hụt tiền và đi báo một lỗi không có."""
+    import re
+
+    from kome.pipeline import SPECS
+
+    khong_tien = [s.display_name for s in SPECS.values() if s.total_column is None]
+    co_tien = [s.display_name for s in SPECS.values() if s.total_column is not None]
+    assert khong_tien and co_tien
+
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/health")
+    assert r.status_code == 200
+
+    # Ô cuối mỗi dòng của bảng = cột "Tổng tiền".
+    o_cuoi = {}
+    for dong in re.findall(r"<tr>\s*(<td>.*?)</tr>", r.text, re.S):
+        o = re.findall(r"<td>(.*?)</td>", dong, re.S)
+        if len(o) >= 4:
+            o_cuoi[o[0].strip()] = o[-1].strip()
+
+    for ten in khong_tien:
+        assert "—" in o_cuoi[ten] and "¥" not in o_cuoi[ten], \
+            f"{ten}: phải hiện — chứ không phải ¥0, đã hiện {o_cuoi[ten]!r}"
+    for ten in co_tien:
+        assert o_cuoi[ten].startswith("¥"), f"{ten}: vẫn phải hiện số tiền"

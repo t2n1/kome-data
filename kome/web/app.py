@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from kome.coverage import tinh_bang_phu
 from kome.db import connect
 from kome.pipeline import ingest, undo_batch, SPECS
 from ops.backup import backup_status
@@ -68,7 +69,8 @@ def create_app(db_url: str | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def home(request: Request):
         try:
-            return TEMPLATES.TemplateResponse(request, "upload.html", {"results": None})
+            return TEMPLATES.TemplateResponse(
+                request, "upload.html", {"results": None, "trang": "nap"})
         except Exception as e:
             return _loi(request, "mở trang nạp dữ liệu", e)
 
@@ -83,7 +85,8 @@ def create_app(db_url: str | None = None) -> FastAPI:
                         with staged.open("wb") as out:
                             shutil.copyfileobj(f.file, out)
                         results.append(ingest(conn, staged, archive_dir))
-            return TEMPLATES.TemplateResponse(request, "upload.html", {"results": results})
+            return TEMPLATES.TemplateResponse(
+                request, "upload.html", {"results": results, "trang": "nap"})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e)
 
@@ -111,15 +114,44 @@ def create_app(db_url: str | None = None) -> FastAPI:
                 {"name": s.display_name,
                  "last": seen[k][1] if k in seen else None,
                  "rows": seen[k][2] if k in seen else 0,
-                 "total": seen[k][3] if k in seen else 0}
+                 "total": seen[k][3] if k in seen else 0,
+                 # File master / bảng giá KHÔNG mang giá trị tiền: total_column
+                 # để trống CÓ CHỦ Ý (xem kome/config.py). Cột "Tổng tiền" phải
+                 # hiện "—", không phải "¥0" — ¥0 làm người đọc tưởng hệ thống
+                 # đếm hụt tiền và đi báo lỗi không tồn tại.
+                 "co_tien": s.total_column is not None}
                 for k, s in SPECS.items()
             ]
             backup = backup_status(backup_dir)
             return TEMPLATES.TemplateResponse(
-                request, "health.html", {"status": status, "backup": backup, "ky": ky}
+                request, "health.html",
+                {"status": status, "backup": backup, "ky": ky, "trang": "suc-khoe"}
             )
         except Exception as e:
             return _loi(request, "mở trang sức khoẻ dữ liệu", e)
+
+    @app.get("/phu-du-lieu", response_class=HTMLResponse)
+    def phu_du_lieu(request: Request):
+        """Bảng phủ dữ liệu: liếc mắt là thấy tháng/kỳ nào đang thiếu.
+
+        Cách tính nằm ở kome/coverage.py — DÙNG CHUNG với lệnh terminal
+        scripts/bang_phu_du_lieu.py. Trang này chỉ hiển thị.
+
+        open_conn() để tôn trọng create_app(db_url=…): gọi connect() không
+        tham số ở đây sẽ âm thầm đọc CSDL THẬT trong khi test tưởng mình
+        đang dùng CSDL thử nghiệm.
+        """
+        try:
+            with open_conn() as conn:
+                bang = tinh_bang_phu(conn)
+            # Mẫu KHÔNG in `bang.database`: tên CSDL là thông tin kết nối,
+            # còn trang này thì ai mở cũng xem được. Terminal in được vì chỉ
+            # người chạy lệnh mới thấy.
+            return TEMPLATES.TemplateResponse(
+                request, "phu_du_lieu.html", {"bang": bang, "trang": "phu"}
+            )
+        except Exception as e:
+            return _loi(request, "mở trang bảng phủ dữ liệu", e)
 
     @app.post("/undo/{batch_id}")
     def undo(request: Request, batch_id: int):

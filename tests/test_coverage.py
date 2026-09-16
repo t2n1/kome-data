@@ -1,0 +1,200 @@
+"""Bảng phủ dữ liệu — module dùng chung cho trang web và lệnh terminal.
+
+Hai thứ phải luôn đúng ở đây:
+  1. Kỳ kế toán là 1/8 → 31/7 (đọc từ core.dim_date), KHÔNG phải 4月始まり.
+  2. "Ngoài phạm vi" KHÁC "không có dữ liệu" — tháng trước 2025-03-03 không
+     bao giờ được hiện như thiếu dữ liệu.
+"""
+from datetime import date
+
+import pandas as pd
+import pytest
+
+from kome.coverage import CO, KHONG, NGOAI, DAU_DU_LIEU, tinh_bang_phu
+
+
+def _nap_ban(conn, batch, ngay: date, amount=10_000, tax=1_000, gp=3_000):
+    """Một dòng bán hàng thật cho ngày đã cho (qua loader, không SQL tay)."""
+    from kome.loaders import sales
+
+    b = batch(int(ngay.strftime("%Y%m%d")) % 100_000)
+    sales.load(conn, pd.DataFrame([{
+        "slip_no": ngay.strftime("S%Y%m%d"), "line_seq": 1, "sales_date": ngay,
+        "customer_code": "000000009292", "product_code": "XT07", "pack_code": "02",
+        "case_qty": 1, "qty": 6, "unit_price": 5250, "unit_cost": 3210,
+        "amount": amount, "tax_amount": tax, "cost": amount - tax - gp,
+        "gross_profit": gp, "paid_amount": 0, "batch_id": b,
+    }]), ngay, b)
+    conn.commit()
+    return b
+
+
+def _nap_ton(conn, batch, ngay: date, n: int = 1):
+    """n ảnh chụp tồn kho, mỗi ngày một ảnh, bắt đầu từ `ngay`."""
+    from datetime import timedelta
+
+    b = batch(900_000 + ngay.month * 100 + ngay.day)
+    conn.execute(
+        """INSERT INTO core.dim_warehouse (warehouse_code, warehouse_name)
+           VALUES ('01','Kho chinh') ON CONFLICT DO NOTHING"""
+    )
+    for i in range(n):
+        d = ngay + timedelta(days=i)
+        conn.execute(
+            """INSERT INTO core.fact_inventory_daily
+                 (snapshot_date, product_code, warehouse_code, stock_qty, batch_id)
+               VALUES (%s, 'XT07', '01', 10, %s)""",
+            (d, b),
+        )
+    conn.commit()
+    return b
+
+
+def _o(bang, thang: str, khoa: str):
+    for t in bang.thang:
+        if t.thang == thang:
+            for o in t.o:
+                if o.cot.khoa == khoa:
+                    return o
+    raise AssertionError(f"không tìm thấy ô {thang}/{khoa}")
+
+
+def _ky(bang, fy: int):
+    for k in bang.ky:
+        if k.company_fy == fy:
+            return k
+    raise AssertionError(f"không tìm thấy kỳ {fy}")
+
+
+def test_nhom_theo_ky_cong_ty_khong_phai_nam_tai_chinh_nhat(conn):
+    """[IMPORTANT] Tháng 9/2025 thuộc kỳ công ty 2026 (1/8/25 → 31/7/26),
+    còn năm tài chính Nhật chuẩn xếp nó vào 2025. Nếu ai đó thay
+    core.dim_date.company_fy bằng công thức 4月始まり tự viết, test này đỏ."""
+    bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
+    fy = {t.thang: t.company_fy for t in bang.thang}
+    assert fy["2025-09"] == 2026
+    assert fy["2025-07"] == 2025        # tháng chốt của kỳ trước
+    assert fy["2025-08"] == 2026        # ngày đầu kỳ mới
+    assert [k.company_fy for k in bang.ky] == [2025, 2026, 2027]
+    assert _ky(bang, 2026).nhan == "Kỳ 2026-07"
+    assert (_ky(bang, 2026).dau, _ky(bang, 2026).cuoi) == (
+        date(2025, 8, 1), date(2026, 7, 31))
+
+
+def test_thang_truoc_moc_du_lieu_la_NGOAI_PHAM_VI_khong_phai_thieu(conn):
+    """[IMPORTANT] Đặc tả §2.2.1: dữ liệu bán hàng bắt đầu 2025-03-03, trước
+    đó KHÔNG TỒN TẠI — công ty không còn lưu. "Ngoài phạm vi" và "thiếu dữ
+    liệu" đòi hai hành động khác hẳn nhau: một bên là đừng đi tìm, một bên là
+    phải xuất lại file từ OBC ngay. Hiện nhầm thành "thiếu" là bắt người ta
+    đi tìm thứ vĩnh viễn không có."""
+    bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
+    assert DAU_DU_LIEU == date(2025, 3, 3)
+
+    # 2024-08 .. 2025-02: TRỌN tháng nằm trước mốc -> ngoài phạm vi, MỌI cột.
+    for thang in ("2024-08", "2024-12", "2025-02"):
+        for o in next(t for t in bang.thang if t.thang == thang).o:
+            assert o.trang_thai == NGOAI, f"{thang}/{o.cot.khoa}"
+            assert o.ky_hieu == "—"
+
+    # 2025-03 chứa chính ngày 3/3 -> trong phạm vi, thiếu là thiếu THẬT.
+    t = next(t for t in bang.thang if t.thang == "2025-03")
+    assert t.ngoai_pham_vi is False
+    assert all(o.trang_thai == KHONG for o in t.o)
+    assert _o(bang, "2025-03", "ban").ky_hieu == "·"
+
+
+def test_ky_2025_khong_du_12_thang_trong_pham_vi(conn):
+    """Kỳ 2025 (8/2024 → 7/2025) chỉ có 5 tháng trong phạm vi dữ liệu
+    (3→7/2025). Đem tổng kỳ đó so với kỳ 2026 là so 5 tháng với 12 tháng."""
+    bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
+    assert _ky(bang, 2025).du_12_thang is False
+    assert sum(1 for t in _ky(bang, 2025).thang if not t.ngoai_pham_vi) == 5
+    assert _ky(bang, 2026).du_12_thang is True
+
+
+def test_thang_chot_ky_lay_tu_dim_date(conn):
+    """is_fy_end_month của core.dim_date: tháng 7, và chỉ tháng 7."""
+    bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
+    chot = sorted(t.thang for t in bang.thang if t.la_thang_chot_ky)
+    assert chot == ["2025-07", "2026-07"]
+    t = next(t for t in bang.thang if t.thang == "2026-07")
+    assert t.company_fy_month == 12          # tháng thứ 12 của kỳ
+
+
+def test_o_co_du_lieu_ban_hien_dau_tron(conn, batch):
+    _nap_ban(conn, batch, date(2026, 5, 11))
+    bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
+    assert _o(bang, "2026-05", "ban").trang_thai == CO
+    assert _o(bang, "2026-05", "ban").ky_hieu == "●"
+    assert _o(bang, "2026-04", "ban").trang_thai == KHONG
+
+
+def test_cot_ton_kho_hien_SO_NGAY_co_anh_chup(conn, batch):
+    """[IMPORTANT] Tồn kho là dữ liệu HẰNG NGÀY: một tháng có 1 ngày ảnh chụp
+    khác hẳn một tháng có 22 ngày. Dấu ● chung chung giấu mất chuyện đó."""
+    _nap_ton(conn, batch, date(2026, 6, 1), n=3)
+    _nap_ton(conn, batch, date(2026, 7, 1), n=1)
+    bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
+    assert _o(bang, "2026-06", "ton").so_ngay == 3
+    assert _o(bang, "2026-06", "ton").ky_hieu == "3"
+    assert _o(bang, "2026-07", "ton").ky_hieu == "1"
+    assert _o(bang, "2026-08", "ton").so_ngay is None
+
+
+def test_tong_ket_ky_dung_doanh_thu_THUAN_va_ty_suat(conn, batch):
+    """Doanh thu thuần = sum(amount - tax_amount). Lấy thẳng `amount` là cộng
+    cả thuế vào doanh thu, và tỷ suất lãi gộp tụt xuống một cách vô cớ."""
+    _nap_ban(conn, batch, date(2026, 5, 11), amount=110_000, tax=10_000, gp=30_000)
+    _nap_ban(conn, batch, date(2026, 6, 11), amount=220_000, tax=20_000, gp=70_000)
+    # Dòng của kỳ TRƯỚC không được lẫn vào kỳ 2026.
+    _nap_ban(conn, batch, date(2025, 5, 12), amount=55_000, tax=5_000, gp=10_000)
+
+    bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
+    k = _ky(bang, 2026)
+    assert k.doanh_thu_thuan == 300_000
+    assert k.lai_gop == 100_000
+    assert k.ty_suat == pytest.approx(1 / 3)
+    assert _ky(bang, 2025).doanh_thu_thuan == 50_000
+
+
+def test_ty_suat_la_None_khi_chua_co_doanh_thu(conn):
+    """Chưa có doanh thu thì tỷ suất phải là None để màn hình nói "chưa có
+    số" — hiện 0% sẽ bị đọc thành "bán mà không lãi đồng nào"."""
+    bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
+    assert _ky(bang, 2026).ty_suat is None
+    assert _ky(bang, 2026).doanh_thu_thuan == 0
+
+
+def test_lo_da_hoan_tac_khong_tinh_la_co_du_lieu(conn):
+    """File master nhận diện qua tên file trong nhật ký nạp. Lô đã hoàn tác
+    (undone_at) nghĩa là dữ liệu ĐÃ BỊ XOÁ khỏi kho — vẫn tô xanh là nói dối."""
+    for undone, digest in ((None, "con"), ("now()", "da-huy")):
+        conn.execute(
+            f"""INSERT INTO meta.ingest_batch
+                  (spec_name, source_file, digest, archived_to, row_count, undone_at)
+                VALUES ('shohin', '商品データ_20260610.xlsx', %s, '/tmp/x', 1, {undone or 'NULL'})""",
+            (digest,),
+        )
+    conn.execute(
+        """INSERT INTO meta.ingest_batch
+             (spec_name, source_file, digest, archived_to, row_count, undone_at)
+           VALUES ('shiiresaki', '仕入先_20260710.xlsx', 'ncc', '/tmp/x', 1, now())"""
+    )
+    conn.commit()
+
+    bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
+    assert _o(bang, "2026-06", "shohin").trang_thai == CO
+    assert _o(bang, "2026-07", "shiiresaki").trang_thai == KHONG
+
+
+def test_module_khong_tu_mo_ket_noi(conn):
+    """tinh_bang_phu() nhận sẵn kết nối. Hàm nào tự gọi connect() không tham
+    số sẽ âm thầm đọc CSDL THẬT khi trang web chạy với create_app(db_url=…)."""
+    import inspect
+
+    import kome.coverage as C
+
+    src = inspect.getsource(C)
+    assert "connect(" not in src
+    assert "DATABASE_URL" not in src
+    assert list(inspect.signature(C.tinh_bang_phu).parameters)[0] == "conn"

@@ -1,0 +1,62 @@
+{# kome/web/templates/_chung.html
+   Khai báo màu DÙNG CHUNG cho mọi trang.
+
+   Vì sao phải khai tường minh: trước đây các trang không đặt `color-scheme`
+   cũng không đặt màu nền/màu chữ. Máy nào để giao diện TỐI thì trình duyệt
+   vẽ nền tối còn chữ vẫn là màu sẫm mặc định của trang -> chữ sẫm trên nền
+   sẫm, gần như không đọc được. Nguyên tắc nền tảng của hệ thống này là "sai
+   phải THẤY NGAY trên màn hình"; một trang không đọc được thì không cảnh báo
+   được gì cả. Đã kiểm tận mắt ở cả hai chế độ. #}
+<meta name="color-scheme" content="light dark">
+<style>
+ :root{
+   color-scheme: light dark;
+   --nen:#ffffff; --chu:#1b1f23; --chu-nhat:#5a6570;
+   --nen-phu:#f4f6f8; --vien:#d7dce2; --lien-ket:#0b57d0;
+   --ok-nen:#e7f7ef;  --ok-vien:#0a8f5f;  --ok-chu:#05613f;
+   --loi-nen:#fdecec; --loi-vien:#cc0000; --loi-chu:#8f1414;
+   --canh-nen:#fff8e1;--canh-vien:#d9a400;--canh-chu:#7a5200;
+   --ngoai-nen:#e9ebee;--ngoai-chu:#6b737c;
+   --chot-nen:#efe7fb; --chot-vien:#7a5bc0; --chot-chu:#4a2f8f;
+ }
+ @media (prefers-color-scheme: dark){
+   :root{
+     --nen:#14171a; --chu:#e6e9ec; --chu-nhat:#a2acb6;
+     --nen-phu:#1e2328; --vien:#343b43; --lien-ket:#8ab4f8;
+     --ok-nen:#0f2c20;  --ok-vien:#2e9e6b;  --ok-chu:#84e3b5;
+     --loi-nen:#3a1616; --loi-vien:#e07070; --loi-chu:#ffb8b8;
+     --canh-nen:#332a10;--canh-vien:#c79a24;--canh-chu:#f2d894;
+     --ngoai-nen:#23272c;--ngoai-chu:#8d959e;
+     --chot-nen:#241c3a; --chot-vien:#8f79cf; --chot-chu:#cdbdf5;
+   }
+ }
+ html{background:var(--nen)}
+ body{font:16px/1.6 system-ui,sans-serif;background:var(--nen);color:var(--chu);
+      max-width:760px;margin:0 auto;padding:1rem}
+ a{color:var(--lien-ket)}
+ h1,h2,h3{color:var(--chu)}
+ table{border-collapse:collapse;width:100%}
+ td,th{border-bottom:1px solid var(--vien);padding:.5rem;text-align:left}
+ code{background:var(--nen-phu);color:var(--chu);padding:.5rem;display:block;
+      overflow-x:auto;margin-top:.5rem;white-space:pre-wrap}
+ .missing{color:var(--loi-chu);background:var(--loi-nen);font-weight:600;
+          padding:0 .3rem;border-radius:4px}
+ .khong-ap-dung{color:var(--chu-nhat)}
+ .backup-bad,.loi-hop{background:var(--loi-nen);border:1px solid var(--loi-vien);
+   color:var(--loi-chu);padding:.75rem 1rem;border-radius:8px;margin-bottom:1rem}
+ .backup-ok{background:var(--ok-nen);border:1px solid var(--ok-vien);color:var(--ok-chu);
+   padding:.5rem 1rem;border-radius:8px;margin-bottom:1rem}
+ .ngay-thieu{background:var(--canh-nen);border:1px solid var(--canh-vien);
+   color:var(--canh-chu);padding:.75rem 1rem;border-radius:8px;margin-bottom:1rem}
+ .ky{background:var(--nen-phu);border:1px solid var(--vien);padding:.5rem 1rem;
+   border-radius:8px;margin-bottom:1rem}
+ /* Thanh điều hướng chung — ba trang phải đi lại được với nhau, không phải
+    mỗi trang một cái link lẻ ở cuối. */
+ .dieu-huong{display:flex;flex-wrap:wrap;gap:.25rem;border-bottom:1px solid var(--vien);
+   margin:0 0 1.25rem;padding-bottom:.5rem}
+ .dieu-huong a{padding:.4rem .75rem;border-radius:8px;text-decoration:none;
+   border:1px solid transparent}
+ .dieu-huong a:hover{background:var(--nen-phu)}
+ .dieu-huong a.dang-xem{background:var(--nen-phu);border-color:var(--vien);
+   color:var(--chu);font-weight:600}
+</style>

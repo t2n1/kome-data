@@ -1,7 +1,8 @@
 """Bảng phủ dữ liệu: tháng nào có, tháng nào thiếu, theo từng loại file.
 
-Đọc thẳng từ kho dữ liệu chứ không đếm tên file — vì file xuất theo quý chứa 3 tháng,
-nên đếm file không cho biết tháng nào thiếu.
+Cách tính nằm ở `kome/coverage.py` — DÙNG CHUNG với trang web `/phu-du-lieu`.
+File này chỉ lo phần in ra terminal. Đừng tính lại ở đây: hai chỗ tính riêng
+là hai chỗ nói hai con số khác nhau.
 
 Chạy (từ thư mục dự án, chạy được ở cả PowerShell lẫn Git Bash):
     python scripts/bang_phu_du_lieu.py            # CSDL thật
@@ -13,7 +14,7 @@ Ký hiệu:
     ●  có dữ liệu trong kho
     ·  không có dữ liệu
     số  số ngày có ảnh chụp trong tháng (chỉ cột tồn kho)
-    —  ngoài phạm vi dữ liệu (trước 2025-03 công ty không còn lưu)
+    —  ngoài phạm vi dữ liệu (trước 2025-03-03 công ty không còn lưu)
 
 LƯU Ý: dấu `·` KHÔNG phân biệt được hai trường hợp —
   (a) chưa bao giờ xuất file cho tháng đó, và
@@ -23,118 +24,49 @@ file đó từng tồn tại. Muốn biết chắc thì đối chiếu với th�
 """
 import os
 import sys
-from datetime import date
 from pathlib import Path
 
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from kome.env import nap_env
-
-
-
-# Kỳ kế toán công ty: 1/8 → 31/7. Dữ liệu bán bắt đầu 2025-03-03 (xem đặc tả §2.2.1).
-DAU_DU_LIEU = date(2025, 3, 1)
-
-
-def ky_ke_toan(d: date) -> int:
-    """Năm KẾT THÚC kỳ. 2026 = kỳ 1/8/2025 → 31/7/2026."""
-    return d.year + 1 if d.month >= 8 else d.year
-
-
-def thang_trong_khoang(dau: date, cuoi: date) -> list[str]:
-    out, y, m = [], dau.year, dau.month
-    while (y, m) <= (cuoi.year, cuoi.month):
-        out.append(f"{y}-{m:02d}")
-        m += 1
-        if m == 13:
-            y, m = y + 1, 1
-    return out
+from kome.coverage import tinh_bang_phu
 
 
 def main(url: str) -> int:
     with psycopg.connect(url) as c:
-        db = c.execute("SELECT current_database()").fetchone()[0]
+        bang = tinh_bang_phu(c)
 
-        ban = dict(c.execute("""
-            SELECT to_char(sales_date,'YYYY-MM'), count(*)
-            FROM core.fact_sales_line GROUP BY 1""").fetchall())
-        ton = dict(c.execute("""
-            SELECT to_char(snapshot_date,'YYYY-MM'), count(DISTINCT snapshot_date)
-            FROM core.fact_inventory_daily GROUP BY 1""").fetchall())
-
-        # Master: lấy ngày từ TÊN FILE trong nhật ký nạp (file đặt tên _YYYYMMDD)
-        master = {}
-        for spec, src in c.execute("""
-                SELECT spec_name, source_file FROM meta.ingest_batch
-                WHERE undone_at IS NULL""").fetchall():
-            import re
-            m = re.search(r"_(\d{4})(\d{2})\d{2}\.xlsx$", src)
-            if m and spec not in ("zaiko", "uriage"):
-                master.setdefault(spec, set()).add(f"{m.group(1)}-{m.group(2)}")
-
-        chan = {}
-        for spec, src in c.execute("""
-                SELECT spec_name, source_file FROM meta.ingest_batch
-                WHERE undone_at IS NOT NULL""").fetchall():
-            pass  # lô đã huỷ, không tính là có dữ liệu
-
-    # Nhãn cột dùng chữ Latin ngắn: ký tự tiếng Nhật rộng gấp đôi nên cột sẽ lệch
-    # trong terminal. Tên đầy đủ in ở phần chú giải bên dưới bảng.
-    cot = [
-        ("Ban", "ban", "売上伝票データ — bán hàng"),
-        ("Ton", "ton", "在庫一覧 — tồn kho, ô hiện SỐ NGÀY có ảnh chụp"),
-        ("Khach", "tokuisaki", "得意先全情報 — khách hàng"),
-        ("SP", "shohin", "商品データ — sản phẩm"),
-        ("NCC", "shiiresaki", "仕入先 — nhà cung cấp"),
-        ("Giao", "chokusousaki", "直送先 — điểm giao thẳng"),
-        ("Gia", "tanka", "取引単価データ — bảng giá"),
-    ]
-    thieu_bo_nap = [
-        ("入金伝票データ", "phiếu thu", "1 quý (2026-05→07), chưa có bộ nạp"),
-        ("得意先元帳", "sổ cái khách", "1 quý, chưa có bộ nạp"),
-        ("請求先元帳", "sổ cái bên trả", "1 quý, chưa có bộ nạp"),
-        ("他勘定振替明細", "xuất khác / hàng hỏng", "1 quý, chưa có bộ nạp"),
-        ("仕入データ", "MUA HÀNG", "KHÔNG CÓ — lỗ hổng lớn nhất"),
-        ("受注データ", "đơn đặt", "KHÔNG CÓ"),
-    ]
-
-    hom_nay = date.today()
-    thang = thang_trong_khoang(date(2024, 8, 1), hom_nay)
-
-    print(f"BẢNG PHỦ DỮ LIỆU — database: {db}\n")
+    print(f"BẢNG PHỦ DỮ LIỆU — database: {bang.database}\n")
     print("  ● có dữ liệu   · không có   — ngoài phạm vi (công ty không còn lưu)")
     print("  Cột tồn kho hiện SỐ NGÀY có ảnh chụp trong tháng\n")
 
-    head = f"{'Thang':<9}{'Ky':>4}  " + "".join(f"{c[0]:<7}" for c in cot)
+    # Nhãn cột dùng chữ Latin ngắn: ký tự tiếng Nhật rộng gấp đôi nên cột sẽ lệch
+    # trong terminal. Tên đầy đủ in ở phần chú giải bên dưới bảng.
+    head = f"{'Thang':<9}{'Ky':>4}  " + "".join(f"{c.nhan:<7}" for c in bang.cot)
     print(head)
     print("-" * len(head))
 
-    for t in thang:
-        y, m = int(t[:4]), int(t[5:])
-        ngoai = date(y, m, 1) < DAU_DU_LIEU
-        row = f"{t:<9}{ky_ke_toan(date(y, m, 1)):>4}  "
-        for nhan, khoa, _ in cot:
-            if khoa == "ban":
-                v = "●" if ban.get(t) else ("—" if ngoai else "·")
-            elif khoa == "ton":
-                v = str(ton[t]) if ton.get(t) else "·"
-            else:
-                v = "●" if t in master.get(khoa, set()) else "·"
-            row += f"{v:<7}"
+    for t in bang.thang:
+        row = f"{t.thang:<9}{t.company_fy:>4}  "
+        row += "".join(f"{o.ky_hieu:<7}" for o in t.o)
         print(row)
 
+    # Tổng kết từng kỳ (doanh thu thuần / lãi gộp / tỷ suất) CỐ Ý chỉ hiện trên
+    # trang /phu-du-lieu: đầu ra terminal giữ nguyên như trước. Số liệu vẫn nằm
+    # sẵn trong `bang.ky` nếu sau này muốn in ra đây.
     print("\nChu giai cot:")
-    for nhan, _, mo_ta in cot:
-        print(f"  {nhan:<7} {mo_ta}")
+    for c in bang.cot:
+        print(f"  {c.nhan:<7} {c.chu_giai}")
 
     print("\nLoai du lieu CHUA vao kho:")
-    for ja, vi, ghi in thieu_bo_nap:
-        print(f"  {ja}  ({vi}) — {ghi}")
+    for l in bang.thieu_bo_nap:
+        print(f"  {l.ten_obc}  ({l.mo_ta}) — {l.ghi_chu}")
     return 0
 
 
 if __name__ == "__main__":
+    from kome.env import nap_env
+
     nap_env()
     key = "DATABASE_URL_TEST" if "--test" in sys.argv else "DATABASE_URL"
     sys.exit(main(os.environ[key]))

@@ -1,0 +1,97 @@
+<!-- kome/web/templates/phu_du_lieu.html
+     Trang để LIẾC MẮT là thấy: tháng nào / kỳ nào đang thiếu dữ liệu.
+     Trạng thái ô phân biệt bằng MÀU NỀN chứ không chỉ bằng ký tự — người
+     đọc trang này đang quét cả năm bằng mắt, không đọc từng ô.
+     Không in tên CSDL hay bất kỳ thông tin kết nối nào ra HTML. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<title>KOME — bảng phủ dữ liệu</title>
+{% include "_chung.html" %}
+<style>
+ body{max-width:980px}
+ .phu{table-layout:auto}
+ .phu th{background:var(--nen-phu);font-size:.85rem;white-space:nowrap}
+ .phu td,.phu th{text-align:center;border:1px solid var(--vien);padding:.35rem .4rem}
+ .phu td.thang{text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
+ .o{font-weight:700;font-variant-numeric:tabular-nums}
+ .o-co   {background:var(--ok-nen);   color:var(--ok-chu)}
+ .o-khong{background:var(--loi-nen);  color:var(--loi-chu)}
+ .o-ngoai{background:var(--ngoai-nen);color:var(--ngoai-chu)}
+ tr.chot-ky td{border-top:2px solid var(--chot-vien);border-bottom:2px solid var(--chot-vien)}
+ tr.chot-ky td.thang{background:var(--chot-nen);color:var(--chot-chu);font-weight:700}
+ .khoi-ky{border:1px solid var(--vien);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.5rem}
+ .khoi-ky h2{margin:.2rem 0 .1rem;font-size:1.15rem}
+ .tom-tat{display:flex;flex-wrap:wrap;gap:1rem;background:var(--nen-phu);
+   border-radius:8px;padding:.5rem .75rem;margin:.5rem 0 .75rem}
+ .tom-tat div{font-size:.95rem}
+ .tom-tat b{display:block;font-size:1.05rem;font-variant-numeric:tabular-nums}
+ .chu-thich{color:var(--chu-nhat);font-size:.9rem}
+ .chu-giai{display:flex;flex-wrap:wrap;gap:.5rem 1.25rem;margin:.5rem 0 1rem}
+ .chu-giai span{display:inline-flex;align-items:center;gap:.4rem}
+ .mau{display:inline-block;width:1.4rem;height:1.4rem;line-height:1.4rem;
+   text-align:center;border:1px solid var(--vien);border-radius:4px;font-weight:700}
+</style>
+{% include "_nav.html" %}
+<h1>Bảng phủ dữ liệu</h1>
+<p class="chu-thich">Mỗi dòng là một tháng, mỗi cột là một loại file xuất từ OBC.
+Nhóm theo <strong>kỳ kế toán của công ty: 1/8 → 31/7 năm sau</strong> (không phải
+năm tài chính Nhật chuẩn 1/4 → 31/3).</p>
+
+<div class="chu-giai">
+  <span><i class="mau o-co">●</i> có dữ liệu trong kho</span>
+  <span><i class="mau o-khong">·</i> không có dữ liệu</span>
+  <span><i class="mau o-ngoai">—</i> ngoài phạm vi</span>
+  <span><i class="mau o-co">7</i> cột tồn kho: SỐ NGÀY có ảnh chụp</span>
+  <span><i class="mau" style="background:var(--chot-nen);color:var(--chot-chu)">7月</i> tháng chốt kỳ</span>
+</div>
+
+<div class="ky">
+📌 <strong>Ràng buộc vĩnh viễn:</strong> dữ liệu bán hàng bắt đầu từ
+<strong>{{ bang.dau_du_lieu }}</strong>. Trước mốc đó <strong>không tồn tại</strong> —
+công ty không còn lưu (đặc tả §2.2.1). Các tháng trước mốc hiện là
+<strong>“ngoài phạm vi”</strong>, đó <em>không phải</em> là thiếu dữ liệu và
+<em>không</em> có gì để đi tìm.
+</div>
+
+<div class="ngay-thieu">
+⚠️ <strong>Hạn chế cần biết:</strong> ô “không có dữ liệu” <strong>không phân biệt
+được</strong> hai trường hợp: (a) chưa bao giờ xuất file cho tháng đó, và (b) đã xuất
+nhưng file bị cổng kiểm tra chặn (bản xuất thiếu dòng, sai mẫu…). Cổng kiểm tra chặn
+<strong>trước khi</strong> ghi nhật ký nạp, nên kho không hề biết file đó từng tồn tại.
+Muốn biết chắc thì đối chiếu với thư mục xuất của OBC.
+</div>
+
+{% for k in bang.ky %}
+<div class="khoi-ky">
+  <h2>{{ k.nhan }}</h2>
+  <div class="chu-thich">{{ k.dau }} → {{ k.cuoi }}{% if not k.du_12_thang %}
+    · <strong>kỳ không đủ 12 tháng trong phạm vi dữ liệu</strong> — đừng đem so tổng
+    kỳ này với kỳ khác{% endif %}</div>
+  <div class="tom-tat">
+    <div>Doanh thu thuần<b>¥{{ "{:,}".format(k.doanh_thu_thuan) }}</b></div>
+    <div>Lãi gộp<b>¥{{ "{:,}".format(k.lai_gop) }}</b></div>
+    <div>Tỷ suất lãi gộp<b>{% if k.ty_suat is none %}<span class="khong-ap-dung">chưa có doanh thu</span>{% else %}{{ "{:.1%}".format(k.ty_suat) }}{% endif %}</b></div>
+  </div>
+  <table class="phu">
+    <tr><th>Tháng</th><th>Tháng thứ<br>trong kỳ</th>
+    {% for c in bang.cot %}<th title="{{ c.chu_giai }}">{{ c.nhan }}</th>{% endfor %}</tr>
+    {% for t in k.thang %}
+    <tr{% if t.la_thang_chot_ky %} class="chot-ky"{% endif %}>
+      <td class="thang">{{ t.thang }}{% if t.la_thang_chot_ky %} · chốt kỳ{% endif %}</td>
+      <td>{{ t.company_fy_month }}</td>
+      {% for o in t.o %}<td class="o o-{{ o.trang_thai }}" title="{{ o.cot.chu_giai }}: {{ o.mo_ta }}">{{ o.ky_hieu }}</td>{% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endfor %}
+
+<h2>Chú giải cột</h2>
+<table>
+{% for c in bang.cot %}<tr><td><strong>{{ c.nhan }}</strong></td><td>{{ c.ten_obc }}</td><td>{{ c.mo_ta }}</td></tr>{% endfor %}
+</table>
+
+<h2>Loại dữ liệu CHƯA vào kho</h2>
+<table>
+{% for l in bang.thieu_bo_nap %}<tr><td>{{ l.ten_obc }}</td><td>{{ l.mo_ta }}</td><td>{{ l.ghi_chu }}</td></tr>{% endfor %}
+</table>
+</html>
