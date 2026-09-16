@@ -66,3 +66,52 @@ tokuisaki:
   money_columns: []
   qty_columns: []
   rate_columns: []
+
+uriage:
+  display_name: 売上伝票データ
+  filename_pattern: '^売上伝票データ_(?P<date>\d{8})\.xlsx$'
+  sheet: 売上伝票データ作成
+  header_row: 1
+  min_rows: 50
+  keys: [slip_no, line_seq]
+  # 出荷内訳 và 明細按分 xuất CÙNG một dòng hai lần (cùng slip_no+line_seq,
+  # cùng 金額/粗利益) — khử trùng NGAY SAU KHI ĐỌC, trước cổng 3, giữ dòng đầu.
+  dedup_on_keys: true
+  # File giao dịch theo ngày biến động mạnh hơn snapshot tồn kho (xem ghi
+  # chú ở zaiko) -> nới rộng ngưỡng cảnh báo cổng 4.
+  warn_row_drop_ratio: 0.3
+  warn_total_spike: 5.0
+  warn_total_drop: 0.2
+  columns:
+    伝票No.: slip_no
+    明細行番号: line_seq
+    売上日付: sales_date
+    請求日付: billing_date
+    伝票区分: slip_type
+    得意先コード: customer_code
+    請求先コード: billing_customer_code
+    担当者コード: salesperson_code
+    部門コード: department_code
+    直送先コード: shipto_code
+    商品コード: product_code
+    荷姿コード: pack_code
+    入数: case_qty
+    数量: qty
+    単価: unit_price
+    単位原価: unit_cost
+    金額: amount
+    消費税額: tax_amount
+    原価: cost
+    粗利益: gross_profit
+    粗利益率: gross_margin
+    消費税率: tax_rate
+    入金額１: paid_amount
+    入金伝票No.１: payment_slip_no
+    請求締日コード: closing_day_code
+  code_columns: [slip_no, line_seq, slip_type, customer_code, billing_customer_code,
+                 salesperson_code, department_code, shipto_code, product_code, pack_code,
+                 payment_slip_no, closing_day_code]
+  money_columns: [unit_price, unit_cost, amount, tax_amount, cost, gross_profit, paid_amount]
+  qty_columns: [case_qty, qty]
+  rate_columns: [gross_margin, tax_rate]
+  date_columns: [sales_date, billing_date]

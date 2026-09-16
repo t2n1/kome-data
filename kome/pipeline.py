@@ -6,14 +6,18 @@ import re
 from kome import archive, gates
 from kome.config import load_specs, FileSpec
 from kome.reader import read, ColumnMismatch
-from kome.loaders import inventory, customer
+from kome.loaders import inventory, customer, sales
 
 SPECS = load_specs(Path("config/files.yml"))
-LOADERS = {"zaiko": inventory.load, "tokuisaki": customer.load}
+LOADERS = {"zaiko": inventory.load, "tokuisaki": customer.load, "uriage": sales.load}
 
 # Bảng nào cần dọn khi hoàn tác một lô, theo từng loại file.
 # Thêm loader mới thì BẮT BUỘC thêm mục ở đây, nếu không hoàn tác sẽ sót bảng.
-UNDO_TABLES = {"zaiko": ["core.fact_inventory_daily"], "tokuisaki": ["core.dim_customer"]}
+UNDO_TABLES = {
+    "zaiko": ["core.fact_inventory_daily"],
+    "tokuisaki": ["core.dim_customer"],
+    "uriage": ["core.fact_sales_line"],
+}
 
 # Bảng SCD2: hoàn tác phải mở lại phiên bản trước đó, không chỉ xoá phiên bản
 # mới — nếu không, khách bị đóng valid_to ở lô đó sẽ mất hẳn is_current=true

@@ -17,6 +17,12 @@ class FileSpec:
     money_columns: list[str]
     qty_columns: list[str]
     rate_columns: list[str] = field(default_factory=list)
+    date_columns: list[str] = field(default_factory=list)
+    # Một số bản xuất OBC lặp lại CÙNG một dòng nghiệp vụ nhiều lần dưới các
+    # mục con khác nhau (vd. 売上伝票データ: 出荷内訳 và 明細按分). Bật cờ này để
+    # reader giữ dòng đầu tiên của mỗi khoá (`keys`), bỏ các bản sao còn lại,
+    # NGAY SAU KHI ĐỌC — trước khi tới cổng 3 (chặn khoá trùng).
+    dedup_on_keys: bool = False
     product_check: dict | None = None
     warn_row_drop_ratio: float = 0.5  # ngưỡng cổng 4: số dòng rơi dưới này
     warn_total_spike: float = 3.0     # ngưỡng cổng 4: tổng tiền tăng quá này lần
