@@ -120,6 +120,25 @@ Ngoài ra: **5.589 file PDF hoá đơn** + 13 file zip. Tên file PDF đã mã h
 4. **Kỳ dữ liệu lệch và thiếu.** `売上伝票データ` bắt đầu 2025-03, `売上明細表` bắt đầu 2025-02.
 5. **Dữ liệu công nợ chỉ có 1 quý.** Muốn phân tích tuổi nợ theo thời gian phải xuất bổ sung từ OBC.
 
+### 2.2.1 Ràng buộc vĩnh viễn về phạm vi dữ liệu
+
+> **Dữ liệu bán hàng bắt đầu từ 2025-03-03. Trước mốc đó KHÔNG TỒN TẠI** — công ty không còn
+> lưu. Đây là ràng buộc vĩnh viễn, không phải thiếu tạm. Đừng đi tìm.
+
+**Kỳ kế toán của công ty là 1/8 → 31/7** (xem `db/migrations/012_ky_ke_toan_cong_ty.sql`),
+nên phạm vi trên có nghĩa:
+
+| So sánh | Khả thi |
+|---|---|
+| Tháng 3–7, năm 2025 so 2026 | ✅ 5 tháng gối nhau |
+| Tháng 8–2, so cùng kỳ năm trước | ❌ không có năm trước |
+| Trọn kỳ 2025 (8/2024–7/2025) so kỳ 2026 | ❌ kỳ 2025 chỉ có 5/12 tháng |
+| Trọn kỳ 2026 so trọn kỳ 2027 | ⏳ từ tháng 8/2027 |
+
+**Hệ quả bắt buộc cho thiết kế báo cáo:** mọi chỉ số "so với cùng kỳ năm trước" phải hiển thị
+rõ **"không có dữ liệu cùng kỳ"** khi rơi vào tháng 8–2, chứ không được để trống hoặc hiện 0 —
+số 0 ở đó sẽ bị đọc thành "năm ngoái không bán được gì".
+
 ### 2.3 Hai ứng dụng web đang chạy
 
 | | Website lên đơn (nhân viên) | Web app đặt hàng (khách) |
