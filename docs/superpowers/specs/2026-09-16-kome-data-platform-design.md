@@ -237,7 +237,7 @@ File Excel gốc được lưu trữ làm **lớp `raw`** — xem §6.1.
 |---|---|---|
 | `dim_customer` | `得意先全情報` | **SCD2 — có lịch sử** |
 | `dim_product` | `商品データ` | Lịch sử nhẹ |
-| `dim_salesperson` | tách từ đơn bán | 5 người |
+| `dim_salesperson` | tách từ đơn bán | **Chỉ 5 `担当者` của OBC** — không gồm người nhập đơn, xem §12.1 |
 | `dim_shipto` | `直送先` | 1.833 điểm |
 | `dim_supplier` | `仕入先` | 50 NCC |
 | `dim_date` | tự sinh | Có 年度 Nhật (4月→3月), tuần, ngày lễ |
@@ -561,20 +561,36 @@ Cũng không nên đặt chung với `sale1.komejapan.com` vì nó đang phục 
 | R3 | OBC đổi cấu trúc cột khi nâng phiên bản | Trung bình | Cổng 2 chặn; sửa YAML, không sửa code |
 | R4 | Mở rộng phạm vi sang GĐ 2–3 quá sớm | Cao | Mỗi giai đoạn phải chạy ổn định trước khi sang giai đoạn sau |
 
-### 12.1 Chi tiết A5 — danh sách nhân viên không khớp
+### 12.1 Chi tiết A5 — ĐÃ GIẢI QUYẾT: hai khái niệm khác nhau
 
-| OBC (`売上主担当者`) | Web lên đơn (`kome-order`) |
-|---|---|
-| `0002` 西村 巧 | *(không có)* |
-| `0004` TRINH CONG MINH | `01` Trình Công Minh |
-| `0102` NGUYEN PHUONG DUNG | `04` Nguyễn Phương Dung |
-| `0104` TRAN THI LAN THANH | `02` Trần Thị Lan Thanh |
-| `0105` HA HUY LONG | `03` Hà Huy Long |
-| *(không có)* | `05` 愛華 本田 |
-| *(không có)* | `06` Hà Minh Chiến |
-| — | `07` Quản trị viên |
+**Kết luận: không phải lỗi dữ liệu.** `05 愛華 本田` và `06 Hà Minh Chiến` là **arubaito hỗ trợ nhập đơn**, không phải người phụ trách khách hàng. Hai danh sách dưới đây là hai chiều dữ liệu độc lập và **tuyệt đối không được gộp**:
 
-Mã khác nhau hoàn toàn, và **mỗi hệ thống có người mà hệ thống kia không có**. `dim_salesperson` phải giữ một bảng ánh xạ tường minh (`config/salesperson_map.yml`), không được ghép bằng tên — tên viết khác nhau giữa hai nơi (chữ hoa không dấu vs có dấu). Cần xác nhận hai người `05` và `06` là nhân viên mới chưa được tạo trong OBC hay thuộc vai trò khác.
+| Khái niệm | Nguồn | Số người | Ý nghĩa |
+|---|---|---|---|
+| **`担当者`** — người phụ trách khách | OBC (`売上主担当者`) | 5 | Sở hữu mối quan hệ khách hàng. **Đây mới là "nhân viên bán hàng".** |
+| **Người lên đơn** | Web `kome-order` | 7 | Chỉ là người gõ đơn vào máy (gồm 2 arubaito + 1 quản trị) |
+
+**Hệ quả bắt buộc:**
+
+- `dim_salesperson` chỉ chứa **5 người từ OBC**. Sạch, không pha tạp.
+- Người lên đơn thuộc bảng `app_user` trong schema `app` — phạm vi Giai đoạn 2/3.
+- **Báo cáo ④ (người bán hàng) phải dùng `担当者` của OBC, tuyệt đối không dùng người gõ đơn.** Nếu nhầm, arubaito sẽ hiện ra như người bán hàng giỏi nhất công ty.
+- Vẫn cần `config/salesperson_map.yml` để ánh xạ 4 người có mặt ở cả hai nơi (mã khác nhau: `0004`↔`01`, `0104`↔`02`, `0105`↔`03`, `0102`↔`04`), **ghép bằng mã, không ghép bằng tên** — tên viết khác nhau giữa hai hệ thống (chữ hoa không dấu vs có dấu).
+
+**Một lợi ích ngoài dự kiến:** vì `kome-order` là nơi nhân viên gõ đơn hộ khách (đơn qua điện thoại/LINE), còn `sale1.komejapan.com` là nơi khách tự đặt, nên **phân biệt được đơn khách tự đặt với đơn được gõ hộ**. Đây chính là nhóm đối chứng mà báo cáo ⑤ cần để đo hiệu quả thật của app đặt hàng.
+
+### 12.2 Bảng đối chiếu nhân sự (tham khảo)
+
+| OBC (`売上主担当者`) | Web lên đơn (`kome-order`) | Vai trò |
+|---|---|---|
+| `0002` 西村 巧 | *(không có)* | 担当者 (23 khách) |
+| `0004` TRINH CONG MINH | `01` Trình Công Minh | 担当者 (350 khách) |
+| `0102` NGUYEN PHUONG DUNG | `04` Nguyễn Phương Dung | 担当者 (108 khách) |
+| `0104` TRAN THI LAN THANH | `02` Trần Thị Lan Thanh | 担当者 (1.119 khách) |
+| `0105` HA HUY LONG | `03` Hà Huy Long | 担当者 (473 khách) |
+| *(không có)* | `05` 愛華 本田 | **Arubaito — chỉ nhập đơn** |
+| *(không có)* | `06` Hà Minh Chiến | **Arubaito — chỉ nhập đơn** |
+| *(không có)* | `07` Quản trị viên | Tài khoản quản trị |
 
 ---
 
