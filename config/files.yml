@@ -1,0 +1,29 @@
+# Khai báo từng loại file xuất từ OBC.
+# OBC đổi tên cột khi nâng phiên bản → SỬA FILE NÀY, không sửa code.
+zaiko:
+  display_name: 在庫一覧
+  filename_pattern: '^在庫一覧_(?P<date>\d{8})\.xlsx$'
+  sheet: 在庫一覧表
+  header_row: 1          # header ở dòng 1 (khác file báo cáo)
+  min_rows: 50           # dưới ngưỡng này coi là xuất một phần → cổng 3 chặn
+  keys: [product_code, warehouse_code]
+  columns:
+    商品コード:     product_code
+    商品名:         product_name
+    荷姿区分コード: pack_code
+    荷姿区分名:     pack_name
+    倉庫コード:     warehouse_code
+    倉庫名:         warehouse_name
+    日本語:         name_ja
+    単位:           unit
+    賞味期限:       best_before
+    売上出荷数量:   shipped_qty      # số xuất TRONG NGÀY (đã xác nhận)
+    在庫残数:       stock_qty
+    在庫単価:       stock_unit_cost
+    在庫金額:       stock_value
+  code_columns:  [product_code, pack_code, warehouse_code]
+  money_columns: [stock_unit_cost, stock_value]
+  qty_columns:   [shipped_qty, stock_qty]
+  rate_columns:  []
+  # Đối chiếu cho cổng 5: cột tích = thừa số × thừa số
+  product_check: {result: stock_value, factors: [stock_qty, stock_unit_cost]}
