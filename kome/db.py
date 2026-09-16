@@ -12,11 +12,16 @@ def connect(url: str | None = None) -> psycopg.Connection:
     """Mở kết nối Postgres. Mật khẩu chỉ đến từ biến môi trường.
 
     psycopg 3 tự chuẩn bị sẵn một câu lệnh sau vài lần chạy giống nhau để đi
-    nhanh hơn. Qua pooler giao dịch, câu lệnh được chuẩn bị trên một kết nối
-    máy chủ rồi lần sau lại gọi trên kết nối khác → `prepared statement "_pg3_0"
-    does not exist`, hoặc `already exists`. Lỗi này KHÔNG xuất hiện ngay: phải
-    đủ số lần chạy lặp mới nổ, nên nó sẽ nổ khi trang đã chạy được một thời
-    gian và có người đang xem. Tắt hẳn khi thấy cổng 6543.
+    nhanh hơn, đặt cho nó cái tên `_pg3_0`. Qua pooler giao dịch, kết nối sau
+    có thể rơi vào đúng kết nối máy chủ mà kết nối trước đã đặt tên đó →
+    `prepared statement "_pg3_0" already exists`.
+
+    ĐÃ ĐO THẬT trên chính CSDL này (2026-09-16), và kết quả quan trọng hơn cái
+    lỗi: **giữ MỘT kết nối rồi chạy lặp 12 lần thì KHÔNG hề lỗi**; mở 20 kết
+    nối ngắn nối tiếp nhau thì **hỏng ngay ở kết nối thứ nhất**. Nghĩa là thử
+    ở máy mình kiểu nào cũng thấy êm, còn trên Vercel — nơi mỗi lượt xem là
+    một kết nối ngắn — thì hỏng ngay từ lượt thứ hai. Đây đúng là loại lỗi
+    chỉ lộ ra sau khi đã triển khai xong.
 
     Cổng 5432 (session pooler, dùng ở máy trong công ty) giữ nguyên một kết
     nối máy chủ suốt phiên nên không dính, và cần giữ câu lệnh chuẩn bị sẵn
