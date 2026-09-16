@@ -11,6 +11,10 @@ from kome.loaders import inventory
 SPECS = load_specs(Path("config/files.yml"))
 LOADERS = {"zaiko": inventory.load}
 
+# Bảng nào cần dọn khi hoàn tác một lô, theo từng loại file.
+# Thêm loader mới thì BẮT BUỘC thêm mục ở đây, nếu không hoàn tác sẽ sót bảng.
+UNDO_TABLES = {"zaiko": ["core.fact_inventory_daily"]}
+
 @dataclass
 class IngestResult:
     ok: bool
@@ -54,3 +58,20 @@ def ingest(conn, path: Path, archive_dir: Path) -> IngestResult:
 
     return IngestResult(ok=True, spec_name=spec.name, row_count=len(df),
                         total=total, batch_id=batch_id, warnings=warnings)
+
+def undo_batch(conn, batch_id: int) -> int:
+    """Xoá dữ liệu của một lô rồi đánh dấu lô đã huỷ. Trả về số dòng đã xoá.
+
+    KHÔNG xoá dòng trong meta.ingest_batch — chỉ đặt undone_at (luật bất biến #6).
+    """
+    row = conn.execute(
+        "SELECT spec_name FROM meta.ingest_batch WHERE batch_id = %s", (batch_id,)
+    ).fetchone()
+    if row is None:
+        return 0
+    deleted = 0
+    for table in UNDO_TABLES.get(row[0], []):
+        cur = conn.execute(f"DELETE FROM {table} WHERE batch_id = %s", (batch_id,))
+        deleted += cur.rowcount
+    archive.undo(conn, batch_id)
+    return deleted

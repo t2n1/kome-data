@@ -5,7 +5,7 @@ from fastapi import FastAPI, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from kome.db import connect
-from kome.pipeline import ingest, SPECS
+from kome.pipeline import ingest, undo_batch, SPECS
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -51,9 +51,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
     @app.post("/undo/{batch_id}")
     def undo(batch_id: int):
         with open_conn() as conn:
-            conn.execute("DELETE FROM core.fact_inventory_daily WHERE batch_id = %s", (batch_id,))
-            from kome import archive as A
-            A.undo(conn, batch_id)
+            undo_batch(conn, batch_id)
         return RedirectResponse("/health", status_code=303)
 
     return app

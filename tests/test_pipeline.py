@@ -31,3 +31,7 @@ def test_file_cat_cut_bi_chan_va_khong_ghi_gi(conn, tmp_path):
     assert not r.ok and any(b.gate == 3 for b in r.blockers)
     n = conn.execute("SELECT count(*) FROM core.fact_inventory_daily").fetchone()[0]
     assert n == 0
+
+def test_moi_loader_deu_khai_bao_bang_can_don():
+    from kome.pipeline import LOADERS, UNDO_TABLES
+    assert set(LOADERS) == set(UNDO_TABLES), "Thêm loader mới thì phải thêm mục vào UNDO_TABLES"
