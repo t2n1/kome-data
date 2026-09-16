@@ -90,12 +90,53 @@ def ingest(conn, path: Path, archive_dir: Path) -> IngestResult:
     if blockers:
         return IngestResult(ok=False, spec_name=spec.name, blockers=blockers, warnings=warnings)
 
-    total = int(df[spec.money_columns[-1]].sum()) if spec.money_columns else 0
+    # Tổng tiền đại diện: cột khai TAY trong files.yml (spec.total_column),
+    # không phải money_columns[-1]. Xem ghi chú ở kome/config.py.
+    total = int(df[spec.total_column].sum()) if spec.total_column else 0
     batch_id = archive.store(conn, path, spec.name, digest, len(df), total, archive_dir)
-    LOADERS[spec.name](conn, df, data_date, batch_id)
+
+    # archive.store() đã COMMIT dòng meta.ingest_batch. Nếu loader lỗi sau đó
+    # (mất kết nối giữa executemany, tràn bigint, spec có trong files.yml mà
+    # quên thêm vào LOADERS -> KeyError, ...) thì lô nằm lại trong CSDL với
+    # undone_at IS NULL, và lần sau archive.already_loaded() thấy digest đó
+    # nên trả skipped=True: màn hình báo XANH "đã nạp rồi" trong khi core có
+    # 0 dòng. File bị bỏ qua VĨNH VIỄN mà không ai biết.
+    #
+    # Vì vậy: mọi lỗi của loader đều phải huỷ lô ngay — rollback phần dở dang,
+    # xoá dữ liệu đã ghi theo batch_id, đặt undone_at, xoá file đã chép vào
+    # kho lưu trữ — rồi NÉM LẠI để tầng trên hiện lỗi thật, không báo xanh.
+    try:
+        LOADERS[spec.name](conn, df, data_date, batch_id)
+    except Exception:
+        _huy_lo_hong(conn, batch_id)
+        raise
 
     return IngestResult(ok=True, spec_name=spec.name, row_count=len(df),
                         total=total, batch_id=batch_id, warnings=warnings)
+
+
+def _huy_lo_hong(conn, batch_id: int) -> None:
+    """Dọn sạch một lô mà loader vừa làm hỏng: không để lại lô mồ côi.
+
+    Việc này cũng đóng luôn khoảng trống của Task 5 (`archive.store()` để lại
+    file mồ côi trong kho lưu trữ nếu bước sau thất bại).
+    """
+    try:
+        conn.rollback()      # bỏ phần loader đã ghi mà chưa commit
+    except Exception:
+        return               # kết nối đã chết: không dọn được, cứ để lỗi nổi lên
+    try:
+        row = conn.execute(
+            "SELECT archived_to FROM meta.ingest_batch WHERE batch_id = %s", (batch_id,)
+        ).fetchone()
+        undo_batch(conn, batch_id)   # xoá dữ liệu đã commit (nếu có) + đặt undone_at
+        if row and row[0]:
+            Path(row[0]).unlink(missing_ok=True)
+    except Exception as e:
+        # Lỗi gốc quan trọng hơn, đừng che nó bằng lỗi dọn dẹp — nhưng cũng
+        # đừng nuốt im lặng: ghi ra nhật ký máy chủ để còn truy được.
+        print(f"[KOME] KHÔNG dọn được lô hỏng {batch_id}: {type(e).__name__}: {e}")
+
 
 def undo_batch(conn, batch_id: int) -> int:
     """Xoá dữ liệu của một lô rồi đánh dấu lô đã huỷ. Trả về số dòng đã xoá.

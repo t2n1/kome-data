@@ -54,15 +54,24 @@ def check(
             if n:
                 blockers.append(Blocker(3, f"{n} dòng có {col} không đọc được thành ngày"))
 
-    # Cổng 4 — so với lần nạp trước
-    total_col = spec.money_columns[-1] if spec.money_columns else None
+    # Cổng 4 — so với lần nạp trước.
+    # Cột tiền đại diện đọc từ spec.total_column (khai tay trong files.yml),
+    # KHÔNG suy ra từ money_columns[-1]: với 売上伝票データ cột cuối là 入金額１
+    # (gần như luôn 0), nên total = 0 và điều kiện `prev_total and ...` bên
+    # dưới sẽ TẮT IM LẶNG cả nhánh cảnh báo lệch tiền cho đúng file quan
+    # trọng nhất. total_column = None nghĩa là file không có tiền đại diện
+    # (file master, bảng giá) -> bỏ qua nhánh tiền CÓ CHỦ Ý.
+    total_col = spec.total_column
     total = int(df[total_col].sum()) if total_col else 0
     if previous:
         prev_rows = previous.get("row_count") or 0
         prev_total = previous.get("total") or 0
         if prev_rows and len(df) < prev_rows * spec.warn_row_drop_ratio:
             warnings.append(Warning_(4, f"Số dòng rơi từ {prev_rows} xuống {len(df)}"))
-        if prev_total and (total > prev_total * spec.warn_total_spike or total < prev_total * spec.warn_total_drop):
+        if total_col and prev_total and (
+            total > prev_total * spec.warn_total_spike
+            or total < prev_total * spec.warn_total_drop
+        ):
             warnings.append(Warning_(4, f"Tổng tiền lệch mạnh: {prev_total:,} → {total:,}"))
 
     # Cổng 5 — khử trùng (dedup_on_keys) đã gộp các dòng trùng khoá mà GIÁ TRỊ

@@ -2,7 +2,6 @@
 from pathlib import Path
 from datetime import date
 import pandas as pd
-from db.migrate import apply_all
 from kome.config import load_specs
 from kome.gates import check as gates_check
 from kome.loaders import sales
@@ -128,7 +127,6 @@ def test_pipeline_chan_ngay_rac_khong_ghi_gi_va_khong_de_lo_mo_coi(conn, tmp_pat
     """Kiểm tra nguyên vẹn qua pipeline.ingest(): ngày rác bị chặn ở cổng 3
     TRƯỚC archive.store(), nên không có dòng nào trong fact_sales_line VÀ
     không có lô mồ côi nào trong meta.ingest_batch."""
-    apply_all(conn, Path("db/migrations"))
     spec = SPECS["uriage"]
     ja_of = {sys_col: ja for ja, sys_col in spec.columns.items()}
     rows = []
@@ -155,3 +153,43 @@ def test_pipeline_chan_ngay_rac_khong_ghi_gi_va_khong_de_lo_mo_coi(conn, tmp_pat
         "SELECT count(*) FROM meta.ingest_batch WHERE spec_name = 'uriage'"
     ).fetchone()[0]
     assert m == 0   # không được để lại lô mồ côi
+
+
+def test_canh_bao_khu_trung_di_qua_reader_read(tmp_path):
+    """Cả ba test khử trùng ở trên gọi THẲNG dedup_on_keys(), nên nếu pandas
+    đổi cách lan truyền df.attrs qua các phép biến đổi trong reader.read()
+    (ép kiểu tiền/số lượng/ngày, reset_index), cảnh báo cổng 5 sẽ biến mất mà
+    test vẫn xanh. Test này đi hết đường thật: file Excel -> read() -> check().
+    """
+    spec = SPECS["uriage"]
+    rows = []
+    for i in range(60):
+        rows.append({
+            "slip_no": f"07{i:04d}", "line_seq": 1, "sales_date": date(2026, 5, 1),
+            "billing_date": date(2026, 5, 31), "slip_type": "債権計上",
+            "customer_code": "000000009292", "billing_customer_code": "000000009292",
+            "salesperson_code": "0004", "department_code": "01", "shipto_code": "0001",
+            "product_code": "XT07", "pack_code": "02", "case_qty": 1, "qty": 6,
+            "unit_price": 5250, "unit_cost": 3210, "amount": 29167,
+            "tax_amount": 2333, "cost": 19260, "gross_profit": 9907,
+            "gross_margin": 0.3397, "tax_rate": 0.08, "paid_amount": 0,
+            "payment_slip_no": "000000", "closing_day_code": "99",
+        })
+    # bản sao CÙNG khoá nhưng KHÁC 金額 -> phải đếm là 1 nhóm bất thường
+    xung_dot = dict(rows[0])
+    xung_dot["amount"] = 40000
+    rows.append(xung_dot)
+
+    df = pd.DataFrame(rows)
+    ja_of = {sys_col: ja for ja, sys_col in spec.columns.items()}
+    df = df.rename(columns=ja_of)[list(spec.columns.keys())]
+    p = tmp_path / "売上伝票データ_20260501.xlsx"
+    df.to_excel(p, sheet_name=spec.sheet, index=False)
+
+    from kome.reader import read
+    doc = read(p, spec)
+    assert len(doc) == 60                      # bản sao đã bị khử
+    assert doc.attrs.get("dedup_conflicts") == 1
+
+    _, warnings = gates_check(p, spec, doc, None)
+    assert any(w.gate == 5 and "khử trùng" in w.message for w in warnings)

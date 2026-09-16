@@ -9,17 +9,12 @@ TRACKED = [
     "postcode", "prefecture", "city", "address", "phone", "invoice_reg_no", "spot_flag",
 ]
 
+# Ô trống của Excel (NaN của pandas) đã được kome.reader.read() chuẩn hoá thành
+# None cho MỌI cột chữ, nên loader này không cần chuẩn hoá lại — trước đây có
+# hàm _norm() riêng, chỉ customer.py được hưởng còn inventory/master/price thì
+# không (xem ghi chú trong kome/reader.py).
 
-def _norm(v):
-    """Chuẩn hoá một giá trị TRACKED để so sánh/lưu trữ ổn định qua các lần nạp.
-
-    Excel để trống -> pandas đọc thành NaN (float), không phải "". Nếu không
-    chuẩn hoá, NaN != NaN nên mỗi lần nạp lại cùng file sẽ tưởng nhầm là "đổi",
-    vi phạm ràng buộc #2 (nạp lại cùng file phải ra cùng kết quả).
-    """
-    if v is None or (isinstance(v, float) and pd.isna(v)):
-        return ""
-    return v
+_SET_TRACKED = ", ".join(f"{c} = %s" for c in TRACKED)
 
 
 def load(conn: psycopg.Connection, df: pd.DataFrame,
@@ -29,20 +24,37 @@ def load(conn: psycopg.Connection, df: pd.DataFrame,
     Bản xuất một phần chỉ chứa vài khách KHÔNG được hiểu là các khách
     khác đã biến mất — hàm này chỉ upsert, không bao giờ đóng dòng của
     khách vắng mặt trong file.
+
+    Sửa lại TRONG NGÀY (kế toán phát hiện sai, sửa trong OBC, xuất lại, kéo–thả
+    lại cùng ngày) thì CẬP NHẬT TẠI CHỖ phiên bản đang mở, không đóng-rồi-mở-mới:
+    đóng bằng `snapshot_date - 1 ngày` khi phiên bản cũ cũng bắt đầu đúng ngày đó
+    sẽ sinh `valid_to < valid_from`, và mọi truy vấn lịch sử dạng
+    `valid_from <= d AND (valid_to IS NULL OR valid_to >= d)` sẽ không bao giờ
+    trả về dòng ấy — nó biến mất khỏi lịch sử vĩnh viễn.
     """
     current = {
-        r[0]: tuple(_norm(v) for v in r[1:]) for r in conn.execute(
-            f"SELECT customer_code, {', '.join(TRACKED)} FROM core.dim_customer WHERE is_current"
+        r[0]: (tuple(r[1:-1]), r[-1]) for r in conn.execute(
+            f"SELECT customer_code, {', '.join(TRACKED)}, valid_from "
+            f"FROM core.dim_customer WHERE is_current"
         ).fetchall()
     }
-    inserted = closed = unchanged = 0
+    inserted = closed = unchanged = updated = 0
     with conn.cursor() as cur:
         for row in df.itertuples(index=False):
             code = row.customer_code
-            new = tuple(_norm(getattr(row, c)) for c in TRACKED)
+            new = tuple(getattr(row, c) for c in TRACKED)
             old = current.get(code)
-            if old is not None and old == new:
+            if old is not None and old[0] == new:
                 unchanged += 1
+                continue
+            if old is not None and old[1] == snapshot_date:
+                # Cùng ngày: sửa tại chỗ phiên bản đang mở.
+                cur.execute(
+                    f"""UPDATE core.dim_customer SET {_SET_TRACKED}, batch_id = %s
+                        WHERE customer_code = %s AND is_current""",
+                    (*new, batch_id, code),
+                )
+                updated += 1
                 continue
             if old is not None:
                 cur.execute(
@@ -59,4 +71,5 @@ def load(conn: psycopg.Connection, df: pd.DataFrame,
             )
             inserted += 1
     conn.commit()
-    return {"inserted": inserted, "closed": closed, "unchanged": unchanged}
+    return {"inserted": inserted, "closed": closed,
+            "unchanged": unchanged, "updated": updated}

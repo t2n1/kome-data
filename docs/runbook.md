@@ -43,9 +43,17 @@ Lưu ý:
   liệu hằng ngày. Tài khoản `postgres` (superuser hiện tại) **chỉ dùng khi
   chạy migration** (`python -m db.migrate` hoặc tương đương), không dùng cho
   vận hành thường ngày.
-- `kome_app_user` dành cho ứng dụng web (đọc `core`/`mart`, đọc-ghi `app` —
-  **không ghi được vào `core`**, kể cả khi có bug trong code). `kome_report_user`
-  chỉ đọc, dùng cho công cụ báo cáo/BI bên ngoài nếu có.
+- **Web app của Giai đoạn 0 chạy bằng `kome_ingest_user`** — chính là
+  `DATABASE_URL` ở trên. Trang nạp, trang `/health` và nút Hoàn tác đều cần
+  ghi và xoá trong `core`, nên không dùng `kome_app_user` được.
+- `kome_app_user` **chưa dùng ở Giai đoạn 0** — dành cho ứng dụng CRM ở Giai
+  đoạn 2 (đọc `core`/`mart`, đọc-ghi `app` — **không ghi được vào `core`**, kể
+  cả khi có bug trong code). Nó cũng không đọc được `meta.ingest_batch` nên
+  không mở được trang `/health`. `kome_report_user` chỉ đọc, dùng cho công cụ
+  báo cáo/BI bên ngoài nếu có.
+- **Migration luôn chạy bằng `postgres`**, không bao giờ bằng `kome_ingest_user`:
+  `ALTER DEFAULT PRIVILEGES` trong migration không có `FOR ROLE`, chạy bằng vai
+  trò khác thì quyền mặc định cho bảng mới sẽ âm thầm không áp dụng.
 - Muốn đổi mật khẩu sau này: `ALTER USER kome_app_user PASSWORD '<mật khẩu mới>';`
   chạy tay trên SQL Editor, rồi cập nhật biến môi trường tương ứng.
 
@@ -54,6 +62,7 @@ Lưu ý:
 | Sự cố | Dấu hiệu nhận biết | Cách xử lý (chép–dán từng khối, theo thứ tự) | Thời gian |
 |---|---|---|---|
 | **Nạp nhầm file** (nhầm ngày, nhầm file, nạp trùng) | Vào trang `/health` thấy số dòng hoặc tổng tiền sai ngay sau khi vừa nạp | 1) Tìm lần nạp vừa rồi:<br>`python -c "from kome.db import connect; [print(r) for r in connect().execute(\"SELECT batch_id, spec_name, source_file, loaded_at FROM meta.ingest_batch WHERE undone_at IS NULL ORDER BY loaded_at DESC LIMIT 5\").fetchall()]"`<br>2) Ghi lại `batch_id` của lần nạp sai, rồi hoàn tác (thay `123` bằng số đó):<br>`python -c "from kome.db import connect; from kome.pipeline import undo_batch; c = connect(); undo_batch(c, 123); print('da hoan tac')"`<br>3) Nạp lại đúng file qua trang nội bộ như bình thường | ~10 giây tìm + hoàn tác |
+| **Thiếu một ngày dữ liệu** (hôm đó không ai kéo–thả: nghỉ ốm, quên, máy hỏng) | Vào trang `/health` thấy dải **vàng** `⚠️ Thiếu N ngày làm việc` kèm danh sách ngày | 1) Xem ngày bị liệt kê có phải ngày nghỉ lễ Nhật / công ty nghỉ không — nếu đúng thì bỏ qua, hệ thống chỉ biết thứ Bảy–Chủ nhật, không biết ngày lễ<br>2) Nếu là ngày làm việc thật: mở OBC, xuất lại `売上伝票データ` của **đúng ngày đó**, kéo–thả vào trang nạp như bình thường<br>3) Tải lại `/health`, dải vàng phải biến mất | ~3 phút/ngày |
 | **OBC đổi tên cột** (nạp file báo lỗi "thiếu cột" / cổng 2 chặn) | Trang nạp báo đỏ, nêu rõ tên cột thiếu | 1) Mở file cấu hình bằng Notepad, ví dụ:<br>`notepad config/files.yml`<br>2) Sửa tên cột OBC mới cho khớp cột hệ thống đang có (không đổi tên cột hệ thống, chỉ đổi tên cột OBC bên trái dấu `:`), lưu lại<br>3) Chạy lại toàn bộ kiểm tra để chắc chắn không hỏng gì khác:<br>`python -m pytest tests/ -v`<br>4) Nếu không chắc sửa đúng chỗ, đừng tự sửa — gửi ảnh chụp lỗi kèm file Excel mới cho AI bảo trì | ~5 phút (tự sửa) |
 | **Số không khớp OBC** (báo cáo trong app lệch số so với sổ OBC) | Đối chiếu cuối tháng thấy tổng tiền lệch | Không cần xoá gì cả — xuất lại **đúng file đó** (cả kỳ, không xuất riêng phần lệch) từ OBC rồi kéo–thả lại vào trang nội bộ. Hệ thống tự nhận theo mã băm nội dung: file y hệt cũ → tự bỏ qua; file có sửa → tự ghi đè đúng dòng thay đổi | ~2 phút |
 | **CSDL đầy 500 MB** (Supabase báo "storage full", trang nạp báo lỗi ghi dữ liệu) | Nạp file báo lỗi kết nối/ghi dữ liệu, hoặc email cảnh báo từ Supabase | 1) Đăng nhập https://supabase.com/dashboard bằng tài khoản công ty<br>2) Chọn dự án KOME → **Settings → Billing** → nâng cấp lên gói trả phí<br>**Không tự ý xoá dữ liệu để giải phóng chỗ** — dữ liệu kế toán không được xoá | ~5 phút (cần thẻ thanh toán công ty) |

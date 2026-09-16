@@ -1,6 +1,5 @@
 # tests/test_reader.py
 from pathlib import Path
-from decimal import Decimal
 from kome.config import load_specs
 from kome.reader import read
 
@@ -49,3 +48,41 @@ def test_khong_bat_dedup_thi_cong_3_van_chan_khoa_trung():
     doubled = pd.concat([df, df.iloc[[0]]], ignore_index=True)
     blockers, _ = check(Path("在庫一覧_20260916.xlsx"), SPECS["zaiko"], doubled, None)
     assert any(b.gate == 3 and "trùng" in b.message for b in blockers)
+
+
+def test_o_trong_cot_chu_thanh_none_khong_phai_chuoi_nan():
+    """[IMPORTANT] pd.read_excel(dtype=str) trả ô trống thành NaN. Trước đây
+    chỉ code_columns được chuẩn hoá, nên các cột chữ khác đi thẳng vào Postgres
+    dưới dạng chuỗi 'NaN': cột trông có dữ liệu, `IS NULL` trả về False, và
+    báo cáo rủi ro hạn sử dụng lọc `WHERE best_before IS NOT NULL` đếm cả dòng
+    trống. Trên chính file mốc 在庫一覧_20260916: name_ja và best_before mỗi
+    cột có 1 ô trống."""
+    df = read(Path("tests/fixtures/zaiko_ok.xlsx"), SPECS["zaiko"])
+    for col in df.columns:
+        if df[col].dtype == object:
+            xau = [v for v in df[col] if isinstance(v, str) and v.strip().lower() == "nan"]
+            assert xau == [], f"cột {col} chứa chuỗi 'NaN': {xau[:3]}"
+    # và ô trống thật sự là None, không phải NaN
+    assert df["name_ja"].isna().sum() >= 1
+    assert all(v is None for v in df["name_ja"] if not isinstance(v, str))
+
+
+def test_o_trong_vao_csdl_la_null_that(conn, batch):
+    """Đi hết đường: đọc -> nạp -> `IS NULL` trong Postgres phải trả về True."""
+    from datetime import date
+    from kome.loaders import inventory
+
+    df = read(Path("tests/fixtures/zaiko_ok.xlsx"), SPECS["zaiko"])
+    inventory.load(conn, df, date(2026, 9, 16), batch(1))
+
+    n_nan = conn.execute(
+        """SELECT count(*) FROM core.fact_inventory_daily
+           WHERE name_ja = 'NaN' OR best_before = 'NaN'"""
+    ).fetchone()[0]
+    assert n_nan == 0
+
+    n_null = conn.execute(
+        """SELECT count(*) FROM core.fact_inventory_daily
+           WHERE name_ja IS NULL OR best_before IS NULL"""
+    ).fetchone()[0]
+    assert n_null >= 1          # ô trống thật -> NULL thật

@@ -16,6 +16,15 @@ class FileSpec:
     code_columns: list[str]
     money_columns: list[str]
     qty_columns: list[str]
+    # Cột tiền ĐẠI DIỆN cho file: "tổng tiền" hiện trên màn hình nạp và
+    # trang /health, và là số mà cổng 4 đem so với lần nạp trước.
+    # PHẢI khai tay, KHÔNG suy ra từ money_columns[-1]: thứ tự cột trong
+    # files.yml là thứ tự của OBC, không phải thứ tự quan trọng — lấy cột
+    # cuối cho 売上伝票データ ra 入金額１ (gần như luôn bằng 0), làm tắt im
+    # lặng nhánh cảnh báo lệch tiền của cổng 4 cho đúng file chở ¥1,5 tỷ/năm.
+    # None = file này không có tiền đại diện (file master, bảng giá): tổng
+    # bằng 0 và cổng 4 bỏ qua nhánh tiền — bỏ qua CÓ CHỦ Ý.
+    total_column: str | None = None
     rate_columns: list[str] = field(default_factory=list)
     date_columns: list[str] = field(default_factory=list)
     # Cột ngày mà mỗi dòng BẮT BUỘC phải đọc được (vd. sales_date có khoá

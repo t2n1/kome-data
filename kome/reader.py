@@ -55,6 +55,21 @@ def read(path: Path, spec: FileSpec) -> pd.DataFrame:
     df = df[list(spec.columns)].rename(columns=spec.columns)
     df = df.dropna(how="all")
 
+    # Ô TRỐNG -> None cho MỌI cột chữ, một lần, ngay tại đây.
+    # pd.read_excel(dtype=str) trả ô trống thành NaN (float). Trước đây chỉ
+    # code_columns được chuẩn hoá, nên các cột chữ khác đi thẳng vào Postgres
+    # dưới dạng chuỗi 'NaN' — cột trông có dữ liệu, `IS NULL` trả về False, và
+    # báo cáo lọc `WHERE best_before IS NOT NULL` đếm cả những dòng trống.
+    # (Task 9 từng vá riêng cho dim_customer bằng customer._norm(); làm ở đây
+    # thì inventory/master/price cũng được hưởng, không phải vá từng loader.)
+    # Lưu ý pandas 3: dtype=str trả về dtype "str" (không phải "object"), nên
+    # KHÔNG kiểm tra `dtype == object` — sẽ trượt hết và lỗi quay lại im lặng.
+    for col in df.columns:
+        s = df[col]
+        if pd.api.types.is_numeric_dtype(s) or pd.api.types.is_datetime64_any_dtype(s):
+            continue
+        df[col] = s.astype(object).where(s.notna(), None)
+
     if spec.dedup_on_keys:
         df = dedup_on_keys(df, spec.keys, spec.money_columns + spec.qty_columns)
 

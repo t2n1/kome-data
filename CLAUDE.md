@@ -24,7 +24,7 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
 ## Bẫy đã biết
 1. Mã (`*コード`) là TEXT. `000000009292` đọc thành số sẽ mất số 0 đầu → hỏng mọi liên kết.
 2. Số lượng CÓ phần thập phân (`83.75` ケース). Tiền thì luôn là số nguyên yên.
-3. Có bản xuất `得意先全情報` chỉ 201 dòng (xuất một phần) và bản chỉ 5 cột (sai mẫu) — cổng 3 phải chặn.
+3. Có bản xuất `得意先全情報` chỉ 201 dòng (xuất một phần — **cổng 3** chặn vì dưới `min_rows`) và bản chỉ 5 cột (sai mẫu — **cổng 2** chặn trước, `ColumnMismatch`, vì thiếu cột khai báo).
 4. File báo cáo (`売上明細表`, `元帳`) có 5 dòng rác trước header. File master và `在庫一覧` thì header ở dòng 1.
 5. `担当者` của OBC (5 người) KHÁC người nhập đơn trên web (7 tài khoản, gồm 2 arubaito).
 
@@ -32,18 +32,33 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
 Luật số một ("OBC chỉ đọc") không chỉ là quy ước trong code — nó là ràng
 buộc của chính CSDL. Bốn vai trò cấp cụm (`NOLOGIN`, mật khẩu đặt tay ngoài
 git — xem `docs/runbook.md`):
-- `kome_ingest` — vai trò của tiến trình nạp dữ liệu. SELECT/INSERT/UPDATE
-  trên `core` và `meta`. Đây là vai trò DUY NHẤT được ghi vào `core`.
-- `kome_app` — vai trò của ứng dụng web. Chỉ SELECT trên `core`/`mart`;
-  đọc-ghi trên `app`. **Không có quyền UPDATE/DELETE trên `core`** — kể cả
-  nếu code lỡ viết nhầm câu lệnh, CSDL sẽ từ chối.
+- `kome_ingest` — vai trò của tiến trình nạp dữ liệu. SELECT/INSERT/UPDATE/
+  **DELETE** trên `core`; SELECT/INSERT/UPDATE trên `meta` (không DELETE —
+  `meta.ingest_batch` là bảng lịch sử, hoàn tác chỉ đặt `undone_at`). Đây là
+  vai trò DUY NHẤT được ghi vào `core`. DELETE trên `core` là BẮT BUỘC: nút
+  Hoàn tác chạy `DELETE FROM core.… WHERE batch_id = %s` (`010_*.sql`).
+  **Web app của Giai đoạn 0 chạy bằng vai trò này** (`kome_ingest_user` trong
+  `DATABASE_URL`) — nó vừa nạp dữ liệu vừa phục vụ trang `/health` và
+  `/undo/{batch_id}`.
+- `kome_app` — **chưa ai dùng ở Giai đoạn 0**; dành cho ứng dụng CRM ở Giai
+  đoạn 2. Chỉ SELECT trên `core`/`mart`; đọc-ghi trên `app`. **Không có quyền
+  UPDATE/DELETE trên `core`** — kể cả nếu code lỡ viết nhầm câu lệnh, CSDL sẽ
+  từ chối. Lưu ý nó KHÔNG có SELECT trên `meta.ingest_batch`, nên không chạy
+  được trang `/health` hiện tại.
 - `kome_report` — chỉ SELECT, mọi schema (`core`, `mart`, `app`). Dùng cho
   công cụ báo cáo/BI ngoài ứng dụng chính.
 - `postgres` (superuser hiện tại của Supabase) — chỉ dùng để chạy migration,
   không dùng cho vận hành thường ngày.
 
 `ALTER DEFAULT PRIVILEGES` trong migration đảm bảo bảng tạo sau này cũng tự
-nhận đúng quyền, không cần GRANT tay mỗi lần thêm bảng mới.
+nhận đúng quyền (TABLES *và* SEQUENCES), không cần GRANT tay mỗi lần thêm
+bảng mới.
+
+**Bất biến:** `ALTER DEFAULT PRIVILEGES` trong các migration KHÔNG có mệnh đề
+`FOR ROLE`, nên nó chỉ áp cho đối tượng do chính vai trò chạy migration tạo
+ra → **migration phải LUÔN chạy bằng vai trò `postgres`**. Đổi vai trò chạy
+migration thì quyền mặc định cho bảng mới sẽ âm thầm không áp dụng, và lỗi
+chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc nạp dữ liệu.
 
 ## Không được tự ý sửa
 - File trong `db/migrations/` đã chạy rồi — chỉ thêm file mới

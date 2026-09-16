@@ -28,6 +28,9 @@ zaiko:
     在庫金額:       stock_value
   code_columns:  [product_code, pack_code, warehouse_code]
   money_columns: [stock_unit_cost, stock_value]
+  # Cột tiền ĐẠI DIỆN của file (tổng hiện trên màn hình nạp + /health, và là
+  # số cổng 4 đem so với lần trước). Khai tay — không suy ra từ cột cuối.
+  total_column:  stock_value
   qty_columns:   [shipped_qty, stock_qty]
   rate_columns:  []
   # Đối chiếu cho cổng 5: cột tích = thừa số × thừa số
@@ -121,6 +124,10 @@ uriage:
                  salesperson_code, department_code, shipto_code, product_code, pack_code,
                  payment_slip_no, closing_day_code]
   money_columns: [unit_price, unit_cost, amount, tax_amount, cost, gross_profit, paid_amount]
+  # 金額 là doanh thu của dòng. KHÔNG phải cột cuối danh sách (入金額１ =
+  # paid_amount, gần như luôn 0) — lấy nhầm cột làm /health hiện ¥0 và tắt im
+  # lặng cảnh báo lệch tiền của cổng 4 cho chính file doanh thu.
+  total_column: amount
   qty_columns: [case_qty, qty]
   rate_columns: [gross_margin, tax_rate]
   date_columns: [sales_date, billing_date]
@@ -228,6 +235,9 @@ tanka:
     売価No.10（税抜）: price_ex_10
     売価No.10（税込）: price_in_10
   code_columns: [product_code, pack_code]
+  # KHÔNG khai total_column: bảng giá không có "tổng tiền" nào có nghĩa
+  # (cộng 20 cột giá lại là con số vô nghĩa). Tổng = 0 và cổng 4 bỏ qua
+  # nhánh tiền — CÓ CHỦ Ý, không phải vô tình. Các file master cũng vậy.
   money_columns: [unit_cost,
                    price_ex_01, price_in_01, price_ex_02, price_in_02,
                    price_ex_03, price_in_03, price_ex_04, price_in_04,

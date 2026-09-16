@@ -29,13 +29,19 @@ def store(conn, path: Path, spec_name: str, digest: str,
     dest = folder / f"{path.stem}__{digest[:12]}{path.suffix}"
     shutil.copy2(path, dest)
 
-    row = conn.execute(
-        """INSERT INTO meta.ingest_batch
-             (spec_name, source_file, digest, archived_to, row_count, total_amount)
-           VALUES (%s,%s,%s,%s,%s,%s) RETURNING batch_id""",
-        (spec_name, path.name, digest, str(dest), row_count, total),
-    ).fetchone()
-    conn.commit()
+    # INSERT lỗi (trùng digest, mất kết nối, ...) thì dọn luôn file vừa chép:
+    # không để lại file mồ côi trong kho lưu trữ mà không có lô nào trỏ tới.
+    try:
+        row = conn.execute(
+            """INSERT INTO meta.ingest_batch
+                 (spec_name, source_file, digest, archived_to, row_count, total_amount)
+               VALUES (%s,%s,%s,%s,%s,%s) RETURNING batch_id""",
+            (spec_name, path.name, digest, str(dest), row_count, total),
+        ).fetchone()
+        conn.commit()
+    except Exception:
+        dest.unlink(missing_ok=True)
+        raise
     return row[0]
 
 

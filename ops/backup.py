@@ -46,13 +46,18 @@ def dump(database_url: str, out_dir: Path) -> Path:
     with psycopg.connect(database_url) as conn, \
          zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         for table in list_tables(conn):
-            n = 0
             with z.open(f"{table}.csv", "w") as out, \
                  conn.cursor().copy(f"COPY {table} TO STDOUT WITH CSV HEADER") as cp:
                 for chunk in cp:
                     out.write(bytes(chunk))
-                    n += bytes(chunk).count(b"\n")
-            manifest["tables"][table] = max(n - 1, 0)   # trừ dòng tiêu đề
+            # Đếm bằng SELECT count(*), KHÔNG đếm ký tự xuống dòng trong CSV:
+            # một ô chữ chứa ký tự xuống dòng (商品名, 支店名 — Excel cho phép)
+            # làm số đếm lớn hơn thực tế, khiến verify() mỗi quý báo ok:False
+            # GIẢ. Cảnh báo sai cũng nguy hiểm như không cảnh báo: người ta
+            # học cách bỏ qua nó.
+            manifest["tables"][table] = conn.execute(
+                f"SELECT count(*) FROM {table}"
+            ).fetchone()[0]
         manifest["migrations"] = [
             r[0] for r in conn.execute(
                 "SELECT filename FROM meta.schema_migration ORDER BY filename"

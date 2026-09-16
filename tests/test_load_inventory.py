@@ -1,6 +1,5 @@
 from pathlib import Path
 from datetime import date
-from db.migrate import apply_all
 from kome.config import load_specs
 from kome.reader import read
 from kome.loaders import inventory

@@ -1,0 +1,23 @@
+<!-- kome/web/templates/error.html -->
+<!-- Trang lỗi cho mọi lỗi NGOÀI DỰ KIẾN. CỐ Ý không hiện chuỗi ngoại lệ gốc
+     của thư viện (tiếng Anh, khó hiểu, dễ làm người dùng tưởng mình bấm sai
+     rồi thử lại) — chuỗi đó chỉ nằm trong nhật ký máy chủ. -->
+<!doctype html><meta charset="utf-8"><title>KOME — có lỗi</title>
+<style>
+ body{font:16px/1.6 system-ui;max-width:760px;margin:2rem auto;padding:0 1rem}
+ .box{background:#fee;border:1px solid #c00;color:#900;padding:1rem 1.25rem;border-radius:8px}
+ h1{font-size:1.4rem}
+ ol{margin:.5rem 0 0 1.2rem;padding:0}
+</style>
+<div class="box">
+<h1>❌ Hệ thống gặp lỗi khi {{ viec }}</h1>
+<p><strong>Dữ liệu chưa được nạp.</strong> Lần nạp vừa rồi đã được huỷ hoàn toàn,
+không có gì nửa vời nằm lại trong cơ sở dữ liệu.</p>
+<p>Hãy làm theo thứ tự:</p>
+<ol>
+ <li>Chụp lại <strong>toàn bộ màn hình này</strong>.</li>
+ <li>Gửi ảnh chụp kèm file Excel vừa kéo–thả cho người phụ trách kỹ thuật.</li>
+ <li><strong>Đừng thử nạp lại nhiều lần</strong> — thử lại không làm hết lỗi.</li>
+</ol>
+</div>
+<p><a href="/">← Về trang nạp dữ liệu</a> · <a href="/health">Kiểm tra sức khoẻ</a></p>
