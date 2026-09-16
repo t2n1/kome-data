@@ -126,12 +126,15 @@ def test_loi_ngoai_du_kien_hien_tieng_viet_khong_lo_chuoi_ngoai_le(
     """Nửa NHÌN THẤY ĐƯỢC của lỗi lô mồ côi: người dùng gặp trang 500 tiếng Anh
     khó hiểu rồi thử lại và được báo 'xanh'. Lỗi ngoài dự kiến phải ra thông
     báo tiếng Việt, và KHÔNG chứa nguyên văn chuỗi ngoại lệ của thư viện."""
-    import kome.web.app as W
+    # Vá ở kome.pipeline chứ không ở kome.web.app: app.py CỐ Ý nhập ingest
+    # bên trong thân route, để bản chỉ-đọc trên Vercel không kéo pandas
+    # (~120 MB) vào gói triển khai. Xem tests/test_bao_mat.py.
+    import kome.pipeline as P
 
     def no_tung(*a, **kw):
         raise RuntimeError("psycopg.OperationalError: connection reset by peer")
 
-    monkeypatch.setattr(W, "ingest", no_tung)
+    monkeypatch.setattr(P, "ingest", no_tung)
     client = TestClient(create_app(db_url=test_db_url), raise_server_exceptions=False)
     with open("tests/fixtures/zaiko_ok.xlsx", "rb") as f:
         r = client.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", f)})
@@ -215,12 +218,12 @@ def test_ba_trang_doc_duoc_o_che_do_toi(conn, test_db_url):
 
 
 def test_trang_loi_cung_doc_duoc_o_che_do_toi(conn, test_db_url, monkeypatch):
-    import kome.web.app as W
+    import kome.pipeline as P
 
     def no_tung(*a, **kw):
         raise RuntimeError("hỏng")
 
-    monkeypatch.setattr(W, "ingest", no_tung)
+    monkeypatch.setattr(P, "ingest", no_tung)
     client = TestClient(create_app(db_url=test_db_url), raise_server_exceptions=False)
     with open("tests/fixtures/zaiko_ok.xlsx", "rb") as f:
         r = client.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", f)})

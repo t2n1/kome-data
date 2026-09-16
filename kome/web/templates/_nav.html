@@ -1,7 +1,16 @@
 {# Thanh điều hướng dùng chung. Biến `trang` ('nap' | 'suc-khoe' | 'phu') đánh
-   dấu trang đang xem; trang lỗi không truyền biến này nên không mục nào sáng. #}
+   dấu trang đang xem; trang lỗi không truyền biến này nên không mục nào sáng.
+
+   `chi_doc`: bản chạy công khai (Vercel) không nạp được dữ liệu — xem ghi chú
+   ở kome/web/app.py::_chi_doc. Ẩn hẳn mục "Nạp dữ liệu" thay vì để nó dẫn tới
+   một trang 403: một liên kết luôn từ chối thì tệ hơn là không có liên kết. #}
 <nav class="dieu-huong">
+  {% if not chi_doc %}
   <a href="/"{% if trang == 'nap' %} class="dang-xem" aria-current="page"{% endif %}>📥 Nạp dữ liệu</a>
+  {% endif %}
   <a href="/health"{% if trang == 'suc-khoe' %} class="dang-xem" aria-current="page"{% endif %}>🩺 Sức khoẻ dữ liệu</a>
   <a href="/phu-du-lieu"{% if trang == 'phu' %} class="dang-xem" aria-current="page"{% endif %}>🗓️ Bảng phủ dữ liệu</a>
+  {% if co_mat_khau %}
+  <form method="post" action="/dang-xuat" class="thoat"><button type="submit">Thoát</button></form>
+  {% endif %}
 </nav>

@@ -1,0 +1,17 @@
+# Thư viện cho BẢN CHẠY TRÊN VERCEL — cố ý KHÔNG có pandas và python-calamine.
+#
+# File này còn là thứ Vercel dùng để NHẬN DIỆN đây là ứng dụng FastAPI. Bỏ
+# dòng fastapi đi là Vercel không biết chạy cái gì.
+#
+# pandas + python-calamine chỉ dùng để ĐỌC file Excel, việc mà bản chỉ-đọc
+# không bao giờ làm (xem kome/web/app.py: ingest/undo_batch nhập bên trong
+# thân route). Chúng nặng ~120 MB: vẫn lọt giới hạn gói 500 MB, nhưng làm mỗi
+# lần triển khai và mỗi lần khởi động nguội chậm đi vì một thứ không ai dùng.
+#
+# Máy trong công ty KHÔNG dùng file này; ở đó cài bằng `pip install -e .`
+# (pyproject.toml) để có đủ cả bộ nạp dữ liệu.
+fastapi>=0.115
+jinja2>=3.1
+psycopg[binary]>=3.2
+PyYAML>=6.0
+python-multipart>=0.0.9

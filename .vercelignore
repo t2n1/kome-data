@@ -1,0 +1,25 @@
+# Những gì KHÔNG đẩy lên máy chủ công khai.
+#
+# Hai lý do tách bạch:
+#  1. Thông tin — mọi file đẩy lên đều nằm trên máy chủ ngoài công ty.
+#     tests/fixtures chứa dữ liệu khách hàng đã khử danh tính, nhưng "đã khử
+#     danh tính" không phải lý do để mang nó ra khỏi công ty.
+#  2. Dung lượng và thời gian — Vercel gói MỌI file có trong dự án (không tự
+#     lược bỏ thứ không dùng), nên mỗi file thừa là thêm thời gian triển khai.
+tests/
+docs/
+scripts/
+db/
+backups/
+raw_archive/
+raw_archive_that/
+.superpowers/
+*.xlsx
+*.zip
+kome_data.egg-info/
+
+# pyproject.toml khai đầy đủ pandas + python-calamine cho máy trong công ty.
+# Vercel chấp nhận CẢ pyproject.toml lẫn requirements.txt để cài thư viện; để
+# cả hai là mập mờ không biết bên nào thắng. Giấu đi thì chỉ còn một nguồn.
+# Bản trên Vercel không cài gói `kome` — server.py ở gốc nhập thẳng từ mã nguồn.
+pyproject.toml

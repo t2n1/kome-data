@@ -4,11 +4,12 @@ from datetime import date, datetime
 from pathlib import Path
 import re
 from kome import archive, gates
-from kome.config import load_specs, FileSpec
+from kome.config import SPECS, FileSpec
 from kome.reader import read, ColumnMismatch
 from kome.loaders import inventory, customer, sales, master, price
 
-SPECS = load_specs(Path("config/files.yml"))
+# SPECS chuyển sang kome/config.py — xem ghi chú ở đó. Vẫn nhập lại tên ở
+# đây vì nhiều nơi đã gọi `from kome.pipeline import SPECS`.
 
 # shohin/shiiresaki/chokusousaki: upsert đơn giản theo khoá, không giữ lịch sử
 # -> một loader chung điều khiển bằng cấu hình (kome/loaders/master.py).

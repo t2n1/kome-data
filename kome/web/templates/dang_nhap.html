@@ -1,0 +1,33 @@
+<!-- kome/web/templates/dang_nhap.html
+     CỐ Ý không có thanh điều hướng: chưa đăng nhập thì mọi liên kết trên đó
+     đều quay về đây, và một thanh menu bấm đâu cũng không đi đâu làm người
+     dùng tưởng trang hỏng. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KOME — đăng nhập</title>
+{% include "_chung.html" %}
+<style>
+ .hop{max-width:24rem;margin:3rem auto;border:1px solid var(--vien);border-radius:12px;
+      padding:1.5rem;background:var(--nen-phu)}
+ h1{font-size:1.3rem;margin:0 0 1rem}
+ input[type=password]{width:100%;box-sizing:border-box;font:inherit;padding:.6rem;
+      border-radius:8px;border:1px solid var(--vien);background:var(--nen);color:var(--chu)}
+ button{font:inherit;padding:.5rem 1.25rem;border-radius:8px;border:1px solid var(--vien);
+      background:var(--nen);color:var(--chu);cursor:pointer;margin-top:.75rem}
+ .sai{background:var(--loi-nen);border:1px solid var(--loi-vien);color:var(--loi-chu);
+      padding:.6rem .9rem;border-radius:8px;margin-bottom:1rem}
+ .nho{color:var(--chu-nhat);font-size:.85rem;margin-top:1rem}
+</style>
+<div class="hop">
+  <h1>🔒 Dữ liệu KOME</h1>
+  {% if sai %}<div class="sai">Mật khẩu không đúng.</div>{% endif %}
+  <form method="post" action="/dang-nhap">
+    <label for="mk">Mật khẩu chung của công ty</label>
+    <input id="mk" type="password" name="mat_khau" required autofocus
+           autocomplete="current-password">
+    <button type="submit">Vào xem</button>
+  </form>
+  <p class="nho">Trang này hiển thị doanh thu, lãi gộp và danh sách khách hàng.
+     Đừng gửi mật khẩu ra ngoài công ty.</p>
+</div>
+</html>

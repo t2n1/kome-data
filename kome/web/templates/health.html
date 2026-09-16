@@ -4,7 +4,12 @@
 {% include "_chung.html" %}
 {% include "_nav.html" %}
 <h1>Sức khoẻ dữ liệu</h1>
-{% if backup.stale %}
+{# backup = None ở bản chỉ-đọc: máy chủ công khai không nhìn thấy thư mục sao
+   lưu nên mọi kết luận nó đưa ra đều sai. Im lặng đúng hơn là một dải đỏ
+   vĩnh viễn — xem ghi chú ở kome/web/app.py. #}
+{% if backup is none %}
+<div class="ky">💾 Tình trạng sao lưu chỉ xem được trên bản chạy ở máy trong công ty.</div>
+{% elif backup.stale %}
 <div class="backup-bad">
 ⚠️ Chưa sao lưu {% if backup.last %}từ {{ backup.last.strftime("%Y-%m-%d %H:%M") }}{% else %}— chưa có bản sao lưu nào{% endif %} — chạy sao lưu ngay:
 <code>python -c "from ops.backup import dump, prune; import os, pathlib; dump(os.environ['DATABASE_URL'], pathlib.Path('backups')); prune(pathlib.Path('backups'))"</code>

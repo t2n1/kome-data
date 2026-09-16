@@ -2,13 +2,28 @@
 import os, shutil, tempfile, traceback
 from datetime import timedelta
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, Request
+from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from kome.config import SPECS
 from kome.coverage import tinh_bang_phu
 from kome.db import connect
-from kome.pipeline import ingest, undo_batch, SPECS
+from kome.env import nap_env
+from kome.web import bao_mat
 from ops.backup import backup_status
+
+# Tự đọc .env khi chạy ở máy trong công ty. `uvicorn kome.web.app:app` khởi
+# động trong môi trường trống, nên không có dòng này thì trang chạy lên bình
+# thường rồi báo lỗi đỏ ở /health — người dùng đọc thành "hỏng CSDL" chứ
+# không đọc ra "quên nạp biến môi trường".
+# bat_buoc=False: trên Vercel KHÔNG có file .env (biến lấy từ bảng cấu hình),
+# và biến môi trường đã có sẵn luôn được ưu tiên hơn file.
+nap_env(bat_buoc=False)
+
+# CỐ Ý không nhập kome.pipeline ở đây. pipeline kéo theo pandas +
+# python-calamine (~120 MB) chỉ để ĐỌC file Excel — thứ mà bản chỉ-đọc trên
+# Vercel không bao giờ làm. Hai hàm ingest/undo_batch được nhập bên trong thân
+# route, nên chúng chỉ nạp khi thật sự có người nạp hoặc hoàn tác dữ liệu.
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -16,7 +31,24 @@ TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 SO_NGAY_SOAT = 30
 
 
-def _loi(request: Request, viec: str, exc: Exception) -> HTMLResponse:
+def _chi_doc() -> bool:
+    """Trang có ở chế độ CHỈ ĐỌC không (ẩn hẳn phần nạp dữ liệu)?
+
+    Trên Vercel thì LUÔN chỉ đọc, và đây không phải lựa chọn:
+      * mỗi yêu cầu bị chặn ở 4,5 MB, còn một file 売上伝票データ nặng ~100 MB;
+      * ổ đĩa của hàm serverless là tạm — ghi xong là mất, nên lớp `raw`
+        (lưu nguyên file Excel gốc) không tồn tại được ở đó;
+      * nạp một quý bán hàng mất ~88 giây, vượt giới hạn thời gian chạy.
+    Ba thứ đó là giới hạn nền tảng. Cho phép bật nạp dữ liệu trên Vercel chỉ
+    tạo ra một nút bấm luôn báo lỗi khó hiểu giữa chừng.
+
+    Ngoài Vercel thì đặt KOME_CHI_DOC=1 nếu muốn dựng thêm một bản chỉ để xem.
+    """
+    return bao_mat.tren_mang() or os.environ.get("KOME_CHI_DOC", "").strip().lower() in (
+        "1", "true", "yes", "co", "có")
+
+
+def _loi(request: Request, viec: str, exc: Exception, chung: dict) -> HTMLResponse:
     """Trang lỗi tiếng Việt cho mọi lỗi NGOÀI DỰ KIẾN.
 
     Công ty không có nhân sự IT: trang 500 mặc định của framework (tiếng Anh,
@@ -26,7 +58,7 @@ def _loi(request: Request, viec: str, exc: Exception) -> HTMLResponse:
     """
     print(f"[KOME] lỗi khi {viec}:\n{traceback.format_exc()}")
     return TEMPLATES.TemplateResponse(
-        request, "error.html", {"viec": viec}, status_code=500
+        request, "error.html", {"viec": viec, **chung}, status_code=500
     )
 
 
@@ -62,21 +94,104 @@ def _ky_du_lieu(conn) -> dict:
 
 def create_app(db_url: str | None = None) -> FastAPI:
     """db_url=None => lấy DATABASE_URL. Test LUÔN truyền DATABASE_URL_TEST."""
-    app = FastAPI(title="KOME — nạp dữ liệu")
+    app = FastAPI(title="KOME — dữ liệu")
     archive_dir = Path(os.environ.get("ARCHIVE_DIR", "./raw_archive"))
     open_conn = lambda: connect(db_url)
+    chi_doc = _chi_doc()
 
+    mk = bao_mat.mat_khau()
+    # Ném CauHinhSai ngay lúc dựng app, trước khi phục vụ dòng nào.
+    bao_mat.kiem_cau_hinh(mk, cong_khai=bao_mat.tren_mang())
+
+    # Biến mà MỌI trang đều cần để vẽ đúng thanh điều hướng. Gom vào một chỗ
+    # để không trang nào bị sót: sót `chi_doc` thì trang đó vẫn mời người ta
+    # bấm "Nạp dữ liệu" — một liên kết dẫn thẳng tới 403 trên bản công khai.
+    chung = {"chi_doc": chi_doc, "co_mat_khau": bool(mk)}
+
+    def _ve(request: Request, ten: str, ctx: dict, **kw) -> HTMLResponse:
+        return TEMPLATES.TemplateResponse(request, ten, {**ctx, **chung}, **kw)
+
+    def _chi_gui_qua_https(request: Request) -> bool:
+        """Có gắn cờ Secure lên cookie không (cấm trình duyệt gửi qua HTTP)?
+
+        Không chỉ đọc `request.url.scheme`: trên Vercel ứng dụng đứng sau một
+        lớp proxy đã gỡ vỏ HTTPS trước khi tới đây, nên scheme có thể đọc ra
+        "http" dù người dùng đang ở HTTPS — và cờ Secure sẽ âm thầm không được
+        gắn. Đang chạy công khai thì chắc chắn là HTTPS, khẳng định thẳng.
+
+        Ngược lại KHÔNG gắn cứng True: bản chạy ở máy dùng http://127.0.0.1,
+        mà trình duyệt lặng lẽ vứt cookie Secure trên HTTP — đăng nhập xong
+        vẫn bị đá về trang đăng nhập, không có thông báo nào giải thích.
+        """
+        return bao_mat.tren_mang() or request.url.scheme == "https"
+
+    def _cam(request: Request) -> HTMLResponse:
+        return _ve(request, "chi_doc.html", {"trang": None}, status_code=403)
+
+    # ---- Cổng đăng nhập -------------------------------------------------
+    # Dùng middleware chứ không phải dependency trên từng route: route nào
+    # thêm về sau cũng tự động được che. Quên gắn dependency cho một route
+    # mới là để hở đúng cái nó hiển thị, mà không có gì báo.
+    if mk:
+        @app.middleware("http")
+        async def chan_cua(request: Request, call_next):
+            if request.url.path == "/dang-nhap" or bao_mat.ve_hop_le(
+                    request.cookies.get(bao_mat.TEN_COOKIE), mk):
+                return await call_next(request)
+            tiep = request.url.path
+            if request.url.query:
+                tiep += "?" + request.url.query
+            resp = RedirectResponse("/dang-nhap", status_code=303)
+            # Nhớ nơi người ta định đến để đăng nhập xong quay lại đúng chỗ,
+            # nhưng chỉ nhớ trong cookie tạm — không đưa vào địa chỉ, vì địa
+            # chỉ thì lộ ra lịch sử duyệt web và nhật ký máy chủ.
+            resp.set_cookie("kome_tiep", tiep, max_age=600, httponly=True,
+                            samesite="lax", secure=_chi_gui_qua_https(request))
+            return resp
+
+        @app.get("/dang-nhap", response_class=HTMLResponse)
+        def form_dang_nhap(request: Request):
+            return _ve(request, "dang_nhap.html", {"trang": None, "sai": False})
+
+        @app.post("/dang-nhap")
+        def nhan_dang_nhap(request: Request, mat_khau: str = Form("")):
+            if not bao_mat.dung_mat_khau(mat_khau, mk):
+                return _ve(request, "dang_nhap.html",
+                           {"trang": None, "sai": True}, status_code=401)
+            resp = RedirectResponse(
+                bao_mat.duong_dan_an_toan(request.cookies.get("kome_tiep")),
+                status_code=303)
+            resp.set_cookie(
+                bao_mat.TEN_COOKIE, bao_mat.tao_ve(mk),
+                max_age=bao_mat.HAN_PHIEN_GIAY, httponly=True, samesite="lax",
+                secure=_chi_gui_qua_https(request))
+            resp.delete_cookie("kome_tiep")
+            return resp
+
+        @app.post("/dang-xuat")
+        def dang_xuat():
+            resp = RedirectResponse("/dang-nhap", status_code=303)
+            resp.delete_cookie(bao_mat.TEN_COOKIE)
+            return resp
+
+    # ---- Các trang ------------------------------------------------------
     @app.get("/", response_class=HTMLResponse)
     def home(request: Request):
         try:
-            return TEMPLATES.TemplateResponse(
-                request, "upload.html", {"results": None, "trang": "nap"})
+            if chi_doc:
+                # Đây là địa chỉ người ta chia sẻ cho nhau. Đưa thẳng tới
+                # trang xem được thay vì một trang 403 cụt lủn.
+                return RedirectResponse("/health", status_code=303)
+            return _ve(request, "upload.html", {"results": None, "trang": "nap"})
         except Exception as e:
-            return _loi(request, "mở trang nạp dữ liệu", e)
+            return _loi(request, "mở trang nạp dữ liệu", e, chung)
 
     @app.post("/upload", response_class=HTMLResponse)
     def upload(request: Request, files: list[UploadFile]):
+        if chi_doc:
+            return _cam(request)
         try:
+            from kome.pipeline import ingest
             results = []
             with open_conn() as conn:
                 for f in files:
@@ -85,10 +200,9 @@ def create_app(db_url: str | None = None) -> FastAPI:
                         with staged.open("wb") as out:
                             shutil.copyfileobj(f.file, out)
                         results.append(ingest(conn, staged, archive_dir))
-            return TEMPLATES.TemplateResponse(
-                request, "upload.html", {"results": results, "trang": "nap"})
+            return _ve(request, "upload.html", {"results": results, "trang": "nap"})
         except Exception as e:
-            return _loi(request, "nạp file dữ liệu", e)
+            return _loi(request, "nạp file dữ liệu", e, chung)
 
     @app.get("/health", response_class=HTMLResponse)
     def health(request: Request):
@@ -122,13 +236,16 @@ def create_app(db_url: str | None = None) -> FastAPI:
                  "co_tien": s.total_column is not None}
                 for k, s in SPECS.items()
             ]
-            backup = backup_status(backup_dir)
-            return TEMPLATES.TemplateResponse(
-                request, "health.html",
-                {"status": status, "backup": backup, "ky": ky, "trang": "suc-khoe"}
-            )
+            # Bản chỉ-đọc KHÔNG nói gì về sao lưu. Sao lưu chạy trên máy nội
+            # bộ, nơi có file .zip; máy chủ công khai không nhìn thấy thư mục
+            # đó nên sẽ luôn kết luận "chưa sao lưu" — một dải đỏ vĩnh viễn
+            # dạy người đọc bỏ qua dải đỏ, đúng thứ hệ thống này cần họ tin.
+            backup = None if chi_doc else backup_status(backup_dir)
+            return _ve(request, "health.html",
+                       {"status": status, "backup": backup, "ky": ky,
+                        "trang": "suc-khoe"})
         except Exception as e:
-            return _loi(request, "mở trang sức khoẻ dữ liệu", e)
+            return _loi(request, "mở trang sức khoẻ dữ liệu", e, chung)
 
     @app.get("/phu-du-lieu", response_class=HTMLResponse)
     def phu_du_lieu(request: Request):
@@ -147,20 +264,21 @@ def create_app(db_url: str | None = None) -> FastAPI:
             # Mẫu KHÔNG in `bang.database`: tên CSDL là thông tin kết nối,
             # còn trang này thì ai mở cũng xem được. Terminal in được vì chỉ
             # người chạy lệnh mới thấy.
-            return TEMPLATES.TemplateResponse(
-                request, "phu_du_lieu.html", {"bang": bang, "trang": "phu"}
-            )
+            return _ve(request, "phu_du_lieu.html", {"bang": bang, "trang": "phu"})
         except Exception as e:
-            return _loi(request, "mở trang bảng phủ dữ liệu", e)
+            return _loi(request, "mở trang bảng phủ dữ liệu", e, chung)
 
     @app.post("/undo/{batch_id}")
     def undo(request: Request, batch_id: int):
+        if chi_doc:
+            return _cam(request)
         try:
+            from kome.pipeline import undo_batch
             with open_conn() as conn:
                 undo_batch(conn, batch_id)
             return RedirectResponse("/health", status_code=303)
         except Exception as e:
-            return _loi(request, "hoàn tác lần nạp dữ liệu", e)
+            return _loi(request, "hoàn tác lần nạp dữ liệu", e, chung)
 
     return app
 

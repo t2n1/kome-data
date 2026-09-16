@@ -59,4 +59,10 @@
  .dieu-huong a:hover{background:var(--nen-phu)}
  .dieu-huong a.dang-xem{background:var(--nen-phu);border-color:var(--vien);
    color:var(--chu);font-weight:600}
+ /* Nút Thoát đẩy về cuối thanh: nó không phải một trang, không đứng cùng hàng
+    với ba mục điều hướng. Chỉ hiện khi trang có đặt mật khẩu. */
+ .dieu-huong .thoat{margin-left:auto}
+ .dieu-huong .thoat button{font:inherit;padding:.4rem .75rem;border-radius:8px;
+   border:1px solid var(--vien);background:transparent;color:var(--chu-nhat);cursor:pointer}
+ .dieu-huong .thoat button:hover{background:var(--nen-phu);color:var(--chu)}
 </style>

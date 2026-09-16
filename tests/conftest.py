@@ -5,6 +5,13 @@ import pytest
 import psycopg
 
 from db.migrate import apply_all
+from kome.env import nap_env
+
+# Đọc .env ngay khi pytest nạp conftest. Không có dòng này thì `pytest` chỉ
+# chạy được sau khi người ta nhớ nạp biến môi trường bằng tay — và trên
+# PowerShell thì cú pháp nạp đó còn khác Bash. Biến đã có sẵn vẫn được ưu
+# tiên, nên chạy trong CI (không có .env) không đổi gì.
+nap_env(bat_buoc=False)
 
 MIGRATIONS = Path("db/migrations")
 SCHEMAS = ("core", "mart", "app", "meta")

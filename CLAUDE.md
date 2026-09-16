@@ -60,6 +60,32 @@ ra → **migration phải LUÔN chạy bằng vai trò `postgres`**. Đổi vai 
 migration thì quyền mặc định cho bảng mới sẽ âm thầm không áp dụng, và lỗi
 chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc nạp dữ liệu.
 
+## Hai bản chạy của web app
+| | Máy trong công ty | Vercel (công khai) |
+|---|---|---|
+| Nạp / Hoàn tác | có | **không** |
+| Đăng nhập | không bắt buộc | **bắt buộc** (`KOME_MAT_KHAU`) |
+| Cổng CSDL | 5432 (session pooler) | **6543** (transaction pooler) |
+| Gói cài | `pip install -e .` (có pandas) | `requirements.txt` (**không** pandas) |
+| Điểm vào | `uvicorn kome.web.app:app` | `server.py` ở gốc (Vercel tự tìm) |
+
+Chế độ chỉ-đọc do biến `VERCEL` quyết định (`kome/web/app.py::_chi_doc`), không
+có công tắc tắt. Lý do là giới hạn nền tảng, không phải sở thích: mỗi yêu cầu
+bị chặn ở **4,5 MB** trong khi `売上伝票データ` nặng ~100 MB; ổ đĩa là tạm nên lớp
+`raw` không tồn tại được; nạp một quý mất ~88 giây, vượt giới hạn thời gian chạy.
+
+**Bất biến:** `kome/web/app.py` KHÔNG được nhập `kome.pipeline` (hay pandas,
+python-calamine) ở mức ngoài cùng — chỉ nhập bên trong thân route. `ingest`/
+`undo_batch` kéo theo ~120 MB, mà `requirements.txt` của Vercel cố ý không có
+chúng, nên nhập ở đầu file sẽ làm trang chết ngay khi khởi động. Có test canh:
+`tests/test_bao_mat.py::test_trang_chi_doc_khong_phu_thuoc_pandas`.
+
+**Bất biến:** qua cổng 6543 phải tắt câu lệnh chuẩn bị sẵn (`prepare_threshold
+=None`, đã làm trong `kome/db.py`). Không tắt thì lỗi chỉ nổ sau vài chục lượt
+xem — tức là lúc trang đã chạy được một thời gian và có người đang dùng.
+
+Chi tiết triển khai: `docs/trien-khai-vercel.md`.
+
 ## Không được tự ý sửa
 - File trong `db/migrations/` đã chạy rồi — chỉ thêm file mới
 - Luật bất biến trong kế hoạch/đặc tả

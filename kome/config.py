@@ -45,3 +45,16 @@ class FileSpec:
 def load_specs(path: Path) -> dict[str, FileSpec]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     return {name: FileSpec(name=name, **body) for name, body in raw.items()}
+
+
+# Thư mục gốc của dự án, suy từ vị trí CHÍNH file này chứ không từ thư mục
+# đang đứng. Trước đây pipeline nạp cấu hình bằng đường dẫn tương đối
+# `config/files.yml`, nên nó chỉ chạy được khi người ta tình cờ đứng đúng ở
+# gốc dự án. Trên Vercel thư mục làm việc không phải gốc dự án, và lỗi hiện ra
+# là "không tìm thấy file" ngay lúc khởi động — sau khi đã triển khai xong.
+GOC = Path(__file__).resolve().parent.parent
+
+# Khai báo các loại file OBC. Ở ĐÂY chứ không ở kome/pipeline.py: trang web
+# chỉ-đọc cần SPECS để vẽ bảng /health, mà nhập nó qua pipeline sẽ kéo theo
+# pandas và python-calamine (~120 MB) vào gói triển khai, chỉ để đọc tên file.
+SPECS: dict[str, FileSpec] = load_specs(GOC / "config" / "files.yml")

@@ -18,6 +18,36 @@ lệnh dưới đây **tự đọc file `.env`**. Mỗi lệnh đều có thêm 
 
 ---
 
+## Mở trang web ở máy trong công ty
+
+```bash
+python -m uvicorn kome.web.app:app --host 127.0.0.1 --port 8000
+```
+
+Rồi mở trình duyệt vào <http://127.0.0.1:8000>. Lệnh này **tự đọc `.env`** nên
+không cần nạp biến môi trường trước. Cứ để cửa sổ đó mở; đóng cửa sổ là trang
+tắt.
+
+Bản chạy ở máy có **đủ cả ba trang**: nạp dữ liệu, sức khoẻ dữ liệu, bảng phủ
+dữ liệu. Bản trên mạng (Vercel) chỉ có hai trang sau — xem
+[docs/trien-khai-vercel.md](trien-khai-vercel.md) để biết vì sao và cách đưa lên.
+
+---
+
+## Trang trên mạng báo lỗi, hoặc không ai đăng nhập được
+
+| Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
+|---|---|---|
+| Trang không mở, Vercel báo lỗi khởi động | Thiếu `KOME_MAT_KHAU`, hoặc mật khẩu ngắn dưới 12 ký tự | Vercel → Settings → Environment Variables → sửa → **Redeploy** |
+| Mở được một lúc rồi báo lỗi đỏ | `DATABASE_URL` đang dùng **cổng 5432** thay vì **6543** | Đổi sang chuỗi Transaction pooler (cổng 6543) → Redeploy |
+| Cần chặn một người đã nghỉ việc | Họ vẫn nhớ mật khẩu chung | Đổi `KOME_MAT_KHAU` rồi Redeploy — **mọi** lần đăng nhập đang có hiệu lực bị huỷ ngay |
+
+Trang trên mạng **không nạp dữ liệu được** và điều đó là cố ý, không phải hỏng:
+mỗi lần gửi bị Vercel chặn ở 4,5 MB còn một file `売上伝票データ` nặng khoảng
+100 MB. Nạp dữ liệu vẫn làm ở máy trong công ty như thường lệ.
+
+---
+
 ## Tạo tài khoản đăng nhập cho từng vai trò
 
 Migration `db/migrations/009_roles.sql` chỉ tạo 4 **vai trò** (`kome_ingest`,
