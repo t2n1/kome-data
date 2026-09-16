@@ -67,3 +67,28 @@ def test_khac_voi_nam_tai_chinh_nhat(conn):
         """SELECT count(*) FROM core.dim_date WHERE fiscal_year <> company_fy"""
     ).fetchone()[0]
     assert n > 0, "hai lịch phải khác nhau ở một số ngày"
+
+
+def test_so_ky_theo_cach_cong_ty_goi(conn):
+    """Chủ sở hữu xác nhận: Kỳ 8 = 2026-08-01 → 2027-07-31, Kỳ 7 và 6 là các năm trước."""
+    rows = {
+        str(r[0]): (r[1], r[2])
+        for r in conn.execute(
+            """SELECT date_key, company_fy_no, company_fy_label FROM core.dim_date
+               WHERE date_key IN ('2024-08-01','2025-07-31','2025-08-01',
+                                  '2026-07-31','2026-08-01','2027-07-31')"""
+        ).fetchall()
+    }
+    assert rows["2024-08-01"][0] == 6 and rows["2025-07-31"][0] == 6   # Kỳ 6 trọn vẹn
+    assert rows["2025-08-01"][0] == 7 and rows["2026-07-31"][0] == 7   # Kỳ 7
+    assert rows["2026-08-01"][0] == 8 and rows["2027-07-31"][0] == 8   # Kỳ 8
+    assert rows["2026-08-01"][1] == "Kỳ 8 (2026-08 → 2027-07)"
+
+
+def test_moi_ky_co_dung_mot_so_ky(conn):
+    n = conn.execute(
+        """SELECT count(*) FROM (
+             SELECT company_fy FROM core.dim_date
+             GROUP BY company_fy HAVING count(DISTINCT company_fy_no) <> 1) x"""
+    ).fetchone()[0]
+    assert n == 0
