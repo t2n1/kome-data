@@ -201,13 +201,47 @@ git commit -m "feat: khung repo, gói kome, tài liệu ngữ cảnh cho AI"
 import os, pytest, psycopg
 
 @pytest.fixture
-def conn():
+def test_db_url() -> str:
+    """CHỈ CSDL thử nghiệm. Fixture conn sẽ XOÁ SẠCH schema — không bao giờ trỏ vào CSDL thật."""
     url = os.environ["DATABASE_URL_TEST"]
-    with psycopg.connect(url) as c:
+    assert url != os.environ.get("DATABASE_URL"), \
+        "DATABASE_URL_TEST trùng DATABASE_URL — test sẽ xoá sạch CSDL thật"
+    return url
+
+@pytest.fixture
+def conn(test_db_url):
+    with psycopg.connect(test_db_url) as c:
         c.execute("DROP SCHEMA IF EXISTS core, mart, app, meta CASCADE")
         c.commit()
         yield c
+
+@pytest.fixture
+def batch(conn):
+    """Tạo sẵn một dòng meta.ingest_batch và trả về batch_id.
+
+    Mọi bảng fact/dim đều có batch_id REFERENCES meta.ingest_batch(batch_id),
+    nên test nào ghi dữ liệu cũng phải có lô thật — truyền số 1 tuỳ tiện sẽ
+    vi phạm khoá ngoại.
+    """
+    from pathlib import Path
+    from db.migrate import apply_all
+    apply_all(conn, Path("db/migrations"))
+
+    def _make(n: int = 1) -> int:
+        row = conn.execute(
+            """INSERT INTO meta.ingest_batch
+                 (spec_name, source_file, digest, archived_to, row_count)
+               VALUES ('test', 'test.xlsx', %s, '/tmp/test.xlsx', 0)
+               RETURNING batch_id""",
+            (f"digest-{n}",),
+        ).fetchone()
+        conn.commit()
+        return row[0]
+
+    return _make
 ```
+
+> **Lưu ý cho mọi task sau:** test nào ghi vào bảng có `batch_id` thì dùng fixture `batch` để lấy id thật, ví dụ `bid = batch(1)`. Đừng truyền số cứng.
 
 ```python
 # tests/test_migrate.py
@@ -531,8 +565,9 @@ def test_cong_3_chan_file_cat_cut():
     assert any(b.gate == 3 for b in blockers)
 
 def test_cong_3_chan_khoa_trung():
+    import pandas as pd
     df = read(OK, SPECS["zaiko"])
-    doubled = df._append(df.iloc[[0]], ignore_index=True)
+    doubled = pd.concat([df, df.iloc[[0]]], ignore_index=True)   # pandas 3: KHÔNG dùng _append
     blockers, _ = check(Path("在庫一覧_20260916.xlsx"), SPECS["zaiko"], doubled, None)
     assert any(b.gate == 3 and "trùng" in b.message for b in blockers)
 
@@ -905,13 +940,12 @@ SPECS = load_specs(Path("config/files.yml"))
 OK = Path("tests/fixtures/zaiko_ok.xlsx")
 D = date(2026, 9, 16)
 
-def _load(conn, batch_id=1):
-    apply_all(conn, Path("db/migrations"))
+def _load(conn, batch, n=1):
     df = read(OK, SPECS["zaiko"])
-    return inventory.load(conn, df, D, batch_id)
+    return inventory.load(conn, df, D, batch(n))   # batch() trả về batch_id thật
 
-def test_khop_moc_doi_chieu(conn):
-    assert _load(conn) == 177
+def test_khop_moc_doi_chieu(conn, batch):
+    assert _load(conn, batch) == 177
     total, rows, whs = conn.execute(
         """SELECT sum(stock_value), count(*), count(DISTINCT warehouse_code)
            FROM core.fact_inventory_daily WHERE snapshot_date = %s""", (D,)
@@ -920,25 +954,25 @@ def test_khop_moc_doi_chieu(conn):
     assert rows == 177
     assert whs == 2
 
-def test_nap_ba_lan_van_the(conn):
+def test_nap_ba_lan_van_the(conn, batch):
     for i in range(3):
-        _load(conn, batch_id=i + 1)
+        _load(conn, batch, n=i + 1)
     total, rows = conn.execute(
         """SELECT sum(stock_value), count(*) FROM core.fact_inventory_daily
            WHERE snapshot_date = %s""", (D,)
     ).fetchone()
     assert total == 137_839_071 and rows == 177
 
-def test_giu_thap_phan_o_so_luong(conn):
-    _load(conn)
+def test_giu_thap_phan_o_so_luong(conn, batch):
+    _load(conn, batch)
     r = conn.execute(
         """SELECT count(*) FROM core.fact_inventory_daily
            WHERE snapshot_date = %s AND stock_qty <> trunc(stock_qty)""", (D,)
     ).fetchone()
     assert r[0] == 20
 
-def test_dim_warehouse_duoc_tao(conn):
-    _load(conn)
+def test_dim_warehouse_duoc_tao(conn, batch):
+    _load(conn, batch)
     rows = conn.execute("SELECT warehouse_code, warehouse_name FROM core.dim_warehouse ORDER BY 1").fetchall()
     assert rows == [("0001", "茨城第１倉庫（出荷専用）"), ("1002", "新・賞味期限用")]
 ```
@@ -1101,16 +1135,16 @@ from fastapi.testclient import TestClient
 from db.migrate import apply_all
 from kome.web.app import create_app
 
-def test_trang_suc_khoe_mo_duoc(conn):
+def test_trang_suc_khoe_mo_duoc(conn, test_db_url):
     apply_all(conn, Path("db/migrations"))
-    client = TestClient(create_app())
+    client = TestClient(create_app(db_url=test_db_url))   # KHÔNG bao giờ để nó tự lấy DATABASE_URL
     r = client.get("/health")
     assert r.status_code == 200
     assert "在庫一覧" in r.text
 
-def test_upload_file_hong_tra_ve_loi_de_hieu(conn):
+def test_upload_file_hong_tra_ve_loi_de_hieu(conn, test_db_url):
     apply_all(conn, Path("db/migrations"))
-    client = TestClient(create_app())
+    client = TestClient(create_app(db_url=test_db_url))
     with open("tests/fixtures/zaiko_cat_cut.xlsx", "rb") as f:
         r = client.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", f)})
     assert r.status_code == 200
@@ -1197,9 +1231,11 @@ from kome.pipeline import ingest, SPECS
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-def create_app() -> FastAPI:
+def create_app(db_url: str | None = None) -> FastAPI:
+    """db_url=None => lấy DATABASE_URL. Test LUÔN truyền DATABASE_URL_TEST."""
     app = FastAPI(title="KOME — nạp dữ liệu")
     archive_dir = Path(os.environ.get("ARCHIVE_DIR", "./raw_archive"))
+    open_conn = lambda: connect(db_url)
 
     @app.get("/", response_class=HTMLResponse)
     def home(request: Request):
@@ -1208,7 +1244,7 @@ def create_app() -> FastAPI:
     @app.post("/upload", response_class=HTMLResponse)
     def upload(request: Request, files: list[UploadFile]):
         results = []
-        with connect() as conn:
+        with open_conn() as conn:
             for f in files:
                 with tempfile.TemporaryDirectory() as tmp:
                     staged = Path(tmp) / f.filename
@@ -1219,7 +1255,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health", response_class=HTMLResponse)
     def health(request: Request):
-        with connect() as conn:
+        with open_conn() as conn:
             rows = conn.execute(
                 """SELECT spec_name, max(loaded_at), max(row_count), max(total_amount)
                    FROM meta.ingest_batch WHERE undone_at IS NULL GROUP BY spec_name"""
@@ -1236,7 +1272,7 @@ def create_app() -> FastAPI:
 
     @app.post("/undo/{batch_id}")
     def undo(batch_id: int):
-        with connect() as conn:
+        with open_conn() as conn:
             conn.execute("DELETE FROM core.fact_inventory_daily WHERE batch_id = %s", (batch_id,))
             from kome import archive as A
             A.undo(conn, batch_id)
