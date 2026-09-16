@@ -6,6 +6,7 @@ __pycache__/
 venv/
 .venv/
 *.xlsx
+!tests/fixtures/*.xlsx
 *.zip
 backups/
 raw_archive/
