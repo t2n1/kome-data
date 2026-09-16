@@ -6,14 +6,17 @@ import re
 from kome import archive, gates
 from kome.config import load_specs, FileSpec
 from kome.reader import read, ColumnMismatch
-from kome.loaders import inventory
+from kome.loaders import inventory, customer
 
 SPECS = load_specs(Path("config/files.yml"))
-LOADERS = {"zaiko": inventory.load}
+LOADERS = {"zaiko": inventory.load, "tokuisaki": customer.load}
 
 # Bảng nào cần dọn khi hoàn tác một lô, theo từng loại file.
 # Thêm loader mới thì BẮT BUỘC thêm mục ở đây, nếu không hoàn tác sẽ sót bảng.
-UNDO_TABLES = {"zaiko": ["core.fact_inventory_daily"]}
+# Lưu ý dim_customer là SCD2 (luật #6): undo_batch() chỉ DELETE các dòng có
+# batch_id = lô vừa nạp (tức các dòng MỚI được insert ở lô đó); nó không phục
+# hồi lại is_current của các dòng đã bị đóng valid_to trong cùng lô đó.
+UNDO_TABLES = {"zaiko": ["core.fact_inventory_daily"], "tokuisaki": ["core.dim_customer"]}
 
 @dataclass
 class IngestResult:

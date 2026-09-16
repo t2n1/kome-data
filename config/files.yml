@@ -32,3 +32,38 @@ zaiko:
   rate_columns:  []
   # Đối chiếu cho cổng 5: cột tích = thừa số × thừa số
   product_check: {result: stock_value, factors: [stock_qty, stock_unit_cost]}
+
+tokuisaki:
+  display_name: 得意先全情報
+  filename_pattern: '^得意先全情報_(?P<date>\d{8})\.xlsx$'
+  sheet: 得意先データ作成
+  header_row: 1
+  min_rows: 1000        # bản xuất thiếu từng chỉ có 201 dòng -> phải bị chặn
+  keys: [customer_code]
+  columns:
+    得意先コード: customer_code
+    得意先名: customer_name
+    支店名: branch_name
+    ランクコード: rank_code
+    業種・カテゴリーコード: category_code
+    注文アプリコード: order_app_code
+    売上主担当者コード: salesperson_code
+    売価No.コード: price_level_code
+    請求締日コード: closing_day_code
+    請求先コード: billing_customer_code
+    郵便番号: postcode
+    都道府県: prefecture
+    市区町村: city
+    番地: address
+    電話番号: phone
+    インボイス登録番号: invoice_reg_no
+    スポット区分コード: spot_flag
+  # 郵便番号 không thuộc code_columns: tên cột không kết thúc bằng "コード" (luật #4
+  # chỉ áp cho *コード), và reader.py đã đọc dtype=str nên vẫn giữ TEXT. Fixture ẩn
+  # danh xoá trắng toàn bộ cột này (cùng lô với điện thoại/địa chỉ) — nếu liệt vào
+  # code_columns, cổng 3 "cột mã rỗng toàn bộ" sẽ chặn nhầm bản xuất hợp lệ.
+  code_columns: [customer_code, rank_code, category_code, order_app_code, salesperson_code,
+                 price_level_code, closing_day_code, billing_customer_code, spot_flag]
+  money_columns: []
+  qty_columns: []
+  rate_columns: []
