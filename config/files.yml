@@ -82,6 +82,10 @@ uriage:
   warn_row_drop_ratio: 0.3
   warn_total_spike: 5.0
   warn_total_drop: 0.2
+  # sales_date có khoá ngoại tới core.dim_date -> ngày không đọc được
+  # (rác/rỗng, bị errors="coerce" nuốt thành None) PHẢI chặn ở cổng 3,
+  # không được để lô lưu rồi mới bung lỗi khoá ngoại.
+  required_date_columns: [sales_date]
   columns:
     伝票No.: slip_no
     明細行番号: line_seq
@@ -108,6 +112,11 @@ uriage:
     入金額１: paid_amount
     入金伝票No.１: payment_slip_no
     請求締日コード: closing_day_code
+  # line_seq (明細行番号) nằm trong code_columns CÓ CHỦ Ý, đây là ngoại lệ đã
+  # xác nhận với luật "mọi cột mã là TEXT": nó là số thứ tự dòng nội bộ của
+  # phiếu, không phải mã nghiệp vụ tra cứu chéo hệ thống, nên không có bẫy
+  # mất số 0 đầu — cột CSDL tương ứng vẫn là integer (xem 007_fact_sales.sql),
+  # Postgres tự ép "1" -> 1 khi insert.
   code_columns: [slip_no, line_seq, slip_type, customer_code, billing_customer_code,
                  salesperson_code, department_code, shipto_code, product_code, pack_code,
                  payment_slip_no, closing_day_code]

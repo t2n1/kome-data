@@ -1,8 +1,15 @@
 # tests/test_load_sales.py
+from pathlib import Path
 from datetime import date
 import pandas as pd
+from db.migrate import apply_all
+from kome.config import load_specs
+from kome.gates import check as gates_check
 from kome.loaders import sales
+from kome.pipeline import ingest
 from kome.reader import dedup_on_keys
+
+SPECS = load_specs(Path("config/files.yml"))
 
 
 def _line(slip="079934", seq=1, amount=29167, profit=9907, qty=6, batch_id=1):
@@ -74,3 +81,77 @@ def test_khu_trung_dong_xuat_hai_lan():
     assert len(result) == 3
     assert result["amount"].sum() == 37_700
     assert result["gross_profit"].sum() == 11_207
+
+
+def test_khu_trung_canh_bao_khi_gia_tri_khac_nhau():
+    """Khử trùng CHỈ so khoá — nếu hai dòng cùng khoá nhưng khác 金額 thì
+    dòng thứ hai sẽ bị bỏ ÂM THẦM. Phải đếm được số nhóm bất thường này để
+    gates.check() cảnh báo (không tự chặn — chưa biết dòng nào đúng)."""
+    df = pd.DataFrame([
+        {"slip_no": "079934", "line_seq": 1, "amount": 31500, "gross_profit": 9907},
+        {"slip_no": "079934", "line_seq": 1, "amount": 40000, "gross_profit": 9907},  # amount khác!
+        {"slip_no": "079935", "line_seq": 1, "amount": 1200, "gross_profit": 300},
+        {"slip_no": "079935", "line_seq": 1, "amount": 1200, "gross_profit": 300},    # giống hệt
+    ])
+    result = dedup_on_keys(df, ["slip_no", "line_seq"], ["amount", "gross_profit"])
+    assert len(result) == 2
+    assert result.attrs["dedup_conflicts"] == 1   # chỉ nhóm 079934 là bất thường
+
+
+def test_khu_trung_khong_canh_bao_khi_gia_tri_giong_het():
+    """Ca bình thường (38.882 nhóm trên dữ liệu thật): bản sao giống hệt
+    nhau -> không cảnh báo."""
+    df = pd.DataFrame([
+        {"slip_no": "079934", "line_seq": 1, "amount": 31500, "gross_profit": 9907},
+        {"slip_no": "079934", "line_seq": 1, "amount": 31500, "gross_profit": 9907},
+    ])
+    result = dedup_on_keys(df, ["slip_no", "line_seq"], ["amount", "gross_profit"])
+    assert result.attrs["dedup_conflicts"] == 0
+
+
+def test_cong_3_chan_ngay_khong_doc_duoc():
+    """sales_date có khoá ngoại tới core.dim_date. Ngày rác/rỗng bị
+    errors="coerce" nuốt thành None ở reader — cổng 3 phải chặn trước khi
+    lô được lưu, không được để bung lỗi khoá ngoại giữa chừng."""
+    df = pd.DataFrame([_line(seq=1), _line(seq=2)])
+    for col in SPECS["uriage"].columns.values():   # đủ mọi cột spec khai báo
+        if col not in df.columns:
+            df[col] = ""
+    df.loc[1, "sales_date"] = None   # mô phỏng ngày không đọc được
+    blockers, _ = gates_check(
+        Path("売上伝票データ_20260501.xlsx"), SPECS["uriage"], df, None
+    )
+    assert any(b.gate == 3 and "sales_date" in b.message for b in blockers)
+
+
+def test_pipeline_chan_ngay_rac_khong_ghi_gi_va_khong_de_lo_mo_coi(conn, tmp_path):
+    """Kiểm tra nguyên vẹn qua pipeline.ingest(): ngày rác bị chặn ở cổng 3
+    TRƯỚC archive.store(), nên không có dòng nào trong fact_sales_line VÀ
+    không có lô mồ côi nào trong meta.ingest_batch."""
+    apply_all(conn, Path("db/migrations"))
+    spec = SPECS["uriage"]
+    ja_of = {sys_col: ja for ja, sys_col in spec.columns.items()}
+    rows = []
+    for r in (_line(seq=1), _line(seq=2)):
+        r.pop("batch_id", None)
+        rows.append(r)
+    rows[1]["sales_date"] = None   # ngày rỗng/rác ở dòng thứ hai
+    df = pd.DataFrame(rows)
+    for col in spec.columns.values():
+        if col not in df.columns:
+            df[col] = None
+    df = df.rename(columns=ja_of)[list(spec.columns.keys())]
+
+    path = tmp_path / "売上伝票データ_20260501.xlsx"
+    df.to_excel(path, sheet_name=spec.sheet, index=False)
+
+    r = ingest(conn, path, tmp_path / "archive")
+    assert not r.ok
+    assert any(b.gate == 3 for b in r.blockers)
+
+    n = conn.execute("SELECT count(*) FROM core.fact_sales_line").fetchone()[0]
+    assert n == 0
+    m = conn.execute(
+        "SELECT count(*) FROM meta.ingest_batch WHERE spec_name = 'uriage'"
+    ).fetchone()[0]
+    assert m == 0   # không được để lại lô mồ côi

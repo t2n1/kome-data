@@ -7,15 +7,32 @@ class ColumnMismatch(Exception):
     """Cột trong file không khớp khai báo — cổng 2 dùng lỗi này."""
 
 
-def dedup_on_keys(df: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+def dedup_on_keys(
+    df: pd.DataFrame, keys: list[str], compare_columns: list[str] | None = None
+) -> pd.DataFrame:
     """Giữ dòng đầu tiên của mỗi khoá `keys`, bỏ các bản sao còn lại.
 
     Dùng cho các bản xuất OBC lặp lại CÙNG một dòng nghiệp vụ nhiều lần
     dưới các mục con khác nhau (vd. 売上伝票データ: 出荷内訳 và 明細按分 — cùng
     伝票No.+明細行番号, cùng 金額/粗利益). Không khử trùng thì cộng thẳng sẽ ra
     gấp đôi số thật.
+
+    CHỈ so khoá — không tự biết bản sao có cùng giá trị hay không. Nếu
+    `compare_columns` được truyền (thường là money_columns + qty_columns),
+    hàm đếm số NHÓM trùng khoá mà các cột đó KHÔNG đồng nhất trong nhóm
+    (nghi có hai dòng khác nhau bị gộp nhầm, không phải bản xuất lặp vô
+    hại) và ghi số đó vào `df.attrs["dedup_conflicts"]` để gates.check()
+    biến thành cảnh báo cổng 5 — hàm này không tự chặn, vì chưa biết dòng
+    nào trong nhóm là đúng.
     """
-    return df.drop_duplicates(subset=keys, keep="first").reset_index(drop=True)
+    conflicts = 0
+    cols = [c for c in (compare_columns or []) if c in df.columns]
+    if cols:
+        nunique = df.groupby(keys, sort=False)[cols].nunique(dropna=False)
+        conflicts = int((nunique.max(axis=1) > 1).sum())
+    result = df.drop_duplicates(subset=keys, keep="first").reset_index(drop=True)
+    result.attrs["dedup_conflicts"] = conflicts
+    return result
 
 
 def read(path: Path, spec: FileSpec) -> pd.DataFrame:
@@ -39,7 +56,7 @@ def read(path: Path, spec: FileSpec) -> pd.DataFrame:
     df = df.dropna(how="all")
 
     if spec.dedup_on_keys:
-        df = dedup_on_keys(df, spec.keys)
+        df = dedup_on_keys(df, spec.keys, spec.money_columns + spec.qty_columns)
 
     for col in spec.date_columns:
         df[col] = pd.to_datetime(df[col], errors="coerce").dt.date

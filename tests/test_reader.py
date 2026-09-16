@@ -28,3 +28,24 @@ def test_ma_rong_thanh_chuoi_rong_khong_phai_nan():
     df = read(Path("tests/fixtures/zaiko_ma_rong.xlsx"), SPECS["zaiko"])
     assert (df["warehouse_code"] == "").sum() >= 2
     assert df["warehouse_code"].isna().sum() == 0   # phải là chuỗi rỗng, không phải NaN
+
+
+def test_dedup_on_keys_mac_dinh_tat_cho_cac_spec_khac():
+    """dedup_on_keys là tính năng riêng cho 売上伝票データ (Task 10, xuất mỗi
+    dòng hai lần). Các spec khác KHÔNG khai báo nó trong files.yml nên phải
+    nhận giá trị mặc định False -- không được vô tình bật cho spec khác."""
+    assert SPECS["zaiko"].dedup_on_keys is False
+    assert SPECS["tokuisaki"].dedup_on_keys is False
+
+
+def test_khong_bat_dedup_thi_cong_3_van_chan_khoa_trung():
+    """Quy hồi quy: với spec không bật dedup_on_keys, khoá trùng vẫn phải
+    bị cổng 3 chặn như trước Task 10 -- dedup không được vô tình che giấu
+    lỗi trùng khoá thật của các file khác."""
+    import pandas as pd
+    from kome.gates import check
+
+    df = read(Path("tests/fixtures/zaiko_ok.xlsx"), SPECS["zaiko"])
+    doubled = pd.concat([df, df.iloc[[0]]], ignore_index=True)
+    blockers, _ = check(Path("在庫一覧_20260916.xlsx"), SPECS["zaiko"], doubled, None)
+    assert any(b.gate == 3 and "trùng" in b.message for b in blockers)

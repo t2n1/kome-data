@@ -45,6 +45,15 @@ def check(
         if len(df) and (df[col].astype(str).str.strip() == "").all():
             blockers.append(Blocker(3, f"Cột mã {col} rỗng toàn bộ"))
 
+    # Ngày bắt buộc không đọc được (errors="coerce" ở reader đã nuốt lỗi
+    # thành None/NaT) -> chặn TRƯỚC khi lô được lưu, không để lô mồ côi
+    # trong meta.ingest_batch hay bung lỗi khoá ngoại giữa chừng.
+    for col in spec.required_date_columns:
+        if col in df.columns:
+            n = int(df[col].isna().sum())
+            if n:
+                blockers.append(Blocker(3, f"{n} dòng có {col} không đọc được thành ngày"))
+
     # Cổng 4 — so với lần nạp trước
     total_col = spec.money_columns[-1] if spec.money_columns else None
     total = int(df[total_col].sum()) if total_col else 0
@@ -55,6 +64,15 @@ def check(
             warnings.append(Warning_(4, f"Số dòng rơi từ {prev_rows} xuống {len(df)}"))
         if prev_total and (total > prev_total * spec.warn_total_spike or total < prev_total * spec.warn_total_drop):
             warnings.append(Warning_(4, f"Tổng tiền lệch mạnh: {prev_total:,} → {total:,}"))
+
+    # Cổng 5 — khử trùng (dedup_on_keys) đã gộp các dòng trùng khoá mà GIÁ TRỊ
+    # khác nhau (tiền/số lượng) -> cảnh báo, không tự biết dòng nào đúng nên
+    # không chặn. df.attrs được reader.dedup_on_keys() gắn vào khi so sánh.
+    dedup_conflicts = df.attrs.get("dedup_conflicts", 0)
+    if dedup_conflicts:
+        warnings.append(Warning_(
+            5, f"{dedup_conflicts} nhóm trùng khoá {spec.keys} có giá trị khác nhau "
+               f"khi khử trùng — đã giữ dòng đầu tiên, cần kiểm tra"))
 
     # Cổng 5 — đối chiếu tích
     pc = spec.product_check

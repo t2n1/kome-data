@@ -18,6 +18,11 @@ class FileSpec:
     qty_columns: list[str]
     rate_columns: list[str] = field(default_factory=list)
     date_columns: list[str] = field(default_factory=list)
+    # Cột ngày mà mỗi dòng BẮT BUỘC phải đọc được (vd. sales_date có khoá
+    # ngoại tới core.dim_date). Ép kiểu lỗi -> None (xem date_columns) —
+    # cổng 3 dùng danh sách này để CHẶN trước khi lô được lưu, tránh lô mồ
+    # côi trong meta.ingest_batch hoặc vi phạm khoá ngoại giữa chừng.
+    required_date_columns: list[str] = field(default_factory=list)
     # Một số bản xuất OBC lặp lại CÙNG một dòng nghiệp vụ nhiều lần dưới các
     # mục con khác nhau (vd. 売上伝票データ: 出荷内訳 và 明細按分). Bật cờ này để
     # reader giữ dòng đầu tiên của mỗi khoá (`keys`), bỏ các bản sao còn lại,

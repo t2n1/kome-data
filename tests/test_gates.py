@@ -58,6 +58,22 @@ def test_cong_3_chan_fixture_zaiko_ma_rong_vi_kho_rong():
     blockers, _ = check(Path("在庫一覧_20260916.xlsx"), SPECS["zaiko"], df, None)
     assert any(b.gate == 3 and "khoá" in b.message for b in blockers)
 
+def test_cong_5_canh_bao_khi_khu_trung_gap_gia_tri_khac_nhau():
+    """reader.dedup_on_keys() gắn số nhóm bất thường (cùng khoá nhưng khác
+    tiền/số lượng) vào df.attrs["dedup_conflicts"] -- gates.check() phải
+    biến nó thành cảnh báo cổng 5. KHÔNG chặn, vì chưa biết dòng nào trong
+    nhóm là đúng."""
+    df = read(OK, SPECS["zaiko"])
+    df.attrs["dedup_conflicts"] = 1
+    _, warnings = check(Path("在庫一覧_20260916.xlsx"), SPECS["zaiko"], df, None)
+    assert any(w.gate == 5 and "khử trùng" in w.message for w in warnings)
+
+def test_cong_5_khong_canh_bao_khi_khu_trung_khong_co_xung_dot():
+    df = read(OK, SPECS["zaiko"])
+    assert df.attrs.get("dedup_conflicts", 0) == 0
+    _, warnings = check(Path("在庫一覧_20260916.xlsx"), SPECS["zaiko"], df, None)
+    assert not any(w.gate == 5 and "khử trùng" in w.message for w in warnings)
+
 def test_cong_3_khong_chan_ma_khong_key_roi_vai_dong():
     """Cột mã KHÔNG phải khoá rỗng vài dòng → KHÔNG bị chặn."""
     df = read(OK, SPECS["zaiko"])
