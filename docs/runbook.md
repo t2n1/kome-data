@@ -59,6 +59,67 @@ Lưu ý:
 
 ---
 
+## Trước khi chạy migration trên CSDL THẬT — kiểm một câu
+
+Chạy **trước mỗi lần** `python -m db.migrate` trên CSDL thật (chỉ mất vài
+giây). Nếu bỏ qua, migration có thể **thất bại giữa chừng**: các file `.sql`
+chạy lần lượt, file nào lỗi thì dừng ở đó, những file sau không chạy và CSDL
+nằm lại ở trạng thái nửa vời.
+
+**Lý do cụ thể:** `db/migrations/010_*.sql` thêm ràng buộc
+`CHECK (valid_to IS NULL OR valid_to >= valid_from)` cho `core.dim_customer`.
+Ràng buộc này được kiểm với **dữ liệu đang có**, nên nếu CSDL thật đã lỡ chứa
+dòng vi phạm — do đúng cái lỗi cũ mà 010 sinh ra để chặn: xuất lại trong cùng
+ngày thì phiên bản cũ bị đóng bằng `ngày hôm trước`, thành khoảng thời gian âm
+— thì 010 sẽ **báo lỗi và không chạy được**.
+
+Chạy lệnh sau bằng **chuỗi kết nối `postgres`** (chính chuỗi dùng để chạy
+migration), thay `<CHUOI_KET_NOI_POSTGRES>`:
+
+```bash
+python -c "from kome.db import connect; [print(r) for r in connect('<CHUOI_KET_NOI_POSTGRES>').execute('SELECT customer_sk, customer_code, valid_from, valid_to FROM core.dim_customer WHERE valid_to < valid_from').fetchall()] or print('OK: khong co dong nao vi pham')"
+```
+
+- **Không in ra dòng nào** (thấy `OK: khong co dong nao vi pham`) → chạy
+  migration như bình thường.
+- **In ra một hoặc nhiều dòng** → **khoan chạy migration**, làm tiếp 3 bước
+  dưới đây.
+
+### Nếu có dòng vi phạm
+
+**Bước 1 — sao lưu trước đã** (xem mục "Sao lưu hằng đêm" bên dưới; đừng bỏ
+qua bước này, các bước sau có xoá dòng):
+
+```bash
+python -c "from ops.backup import dump; import os, pathlib; print(dump(os.environ['DATABASE_URL'], pathlib.Path('backups')))"
+```
+
+**Bước 2 — xem từng dòng vi phạm đã có bản thay thế chưa.** Cột cuối
+`co_ban_thay_the` phải là `True` cho **mọi** dòng:
+
+```bash
+python -c "from kome.db import connect; [print(r) for r in connect('<CHUOI_KET_NOI_POSTGRES>').execute('SELECT d.customer_sk, d.customer_code, d.valid_from, d.valid_to, EXISTS (SELECT 1 FROM core.dim_customer x WHERE x.customer_code = d.customer_code AND x.customer_sk <> d.customer_sk AND x.valid_from >= d.valid_from) AS co_ban_thay_the FROM core.dim_customer d WHERE d.valid_to < d.valid_from').fetchall()]"
+```
+
+- Nếu có dòng nào `False` → **dừng lại**, chụp màn hình gửi AI bảo trì. Dòng
+  đó là phiên bản duy nhất của khách, không được đụng vào.
+
+**Bước 3 — dọn các dòng chết.** Chỉ chạy khi bước 2 cho `True` hết. Những dòng
+này **không có ngày nào đọc ra được** (mọi truy vấn lịch sử dạng
+`valid_from <= ngày AND (valid_to IS NULL OR valid_to >= ngày)` đều bỏ qua
+chúng) và đều đã có bản thay thế, nên xoá đi không mất thông tin nào đang
+dùng được — đây cũng là ngoại lệ duy nhất của luật "không bao giờ xoá dòng
+trong `core.dim_customer`", làm một lần khi vá lỗi cũ:
+
+```bash
+python -c "from kome.db import connect; c = connect('<CHUOI_KET_NOI_POSTGRES>'); n = c.execute('DELETE FROM core.dim_customer d WHERE d.valid_to < d.valid_from AND EXISTS (SELECT 1 FROM core.dim_customer x WHERE x.customer_code = d.customer_code AND x.customer_sk <> d.customer_sk AND x.valid_from >= d.valid_from)').rowcount; c.commit(); print(f'da don {n} dong chet')"
+```
+
+Chạy lại câu kiểm ở đầu mục này (phải ra `OK: khong co dong nao vi pham`), rồi
+mới chạy migration.
+
+---
+
 | Sự cố | Dấu hiệu nhận biết | Cách xử lý (chép–dán từng khối, theo thứ tự) | Thời gian |
 |---|---|---|---|
 | **Nạp nhầm file** (nhầm ngày, nhầm file, nạp trùng) | Vào trang `/health` thấy số dòng hoặc tổng tiền sai ngay sau khi vừa nạp | 1) Tìm lần nạp vừa rồi:<br>`python -c "from kome.db import connect; [print(r) for r in connect().execute(\"SELECT batch_id, spec_name, source_file, loaded_at FROM meta.ingest_batch WHERE undone_at IS NULL ORDER BY loaded_at DESC LIMIT 5\").fetchall()]"`<br>2) Ghi lại `batch_id` của lần nạp sai, rồi hoàn tác (thay `123` bằng số đó):<br>`python -c "from kome.db import connect; from kome.pipeline import undo_batch; c = connect(); undo_batch(c, 123); print('da hoan tac')"`<br>3) Nạp lại đúng file qua trang nội bộ như bình thường | ~10 giây tìm + hoàn tác |
@@ -70,6 +131,22 @@ Lưu ý:
 | **Web app không truy cập được** (trang nạp/health không mở được) | Trình duyệt báo không kết nối được tới trang nội bộ | **Không làm gì với việc nạp dữ liệu** — việc xuất file từ OBC và lưu trên OneDrive vẫn diễn ra bình thường, không phụ thuộc web app. Báo cho AI bảo trì để khởi động lại máy chủ web; công việc kế toán không bị gián đoạn | — |
 
 ---
+
+## Nút Hoàn tác đưa được về đúng trạng thái cũ
+
+Trường hợp hay gặp nhất với file khách hàng (`得意先全情報`): 13:30 nạp lần đầu,
+kế toán phát hiện sai, sửa trong OBC, xuất lại và kéo–thả lại **trong cùng
+ngày**, rồi nhận ra file thứ hai cũng sai và bấm **Hoàn tác**.
+
+Lần nạp thứ hai trong cùng ngày **sửa đè lên dòng cũ** (không tạo thêm phiên
+bản mới, vì hai phiên bản cùng bắt đầu một ngày sẽ làm hỏng lịch sử). Trước
+khi đè, hệ thống **chép lại giá trị cũ** vào nhật ký của chính lần nạp đó, nên
+Hoàn tác trả khách về **đúng giá trị của lần nạp thứ nhất** — khách không biến
+mất, và cũng không kẹt lại giá trị sai của lần nạp thứ hai. Sửa đè nhiều lần
+trong ngày thì hoàn tác lùi được **từng bước một**, theo đúng thứ tự ngược lại.
+
+Với các lần nạp **khác ngày** thì như cũ: hoàn tác xoá phiên bản mới và mở lại
+phiên bản trước đó.
 
 ## Vì sao không có bước "chép chuỗi kết nối CSDL thật vào lệnh restore"
 

@@ -47,11 +47,14 @@ UNDO_TABLES = {
 
 # Bảng SCD2: hoàn tác phải mở lại phiên bản trước đó, không chỉ xoá phiên bản
 # mới — nếu không, khách bị đóng valid_to ở lô đó sẽ mất hẳn is_current=true
-# và biến mất khỏi mọi báo cáo. Dạng: spec_name -> (tên bảng, cột khoá nghiệp vụ).
+# và biến mất khỏi mọi báo cáo. Dạng:
+#   spec_name -> (tên bảng, cột khoá nghiệp vụ, các cột được hoàn nguyên)
+# Cột thứ ba là danh sách cột mà loader chép vào `meta.ingest_batch.scd2_preimage`
+# khi đè tại chỗ, để hoàn tác gán trả lại — phải TRÙNG với TRACKED của loader.
 # Bảng nào có mặt ở đây thì undo_batch() xử lý riêng, KHÔNG xoá lại theo
 # UNDO_TABLES nữa (tránh xoá hai lần) — nhưng vẫn giữ trong UNDO_TABLES để
 # test lưới an toàn set(LOADERS) == set(UNDO_TABLES) còn đúng.
-UNDO_SCD2 = {"tokuisaki": ("core.dim_customer", "customer_code")}
+UNDO_SCD2 = {"tokuisaki": ("core.dim_customer", "customer_code", customer.TRACKED)}
 
 @dataclass
 class IngestResult:
@@ -143,11 +146,21 @@ def undo_batch(conn, batch_id: int) -> int:
 
     KHÔNG xoá dòng trong meta.ingest_batch — chỉ đặt undone_at (luật bất biến #6).
 
-    Bảng SCD2 (UNDO_SCD2) được xử lý riêng theo 3 bước: (1) lấy trước danh sách
-    khoá nghiệp vụ bị đụng tới ở lô này, (2) xoá phiên bản mới do lô này tạo,
-    (3) mở lại phiên bản còn lại mới nhất của từng khoá đó (is_current=true,
-    valid_to=NULL) — nếu không, khách bị đóng ở lô này sẽ mất hẳn is_current
-    và biến mất khỏi báo cáo mà không ai biết.
+    Bảng SCD2 (UNDO_SCD2) được xử lý riêng theo 4 bước: (0) hoàn nguyên các
+    dòng lô này ĐÈ TẠI CHỖ (xuất lại trong cùng ngày) về giá trị cũ đã lưu ở
+    `meta.ingest_batch.scd2_preimage`, (1) lấy danh sách khoá nghiệp vụ bị đụng
+    tới ở lô này, (2) xoá phiên bản mới do lô này tạo, (3) mở lại phiên bản còn
+    lại mới nhất của từng khoá đó (is_current=true, valid_to=NULL) — nếu không,
+    khách bị đóng ở lô này sẽ mất hẳn is_current và biến mất khỏi báo cáo mà
+    không ai biết.
+
+    Bước (0) BẮT BUỘC chạy trước (1)-(2): dòng bị đè tại chỗ mang batch_id của
+    lô này, nên nếu xoá trước thì dòng DUY NHẤT của khách bị xoá hẳn và (3)
+    không còn gì để mở lại — khách biến mất. Hoàn nguyên xong, batch_id của
+    dòng quay về lô cũ nên (1)-(2) không đụng tới nó nữa, đúng như mong muốn:
+    dòng ấy không phải do lô này tạo ra.
+
+    Số trả về là số dòng ĐÃ XOÁ, không tính dòng được hoàn nguyên tại chỗ.
     """
     row = conn.execute(
         "SELECT spec_name FROM meta.ingest_batch WHERE batch_id = %s", (batch_id,)
@@ -159,7 +172,8 @@ def undo_batch(conn, batch_id: int) -> int:
 
     scd2 = UNDO_SCD2.get(spec_name)
     if scd2:
-        table, key = scd2
+        table, key, cols = scd2
+        _hoan_nguyen_de_tai_cho(conn, batch_id, table, key, cols)
         codes = [
             r[0] for r in conn.execute(
                 f"SELECT DISTINCT {key} FROM {table} WHERE batch_id = %s", (batch_id,)
@@ -184,3 +198,29 @@ def undo_batch(conn, batch_id: int) -> int:
 
     archive.undo(conn, batch_id)
     return deleted
+
+
+def _hoan_nguyen_de_tai_cho(conn, batch_id: int, table: str, key: str,
+                            cols: list[str]) -> int:
+    """Bước (0) của hoàn tác SCD2: trả các dòng lô này đè tại chỗ về giá trị cũ.
+
+    Điều kiện `batch_id = %s` khiến hàm này chỉ đụng đúng những dòng CÒN thuộc
+    lô đang hoàn tác: gọi hoàn tác hai lần, hay hoàn tác một lô cũ sau khi đã có
+    lô mới hơn đè lên, đều không ghi đè nhầm dữ liệu của người khác.
+    """
+    row = conn.execute(
+        "SELECT scd2_preimage FROM meta.ingest_batch WHERE batch_id = %s", (batch_id,)
+    ).fetchone()
+    preimage = row[0] if row else None
+    if not preimage:
+        return 0
+    sets = ", ".join(f"{c} = %s" for c in cols)
+    with conn.cursor() as cur:
+        cur.executemany(
+            f"""UPDATE {table} SET {sets}, batch_id = %s
+                WHERE {key} = %s AND is_current AND batch_id = %s""",
+            [(*(e["values"][c] for c in cols), e["batch_id"], e["code"], batch_id)
+             for e in preimage],
+        )
+    conn.commit()
+    return len(preimage)

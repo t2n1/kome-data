@@ -155,6 +155,90 @@ def test_hoan_tac_khong_lam_mat_hoac_trung_is_current(conn):
     assert rows == [("000000000002", 1), ("000000009292", 1)]
 
 
+def test_hoan_tac_lo_sua_trong_ngay_giu_khach_va_tra_lai_gia_tri_cu(conn):
+    """[IMPORTANT] Giao điểm "sửa trong ngày" × "hoàn tác" — mất dữ liệu.
+
+    13:30 nạp 得意先全情報 (lô 1); kế toán phát hiện sai, sửa trong OBC, xuất lại,
+    kéo–thả lại CÙNG NGÀY (lô 2) -> cập nhật TẠI CHỖ, chỉ còn MỘT dòng; rồi nhận
+    ra file thứ hai cũng sai -> bấm Hoàn tác lô 2.
+
+    Nếu dòng bị đè mang luôn batch_id của lô 2 mà không lưu lại giá trị cũ thì
+    `DELETE ... WHERE batch_id = lô 2` xoá hẳn dòng duy nhất, bước "mở lại phiên
+    bản trước" không còn gì để mở, và KHÁCH BIẾN MẤT khỏi CSDL.
+
+    Đúng phải là: khách còn nguyên, và mang lại đúng giá trị của lô 1.
+    """
+    b1 = _batch_tokuisaki(conn, 1)
+    b2 = _batch_tokuisaki(conn, 2)
+    customer.load(conn, _df(rank="0003"), D1, b1)
+    r = customer.load(conn, _df(rank="0001"), D1, b2)   # cùng ngày -> sửa tại chỗ
+    assert r["updated"] == 1 and r["inserted"] == 0
+
+    undo_batch(conn, b2)
+
+    rows = conn.execute(
+        """SELECT rank_code, valid_from, valid_to, is_current, batch_id
+           FROM core.dim_customer WHERE customer_code = '000000009292'"""
+    ).fetchall()
+    assert len(rows) == 1                 # khách KHÔNG bị xoá
+    assert rows[0][0] == "0003"           # trả về đúng giá trị của lô 1
+    assert rows[0][1] == D1               # valid_from không đổi
+    assert rows[0][2] is None             # không sinh khoảng âm
+    assert rows[0][3] is True             # vẫn là phiên bản hiện hành
+    assert rows[0][4] == b1               # dòng thuộc về lô 1 trở lại
+
+
+def test_hoan_tac_lo_nap_khac_ngay_van_mo_lai_phien_ban_cu(conn):
+    """Chống hồi quy cho hành vi ĐÃ CÓ, cặp đôi với test ngay trên: khi lô 2 nạp
+    vào NGÀY KHÁC thì nó tạo phiên bản mới + đóng phiên bản cũ (không sửa tại
+    chỗ), nên hoàn tác vẫn phải đi đường cũ — xoá phiên bản mới rồi mở lại phiên
+    bản cũ — và KHÔNG được chạm vào cơ chế hoàn nguyên giá trị.
+    """
+    b1 = _batch_tokuisaki(conn, 1)
+    b2 = _batch_tokuisaki(conn, 2)
+    customer.load(conn, _df(rank="0003"), D1, b1)
+    r = customer.load(conn, _df(rank="0001"), D2, b2)   # khác ngày -> phiên bản mới
+    assert r["inserted"] == 1 and r["closed"] == 1 and r["updated"] == 0
+    assert conn.execute(
+        "SELECT scd2_preimage FROM meta.ingest_batch WHERE batch_id = %s", (b2,)
+    ).fetchone()[0] is None               # khác ngày thì không lưu ảnh trước
+
+    undo_batch(conn, b2)
+
+    rows = conn.execute(
+        """SELECT rank_code, valid_from, valid_to, is_current, batch_id
+           FROM core.dim_customer WHERE customer_code = '000000009292'"""
+    ).fetchall()
+    assert len(rows) == 1
+    assert rows[0][0] == "0003"
+    assert rows[0][1] == D1
+    assert rows[0][2] is None             # valid_to đã xoá khi mở lại
+    assert rows[0][3] is True
+    assert rows[0][4] == b1               # dòng vốn của lô 1, không ai đổi
+
+
+def test_hoan_tac_nhieu_lan_sua_trong_ngay_lui_tung_buoc(conn):
+    """Sửa lại BA lần trong cùng một ngày (lô 1 -> 2 -> 3). Hoàn tác lô 3 phải
+    lùi về trạng thái lô 2, hoàn tác tiếp lô 2 phải lùi về trạng thái lô 1 —
+    mỗi lô giữ ảnh trước của riêng nó, không chồng lấn."""
+    b1, b2, b3 = (_batch_tokuisaki(conn, n) for n in (1, 2, 3))
+    customer.load(conn, _df(rank="0003"), D1, b1)
+    customer.load(conn, _df(rank="0002"), D1, b2)
+    customer.load(conn, _df(rank="0001"), D1, b3)
+
+    def _hien_tai():
+        return conn.execute(
+            """SELECT rank_code, batch_id, count(*) OVER () FROM core.dim_customer
+               WHERE customer_code = '000000009292'"""
+        ).fetchone()
+
+    assert _hien_tai() == ("0001", b3, 1)
+    undo_batch(conn, b3)
+    assert _hien_tai() == ("0002", b2, 1)
+    undo_batch(conn, b2)
+    assert _hien_tai() == ("0003", b1, 1)
+
+
 def test_sua_roi_xuat_lai_trong_cung_ngay_khong_sinh_khoang_am(conn, batch):
     """[IMPORTANT] 13:30 nạp 得意先全情報; kế toán phát hiện sai hạng, sửa trong
     OBC, xuất lại, kéo–thả lại CÙNG NGÀY.
