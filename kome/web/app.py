@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from kome.config import SPECS
 from kome.bao_cao import tinh_bao_cao, ve_bieu_do
 from kome.coverage import tinh_bang_phu
+from kome import khach_hang as KH
 from kome.db import connect
 from kome.env import nap_env
 from kome.web import bao_mat
@@ -177,15 +178,70 @@ def create_app(db_url: str | None = None) -> FastAPI:
 
     # ---- Các trang ------------------------------------------------------
     @app.get("/", response_class=HTMLResponse)
-    def home(request: Request):
+    def tong_quan(request: Request):
+        """Trang chủ: công ty đang thế nào, và hôm nay cần làm gì.
+
+        TRƯỚC ĐÂY `/` là trang nạp dữ liệu. Đổi vì nạp dữ liệu là việc của MỘT
+        người, MỘT lần mỗi ngày, còn `/` là thứ mọi người mở nhiều lần mỗi
+        ngày. Trang nạp chuyển sang /nap và vẫn nằm trong thanh điều hướng.
+        """
         try:
-            if chi_doc:
-                # Đây là địa chỉ người ta chia sẻ cho nhau. Đưa thẳng tới
-                # trang xem được thay vì một trang 403 cụt lủn.
-                return RedirectResponse("/health", status_code=303)
+            with open_conn() as conn:
+                bc = tinh_bao_cao(conn)
+                dem = dict(conn.execute(
+                    "SELECT trang_thai, count(*) FROM mart.khach_360 GROUP BY 1"
+                ).fetchall())
+                so_ngay_ton = conn.execute(
+                    "SELECT count(DISTINCT snapshot_date) FROM core.fact_inventory_daily"
+                ).fetchone()[0]
+            return _ve(request, "tong_quan.html",
+                       {"bc": bc, "dem": dem, "so_ngay_ton": so_ngay_ton,
+                        "trang": "tong-quan"})
+        except Exception as e:
+            return _loi(request, "mở trang tổng quan", e, chung)
+
+    @app.get("/nap", response_class=HTMLResponse)
+    def trang_nap(request: Request):
+        if chi_doc:
+            return _cam(request)
+        try:
             return _ve(request, "upload.html", {"results": None, "trang": "nap"})
         except Exception as e:
             return _loi(request, "mở trang nạp dữ liệu", e, chung)
+
+    @app.get("/khach-hang", response_class=HTMLResponse)
+    def ds_khach(request: Request, tim: str = "", loc: str = "",
+                 sap: str = "doanh_thu", trang: int = 1):
+        try:
+            with open_conn() as conn:
+                t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang)
+            return _ve(request, "khach_hang.html",
+                       {"t": t, "trang_thai": KH.TRANG_THAI, "trang": "khach"})
+        except Exception as e:
+            return _loi(request, "mở danh sách khách hàng", e, chung)
+
+    @app.get("/khach-hang/{ma}", response_class=HTMLResponse)
+    def ho_so_khach(request: Request, ma: str):
+        try:
+            with open_conn() as conn:
+                h = KH.ho_so(conn, ma)
+            if h is None:
+                return _ve(request, "khong_thay.html",
+                           {"thu": f"khách hàng mã {ma}", "trang": "khach"},
+                           status_code=404)
+            return _ve(request, "khach_360.html",
+                       {"h": h, "d": KH.ve_duong(h.thang), "trang": "khach"})
+        except Exception as e:
+            return _loi(request, "mở hồ sơ khách hàng", e, chung)
+
+    @app.get("/can-xu-ly", response_class=HTMLResponse)
+    def can_xu_ly(request: Request):
+        try:
+            with open_conn() as conn:
+                ds = KH.can_xu_ly(conn)
+            return _ve(request, "can_xu_ly.html", {"ds": ds, "trang": "can-xu-ly"})
+        except Exception as e:
+            return _loi(request, "mở danh sách cần xử lý", e, chung)
 
     @app.post("/upload", response_class=HTMLResponse)
     def upload(request: Request, files: list[UploadFile]):

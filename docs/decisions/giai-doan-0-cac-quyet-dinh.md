@@ -245,3 +245,20 @@ có kho phiên ở máy chủ (bắt buộc, để chạy được trên serverl
 chặn người đã nghỉ việc — đã ghi vào `docs/runbook.md` và `docs/trien-khai-vercel.md` mục 5.
 Giá nếu sai: khi cần biết AI đã xem gì (nhật ký truy cập, phân quyền theo vai trò) thì phải làm lại
 phần đăng nhập. Chấp nhận được — hiện chưa ai cần.
+
+**Ruling AQ: hồ sơ 360° hiển thị ĐẦY ĐỦ điện thoại và địa chỉ khách, kể cả trên bản công khai.**
+Chủ sở hữu đã được trình bày ba phương án (giữ nguyên / che ở bản Vercel / bỏ hẳn trang Khách hàng
+khỏi bản công khai) và chọn giữ nguyên.
+
+Vì: phần lớn giá trị của công cụ này nằm ở chỗ dùng được NGOÀI THỊ TRƯỜNG — nhân viên mở trên điện
+thoại khi đi thăm khách, thấy ngay số để gọi và địa chỉ để tới. Che đi thì trang vẫn "an toàn" nhưng
+không còn giải quyết đúng việc người ta cần.
+
+Điều này có nghĩa: danh bạ 2.080 khách hàng (tên, điện thoại, địa chỉ — 個人情報 theo luật Nhật) nằm
+trên một địa chỉ Internet, cách nhau đúng MỘT mật khẩu chung. Hệ quả kéo theo, đã ghi vào runbook:
+  * mật khẩu tối thiểu 12 ký tự là ràng buộc CỨNG trong mã (kome/web/bao_mat.py), không phải khuyến nghị
+  * đổi mật khẩu mỗi khi có người nghỉ việc là bắt buộc, không phải tuỳ chọn
+  * vé đăng nhập tự hết hạn sau 12 giờ
+
+Giá nếu sai: nếu mật khẩu lọt ra ngoài thì mất cả danh bạ khách hàng, không chỉ mất số liệu tổng hợp.
+Đường lùi đã rõ và rẻ: che một phần ở bản `chi_doc` (khoảng 15 phút), mã nguồn không phải đổi cấu trúc.

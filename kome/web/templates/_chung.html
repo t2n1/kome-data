@@ -50,6 +50,48 @@
    color:var(--canh-chu);padding:.75rem 1rem;border-radius:8px;margin-bottom:1rem}
  .ky{background:var(--nen-phu);border:1px solid var(--vien);padding:.5rem 1rem;
    border-radius:8px;margin-bottom:1rem}
+ /* ---- Khung ứng dụng ---------------------------------------------
+    Hai tầng điều hướng: tầng trên là việc hằng ngày, tầng dưới là việc nạp
+    số. Xem ghi chú trong _nav.html. */
+ body{max-width:1100px}
+ .dau-trang{margin:0 0 1.25rem;border-bottom:1px solid var(--vien);padding-bottom:.4rem}
+ .hieu{display:inline-block;font-weight:700;letter-spacing:.08em;text-decoration:none;
+   color:var(--chu);margin-bottom:.35rem}
+ .dieu-huong.phu{border:0;margin:.1rem 0 0;padding:0;font-size:.85rem;opacity:.85}
+ .dieu-huong.phu a{padding:.2rem .55rem}
+ .nhom{color:var(--chu-nhat);font-size:.8rem;align-self:center;
+   text-transform:uppercase;letter-spacing:.06em;margin-right:.15rem}
+
+ /* ---- Thành phần dùng lại ---------------------------------------- */
+ .the-so{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}
+ .the-so > div{flex:1 1 9rem;background:var(--nen-phu);border:1px solid var(--vien);
+   border-radius:10px;padding:.7rem .9rem}
+ .the-so .nhan{color:var(--chu-nhat);font-size:.8rem}
+ .the-so .gia{font-size:1.4rem;font-weight:700;line-height:1.25;margin-top:.15rem}
+ .bang-cuon{overflow-x:auto}
+ td.so,th.so{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+ .ghi-chu{color:var(--chu-nhat);font-size:.85rem;margin:.25rem 0 .75rem}
+ /* Viên trạng thái: đọc bằng MÀU + CHỮ, không chỉ bằng màu — khoảng 1 trong 12
+    nam giới không phân biệt được đỏ với xanh lá. */
+ .vien{display:inline-block;padding:.1rem .55rem;border-radius:999px;
+   font-size:.8rem;font-weight:600;white-space:nowrap;border:1px solid}
+ .vien.ok{background:var(--ok-nen);border-color:var(--ok-vien);color:var(--ok-chu)}
+ .vien.canh{background:var(--canh-nen);border-color:var(--canh-vien);color:var(--canh-chu)}
+ .vien.loi{background:var(--loi-nen);border-color:var(--loi-vien);color:var(--loi-chu)}
+ .vien.nhat{background:var(--ngoai-nen);border-color:var(--vien);color:var(--ngoai-chu)}
+ .loc{display:flex;flex-wrap:wrap;gap:.4rem;margin:.75rem 0}
+ .loc a{padding:.3rem .8rem;border:1px solid var(--vien);border-radius:999px;
+   text-decoration:none;font-size:.9rem}
+ .loc a.dang-xem{background:var(--chot-nen);border-color:var(--chot-vien);
+   color:var(--chot-chu);font-weight:600}
+ .o-tim{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 0}
+ .o-tim input[type=search]{flex:1 1 16rem;font:inherit;padding:.45rem .7rem;
+   border-radius:8px;border:1px solid var(--vien);background:var(--nen);color:var(--chu)}
+ .o-tim button{font:inherit;padding:.45rem 1rem;border-radius:8px;
+   border:1px solid var(--vien);background:var(--nen-phu);color:var(--chu);cursor:pointer}
+ .trong{color:var(--chu-nhat);padding:1.5rem;text-align:center;
+   border:1px dashed var(--vien);border-radius:10px}
+
  /* Thanh điều hướng chung — ba trang phải đi lại được với nhau, không phải
     mỗi trang một cái link lẻ ở cuối. */
  .dieu-huong{display:flex;flex-wrap:wrap;gap:.25rem;border-bottom:1px solid var(--vien);

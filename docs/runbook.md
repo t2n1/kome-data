@@ -24,7 +24,8 @@ lệnh dưới đây **tự đọc file `.env`**. Mỗi lệnh đều có thêm 
 python -m uvicorn kome.web.app:app --host 127.0.0.1 --port 8000
 ```
 
-Rồi mở trình duyệt vào <http://127.0.0.1:8000>. Lệnh này **tự đọc `.env`** nên
+Rồi mở trình duyệt vào <http://127.0.0.1:8000>. Trang kéo–thả file nằm ở
+mục **Dữ liệu → Nạp từ OBC** (<http://127.0.0.1:8000/nap>). Lệnh này **tự đọc `.env`** nên
 không cần nạp biến môi trường trước. Cứ để cửa sổ đó mở; đóng cửa sổ là trang
 tắt.
 

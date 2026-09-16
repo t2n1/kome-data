@@ -1,17 +1,33 @@
-{# Thanh điều hướng dùng chung. Biến `trang` ('nap' | 'suc-khoe' | 'phu') đánh
-   dấu trang đang xem; trang lỗi không truyền biến này nên không mục nào sáng.
+{# Khung điều hướng chung.
 
-   `chi_doc`: bản chạy công khai (Vercel) không nạp được dữ liệu — xem ghi chú
-   ở kome/web/app.py::_chi_doc. Ẩn hẳn mục "Nạp dữ liệu" thay vì để nó dẫn tới
-   một trang 403: một liên kết luôn từ chối thì tệ hơn là không có liên kết. #}
-<nav class="dieu-huong">
-  {% if not chi_doc %}
-  <a href="/"{% if trang == 'nap' %} class="dang-xem" aria-current="page"{% endif %}>📥 Nạp dữ liệu</a>
-  {% endif %}
-  <a href="/bao-cao"{% if trang == 'bao-cao' %} class="dang-xem" aria-current="page"{% endif %}>📊 Báo cáo</a>
-  <a href="/health"{% if trang == 'suc-khoe' %} class="dang-xem" aria-current="page"{% endif %}>🩺 Sức khoẻ dữ liệu</a>
-  <a href="/phu-du-lieu"{% if trang == 'phu' %} class="dang-xem" aria-current="page"{% endif %}>🗓️ Bảng phủ dữ liệu</a>
-  {% if co_mat_khau %}
-  <form method="post" action="/dang-xuat" class="thoat"><button type="submit">Thoát</button></form>
-  {% endif %}
-</nav>
+   Chia làm HAI tầng có chủ ý:
+     * Tầng trên — công việc hằng ngày: xem khách, xem báo cáo, xử lý cảnh báo.
+       Đây là thứ mọi người mở nhiều lần mỗi ngày.
+     * Tầng dưới (nhóm "Dữ liệu") — việc của người phụ trách nạp số, làm một
+       lần mỗi ngày lúc 13:30. Để lẫn vào tầng trên thì mục quan trọng nhất
+       (Khách hàng) bị đẩy xuống ngang hàng với một việc kỹ thuật.
+
+   `trang`: đánh dấu mục đang xem. Trang lỗi không truyền biến này nên không
+   mục nào sáng — đúng, vì trang lỗi không thuộc mục nào cả.
+   `chi_doc`: bản chạy công khai (Vercel) không nạp được dữ liệu, ẩn hẳn mục
+   Nạp thay vì để nó dẫn tới một trang 403. #}
+<header class="dau-trang">
+  <a class="hieu" href="/">KOME</a>
+  <nav class="dieu-huong">
+    <a href="/"{% if trang == 'tong-quan' %} class="dang-xem" aria-current="page"{% endif %}>Tổng quan</a>
+    <a href="/khach-hang"{% if trang == 'khach' %} class="dang-xem" aria-current="page"{% endif %}>Khách hàng</a>
+    <a href="/bao-cao"{% if trang == 'bao-cao' %} class="dang-xem" aria-current="page"{% endif %}>Báo cáo</a>
+    <a href="/can-xu-ly"{% if trang == 'can-xu-ly' %} class="dang-xem" aria-current="page"{% endif %}>Cần xử lý</a>
+    {% if co_mat_khau %}
+    <form method="post" action="/dang-xuat" class="thoat"><button type="submit">Thoát</button></form>
+    {% endif %}
+  </nav>
+  <nav class="dieu-huong phu">
+    <span class="nhom">Dữ liệu</span>
+    {% if not chi_doc %}
+    <a href="/nap"{% if trang == 'nap' %} class="dang-xem" aria-current="page"{% endif %}>Nạp từ OBC</a>
+    {% endif %}
+    <a href="/health"{% if trang == 'suc-khoe' %} class="dang-xem" aria-current="page"{% endif %}>Sức khoẻ</a>
+    <a href="/phu-du-lieu"{% if trang == 'phu' %} class="dang-xem" aria-current="page"{% endif %}>Bảng phủ</a>
+  </nav>
+</header>

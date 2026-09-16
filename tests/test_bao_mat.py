@@ -189,8 +189,10 @@ def test_tren_vercel_khong_nap_va_khong_hoan_tac_duoc(khach):
 
     assert c.post("/undo/1").status_code == 403
 
-    r = c.get("/")
-    assert (r.status_code, r.headers["location"]) == (303, "/health")
+    # "/" giờ là trang Tổng quan — chỉ đọc, nên bản công khai xem được bình
+    # thường. Trang nạp chuyển sang /nap và bị chặn ở đó.
+    assert c.get("/").status_code == 200
+    assert c.get("/nap").status_code == 403
 
 
 def test_ban_chi_doc_an_han_muc_nap_du_lieu(khach):
@@ -198,8 +200,8 @@ def test_ban_chi_doc_an_han_muc_nap_du_lieu(khach):
     c = khach(vercel=True)
     c.post("/dang-nhap", data={"mat_khau": MK})
     t = c.get("/health").text
-    assert "Nạp dữ liệu" not in t
-    assert "Bảng phủ dữ liệu" in t
+    assert "Nạp từ OBC" not in t and 'href="/nap"' not in t
+    assert "Bảng phủ" in t and 'href="/khach-hang"' in t
 
 
 def test_ban_chi_doc_khong_bao_dong_sao_luu_gia(khach):
@@ -215,8 +217,8 @@ def test_ban_chi_doc_khong_bao_dong_sao_luu_gia(khach):
 
 def test_ban_o_may_ca_nhan_van_nap_duoc(khach):
     c = khach(mat_khau=None)
-    assert c.get("/").status_code == 200
-    assert "Nạp dữ liệu OBC" in c.get("/").text
+    assert c.get("/nap").status_code == 200
+    assert "Nạp dữ liệu OBC" in c.get("/nap").text
 
 
 def test_trang_chi_doc_khong_phu_thuoc_pandas():

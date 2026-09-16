@@ -1,0 +1,37 @@
+<!-- Việc cần làm hôm nay: khách đang rời đi, xếp theo TIỀN đang mất. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KOME — cần xử lý</title>
+{% include "_chung.html" %}
+{% include "_nav.html" %}
+<h1>Cần xử lý</h1>
+<p class="ghi-chu">Khách đang im lặng lâu hơn <strong>nhịp mua riêng của chính họ</strong>,
+xếp theo doanh thu luỹ kế — gọi lại khách ¥5 triệu im gấp 3 lần nhịp đáng hơn
+khách ¥50.000 im gấp 10 lần, dù con số thứ hai trông đáng báo động hơn.
+Khách OBC đã đánh dấu ※廃業※ / ※取引停止※ <strong>không</strong> có trong danh sách này.</p>
+
+{% if ds %}
+<div class="bang-cuon">
+<table>
+ <tr><th>Khách hàng</th><th>Trạng thái</th><th>Điện thoại</th><th>Phụ trách</th>
+     <th class="so">Nhịp mua</th><th class="so">Im lặng</th>
+     <th class="so">Doanh thu luỹ kế</th></tr>
+ {% for k in ds %}
+ <tr>
+  <td><a href="/khach-hang/{{ k.ma }}">{{ k.ten }}</a>
+      <span class="khong-ap-dung">{{ k.tinh or "" }}</span></td>
+  <td><span class="vien {{ k.mau }}">{{ k.nhan_trang_thai }}</span></td>
+  <td>{{ k.dien_thoai or "—" }}</td>
+  <td>{{ k.nguoi_phu_trach or "—" }}</td>
+  <td class="so">{% if k.nhip_ngay %}{{ k.nhip_ngay|int }} ngày{% else %}—{% endif %}</td>
+  <td class="so">{{ k.so_ngay_im_lang }} ngày{% if k.ty_le_im_lang %}
+      <span class="khong-ap-dung">({{ "%.1f"|format(k.ty_le_im_lang) }}×)</span>{% endif %}</td>
+  <td class="so">¥{{ "{:,}".format(k.doanh_thu) }}</td>
+ </tr>
+ {% endfor %}
+</table>
+</div>
+{% else %}
+<div class="trong">Không có khách nào trong diện cảnh báo.</div>
+{% endif %}
+</html>

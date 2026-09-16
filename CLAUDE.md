@@ -60,6 +60,30 @@ ra → **migration phải LUÔN chạy bằng vai trò `postgres`**. Đổi vai 
 migration thì quyền mặc định cho bảng mới sẽ âm thầm không áp dụng, và lỗi
 chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc nạp dữ liệu.
 
+## Các trang của web app
+| Đường dẫn | Việc | Dữ liệu lấy từ |
+|---|---|---|
+| `/` | Tổng quan | `mart.tong_theo_ky`, `mart.khach_360` |
+| `/khach-hang` | Danh sách + tìm kiếm + lọc theo trạng thái | `mart.khach_360` |
+| `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang` |
+| `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
+| `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
+| `/nap` | Kéo–thả file OBC (ẩn ở bản Vercel) | — |
+| `/health`, `/phu-du-lieu` | Sức khoẻ & độ phủ dữ liệu | `meta.ingest_batch` |
+
+**Bất biến:** trạng thái quan hệ khách hàng so số ngày im lặng với **nhịp mua
+riêng của từng khách** (trung vị khoảng cách giữa các lần mua), KHÔNG với một
+ngưỡng chung. Đo thật: ngưỡng chung 90 ngày bỏ sót 49 khách đang rời đi và báo
+động nhầm 34 khách vẫn mua bình thường.
+
+**Bất biến:** mốc thời gian là **ngày bán mới nhất trong kho**
+(`mart.moc_thoi_gian`), KHÔNG phải `current_date`. Dùng `current_date` thì một
+ngày không ai nạp file sẽ làm cả 1.710 khách "im lặng thêm một ngày".
+
+**Bất biến:** khách OBC đã đánh dấu `※廃業※` / `※取引停止※` trong TÊN (281/2.077
+khách) không bao giờ vào danh sách gọi lại. Doanh nghiệp đã phá sản thì im lặng
+là đúng, không phải bất thường — xem `db/migrations/016_*.sql`.
+
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |
 |---|---|---|
