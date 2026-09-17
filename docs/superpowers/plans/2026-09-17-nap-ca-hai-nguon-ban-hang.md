@@ -122,14 +122,92 @@ git commit -m "feat: them co synthesize_line_seq vao FileSpec"
 
 ---
 
-## Task 3: `reader.read()` — tự sinh `line_seq` khi spec bật cờ
+## Task 3: `config/files.yml` — thêm spec `meisai`
+
+**Files:**
+- Modify: `config/files.yml`
+
+**Interfaces:**
+- Consumes: `FileSpec.synthesize_line_seq` (Task 2, cần tồn tại để `FileSpec(**body)` chấp nhận khoá này trong YAML)
+- Produces: `SPECS["meisai"]` — dùng bởi Task 4 (test đọc file), Task 5 (loader), Task 6 (pipeline).
+
+- [ ] **Step 1: Thêm khối `meisai` vào cuối `config/files.yml`**
+
+```yaml
+meisai:
+  display_name: 売上明細表
+  filename_pattern: '^売上明細表_(?P<date>\d{8})\.xlsx$'
+  sheet: 売上明細表
+  header_row: 1
+  min_rows: 50
+  keys: [slip_no, line_seq]
+  # KHÔNG có 明細行番号 trong file gốc -- reader tự sinh line_seq (xem
+  # synthesize_line_seq trong kome/reader.py, Task 4 của plan này). Dự phòng
+  # khi không lấy được 売上伝票データ -- đối chiếu số liệu thật giữa hai nguồn
+  # ở docs/cot-day-du-ban-hang.md.
+  synthesize_line_seq: true
+  warn_row_drop_ratio: 0.3
+  warn_total_spike: 5.0
+  warn_total_drop: 0.2
+  date_columns: [sales_date]
+  columns:
+    伝票No.: slip_no
+    売上日付: sales_date
+    伝票区分: slip_type
+    得意先コード: customer_code
+    担当者コード: salesperson_code
+    部門コード: department_code
+    商品コード: product_code
+    荷姿区分コード: pack_code
+    入数: case_qty
+    純売上数量: qty
+    単価: unit_price
+    単位原価: unit_cost
+    税込純売上高: amount
+    消費税額: tax_amount
+    売上原価: cost
+    粗利益: gross_profit
+    粗利益率: gross_margin
+    消費税率: tax_rate
+  # 荷姿区分コード/名 xuất hiện HAI LẦN trong file gốc, CÙNG TÊN CỘT: một bản đi
+  # kèm ngay 商品名/商品コード ở đầu file (LUÔN có giá trị), một bản tra theo
+  # danh mục sản phẩm (RỖNG ở dòng phụ phí/coupon như 代引手数料, 値引きクーポン --
+  # không phải sản phẩm thật, ~24% số dòng trong mẫu đã kiểm). pandas tự
+  # thêm hậu tố ".1" cho cột trùng THỨ HAI khi đọc, nên khai tên KHÔNG hậu
+  # tố ở trên là lấy đúng bản luôn có giá trị -- đã kiểm chứng trên dữ liệu
+  # thật: 0/926 dòng lệch nhau giữa 2 bản khi cả hai đều có dữ liệu.
+  # Không có 請求先コード/請求日付/請求締日コード/入金額１/入金伝票No.１ trong file
+  # gốc -- loader để các cột CSDL tương ứng là NULL/0 (xem kome/loaders/sales.py).
+  code_columns: [slip_no, customer_code, salesperson_code, department_code, product_code, pack_code]
+  money_columns: [unit_price, unit_cost, amount, tax_amount, cost, gross_profit]
+  total_column: amount
+  qty_columns: [case_qty, qty]
+  rate_columns: [gross_margin, tax_rate]
+  required_date_columns: [sales_date]
+```
+
+- [ ] **Step 2: Xác nhận YAML nạp được và trường mới có mặt**
+
+Run: `python -c "from kome.config import load_specs; from pathlib import Path; s = load_specs(Path('config/files.yml'))['meisai']; print(s.synthesize_line_seq, len(s.columns))"`
+Expected: in ra `True 18` — nạp sạch, không lỗi `TypeError`/`KeyError`. (`synthesize_line_seq` đã có từ Task 2 nên khoá mới trong YAML không bị `FileSpec(**body)` từ chối.)
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add config/files.yml
+git commit -m "feat: khai bao spec meisai (uriage_明細表) trong files.yml"
+```
+
+---
+
+## Task 4: `reader.read()` — tự sinh `line_seq` khi spec bật cờ
 
 **Files:**
 - Modify: `kome/reader.py:38-87` (hàm `read()`)
 - Test: `tests/test_reader.py`
 
 **Interfaces:**
-- Consumes: `FileSpec.synthesize_line_seq` (Task 2)
+- Consumes: `FileSpec.synthesize_line_seq` (Task 2), `SPECS["meisai"]` (Task 3)
 - Produces: `DataFrame` trả về từ `read()` có cột `line_seq` (int, duy nhất trong từng nhóm `slip_no`) khi spec bật cờ.
 
 - [ ] **Step 1: Viết test — cột trùng tên trong file + line_seq tự sinh**
@@ -177,12 +255,10 @@ def test_meisai_tu_sinh_line_seq_va_lay_dung_cot_trung_ten(tmp_path):
     assert doc["amount"].sum() == 33_800
 ```
 
-- [ ] **Step 2: Chạy test, xác nhận lỗi (spec `meisai` chưa tồn tại trong `config/files.yml`)**
+- [ ] **Step 2: Chạy test, xác nhận lỗi (bước sinh `line_seq` chưa có trong `reader.read()`)**
 
 Run: `pytest tests/test_reader.py::test_meisai_tu_sinh_line_seq_va_lay_dung_cot_trung_ten -v`
-Expected: FAIL với `KeyError: 'meisai'`
-
-*(Spec `meisai` được thêm ở Task 4 — chạy lại test này SAU Task 4, không dừng lại sửa ở đây.)*
+Expected: FAIL với `KeyError: 'line_seq'`
 
 - [ ] **Step 3: Thêm bước sinh `line_seq` vào `reader.read()`**
 
@@ -197,7 +273,7 @@ Trong `kome/reader.py`, sau dòng `df = df.dropna(how="all")` (dòng 56), TRƯ�
         df["line_seq"] = df.groupby("slip_no").cumcount() + 1
 ```
 
-- [ ] **Step 4: Chạy test lại (sau khi Task 4 xong) để xác nhận qua**
+- [ ] **Step 4: Chạy test lại, xác nhận qua**
 
 Run: `pytest tests/test_reader.py::test_meisai_tu_sinh_line_seq_va_lay_dung_cot_trung_ten -v`
 Expected: PASS
@@ -207,83 +283,6 @@ Expected: PASS
 ```bash
 git add kome/reader.py tests/test_reader.py
 git commit -m "feat: reader tu sinh line_seq cho spec bat synthesize_line_seq"
-```
-
----
-
-## Task 4: `config/files.yml` — thêm spec `meisai`
-
-**Files:**
-- Modify: `config/files.yml`
-
-**Interfaces:**
-- Produces: `SPECS["meisai"]` — dùng bởi Task 3 (test), Task 5 (loader), Task 6 (pipeline).
-
-- [ ] **Step 1: Thêm khối `meisai` vào cuối `config/files.yml`**
-
-```yaml
-meisai:
-  display_name: 売上明細表
-  filename_pattern: '^売上明細表_(?P<date>\d{8})\.xlsx$'
-  sheet: 売上明細表
-  header_row: 1
-  min_rows: 50
-  keys: [slip_no, line_seq]
-  # KHÔNG có 明細行番号 trong file gốc -- reader tự sinh line_seq (xem
-  # synthesize_line_seq trong kome/reader.py). Dự phòng khi không lấy được
-  # 売上伝票データ -- đối chiếu số liệu thật giữa hai nguồn ở
-  # docs/cot-day-du-ban-hang.md.
-  synthesize_line_seq: true
-  warn_row_drop_ratio: 0.3
-  warn_total_spike: 5.0
-  warn_total_drop: 0.2
-  date_columns: [sales_date]
-  columns:
-    伝票No.: slip_no
-    売上日付: sales_date
-    伝票区分: slip_type
-    得意先コード: customer_code
-    担当者コード: salesperson_code
-    部門コード: department_code
-    商品コード: product_code
-    荷姿区分コード: pack_code
-    入数: case_qty
-    純売上数量: qty
-    単価: unit_price
-    単位原価: unit_cost
-    税込純売上高: amount
-    消費税額: tax_amount
-    売上原価: cost
-    粗利益: gross_profit
-    粗利益率: gross_margin
-    消費税率: tax_rate
-  # 荷姿区分コード/名 xuất hiện HAI LẦN trong file gốc, CÙNG TÊN CỘT: một bản đi
-  # kèm ngay 商品名/商品コード ở đầu file (LUÔN có giá trị), một bản tra theo
-  # danh mục sản phẩm (RỖNG ở dòng phụ phí/coupon như 代引手数料, 値引きクーポン --
-  # không phải sản phẩm thật, ~24% số dòng trong mẫu đã kiểm). pandas tự
-  # thêm hậu tố ".1" cho cột trùng THỨ HAI khi đọc, nên khai tên KHÔNG hậu
-  # tố ở trên là lấy đúng bản luôn có giá trị -- đã kiểm chứng trên dữ liệu
-  # thật: 0/926 dòng lệch nhau giữa 2 bản khi cả hai đều có dữ liệu.
-  # Không có 請求先コード/請求日付/請求締日コード/入金額１/入金伝票No.１ trong file
-  # gốc -- loader để các cột CSDL tương ứng là NULL/0 (xem kome/loaders/sales.py).
-  code_columns: [slip_no, customer_code, salesperson_code, department_code, product_code, pack_code]
-  money_columns: [unit_price, unit_cost, amount, tax_amount, cost, gross_profit]
-  total_column: amount
-  qty_columns: [case_qty, qty]
-  rate_columns: [gross_margin, tax_rate]
-  required_date_columns: [sales_date]
-```
-
-- [ ] **Step 2: Chạy lại test Task 3 (giờ spec đã tồn tại)**
-
-Run: `pytest tests/test_reader.py::test_meisai_tu_sinh_line_seq_va_lay_dung_cot_trung_ten -v`
-Expected: PASS
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add config/files.yml
-git commit -m "feat: khai bao spec meisai (uriage_明細表) trong files.yml"
 ```
 
 ---
@@ -426,7 +425,7 @@ git commit -m "feat: loader ban hang ghi cot source, them load_meisai"
 - Test: `tests/test_pipeline.py`
 
 **Interfaces:**
-- Consumes: `sales.load_meisai` (Task 5), `SPECS["meisai"]` (Task 4)
+- Consumes: `sales.load_meisai` (Task 5), `SPECS["meisai"]` (Task 3)
 - Produces: `LOADERS["meisai"]`, `UNDO_TABLES["meisai"]`, hàm `_kiem_tra_trung_nguon(conn, spec, df) -> list[gates.Blocker]`
 
 - [ ] **Step 1: Viết test — nạp `meisai` cho ngày đã có `uriage` phải bị chặn**
