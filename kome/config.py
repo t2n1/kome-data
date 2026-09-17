@@ -37,6 +37,11 @@ class FileSpec:
     # reader giữ dòng đầu tiên của mỗi khoá (`keys`), bỏ các bản sao còn lại,
     # NGAY SAU KHI ĐỌC — trước khi tới cổng 3 (chặn khoá trùng).
     dedup_on_keys: bool = False
+    # 売上明細表 không có 明細行番号 trong file gốc (chỉ 売上伝票データ có). Bật cờ
+    # này để reader tự sinh line_seq = số thứ tự xuất hiện trong file, nhóm
+    # theo slip_no -- ổn định khi nạp lại CÙNG một file, không đảm bảo khớp
+    # giữa hai lần xuất khác nhau của cùng kỳ (xem migration 017).
+    synthesize_line_seq: bool = False
     product_check: dict | None = None
     warn_row_drop_ratio: float = 0.5  # ngưỡng cổng 4: số dòng rơi dưới này
     warn_total_spike: float = 3.0     # ngưỡng cổng 4: tổng tiền tăng quá này lần

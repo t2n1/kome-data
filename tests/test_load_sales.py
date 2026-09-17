@@ -23,6 +23,18 @@ def _line(slip="079934", seq=1, amount=29167, profit=9907, qty=6, batch_id=1):
     }
 
 
+def _meisai_line(slip="090001", seq=1, amount=31500, profit=9907, batch_id=1):
+    return {
+        "slip_no": slip, "line_seq": seq, "sales_date": date(2026, 8, 3),
+        "slip_type": "債權計上", "customer_code": "000000009292",
+        "salesperson_code": "0004", "department_code": "0020",
+        "product_code": "XT07", "pack_code": "02", "case_qty": 1, "qty": 6,
+        "unit_price": 5250, "unit_cost": 3210, "amount": amount,
+        "tax_amount": 2333, "cost": 19260, "gross_profit": profit,
+        "gross_margin": 0.3145, "batch_id": batch_id,
+    }
+
+
 def test_nap_va_cong_dung(conn, batch):
     b = batch(1)
     df = pd.DataFrame([_line(seq=1, batch_id=b), _line(seq=2, amount=37778, profit=14498, batch_id=b)])
@@ -193,3 +205,73 @@ def test_canh_bao_khu_trung_di_qua_reader_read(tmp_path):
 
     _, warnings = gates_check(p, spec, doc, None)
     assert any(w.gate == 5 and "khử trùng" in w.message for w in warnings)
+
+
+def test_load_meisai_ghi_source_dung(conn, batch):
+    b = batch(1)
+    df = pd.DataFrame([_meisai_line(batch_id=b)])
+    assert sales.load_meisai(conn, df, date(2026, 8, 3), b) == 1
+    r = conn.execute(
+        "SELECT source, amount FROM core.fact_sales_line"
+    ).fetchone()
+    assert r == ("meisai", 31500)
+
+
+def test_uriage_va_meisai_khong_dung_do_khoa_ba_phan(conn, batch):
+    """slip_no+line_seq CÓ THỂ trùng giữa 2 nguồn (line_seq của meisai là số
+    tự sinh, không liên quan gì tới line_seq thật của uriage) -- khoá chính
+    phải có thêm source để không đè nhầm dữ liệu của nhau."""
+    b1 = batch(1)
+    # Dùng _line (uriage data) với slip_no="090001" để mô phỏng trùng key
+    uriage_data = _line(slip="090001", seq=1, amount=29167, batch_id=b1)
+    sales.load(conn, pd.DataFrame([uriage_data]),
+               date(2026, 5, 1), b1)   # source mặc định "uriage"
+    b2 = batch(2)
+    # Dùng _meisai_line với slip_no="090001", line_seq=1 (trùng key với uriage phía trên)
+    sales.load_meisai(conn, pd.DataFrame([_meisai_line(slip="090001", seq=1, amount=31500, batch_id=b2)]),
+                       date(2026, 8, 3), b2)
+    r = conn.execute(
+        "SELECT source, amount FROM core.fact_sales_line ORDER BY source"
+    ).fetchall()
+    assert r == [("meisai", 31500), ("uriage", 29167)]
+
+
+def test_meisai_tu_file_thuc_teu_khong_co_paid_amount(conn, batch, tmp_path):
+    """Hồi quy: meisai không mang paid_amount trong file gốc. Nếu không đặt
+    về 0 trong load_meisai(), INSERT sẽ bị NULL constraint violation vì
+    paid_amount là NOT NULL DEFAULT 0 -- DEFAULT chỉ áp khi cột OMIT, không
+    khi NULL được truyền rõ ràng.
+
+    Test này đi hết đường thật: file .xlsx -> read() -> load_meisai(),
+    không như test_load_meisai_ghi_source_dung dùng hand-built dataframe.
+    """
+    from kome.reader import read
+
+    # Tạo meisai-shaped .xlsx với dữ liệu thực (không có paid_amount column)
+    cols = ["伝票No.", "得意先コード", "商品コード", "荷姿区分コード", "荷姿区分名",
+            "売上日付", "伝票区分", "担当者コード", "部門コード",
+            "入数", "純売上数量", "単価", "単位原価",
+            "税込純売上高", "消費税額", "売上原価", "粗利益", "粗利益率", "消費税率",
+            "荷姿区分コード", "荷姿区分名"]
+    rows = [
+        ["090001", "000000009292", "XT07", "02", "ケース（大：段ボール）",
+         "2026-08-03", "債権計上", "0004", "0020", 1, 6, 5250, 3210,
+         31500, 2333, 19260, 9907, 0.3145, 0.08, "02", "ケース（大：段ボール）"],
+    ]
+    df_xlsx = pd.DataFrame(rows, columns=cols)
+    p = tmp_path / "売上明細表_20260803.xlsx"
+    df_xlsx.to_excel(p, sheet_name="売上明細表", index=False)
+
+    # Đọc qua reader (sẽ ko có cột paid_amount)
+    doc = read(p, SPECS["meisai"])
+    assert "paid_amount" not in doc.columns   # Xác nhận: real meisai ko có cột này
+
+    # Load qua load_meisai (phải xử lý thêm paid_amount=0)
+    b = batch(1)
+    assert sales.load_meisai(conn, doc, date(2026, 8, 3), b) == 1
+
+    # Kiểm chứng: dữ liệu lạch vào CSDL với source='meisai' và paid_amount=0
+    r = conn.execute(
+        "SELECT slip_no, source, amount, paid_amount FROM core.fact_sales_line"
+    ).fetchone()
+    assert r == ("090001", "meisai", 31500, 0)

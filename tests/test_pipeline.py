@@ -122,3 +122,60 @@ def test_tong_tien_uriage_la_sum_amount(conn, tmp_path):
     r = ingest(conn, p, tmp_path / "archive")
     assert r.ok, r.blockers
     assert r.total == mong_doi          # KHÔNG phải 0 (sum(paid_amount))
+
+
+def test_chan_nap_meisai_khi_ngay_do_da_co_uriage(conn, tmp_path):
+    """Hai nguồn cùng ghi vào core.fact_sales_line -- nạp cả hai cho CÙNG
+    một ngày sẽ cộng doanh thu hai lần trong mọi báo cáo mart mà không ai
+    biết. pipeline.ingest() phải chặn, không chỉ cảnh báo."""
+    from kome.config import load_specs
+    spec = load_specs(Path("config/files.yml"))["uriage"]
+    rows = []
+    for i in range(60):
+        rows.append({
+            "slip_no": f"07{i:04d}", "line_seq": 1, "sales_date": date(2026, 8, 3),
+            "billing_date": date(2026, 8, 31), "slip_type": "債権計上",
+            "customer_code": "000000009292", "billing_customer_code": "000000009292",
+            "salesperson_code": "0004", "department_code": "01", "shipto_code": "0001",
+            "product_code": "XT07", "pack_code": "02", "case_qty": 1, "qty": 6,
+            "unit_price": 5250, "unit_cost": 3210, "amount": 29167,
+            "tax_amount": 2333, "cost": 19260, "gross_profit": 9907,
+            "gross_margin": 0.3397, "tax_rate": 0.08, "paid_amount": 0,
+            "payment_slip_no": "000000", "closing_day_code": "99",
+        })
+    import pandas as pd
+    df = pd.DataFrame(rows)
+    ja_of = {sys_col: ja for ja, sys_col in spec.columns.items()}
+    df = df.rename(columns=ja_of)[list(spec.columns.keys())]
+    p_uriage = tmp_path / "売上伝票データ_20260803.xlsx"
+    df.to_excel(p_uriage, sheet_name=spec.sheet, index=False)
+
+    r1 = ingest(conn, p_uriage, tmp_path / "archive")
+    assert r1.ok, r1.blockers
+
+    spec_m = load_specs(Path("config/files.yml"))["meisai"]
+    rows_m = []
+    for i in range(60):
+        rows_m.append({
+            "slip_no": f"09{i:04d}", "sales_date": date(2026, 8, 3),
+            "slip_type": "債権計上", "customer_code": "000000009292",
+            "salesperson_code": "0004", "department_code": "0020",
+            "product_code": "XT07", "pack_code": "02", "case_qty": 1, "qty": 6,
+            "unit_price": 5250, "unit_cost": 3210, "amount": 31500,
+            "tax_amount": 2333, "cost": 19260, "gross_profit": 9907,
+            "gross_margin": 0.3145, "tax_rate": 0.08,
+        })
+    df_m = pd.DataFrame(rows_m)
+    ja_of_m = {sys_col: ja for ja, sys_col in spec_m.columns.items()}
+    df_m = df_m.rename(columns=ja_of_m)[list(spec_m.columns.keys())]
+    p_meisai = tmp_path / "売上明細表_20260803.xlsx"
+    df_m.to_excel(p_meisai, sheet_name=spec_m.sheet, index=False)
+
+    r2 = ingest(conn, p_meisai, tmp_path / "archive")
+    assert not r2.ok
+    assert any(b.gate == 3 and "uriage" in b.message for b in r2.blockers)
+
+    n = conn.execute(
+        "SELECT count(*) FROM core.fact_sales_line WHERE source = 'meisai'"
+    ).fetchone()[0]
+    assert n == 0   # không ghi gì cả khi bị chặn

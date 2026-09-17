@@ -20,6 +20,7 @@ LOADERS = {
     "zaiko": inventory.load,
     "tokuisaki": customer.load,
     "uriage": sales.load,
+    "meisai": sales.load_meisai,
     "shohin": master.make_loader(
         "core.dim_product", ["product_code"],
         ["product_code", "product_name", "name_ja", "kind_code", "kind_name",
@@ -40,6 +41,7 @@ UNDO_TABLES = {
     "zaiko": ["core.fact_inventory_daily"],
     "tokuisaki": ["core.dim_customer"],
     "uriage": ["core.fact_sales_line"],
+    "meisai": ["core.fact_sales_line"],
     "shohin": ["core.dim_product"],
     "shiiresaki": ["core.dim_supplier"],
     "chokusousaki": ["core.dim_shipto"],
@@ -76,6 +78,36 @@ def identify(path: Path) -> tuple[FileSpec, date] | tuple[None, None]:
             return spec, datetime.strptime(m.group("date"), "%Y%m%d").date()
     return None, None
 
+def _kiem_tra_trung_nguon(conn, spec: FileSpec, df) -> list[gates.Blocker]:
+    """Chặn nạp 売上伝票データ và 売上明細表 CHỒNG NGÀY nhau.
+
+    Hai loại file này cùng ghi vào core.fact_sales_line (phân biệt bằng cột
+    source) -- nếu cả hai cùng có dữ liệu một ngày thì MỌI báo cáo mart sẽ
+    cộng doanh thu ngày đó hai lần mà không ai biết (mart/ chưa có logic
+    chọn nguồn -- xem ghi chú "Việc cố tình để lại" trong plan triển khai
+    tính năng này). Chỉ áp dụng cho hai spec này.
+    """
+    if spec.name not in ("uriage", "meisai"):
+        return []
+    nguon_khac = "meisai" if spec.name == "uriage" else "uriage"
+    ngay = sorted(d for d in df["sales_date"].dropna().unique())
+    if not ngay:
+        return []
+    rows = conn.execute(
+        """SELECT DISTINCT sales_date FROM core.fact_sales_line
+           WHERE source = %s AND sales_date = ANY(%s)""",
+        (nguon_khac, list(ngay)),
+    ).fetchall()
+    if not rows:
+        return []
+    trung = sorted(r[0] for r in rows)
+    return [gates.Blocker(
+        3,
+        f"Đã có dữ liệu nguồn {nguon_khac} cho {len(trung)} ngày "
+        f"({trung[0]}..{trung[-1]}) — nạp thêm {spec.name} sẽ cộng doanh thu "
+        f"hai lần. Hoàn tác lô {nguon_khac} trước nếu muốn đổi nguồn.")]
+
+
 def ingest(conn, path: Path, archive_dir: Path) -> IngestResult:
     spec, data_date = identify(path)
     if spec is None:
@@ -91,6 +123,7 @@ def ingest(conn, path: Path, archive_dir: Path) -> IngestResult:
         return IngestResult(ok=False, spec_name=spec.name, blockers=[gates.Blocker(2, str(e))])
 
     blockers, warnings = gates.check(path, spec, df, archive.previous_stats(conn, spec.name))
+    blockers = blockers + _kiem_tra_trung_nguon(conn, spec, df)
     if blockers:
         return IngestResult(ok=False, spec_name=spec.name, blockers=blockers, warnings=warnings)
 

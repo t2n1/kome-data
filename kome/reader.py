@@ -55,6 +55,13 @@ def read(path: Path, spec: FileSpec) -> pd.DataFrame:
     df = df[list(spec.columns)].rename(columns=spec.columns)
     df = df.dropna(how="all")
 
+    # 売上明細表 không có 明細行番号 trong file gốc -- sinh line_seq bằng số thứ
+    # tự xuất hiện trong file, nhóm theo slip_no. PHẢI làm TRƯỚC dedup_on_keys
+    # và trước cổng 3 (kiểm khoá trùng dùng spec.keys = [slip_no, line_seq]),
+    # để line_seq tồn tại lúc cổng 3 kiểm tra.
+    if spec.synthesize_line_seq:
+        df["line_seq"] = df.groupby("slip_no").cumcount() + 1
+
     # Ô TRỐNG -> None cho MỌI cột chữ, một lần, ngay tại đây.
     # pd.read_excel(dtype=str) trả ô trống thành NaN (float). Trước đây chỉ
     # code_columns được chuẩn hoá, nên các cột chữ khác đi thẳng vào Postgres
