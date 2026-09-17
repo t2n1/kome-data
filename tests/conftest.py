@@ -1,3 +1,4 @@
+from datetime import date
 import os
 from pathlib import Path
 
@@ -119,13 +120,13 @@ def batch(conn):
     nên test nào ghi dữ liệu cũng phải có lô thật — truyền số 1 tuỳ tiện sẽ
     vi phạm khoá ngoại.
     """
-    def _make(n: int = 1) -> int:
+    def _make(n: int = 1, ngay: date = date(2026, 1, 1)) -> int:
         row = conn.execute(
             """INSERT INTO meta.ingest_batch
-                 (spec_name, source_file, digest, archived_to, row_count)
-               VALUES ('test', 'test.xlsx', %s, '/tmp/test.xlsx', 0)
+                 (spec_name, source_file, digest, archived_to, row_count, data_date)
+               VALUES ('test', 'test.xlsx', %s, '/tmp/test.xlsx', 0, %s)
                RETURNING batch_id""",
-            (f"digest-{n}",),
+            (f"digest-{n}", ngay),
         ).fetchone()
         conn.commit()
         return row[0]

@@ -179,3 +179,19 @@ def test_chan_nap_meisai_khi_ngay_do_da_co_uriage(conn, tmp_path):
         "SELECT count(*) FROM core.fact_sales_line WHERE source = 'meisai'"
     ).fetchone()[0]
     assert n == 0   # không ghi gì cả khi bị chặn
+
+
+def test_lo_ghi_ngay_du_lieu_tu_ten_file(conn, tmp_path):
+    """meta.ingest_batch.data_date = ngày trong TÊN FILE, không phải ngày nạp.
+
+    Ô cảnh báo "hôm nay chưa có dữ liệu" đọc đúng cột này. Nếu nó lưu ngày
+    NẠP thì hôm nay nạp bù file của tuần trước sẽ làm ô đó xanh — đúng cái
+    tình huống nó sinh ra để bắt.
+    """
+    r = ingest(conn, _staged(tmp_path), tmp_path / "archive")
+    assert r.ok
+    ngay = conn.execute(
+        "SELECT data_date FROM meta.ingest_batch WHERE batch_id = %s",
+        (r.batch_id,),
+    ).fetchone()[0]
+    assert ngay == date(2026, 9, 16)
