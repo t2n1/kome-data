@@ -37,6 +37,13 @@ def test_dedup_on_keys_mac_dinh_tat_cho_cac_spec_khac():
     assert SPECS["tokuisaki"].dedup_on_keys is False
 
 
+def test_synthesize_line_seq_mac_dinh_tat_cho_cac_spec_khac():
+    """synthesize_line_seq là tính năng riêng cho 売上明細表 (không có
+    明細行番号 trong file gốc). Các spec khác phải nhận mặc định False."""
+    assert SPECS["zaiko"].synthesize_line_seq is False
+    assert SPECS["uriage"].synthesize_line_seq is False
+
+
 def test_khong_bat_dedup_thi_cong_3_van_chan_khoa_trung():
     """Quy hồi quy: với spec không bật dedup_on_keys, khoá trùng vẫn phải
     bị cổng 3 chặn như trước Task 10 -- dedup không được vô tình che giấu
