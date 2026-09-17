@@ -50,5 +50,11 @@ def load(conn: psycopg.Connection, df: pd.DataFrame,
 
 def load_meisai(conn: psycopg.Connection, df: pd.DataFrame,
                  data_date: date, batch_id: int) -> int:
-    """売上明細表 (nguồn dự phòng) -- chỉ khác `load()` ở source="meisai"."""
+    """売上明細表 (nguồn dự phòng) -- chỉ khác `load()` ở source="meisai".
+
+    Meisai không mang dữ liệu thanh toán (paid_amount không có trong file gốc),
+    nhưng core.fact_sales_line yêu cầu NOT NULL. Đặt về 0 (= chưa ghi nhận
+    biên lai), phù hợp với DEFAULT của cột."""
+    df = df.copy()
+    df["paid_amount"] = 0
     return load(conn, df, data_date, batch_id, source="meisai")
