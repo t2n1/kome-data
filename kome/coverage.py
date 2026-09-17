@@ -29,12 +29,14 @@ import re
 CO = "co"        # có dữ liệu trong kho
 KHONG = "khong"  # không có dữ liệu (xem lưu ý ở đầu file)
 NGOAI = "ngoai"  # ngoài phạm vi dữ liệu — công ty không còn lưu
+NGHI = "nghi"    # ngày nghỉ cuối tuần — CHỈ bảng theo ngày
 
-KY_HIEU = {CO: "●", KHONG: "·", NGOAI: "—"}
+KY_HIEU = {CO: "●", KHONG: "·", NGOAI: "—", NGHI: " "}
 MO_TA_TRANG_THAI = {
     CO: "có dữ liệu trong kho",
     KHONG: "KHÔNG có dữ liệu — hoặc chưa xuất, hoặc đã bị cổng kiểm tra chặn",
     NGOAI: "ngoài phạm vi dữ liệu — công ty không còn lưu, đừng đi tìm",
+    NGHI: "ngày nghỉ cuối tuần — không ai xuất file, không phải thiếu",
 }
 
 # Ràng buộc VĨNH VIỄN (đặc tả §2.2.1): dữ liệu bán hàng bắt đầu 2025-03-03,
@@ -90,6 +92,18 @@ THIEU_BO_NAP = [
 # Hai loại này có bảng fact riêng nên đếm theo NGÀY nghiệp vụ trong kho, không
 # theo tên file đã nạp.
 _CO_BANG_FACT = {"ban", "ton"}
+
+# Bảng THEO NGÀY chỉ có 3 nguồn của nhịp 13:30 (CLAUDE.md, "Quy trình hằng
+# ngày") — cùng bộ với ô cảnh báo ở `kome/tuoi_du_lieu.py`. 4 loại master còn
+# lại (商品データ, 仕入先, 直送先, 取引単価データ) xuất vài lần mỗi năm; chiếu
+# xuống từng ngày thì 99% số ô sẽ đỏ dù không ai làm sai, và một cột đỏ gần
+# như thường trực dạy người đọc bỏ qua cả cột. Chúng ở lại bảng THÁNG.
+KHOA_NGAY = ("ban", "ton", "tokuisaki")
+COT_NGAY = [c for c in COT if c.khoa in KHOA_NGAY]
+
+# Số ngày mặc định của bảng theo ngày. Đủ để thấy nhịp hằng ngày và bắt ngày
+# quên nạp; nhìn xa hơn thì đã có bảng tháng ngay bên dưới.
+SO_NGAY_MAC_DINH = 90
 
 
 @dataclass(frozen=True)
@@ -263,3 +277,95 @@ def tinh_bang_phu(conn, hom_nay: date | None = None,
         ky.append(Ky(fy, nhan, dau, cuoi, theo_ky[fy], dt, lg))
 
     return BangPhu(database, COT, ky, DAU_DU_LIEU, THIEU_BO_NAP)
+
+
+# --- Bảng theo NGÀY ------------------------------------------------------
+# Bảng tháng ở trên trả lời "tháng nào thiếu". Từ khi có nhịp xuất file 13:30
+# hằng ngày, câu hỏi thật sự đổi thành "hôm qua có sót ngày nào không" — mà
+# độ phân giải tháng không bao giờ trả lời được.
+
+
+@dataclass(frozen=True)
+class Ngay:
+    ngay: date
+    thu: int                # isodow: 1 = thứ Hai … 7 = Chủ nhật
+    la_cuoi_tuan: bool
+    o: list[O]
+
+    @property
+    def nhan_thu(self) -> str:
+        return ("T2", "T3", "T4", "T5", "T6", "T7", "CN")[self.thu - 1]
+
+
+@dataclass(frozen=True)
+class BangNgay:
+    cot: list[CotLoaiFile]
+    ngay: list[Ngay]        # MỚI NHẤT TRƯỚC — hôm nay ở dòng đầu
+    dau: date
+    cuoi: date
+    thieu: dict[str, int]   # khoá cột -> số NGÀY LÀM VIỆC thiếu trong khung
+
+    @property
+    def co_thieu(self) -> bool:
+        return any(self.thieu.values())
+
+
+def tinh_bang_ngay(conn, hom_nay: date | None = None,
+                   so_ngay: int = SO_NGAY_MAC_DINH) -> BangNgay:
+    """Độ phủ từng ngày của 3 nguồn hằng ngày, `so_ngay` ngày lùi từ hôm nay.
+
+    Không tự mở kết nối (xem ghi chú ở `tinh_bang_phu`). `hom_nay` bơm được
+    để test khỏi phụ thuộc đồng hồ thật.
+
+    Cuối tuần KHÔNG bao giờ tính là thiếu và không vào `thieu`: không ai xuất
+    file thứ Bảy, nên 26 ô đỏ mỗi quý chỉ dạy người đọc lướt qua cả cột. Ngày
+    lễ Nhật không có trong `core.dim_date` nên vẫn hiện thiếu — nhất quán với
+    `/health` và `kome/tuoi_du_lieu.py`.
+    """
+    from kome.tuoi_du_lieu import hom_nay_o_nhat
+
+    hom_nay = hom_nay or hom_nay_o_nhat()
+    khung = conn.execute(
+        """SELECT date_key, extract(isodow FROM date_key)::int, is_weekend
+           FROM core.dim_date
+           WHERE date_key <= %s ORDER BY date_key DESC LIMIT %s""",
+        (hom_nay, so_ngay),
+    ).fetchall()
+    if not khung:
+        return BangNgay(COT_NGAY, [], hom_nay, hom_nay,
+                        {c.khoa: 0 for c in COT_NGAY})
+
+    dau = khung[-1][0]
+    co: dict[str, set[date]] = {
+        "ban": {r[0] for r in conn.execute(
+            """SELECT DISTINCT sales_date FROM core.fact_sales_line
+               WHERE sales_date BETWEEN %s AND %s""", (dau, hom_nay)).fetchall()},
+        "ton": {r[0] for r in conn.execute(
+            """SELECT DISTINCT snapshot_date FROM core.fact_inventory_daily
+               WHERE snapshot_date BETWEEN %s AND %s""", (dau, hom_nay)).fetchall()},
+        # Master khách: đọc `data_date` của lô (migration 018), KHÔNG tách lại
+        # từ tên file như `_thang_master`. `core.dim_customer` là SCD2 nên ngày
+        # khách không đổi gì thì nạp xong không có dòng nào mang ngày hôm đó.
+        "tokuisaki": {r[0] for r in conn.execute(
+            """SELECT DISTINCT data_date FROM meta.ingest_batch
+               WHERE spec_name = 'tokuisaki' AND undone_at IS NULL
+                 AND data_date BETWEEN %s AND %s""", (dau, hom_nay)).fetchall()},
+    }
+
+    ngay, thieu = [], {c.khoa: 0 for c in COT_NGAY}
+    for d, thu, cuoi_tuan in khung:
+        o = []
+        for c in COT_NGAY:
+            if d < DAU_DU_LIEU:
+                tt = NGOAI
+            elif d in co[c.khoa]:
+                tt = CO
+            elif cuoi_tuan:
+                tt = NGHI
+            else:
+                tt = KHONG
+                thieu[c.khoa] += 1
+            o.append(O(c, tt))
+        ngay.append(Ngay(d, thu, cuoi_tuan, o))
+
+    return BangNgay(COT_NGAY, ngay, dau, hom_nay, thieu)

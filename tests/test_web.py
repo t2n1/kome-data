@@ -291,3 +291,16 @@ def test_trang_chu_khong_bao_dong_truoc_gio_chot(conn, test_db_url, monkeypatch)
     assert r.status_code == 200
     assert "Chưa có dữ liệu hôm nay" not in r.text
     assert "Chưa tới giờ xuất file" in r.text
+
+def test_trang_phu_du_lieu_co_bang_theo_tung_ngay(conn, test_db_url, monkeypatch):
+    """Bảng tháng không trả lời được "hôm qua có sót ngày nào không"."""
+    from datetime import datetime
+    from kome.tuoi_du_lieu import MUI_GIO
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 14, 0, tzinfo=MUI_GIO))
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/phu-du-lieu")
+    assert r.status_code == 200
+    assert "90 ngày gần nhất" in r.text
+    assert "2026-09-17" in r.text          # dòng đầu là hôm nay
+    assert "2026-06-20" in r.text          # dòng cuối, đủ 90 ngày

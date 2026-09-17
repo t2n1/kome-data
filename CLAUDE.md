@@ -72,7 +72,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
 | `/nap` | Kéo–thả file OBC (ẩn ở bản Vercel) | — |
-| `/health`, `/phu-du-lieu` | Sức khoẻ & độ phủ dữ liệu | `meta.ingest_batch` |
+| `/health`, `/phu-du-lieu` | Sức khoẻ & độ phủ dữ liệu (bảng **theo ngày** 90 ngày gần nhất cho 3 nguồn hằng ngày, rồi bảng theo tháng đủ 7 loại file) | `meta.ingest_batch` |
 
 **Bất biến:** trạng thái quan hệ khách hàng so số ngày im lặng với **nhịp mua
 riêng của từng khách** (trung vị khoảng cách giữa các lần mua), KHÔNG với một
