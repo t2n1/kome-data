@@ -137,17 +137,31 @@ chưa xây.
 
 ### 5.3 Tách kết nối CSDL theo vai trò ngay trong code
 
-`kome/db.py` hiện có một kết nối duy nhất, xác thực bằng `kome_ingest_user` (theo luật
-đã ghi trong `CLAUDE.md`), đọc từ biến môi trường `DATABASE_URL`. Người dùng
-`kome_app_user` **đã được tạo sẵn** từ trước (`docs/runbook.md`, cùng lượt tạo với
-`kome_ingest_user`) nhưng chưa ai dùng — không cần tạo tài khoản CSDL mới, chỉ cần:
+`kome/db.py` hiện có một kết nối duy nhất, đọc từ biến môi trường `DATABASE_URL`.
 
-1. Thêm biến môi trường mới `DATABASE_URL_APP` — chuỗi kết nối dùng `kome_app_user`.
-2. Trong code, gọi `db.connect(os.environ["DATABASE_URL_APP"])` (hàm `connect()` ở
+**Đã kiểm chứng trên CSDL thật (2026-09-17):** ba vai trò `kome_ingest`/`kome_app`/
+`kome_report` tồn tại đúng như `009_roles.sql` (cả ba đều `NOLOGIN`, đúng thiết kế —
+đây là vai trò nhóm, không phải tài khoản đăng nhập). Nhưng **các tài khoản đăng nhập
+`kome_ingest_user`/`kome_app_user`/`kome_report_user` mà `docs/runbook.md` mô tả cách
+tạo — CHƯA tồn tại trên CSDL thật.** `DATABASE_URL` hiện tại (cả bản chạy thật lẫn bản
+test) kết nối bằng chính **`postgres`** (superuser) — bước tạo tài khoản tay trên SQL
+Editor của Supabase, dù đã viết hướng dẫn, **chưa từng được thực hiện**.
+
+Điều này không chặn được đợt việc này, nhưng đổi thứ tự bước làm — phải tạo tài khoản
+đăng nhập trước khi viết bất kỳ dòng code nào dùng `kome_app_user`:
+
+1. **Việc tay, ngoài git** (SQL Editor Supabase, đúng 3 dòng lệnh đã có sẵn ở
+   `docs/runbook.md`): tạo `kome_app_user LOGIN ... IN ROLE kome_app` (tối thiểu; nên
+   tạo luôn cả `kome_ingest_user`/`kome_report_user` cùng lúc để khớp tài liệu, dù
+   không bắt buộc cho riêng đợt này).
+2. Thêm biến môi trường mới `DATABASE_URL_APP` — chuỗi kết nối dùng `kome_app_user` vừa tạo.
+3. Trong code, gọi `db.connect(os.environ["DATABASE_URL_APP"])` (hàm `connect()` ở
    `kome/db.py` đã nhận `url` tuỳ chọn, không cần sửa hàm này) cho **mọi route mới**
    trong đợt này (đăng nhập, dashboard, danh sách ưu tiên liên hệ, ghi nhật ký).
 
-Route nạp/hoàn tác hiện tại giữ nguyên kết nối `DATABASE_URL`/`kome_ingest_user` — không đổi.
+Route nạp/hoàn tác hiện tại giữ nguyên `DATABASE_URL` — nhưng lưu ý nó cũng đang chạy
+bằng `postgres` chứ chưa phải `kome_ingest_user`, một khoảng cách có sẵn từ trước,
+ngoài phạm vi sửa của đợt này (ghi lại ở §7 để không quên).
 
 Lợi ích không chỉ là đúng thiết kế Task 13: nếu code CRM mới lỡ viết nhầm một câu lệnh
 `UPDATE core...`, CSDL tự chặn (`kome_app` không có quyền đó) — một lớp an toàn nằm ở
@@ -257,6 +271,8 @@ tục dùng kết nối `kome_ingest` như cũ, không rủi ro tới luồng đ
 | G2 | Mật khẩu ban đầu của từng người: ai đặt, gửi bằng kênh nào | Thấp | Chủ sở hữu đặt tay từng người, giống cách `KOME_MAT_KHAU` hiện đặt — ngoài phạm vi kỹ thuật của tài liệu này |
 | G3 | Đợt sau (kéo-thả) sẽ cần một bảng lưu bố cục riêng từng người | Thấp | Chỉ ghi chú tên dự kiến `app.bo_cuc_dashboard` ở đây để tránh trùng tên sau này — **không tạo bảng này bây giờ** |
 | G4 | `ty_le_im_lang >= 1` có thể tạo danh sách khá dài (nhiều khách "sắp đến hạn") | Trung bình | Đo thử trên dữ liệu thật sau khi triển khai; nếu quá dài, cân nhắc thêm ngưỡng doanh thu tối thiểu — quyết định sau khi có số liệu, không đoán trước |
+| G5 | **Đã kiểm chứng 2026-09-17**: `kome_app_user`/`kome_ingest_user`/`kome_report_user` chưa tồn tại trên CSDL thật — `DATABASE_URL` hiện đang chạy bằng `postgres` (superuser), cả bản thật lẫn bản test | Cao — chặn §5.3 nếu bỏ qua | Tạo tài khoản tay trên SQL Editor Supabase (lệnh có sẵn ở `docs/runbook.md`) **trước khi** viết code dùng `DATABASE_URL_APP` — xem §9 bước 2 |
+| G6 | 7 khách hiện hành có `salesperson_code` rỗng (đã đo: `''`, 7 dòng) | Thấp | `mart.uu_tien_lien_he` và dashboard theo vai trò `sale` sẽ tự động không hiện các khách này cho ai (không khớp `salesperson_code` của ai) — chấp nhận được ở MVP, quản lý vẫn thấy qua chế độ xem toàn bộ |
 
 ---
 
@@ -275,8 +291,11 @@ tục dùng kết nối `kome_ingest` như cũ, không rủi ro tới luồng đ
 ## 9. Bước tiếp theo
 
 1. Chủ sở hữu đọc và duyệt đặc tả này
-2. Thêm biến môi trường `DATABASE_URL_APP` (dùng `kome_app_user` đã có sẵn) và
+2. **Việc tay trên SQL Editor Supabase** (ngoài git, theo `docs/runbook.md`): tạo
+   `kome_app_user LOGIN ... IN ROLE kome_app` (và nên tạo luôn `kome_ingest_user`,
+   `kome_report_user` cho khớp tài liệu — hiện cả ba đều chưa tồn tại, đã kiểm chứng)
+3. Thêm biến môi trường `DATABASE_URL_APP` (dùng `kome_app_user` vừa tạo) và
    `KOME_SESSION_SECRET` (khoá ký vé mới) vào `.env` và vào cấu hình triển khai
-3. Viết migration `017_...sql` (bảng + view, chạy bằng vai trò `postgres`)
-4. Lập kế hoạch triển khai chi tiết (writing-plans)
-5. Triển khai, chạy `pytest -v`, kiểm thử tay luồng đăng nhập + ghi nhật ký trên trình duyệt trước khi coi là xong
+4. Viết migration `017_...sql` (bảng + view, chạy bằng vai trò `postgres`)
+5. Lập kế hoạch triển khai chi tiết (writing-plans)
+6. Triển khai, chạy `pytest -v`, kiểm thử tay luồng đăng nhập + ghi nhật ký trên trình duyệt trước khi coi là xong
