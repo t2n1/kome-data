@@ -66,7 +66,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 ## Các trang của web app
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
-| `/` | Tổng quan | `mart.tong_theo_ky`, `mart.khach_360` |
+| `/` | Tổng quan + ô "hôm nay đã có dữ liệu chưa" | `mart.tong_theo_ky`, `mart.khach_360`, `meta.ingest_batch` |
 | `/khach-hang` | Danh sách + tìm kiếm + lọc theo trạng thái | `mart.khach_360` |
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang` |
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
@@ -82,6 +82,21 @@ ngưỡng chung. Đo thật: ngưỡng chung 90 ngày bỏ sót 49 khách đang 
 **Bất biến:** mốc thời gian là **ngày bán mới nhất trong kho**
 (`mart.moc_thoi_gian`), KHÔNG phải `current_date`. Dùng `current_date` thì một
 ngày không ai nạp file sẽ làm cả 1.710 khách "im lặng thêm một ngày".
+
+**Ngoại lệ DUY NHẤT của bất biến trên:** ô "hôm nay đã có dữ liệu chưa"
+(`kome/tuoi_du_lieu.py`) cố ý dùng ĐỒNG HỒ THẬT, vì câu hỏi của nó đúng là
+"đến giờ này đã ai nạp chưa" — không thể trả lời bằng chính dữ liệu đang
+thiếu. Ba ràng buộc của ô đó:
+- "Hôm nay" tính theo **Asia/Tokyo trong Python**, KHÔNG dùng `current_date`
+  của Postgres: CSDL chạy UTC, nên `current_date` vẫn là hôm qua suốt
+  00:00–09:00 giờ Nhật — tức suốt buổi sáng làm việc.
+- Chỉ ĐỎ khi đã qua **13:30** và hôm nay là ngày làm việc
+  (`core.dim_date.is_weekend`). Đỏ từ sáng nghĩa là sáng nào cũng đỏ, và một
+  dải đỏ vĩnh viễn dạy người đọc bỏ qua dải đỏ.
+- "Đã có dữ liệu hôm nay" đọc `meta.ingest_batch.data_date` (ngày trong TÊN
+  FILE, migration `018_*.sql`), KHÔNG đọc `loaded_at` và KHÔNG đếm dòng trong
+  bảng fact: `core.dim_customer` là SCD2 nên ngày khách không đổi gì thì nạp
+  `得意先全情報` xong không sinh dòng nào mang ngày hôm nay.
 
 **Bất biến:** khách OBC đã đánh dấu `※廃業※` / `※取引停止※` trong TÊN (281/2.077
 khách) không bao giờ vào danh sách gọi lại. Doanh nghiệp đã phá sản thì im lặng
