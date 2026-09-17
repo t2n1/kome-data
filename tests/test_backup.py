@@ -72,8 +72,9 @@ def test_khoi_phuc_dat_lai_sequence_bigserial(conn, batch, tmp_path):
     with psycopg.connect(url) as c:
         new_bid = c.execute(
             """INSERT INTO meta.ingest_batch
-                 (spec_name, source_file, digest, archived_to, row_count)
-               VALUES ('test', 'test2.xlsx', 'digest-sau-khoi-phuc', '/tmp/t2.xlsx', 0)
+                 (spec_name, source_file, digest, archived_to, row_count, data_date)
+               VALUES ('test', 'test2.xlsx', 'digest-sau-khoi-phuc', '/tmp/t2.xlsx', 0,
+                       DATE '2026-01-01')
                RETURNING batch_id"""
         ).fetchone()[0]
         c.execute(

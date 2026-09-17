@@ -22,8 +22,13 @@ def already_loaded(conn: psycopg.Connection, digest: str) -> bool:
 
 
 def store(conn, path: Path, spec_name: str, digest: str,
-          row_count: int, total: int, archive_dir: Path) -> int:
-    """Lưu file gốc rồi ghi nhật ký. Lưu file TRƯỚC khi ghi CSDL."""
+          row_count: int, total: int, archive_dir: Path, data_date: date) -> int:
+    """Lưu file gốc rồi ghi nhật ký. Lưu file TRƯỚC khi ghi CSDL.
+
+    `data_date` KHÔNG có giá trị mặc định có chủ ý: mặc định `date.today()`
+    sẽ biến một lô nạp bù thành "dữ liệu của hôm nay" mà không ai nhận ra, và
+    đó đúng là thứ ô cảnh báo tuổi dữ liệu sinh ra để bắt.
+    """
     folder = Path(archive_dir) / spec_name / date.today().strftime("%Y/%m")
     folder.mkdir(parents=True, exist_ok=True)
     dest = folder / f"{path.stem}__{digest[:12]}{path.suffix}"
@@ -34,9 +39,10 @@ def store(conn, path: Path, spec_name: str, digest: str,
     try:
         row = conn.execute(
             """INSERT INTO meta.ingest_batch
-                 (spec_name, source_file, digest, archived_to, row_count, total_amount)
-               VALUES (%s,%s,%s,%s,%s,%s) RETURNING batch_id""",
-            (spec_name, path.name, digest, str(dest), row_count, total),
+                 (spec_name, source_file, digest, archived_to, row_count,
+                  total_amount, data_date)
+               VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING batch_id""",
+            (spec_name, path.name, digest, str(dest), row_count, total, data_date),
         ).fetchone()
         conn.commit()
     except Exception:

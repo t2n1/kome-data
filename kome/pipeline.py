@@ -130,7 +130,8 @@ def ingest(conn, path: Path, archive_dir: Path) -> IngestResult:
     # Tổng tiền đại diện: cột khai TAY trong files.yml (spec.total_column),
     # không phải money_columns[-1]. Xem ghi chú ở kome/config.py.
     total = int(df[spec.total_column].sum()) if spec.total_column else 0
-    batch_id = archive.store(conn, path, spec.name, digest, len(df), total, archive_dir)
+    batch_id = archive.store(conn, path, spec.name, digest, len(df), total,
+                             archive_dir, data_date)
 
     # archive.store() đã COMMIT dòng meta.ingest_batch. Nếu loader lỗi sau đó
     # (mất kết nối giữa executemany, tràn bigint, spec có trong files.yml mà

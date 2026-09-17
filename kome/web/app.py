@@ -11,6 +11,7 @@ from kome.coverage import tinh_bang_phu
 from kome import khach_hang as KH
 from kome.db import connect
 from kome.env import nap_env
+from kome.tuoi_du_lieu import tinh_tuoi
 from kome.web import bao_mat
 from ops.backup import backup_status
 
@@ -194,9 +195,10 @@ def create_app(db_url: str | None = None) -> FastAPI:
                 so_ngay_ton = conn.execute(
                     "SELECT count(DISTINCT snapshot_date) FROM core.fact_inventory_daily"
                 ).fetchone()[0]
+                tuoi = tinh_tuoi(conn)
             return _ve(request, "tong_quan.html",
                        {"bc": bc, "dem": dem, "so_ngay_ton": so_ngay_ton,
-                        "trang": "tong-quan"})
+                        "tuoi": tuoi, "trang": "tong-quan"})
         except Exception as e:
             return _loi(request, "mở trang tổng quan", e, chung)
 
@@ -280,6 +282,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
                        ORDER BY spec_name, loaded_at DESC"""
                 ).fetchall()
                 ky = _ky_du_lieu(conn)
+                tuoi = tinh_tuoi(conn)
             seen = {r[0]: r for r in rows}
             status = [
                 {"name": s.display_name,
@@ -300,7 +303,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
             backup = None if chi_doc else backup_status(backup_dir)
             return _ve(request, "health.html",
                        {"status": status, "backup": backup, "ky": ky,
-                        "trang": "suc-khoe"})
+                        "tuoi": tuoi, "trang": "suc-khoe"})
         except Exception as e:
             return _loi(request, "mở trang sức khoẻ dữ liệu", e, chung)
 

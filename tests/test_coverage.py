@@ -173,14 +173,18 @@ def test_lo_da_hoan_tac_khong_tinh_la_co_du_lieu(conn):
     for undone, digest in ((None, "con"), ("now()", "da-huy")):
         conn.execute(
             f"""INSERT INTO meta.ingest_batch
-                  (spec_name, source_file, digest, archived_to, row_count, undone_at)
-                VALUES ('shohin', '商品データ_20260610.xlsx', %s, '/tmp/x', 1, {undone or 'NULL'})""",
+                  (spec_name, source_file, digest, archived_to, row_count, undone_at,
+                   data_date)
+                VALUES ('shohin', '商品データ_20260610.xlsx', %s, '/tmp/x', 1,
+                        {undone or 'NULL'}, DATE '2026-06-10')""",
             (digest,),
         )
     conn.execute(
         """INSERT INTO meta.ingest_batch
-             (spec_name, source_file, digest, archived_to, row_count, undone_at)
-           VALUES ('shiiresaki', '仕入先_20260710.xlsx', 'ncc', '/tmp/x', 1, now())"""
+             (spec_name, source_file, digest, archived_to, row_count, undone_at,
+              data_date)
+           VALUES ('shiiresaki', '仕入先_20260710.xlsx', 'ncc', '/tmp/x', 1, now(),
+                   DATE '2026-07-10')"""
     )
     conn.commit()
 
