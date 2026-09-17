@@ -23,6 +23,18 @@ def _line(slip="079934", seq=1, amount=29167, profit=9907, qty=6, batch_id=1):
     }
 
 
+def _meisai_line(slip="090001", seq=1, amount=31500, profit=9907, batch_id=1):
+    return {
+        "slip_no": slip, "line_seq": seq, "sales_date": date(2026, 8, 3),
+        "slip_type": "債権計上", "customer_code": "000000009292",
+        "salesperson_code": "0004", "department_code": "0020",
+        "product_code": "XT07", "pack_code": "02", "case_qty": 1, "qty": 6,
+        "unit_price": 5250, "unit_cost": 3210, "amount": amount,
+        "tax_amount": 2333, "cost": 19260, "gross_profit": profit,
+        "gross_margin": 0.3145, "paid_amount": 0, "batch_id": batch_id,
+    }
+
+
 def test_nap_va_cong_dung(conn, batch):
     b = batch(1)
     df = pd.DataFrame([_line(seq=1, batch_id=b), _line(seq=2, amount=37778, profit=14498, batch_id=b)])
@@ -193,3 +205,29 @@ def test_canh_bao_khu_trung_di_qua_reader_read(tmp_path):
 
     _, warnings = gates_check(p, spec, doc, None)
     assert any(w.gate == 5 and "khử trùng" in w.message for w in warnings)
+
+
+def test_load_meisai_ghi_source_dung(conn, batch):
+    b = batch(1)
+    df = pd.DataFrame([_meisai_line(batch_id=b)])
+    assert sales.load_meisai(conn, df, date(2026, 8, 3), b) == 1
+    r = conn.execute(
+        "SELECT source, amount FROM core.fact_sales_line"
+    ).fetchone()
+    assert r == ("meisai", 31500)
+
+
+def test_uriage_va_meisai_khong_dung_do_khoa_ba_phan(conn, batch):
+    """slip_no+line_seq CÓ THỂ trùng giữa 2 nguồn (line_seq của meisai là số
+    tự sinh, không liên quan gì tới line_seq thật của uriage) -- khoá chính
+    phải có thêm source để không đè nhầm dữ liệu của nhau."""
+    b1 = batch(1)
+    sales.load(conn, pd.DataFrame([_meisai_line(seq=1, amount=29167, batch_id=b1)]),
+               date(2026, 8, 3), b1)   # source mặc định "uriage"
+    b2 = batch(2)
+    sales.load_meisai(conn, pd.DataFrame([_meisai_line(seq=1, amount=31500, batch_id=b2)]),
+                       date(2026, 8, 3), b2)
+    r = conn.execute(
+        "SELECT source, amount FROM core.fact_sales_line ORDER BY source"
+    ).fetchall()
+    assert r == [("meisai", 31500), ("uriage", 29167)]

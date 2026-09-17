@@ -9,16 +9,21 @@ COLUMNS = [
     "shipto_code", "product_code", "pack_code", "case_qty", "qty", "unit_price",
     "unit_cost", "amount", "tax_amount", "cost", "gross_profit", "gross_margin",
     "tax_rate", "paid_amount", "payment_slip_no", "closing_day_code", "batch_id",
+    "source",
 ]
-_UPDATE = ", ".join(f"{c}=EXCLUDED.{c}" for c in COLUMNS if c not in ("slip_no", "line_seq"))
+_UPDATE = ", ".join(f"{c}=EXCLUDED.{c}" for c in COLUMNS if c not in ("slip_no", "line_seq", "source"))
 
 
 def load(conn: psycopg.Connection, df: pd.DataFrame,
-         data_date: date, batch_id: int) -> int:
-    """Upsert theo 伝票No. + số dòng.
+         data_date: date, batch_id: int, source: str = "uriage") -> int:
+    """Upsert theo 伝票No. + số dòng + nguồn.
 
     Nhờ khoá này mà đối soát tháng hoạt động: nạp lại cả tháng thì phiếu
     đã sửa trong OBC được ghi đè, phiếu không đổi thì ghi lại y nguyên.
+    Có `source` trong khoá để 売上伝票データ (source="uriage") và 売上明細表
+    (source="meisai", xem load_meisai) không đè lên nhau dù line_seq trùng
+    số -- line_seq của meisai là số THỨ TỰ TỰ SINH, không liên quan gì tới
+    line_seq thật của uriage.
 
     LƯU Ý: 売上伝票データ xuất mỗi dòng nghiệp vụ HAI LẦN (出荷内訳 và 明細按分,
     cùng khoá slip_no+line_seq). Việc khử trùng phải xảy ra TRƯỚC khi tới đây
@@ -27,6 +32,7 @@ def load(conn: psycopg.Connection, df: pd.DataFrame,
     """
     df = df.copy()
     df["batch_id"] = batch_id
+    df["source"] = source
     for c in COLUMNS:
         if c not in df.columns:
             df[c] = None
@@ -35,8 +41,14 @@ def load(conn: psycopg.Connection, df: pd.DataFrame,
         cur.executemany(
             f"""INSERT INTO core.fact_sales_line ({', '.join(COLUMNS)})
                 VALUES ({', '.join(['%s'] * len(COLUMNS))})
-                ON CONFLICT (slip_no, line_seq) DO UPDATE SET {_UPDATE}""",
+                ON CONFLICT (slip_no, line_seq, source) DO UPDATE SET {_UPDATE}""",
             rows,
         )
     conn.commit()
     return len(rows)
+
+
+def load_meisai(conn: psycopg.Connection, df: pd.DataFrame,
+                 data_date: date, batch_id: int) -> int:
+    """売上明細表 (nguồn dự phòng) -- chỉ khác `load()` ở source="meisai"."""
+    return load(conn, df, data_date, batch_id, source="meisai")
