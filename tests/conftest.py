@@ -5,6 +5,7 @@ import pytest
 import psycopg
 
 from db.migrate import apply_all
+from kome.db import connect as ket_noi
 from kome.env import nap_env
 
 # Đọc .env ngay khi pytest nạp conftest. Không có dòng này thì `pytest` chỉ
@@ -48,8 +49,15 @@ def _session_conn(test_db_url):
 
     Không dùng Docker hay bất cứ thứ gì phải cài đặt: ràng buộc của dự án là
     giảm tối đa số thứ có thể hỏng.
+
+    Dùng `kome.db.connect()` chứ không gọi thẳng `psycopg.connect()`: hàm đó
+    tự tắt câu lệnh chuẩn bị sẵn khi URL đi qua pooler giao dịch (cổng 6543,
+    đúng cổng `DATABASE_URL_TEST` đang dùng). Bỏ qua nó từng làm lộ đúng lỗi
+    `kome/db.py` viết ra để né: `prepared statement "_pg3_N" does not exist`,
+    vì pooler có thể âm thầm đổi kết nối vật lý phía sau kết nối phiên dài
+    này (đã bắt được lỗi này thật, không phải giả định).
     """
-    with psycopg.connect(test_db_url) as c:
+    with ket_noi(test_db_url) as c:
         c.execute(f"DROP SCHEMA IF EXISTS {', '.join(SCHEMAS)} CASCADE")
         c.commit()
         apply_all(c, MIGRATIONS)
@@ -96,7 +104,7 @@ def fresh_conn(test_db_url, _session_conn):
     (apply_all là no-op nếu test đã tự chạy nó).
     """
     _session_conn.rollback()
-    with psycopg.connect(test_db_url) as c:
+    with ket_noi(test_db_url) as c:
         c.execute(f"DROP SCHEMA IF EXISTS {', '.join(SCHEMAS)} CASCADE")
         c.commit()
         yield c
