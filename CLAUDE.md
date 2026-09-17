@@ -25,7 +25,10 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
 1. Mã (`*コード`) là TEXT. `000000009292` đọc thành số sẽ mất số 0 đầu → hỏng mọi liên kết.
 2. Số lượng CÓ phần thập phân (`83.75` ケース). Tiền thì luôn là số nguyên yên.
 3. Có bản xuất `得意先全情報` chỉ 201 dòng (xuất một phần — **cổng 3** chặn vì dưới `min_rows`) và bản chỉ 5 cột (sai mẫu — **cổng 2** chặn trước, `ColumnMismatch`, vì thiếu cột khai báo).
-4. File báo cáo (`売上明細表`, `元帳`) có 5 dòng rác trước header. File master và `在庫一覧` thì header ở dòng 1.
+4. File `元帳` có 5 dòng rác trước header (CHƯA kiểm chứng lại). `売上明細表`
+   đã đo thật (2026-09-17): header ở dòng 1, KHÔNG có dòng rác — có thể do
+   OBC đổi mẫu xuất, hoặc quan sát cũ chỉ đúng cho một cấu hình xuất khác.
+   File master và `在庫一覧` thì header ở dòng 1.
 5. `担当者` của OBC (5 người) KHÁC người nhập đơn trên web (7 tài khoản, gồm 2 arubaito).
 
 ## Bốn vai trò CSDL (Task 13, `db/migrations/009_roles.sql`)

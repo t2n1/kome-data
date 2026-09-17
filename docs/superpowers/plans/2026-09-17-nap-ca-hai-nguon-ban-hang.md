@@ -30,7 +30,7 @@
 **Interfaces:**
 - Produces: cột `core.fact_sales_line.source text NOT NULL DEFAULT 'uriage'`; khoá chính `(slip_no, line_seq, source)`; index `(source, sales_date)`.
 
-- [ ] **Step 1: Viết file migration**
+- [x] **Step 1: Viết file migration**
 
 ```sql
 -- db/migrations/017_nguon_ban_hang_thay_the.sql
@@ -57,12 +57,12 @@ COMMENT ON COLUMN core.fact_sales_line.source IS
   'nếu ngày đó đã có dữ liệu từ nguồn kia (xem _kiem_tra_trung_nguon).';
 ```
 
-- [ ] **Step 2: Chạy lại bộ test migration để xác nhận áp được sạch từ đầu**
+- [x] **Step 2: Chạy lại bộ test migration để xác nhận áp được sạch từ đầu**
 
 Run: `pytest tests/test_migrate.py tests/test_roles.py -v`
 Expected: PASS (migration 017 chạy không lỗi, quyền các vai trò không đổi)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add db/migrations/017_nguon_ban_hang_thay_the.sql
@@ -79,7 +79,7 @@ git commit -m "feat: them cot source cho fact_sales_line, chuan bi nap tu 2 nguo
 **Interfaces:**
 - Produces: `FileSpec.synthesize_line_seq: bool = False`
 
-- [ ] **Step 1: Viết test cho giá trị mặc định (giống mẫu `test_dedup_on_keys_mac_dinh_tat_cho_cac_spec_khac`)**
+- [x] **Step 1: Viết test cho giá trị mặc định (giống mẫu `test_dedup_on_keys_mac_dinh_tat_cho_cac_spec_khac`)**
 
 Thêm vào `tests/test_reader.py`:
 
@@ -91,12 +91,12 @@ def test_synthesize_line_seq_mac_dinh_tat_cho_cac_spec_khac():
     assert SPECS["uriage"].synthesize_line_seq is False
 ```
 
-- [ ] **Step 2: Chạy test, xác nhận lỗi vì field chưa tồn tại**
+- [x] **Step 2: Chạy test, xác nhận lỗi vì field chưa tồn tại**
 
 Run: `pytest tests/test_reader.py::test_synthesize_line_seq_mac_dinh_tat_cho_cac_spec_khac -v`
 Expected: FAIL với `TypeError: FileSpec.__init__() got an unexpected keyword argument` HOẶC `AttributeError` (field chưa có)
 
-- [ ] **Step 3: Thêm field vào `FileSpec`**
+- [x] **Step 3: Thêm field vào `FileSpec`**
 
 Trong `kome/config.py`, sau dòng `dedup_on_keys: bool = False` (dòng 39):
 
@@ -108,12 +108,12 @@ Trong `kome/config.py`, sau dòng `dedup_on_keys: bool = False` (dòng 39):
     synthesize_line_seq: bool = False
 ```
 
-- [ ] **Step 4: Chạy lại test, xác nhận qua**
+- [x] **Step 4: Chạy lại test, xác nhận qua**
 
 Run: `pytest tests/test_reader.py::test_synthesize_line_seq_mac_dinh_tat_cho_cac_spec_khac -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add kome/config.py tests/test_reader.py
@@ -131,7 +131,7 @@ git commit -m "feat: them co synthesize_line_seq vao FileSpec"
 - Consumes: `FileSpec.synthesize_line_seq` (Task 2, cần tồn tại để `FileSpec(**body)` chấp nhận khoá này trong YAML)
 - Produces: `SPECS["meisai"]` — dùng bởi Task 4 (test đọc file), Task 5 (loader), Task 6 (pipeline).
 
-- [ ] **Step 1: Thêm khối `meisai` vào cuối `config/files.yml`**
+- [x] **Step 1: Thêm khối `meisai` vào cuối `config/files.yml`**
 
 ```yaml
 meisai:
@@ -186,12 +186,12 @@ meisai:
   required_date_columns: [sales_date]
 ```
 
-- [ ] **Step 2: Xác nhận YAML nạp được và trường mới có mặt**
+- [x] **Step 2: Xác nhận YAML nạp được và trường mới có mặt**
 
 Run: `python -c "from kome.config import load_specs; from pathlib import Path; s = load_specs(Path('config/files.yml'))['meisai']; print(s.synthesize_line_seq, len(s.columns))"`
 Expected: in ra `True 18` — nạp sạch, không lỗi `TypeError`/`KeyError`. (`synthesize_line_seq` đã có từ Task 2 nên khoá mới trong YAML không bị `FileSpec(**body)` từ chối.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add config/files.yml
@@ -210,7 +210,7 @@ git commit -m "feat: khai bao spec meisai (uriage_明細表) trong files.yml"
 - Consumes: `FileSpec.synthesize_line_seq` (Task 2), `SPECS["meisai"]` (Task 3)
 - Produces: `DataFrame` trả về từ `read()` có cột `line_seq` (int, duy nhất trong từng nhóm `slip_no`) khi spec bật cờ.
 
-- [ ] **Step 1: Viết test — cột trùng tên trong file + line_seq tự sinh**
+- [x] **Step 1: Viết test — cột trùng tên trong file + line_seq tự sinh**
 
 Thêm vào `tests/test_reader.py`:
 
@@ -255,12 +255,12 @@ def test_meisai_tu_sinh_line_seq_va_lay_dung_cot_trung_ten(tmp_path):
     assert doc["amount"].sum() == 33_800
 ```
 
-- [ ] **Step 2: Chạy test, xác nhận lỗi (bước sinh `line_seq` chưa có trong `reader.read()`)**
+- [x] **Step 2: Chạy test, xác nhận lỗi (bước sinh `line_seq` chưa có trong `reader.read()`)**
 
 Run: `pytest tests/test_reader.py::test_meisai_tu_sinh_line_seq_va_lay_dung_cot_trung_ten -v`
 Expected: FAIL với `KeyError: 'line_seq'`
 
-- [ ] **Step 3: Thêm bước sinh `line_seq` vào `reader.read()`**
+- [x] **Step 3: Thêm bước sinh `line_seq` vào `reader.read()`**
 
 Trong `kome/reader.py`, sau dòng `df = df.dropna(how="all")` (dòng 56), TRƯỚC đoạn chuẩn hoá ô trống (dòng 58-71):
 
@@ -273,12 +273,12 @@ Trong `kome/reader.py`, sau dòng `df = df.dropna(how="all")` (dòng 56), TRƯ�
         df["line_seq"] = df.groupby("slip_no").cumcount() + 1
 ```
 
-- [ ] **Step 4: Chạy test lại, xác nhận qua**
+- [x] **Step 4: Chạy test lại, xác nhận qua**
 
 Run: `pytest tests/test_reader.py::test_meisai_tu_sinh_line_seq_va_lay_dung_cot_trung_ten -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add kome/reader.py tests/test_reader.py
@@ -297,7 +297,7 @@ git commit -m "feat: reader tu sinh line_seq cho spec bat synthesize_line_seq"
 - Consumes: `core.fact_sales_line.source` (Task 1)
 - Produces: `sales.load(conn, df, data_date, batch_id, source="uriage")` (tương thích ngược, gọi 4 tham số như cũ vẫn chạy đúng); `sales.load_meisai(conn, df, data_date, batch_id)`.
 
-- [ ] **Step 1: Viết test cho `load_meisai` và khoá 3 phần**
+- [x] **Step 1: Viết test cho `load_meisai` và khoá 3 phần**
 
 Thêm vào `tests/test_load_sales.py`:
 
@@ -340,12 +340,12 @@ def test_uriage_va_meisai_khong_dung_do_khoa_ba_phan(conn, batch):
     assert r == [("meisai", 31500), ("uriage", 29167)]
 ```
 
-- [ ] **Step 2: Chạy test, xác nhận lỗi (`load_meisai` chưa tồn tại)**
+- [x] **Step 2: Chạy test, xác nhận lỗi (`load_meisai` chưa tồn tại)**
 
 Run: `pytest tests/test_load_sales.py::test_load_meisai_ghi_source_dung tests/test_load_sales.py::test_uriage_va_meisai_khong_dung_do_khoa_ba_phan -v`
 Expected: FAIL với `AttributeError: module 'kome.loaders.sales' has no attribute 'load_meisai'`
 
-- [ ] **Step 3: Sửa `kome/loaders/sales.py`**
+- [x] **Step 3: Sửa `kome/loaders/sales.py`**
 
 ```python
 # kome/loaders/sales.py
@@ -404,12 +404,12 @@ def load_meisai(conn: psycopg.Connection, df: pd.DataFrame,
     return load(conn, df, data_date, batch_id, source="meisai")
 ```
 
-- [ ] **Step 4: Chạy toàn bộ test loader bán hàng, xác nhận qua hết**
+- [x] **Step 4: Chạy toàn bộ test loader bán hàng, xác nhận qua hết**
 
 Run: `pytest tests/test_load_sales.py -v`
 Expected: PASS (bao gồm cả các test cũ — `source` mặc định `"uriage"` giữ nguyên hành vi trước đây)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add kome/loaders/sales.py tests/test_load_sales.py
@@ -428,7 +428,7 @@ git commit -m "feat: loader ban hang ghi cot source, them load_meisai"
 - Consumes: `sales.load_meisai` (Task 5), `SPECS["meisai"]` (Task 3)
 - Produces: `LOADERS["meisai"]`, `UNDO_TABLES["meisai"]`, hàm `_kiem_tra_trung_nguon(conn, spec, df) -> list[gates.Blocker]`
 
-- [ ] **Step 1: Viết test — nạp `meisai` cho ngày đã có `uriage` phải bị chặn**
+- [x] **Step 1: Viết test — nạp `meisai` cho ngày đã có `uriage` phải bị chặn**
 
 Thêm vào `tests/test_pipeline.py`:
 
@@ -490,12 +490,12 @@ def test_chan_nap_meisai_khi_ngay_do_da_co_uriage(conn, tmp_path):
     assert n == 0   # không ghi gì cả khi bị chặn
 ```
 
-- [ ] **Step 2: Chạy test, xác nhận lỗi (`meisai` chưa có trong `LOADERS`)**
+- [x] **Step 2: Chạy test, xác nhận lỗi (`meisai` chưa có trong `LOADERS`)**
 
 Run: `pytest tests/test_pipeline.py::test_chan_nap_meisai_khi_ngay_do_da_co_uriage -v`
 Expected: FAIL với `KeyError: 'meisai'` (từ `LOADERS[spec.name]` trong `ingest()`)
 
-- [ ] **Step 3: Sửa `kome/pipeline.py`**
+- [x] **Step 3: Sửa `kome/pipeline.py`**
 
 Thêm import và đăng ký loader (đầu file, cạnh `LOADERS`/`UNDO_TABLES` hiện có):
 
@@ -578,12 +578,12 @@ Sửa `ingest()` — chèn kiểm tra ngay sau dòng gọi `gates.check(...)`:
         return IngestResult(ok=False, spec_name=spec.name, blockers=blockers, warnings=warnings)
 ```
 
-- [ ] **Step 4: Chạy lại test vừa viết + toàn bộ test pipeline/gates hiện có**
+- [x] **Step 4: Chạy lại test vừa viết + toàn bộ test pipeline/gates hiện có**
 
 Run: `pytest tests/test_pipeline.py tests/test_load_sales.py tests/test_gates.py -v`
 Expected: PASS toàn bộ, kể cả `test_moi_loader_deu_khai_bao_bang_can_don` và `test_moi_spec_trong_files_yml_deu_co_loader` (hai test lưới an toàn có sẵn, không cần sửa)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add kome/pipeline.py tests/test_pipeline.py
@@ -601,12 +601,12 @@ git commit -m "feat: dang ky loader meisai, chan nap trung nguon cung ngay"
 **Interfaces:**
 - Không có — task tài liệu, không có code mới.
 
-- [ ] **Step 1: Chạy toàn bộ test suite**
+- [x] **Step 1: Chạy toàn bộ test suite**
 
 Run: `pytest -v`
 Expected: PASS toàn bộ (không chỉ các file đã chạy riêng ở các Task trên — `test_bao_cao.py`, `test_khach_hang.py`, `test_coverage.py`, `test_web.py` đều gọi `sales.load(...)` với 4 tham số, phải vẫn xanh vì `source` có giá trị mặc định)
 
-- [ ] **Step 2: Thêm kết quả đối chiếu thật vào `docs/cot-day-du-ban-hang.md`**
+- [x] **Step 2: Thêm kết quả đối chiếu thật vào `docs/cot-day-du-ban-hang.md`**
 
 Thêm mục mới ở cuối file:
 
@@ -634,7 +634,7 @@ phiên này tên là `売上明細表.xlsx` (không có ngày), cổng 1 sẽ ch
 nguyên tên đó.
 ```
 
-- [ ] **Step 3: Sửa điểm 4 trong "Bẫy đã biết" của `CLAUDE.md`**
+- [x] **Step 3: Sửa điểm 4 trong "Bẫy đã biết" của `CLAUDE.md`**
 
 Điểm này hiện viết: *"File báo cáo (`売上明細表`, `元帳`) có 5 dòng rác trước header."* — đo thật trên file `売上明細表_20260803` thì header nằm ở dòng 1, không có dòng rác. Sửa thành:
 
@@ -645,7 +645,7 @@ nguyên tên đó.
    File master và `在庫一覧` thì header ở dòng 1.
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/cot-day-du-ban-hang.md CLAUDE.md

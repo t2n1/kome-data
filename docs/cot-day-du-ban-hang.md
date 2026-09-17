@@ -53,3 +53,25 @@ chỉ dùng **25 cột**.
 Không liệt kê — quá nhiều và chưa khảo sát chi tiết như 2 file trước (chưa có
 file mẫu 271 cột đầy đủ trong tay). Khi có file thật, đối chiếu lại bảng 25
 cột ở trên để biết cột nào bỏ được.
+
+## Đối chiếu thật với 売上明細表 (nguồn dự phòng, Task ngày 2026-09-17)
+
+Cùng ngày 2026-08-03, sau khử trùng `売上伝票データ` theo (slip_no, line_seq):
+
+| | 売上伝票データ | 売上明細表 | Lệch |
+|---|---|---|---|
+| Số dòng | 926 | 926 | 0 |
+| 消費税額 | 509.889 | 509.889 | 0 |
+| 原価 | 4.260.179 | 4.260.179 | 0 |
+| 粗利益 | 1.983.539 | 1.983.539 | 0 |
+| 金額/税込純売上高 | 6.753.717 | 6.753.662 | 55 (0,0008%) |
+
+Kết luận: cả hai nguồn đáng tin ở mức số liệu. `売上伝票データ` vẫn là nguồn
+CHÍNH vì có `明細行番号` (khoá dòng thật) và `入金額１`/`入金伝票No.１` (nối phiếu
+thu). `売上明細表` chỉ dùng khi KHÔNG lấy được `売上伝票データ` — xem
+`db/migrations/017_nguon_ban_hang_thay_the.sql` và `kome/loaders/sales.py`.
+
+**Tên file khi xuất `売上明細表` để nạp qua `/nap`:** phải đặt tên đúng mẫu
+`売上明細表_YYYYMMDD.xlsx` (giống mọi loại file khác) — bản test gửi trong
+phiên này tên là `売上明細表.xlsx` (không có ngày), cổng 1 sẽ chặn nếu nạp
+nguyên tên đó.
