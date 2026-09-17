@@ -93,3 +93,42 @@ def test_o_trong_vao_csdl_la_null_that(conn, batch):
            WHERE name_ja IS NULL OR best_before IS NULL"""
     ).fetchone()[0]
     assert n_null >= 1          # ô trống thật -> NULL thật
+
+
+def test_meisai_tu_sinh_line_seq_va_lay_dung_cot_trung_ten(tmp_path):
+    """売上明細表 không có 明細行番号, và có 2 cột CÙNG TÊN 荷姿区分コード (một
+    bản luôn có giá trị, một bản tra theo danh mục sản phẩm nên rỗng ở dòng
+    phụ phí/coupon không phải sản phẩm thật -- đã kiểm chứng trên dữ liệu
+    thật 2026-08-03: 0 lệch giữa 2 bản khi cả hai đều có dữ liệu).
+
+    pandas tự thêm hậu tố ".1" cho cột trùng thứ hai khi đọc -- khai tên
+    KHÔNG hậu tố trong config/files.yml là lấy đúng bản luôn có giá trị.
+    """
+    import pandas as pd
+    cols = ["伝票No.", "得意先コード", "商品コード", "荷姿区分コード", "荷姿区分名",
+            "売上日付", "伝票区分", "担当者コード", "部門コード",
+            "入数", "純売上数量", "単価", "単位原価",
+            "税込純売上高", "消費税額", "売上原価", "粗利益", "粗利益率", "消費税率",
+            "荷姿区分コード", "荷姿区分名"]     # 2 cột cuối là bản trùng tên, để trống
+    rows = [
+        # 2 dòng cùng 伝票No. 090001 -> phải được sinh line_seq 1, 2
+        ["090001", "000000009292", "XT07", "02", "ケース（大：段ボール）",
+         "2026-08-03", "債権計上", "0004", "0020", 1, 6, 5250, 3210,
+         31500, 2333, 19260, 9907, 0.3145, 0.08, "02", "ケース（大：段ボール）"],
+        ["090001", "000000009292", "XT08", "00", "バ　ラ（小：単品）",
+         "2026-08-03", "債権計上", "0004", "0020", 1, 2, 1000, 600,
+         2000, 148, 1200, 652, 0.326, 0.08, "00", "バ　ラ（小：単品）"],
+        # dòng phụ phí COD: mã không phải sản phẩm thật -> bản tra danh mục rỗng
+        ["090001", "000000009292", "000000000001", "00", "荷姿区分なし",
+         "2026-08-03", "債権計上", "0004", "0020", 1, 1, 300, 0,
+         300, 22, 0, 273, 1.0, 0.08, "", ""],
+    ]
+    df_out = pd.DataFrame(rows, columns=cols)
+    p = tmp_path / "売上明細表_20260803.xlsx"
+    df_out.to_excel(p, sheet_name="売上明細表", index=False)
+
+    doc = read(p, SPECS["meisai"])
+
+    assert list(doc["line_seq"]) == [1, 2, 3]
+    assert doc["pack_code"].tolist() == ["02", "00", "00"]   # bản LUÔN có giá trị
+    assert doc["amount"].sum() == 33_800
