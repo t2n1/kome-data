@@ -12,3 +12,4 @@ backups/
 raw_archive/
 .superpowers/
 *.egg-info/
+.claude/worktrees/
