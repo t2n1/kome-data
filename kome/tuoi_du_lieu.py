@@ -52,6 +52,15 @@ def _bay_gio() -> datetime:
     return datetime.now(MUI_GIO)
 
 
+def hom_nay_o_nhat() -> date:
+    """Hôm nay Ở NHẬT — dùng chung cho mọi chỗ cần đồng hồ thật.
+
+    Đừng thay bằng `date.today()`: máy chủ Vercel chạy UTC, nên suốt
+    00:00–09:00 giờ Nhật nó trả về HÔM QUA — tức suốt buổi sáng làm việc.
+    """
+    return _bay_gio().date()
+
+
 def _la_ngay_nghi(conn, ngay: date) -> bool:
     """Cuối tuần theo core.dim_date. Ngày lễ Nhật KHÔNG có trong dim_date nên
     vẫn bị coi là ngày làm việc — giống hệt cách /health xử lý ngày thiếu.

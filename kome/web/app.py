@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from kome.config import SPECS
 from kome.bao_cao import tinh_bao_cao, ve_bieu_do
-from kome.coverage import tinh_bang_phu
+from kome.coverage import tinh_bang_ngay, tinh_bang_phu
 from kome import khach_hang as KH
 from kome.db import connect
 from kome.env import nap_env
@@ -337,10 +337,12 @@ def create_app(db_url: str | None = None) -> FastAPI:
         try:
             with open_conn() as conn:
                 bang = tinh_bang_phu(conn)
+                bang_ngay = tinh_bang_ngay(conn)
             # Mẫu KHÔNG in `bang.database`: tên CSDL là thông tin kết nối,
             # còn trang này thì ai mở cũng xem được. Terminal in được vì chỉ
             # người chạy lệnh mới thấy.
-            return _ve(request, "phu_du_lieu.html", {"bang": bang, "trang": "phu"})
+            return _ve(request, "phu_du_lieu.html",
+                       {"bang": bang, "bang_ngay": bang_ngay, "trang": "phu"})
         except Exception as e:
             return _loi(request, "mở trang bảng phủ dữ liệu", e, chung)
 

@@ -60,6 +60,13 @@ nhưng file bị cổng kiểm tra chặn (bản xuất thiếu dòng, sai mẫu
 Muốn biết chắc thì đối chiếu với thư mục xuất của OBC.
 </div>
 
+{% include "_bang_ngay.html" %}
+
+<h2 style="font-size:1.15rem;margin-top:2rem;padding-top:.6rem;
+           border-top:1px solid var(--vien)">Theo tháng, nhóm theo kỳ kế toán</h2>
+<p class="chu-thich">Bảng này có đủ 7 loại file và trải toàn bộ lịch sử. Dùng để
+soát lịch sử; muốn biết hôm qua có sót ngày nào thì xem bảng ngày ở trên.</p>
+
 {% for k in bang.ky %}
 <div class="khoi-ky">
   <h2>{{ k.nhan }}</h2>

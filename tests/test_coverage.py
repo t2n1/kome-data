@@ -10,7 +10,8 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from kome.coverage import CO, KHONG, NGOAI, DAU_DU_LIEU, tinh_bang_phu
+from kome.coverage import (CO, KHONG, NGHI, NGOAI, DAU_DU_LIEU, tinh_bang_phu,
+                           tinh_bang_ngay)
 
 
 def _nap_ban(conn, batch, ngay: date, amount=10_000, tax=1_000, gp=3_000):
@@ -204,3 +205,80 @@ def test_module_khong_tu_mo_ket_noi(conn):
     assert "connect(" not in src
     assert "DATABASE_URL" not in src
     assert list(inspect.signature(C.tinh_bang_phu).parameters)[0] == "conn"
+
+
+# --- Bảng theo NGÀY (3 nguồn của nhịp 13:30) -----------------------------
+
+def _o_ngay(bang, ngay: date, khoa: str):
+    d = next(n for n in bang.ngay if n.ngay == ngay)
+    return next(o for o in d.o if o.cot.khoa == khoa)
+
+
+def test_bang_ngay_dung_90_dong_va_ket_thuc_o_hom_nay(conn):
+    bang = tinh_bang_ngay(conn, hom_nay=date(2026, 9, 17))
+    assert len(bang.ngay) == 90
+    assert bang.cuoi == date(2026, 9, 17)
+    assert bang.dau == date(2026, 6, 20)
+
+
+def test_bang_ngay_xep_moi_nhat_len_dau(conn):
+    """Hôm nay phải ở dòng đầu: người ta mở bảng này để hỏi "hôm qua có sót
+    ngày nào không", không phải để đọc lại 90 ngày từ đầu."""
+    bang = tinh_bang_ngay(conn, hom_nay=date(2026, 9, 17))
+    assert bang.ngay[0].ngay == date(2026, 9, 17)
+    assert bang.ngay[-1].ngay == date(2026, 6, 20)
+
+
+def test_ngay_co_ban_thi_CO_ngay_lam_viec_khong_co_thi_KHONG(conn, batch):
+    _nap_ban(conn, batch, date(2026, 9, 16))          # thứ Tư
+    bang = tinh_bang_ngay(conn, hom_nay=date(2026, 9, 17))
+    assert _o_ngay(bang, date(2026, 9, 16), "ban").trang_thai == CO
+    assert _o_ngay(bang, date(2026, 9, 17), "ban").trang_thai == KHONG
+
+
+def test_cuoi_tuan_la_NGHI_chu_khong_phai_thieu(conn):
+    """Thứ Bảy/Chủ nhật không ai xuất file. 26 ô đỏ mỗi quý sẽ dạy người đọc
+    lướt qua cả cột — đúng thứ bảng này sinh ra để chống."""
+    bang = tinh_bang_ngay(conn, hom_nay=date(2026, 9, 21))
+    assert _o_ngay(bang, date(2026, 9, 19), "ban").trang_thai == NGHI   # thứ Bảy
+    assert _o_ngay(bang, date(2026, 9, 20), "ban").trang_thai == NGHI   # Chủ nhật
+    assert _o_ngay(bang, date(2026, 9, 18), "ban").trang_thai == KHONG  # thứ Sáu
+
+
+def test_ngay_truoc_moc_du_lieu_la_NGOAI(conn):
+    """Trước 2025-03-03 dữ liệu KHÔNG TỒN TẠI — không phải thiếu, không đi tìm."""
+    bang = tinh_bang_ngay(conn, hom_nay=date(2025, 3, 10))
+    assert _o_ngay(bang, date(2025, 2, 28), "ban").trang_thai == NGOAI
+    assert _o_ngay(bang, date(2025, 3, 4), "ban").trang_thai == KHONG
+
+
+def test_cot_khach_doc_data_date_cua_lo_bo_qua_lo_da_hoan_tac(conn):
+    for digest, ngay, undone in (("con", "2026-09-15", "NULL"),
+                                 ("da-huy", "2026-09-16", "now()")):
+        conn.execute(
+            f"""INSERT INTO meta.ingest_batch
+                  (spec_name, source_file, digest, archived_to, row_count,
+                   undone_at, data_date)
+                VALUES ('tokuisaki', '得意先全情報_x.xlsx', %s, '/tmp/x', 1,
+                        {undone}, DATE '{ngay}')""",
+            (digest,),
+        )
+    conn.commit()
+    bang = tinh_bang_ngay(conn, hom_nay=date(2026, 9, 17))
+    assert _o_ngay(bang, date(2026, 9, 15), "tokuisaki").trang_thai == CO
+    assert _o_ngay(bang, date(2026, 9, 16), "tokuisaki").trang_thai == KHONG
+
+
+def test_dem_thieu_chi_dem_ngay_lam_viec(conn, batch):
+    """Con số tóm tắt không được cộng cả cuối tuần vào, nếu không nó vô nghĩa."""
+    bang = tinh_bang_ngay(conn, hom_nay=date(2026, 9, 18), so_ngay=5)
+    # 14/9 T2 .. 18/9 T6 -> 5 ngày làm việc, chưa nạp gì
+    assert bang.thieu["ban"] == 5
+    _nap_ban(conn, batch, date(2026, 9, 16))
+    assert tinh_bang_ngay(conn, hom_nay=date(2026, 9, 18), so_ngay=5).thieu["ban"] == 4
+
+
+def test_cuoi_tuan_khong_lam_tang_so_thieu(conn):
+    bang = tinh_bang_ngay(conn, hom_nay=date(2026, 9, 20), so_ngay=7)
+    # 14/9 T2 .. 20/9 CN -> chỉ 5 ngày làm việc
+    assert bang.thieu["ban"] == 5

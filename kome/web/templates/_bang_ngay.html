@@ -1,0 +1,51 @@
+{# Bảng phủ dữ liệu THEO NGÀY — 3 nguồn của nhịp 13:30.
+
+   Xếp MỚI NHẤT TRƯỚC, ngược với bảng tháng bên dưới. Có chủ ý: bảng tháng
+   dùng để đọc lịch sử theo chiều thời gian, còn bảng này người ta mở ra để
+   hỏi "hôm qua có sót ngày nào không" — câu trả lời phải nằm ở dòng đầu,
+   không phải sau 90 dòng cuộn.
+
+   Cuối tuần để trống, KHÔNG tô đỏ: không ai xuất file thứ Bảy. #}
+<style>
+ .ngay{table-layout:auto;max-width:34rem}
+ .ngay th{background:var(--nen-phu);font-size:.85rem;white-space:nowrap}
+ .ngay td,.ngay th{text-align:center;border:1px solid var(--vien);padding:.2rem .45rem}
+ .ngay td.d{text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
+ .ngay tr.cuoi-tuan td.d{color:var(--chu-nhat)}
+ .o-nghi{background:var(--ngoai-nen)}
+ .cuon-ngay{max-height:30rem;overflow-y:auto;border:1px solid var(--vien);
+   border-radius:8px}
+ .cuon-ngay table{border:0}
+ .cuon-ngay thead th{position:sticky;top:0;z-index:1}
+</style>
+<h2 style="font-size:1.15rem;margin-bottom:.2rem">Từng ngày — 90 ngày gần nhất</h2>
+<p class="chu-thich">{{ bang_ngay.dau }} → {{ bang_ngay.cuoi }}, mới nhất ở trên.
+Chỉ 3 nguồn phải xuất <strong>mỗi ngày lúc 13:30</strong>; 4 loại master xuất thưa
+nằm ở bảng tháng bên dưới. Cuối tuần để trống — không ai xuất file thứ Bảy.</p>
+
+{% if bang_ngay.co_thieu %}
+<div class="ngay-thieu">
+⚠️ Trong 90 ngày:
+{% for c in bang_ngay.cot %}{% if bang_ngay.thieu[c.khoa] %}
+<strong>{{ c.ten_obc }}</strong> thiếu {{ bang_ngay.thieu[c.khoa] }} ngày làm việc{% if not loop.last %} · {% endif %}
+{% endif %}{% endfor %}
+</div>
+{% else %}
+<div class="backup-ok">✅ Đủ dữ liệu mọi ngày làm việc trong 90 ngày qua.</div>
+{% endif %}
+
+<div class="cuon-ngay">
+<table class="phu ngay">
+  <thead><tr><th>Ngày</th><th>Thứ</th>
+  {% for c in bang_ngay.cot %}<th title="{{ c.chu_giai }}">{{ c.nhan }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for n in bang_ngay.ngay %}
+  <tr{% if n.la_cuoi_tuan %} class="cuoi-tuan"{% endif %}>
+    <td class="d">{{ n.ngay }}</td><td class="d">{{ n.nhan_thu }}</td>
+    {% for o in n.o %}<td class="o o-{{ o.trang_thai }}"
+      title="{{ o.cot.chu_giai }}: {{ o.mo_ta }}">{{ o.ky_hieu }}</td>{% endfor %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
