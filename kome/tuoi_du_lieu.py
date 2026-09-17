@@ -43,6 +43,15 @@ class Tuoi:
     co_thieu: bool          # có nguồn nào đang ở trạng thái "do" không
 
 
+def _bay_gio() -> datetime:
+    """Đồng hồ, tách riêng để test thay được.
+
+    Test KHÔNG được phụ thuộc giờ chạy thật: một bộ test xanh buổi sáng và đỏ
+    buổi chiều thì không chứng minh được gì.
+    """
+    return datetime.now(MUI_GIO)
+
+
 def _la_ngay_nghi(conn, ngay: date) -> bool:
     """Cuối tuần theo core.dim_date. Ngày lễ Nhật KHÔNG có trong dim_date nên
     vẫn bị coi là ngày làm việc — giống hệt cách /health xử lý ngày thiếu.
@@ -59,7 +68,7 @@ def _la_ngay_nghi(conn, ngay: date) -> bool:
 
 def tinh_tuoi(conn, bay_gio: datetime | None = None) -> Tuoi:
     """`bay_gio` bơm được để test khỏi phụ thuộc đồng hồ thật."""
-    bay_gio = bay_gio or datetime.now(MUI_GIO)
+    bay_gio = bay_gio or _bay_gio()
     hom_nay = bay_gio.date()
     qua_gio_chot = bay_gio.timetz().replace(tzinfo=None) >= GIO_CHOT
 

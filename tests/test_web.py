@@ -74,8 +74,9 @@ def test_health_hien_lan_nap_GAN_NHAT_khong_phai_lon_nhat(conn, test_db_url):
         conn.execute(
             """INSERT INTO meta.ingest_batch
                  (spec_name, source_file, digest, archived_to, row_count,
-                  total_amount, loaded_at)
-               VALUES ('uriage', 'u.xlsx', %s, '/tmp/u.xlsx', %s, %s, now() - %s::interval)""",
+                  total_amount, loaded_at, data_date)
+               VALUES ('uriage', 'u.xlsx', %s, '/tmp/u.xlsx', %s, %s,
+                       now() - %s::interval, DATE '2026-07-31')""",
             (digest, rows, total, tre),
         )
     conn.commit()
@@ -261,3 +262,32 @@ def test_health_hien_gach_ngang_thay_vi_yen_0_cho_file_khong_mang_tien(
             f"{ten}: phải hiện — chứ không phải ¥0, đã hiện {o_cuoi[ten]!r}"
     for ten in co_tien:
         assert o_cuoi[ten].startswith("¥"), f"{ten}: vẫn phải hiện số tiền"
+
+def test_trang_chu_canh_bao_hom_nay_chua_co_du_lieu(conn, test_db_url, monkeypatch):
+    """Sau 13:30 mà chưa nạp gì thì trang chủ phải nói thẳng, kèm tên 3 file cần xuất.
+
+    Đặt ở `/` chứ không chỉ ở /health: /health là trang người ta mở khi ĐÃ
+    nghi ngờ có chuyện, còn đây là chuyện phải đập vào mắt khi chưa nghi gì.
+    """
+    from datetime import datetime
+    from kome.tuoi_du_lieu import MUI_GIO
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 14, 0, tzinfo=MUI_GIO))
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "Chưa có dữ liệu hôm nay" in r.text
+    for ten in ("在庫一覧", "得意先全情報", "売上伝票データ"):
+        assert ten in r.text
+
+def test_trang_chu_khong_bao_dong_truoc_gio_chot(conn, test_db_url, monkeypatch):
+    """8 giờ sáng chưa ai xuất file là bình thường — không được đỏ."""
+    from datetime import datetime
+    from kome.tuoi_du_lieu import MUI_GIO
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 8, 0, tzinfo=MUI_GIO))
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "Chưa có dữ liệu hôm nay" not in r.text
+    assert "Chưa tới giờ xuất file" in r.text

@@ -105,8 +105,9 @@ def _batch_tokuisaki(conn, n: int) -> int:
     spec_name='test' mặc định của fixture batch() trong conftest.py."""
     row = conn.execute(
         """INSERT INTO meta.ingest_batch
-             (spec_name, source_file, digest, archived_to, row_count)
-           VALUES ('tokuisaki', 'tokuisaki_test.xlsx', %s, '/tmp/tokuisaki_test.xlsx', 0)
+             (spec_name, source_file, digest, archived_to, row_count, data_date)
+           VALUES ('tokuisaki', 'tokuisaki_test.xlsx', %s, '/tmp/tokuisaki_test.xlsx', 0,
+                   DATE '2026-01-01')
            RETURNING batch_id""",
         (f"tokuisaki-digest-{n}",),
     ).fetchone()

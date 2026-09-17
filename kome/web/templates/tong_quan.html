@@ -16,6 +16,10 @@
 {% include "_nav.html" %}
 <h1>Tổng quan</h1>
 
+{# Đặt TRÊN mọi con số: "hôm nay đã nạp chưa" quyết định các con số bên dưới
+   có đáng tin hay không, nên phải đọc được trước chúng. #}
+{% include "_tuoi_du_lieu.html" %}
+
 {% if bc.khong_co_du_lieu %}
 <div class="ngay-thieu">Chưa có dòng bán hàng nào. Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
 {% else %}

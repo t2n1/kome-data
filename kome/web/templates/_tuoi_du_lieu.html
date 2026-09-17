@@ -1,0 +1,42 @@
+{# Ô "hôm nay đã có dữ liệu chưa" — dùng chung cho / và /health.
+
+   Chỉ ĐỎ khi thật sự có việc phải làm: đã qua 13:30, là ngày làm việc, mà
+   nguồn vẫn thiếu. Trước giờ chốt và cuối tuần thì chỉ một dòng xám. Lý do
+   nằm ở chính repo này: một dải đỏ vĩnh viễn dạy người đọc bỏ qua dải đỏ, và
+   lúc đó cảnh báo thật cũng chìm theo.
+
+   Màu ĐI KÈM CHỮ, không bao giờ chỉ có màu — khoảng 1 trong 12 nam giới không
+   phân biệt được đỏ với xanh lá. #}
+<style>
+ .tuoi{margin-bottom:1rem;border-radius:8px;padding:.75rem 1rem;border:1px solid}
+ .tuoi.do{background:var(--loi-nen);border-color:var(--loi-vien);color:var(--loi-chu)}
+ .tuoi.im{background:var(--nen-phu);border-color:var(--vien);color:var(--chu-nhat)}
+ .tuoi.du{background:var(--ok-nen);border-color:var(--ok-vien);color:var(--ok-chu)}
+ .tuoi ul{margin:.5rem 0 0;padding-left:1.1rem}
+ .tuoi li{margin:.2rem 0}
+ .tuoi .lam-gi{margin:.6rem 0 0;font-size:.9rem}
+</style>
+{% set thieu = tuoi.nguon | selectattr("trang_thai", "equalto", "do") | list %}
+{% set cho = tuoi.nguon | selectattr("trang_thai", "equalto", "cho") | list %}
+{% if tuoi.nguon[0].trang_thai == "nghi" %}
+<div class="tuoi im">🛌 Hôm nay ({{ tuoi.hom_nay }}) là ngày nghỉ cuối tuần — không cần xuất file.</div>
+{% elif thieu %}
+<div class="tuoi do">
+  <strong>⚠️ Chưa có dữ liệu hôm nay ({{ tuoi.hom_nay }})</strong>
+  <ul>
+  {% for n in thieu %}
+    <li><strong>{{ n.ten }}</strong> —
+      {% if n.ngay %}mới có đến {{ n.ngay }}{% if n.tre %} (trễ {{ n.tre }} ngày làm việc){% endif %}
+      {% else %}chưa nạp lần nào{% endif %}</li>
+  {% endfor %}
+  </ul>
+  <p class="lam-gi">Xuất {{ thieu | length }} file trên từ OBC (đặt tên đúng mẫu
+  <code style="display:inline;padding:0 .3rem">&lt;tên&gt;_{{ tuoi.hom_nay.strftime("%Y%m%d") }}.xlsx</code>)
+  rồi kéo–thả vào trang nạp.</p>
+</div>
+{% elif cho %}
+<div class="tuoi im">🕐 Chưa tới giờ xuất file (13:30) — còn thiếu
+{% for n in cho %}<strong>{{ n.ten }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}.</div>
+{% else %}
+<div class="tuoi du">✅ Cả 3 nguồn đã có dữ liệu hôm nay ({{ tuoi.hom_nay }}).</div>
+{% endif %}
