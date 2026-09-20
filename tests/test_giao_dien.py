@@ -85,3 +85,27 @@ def test_co_mau_hanh_dong_chinh_va_khong_con_mau_tim():
     assert "--do:#D62C27" in toi.replace(" ", ""), "khối tối: thiếu --do:#D62C27"
     # Không còn hệ cũ
     assert "--chot-" not in css
+
+
+def test_moi_bien_dung_deu_duoc_dinh_nghia():
+    """Mọi biến CSS var(--x) dùng ở bất cứ đâu (template + kome.css)
+    phải có định nghĩa --x: trong kome.css. Chặn thảm hoạ: xoá một biến
+    CSS nhưng quên sửa chỗ dùng nó -> var() không xác định, thuộc tính
+    hỏng, SVG render sai màu hay mất nền. Không làm trang lỗi, không làm
+    test nào đỏ — chỉ âm thầm vẽ sai, lộ ra khi người dùng mở đúng trang
+    ở đúng chế độ."""
+    css = CSS.read_text(encoding="utf-8")
+    bien_dinh = _bien_khai(css)
+
+    # Gom tập biến được DÙNG
+    bien_dung = set()
+    # Tìm trong CSS
+    bien_dung.update(re.findall(r"var\(\s*(--[a-z0-9-]+)", css))
+    # Tìm trong tất cả template
+    for f in sorted(TEMPLATES.glob("*.html")):
+        text = f.read_text(encoding="utf-8")
+        bien_dung.update(re.findall(r"var\(\s*(--[a-z0-9-]+)", text))
+
+    # Chắc chắn tất cả biến dùng đều được định nghĩa
+    thieu = bien_dung - bien_dinh
+    assert not thieu, f"Biến không được định nghĩa (quên sửa khi xoá?): {sorted(thieu)}"
