@@ -48,3 +48,32 @@ def test_khong_ma_mau_nao_ngoai_kome_css():
     for f in sorted(TEMPLATES.glob("*.html")):
         text = f.read_text(encoding="utf-8")
         assert not re.search(r"#[0-9A-Fa-f]{6}\b", text), f"{f.name} chứa mã màu"
+
+
+def _bien_khai(khoi: str) -> set[str]:
+    """Tên các biến được ĐỊNH NGHĨA trong một khối CSS.
+
+    Chỉ khớp `--x:` (định nghĩa), không khớp `var(--x)` (sử dụng) — nên
+    phần thân dưới file, vốn chỉ dùng biến, không lọt vào."""
+    return set(re.findall(r"(--[a-z0-9-]+)\s*:", khoi))
+
+
+def test_moi_bien_mau_deu_co_ban_toi():
+    """Chặn thảm hoạ đã từng xảy ra: thêm một biến màu, quên bản tối ->
+    chữ sẫm trên nền sẫm ở máy để giao diện tối. Trang vẫn trả 200 nên
+    không test nào khác bắt được."""
+    css = CSS.read_text(encoding="utf-8")
+    moc = "@media (prefers-color-scheme: dark)"
+    assert moc in css, "mất khối màu tối"
+    sang, toi = css.split(moc, 1)
+    thieu = _bien_khai(sang) - _bien_khai(toi)
+    assert not thieu, f"thiếu bản tối cho: {sorted(thieu)}"
+
+
+def test_co_mau_hanh_dong_chinh_va_khong_con_mau_tim():
+    """Bảng màu thiết kế dùng đỏ công ty #D62C27 cho hành động chính và
+    trạng thái được chọn. Màu tím --chot-* của hệ cũ không còn chỗ đứng;
+    để sót lại thì hai hệ màu cùng sống trong một file."""
+    css = CSS.read_text(encoding="utf-8")
+    assert "--do:#D62C27" in css.replace(" ", "")
+    assert "--chot-" not in css
