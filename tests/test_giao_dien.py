@@ -11,6 +11,17 @@ from kome.web.app import create_app
 
 CSS = Path("kome/web/static/kome.css")
 TEMPLATES = Path("kome/web/templates")
+FONTS = Path("kome/web/static/fonts")
+
+TEN_FONT = [
+    "IBMPlexSans-Regular-Latin1.woff2",
+    "IBMPlexSans-Medium-Latin1.woff2",
+    "IBMPlexSans-SemiBold-Latin1.woff2",
+    "IBMPlexSans-Bold-Latin1.woff2",
+    "IBMPlexMono-Regular-Latin1.woff2",
+    "IBMPlexMono-Medium-Latin1.woff2",
+    "IBMPlexMono-SemiBold-Latin1.woff2",
+]
 
 # Mọi trang mở được mà không cần tham số. Trang hồ sơ khách và trang lỗi
 # không nằm đây vì chúng cần dữ liệu hoặc một sự cố để hiện ra.
@@ -58,6 +69,10 @@ def _bien_khai(khoi: str) -> set[str]:
     return set(re.findall(r"(--[a-z0-9-]+)\s*:", khoi))
 
 
+# Biến KHÔNG đổi theo chế độ sáng/tối: font là font, không có bản tối.
+BIEN_KHONG_THEO_CHE_DO = {"--font-ui", "--font-so"}
+
+
 def test_moi_bien_mau_deu_co_ban_toi():
     """Chặn thảm hoạ đã từng xảy ra: thêm một biến màu, quên bản tối ->
     chữ sẫm trên nền sẫm ở máy để giao diện tối. Trang vẫn trả 200 nên
@@ -66,7 +81,7 @@ def test_moi_bien_mau_deu_co_ban_toi():
     moc = "@media (prefers-color-scheme: dark)"
     assert moc in css, "mất khối màu tối"
     sang, toi = css.split(moc, 1)
-    thieu = _bien_khai(sang) - _bien_khai(toi)
+    thieu = _bien_khai(sang) - _bien_khai(toi) - BIEN_KHONG_THEO_CHE_DO
     assert not thieu, f"thiếu bản tối cho: {sorted(thieu)}"
 
 
@@ -109,3 +124,24 @@ def test_moi_bien_dung_deu_duoc_dinh_nghia():
     # Chắc chắn tất cả biến dùng đều được định nghĩa
     thieu = bien_dung - bien_dinh
     assert not thieu, f"Biến không được định nghĩa (quên sửa khi xoá?): {sorted(thieu)}"
+
+
+def test_du_bay_file_font_va_khong_rong():
+    """Chặn thảm hoạ: @font-face trỏ tới file không có -> trình duyệt im
+    lặng rơi về font hệ thống, trang vẫn 200, không ai biết."""
+    for ten in TEN_FONT:
+        f = FONTS / ten
+        assert f.exists(), f"thiếu {ten}"
+        assert f.stat().st_size > 10_000, f"{ten} có vẻ là file rỗng hoặc trang lỗi tải nhầm"
+
+
+def test_khong_goi_ra_ngoai_mang():
+    """Chặn thảm hoạ: một link Google Fonts lọt vào -> máy trong công ty
+    mất mạng là chữ Nhật rơi về font mặc định, và đó là lúc khó nhận ra
+    nhất. Spec §5 đã chốt tự host."""
+    ngoai = ("fonts.googleapis.com", "fonts.gstatic.com", "cdnjs", "unpkg.com", "jsdelivr")
+    canh = [CSS] + sorted(TEMPLATES.glob("*.html"))
+    for f in canh:
+        text = f.read_text(encoding="utf-8")
+        for x in ngoai:
+            assert x not in text, f"{f.name} gọi ra ngoài mạng: {x}"

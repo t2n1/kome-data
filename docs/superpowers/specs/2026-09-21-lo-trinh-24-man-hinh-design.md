@@ -124,7 +124,7 @@ thay đổi pipeline nạp ngoài đợt 6.
 |---|---|---|
 | Công nghệ giao diện | **Giữ FastAPI + Jinja, thêm `static/`**, JS thuần khi cần. Không npm, không bundler | R2: hệ thống được bảo trì bằng AI, một mình chủ sở hữu. Repo không build step, mọi thứ là file text đọc được, là điều kiện để điều đó còn đúng sau 5 năm |
 | Nhóm C có phá Luật số một không | **Không** — đặc tả nền R3 đã lường trước: "đơn từ app phải quay về OBC" | Công ty đã có hai app nhận đơn; đơn từ chúng đã quay về OBC bằng cách nào đó. Luật chỉ bị phá nếu đơn nằm lại trong hệ thống này |
-| Font | **Tự host trong `static/`**, không gọi Google Fonts | R1: một CDN ngoài là một thứ có thể hỏng mà không ai trong công ty sửa được — và chữ Nhật trong tên 得意先 mất font sẽ hỏng ở chỗ khó nhận ra nhất |
+| Font | **Tự host IBM Plex trong `static/`; chữ Nhật dùng font hệ thống** | R1: một CDN ngoài là một thứ có thể hỏng mà không ai trong công ty sửa được — và chữ Nhật trong tên 得意先 mất font sẽ hỏng ở chỗ khó nhận ra nhất |
 | Mã hoá bằng màu | **Giữ bất biến "màu + chữ"** đã ghi ở `_chung.html:76-77` | ~1/12 nam giới không phân biệt đỏ với xanh lá; tooltip `title` của thiết kế không tới được bằng bàn phím và không tồn tại trên điện thoại |
 | Vai trò người dùng: 2 hay 4 | **Hai cột riêng** — `vai_tro` (lọc dữ liệu) và `dashboard_mac_dinh` (mặc định hiển thị) | Hai con số trả lời hai câu khác nhau; nhét vào một cột là chỗ sinh mâu thuẫn — §8.3 |
 | CRM làm hình dáng nào trước | **Danh sách ưu tiên liên hệ** trước; Kanban để sau và thu hẹp phạm vi | Khảo sát thực địa có bằng chứng người cần cái trước, không có bằng chứng nào cho cái sau — §8.2 |
@@ -179,8 +179,14 @@ sẽ đi từ ~110 dòng lên vài trăm khi có 20 màn, và trình duyệt cac
 tải lại theo mỗi trang. `requirements.txt` không thêm gì — `StaticFiles` nằm sẵn trong
 FastAPI.
 
-Font tự host trong `static/`: IBM Plex Sans (400/500/600/700), IBM Plex Mono
-(400/500/600), Noto Sans JP (400/500).
+Font tự host trong `static/`: IBM Plex Sans (400/500/600/700) và IBM Plex Mono
+(400/500/600), bản Latin — bảy file woff2.
+
+**Chữ Nhật dùng ngăn xếp font hệ thống**, không tự host Noto Sans JP. Noto Sans
+JP phủ toàn bộ CJK; tự host đúng cách là hơn 200 file mảnh `unicode-range`, một
+cam kết bảo trì va thẳng R1. Windows có Yu Gothic UI, macOS có Hiragino Sans —
+ý đồ của thiết kế (tên 得意先 hiện bằng font Nhật thật) vẫn đạt. Nếu về sau chữ
+Nhật hiện xấu trên máy thật, xem lại quyết định này trước tiên.
 
 ### 6.4 Shell điều hướng
 
