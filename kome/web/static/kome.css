@@ -97,19 +97,14 @@
    color:var(--canh-chu);padding:.75rem 1rem;border-radius:12px;margin-bottom:1rem}
  .ky{background:var(--nen-phu);border:1px solid var(--vien);padding:.5rem 1rem;
    border-radius:12px;margin-bottom:1rem}
- /* ---- Khung ứng dụng ---------------------------------------------
-    Hai tầng điều hướng: tầng trên là việc hằng ngày, tầng dưới là việc nạp
-    số. Xem ghi chú trong _nav.html. */
- body{max-width:1100px}
- .dau-trang{margin:0 0 1.25rem;border-bottom:1px solid var(--vien);padding-bottom:.4rem}
- .hieu{display:inline-block;font-weight:700;letter-spacing:.08em;text-decoration:none;
-   color:var(--chu);margin-bottom:.35rem}
- .dieu-huong.phu{border:0;margin:.1rem 0 0;padding:0;font-size:.85rem;opacity:.85}
- .dieu-huong.phu a{padding:.2rem .55rem}
- .nhom{color:var(--chu-nhat);font-size:.8rem;align-self:center;
-   text-transform:uppercase;letter-spacing:.06em;margin-right:.15rem}
 
  /* ---- Thành phần dùng lại ---------------------------------------- */
+ /* Nhãn nhóm nhỏ dùng lại ở nhiều nơi ngoài sidebar — ví dụ "Trang X / Y"
+    trong thanh phân trang .loc bên dưới. Sidebar có nhãn nhóm RIÊNG, kiểu
+    khác (xem `.dieu-huong .nhom` trong khối "Khung trang"), nên khối này
+    chỉ còn phục vụ chỗ dùng ngoài sidebar. */
+ .nhom{color:var(--chu-nhat);font-size:.8rem;align-self:center;
+   text-transform:uppercase;letter-spacing:.06em;margin-right:.15rem}
  .the-so{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}
  .the-so > div{flex:1 1 9rem;background:var(--nen-the);border:1px solid var(--vien);
    border-radius:11px;padding:.75rem .9rem}
@@ -141,18 +136,41 @@
  .trong{color:var(--chu-nhat);padding:1.5rem;text-align:center;
    border:1px dashed var(--vien);border-radius:12px}
 
- /* Thanh điều hướng chung — ba trang phải đi lại được với nhau, không phải
-    mỗi trang một cái link lẻ ở cuối. */
- .dieu-huong{display:flex;flex-wrap:wrap;gap:.25rem;border-bottom:1px solid var(--vien);
-   margin:0 0 1.25rem;padding-bottom:.5rem}
- .dieu-huong a{padding:.4rem .75rem;border-radius:8px;text-decoration:none;
-   border:1px solid transparent}
+ /* ---- Khung trang: sidebar trái cố định + vùng nội dung ---------- */
+ body{display:flex;align-items:flex-start;max-width:none;margin:0;padding:0}
+ .canh{position:sticky;top:0;flex-shrink:0;width:196px;height:100vh;
+   box-sizing:border-box;display:flex;flex-direction:column;
+   background:var(--nen-the);border-right:1px solid var(--vien);
+   padding:1rem .7rem;overflow-y:auto}
+ .noi-dung{flex:1;min-width:0;max-width:1400px;padding:1.1rem;padding-bottom:3rem}
+ .hieu{display:flex;align-items:center;gap:.5rem;font-weight:700;letter-spacing:.08em;
+   font-size:.84rem;text-decoration:none;color:var(--chu);padding:0 .3rem .8rem}
+ .dieu-huong{display:flex;flex-direction:column;gap:.12rem}
+ /* Nhãn nhóm của sidebar — riêng với `.nhom` dùng lại ở nơi khác (khối
+    "Thành phần dùng lại" phía trên), nên scope trong `.dieu-huong` để đổi
+    kiểu một bên không kéo theo bên kia. */
+ .dieu-huong .nhom{margin:.9rem 0 .25rem;padding:0 .55rem;font-size:.68rem;font-weight:600;
+   letter-spacing:.1em;color:var(--chu-nhat)}
+ .dieu-huong .nhom:first-child{margin-top:0}
+ .dieu-huong a{padding:.42rem .55rem;border-radius:8px;font-size:.85rem;
+   text-decoration:none;color:var(--chu-thuong)}
  .dieu-huong a:hover{background:var(--nen-phu)}
- .dieu-huong a.dang-xem{background:var(--nen-phu);border-color:var(--vien);
-   color:var(--chu);font-weight:600}
- /* Nút Thoát đẩy về cuối thanh: nó không phải một trang, không đứng cùng hàng
-    với ba mục điều hướng. Chỉ hiện khi trang có đặt mật khẩu. */
- .dieu-huong .thoat{margin-left:auto}
- .dieu-huong .thoat button{font:inherit;padding:.4rem .75rem;border-radius:8px;
-   border:1px solid var(--vien);background:transparent;color:var(--chu-nhat);cursor:pointer}
- .dieu-huong .thoat button:hover{background:var(--nen-phu);color:var(--chu)}
+ /* Mục đang mở: nền và chữ lấy từ kome-nav.js:146-147 của gói thiết kế
+    (KHÔNG theo README của gói — README ghi #FFF4D6 kèm thanh đỏ bên trái,
+    lệch với chính prototype của nó). */
+ .dieu-huong a.dang-xem{background:var(--do-nen);color:var(--do-chu);font-weight:600}
+ .thoat{margin-top:auto;border-top:1px solid var(--vien);padding-top:.7rem}
+ .thoat button{font:inherit;width:100%;text-align:left;padding:.4rem .55rem;
+   border-radius:8px;border:0;background:transparent;color:var(--chu-nhat);cursor:pointer}
+ .thoat button:hover{background:var(--nen-phu);color:var(--chu)}
+
+ /* Màn hẹp: sidebar nằm ngang trên đầu thay vì chiếm 196px của 375px. */
+ @media (max-width:720px){
+   body{flex-direction:column}
+   .canh{position:static;width:auto;height:auto;flex-direction:row;flex-wrap:wrap;
+     align-items:center;gap:.25rem;border-right:0;border-bottom:1px solid var(--vien)}
+   .dieu-huong{flex-direction:row;flex-wrap:wrap}
+   .dieu-huong .nhom{display:none}
+   .thoat{margin-top:0;margin-left:auto;border-top:0;padding-top:0}
+   .noi-dung{max-width:none;width:100%;box-sizing:border-box}
+ }

@@ -145,3 +145,39 @@ def test_khong_goi_ra_ngoai_mang():
         text = f.read_text(encoding="utf-8")
         for x in ngoai:
             assert x not in text, f"{f.name} gọi ra ngoài mạng: {x}"
+
+
+def test_sidebar_hien_du_bay_muc_va_ba_nhom(conn, test_db_url):
+    """Chặn thảm hoạ: đổi khung điều hướng làm rơi mất một trang khỏi
+    sidebar -> trang đó vẫn chạy nhưng không ai vào được nữa."""
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    for duong_dan in ["/", "/bao-cao", "/khach-hang", "/can-xu-ly",
+                      "/nap", "/health", "/phu-du-lieu"]:
+        assert f'href="{duong_dan}"' in html, f"sidebar thiếu {duong_dan}"
+    for nhom in ["TỔNG QUAN", "KHÁCH HÀNG", "HỆ THỐNG"]:
+        assert nhom in html, f"sidebar thiếu nhóm {nhom}"
+
+
+def test_muc_dang_mo_duoc_danh_dau(conn, test_db_url):
+    """Đánh dấu mục đang mở bằng CẢ class lẫn aria-current: người dùng
+    trình đọc màn hình không thấy màu nền."""
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/bao-cao").text
+    assert 'href="/bao-cao" class="dang-xem" aria-current="page"' in html
+
+
+def test_ban_chi_doc_an_han_muc_nap(conn, test_db_url, monkeypatch):
+    """Bản chỉ-đọc không nạp được. Hiện mục Nạp ở đó là mời người ta bấm
+    vào một đường dẫn thẳng tới 403.
+
+    Dùng KOME_CHI_DOC chứ KHÔNG dùng VERCEL: đặt VERCEL=1 làm
+    `bao_mat.kiem_cau_hinh` ném CauHinhSai ngay lúc dựng app nếu chưa có
+    KOME_MAT_KHAU (bao_mat.py:55-62), và nếu đặt mật khẩu cho qua thì mọi
+    trang lại chuyển hướng sang /dang-nhap — test sẽ đỏ vì hai lý do chẳng
+    liên quan gì tới sidebar. app.py:48 chỉ sẵn đường này."""
+    monkeypatch.setenv("KOME_CHI_DOC", "1")
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    assert 'href="/nap"' not in html
+    assert 'href="/health"' in html

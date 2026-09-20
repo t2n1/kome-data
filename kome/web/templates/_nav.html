@@ -1,33 +1,37 @@
-{# Khung điều hướng chung.
+{# Sidebar trái, 196px, cố định. Thay thanh ngang hai tầng của bản trước.
 
-   Chia làm HAI tầng có chủ ý:
-     * Tầng trên — công việc hằng ngày: xem khách, xem báo cáo, xử lý cảnh báo.
-       Đây là thứ mọi người mở nhiều lần mỗi ngày.
-     * Tầng dưới (nhóm "Dữ liệu") — việc của người phụ trách nạp số, làm một
-       lần mỗi ngày lúc 13:30. Để lẫn vào tầng trên thì mục quan trọng nhất
-       (Khách hàng) bị đẩy xuống ngang hàng với một việc kỹ thuật.
+   Vì sao đổi: bản cũ để việc hằng ngày và việc kỹ thuật trên hai tầng của
+   cùng một thanh, nên mục quan trọng nhất (Khách hàng) đứng ngang hàng với
+   một việc làm mỗi ngày một lần. Sidebar tách hẳn nhóm HỆ THỐNG xuống dưới.
+
+   Chỉ liệt kê trang ĐANG CÓ THẬT. Không hiện mục mờ dẫn tới trang chưa xây:
+   một thanh điều hướng đầy mục bấm không được dạy người ta bỏ qua nó.
 
    `trang`: đánh dấu mục đang xem. Trang lỗi không truyền biến này nên không
    mục nào sáng — đúng, vì trang lỗi không thuộc mục nào cả.
-   `chi_doc`: bản chạy công khai (Vercel) không nạp được dữ liệu, ẩn hẳn mục
-   Nạp thay vì để nó dẫn tới một trang 403. #}
-<header class="dau-trang">
+   `chi_doc`: bản Vercel không nạp được, ẩn hẳn mục Nạp. #}
+<aside class="canh">
   <a class="hieu" href="/">KOME</a>
+
   <nav class="dieu-huong">
+    <p class="nhom">TỔNG QUAN</p>
     <a href="/"{% if trang == 'tong-quan' %} class="dang-xem" aria-current="page"{% endif %}>Tổng quan</a>
+    <a href="/bao-cao"{% if trang == 'bao-cao' %} class="dang-xem" aria-current="page"{% endif %}>Báo cáo doanh thu</a>
+
+    <p class="nhom">KHÁCH HÀNG</p>
     <a href="/khach-hang"{% if trang == 'khach' %} class="dang-xem" aria-current="page"{% endif %}>Khách hàng</a>
-    <a href="/bao-cao"{% if trang == 'bao-cao' %} class="dang-xem" aria-current="page"{% endif %}>Báo cáo</a>
     <a href="/can-xu-ly"{% if trang == 'can-xu-ly' %} class="dang-xem" aria-current="page"{% endif %}>Cần xử lý</a>
-    {% if co_mat_khau %}
-    <form method="post" action="/dang-xuat" class="thoat"><button type="submit">Thoát</button></form>
-    {% endif %}
-  </nav>
-  <nav class="dieu-huong phu">
-    <span class="nhom">Dữ liệu</span>
+
+    <p class="nhom">HỆ THỐNG</p>
     {% if not chi_doc %}
     <a href="/nap"{% if trang == 'nap' %} class="dang-xem" aria-current="page"{% endif %}>Nạp từ OBC</a>
     {% endif %}
-    <a href="/health"{% if trang == 'suc-khoe' %} class="dang-xem" aria-current="page"{% endif %}>Sức khoẻ</a>
-    <a href="/phu-du-lieu"{% if trang == 'phu' %} class="dang-xem" aria-current="page"{% endif %}>Bảng phủ</a>
+    <a href="/health"{% if trang == 'suc-khoe' %} class="dang-xem" aria-current="page"{% endif %}>Sức khoẻ dữ liệu</a>
+    <a href="/phu-du-lieu"{% if trang == 'phu' %} class="dang-xem" aria-current="page"{% endif %}>Bảng phủ dữ liệu</a>
   </nav>
-</header>
+
+  {% if co_mat_khau %}
+  <form method="post" action="/dang-xuat" class="thoat"><button type="submit">Đăng xuất</button></form>
+  {% endif %}
+</aside>
+<main class="noi-dung">
