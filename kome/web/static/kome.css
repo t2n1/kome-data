@@ -14,7 +14,10 @@
    thể hỏng mà không ai trong công ty sửa được (R1). Có test canh.
 
    Chữ Nhật KHÔNG tự host — xem ngăn xếp --font-ui bên dưới. Noto Sans JP
-   phủ toàn bộ CJK, tự host đúng cách là hơn 200 file mảnh unicode-range. */
+   phủ toàn bộ CJK, tự host đúng cách là hơn 200 file mảnh unicode-range.
+
+   Font là IBM Plex (SIL Open Font License 1.1) — nguyên văn giấy phép ở
+   static/fonts/OFL.txt, đi kèm bắt buộc khi phân phối lại theo OFL. */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;
   font-display:swap;src:url("/static/fonts/IBMPlexSans-Regular-Latin1.woff2") format("woff2")}
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:500;
