@@ -73,7 +73,15 @@ def test_moi_bien_mau_deu_co_ban_toi():
 def test_co_mau_hanh_dong_chinh_va_khong_con_mau_tim():
     """Bảng màu thiết kế dùng đỏ công ty #D62C27 cho hành động chính và
     trạng thái được chọn. Màu tím --chot-* của hệ cũ không còn chỗ đứng;
-    để sót lại thì hai hệ màu cùng sống trong một file."""
+    để sót lại thì hai hệ màu cùng sống trong một file. Kiểm TỪNG khối
+    riêng để bắt lỗi gõ sai một phía."""
     css = CSS.read_text(encoding="utf-8")
-    assert "--do:#D62C27" in css.replace(" ", "")
+    moc = "@media (prefers-color-scheme: dark)"
+    assert moc in css, "mất khối màu tối"
+    sang, toi = css.split(moc, 1)
+    # Kiểm khối sáng
+    assert "--do:#D62C27" in sang.replace(" ", ""), "khối sáng: thiếu --do:#D62C27"
+    # Kiểm khối tối
+    assert "--do:#D62C27" in toi.replace(" ", ""), "khối tối: thiếu --do:#D62C27"
+    # Không còn hệ cũ
     assert "--chot-" not in css
