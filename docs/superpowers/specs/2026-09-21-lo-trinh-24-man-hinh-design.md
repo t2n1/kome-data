@@ -180,7 +180,13 @@ tải lại theo mỗi trang. `requirements.txt` không thêm gì — `StaticFil
 FastAPI.
 
 Font tự host trong `static/`: IBM Plex Sans (400/500/600/700) và IBM Plex Mono
-(400/500/600), bản Latin — bảy file woff2.
+(400/500/600), bản **đầy đủ (không subset)** — bảy file woff2, ~50-70KB mỗi
+file. **Không dùng bản subset `-Latin1`**: bản đó không có glyph tiếng Việt
+(đo thật bằng `canvas.measureText` — mọi ký tự có dấu rơi về font hệ thống,
+dấu tách rời khỏi chữ), mà toàn bộ giao diện này là tiếng Việt. Đây là bẫy đã
+vấp thật một lần khi lập kế hoạch: tên file `-Latin1` nghe như "đủ dùng cho
+chữ Latin" nhưng "Latin" ở đây chỉ nghĩa là Latin cơ bản (ASCII + Tây Âu),
+không phải toàn bộ chữ Latin mở rộng có dấu.
 
 **Chữ Nhật dùng ngăn xếp font hệ thống**, không tự host Noto Sans JP. Noto Sans
 JP phủ toàn bộ CJK; tự host đúng cách là hơn 200 file mảnh `unicode-range`, một

@@ -16,22 +16,26 @@
    Chữ Nhật KHÔNG tự host — xem ngăn xếp --font-ui bên dưới. Noto Sans JP
    phủ toàn bộ CJK, tự host đúng cách là hơn 200 file mảnh unicode-range.
 
+   Dùng file woff2 ĐẦY ĐỦ (không phải bản subset -Latin1): bản -Latin1
+   không có glyph tiếng Việt, mà toàn bộ giao diện này là tiếng Việt — xem
+   test_du_bay_file_font_va_khong_rong.
+
    Font là IBM Plex (SIL Open Font License 1.1) — nguyên văn giấy phép ở
    static/fonts/OFL.txt, đi kèm bắt buộc khi phân phối lại theo OFL. */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;
-  font-display:swap;src:url("/static/fonts/IBMPlexSans-Regular-Latin1.woff2") format("woff2")}
+  font-display:swap;src:url("/static/fonts/IBMPlexSans-Regular.woff2") format("woff2")}
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:500;
-  font-display:swap;src:url("/static/fonts/IBMPlexSans-Medium-Latin1.woff2") format("woff2")}
+  font-display:swap;src:url("/static/fonts/IBMPlexSans-Medium.woff2") format("woff2")}
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:600;
-  font-display:swap;src:url("/static/fonts/IBMPlexSans-SemiBold-Latin1.woff2") format("woff2")}
+  font-display:swap;src:url("/static/fonts/IBMPlexSans-SemiBold.woff2") format("woff2")}
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:700;
-  font-display:swap;src:url("/static/fonts/IBMPlexSans-Bold-Latin1.woff2") format("woff2")}
+  font-display:swap;src:url("/static/fonts/IBMPlexSans-Bold.woff2") format("woff2")}
 @font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;
-  font-display:swap;src:url("/static/fonts/IBMPlexMono-Regular-Latin1.woff2") format("woff2")}
+  font-display:swap;src:url("/static/fonts/IBMPlexMono-Regular.woff2") format("woff2")}
 @font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;
-  font-display:swap;src:url("/static/fonts/IBMPlexMono-Medium-Latin1.woff2") format("woff2")}
+  font-display:swap;src:url("/static/fonts/IBMPlexMono-Medium.woff2") format("woff2")}
 @font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:600;
-  font-display:swap;src:url("/static/fonts/IBMPlexMono-SemiBold-Latin1.woff2") format("woff2")}
+  font-display:swap;src:url("/static/fonts/IBMPlexMono-SemiBold.woff2") format("woff2")}
 
 /* Ngăn xếp: chữ Latin đi qua IBM Plex, chữ Nhật rơi xuống font hệ thống
    (Yu Gothic UI trên Windows, Hiragino Sans trên macOS). Trình duyệt tự

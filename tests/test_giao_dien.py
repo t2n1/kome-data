@@ -14,13 +14,13 @@ TEMPLATES = Path("kome/web/templates")
 FONTS = Path("kome/web/static/fonts")
 
 TEN_FONT = [
-    "IBMPlexSans-Regular-Latin1.woff2",
-    "IBMPlexSans-Medium-Latin1.woff2",
-    "IBMPlexSans-SemiBold-Latin1.woff2",
-    "IBMPlexSans-Bold-Latin1.woff2",
-    "IBMPlexMono-Regular-Latin1.woff2",
-    "IBMPlexMono-Medium-Latin1.woff2",
-    "IBMPlexMono-SemiBold-Latin1.woff2",
+    "IBMPlexSans-Regular.woff2",
+    "IBMPlexSans-Medium.woff2",
+    "IBMPlexSans-SemiBold.woff2",
+    "IBMPlexSans-Bold.woff2",
+    "IBMPlexMono-Regular.woff2",
+    "IBMPlexMono-Medium.woff2",
+    "IBMPlexMono-SemiBold.woff2",
 ]
 
 # Mọi trang mở được mà không cần tham số. Trang hồ sơ khách và trang lỗi
@@ -128,11 +128,32 @@ def test_moi_bien_dung_deu_duoc_dinh_nghia():
 
 def test_du_bay_file_font_va_khong_rong():
     """Chặn thảm hoạ: @font-face trỏ tới file không có -> trình duyệt im
-    lặng rơi về font hệ thống, trang vẫn 200, không ai biết."""
+    lặng rơi về font hệ thống, trang vẫn 200, không ai biết.
+
+    Ngưỡng kích thước là ĐẠI DIỆN THÔ cho "font đầy đủ, không phải bản
+    subset": bản subset `-Latin1` của IBM Plex chỉ ~17-22KB và KHÔNG có
+    glyph tiếng Việt (đã đo thật bằng canvas.measureText — mọi ký tự có
+    dấu rơi về font hệ thống, dấu tách rời khỏi chữ). Toàn bộ giao diện
+    này là tiếng Việt nên đây là thảm hoạ nặng nhất có thể xảy ra với
+    font, và trang vẫn trả 200 — không test nào khác bắt được.
+
+    Ngưỡng đặt ở 35.000 byte, KHÔNG phải 60.000: bản đầy đủ đo thật của
+    IBM Plex Mono chỉ ~49-50KB (Mono ít glyph phức tạp hơn Sans), thấp
+    hơn 60.000. 35.000 nằm giữa hai nhóm với biên an toàn rộng cả hai
+    phía (subset lớn nhất 22.260B, đầy đủ nhỏ nhất 49.248B).
+
+    Giới hạn của chính test này: đây KHÔNG phải kiểm glyph thật. Kiểm
+    glyph thật đòi giải nén woff2 (`fonttools` + `brotli`) — thêm một phụ
+    thuộc mới, trái R1 (giảm tối đa số thứ có thể hỏng). Nếu một ngày IBM
+    phát hành bản đầy đủ nhỏ hơn ngưỡng này, test sẽ báo động giả — người
+    đọc cần biết đây là đại diện, không phải phép đo chính xác."""
     for ten in TEN_FONT:
         f = FONTS / ten
         assert f.exists(), f"thiếu {ten}"
-        assert f.stat().st_size > 10_000, f"{ten} có vẻ là file rỗng hoặc trang lỗi tải nhầm"
+        assert f.stat().st_size > 35_000, (
+            f"{ten} nhỏ hơn 35.000 byte — có thể là bản subset -Latin1 "
+            "thiếu glyph tiếng Việt, không phải bản đầy đủ"
+        )
 
 
 def test_khong_goi_ra_ngoai_mang():
