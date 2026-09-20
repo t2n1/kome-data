@@ -111,7 +111,7 @@
  .the-so > div{flex:1 1 9rem;background:var(--nen-the);border:1px solid var(--vien);
    border-radius:11px;padding:.75rem .9rem}
  .the-so .nhan{color:var(--chu-nhat);font-size:.8rem}
- .the-so .gia{font-size:1.4rem;font-weight:700;line-height:1.25;margin-top:.15rem;
+ .the-so .gia{font-size:1.45rem;font-weight:600;line-height:1.25;margin-top:.15rem;
    font-family:var(--font-so);font-variant-numeric:tabular-nums}
  .bang-cuon{overflow-x:auto}
  td.so,th.so{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;
