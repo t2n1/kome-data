@@ -9,8 +9,13 @@
 
    `trang`: đánh dấu mục đang xem. Trang lỗi không truyền biến này nên không
    mục nào sáng — đúng, vì trang lỗi không thuộc mục nào cả.
-   `chi_doc`: bản Vercel không nạp được, ẩn hẳn mục Nạp. #}
-<aside class="canh">
+   `chi_doc`: bản Vercel không nạp được, ẩn hẳn mục Nạp.
+
+   QUAN TRỌNG — partial này MỞ `<main class="noi-dung">` ở cuối và KHÔNG
+   ĐÓNG nó. Mọi template include partial này BẮT BUỘC phải tự thêm dòng
+   `</main>` ở cuối file của chính nó. Có test canh —
+   tests/test_giao_dien.py::test_moi_template_dung_nav_deu_dong_main. #}
+<aside class="thanh-ben">
   <a class="hieu" href="/">KOME</a>
 
   <nav class="dieu-huong">

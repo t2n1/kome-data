@@ -138,7 +138,7 @@
 
  /* ---- Khung trang: sidebar trái cố định + vùng nội dung ---------- */
  body{display:flex;align-items:flex-start;max-width:none;margin:0;padding:0}
- .canh{position:sticky;top:0;flex-shrink:0;width:196px;height:100vh;
+ .thanh-ben{position:sticky;top:0;flex-shrink:0;width:196px;height:100vh;
    box-sizing:border-box;display:flex;flex-direction:column;
    background:var(--nen-the);border-right:1px solid var(--vien);
    padding:1rem .7rem;overflow-y:auto}
@@ -167,7 +167,7 @@
  /* Màn hẹp: sidebar nằm ngang trên đầu thay vì chiếm 196px của 375px. */
  @media (max-width:720px){
    body{flex-direction:column}
-   .canh{position:static;width:auto;height:auto;flex-direction:row;flex-wrap:wrap;
+   .thanh-ben{position:static;width:auto;height:auto;flex-direction:row;flex-wrap:wrap;
      align-items:center;gap:.25rem;border-right:0;border-bottom:1px solid var(--vien)}
    .dieu-huong{flex-direction:row;flex-wrap:wrap}
    .dieu-huong .nhom{display:none}

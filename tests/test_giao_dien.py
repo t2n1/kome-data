@@ -181,3 +181,62 @@ def test_ban_chi_doc_an_han_muc_nap(conn, test_db_url, monkeypatch):
     html = client.get("/").text
     assert 'href="/nap"' not in html
     assert 'href="/health"' in html
+
+
+# Bốn tên lớp badge trạng thái khách hàng, GHÉP Ở TẦNG PYTHON
+# (kome/khach_hang.py) chứ không phải chuỗi tĩnh trong template -> grep trên
+# *.html không bao giờ bắt được ai đang định nghĩa CSS đè lên chúng.
+TEN_BADGE = ("ok", "canh", "loi", "nhat")
+
+
+def test_ten_badge_khong_duoc_dung_lam_lop_tran_trong_css():
+    """Chặn thảm hoạ đã XẢY RA THẬT: sidebar Task 4 đặt tên lớp `.canh`
+    (đúng bản mô tả), nhưng `.canh` đã có nghĩa khác từ trước -- lớp badge
+    "Cần gọi lại" ở dạng CÓ ĐỊNH TÍNH `.vien.canh` (kome.css, khối "Viên
+    trạng thái"). `.vien.canh` chỉ khai background/border-color/color; mọi
+    thuộc tính khác của `.canh` (sidebar: position:sticky, width:196px,
+    height:100vh, display:flex...) áp thẳng lên badge, biến nó thành một
+    khối 196px x 100vh dính trên đầu màn hình. 207 test vẫn xanh lúc đó vì
+    không test nào soi việc MỘT TÊN LỚP bị TÁI SỬ DỤNG cho hai thứ khác
+    nhau -- nó chỉ lộ ra khi có người mở đúng trang có đúng loại khách
+    (`/can-xu-ly`, nhóm "Cần gọi lại").
+
+    `ok`/`canh`/`loi`/`nhat` là bốn tên RẤT CHUNG (kome/khach_hang.py) --
+    người viết CSS sau này rất dễ đặt lại một trong bốn tên đó cho một
+    thành phần hoàn toàn khác, y hệt chuyện vừa xảy ra với `.canh`. Test
+    này khẳng định bốn tên đó CHỈ được xuất hiện trong kome.css dưới dạng
+    CÓ ĐỊNH TÍNH (`.vien.ok`, `.vien.canh`, `.vien.loi`, `.vien.nhat`) --
+    tức luôn có một lớp khác đứng ngay trước, không đứng trần một mình.
+
+    Khớp selector trần: một `.` đứng ở đầu selector (đầu file, sau khoảng
+    trắng/xuống dòng, sau dấu phẩy, hoặc sau `{` đóng khối trước) theo sau
+    là đúng một trong bốn tên rồi hết từ (không phải tiền tố của tên dài
+    hơn như `.loi-hop`)."""
+    css = CSS.read_text(encoding="utf-8")
+    tran = re.compile(r'(?:^|[\s,{])\.(' + "|".join(TEN_BADGE) + r')(?![\w-])')
+    khop = [m.group(1) for m in tran.finditer(css)]
+    assert not khop, (
+        f"lớp badge dùng TRẦN (không có định tính) trong kome.css: {khop} -- "
+        "badge trạng thái sẽ ăn nguyên kiểu dáng của bất cứ thứ gì đang mượn "
+        "tên này (xem docstring)"
+    )
+
+
+def test_moi_template_dung_nav_deu_dong_main():
+    """`_nav.html` MỞ `<main class="noi-dung">` và KHÔNG đóng (xem chú
+    thích Jinja đầu file) -- mỗi template include nó phải tự thêm `</main>`
+    ở cuối. Ghi chú giải thích chuyện này nằm trong bản mô tả nhiệm vụ,
+    tức NGOÀI repo -- người mở `_nav.html` sáu tháng nữa không có nó trong
+    tay nếu chỉ đọc code. Không viết cứng số lượng file: tự tìm mọi
+    template include `_nav.html`, để thêm trang mới cũng được canh."""
+    dung_nav = [
+        f for f in sorted(TEMPLATES.glob("*.html"))
+        if '{% include "_nav.html" %}' in f.read_text(encoding="utf-8")
+    ]
+    assert dung_nav, "không tìm thấy template nào include _nav.html"
+    for f in dung_nav:
+        text = f.read_text(encoding="utf-8")
+        assert text.count("</main>") == 1, (
+            f"{f.name} include _nav.html (mở <main> không đóng) nhưng có "
+            f"{text.count('</main>')} thẻ </main>, cần đúng 1"
+        )
