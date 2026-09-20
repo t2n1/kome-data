@@ -4,6 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from kome.config import SPECS
 from kome.bao_cao import tinh_bao_cao, ve_bieu_do
@@ -98,6 +99,13 @@ def _ky_du_lieu(conn) -> dict:
 def create_app(db_url: str | None = None) -> FastAPI:
     """db_url=None => lấy DATABASE_URL. Test LUÔN truyền DATABASE_URL_TEST."""
     app = FastAPI(title="KOME — dữ liệu")
+    # Phục vụ CSS và font từ đĩa. Dùng StaticFiles có sẵn trong FastAPI —
+    # KHÔNG thêm gói nào vào requirements.txt (bản Vercel cố ý mỏng).
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(Path(__file__).parent / "static")),
+        name="static",
+    )
     archive_dir = Path(os.environ.get("ARCHIVE_DIR", "./raw_archive"))
     open_conn = lambda: connect(db_url)
     chi_doc = _chi_doc()

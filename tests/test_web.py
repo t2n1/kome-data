@@ -208,17 +208,25 @@ def test_ba_trang_deu_co_thanh_dieu_huong_di_qua_lai(conn, test_db_url):
 def test_ba_trang_doc_duoc_o_che_do_toi(conn, test_db_url):
     """[IMPORTANT] Không khai màu nền/màu chữ thì máy để giao diện TỐI sẽ vẽ
     chữ sẫm trên nền sẫm — trang cảnh báo mà không đọc được thì không cảnh
-    báo được gì. Đã kiểm tận mắt."""
+    báo được gì. Đã kiểm tận mắt.
+
+    CSS giờ nằm ở /static/kome.css (tách ra ở Task 1, xem
+    tests/test_giao_dien.py) chứ không còn nằm trong HTML — nên bài kiểm
+    tra soi cả CSS thật sự được phục vụ, không chỉ trang HTML trỏ tới nó."""
     client = TestClient(create_app(db_url=test_db_url))
+    css = client.get("/static/kome.css").text.replace(" ", "")
+    assert "prefers-color-scheme:dark" in css
+    assert "body{" in css and "background:var(--nen)" in css
+    assert "color:var(--chu)" in css
     for duong in ("/", "/health", "/phu-du-lieu"):
-        text = client.get(duong).text.replace(" ", "")
-        assert 'name="color-scheme"' in client.get(duong).text, duong
-        assert "prefers-color-scheme:dark" in text, duong
-        assert "body{" in text and "background:var(--nen)" in text, duong
-        assert "color:var(--chu)" in text, duong
+        text = client.get(duong).text
+        assert 'name="color-scheme"' in text, duong
+        assert "/static/kome.css" in text, duong
 
 
 def test_trang_loi_cung_doc_duoc_o_che_do_toi(conn, test_db_url, monkeypatch):
+    """CSS nằm ở /static/kome.css (Task 1) — trang lỗi chỉ cần trỏ tới đó,
+    không còn tự mang theo biến màu TỐI trong HTML của chính nó."""
     import kome.pipeline as P
 
     def no_tung(*a, **kw):
@@ -230,7 +238,7 @@ def test_trang_loi_cung_doc_duoc_o_che_do_toi(conn, test_db_url, monkeypatch):
         r = client.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", f)})
     assert r.status_code == 500
     assert 'name="color-scheme"' in r.text
-    assert "prefers-color-scheme:dark" in r.text.replace(" ", "")
+    assert "/static/kome.css" in r.text
 
 
 def test_health_hien_gach_ngang_thay_vi_yen_0_cho_file_khong_mang_tien(
