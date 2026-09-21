@@ -204,9 +204,16 @@ cũ giữ tới khi đợt 7 dựng trang "danh sách ưu tiên liên hệ" riê
 **Chấp nhận hai nhà trong một thời gian.** Đổi lại là không đụng vào trang người ta đang
 mở hằng ngày, giữa lúc đợt 3 vừa đổi cổng đăng nhập của chính nó.
 
-**Bất biến:** hai chỗ phải đọc cùng một định nghĩa từ `mart` — không được để `/can-xu-ly`
-dùng `trang_thai` còn nhóm việc dùng một ngưỡng viết tay. Có test canh: hai đường phải trả
-về **cùng một tập mã khách**.
+**Bất biến:** **ba** chỗ phải đọc cùng một định nghĩa từ `mart` — không được để
+`/can-xu-ly` dùng `trang_thai` còn nhóm việc dùng một ngưỡng viết tay:
+
+1. `mart.khach_nhom_viec` nhóm `'im'` → nút "Im lặng ≥ 2× nhịp"
+2. `mart.tai_nhan_vien.so_khach_canh_bao` → cột **"Cần gọi"** của bảng "Tải của từng
+   nhân viên"
+3. `kome/khach_hang.py::can_xu_ly` → trang `/can-xu-ly`
+
+Chỗ (2) do đợt 4a thêm và ban đầu chép lại vị từ; migration `022` cho nó **đọc** (1) bằng
+`EXISTS`. Có test canh: cả ba đường phải trả về **cùng một tập mã khách**.
 
 ### 5.5 Bốn nhóm việc, không phải sáu
 
@@ -287,7 +294,9 @@ token, nên không cần thêm biến CSS mới.
 |---|---|
 | Nhịp theo mã của khách mua < 3 lần là NULL | Bịa một con số từ hai điểm dữ liệu |
 | Nhịp theo mã dùng **cùng công thức** `mart.nhip_mua` (trung vị) | Hai định nghĩa cho cùng một khái niệm |
-| Nhóm "Im lặng ≥ 2× nhịp" và `/can-xu-ly` trả **cùng tập mã khách** | Hai trang nói hai điều về cùng một câu hỏi |
+| Nhóm "Im lặng ≥ 2× nhịp", cột "Cần gọi" của bảng tải nhân viên, và `/can-xu-ly` trả **cùng tập mã khách** | Ba chỗ nói ba điều về cùng một câu hỏi |
+| Bộ đếm chip trạng thái co theo **đúng những bộ lọc mà liên kết của chip mang theo** | Con số nói dối về chính danh sách nó mở ra |
+| Mục "— mọi người phụ trách —" thật sự bỏ lọc theo người đăng nhập | Ô điều khiển nói một đằng, dữ liệu một nẻo |
 | Khách `※廃業※` không lọt vào nhóm việc nào ngoài "Toàn bộ" | Gọi lại một doanh nghiệp đã phá sản |
 | `hang_doanh_thu` phủ **đúng 100%** khách, không trùng bậc | Khách biến mất khỏi mọi bộ lọc hạng |
 | Ba bộ lọc mới kết hợp được với nhau và với `sale`/`tim`/`loc` | Bấm hai bộ lọc thì một cái im lặng bị bỏ |
@@ -321,6 +330,57 @@ token, nên không cần thêm biến CSS mới.
       ```bash
       python -u -c "import os;from kome.db import connect;from kome.env import nap_env;nap_env(bat_buoc=False);c=connect(os.environ['DATABASE_URL']);[print([r[0] for r in c.execute('EXPLAIN (ANALYZE, TIMING OFF) SELECT * FROM mart.khach_mat_hang WHERE customer_code=%s',('000000009292',)).fetchall()][-1]) for _ in range(2)]"
       ```
+
+- [ ] **KIỂM TAY thứ hai (chỉ chủ sở hữu, cùng lúc với mục trên):
+      `tong_quan_danh_ba`.** Mục KIỂM TAY phía trên đo `mart.khach_mat_hang`
+      **lọc một khách** — ca có vị từ đẩy xuống được, và con số "10 ms" ở §3.1
+      là của chính ca đó. Nó **không mô tả** truy vấn của
+      `kome/khach_hang.py::tong_quan_danh_ba`, thứ chạy trên **mọi** lượt mở
+      `/khach-hang` và là truy vấn đắt nhất đợt 4a tạo ra:
+
+      - `mart.khach_360` bị tham chiếu **6 lần** trong chính câu lệnh (nhóm
+        việc · tổng · hạng · tỉnh · bộ đếm trạng thái · tổng toàn công ty),
+        **cộng 3 lần nữa bên trong `mart.khach_nhom_viec`**;
+      - `mart.hang_doanh_thu` 2 lần (một trực tiếp, một trong nhánh `tut`);
+      - nhánh `tut` còn **hai truy vấn con tương quan** trên `mart.lan_mua`.
+
+      Không lần nào có vị từ `customer_code` để đẩy xuống, nên mỗi lần là một
+      phép gộp **toàn bảng** `core.fact_sales_line` (~1,08 triệu dòng). Migration
+      020/021 tới nay mới chỉ chạy trên CSDL thử nghiệm (gần như rỗng), nên chi
+      phí thật **chưa ai đo**.
+
+      Chạy **hai lần liên tiếp** và lấy con số **lần thứ hai** — lần đầu là cache
+      lạnh (đã đo trên chính CSDL này ở một khối khác: 272 ms → 7 ms, và
+      7.609 ms → 57 ms). Đo **cả hai nhánh**: `sale=None` (chủ DN, kế toán, kho
+      — không lọc ai) và `sale='0104'` (một nhân viên bán hàng), vì nhánh có
+      `sale` thêm bốn vị từ vào bốn khối khác nhau.
+
+      **Ngưỡng đặt TRƯỚC khi đo: dưới 500 ms** ở lần thứ hai, mỗi nhánh. Vượt
+      thì **báo lại, đừng tự tối ưu** — cách sửa (materialized view, index, tách
+      lại thành nhiều lượt hỏi) là một quyết định kiến trúc, không phải một
+      chỉnh sửa nhỏ, và lộ trình §7 dành đợt 6 làm đợt duy nhất động vào
+      pipeline nạp.
+
+      ```bash
+      python -u -c "
+      import os, time
+      from kome.db import connect
+      from kome.env import nap_env
+      from kome import khach_hang as KH
+      nap_env(bat_buoc=False)
+      c = connect(os.environ['DATABASE_URL'])
+      for lan in (1, 2):
+          for sale in (None, '0104'):
+              t0 = time.perf_counter()
+              KH.tong_quan_danh_ba(c, sale)
+              print(f'lan {lan}  sale={sale!r:8}  {(time.perf_counter()-t0)*1000:7.0f} ms')
+      "
+      ```
+
+      Đo từ Python (gồm cả vòng mạng tới Tokyo) chứ không bằng `EXPLAIN
+      ANALYZE`: §3.1 đã đo được nút thắt là **số lượt hỏi**, nên con số cần
+      biết là con số người dùng thật sự phải chờ, không phải thời gian CSDL
+      tính.
 
 ---
 

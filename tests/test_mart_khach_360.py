@@ -114,6 +114,50 @@ def test_nhom_im_lang_trung_khop_voi_can_xu_ly(conn, batch):
     assert tu_nhom == tu_trang, f"lệch: chỉ nhóm {tu_nhom - tu_trang}, chỉ trang {tu_trang - tu_nhom}"
 
 
+def test_ba_cho_noi_ve_khach_dang_roi_di_deu_cho_cung_mot_tap(conn, batch):
+    """[CRITICAL] BA chỗ trả lời "khách nào đang rời đi", không phải hai:
+
+      1. mart.khach_nhom_viec nhóm 'im'              -> nút "Im lặng ≥ 2× nhịp"
+      2. mart.tai_nhan_vien.so_khach_canh_bao        -> cột "Cần gọi"
+      3. kome/khach_hang.py::can_xu_ly               -> trang /can-xu-ly
+
+    Đặc tả §5.4 viết bất biến cho (1) và (3) và có test canh đúng hai cái đó;
+    đợt 4a thêm (2) mà không ai canh. Đợt 7 sẽ đổi định nghĩa này — khi đó
+    cột "Cần gọi" âm thầm trôi khỏi hai chỗ kia, và nó là con số quản lý dùng
+    để chia việc cho năm người. Migration 022 cho (2) ĐỌC (1); test này canh
+    cả ba.
+
+    Có một khách ※廃業※ cố ý: cả ba chỗ phải loại nó (migration 016). Một cài
+    đặt sai theo kiểu "đếm mọi khách im lặng" vẫn qua được hai khẳng định đầu
+    nếu không có ca này.
+    """
+    # 0104: một khách im, một khách vẫn mua đều.  0102: một khách im.
+    # Và một khách ※廃業※ của 0104 — im lặng nhưng KHÔNG phải việc cần làm.
+    for ma, sale, ten, ngung in (("C0104A", "0104", "Quán im", 40),
+                                 ("C0104B", "0104", "Quán đều", 2),
+                                 ("C0102C", "0102", "Quán im người khác", 40),
+                                 ("C0104D", "0104", "※廃業・精算※Quán đóng", 40)):
+        _ho_so_khach(conn, batch, ma, ten, salesperson_code=sale)
+        for i in range(6):
+            _mua(conn, batch, ma, HOM_NAY - timedelta(days=ngung + i * 7))
+    _neo(conn, batch)
+
+    tu_nhom = {r[0] for r in conn.execute(
+        "SELECT customer_code FROM mart.khach_nhom_viec WHERE nhom='im'").fetchall()}
+    tu_trang = {k.ma for k in KH.can_xu_ly(conn)}
+    assert tu_nhom == tu_trang == {"C0104A", "C0102C"}, \
+        f"nhóm việc {tu_nhom} vs /can-xu-ly {tu_trang}"
+
+    # Chỗ thứ ba: từng người một, không chỉ tổng — một cài đặt cộng nhầm vẫn
+    # ra đúng tổng, mà bảng này hiện từng dòng cho từng người.
+    bang = {r[0]: r[1] for r in conn.execute(
+        "SELECT salesperson_code, so_khach_canh_bao FROM mart.tai_nhan_vien").fetchall()}
+    tu_bang = {ma: so for ma, so in bang.items() if so}
+    assert tu_bang == {"0104": 1, "0102": 1}, \
+        f"cột 'Cần gọi' lệch khỏi hai chỗ kia: {bang}"
+    assert sum(bang.values()) == len(tu_nhom)
+
+
 def test_nhom_tut_bat_khach_hang_cao_dang_giam_manh(conn, batch):
     """[IMPORTANT] `tut` là đoạn SQL phức tạp nhất file (hai truy vấn con
     tương quan, cửa sổ trượt 30/90 ngày, ngưỡng 80%, cổng hạng S/A) — chưa có

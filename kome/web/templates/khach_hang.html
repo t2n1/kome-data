@@ -84,7 +84,7 @@
 <p class="ghi-chu">Đang xem khách của <strong>{{ t.ten_sale }}</strong>{%
   if not t.tim and not t.loc %} ({{ "{:,}".format(t.tong) }} khách){%
   else %} (đang hiện {{ "{:,}".format(t.tong) }} khách khớp){% endif %}.
-  <a href="/khach-hang?tat_ca=1">Xem tất cả {{ "{:,}".format(t.tong_tat_ca) }} khách →</a></p>
+  <a href="/khach-hang?tat_ca=1">Xem tất cả {{ "{:,}".format(tq.tong_tat_ca) }} khách →</a></p>
 {% endif %}
 
 {# ---- Khối 1: danh sách làm việc ------------------------------------
@@ -174,15 +174,16 @@
   {% if t.tim %}<a class="loc" href="/khach-hang?loc={{ t.loc }}{{ giu }}" style="align-self:center">Xoá tìm</a>{% endif %}
 </form>
 
-{# Bộ đếm KHÔNG theo ô tìm và KHÔNG theo bộ lọc trạng thái đang bật — nếu
+{# Bộ đếm KHÔNG theo ô tìm và KHÔNG theo bộ lọc TRẠNG THÁI đang bật — nếu
    không thì bấm vào một mục xong các con số khác về 0 hết và không ai quay
-   lại được. Nhưng nó CÓ theo bộ lọc sale: đang xem khách của mình mà bộ đếm
-   khoe con số toàn công ty thì bấm vào một mục xong ra danh sách ngắn hơn hẳn
-   số vừa đọc. Xem kome/khach_hang.py::danh_sach. #}
+   lại được. Nhưng nó CÓ theo bốn bộ lọc còn lại (sale, nhóm việc, hạng,
+   tỉnh), vì liên kết của chính mỗi chip mang `giu` — tức mang cả bốn thứ đó
+   theo. Bộ đếm không co theo chúng thì chip nói "Tất cả (1.710)" rồi bấm vào
+   ra 216 khách. Xem kome/khach_hang.py::tong_quan_danh_ba. #}
 <div class="loc">
-  <a href="/khach-hang?tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if not t.loc %} class="dang-xem"{% endif %}>Tất cả ({{ "{:,}".format(t.dem_trang_thai.values()|sum) }})</a>
+  <a href="/khach-hang?tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if not t.loc %} class="dang-xem"{% endif %}>Tất cả ({{ "{:,}".format(tq.dem_trang_thai.values()|sum) }})</a>
   {% for ma, (nhan, mau) in trang_thai.items() %}
-  <a href="/khach-hang?loc={{ ma }}&tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if t.loc == ma %} class="dang-xem"{% endif %}>{{ nhan }} ({{ "{:,}".format(t.dem_trang_thai.get(ma, 0)) }})</a>
+  <a href="/khach-hang?loc={{ ma }}&tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if t.loc == ma %} class="dang-xem"{% endif %}>{{ nhan }} ({{ "{:,}".format(tq.dem_trang_thai.get(ma, 0)) }})</a>
   {% endfor %}
 </div>
 
@@ -205,11 +206,17 @@
   <input type="hidden" name="nhom" value="{{ t.nhom or '' }}">
   <input type="hidden" name="hang" value="{{ t.hang or '' }}">
   {% if tat_ca %}<input type="hidden" name="tat_ca" value="1">{% endif %}
+  {# Mục đầu mang GIÁ TRỊ QUY ƯỚC `nv_moi_nguoi`, không mang chuỗi rỗng:
+     chuỗi rỗng nghĩa là "không chọn gì" và trang rơi về mặc định lọc theo
+     người đang đăng nhập (đợt 3) — tức chọn "mọi người" xong danh sách
+     không đổi. Và `nv_chon` đọc từ bộ lọc THỰC SỰ đang áp dụng (`t.sale`),
+     nên khi đang ở mặc định thì ô chọn hiện đúng tên người đó thay vì nói
+     dối là "mọi người". Cùng bất biến với ô Tỉnh ngay dưới. #}
   <label>担当者
     <select name="nv">
-      <option value="">— mọi người phụ trách —</option>
+      <option value="{{ nv_moi_nguoi }}"{% if nv_chon == nv_moi_nguoi %} selected{% endif %}>— mọi người phụ trách —</option>
       {% for n in tq.nhan_vien %}
-      <option value="{{ n.ma }}"{% if nv == n.ma %} selected{% endif %}>{{ n.ten }} ({{ n.so_khach }})</option>
+      <option value="{{ n.ma }}"{% if nv_chon == n.ma %} selected{% endif %}>{{ n.ten }} ({{ n.so_khach }})</option>
       {% endfor %}
     </select></label>
   {# `tinh_chon` do route dựng: (giá trị trên URL, nhãn, số khách). Hai việc

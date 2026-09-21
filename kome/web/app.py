@@ -332,9 +332,17 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         `mart.tai_nhan_vien` (đã nằm sẵn trong `tong_quan_danh_ba`), không tốn
         thêm một vòng hỏi nào.
 
+        `nv == KH.NV_MOI_NGUOI` là mục đầu của ô chọn — "mọi người phụ
+        trách". Nó cũng là một lựa chọn TƯỜNG MINH, nên nó cũng thắng mặc
+        định theo người đăng nhập. Không có giá trị quy ước này thì mục đó
+        gửi `nv=""`, hàm rơi xuống nhánh mặc định và trả về đúng người đang
+        đăng nhập — ô chọn khoe "mọi người" trong khi danh sách vẫn bị lọc.
+
         Vẫn KHÔNG phải hàng rào bảo mật: năm sale ai cũng biết khách của ai
         (đặc tả đợt 3 §5), nên chọn mã của người khác là hợp lệ.
         """
+        if nv == KH.NV_MOI_NGUOI:
+            return None, None
         if nv:
             return nv, None
         nguoi = getattr(request.state, "nguoi", None)
@@ -353,10 +361,14 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 # bảng "Tải của từng nhân viên" trong `tq` là chỗ duy nhất
                 # biết mã sale nào ứng với tên nào, mà dải bộ lọc cần cái tên
                 # đó để nói rõ đang xem khách của ai.
-                tq = KH.tong_quan_danh_ba(conn, sale)
-                if nv and ten_sale is None:
+                tq = KH.tong_quan_danh_ba(conn, sale, nhom=nhom, hang=hang,
+                                          tinh=tinh)
+                # `sale and ten_sale is None` chứ không `nv and …`: chỉ có
+                # nhánh `nv` là một mã sale (`KH.NV_MOI_NGUOI` không phải —
+                # nó BỎ lọc, nên `sale` là None và không có tên nào để tra).
+                if sale and ten_sale is None:
                     ten_sale = next((n["ten"] for n in tq.nhan_vien
-                                     if n["ma"] == nv), nv)
+                                     if n["ma"] == sale), sale)
                 t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang,
                                  sale=sale, ten_sale=ten_sale, nhom=nhom,
                                  hang=hang, tinh=tinh)
@@ -379,9 +391,17 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             # truyền thêm bản sao vào ctx: hai nguồn cho cùng một giá trị là
             # hai chỗ có thể trôi khỏi nhau. `nv` thì KHÔNG có trong `t` vì
             # nó không phải tham số của danh_sach() — nó đi qua `sale`.
+            # Giá trị ĐANG được chọn của ô 担当者. Lấy từ `t.sale` (bộ lọc
+            # THỰC SỰ đang áp dụng) chứ không từ `nv` (thứ người ta gõ trên
+            # URL): mặc định của đợt 3 lọc theo người đăng nhập mà `nv` rỗng,
+            # nên đọc `nv` thì ô chọn hiện "— mọi người phụ trách —" trong
+            # khi danh sách chỉ có khách của một người. Không lọc ai thì rơi
+            # về mục quy ước NV_MOI_NGUOI — chính là mục đầu.
             return _ve(request, "khach_hang.html",
                        {"t": t, "tq": tq, "trang_thai": KH.TRANG_THAI,
                         "trang": "khach", "tat_ca": bool(tat_ca), "nv": nv,
+                        "nv_chon": t.sale or KH.NV_MOI_NGUOI,
+                        "nv_moi_nguoi": KH.NV_MOI_NGUOI,
                         "tinh_chon": tinh_chon})
         except Exception as e:
             return _loi(request, "mở danh sách khách hàng", e)

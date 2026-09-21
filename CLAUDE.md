@@ -84,11 +84,33 @@ tháng**, KHÔNG phải `得意先ランク` của OBC. `core.dim_customer.rank_
 gọi tắt là "hạng" thì sẽ có người đối chiếu với OBC rồi thấy lệch và không biết tin
 cái nào.
 
-**Bất biến:** `kome/khach_hang.py::ho_so()` chạy **không quá 8 truy vấn**, và bốn
-khối phân tích của `/khach-hang` chạy trong **một**. Đo thật 2026-09-22: CSDL tính
-xong một khối trong ~10 ms, nhưng một round-trip tới pooler Tokyo mất 47 ms và một
-lượt hỏi thật mất ~260 ms. Nút thắt là **số lượt hỏi**, không phải sức tính — nên
-tối ưu đúng là gộp truy vấn, không phải materialized view. Có test đếm.
+**Bất biến:** `kome/khach_hang.py::ho_so()` chạy **không quá 8 truy vấn** (nay là
+7 — chỗ trống là cố ý, để khối tiếp theo thêm được mà không phải nới trần), và cả
+trang `/khach-hang` chạy **3**: `tong_quan_danh_ba` 1 (bốn khối phân tích + bộ đếm
+trạng thái + tổng toàn công ty) và `danh_sach` 2 (đếm + lấy dòng). Đo thật
+2026-09-22: một round-trip tới pooler Tokyo mất 47 ms và một lượt hỏi thật ~260 ms.
+Nút thắt là **số lượt hỏi**, không phải sức tính — nên tối ưu đúng là gộp truy vấn,
+không phải materialized view. Có test đếm.
+
+Con số "~10 ms cho một khối" từng ghi ở đây là phép đo của `mart.khach_mat_hang`
+**lọc một khách** — ca có vị từ đẩy xuống được. Nó KHÔNG mô tả truy vấn của
+`tong_quan_danh_ba`, thứ tham chiếu `mart.khach_360` chín lần mà không lần nào có
+`customer_code` để đẩy xuống. Chi phí thật của khối đó **chưa đo trên CSDL đầy** —
+có mục KIỂM TAY riêng ở đặc tả đợt 4a §9, ngưỡng 500 ms.
+
+**Bất biến:** bộ đếm của dải chip trạng thái (`TongQuan.dem_trang_thai`) co theo
+**đúng những bộ lọc mà liên kết của chính chip đó mang theo** — `nhom`/`hang`/
+`tinh`/`sale` — và KHÔNG theo `loc`. Một bộ đếm lọc theo chính bộ lọc mà nó bật là
+bấm vào một mục xong các số khác về 0 hết; một bộ đếm bỏ qua bốn bộ lọc kia là con
+số nói dối về danh sách mà nó mở ra ("Tất cả (1.710)" bấm vào ra 216 khách).
+`tong_tat_ca` thì ngược lại — không lọc gì hết, vì liên kết của nó (`?tat_ca=1`) bỏ
+mọi bộ lọc.
+
+**Bất biến:** "khách đang rời đi" có **ba** chỗ hiển thị và chỉ **một** định nghĩa,
+`mart.khach_nhom_viec` nhóm `'im'`: nút "Im lặng ≥ 2× nhịp", cột "Cần gọi" của bảng
+tải nhân viên (`mart.tai_nhan_vien.so_khach_canh_bao`, migration `022` cho nó ĐỌC
+nhóm việc chứ không chép lại vị từ), và `can_xu_ly()` của `/can-xu-ly`. Có test canh
+cả ba trả cùng một tập khách.
 
 **Bất biến:** nhịp mua theo từng mã (`mart.nhip_mat_hang`) dùng **cùng công thức
 trung vị** với nhịp mua của khách (`mart.nhip_mua`). Một khái niệm một công thức;
@@ -110,6 +132,10 @@ Trang `/khach-hang` và `/can-xu-ly` mặc định chỉ hiện khách của ng�
 toán) thấy toàn bộ ngay từ đầu. Riêng `/khach-hang` còn nhận `?nv=<mã sale>` để
 chủ động xem danh bạ của MỘT người phụ trách khác — cùng nếp đợt 3: mặc định
 tiện dụng, không phải hàng rào, không kiểm quyền, và luôn còn liên kết bỏ lọc.
+`?nv=__moi_nguoi` (`KH.NV_MOI_NGUOI`) là mục "— mọi người phụ trách —" của ô lọc:
+một GIÁ TRỊ QUY ƯỚC, không phải chuỗi rỗng, vì rỗng nghĩa là "không chọn gì" và
+trang rơi về mặc định lọc theo người đăng nhập — tức ô chọn khoe "mọi người" trong
+khi danh sách vẫn bị lọc. Cùng lý lẽ với `KH.TINH_TRONG` của ô Tỉnh.
 
 Ba trang cũ — nạp (`nap`), sức khoẻ (`health`), độ phủ dữ liệu (`phu-du-lieu`)
 — nay chỉ còn 301 về `/kho-du-lieu`, không render nội dung gì nữa.

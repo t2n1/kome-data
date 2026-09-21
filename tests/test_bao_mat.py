@@ -8,6 +8,7 @@ khai**.
 import pytest
 from fastapi.testclient import TestClient
 
+from kome import khach_hang as KH
 from kome.web import bao_mat
 from kome.web.app import create_app
 
@@ -612,6 +613,41 @@ def test_bam_xem_tat_ca_thi_bo_loc(khach):
     r = c.get("/khach-hang?tat_ca=1")
     assert r.status_code == 200
     assert "Đang xem khách của" not in r.text
+
+
+def test_chon_moi_nguoi_phu_trach_thi_that_su_bo_loc(khach, conn, batch):
+    """[IMPORTANT] Mục đầu của ô lọc 担当者 phải THẬT SỰ bỏ lọc.
+
+    Trước vòng sửa này mục đó mang giá trị RỖNG, mà rỗng nghĩa là "không chọn
+    gì" -> trang rơi về mặc định của đợt 3 và lọc theo người ĐANG ĐĂNG NHẬP.
+    Kết quả: ô chọn khoe "— mọi người phụ trách —" trong khi danh sách vẫn
+    chỉ có khách của một người — đúng cái "ô điều khiển nói một đằng, dữ liệu
+    một nẻo" mà test của ô Tỉnh được viết ra để chặn. Và vì form lọc chỉ mang
+    `tat_ca` khi nó ĐÃ bật, trên bản Vercel nhân viên không có đường nào từ ô
+    đó ra xem toàn công ty.
+    """
+    from tests.test_khach_hang import HOM_NAY, _ho_so_khach, _mua
+
+    _ho_so_khach(conn, batch, "S0104", "Quan CUA MINH", salesperson_code="0104")
+    _ho_so_khach(conn, batch, "S0102", "Quan NGUOI KHAC", salesperson_code="0102")
+    for ma in ("S0104", "S0102"):
+        _mua(conn, batch, ma, HOM_NAY)
+
+    c = khach(sale="0104")
+    _vao(c)
+
+    mac_dinh = c.get("/khach-hang").text
+    assert "Quan NGUOI KHAC" not in mac_dinh, "mặc định đợt 3 đã hỏng"
+    # Ô chọn phải nói đúng cái đang xảy ra: đang lọc theo 0104 thì nó hiện
+    # tên 0104, KHÔNG hiện "— mọi người phụ trách —".
+    assert '<option value="__moi_nguoi" selected>' not in mac_dinh, \
+        "ô chọn khoe 'mọi người' trong khi danh sách đang bị lọc theo một người"
+
+    moi_nguoi = c.get(f"/khach-hang?nv={KH.NV_MOI_NGUOI}").text
+    assert "Quan NGUOI KHAC" in moi_nguoi and "Quan CUA MINH" in moi_nguoi, \
+        "chọn '— mọi người phụ trách —' mà danh sách vẫn bị lọc theo người đăng nhập"
+    assert "Đang xem khách của" not in moi_nguoi
+    assert '<option value="__moi_nguoi" selected>' in moi_nguoi
 
 
 def test_nguoi_khong_phu_trach_khach_nao_thay_toan_bo_ngay_tu_dau(khach):

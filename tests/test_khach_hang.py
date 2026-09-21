@@ -4,6 +4,7 @@ Trọng tâm: **trạng thái phải so với nhịp mua RIÊNG của từng kh�
 chung sẽ báo động nhầm ở khách mua thưa và im lặng ở khách mua dày — tức là bỏ
 sót đúng những khách đang rời đi nhanh nhất.
 """
+import inspect
 from datetime import date, timedelta
 
 import pandas as pd
@@ -236,8 +237,12 @@ def test_sap_xep_chi_nhan_cot_trong_danh_sach_trang(conn, batch):
 
 
 def test_dem_trang_thai_tinh_tren_TOAN_BO_khong_theo_bo_loc(conn, batch):
-    """Nếu bộ đếm chạy theo bộ lọc đang bật thì bấm vào một mục xong các con số
-    khác về 0 hết, và không ai tìm đường quay lại."""
+    """Nếu bộ đếm chạy theo bộ lọc TRẠNG THÁI đang bật thì bấm vào một mục
+    xong các con số khác về 0 hết, và không ai tìm đường quay lại.
+
+    Bộ đếm đã chuyển sang `tong_quan_danh_ba` (vòng sửa cuối đợt 4a) — nó
+    không nhận `loc` nữa, nên bất biến này giờ là bất biến CẤU TRÚC. Test vẫn
+    giữ để nói rõ vì sao nó không được nhận."""
     _ho_so_khach(conn, batch, "000000000001", "Khach deu")
     _ho_so_khach(conn, batch, "000000000002", "Khach roi bo")
     _mua_deu(conn, batch, "000000000001", nhip=7, so_lan=6)
@@ -245,7 +250,10 @@ def test_dem_trang_thai_tinh_tren_TOAN_BO_khong_theo_bo_loc(conn, batch):
 
     t = KH.danh_sach(conn, loc="da_roi_bo")
     assert t.tong == 1                                    # danh sách bị lọc
-    assert t.dem_trang_thai["binh_thuong"] == 1           # bộ đếm thì không
+    tq = KH.tong_quan_danh_ba(conn)
+    assert tq.dem_trang_thai["binh_thuong"] == 1          # bộ đếm thì không
+    assert "loc" not in inspect.signature(KH.tong_quan_danh_ba).parameters, \
+        "bộ đếm nhận `loc` là bấm một mục xong các con số khác về 0"
 
 
 def test_ho_so_360_day_du(conn, batch):
@@ -393,9 +401,9 @@ def test_bo_dem_trang_thai_di_theo_bo_loc_sale(conn, batch):
     neo có mặt hay không.
     """
     _hai_sale(conn, batch)
-    assert sum(KH.danh_sach(conn, sale="0104").dem_trang_thai.values()) == 2
+    assert sum(KH.tong_quan_danh_ba(conn, sale="0104").dem_trang_thai.values()) == 2
     t = KH.danh_sach(conn)
-    assert sum(t.dem_trang_thai.values()) == t.tong
+    assert sum(KH.tong_quan_danh_ba(conn).dem_trang_thai.values()) == t.tong
 
 
 def test_tong_tat_ca_luon_dem_toan_bo_du_dang_loc(conn, batch):
@@ -405,10 +413,19 @@ def test_tong_tat_ca_luon_dem_toan_bo_du_dang_loc(conn, batch):
     So với `danh_sach(conn).tong` (không lọc) thay vì một số cứng: khách neo
     của `_neo` (xem `_tru_neo`) làm tổng công ty không cố định bằng 3. Đây
     không phải tautology — nó khẳng định đúng hợp đồng của `tong_tat_ca`: bỏ
-    qua bộ lọc sale, nên sẽ đỏ ngay nếu ai đó lỡ cho nó chạy qua bộ lọc.
+    qua MỌI bộ lọc, nên sẽ đỏ ngay nếu ai đó lỡ cho nó chạy qua một cái.
+
+    Kiểm cả ba bộ lọc mới cùng lúc, không chỉ `sale`: `tong_tat_ca` nay nằm
+    trong UNION ALL của `tong_quan_danh_ba` cạnh `dem_trang_thai` — thứ CÓ
+    lọc theo chúng — nên nhánh của nó rất dễ bị "sửa cho nhất quán" nhầm.
+    Liên kết mang con số này (`?tat_ca=1`) bỏ hết bộ lọc, nên con số phải là
+    con số người ta thấy SAU KHI bấm.
     """
     _hai_sale(conn, batch)
-    assert KH.danh_sach(conn, sale="0104").tong_tat_ca == KH.danh_sach(conn).tong
+    tong = KH.danh_sach(conn).tong
+    assert KH.tong_quan_danh_ba(conn, sale="0104").tong_tat_ca == tong
+    assert KH.tong_quan_danh_ba(conn, sale="0104", nhom="im", hang="S",
+                                tinh="東京都").tong_tat_ca == tong
 
 
 def test_loc_sale_ket_hop_duoc_voi_tim_kiem_va_loc_trang_thai(conn, batch):
@@ -478,6 +495,58 @@ def test_tong_quan_danh_ba_loc_theo_sale(conn, batch):
     tq = KH.tong_quan_danh_ba(conn, sale="0104")
     assert tq.tong == 2                                   # chỉ K0104A, K0104B
     assert KH.tong_quan_danh_ba(conn).tong > tq.tong       # còn K0102C + khách neo
+
+
+def test_trang_danh_sach_chay_dung_BA_luot_hoi(conn, batch, monkeypatch):
+    """[IMPORTANT] `/khach-hang` = `tong_quan_danh_ba` (1) + `danh_sach` (2).
+
+    Trước vòng sửa cuối đợt 4a là 5: `danh_sach` chạy thêm một câu đếm theo
+    trạng thái và một câu đếm tổng công ty — hai câu mà `tong_quan_danh_ba`
+    vốn đã quét đúng bảng đó rồi. Ở đây mỗi lượt hỏi là ~47 ms mạng tới
+    Tokyo trước khi CSDL làm gì (§3.1), nên hai con số đó là ~94 ms mỗi lần
+    mở trang, trả cho thứ đã nằm sẵn trong một câu lệnh khác.
+    """
+    _ho_so_khach(conn, batch, "BA01", "Quán ba lượt")
+    _mua(conn, batch, "BA01", HOM_NAY)
+
+    dem = {"n": 0}
+    that = conn.execute
+
+    def demo(*a, **k):
+        dem["n"] += 1
+        return that(*a, **k)
+
+    monkeypatch.setattr(conn, "execute", demo)
+    KH.tong_quan_danh_ba(conn)
+    KH.danh_sach(conn)
+    assert dem["n"] == 3, f"trang danh sách chạy {dem['n']} lượt hỏi, phải đúng 3"
+
+
+def test_bo_dem_trang_thai_co_theo_ba_bo_loc_moi(conn, batch):
+    """[IMPORTANT] Chip trạng thái mang theo `nhom`/`hang`/`tinh` trong href
+    (biến `giu` của template). Bộ đếm không co theo chúng thì con số trên chip
+    nói dối về chính danh sách mà nó mở ra: đang lọc nhóm việc `im` mà chip
+    hiện "Tất cả (toàn bộ danh bạ)", bấm vào ra ít hơn hẳn.
+
+    Đây là lý lẽ MỚI, thay lý lẽ cũ ("bộ đếm chỉ theo sale") — lý lẽ cũ viết
+    khi trang có MỘT bộ lọc, giờ có năm.
+    """
+    for ma, ngung in (("D0001", 40), ("D0002", 2)):     # D0001 im, D0002 thì không
+        _ho_so_khach(conn, batch, ma, f"Quán {ma}")
+        for i in range(6):
+            _mua(conn, batch, ma, HOM_NAY - timedelta(days=ngung + i * 7))
+    _neo(conn, batch)
+
+    tq_tat = KH.tong_quan_danh_ba(conn)
+    tq_im = KH.tong_quan_danh_ba(conn, nhom="im")
+    assert sum(tq_im.dem_trang_thai.values()) < sum(tq_tat.dem_trang_thai.values()), \
+        "bộ đếm không co theo bộ lọc nhóm việc"
+    # Và nó phải khớp CHÍNH XÁC số dòng danh sách mà chip "Tất cả" mở ra.
+    assert sum(tq_im.dem_trang_thai.values()) == KH.danh_sach(conn, nhom="im").tong
+    # Tỉnh cũng vậy: "(không rõ)" là khách chưa có hồ sơ 得意先全情報.
+    tq_tinh = KH.tong_quan_danh_ba(conn, tinh=KH.TINH_TRONG)
+    assert sum(tq_tinh.dem_trang_thai.values()) == \
+        KH.danh_sach(conn, tinh=KH.TINH_TRONG).tong
 
 
 def test_tong_quan_khong_ro_tinh_van_duoc_dem(conn, batch):
@@ -552,7 +621,12 @@ def test_ba_bo_loc_moi_ket_hop_duoc_voi_nhau_va_voi_sale(conn, batch):
 def test_ho_so_khong_qua_8_truy_van(conn, batch, monkeypatch):
     """[IMPORTANT] Mỗi vòng hỏi qua pooler Tokyo mất ~47 ms chỉ riêng mạng.
     Trang hồ sơ chậm dần từng đợt là cách nó chết mà không ai thấy ngày nào
-    nó chết."""
+    nó chết.
+
+    Ngưỡng giữ nguyên 8 (bất biến của đặc tả §6.2) dù hàm nay chỉ chạy 7:
+    chỗ trống đó CÓ CHỦ Ý — vòng sửa cuối đợt 4a gộp hai câu SELECT trùng
+    mệnh đề lọc trên `mart.khach_360` để khối tiếp theo thêm được mà không
+    phải phá bất biến. Siết xuống 7 là lấy lại đúng chỗ trống vừa tạo ra."""
     _ho_so_khach(conn, batch, "Q0001", "Quán đếm")
     _mua(conn, batch, "Q0001", HOM_NAY - timedelta(days=3))
     _neo(conn, batch)
