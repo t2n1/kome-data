@@ -72,3 +72,38 @@ def test_ban_chi_doc_an_khoi_hoan_tac(conn, test_db_url, monkeypatch):
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/kho-du-lieu").text
     assert "/undo/" not in html
+
+
+def test_hoan_tac_master_upsert_hien_canh_bao_se_trong(conn, test_db_url):
+    """[IMPORTANT] Bốn loại master (shohin/shiiresaki/chokusousaki/tanka) nạp
+    bằng upsert: mỗi lần nạp dán batch_id MỚI lên mọi dòng, nên hoàn tác
+    (`DELETE WHERE batch_id`) quét sạch CẢ BẢNG chứ không lùi về lô trước —
+    khác hẳn ba loại fact/SCD2 còn lại. Sự cố thật đã xảy ra vì thiếu cảnh báo
+    này: hoàn tác một lô shiiresaki 49 dòng, tưởng lùi về 48, thực tế còn 0."""
+    conn.execute("DELETE FROM meta.ingest_batch")
+    conn.execute(
+        """INSERT INTO meta.ingest_batch
+             (spec_name, source_file, digest, archived_to, row_count,
+              total_amount, data_date)
+           VALUES ('shiiresaki', '仕入先_20260908.xlsx', 'dg2', 'test', 49, 0, '2026-09-08')""")
+    conn.commit()
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/kho-du-lieu").text
+    assert "sẽ trống hoàn toàn" in html
+    assert "không lùi về lần nạp trước" in html
+
+
+def test_hoan_tac_fact_khong_hien_canh_bao_se_trong(conn, test_db_url):
+    """Ba loại fact/SCD2 (uriage/meisai/zaiko/tokuisaki) lùi đúng một lô khi
+    hoàn tác. Dán cảnh báo "sẽ trống" lên cả loại không cần sẽ dạy người đọc
+    coi thường cảnh báo — quan trọng ngang test trên."""
+    conn.execute("DELETE FROM meta.ingest_batch")
+    conn.execute(
+        """INSERT INTO meta.ingest_batch
+             (spec_name, source_file, digest, archived_to, row_count,
+              total_amount, data_date)
+           VALUES ('uriage', '売上伝票データ_20260916.xlsx', 'dg3', 'test', 100, 5000, '2026-09-16')""")
+    conn.commit()
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/kho-du-lieu").text
+    assert "sẽ trống hoàn toàn" not in html

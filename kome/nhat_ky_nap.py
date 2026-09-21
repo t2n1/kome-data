@@ -54,6 +54,17 @@ def trang_thai_nap(conn) -> list[dict]:
     ]
 
 
+# Bốn loại master nạp bằng upsert: mỗi lần nạp dán batch_id MỚI lên mọi dòng,
+# kể cả dòng đến từ lô trước. Nên `DELETE WHERE batch_id` của hoàn tác quét
+# sạch cả bảng chứ không lùi về lô trước. Ba loại còn lại (fact_sales_line,
+# fact_inventory_daily, dim_customer SCD2) lùi đúng một lô.
+#
+# Sự cố thật (2026-09-21): hoàn tác một lô shiiresaki (仕入先) 49 dòng, tưởng
+# bảng lùi về lô trước còn 48 dòng — thực tế core.dim_supplier còn 0 dòng.
+# Xem kome/pipeline.py::undo_batch và kome/loaders/master.py::make_loader.
+_UPSERT_QUET_SACH = {"shohin", "shiiresaki", "chokusousaki", "tanka"}
+
+
 @dataclass(frozen=True)
 class LoNap:
     batch_id: int
@@ -64,6 +75,7 @@ class LoNap:
     so_dong: int
     tong_tien: int
     co_tien: bool
+    xoa_sach_bang: bool
 
 
 def lo_nap_gan_nhat(conn, gioi_han: int = 10) -> list[LoNap]:
@@ -85,6 +97,7 @@ def lo_nap_gan_nhat(conn, gioi_han: int = 10) -> list[LoNap]:
     return [
         LoNap(batch_id=r[0], loai=_ten_loai(r[1]), ten_file=r[2],
               ngay_du_lieu=r[3], nap_luc=r[4], so_dong=r[5], tong_tien=r[6],
-              co_tien=(SPECS[r[1]].total_column is not None) if r[1] in SPECS else False)
+              co_tien=(SPECS[r[1]].total_column is not None) if r[1] in SPECS else False,
+              xoa_sach_bang=(r[1] in _UPSERT_QUET_SACH))
         for r in rows
     ]

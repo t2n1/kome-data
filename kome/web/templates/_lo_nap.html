@@ -10,7 +10,18 @@
 
    Nút mang đúng số lô để người bấm đối chiếu với dòng mình định xoá.
 
+   l.xoa_sach_bang (kome/nhat_ky_nap.py): bốn loại master (shohin/shiiresaki/
+   chokusousaki/tanka) nạp bằng upsert — mỗi lần nạp dán batch_id MỚI lên mọi
+   dòng, kể cả dòng đến từ lô trước. Nên DELETE WHERE batch_id của hoàn tác
+   quét sạch CẢ BẢNG chứ không lùi về lô trước, khác hẳn ba loại fact/SCD2.
+   Sự cố thật (2026-09-21): hoàn tác một lô shiiresaki 49 dòng, tưởng lùi về
+   48, thực tế core.dim_supplier còn 0. Câu xác nhận PHẢI nói rõ hậu quả này,
+   không chỉ số dòng — tên bảng lấy tiếng Việt cho người vận hành hiểu, không
+   in tên bảng SQL.
+
    Khối này KHÔNG render ở bản chỉ-đọc — xem kho_du_lieu.html. #}
+{% set TEN_BANG_VI = {"商品データ": "sản phẩm", "仕入先": "nhà cung cấp",
+                       "直送先": "điểm giao thẳng", "取引単価データ": "bảng giá"} %}
 <section id="lo-nap">
 <h2>Lô nạp gần nhất</h2>
 {% if not lo %}
@@ -32,7 +43,14 @@
       <details class="hoan-tac">
         <summary>Hoàn tác</summary>
         <p>Xoá <strong>{{ "{:,}".format(l.so_dong) }} dòng</strong> đã nạp từ
-           <strong>{{ l.ten_file }}</strong>. <strong>Không thể hoàn lại.</strong></p>
+           <strong>{{ l.ten_file }}</strong>.
+           {% if l.xoa_sach_bang %}
+           <br>⚠️ Đây là file master: bảng
+           <strong>{{ TEN_BANG_VI.get(l.loai, l.loai) }} sẽ trống hoàn toàn</strong>,
+           không lùi về lần nạp trước. Muốn khôi phục phải nạp lại một file
+           {{ l.loai }}.
+           {% endif %}
+           <strong>Không thể hoàn lại.</strong></p>
         <form method="post" action="/undo/{{ l.batch_id }}">
           <button type="submit">Xoá lô {{ l.batch_id }}</button>
         </form>
