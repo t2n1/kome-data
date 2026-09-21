@@ -174,6 +174,34 @@ def test_mat_khau_khong_bao_gio_hien_tren_trang(khach):
         assert MK not in r.text
 
 
+def test_static_khong_bi_chan_boi_cong_dang_nhap(khach):
+    """[CRITICAL] Task chuyển CSS/font ra /static (nhánh giao diện) khiến
+    /dang-nhap PHỤ THUỘC vào một tài nguyên mà chính cổng đăng nhập chặn.
+
+    Trước nhánh giao diện, CSS nằm inline trong _chung.html nên trang đăng
+    nhập tự mang theo kiểu dáng. Từ khi CSS/font chuyển ra kome/web/static/,
+    middleware `chan_cua` (chỉ miễn trừ đúng path "/dang-nhap") đá
+    GET /static/kome.css và mọi file font về 303 /dang-nhap — trên bản
+    Vercel (nơi KOME_MAT_KHAU LUÔN bắt buộc), màn hình ĐẦU TIÊN người dùng
+    thấy là một trang trơ trụi, không CSS không font.
+
+    Bộ test cũ không bắt được vì hầu hết chạy với khach(mat_khau=None) —
+    tức không có middleware nào cả. Test này phải dựng app CÓ mật khẩu."""
+    c = khach()
+    r = c.get("/static/kome.css")
+    assert r.status_code == 200, "CSS bị cổng đăng nhập chặn — /dang-nhap sẽ trơ trụi"
+    assert "text/css" in r.headers["content-type"]
+
+    r = c.get("/static/fonts/IBMPlexSans-Regular.woff2")
+    assert r.status_code == 200, "font bị cổng đăng nhập chặn — /dang-nhap mất chữ Việt"
+
+    # Cổng vẫn phải đóng với TRANG THẬT — miễn trừ /static không được nới
+    # rộng ra thành miễn trừ mọi thứ.
+    r = c.get("/")
+    assert r.status_code == 303
+    assert r.headers["location"] == "/dang-nhap"
+
+
 # ---- Chế độ chỉ-đọc ----------------------------------------------------
 
 def test_tren_vercel_khong_nap_va_khong_hoan_tac_duoc(khach):

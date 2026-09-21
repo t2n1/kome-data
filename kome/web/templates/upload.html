@@ -5,7 +5,7 @@
 <style>
  .drop{border:2px dashed var(--vien);border-radius:12px;padding:3rem;text-align:center;
        background:var(--nen-phu)}
- .ok{color:var(--ok-chu)} .warn{color:var(--canh-chu)} .err{color:var(--loi-chu)}
+ .kq-ok{color:var(--ok-chu)} .kq-canh{color:var(--canh-chu)} .kq-loi{color:var(--loi-chu)}
  li{margin:.4rem 0}
  button{font:inherit;padding:.4rem 1rem;border-radius:8px;border:1px solid var(--vien);
         background:var(--nen-phu);color:var(--chu);cursor:pointer}
@@ -19,10 +19,11 @@
 </form>
 {% if results %}<h2>Kết quả</h2><ul>
 {% for r in results %}<li>
-  {% if r.skipped %}<span class="ok">⏭️ {{ r.spec_name }} — file này đã nạp rồi, bỏ qua</span>
-  {% elif r.ok %}<span class="ok">✅ {{ r.spec_name }} — {{ "{:,}".format(r.row_count) }} dòng · ¥{{ "{:,}".format(r.total) }}</span>
-  {% else %}<span class="err">❌ {{ r.spec_name or "?" }} — KHÔNG nạp</span>{% endif %}
-  {% for b in r.blockers %}<div class="err">Cổng {{ b.gate }}: {{ b.message }}</div>{% endfor %}
-  {% for w in r.warnings %}<div class="warn">⚠️ Cổng {{ w.gate }}: {{ w.message }}</div>{% endfor %}
+  {% if r.skipped %}<span class="kq-ok">⏭️ {{ r.spec_name }} — file này đã nạp rồi, bỏ qua</span>
+  {% elif r.ok %}<span class="kq-ok">✅ {{ r.spec_name }} — {{ "{:,}".format(r.row_count) }} dòng · ¥{{ "{:,}".format(r.total) }}</span>
+  {% else %}<span class="kq-loi">❌ {{ r.spec_name or "?" }} — KHÔNG nạp</span>{% endif %}
+  {% for b in r.blockers %}<div class="kq-loi">Cổng {{ b.gate }}: {{ b.message }}</div>{% endfor %}
+  {% for w in r.warnings %}<div class="kq-canh">⚠️ Cổng {{ w.gate }}: {{ w.message }}</div>{% endfor %}
 </li>{% endfor %}</ul>{% endif %}
 </html>
+</main>

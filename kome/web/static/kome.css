@@ -1,0 +1,180 @@
+/* Nguồn DUY NHẤT của mọi màu trong app.
+
+   Vì sao phải khai tường minh: trước đây các trang không đặt `color-scheme`
+   cũng không đặt màu nền/màu chữ. Máy nào để giao diện TỐI thì trình duyệt
+   vẽ nền tối còn chữ vẫn là màu sẫm mặc định của trang -> chữ sẫm trên nền
+   sẫm, gần như không đọc được. Nguyên tắc nền tảng của hệ thống này là "sai
+   phải THẤY NGAY trên màn hình"; một trang không đọc được thì không cảnh
+   báo được gì cả.
+
+   Bất biến: mọi biến khai ở :root PHẢI có bản tối tương ứng trong khối
+   @media bên dưới. Có test canh — tests/test_giao_dien.py. */
+
+/* Font tự host. Không gọi Google Fonts: một CDN ngoài là một thứ nữa có
+   thể hỏng mà không ai trong công ty sửa được (R1). Có test canh.
+
+   Chữ Nhật KHÔNG tự host — xem ngăn xếp --font-ui bên dưới. Noto Sans JP
+   phủ toàn bộ CJK, tự host đúng cách là hơn 200 file mảnh unicode-range.
+
+   Dùng file woff2 ĐẦY ĐỦ (không phải bản subset -Latin1): bản -Latin1
+   không có glyph tiếng Việt, mà toàn bộ giao diện này là tiếng Việt — xem
+   test_du_bay_file_font_va_khong_rong.
+
+   Font là IBM Plex (SIL Open Font License 1.1) — nguyên văn giấy phép ở
+   static/fonts/OFL.txt, đi kèm bắt buộc khi phân phối lại theo OFL. */
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;
+  font-display:swap;src:url("/static/fonts/IBMPlexSans-Regular.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:500;
+  font-display:swap;src:url("/static/fonts/IBMPlexSans-Medium.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:600;
+  font-display:swap;src:url("/static/fonts/IBMPlexSans-SemiBold.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:700;
+  font-display:swap;src:url("/static/fonts/IBMPlexSans-Bold.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;
+  font-display:swap;src:url("/static/fonts/IBMPlexMono-Regular.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;
+  font-display:swap;src:url("/static/fonts/IBMPlexMono-Medium.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:600;
+  font-display:swap;src:url("/static/fonts/IBMPlexMono-SemiBold.woff2") format("woff2")}
+
+/* Ngăn xếp: chữ Latin đi qua IBM Plex, chữ Nhật rơi xuống font hệ thống
+   (Yu Gothic UI trên Windows, Hiragino Sans trên macOS). Trình duyệt tự
+   chọn theo từng ký tự, nên một tên 得意先 lẫn chữ Latin vẫn đúng cả hai.
+   Biến font KHÔNG đổi theo chế độ sáng/tối -> đặt ở :root RIÊNG, trước
+   khối màu, để không lọt vào test parity sáng/tối (soi biến MÀU). */
+ :root{
+   --font-ui:"IBM Plex Sans","Yu Gothic UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+   --font-so:"IBM Plex Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
+ }
+
+ :root{
+   color-scheme: light dark;
+   /* Nền: trang là giấy ấm, thẻ/bảng mới là trắng. Hệ cũ dùng chung một
+      màu cho cả hai — thiết kế phân tầng bằng chính sự chênh lệch này,
+      vì nó không dùng đổ bóng. */
+   --nen:#FBF9F5; --nen-the:#FFFFFF; --nen-phu:#F6F3EC;
+   --vien:#E6E2D9; --vien-phu:#F0EDE6; --vien-dam:#D8D3C8;
+   --chu:#1A1714; --chu-thuong:#474139; --chu-nhat:#6E6A63; --chu-mo:#8E8A82;
+   --lien-ket:#8A5E06;
+   /* Đỏ công ty: CHỈ dành cho hành động chính và trạng thái được chọn.
+      Không dùng để tô cho đẹp. --do là nét/nền, --do-chu là chữ (đỏ đậm
+      hơn để đủ tương phản trên nền sáng). */
+   --do:#D62C27; --do-chu:#B4231C; --do-nen:#FDEDEC;
+   --ok-nen:#E6F2EB;  --ok-vien:#1E7A4D;  --ok-chu:#14603E;
+   --loi-nen:#FDEDEC; --loi-vien:#D62C27; --loi-chu:#B4231C;
+   --canh-nen:#FFF9E8;--canh-vien:#E6D08A;--canh-chu:#8A5E06;
+   --ngoai-nen:#F0EDE6;--ngoai-chu:#8E8A82;
+ }
+ @media (prefers-color-scheme: dark){
+   /* Từng cặp lấy từ bảng MAP trong kome-theme.js của gói thiết kế —
+      không tự pha. #D62C27 không có trong bảng đó: thiết kế giữ nguyên
+      đỏ công ty ở cả hai chế độ. */
+   :root{
+     --nen:#17140F; --nen-the:#211D17; --nen-phu:#262019;
+     --vien:#342E26; --vien-phu:#2B251D; --vien-dam:#4A4239;
+     --chu:#F4EFE6; --chu-thuong:#D6CFC2; --chu-nhat:#A79F92; --chu-mo:#978F83;
+     --lien-ket:#E2A72E;
+     --do:#D62C27; --do-chu:#F0776F; --do-nen:#3A1E1C;
+     --ok-nen:#16301F;  --ok-vien:#3FA06C;  --ok-chu:#5FC492;
+     --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
+     --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
+     --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
+   }
+ }
+ html{background:var(--nen)}
+ body{font:16px/1.6 var(--font-ui);background:var(--nen);color:var(--chu);
+      max-width:760px;margin:0 auto;padding:1rem}
+ a{color:var(--lien-ket)}
+ h1,h2,h3{color:var(--chu)}
+ table{border-collapse:collapse;width:100%}
+ td,th{border-bottom:1px solid var(--vien);padding:.5rem;text-align:left}
+ code{background:var(--nen-phu);color:var(--chu);padding:.5rem;display:block;
+      overflow-x:auto;margin-top:.5rem;white-space:pre-wrap;font-family:var(--font-so)}
+ .missing{color:var(--loi-chu);background:var(--loi-nen);font-weight:600;
+          padding:0 .3rem;border-radius:4px}
+ .khong-ap-dung{color:var(--chu-nhat)}
+ .backup-bad,.loi-hop{background:var(--loi-nen);border:1px solid var(--loi-vien);
+   color:var(--loi-chu);padding:.75rem 1rem;border-radius:12px;margin-bottom:1rem}
+ .backup-ok{background:var(--ok-nen);border:1px solid var(--ok-vien);color:var(--ok-chu);
+   padding:.5rem 1rem;border-radius:12px;margin-bottom:1rem}
+ .ngay-thieu{background:var(--canh-nen);border:1px solid var(--canh-vien);
+   color:var(--canh-chu);padding:.75rem 1rem;border-radius:12px;margin-bottom:1rem}
+ .ky{background:var(--nen-phu);border:1px solid var(--vien);padding:.5rem 1rem;
+   border-radius:12px;margin-bottom:1rem}
+
+ /* ---- Thành phần dùng lại ---------------------------------------- */
+ /* Nhãn nhóm nhỏ dùng lại ở nhiều nơi ngoài sidebar — ví dụ "Trang X / Y"
+    trong thanh phân trang .loc bên dưới. Sidebar có nhãn nhóm RIÊNG, kiểu
+    khác (xem `.dieu-huong .nhom` trong khối "Khung trang"), nên khối này
+    chỉ còn phục vụ chỗ dùng ngoài sidebar. */
+ .nhom{color:var(--chu-nhat);font-size:.8rem;align-self:center;
+   text-transform:uppercase;letter-spacing:.06em;margin-right:.15rem}
+ .the-so{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}
+ .the-so > div{flex:1 1 9rem;background:var(--nen-the);border:1px solid var(--vien);
+   border-radius:11px;padding:.75rem .9rem}
+ .the-so .nhan{color:var(--chu-nhat);font-size:.8rem}
+ .the-so .gia{font-size:1.45rem;font-weight:600;line-height:1.25;margin-top:.15rem;
+   font-family:var(--font-so);font-variant-numeric:tabular-nums}
+ .bang-cuon{overflow-x:auto}
+ td.so,th.so{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;
+   font-family:var(--font-so)}
+ .ghi-chu{color:var(--chu-nhat);font-size:.85rem;margin:.25rem 0 .75rem}
+ /* Viên trạng thái: đọc bằng MÀU + CHỮ, không chỉ bằng màu — khoảng 1 trong 12
+    nam giới không phân biệt được đỏ với xanh lá. */
+ .vien{display:inline-block;padding:.1rem .55rem;border-radius:99px;
+   font-size:.8rem;font-weight:600;white-space:nowrap;border:1px solid}
+ .vien.ok{background:var(--ok-nen);border-color:var(--ok-vien);color:var(--ok-chu)}
+ .vien.canh{background:var(--canh-nen);border-color:var(--canh-vien);color:var(--canh-chu)}
+ .vien.loi{background:var(--loi-nen);border-color:var(--loi-vien);color:var(--loi-chu)}
+ .vien.nhat{background:var(--ngoai-nen);border-color:var(--vien);color:var(--ngoai-chu)}
+ .loc{display:flex;flex-wrap:wrap;gap:.4rem;margin:.75rem 0}
+ .loc a{padding:.3rem .8rem;border:1px solid var(--vien);border-radius:99px;
+   text-decoration:none;font-size:.9rem}
+ .loc a.dang-xem{background:var(--nen-the);border-color:var(--do);
+   color:var(--do-chu);font-weight:600}
+ .o-tim{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 0}
+ .o-tim input[type=search]{flex:1 1 16rem;font:inherit;padding:.45rem .7rem;
+   border-radius:9px;border:1px solid var(--vien);background:var(--nen);color:var(--chu)}
+ .o-tim button{font:inherit;padding:.45rem 1rem;border-radius:9px;
+   border:1px solid var(--vien);background:var(--nen-phu);color:var(--chu);cursor:pointer}
+ .trong{color:var(--chu-nhat);padding:1.5rem;text-align:center;
+   border:1px dashed var(--vien);border-radius:12px}
+
+ /* ---- Khung trang: sidebar trái cố định + vùng nội dung ---------- */
+ body{display:flex;align-items:flex-start;max-width:none;margin:0;padding:0}
+ .thanh-ben{position:sticky;top:0;flex-shrink:0;width:196px;height:100vh;
+   box-sizing:border-box;display:flex;flex-direction:column;
+   background:var(--nen-the);border-right:1px solid var(--vien);
+   padding:1rem .7rem;overflow-y:auto}
+ .noi-dung{flex:1;min-width:0;max-width:1400px;padding:1.1rem;padding-bottom:3rem}
+ .hieu{display:flex;align-items:center;gap:.5rem;font-weight:700;letter-spacing:.08em;
+   font-size:.84rem;text-decoration:none;color:var(--chu);padding:0 .3rem .8rem}
+ .dieu-huong{display:flex;flex-direction:column;gap:.12rem}
+ /* Nhãn nhóm của sidebar — riêng với `.nhom` dùng lại ở nơi khác (khối
+    "Thành phần dùng lại" phía trên), nên scope trong `.dieu-huong` để đổi
+    kiểu một bên không kéo theo bên kia. */
+ .dieu-huong .nhom{margin:.9rem 0 .25rem;padding:0 .55rem;font-size:.68rem;font-weight:600;
+   letter-spacing:.1em;color:var(--chu-nhat);align-self:stretch}
+ .dieu-huong .nhom:first-child{margin-top:0}
+ .dieu-huong a{padding:.42rem .55rem;border-radius:8px;font-size:.85rem;
+   text-decoration:none;color:var(--chu-thuong)}
+ .dieu-huong a:hover{background:var(--nen-phu)}
+ /* Mục đang mở: nền và chữ lấy từ kome-nav.js:146-147 của gói thiết kế
+    (KHÔNG theo README của gói — README ghi #FFF4D6 kèm thanh đỏ bên trái,
+    lệch với chính prototype của nó). */
+ .dieu-huong a.dang-xem{background:var(--do-nen);color:var(--do-chu);font-weight:600}
+ .thoat{margin-top:auto;border-top:1px solid var(--vien);padding-top:.7rem}
+ .thoat button{font:inherit;width:100%;text-align:left;padding:.4rem .55rem;
+   border-radius:8px;border:0;background:transparent;color:var(--chu-nhat);cursor:pointer}
+ .thoat button:hover{background:var(--nen-phu);color:var(--chu)}
+
+ /* Màn hẹp: sidebar nằm ngang trên đầu thay vì chiếm 196px của 375px. */
+ @media (max-width:720px){
+   body{flex-direction:column}
+   .thanh-ben{position:static;width:auto;height:auto;flex-direction:row;flex-wrap:wrap;
+     align-items:center;gap:.25rem;border-right:0;border-bottom:1px solid var(--vien)}
+   .dieu-huong{flex-direction:row;flex-wrap:wrap}
+   .dieu-huong .nhom{display:none}
+   .thoat{margin-top:0;margin-left:auto;border-top:0;padding-top:0}
+   .noi-dung{max-width:none;width:100%;box-sizing:border-box}
+ }

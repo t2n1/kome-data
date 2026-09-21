@@ -3,10 +3,14 @@
      đều quay về đây, và một thanh menu bấm đâu cũng không đi đâu làm người
      dùng tưởng trang hỏng. -->
 <!doctype html><html lang="vi"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KOME — đăng nhập</title>
 {% include "_chung.html" %}
 <style>
+ /* Trang này không include _nav.html nên không có <aside>/<main> — vẫn ăn
+    `body{display:flex;padding:0}` của khung sidebar trong kome.css. Không
+    có lề thì ở bề rộng <=384px (24rem của .hop) hộp đăng nhập chạm mép màn
+    hình. Đây là trang ĐẦU TIÊN mọi người dùng bản Vercel nhìn thấy. */
+ body{padding:0 1rem;box-sizing:border-box}
  .hop{max-width:24rem;margin:3rem auto;border:1px solid var(--vien);border-radius:12px;
       padding:1.5rem;background:var(--nen-phu)}
  h1{font-size:1.3rem;margin:0 0 1rem}

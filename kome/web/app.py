@@ -4,6 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from kome.config import SPECS
 from kome.bao_cao import tinh_bao_cao, ve_bieu_do
@@ -98,6 +99,13 @@ def _ky_du_lieu(conn) -> dict:
 def create_app(db_url: str | None = None) -> FastAPI:
     """db_url=None => lấy DATABASE_URL. Test LUÔN truyền DATABASE_URL_TEST."""
     app = FastAPI(title="KOME — dữ liệu")
+    # Phục vụ CSS và font từ đĩa. Dùng StaticFiles có sẵn trong FastAPI —
+    # KHÔNG thêm gói nào vào requirements.txt (bản Vercel cố ý mỏng).
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(Path(__file__).parent / "static")),
+        name="static",
+    )
     archive_dir = Path(os.environ.get("ARCHIVE_DIR", "./raw_archive"))
     open_conn = lambda: connect(db_url)
     chi_doc = _chi_doc()
@@ -138,8 +146,23 @@ def create_app(db_url: str | None = None) -> FastAPI:
     if mk:
         @app.middleware("http")
         async def chan_cua(request: Request, call_next):
-            if request.url.path == "/dang-nhap" or bao_mat.ve_hop_le(
-                    request.cookies.get(bao_mat.TEN_COOKIE), mk):
+            # Miễn trừ /static/ CÓ CHỦ Ý — đây là một lỗ thủng trong cổng
+            # bảo mật, không phải sót. /static/ chỉ chứa kome.css và font:
+            # tài sản thiết kế thuần tuý, không một byte dữ liệu kinh doanh
+            # nào (doanh thu, khách hàng, giá vốn...) đi qua đường này, nên
+            # miễn trừ không mở lộ gì. Trước khi CSS được tách ra thư mục
+            # riêng (nhánh giao diện, Task 1), nó nằm inline trong
+            # _chung.html nên /dang-nhap tự mang theo kiểu dáng và không
+            # cần miễn trừ này; từ khi CSS/font chuyển ra /static/, thiếu
+            # dòng này thì CHÍNH trang đăng nhập — màn hình ĐẦU TIÊN của
+            # bản Vercel, nơi mật khẩu LUÔN bắt buộc — bị 303 mất cả
+            # CSS lẫn font, hiện trơ trụi trước khi ai kịp đăng nhập.
+            # Có test canh: tests/test_bao_mat.py::
+            # test_static_khong_bi_chan_boi_cong_dang_nhap.
+            if (request.url.path == "/dang-nhap"
+                    or request.url.path.startswith("/static/")
+                    or bao_mat.ve_hop_le(
+                        request.cookies.get(bao_mat.TEN_COOKIE), mk)):
                 return await call_next(request)
             tiep = request.url.path
             if request.url.query:

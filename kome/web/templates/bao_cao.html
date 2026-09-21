@@ -3,20 +3,20 @@
      thư viện JavaScript nào. Trang phải chạy được cả trên Vercel (CSP chặn
      script ngoài) lẫn ở máy không có mạng. -->
 <!doctype html><html lang="vi"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KOME — báo cáo</title>
 {% include "_chung.html" %}
 <style>
  .so-lon{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}
- .the{flex:1 1 10rem;background:var(--nen-phu);border:1px solid var(--vien);
-      border-radius:10px;padding:.75rem 1rem}
+ .the{flex:1 1 10rem;background:var(--nen-the);border:1px solid var(--vien);
+      border-radius:11px;padding:.75rem 1rem}
  .the .nhan{color:var(--chu-nhat);font-size:.8rem}
- .the .gia{font-size:1.5rem;font-weight:700;line-height:1.25;margin-top:.15rem}
+ .the .gia{font-size:1.45rem;font-weight:600;line-height:1.25;margin-top:.15rem;
+      font-family:var(--font-so);font-variant-numeric:tabular-nums}
  .chon-ky{display:flex;flex-wrap:wrap;gap:.4rem;margin:.5rem 0 1rem}
  .chon-ky a{padding:.3rem .8rem;border:1px solid var(--vien);border-radius:999px;
       text-decoration:none;font-size:.9rem}
- .chon-ky a.dang-xem{background:var(--chot-nen);border-color:var(--chot-vien);
-      color:var(--chot-chu);font-weight:600}
+ .chon-ky a.dang-xem{background:var(--nen-the);border-color:var(--do);
+      color:var(--do-chu);font-weight:600}
  .khung-bd{overflow-x:auto;border:1px solid var(--vien);border-radius:10px;
       padding:.75rem;background:var(--nen-phu)}
  .chu-thich{display:flex;flex-wrap:wrap;gap:1rem;font-size:.85rem;
@@ -72,7 +72,7 @@ Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
      role="img" aria-label="Doanh thu và tỷ suất lãi gộp theo tháng">
   {% for c in bd.cot %}
   <rect x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}" rx="2"
-        fill="{% if c.o.la_thang_chot %}var(--chot-vien){% else %}var(--lien-ket){% endif %}"
+        fill="{% if c.o.la_thang_chot %}var(--do){% else %}var(--lien-ket){% endif %}"
         opacity=".72"><title>{{ c.o.thang }}: ¥{{ "{:,}".format(c.o.doanh_thu) }}</title></rect>
   <text x="{{ c.x + c.w/2 }}" y="{{ bd.cao - 20 }}" font-size="10" text-anchor="middle"
         fill="var(--chu-nhat)">{{ c.o.thang[5:] }}</text>
@@ -81,17 +81,17 @@ Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
         fill="var(--chu-nhat)">{{ c.o.thang[:4] }}</text>
   {% endif %}
   {% endfor %}
-  <polyline points="{{ bd.duong }}" fill="none" stroke="var(--loi-vien)" stroke-width="2"/>
+  <polyline points="{{ bd.duong }}" fill="none" stroke="var(--ok-vien)" stroke-width="2"/>
   {% for x, y, o in bd.diem %}
-  <circle cx="{{ x }}" cy="{{ y }}" r="3.5" fill="var(--loi-vien)">
+  <circle cx="{{ x }}" cy="{{ y }}" r="3.5" fill="var(--ok-vien)">
     <title>{{ o.thang }}: tỷ suất {{ "%.1f"|format(o.ty_suat*100) }}%</title></circle>
   {% endfor %}
 </svg>
 </div>
 <div class="chu-thich">
   <span><i class="mau" style="background:var(--lien-ket);opacity:.72"></i> Doanh thu thuần (cột)</span>
-  <span><i class="mau" style="background:var(--chot-vien);opacity:.72"></i> Tháng 7 — chốt kỳ</span>
-  <span><i class="mau" style="background:var(--loi-vien)"></i> Tỷ suất lãi gộp (đường)</span>
+  <span><i class="mau" style="background:var(--do);opacity:.72"></i> Tháng 7 — chốt kỳ</span>
+  <span><i class="mau" style="background:var(--ok-vien)"></i> Tỷ suất lãi gộp (đường)</span>
   <span>Trục tỷ suất vẽ từ {{ "%.0f"|format(bd.ts_lo*100) }}% đến {{ "%.0f"|format(bd.ts_hi*100) }}%,
         không từ 0% — nếu từ 0 thì đường gần như phẳng và giấu mất chỗ cần nhìn.</span>
 </div>
@@ -168,3 +168,4 @@ sách mã ↔ tên là thay được.</p>
 </div>
 {% endif %}
 </html>
+</main>
