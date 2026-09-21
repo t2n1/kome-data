@@ -139,9 +139,12 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
                                        AND v.nhom = %s)""")
         tham_so.append(nhom)
     if hang:
-        dieu_kien.append("""customer_code IN (SELECT customer_code
-                                                FROM mart.hang_doanh_thu
-                                               WHERE hang = %s)""")
+        # EXISTS định danh đầy đủ, nhất quán với nhánh `nhom` ngay trên — cùng
+        # một bẫy phân giải tên (customer_code không đủ rõ nó thuộc bảng nào
+        # khi có nhiều bảng cùng cột) nên dùng chung một cách viết.
+        dieu_kien.append("""EXISTS (SELECT 1 FROM mart.hang_doanh_thu hd
+                                     WHERE hd.customer_code = mart.khach_360.customer_code
+                                       AND hd.hang = %s)""")
         tham_so.append(hang)
     if tinh:
         dieu_kien.append("prefecture = %s")
@@ -204,21 +207,25 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # `nhip` là numeric từ Postgres — ép sang int khi HIỂN THỊ ở template
     # (`|int`), không ép ở đây: None phải đi qua nguyên vẹn để template hiện
     # "—" cho mã chưa đủ lịch sử để tính nhịp.
+    # Cả ba cột nhịp (`nhip`, `du_kien`, `tre`) nằm sẵn trong CÙNG một view
+    # mart.khach_mat_hang — lấy đủ ba ở cả hai khối bên dưới, không chỉ khối
+    # đưa ra trong đặc tả gốc, vì bổ sung không tốn thêm truy vấn nào.
     mat_hang = [dict(zip(("ma", "ten", "doanh_thu", "lai_gop", "so_luong",
-                          "so_lan", "lan_cuoi", "nhip", "du_kien"), h))
+                          "so_lan", "lan_cuoi", "nhip", "du_kien", "tre"), h))
                 for h in conn.execute(
         """SELECT product_code, ten_hang, doanh_thu_thuan, lai_gop, so_luong,
-                  so_lan, lan_cuoi, nhip_ngay, du_kien_lan_toi
+                  so_lan, lan_cuoi, nhip_ngay, du_kien_lan_toi, tre_ngay
            FROM mart.khach_mat_hang WHERE customer_code = %s
            ORDER BY doanh_thu_thuan DESC LIMIT 15""", (ma,)).fetchall()]
 
     # Mặt hàng khách TỪNG mua đều rồi NGỪNG hẳn. Đây là tín hiệu sớm hơn nhiều
     # so với việc khách ngừng mua toàn bộ: họ đang chuyển dần sang nhà cung cấp
     # khác, từng món một, và không ai để ý cho tới khi mất luôn khách.
-    da_ngung = [dict(zip(("ma", "ten", "so_lan", "lan_cuoi", "doanh_thu", "tre"), h))
+    da_ngung = [dict(zip(("ma", "ten", "so_lan", "lan_cuoi", "doanh_thu",
+                          "nhip", "du_kien", "tre"), h))
                 for h in conn.execute(
         """SELECT h.product_code, h.ten_hang, h.so_lan, h.lan_cuoi,
-                  h.doanh_thu_thuan, h.tre_ngay
+                  h.doanh_thu_thuan, h.nhip_ngay, h.du_kien_lan_toi, h.tre_ngay
            FROM mart.khach_mat_hang h, mart.moc_thoi_gian m
            WHERE h.customer_code = %s
              AND h.so_lan >= 3
@@ -299,39 +306,58 @@ def tong_quan_danh_ba(conn, sale: str | None = None) -> TongQuan:
     """
     dk = "WHERE k.salesperson_code = %s" if sale else ""
     p = [sale] if sale else []
+    # Cột thứ năm `canh_bao` (số khách cần gọi lại) chỉ có giá trị thật ở
+    # khối 'nv' — bốn khối kia trả 0. Đây LÀ một cột riêng, không nhồi vào
+    # chuỗi `khoa` như "mã|tên": nhồi chuỗi thêm một quy ước phải nhớ và một
+    # chỗ nữa có thể tách sai (vd tên nhân viên lỡ chứa dấu phân cách).
     rows = conn.execute(f"""
-        SELECT 'nhom' AS khoi, v.nhom AS khoa, count(*) AS so, 0::bigint AS tien
+        SELECT 'nhom' AS khoi, v.nhom AS khoa, count(*) AS so, 0::bigint AS tien,
+               0::bigint AS canh_bao
           FROM mart.khach_nhom_viec v
           JOIN mart.khach_360 k ON k.customer_code = v.customer_code
           {dk}
          GROUP BY v.nhom
         UNION ALL
-        SELECT 'tong', '', count(*), 0 FROM mart.khach_360 k {dk}
+        SELECT 'tong', '', count(*), 0, 0 FROM mart.khach_360 k {dk}
         UNION ALL
-        SELECT 'hang', h.hang, count(*), 0
+        SELECT 'hang', h.hang, count(*), 0, 0
           FROM mart.hang_doanh_thu h
           JOIN mart.khach_360 k ON k.customer_code = h.customer_code
           {dk}
          GROUP BY h.hang
         UNION ALL
-        SELECT 'tinh', coalesce(nullif(k.prefecture, ''), '(không rõ)'), count(*), 0
+        SELECT 'tinh', coalesce(nullif(k.prefecture, ''), '(không rõ)'), count(*), 0, 0
           FROM mart.khach_360 k {dk}
          GROUP BY 2
         UNION ALL
-        SELECT 'nv', t.salesperson_code || '|' || t.ten, t.so_khach, t.doanh_thu
+        SELECT 'nv', t.salesperson_code || '|' || t.ten, t.so_khach, t.doanh_thu,
+               t.so_khach_canh_bao
           FROM mart.tai_nhan_vien t
     """, p * 4).fetchall()
 
-    lay = lambda khoi: [(r[1], r[2], r[3]) for r in rows if r[0] == khoi]
-    nhom = {k: n for k, n, _ in lay("nhom")}
-    hang = dict((k, n) for k, n, _ in lay("hang"))
-    tinh = sorted(lay("tinh"), key=lambda x: -x[1])[:9]
+    lay = lambda khoi: [(r[1], r[2], r[3], r[4]) for r in rows if r[0] == khoi]
+    nhom = {k: n for k, n, _, _ in lay("nhom")}
+    hang = dict((k, n) for k, n, _, _ in lay("hang"))
+    # "(không rõ)" phải được tách ra KHỎI phép xếp hạng trước khi cắt top 8,
+    # không phải trộn chung rồi cắt: công ty thật có 48 tỉnh, "(không rõ)"
+    # thường chỉ vài khách nên đứng NGOÀI top 8/9 nếu xếp chung — trộn rồi
+    # cắt sẽ âm thầm đánh rơi nhóm này khỏi khối "Tập trung ở đâu" đúng vào
+    # lúc dữ liệu đủ lớn để thấy sự khác biệt, còn CSDL thử nghiệm nhỏ (1-2
+    # tỉnh) không bao giờ lộ ra lỗi này.
+    tinh_rows = lay("tinh")
+    tinh_that = sorted(((t, n) for t, n, _, _ in tinh_rows if t != "(không rõ)"),
+                        key=lambda x: -x[1])[:8]
+    khong_ro = next(((t, n) for t, n, _, _ in tinh_rows if t == "(không rõ)"), None)
+    tinh = tinh_that + ([khong_ro] if khong_ro else [])
     return TongQuan(
         nhom={k: nhom.get(k, 0) for k in ("im", "tut", "moi")},
-        tong=next((n for _, n, _ in lay("tong")), 0),
+        tong=next((n for _, n, _, _ in lay("tong")), 0),
         hang=[(h, hang.get(h, 0)) for h in THU_TU_HANG],
-        tinh=[(t, n) for t, n, _ in tinh],
+        tinh=tinh,
+        # Xếp theo DOANH THU chứ không theo số khách: khối này trả lời "ai
+        # đang gánh bao nhiêu tiền", không phải "ai có nhiều khách nhất" — một
+        # người ít khách nhưng khách lớn vẫn đáng chú ý hơn trên bảng tải.
         nhan_vien=[{"ma": k.split("|")[0], "ten": k.split("|", 1)[1],
-                    "so_khach": n, "doanh_thu": int(d)}
-                   for k, n, d in sorted(lay("nv"), key=lambda x: -x[2])],
+                    "so_khach": n, "doanh_thu": int(d), "canh_bao": int(cb)}
+                   for k, n, d, cb in sorted(lay("nv"), key=lambda x: -x[2])],
     )

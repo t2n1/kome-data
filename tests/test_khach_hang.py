@@ -374,6 +374,11 @@ def test_tong_quan_danh_ba_chay_dung_MOT_truy_van(conn, batch, monkeypatch):
     mỗi lần mở trang danh sách."""
     _ho_so_khach(conn, batch, "TQ01", "Quán TQ", salesperson_code="0104")
     _mua(conn, batch, "TQ01", HOM_NAY - timedelta(days=3))
+    # TQ02 im lặng quá 2 lần nhịp riêng của nó -> chắc chắn rơi vào nhóm việc
+    # 'im'. Khách DUY NHẤT của test này được dựng để vào nhóm đó, nên
+    # nhom["im"] phải bằng ĐÚNG 1, không chỉ khác 0.
+    _ho_so_khach(conn, batch, "TQ02", "Quán TQ rời bỏ")
+    _mua_deu(conn, batch, "TQ02", nhip=7, so_lan=6, ngung_truoc=30)
     _neo(conn, batch)
 
     dem = {"n": 0}
@@ -389,16 +394,54 @@ def test_tong_quan_danh_ba_chay_dung_MOT_truy_van(conn, batch, monkeypatch):
     assert [h[0] for h in tq.hang] == ["S", "A", "B", "C", "D"]
     assert len(tq.nhan_vien) == 5
     assert set(tq.nhom) == {"im", "tut", "moi"}
+    # [IMPORTANT] Bốn khẳng định trên chỉ canh CÁI KHOÁ — chúng đúng cả khi
+    # điều kiện JOIN của một nhánh SQL sai và trả về 0 dòng, vì khoá được
+    # sinh cứng từ THU_TU_HANG / bộ ba tên nhóm, không phải từ kết quả truy
+    # vấn. Bù lại bằng khẳng định GIÁ TRỊ: mỗi khách trong danh bạ có ĐÚNG
+    # một hạng, nên tổng số khách theo hạng phải khớp `tong` — sai điều kiện
+    # JOIN ở khối 'hang' (vd JOIN thay vì LEFT JOIN, hay lệch cột) sẽ làm
+    # tổng này lệch ngay.
+    assert sum(n for _, n in tq.hang) == tq.tong
+    # Và một khách CỤ THỂ (TQ02) phải rơi đúng nhóm việc mong đợi — không chỉ
+    # "có nhóm nào đó khác rỗng".
+    assert tq.nhom["im"] == 1
+
+
+def test_tong_quan_danh_ba_loc_theo_sale(conn, batch):
+    """[IMPORTANT] Nhánh `sale` sinh bốn placeholder (`p * 4`) trong UNION ALL
+    nhưng trước bản sửa này CHƯA có test nào gọi `tong_quan_danh_ba(sale=...)`
+    — ghi chú "đếm sai số tham số thì psycopg báo lỗi ngay" mô tả một lưới an
+    toàn không tồn tại, vì không test nào đi qua nhánh có tham số."""
+    _hai_sale(conn, batch)
+    tq = KH.tong_quan_danh_ba(conn, sale="0104")
+    assert tq.tong == 2                                   # chỉ K0104A, K0104B
+    assert KH.tong_quan_danh_ba(conn).tong > tq.tong       # còn K0102C + khách neo
 
 
 def test_tong_quan_khong_ro_tinh_van_duoc_dem(conn, batch):
-    """8 khách không có tỉnh (đo thật). Bỏ im lặng thì tổng của khối 'Tập trung
-    ở đâu' không khớp tổng danh bạ và không ai biết vì sao."""
+    """[IMPORTANT] Với ĐỦ tỉnh thật (nhiều hơn 8, như 48 tỉnh thật của công
+    ty), "(không rõ)" phải vẫn xuất hiện trong khối 'Tập trung ở đâu' dù nó
+    xếp hạng THẤP NHẤT. Trộn nó chung với các tỉnh thật rồi cắt top-9 (lỗi cũ)
+    sẽ âm thầm đánh rơi đúng nhóm này khi có nhiều hơn 8 tỉnh thật xếp hạng
+    cao hơn nó — CSDL thử nghiệm nhỏ (1-2 tỉnh) không bao giờ lộ ra lỗi này,
+    vì "(không rõ)" luôn lọt vào top-9 khi tổng số nhóm còn dưới 9."""
+    tinh_that = ["北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県",
+                 "福島県", "茨城県", "栃木県"]                 # 9 tỉnh thật
+    for i, t in enumerate(tinh_that):
+        for j in range(3):          # mỗi tỉnh 3 khách -> luôn xếp trên "(không rõ)"
+            ma = f"P{i}{j}"
+            _ho_so_khach(conn, batch, ma, f"Quán {ma}", prefecture=t)
+            _mua(conn, batch, ma, HOM_NAY - timedelta(days=3))
     _ho_so_khach(conn, batch, "KT01", "Quán không tỉnh", prefecture="")
     _mua(conn, batch, "KT01", HOM_NAY - timedelta(days=3))
-    _neo(conn, batch)
+    _neo(conn, batch)     # khách neo cũng không có dim_customer -> cũng "(không rõ)"
+
     tq = KH.tong_quan_danh_ba(conn)
-    assert any(t[0] == "(không rõ)" for t in tq.tinh)
+    assert any(t[0] == "(không rõ)" for t in tq.tinh), \
+        "'(không rõ)' bị cắt mất khi có nhiều hơn 8 tỉnh thật xếp hạng cao hơn"
+    thuc = [t for t in tq.tinh if t[0] != "(không rõ)"]
+    assert len(thuc) == 8, "top 8 tỉnh THẬT, không lẫn '(không rõ)' vào phép đếm"
+    assert dict(tq.tinh)["(không rõ)"] == 2       # KT01 + khách neo
 
 
 # ---- Ba bộ lọc mới: nhóm việc, hạng, tỉnh (task 4 đợt 4a) --------------
@@ -416,11 +459,27 @@ def test_loc_theo_nhom_viec(conn, batch):
 
 def test_ba_bo_loc_moi_ket_hop_duoc_voi_nhau_va_voi_sale(conn, batch):
     """Bấm hai bộ lọc mà một cái im lặng bị bỏ là người dùng đọc sai danh sách
-    mà không có gì báo."""
-    _ho_so_khach(conn, batch, "K0001", "Quán K", salesperson_code="0104",
+    mà không có gì báo. Khẳng định CẢ BA bộ lọc mới — nhóm việc đã có test
+    riêng (`test_loc_theo_nhom_viec`) nên ở đây canh `tinh` và `hang`, cả hai
+    kết hợp được với `sale` đã có từ đợt 3.
+    """
+    # K0001 doanh thu lớn, K0002 doanh thu rất nhỏ, khách neo ở giữa -> ba mức
+    # doanh thu tách bạch cho ra ba hạng khác nhau (n=3: cume_dist 1/3 -> 'B',
+    # 2/3 -> 'C', 3/3 -> 'D') — đủ để phân biệt bộ lọc `hang` mà không cần
+    # đoán ngưỡng phần trăm chính xác.
+    _ho_so_khach(conn, batch, "K0001", "Quán K lớn", salesperson_code="0104",
                  prefecture="愛知県")
-    _mua(conn, batch, "K0001", HOM_NAY - timedelta(days=3))
+    _mua(conn, batch, "K0001", HOM_NAY - timedelta(days=3),
+         tien=1_000_000, tax=100_000, gp=300_000)
+    _ho_so_khach(conn, batch, "K0002", "Quán K nhỏ", salesperson_code="0104",
+                 prefecture="愛知県")
+    _mua(conn, batch, "K0002", HOM_NAY - timedelta(days=3),
+         tien=1_000, tax=100, gp=300)
     _neo(conn, batch)
+
     t = KH.danh_sach(conn, tinh="愛知県", sale="0104")
     assert "K0001" in {k.ma for k in t.khach}
     assert KH.danh_sach(conn, tinh="東京都", sale="0104").tong == 0
+
+    assert {k.ma for k in KH.danh_sach(conn, hang="B", sale="0104").khach} == {"K0001"}
+    assert {k.ma for k in KH.danh_sach(conn, hang="D", sale="0104").khach} == {"K0002"}
