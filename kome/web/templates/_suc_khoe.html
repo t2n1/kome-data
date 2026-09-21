@@ -1,10 +1,11 @@
-<!-- kome/web/templates/health.html -->
-<!doctype html><html lang="vi"><meta charset="utf-8">
-<title>KOME — sức khoẻ dữ liệu</title>
-{% include "_chung.html" %}
-{% include "_nav.html" %}
-<h1>Sức khoẻ dữ liệu</h1>
-{% include "_tuoi_du_lieu.html" %}
+{# id="suc-khoe": neo để test cô lập đúng khối này (xem tests/test_web.py::
+   test_health_hien_lan_nap_GAN_NHAT_khong_phai_lon_nhat) thay vì cắt bằng
+   chuỗi tiêu đề — cắt bằng chuỗi vỡ âm thầm nếu đảo thứ tự khối hoặc nếu
+   khối kế tiếp ("Lô nạp gần nhất") bị ẩn ở bản chỉ-đọc. Chỉ file này include
+   _suc_khoe.html (không dùng chung như _tuoi_du_lieu.html/_bang_ngay.html)
+   nên bọc <section> ngay trong chính partial, không cần bọc ở kho_du_lieu.html. #}
+<section id="suc-khoe">
+<h2>Sức khoẻ dữ liệu</h2>
 {# backup = None ở bản chỉ-đọc: máy chủ công khai không nhìn thấy thư mục sao
    lưu nên mọi kết luận nó đưa ra đều sai. Im lặng đúng hơn là một dải đỏ
    vĩnh viễn — xem ghi chú ở kome/web/app.py. #}
@@ -43,5 +44,4 @@ xuất lại 売上伝票データ của đúng ngày đó từ OBC rồi kéo�
  <td>{{ "{:,}".format(s.rows) }}</td>
  <td>{% if s.co_tien %}¥{{ "{:,}".format(s.total) }}{% else %}<span class="khong-ap-dung" title="Loại file này không mang giá trị tiền">—</span>{% endif %}</td>
 </tr>{% endfor %}</table>
-</html>
-</main>
+</section>

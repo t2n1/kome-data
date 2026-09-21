@@ -110,4 +110,4 @@ def duong_dan_an_toan(tiep: str | None) -> str:
     """
     if tiep and tiep.startswith("/") and not tiep.startswith("//"):
         return tiep
-    return "/health"
+    return "/kho-du-lieu"

@@ -1,0 +1,23 @@
+{# Khối NẠP DỮ LIỆU của màn Kho dữ liệu. Tách từ upload.html, giữ nguyên
+   hành vi: MỘT ô nhận NHIỀU file.
+
+   Vì sao không theo thiết kế (7 ô riêng, mỗi loại một ô): người làm việc
+   13:30 thả 3 file một lần; 7 ô biến 1 thao tác thành 3 mỗi ngày. Câu hỏi
+   "còn thiếu file nào" đã được ô tuổi dữ liệu ngay phía trên trả lời rồi.
+
+   Khối này KHÔNG render ở bản chỉ-đọc — xem kho_du_lieu.html. #}
+<section id="nap">
+<h2>Nạp dữ liệu OBC</h2>
+<form method="post" action="/upload" enctype="multipart/form-data">
+  <div class="drop">Kéo thả file Excel vào đây<br><input class="chon-file" type="file" name="files" multiple required></div>
+  <p><button class="nut-nap" type="submit">Nạp</button></p>
+</form>
+{% if results %}<h3>Kết quả</h3><ul>
+{% for r in results %}<li>
+  {% if r.skipped %}<span class="kq-ok">⏭️ {{ r.spec_name }} — file này đã nạp rồi, bỏ qua</span>
+  {% elif r.ok %}<span class="kq-ok">✅ {{ r.spec_name }} — {{ "{:,}".format(r.row_count) }} dòng · ¥{{ "{:,}".format(r.total) }}</span>
+  {% else %}<span class="kq-loi">❌ {{ r.spec_name or "?" }} — KHÔNG nạp</span>{% endif %}
+  {% for b in r.blockers %}<div class="kq-loi">Cổng {{ b.gate }}: {{ b.message }}</div>{% endfor %}
+  {% for w in r.warnings %}<div class="kq-canh">⚠️ Cổng {{ w.gate }}: {{ w.message }}</div>{% endfor %}
+</li>{% endfor %}</ul>{% endif %}
+</section>

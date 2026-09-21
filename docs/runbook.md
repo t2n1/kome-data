@@ -25,13 +25,15 @@ python -m uvicorn kome.web.app:app --host 127.0.0.1 --port 8000
 ```
 
 Rồi mở trình duyệt vào <http://127.0.0.1:8000>. Trang kéo–thả file nằm ở
-mục **Dữ liệu → Nạp từ OBC** (<http://127.0.0.1:8000/nap>). Lệnh này **tự đọc `.env`** nên
+mục **Kho dữ liệu** (<http://127.0.0.1:8000/kho-du-lieu>). Lệnh này **tự đọc `.env`** nên
 không cần nạp biến môi trường trước. Cứ để cửa sổ đó mở; đóng cửa sổ là trang
 tắt.
 
-Bản chạy ở máy có **đủ cả ba trang**: nạp dữ liệu, sức khoẻ dữ liệu, bảng phủ
-dữ liệu. Bản trên mạng (Vercel) chỉ có hai trang sau — xem
-[docs/trien-khai-vercel.md](trien-khai-vercel.md) để biết vì sao và cách đưa lên.
+Nạp dữ liệu, sức khoẻ dữ liệu và bảng phủ dữ liệu nay nằm chung trong **một
+màn Kho dữ liệu duy nhất** (những địa chỉ cũ tự chuyển hướng sang đó). Bản trên
+mạng (Vercel) mở **cùng màn này**, chỉ ẩn hai khối: ô kéo–thả file và nút
+**Hoàn tác** — xem [docs/trien-khai-vercel.md](trien-khai-vercel.md) để biết vì
+sao và cách đưa lên.
 
 ---
 
@@ -78,12 +80,12 @@ Lưu ý:
   chạy migration** (`python -m db.migrate` hoặc tương đương), không dùng cho
   vận hành thường ngày.
 - **Web app của Giai đoạn 0 chạy bằng `kome_ingest_user`** — chính là
-  `DATABASE_URL` ở trên. Trang nạp, trang `/health` và nút Hoàn tác đều cần
-  ghi và xoá trong `core`, nên không dùng `kome_app_user` được.
+  `DATABASE_URL` ở trên. Trang **Kho dữ liệu** (nạp, sức khoẻ, hoàn tác) đều
+  cần ghi và xoá trong `core`, nên không dùng `kome_app_user` được.
 - `kome_app_user` **chưa dùng ở Giai đoạn 0** — dành cho ứng dụng CRM ở Giai
   đoạn 2 (đọc `core`/`mart`, đọc-ghi `app` — **không ghi được vào `core`**, kể
   cả khi có bug trong code). Nó cũng không đọc được `meta.ingest_batch` nên
-  không mở được trang `/health`. `kome_report_user` chỉ đọc, dùng cho công cụ
+  không mở được trang **Kho dữ liệu**. `kome_report_user` chỉ đọc, dùng cho công cụ
   báo cáo/BI bên ngoài nếu có.
 - **Migration luôn chạy bằng `postgres`**, không bao giờ bằng `kome_ingest_user`:
   `ALTER DEFAULT PRIVILEGES` trong migration không có `FOR ROLE`, chạy bằng vai
@@ -149,14 +151,14 @@ mới chạy migration.
 
 | Sự cố | Dấu hiệu nhận biết | Cách xử lý (chép–dán từng khối, theo thứ tự) | Thời gian |
 |---|---|---|---|
-| **Nạp nhầm file** (nhầm ngày, nhầm file, nạp trùng) | Vào trang `/health` thấy số dòng hoặc tổng tiền sai ngay sau khi vừa nạp | 1) Xem các lần nạp gần nhất:<br>`python scripts/hoan_tac.py`<br>2) Ghi số lô của lần nạp sai rồi hoàn tác (thay `123`):<br>`python scripts/hoan_tac.py 123`<br>3) Nạp lại đúng file qua trang nội bộ như bình thường | ~10 giây tìm + hoàn tác |
-| **Thiếu một ngày dữ liệu** (hôm đó không ai kéo–thả: nghỉ ốm, quên, máy hỏng) | Vào trang `/health` thấy dải **vàng** `⚠️ Thiếu N ngày làm việc` kèm danh sách ngày | 1) Xem ngày bị liệt kê có phải ngày nghỉ lễ Nhật / công ty nghỉ không — nếu đúng thì bỏ qua, hệ thống chỉ biết thứ Bảy–Chủ nhật, không biết ngày lễ<br>2) Nếu là ngày làm việc thật: mở OBC, xuất lại `売上伝票データ` của **đúng ngày đó**, kéo–thả vào trang nạp như bình thường<br>3) Tải lại `/health`, dải vàng phải biến mất | ~3 phút/ngày |
-| **Thiếu cả một tháng / một loại file** (không phải một ngày lẻ) | Vào trang `/phu-du-lieu` thấy ô **đỏ** ở tháng đó — ô **xám** `—` là "ngoài phạm vi", không phải thiếu, đừng đi tìm | 1) Mở OBC, xuất lại loại file của đúng tháng đó, kéo–thả vào trang nạp<br>2) Tải lại `/phu-du-lieu`, ô phải chuyển **xanh**<br>3) Ô đỏ cũng có thể là file ĐÃ xuất nhưng bị cổng kiểm tra chặn (trang không phân biệt được) — nếu chắc đã nạp rồi mà vẫn đỏ, xuất lại và xem trang nạp báo cổng nào chặn | ~3 phút/tháng |
+| **Nạp nhầm file** (nhầm ngày, nhầm file, nạp trùng) | Vào trang `/kho-du-lieu` thấy số dòng hoặc tổng tiền sai ngay sau khi vừa nạp | 1) Mở trang **Kho dữ liệu**, khối **Lô nạp gần nhất**<br>2) Tìm dòng của file vừa nạp nhầm, bấm **Hoàn tác**, đọc số dòng sẽ bị xoá rồi xác nhận<br>3) Nạp lại đúng file qua ô kéo–thả ngay trên màn đó<br>**Cách khác nếu web app không mở được:** xem hàng **Web app không truy cập được** bên dưới | ~10 giây tìm + hoàn tác |
+| **Thiếu một ngày dữ liệu** (hôm đó không ai kéo–thả: nghỉ ốm, quên, máy hỏng) | Vào trang `/kho-du-lieu` thấy dải **vàng** `⚠️ Thiếu N ngày làm việc` kèm danh sách ngày | 1) Xem ngày bị liệt kê có phải ngày nghỉ lễ Nhật / công ty nghỉ không — nếu đúng thì bỏ qua, hệ thống chỉ biết thứ Bảy–Chủ nhật, không biết ngày lễ<br>2) Nếu là ngày làm việc thật: mở OBC, xuất lại `売上伝票データ` của **đúng ngày đó**, kéo–thả vào trang nạp như bình thường<br>3) Tải lại `/kho-du-lieu`, dải vàng phải biến mất | ~3 phút/ngày |
+| **Thiếu cả một tháng / một loại file** (không phải một ngày lẻ) | Vào trang `/kho-du-lieu` thấy ô **đỏ** ở tháng đó — ô **xám** `—` là "ngoài phạm vi", không phải thiếu, đừng đi tìm | 1) Mở OBC, xuất lại loại file của đúng tháng đó, kéo–thả vào trang nạp<br>2) Tải lại `/kho-du-lieu`, ô phải chuyển **xanh**<br>3) Ô đỏ cũng có thể là file ĐÃ xuất nhưng bị cổng kiểm tra chặn (trang không phân biệt được) — nếu chắc đã nạp rồi mà vẫn đỏ, xuất lại và xem trang nạp báo cổng nào chặn | ~3 phút/tháng |
 | **OBC đổi tên cột** (nạp file báo lỗi "thiếu cột" / cổng 2 chặn) | Trang nạp báo đỏ, nêu rõ tên cột thiếu | 1) Mở file cấu hình bằng Notepad, ví dụ:<br>`notepad config/files.yml`<br>2) Sửa tên cột OBC mới cho khớp cột hệ thống đang có (không đổi tên cột hệ thống, chỉ đổi tên cột OBC bên trái dấu `:`), lưu lại<br>3) Chạy lại toàn bộ kiểm tra để chắc chắn không hỏng gì khác:<br>`python -m pytest tests/ -v`<br>4) Nếu không chắc sửa đúng chỗ, đừng tự sửa — gửi ảnh chụp lỗi kèm file Excel mới cho AI bảo trì | ~5 phút (tự sửa) |
 | **Số không khớp OBC** (báo cáo trong app lệch số so với sổ OBC) | Đối chiếu cuối tháng thấy tổng tiền lệch | Không cần xoá gì cả — xuất lại **đúng file đó** (cả kỳ, không xuất riêng phần lệch) từ OBC rồi kéo–thả lại vào trang nội bộ. Hệ thống tự nhận theo mã băm nội dung: file y hệt cũ → tự bỏ qua; file có sửa → tự ghi đè đúng dòng thay đổi | ~2 phút |
 | **CSDL đầy 500 MB** (Supabase báo "storage full", trang nạp báo lỗi ghi dữ liệu) | Nạp file báo lỗi kết nối/ghi dữ liệu, hoặc email cảnh báo từ Supabase | 1) Đăng nhập https://supabase.com/dashboard bằng tài khoản công ty<br>2) Chọn dự án KOME → **Settings → Billing** → nâng cấp lên gói trả phí<br>**Không tự ý xoá dữ liệu để giải phóng chỗ** — dữ liệu kế toán không được xoá | ~5 phút (cần thẻ thanh toán công ty) |
 | **Mất sạch CSDL** (Supabase báo dự án bị xoá/hỏng, hoặc không kết nối được nữa) | Mọi trang trong app đều báo lỗi kết nối CSDL | 1) Tạo CSDL Postgres mới trên Supabase (chọn **Session Pooler**, IPv4, cổng **5432** — không dùng cổng 6543), lấy chuỗi kết nối mới<br>2) **Sửa `DATABASE_URL` trong file `.env`** thành chuỗi kết nối mới — làm bước này TRƯỚC thì mọi lệnh sau chạy được như bình thường, không phải dán chuỗi vào đâu cả<br>3) Dựng lại cấu trúc bảng:<br>`python db/migrate.py`<br>4) Nếu có bản sao lưu trong `backups/`, đổ dữ liệu vào:<br>`python -m ops.restore_check` (kiểm tra khôi phục được trước), rồi khôi phục thật theo hướng dẫn cuối sổ tay<br>5) Nếu **không có** bản sao lưu nào, nạp lại từ đầu bằng toàn bộ file Excel gốc đã lưu trên OneDrive, theo đúng thứ tự ngày, qua trang nội bộ như nạp bình thường | ~1 giờ (có sao lưu) |
-| **Web app không truy cập được** (trang nạp/health không mở được) | Trình duyệt báo không kết nối được tới trang nội bộ | **Không làm gì với việc nạp dữ liệu** — việc xuất file từ OBC và lưu trên OneDrive vẫn diễn ra bình thường, không phụ thuộc web app. Báo cho AI bảo trì để khởi động lại máy chủ web; công việc kế toán không bị gián đoạn | — |
+| **Web app không truy cập được** (trang Kho dữ liệu không mở được) | Trình duyệt báo không kết nối được tới trang nội bộ | **Không làm gì với việc nạp dữ liệu** — việc xuất file từ OBC và lưu trên OneDrive vẫn diễn ra bình thường, không phụ thuộc web app. Báo cho AI bảo trì để khởi động lại máy chủ web; công việc kế toán không bị gián đoạn<br>**Cần hoàn tác gấp một lô nạp sai ngay lúc này (không đợi được)?** Mở Git Bash hoặc PowerShell tại thư mục dự án, chạy trực tiếp trên máy — không cần trình duyệt:<br>`python scripts/hoan_tac.py` → xem các lô nạp gần nhất<br>`python scripts/hoan_tac.py 123` → hoàn tác lô số 123 | — |
 
 ---
 
@@ -199,7 +201,7 @@ File sao lưu nằm trong thư mục `backups/` (không đưa vào git — xem
 `.gitignore`). Chép thư mục này lên OneDrive định kỳ để có bản sao ở nơi
 khác.
 
-**Trang `/health` tự cảnh báo nếu quên sao lưu**: nếu bản sao lưu mới nhất
+**Trang `/kho-du-lieu` tự cảnh báo nếu quên sao lưu**: nếu bản sao lưu mới nhất
 cũ hơn 36 giờ (hoặc chưa có bản nào), đầu trang hiện dải đỏ
 `⚠️ Chưa sao lưu ... — chạy sao lưu ngay` kèm sẵn lệnh ở trên để chép–dán.
 Còn mới thì hiện dòng xanh `✅ Sao lưu gần nhất: ...`. Mở trang này mỗi ngày
@@ -242,7 +244,7 @@ schtasks /delete /tn KomeBackup /f
 được khi **máy tính đang bật và không ở chế độ ngủ (sleep)** vào đúng giờ
 hẹn — nó không tự đánh thức máy dậy để chạy. Nếu máy tắt hoặc ngủ lúc 19:00,
 sao lưu hôm đó sẽ không chạy và không có gì báo cho biết ngay lúc đó. Đây
-chính là lý do dải cảnh báo trên trang `/health` (ở trên) vẫn cần thiết dù
+chính là lý do dải cảnh báo trên trang `/kho-du-lieu` (ở trên) vẫn cần thiết dù
 đã bật lịch tự động: mở trang mỗi ngày là cách duy nhất để biết chắc sao lưu
 có thật sự chạy hay không.
 

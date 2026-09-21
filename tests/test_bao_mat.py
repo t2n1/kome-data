@@ -72,9 +72,9 @@ def test_doi_mat_khau_huy_moi_ve_dang_luu_hanh():
 
 @pytest.mark.parametrize("tiep,mong", [
     ("/phu-du-lieu", "/phu-du-lieu"),
-    ("https://site-gia.example", "/health"),   # địa chỉ tuyệt đối
-    ("//site-gia.example", "/health"),         # cũng là tuyệt đối
-    (None, "/health"),
+    ("https://site-gia.example", "/kho-du-lieu"),   # địa chỉ tuyệt đối
+    ("//site-gia.example", "/kho-du-lieu"),         # cũng là tuyệt đối
+    (None, "/kho-du-lieu"),
 ])
 def test_khong_lam_ban_dap_chuyen_huong(tiep, mong):
     """Trang đăng nhập của công ty không được đẩy người dùng sang site lạ."""
@@ -99,15 +99,23 @@ def test_mat_khau_qua_ngan_bi_tu_choi(khach):
 
 def test_chay_o_may_ca_nhan_khong_bat_buoc_mat_khau(khach):
     """Máy trong công ty chạy ở 127.0.0.1 — bắt đăng nhập ở đó chỉ làm chậm
-    công việc hằng ngày mà không chặn được ai."""
-    r = khach(mat_khau=None).get("/health")
+    công việc hằng ngày mà không chặn được ai.
+
+    Đợt 2a (Task 4): /health giờ chỉ 301 sang /kho-du-lieu — kiểm thẳng màn
+    gộp, /health không còn render nội dung gì để kiểm."""
+    r = khach(mat_khau=None).get("/kho-du-lieu")
     assert r.status_code == 200
 
 
 # ---- Cổng chặn trên mọi trang ------------------------------------------
 
-@pytest.mark.parametrize("duong_dan", ["/", "/health", "/phu-du-lieu"])
+@pytest.mark.parametrize("duong_dan", ["/", "/kho-du-lieu", "/khach-hang"])
 def test_chua_dang_nhap_thi_moi_trang_deu_bi_chan(khach, duong_dan):
+    """Đợt 2a (Task 4): /health và /phu-du-lieu giờ chỉ 301 sang
+    /kho-du-lieu — kiểm chúng ở đây không còn kiểm được gì (redirect rỗng
+    trước khi middleware đăng nhập kịp chạm nội dung). Đổi sang ba trang
+    THẬT SỰ có nội dung, và /kho-du-lieu PHẢI có mặt vì đó đúng là trang
+    giờ mang nhật ký nạp, bảng phủ dữ liệu và khối Hoàn tác."""
     r = khach().get(duong_dan)
     assert r.status_code == 303
     assert r.headers["location"] == "/dang-nhap"
@@ -122,7 +130,8 @@ def test_dang_nhap_dung_thi_xem_duoc_va_sai_thi_khong(khach):
 
     r = c.post("/dang-nhap", data={"mat_khau": MK})
     assert r.status_code == 303
-    assert c.get("/health").status_code == 200
+    # /health giờ chỉ 301 sang /kho-du-lieu (Task 4) — kiểm thẳng màn gộp.
+    assert c.get("/kho-du-lieu").status_code == 200
 
 
 def test_dang_nhap_xong_quay_lai_dung_trang_dinh_xem(khach):
@@ -160,11 +169,13 @@ def test_o_may_ca_nhan_khong_gan_secure(khach):
 
 
 def test_thoat_thi_het_xem_duoc(khach):
+    """/health giờ chỉ 301 sang /kho-du-lieu (Task 4) — kiểm thẳng màn gộp,
+    trạng thái đăng nhập/đăng xuất không đổi."""
     c = khach()
     c.post("/dang-nhap", data={"mat_khau": MK})
-    assert c.get("/health").status_code == 200
+    assert c.get("/kho-du-lieu").status_code == 200
     c.post("/dang-xuat")
-    assert c.get("/health").status_code == 303
+    assert c.get("/kho-du-lieu").status_code == 303
 
 
 def test_mat_khau_khong_bao_gio_hien_tren_trang(khach):
@@ -218,18 +229,29 @@ def test_tren_vercel_khong_nap_va_khong_hoan_tac_duoc(khach):
     assert c.post("/undo/1").status_code == 403
 
     # "/" giờ là trang Tổng quan — chỉ đọc, nên bản công khai xem được bình
-    # thường. Trang nạp chuyển sang /nap và bị chặn ở đó.
+    # thường.
     assert c.get("/").status_code == 200
-    assert c.get("/nap").status_code == 403
+    # /nap giờ LUÔN 301 sang /kho-du-lieu#nap (Task 4), kể cả ở bản chỉ-đọc:
+    # màn đích tự ẩn khối nạp thay vì trả 403 cho một dấu trang cũ. Chặn
+    # thật sự nằm ở POST /upload phía trên, không phải ở GET /nap.
+    r = c.get("/nap", follow_redirects=False)
+    assert r.status_code == 301
+    assert r.headers["location"] == "/kho-du-lieu#nap"
+    assert c.get("/kho-du-lieu").status_code == 200
 
 
 def test_ban_chi_doc_an_han_muc_nap_du_lieu(khach):
-    """Một liên kết luôn dẫn tới trang từ chối thì tệ hơn là không có."""
+    """Một liên kết luôn dẫn tới trang từ chối thì tệ hơn là không có.
+
+    Đợt 2a (Task 4): /health chỉ 301 sang /kho-du-lieu, và mục nạp riêng
+    trong sidebar biến mất — thay bằng một mục "Kho dữ liệu" duy nhất, còn
+    khối nạp bên TRONG màn đó tự ẩn ở bản chỉ-đọc (id="nap")."""
     c = khach(vercel=True)
     c.post("/dang-nhap", data={"mat_khau": MK})
-    t = c.get("/health").text
+    t = c.get("/kho-du-lieu").text
     assert "Nạp từ OBC" not in t and 'href="/nap"' not in t
-    assert "Bảng phủ" in t and 'href="/khach-hang"' in t
+    assert 'id="nap"' not in t
+    assert "在庫一覧" in t and 'href="/khach-hang"' in t
 
 
 def test_ban_chi_doc_khong_bao_dong_sao_luu_gia(khach):
@@ -238,15 +260,21 @@ def test_ban_chi_doc_khong_bao_dong_sao_luu_gia(khach):
     đỏ — đúng thứ hệ thống này cần họ tin."""
     c = khach(vercel=True)
     c.post("/dang-nhap", data={"mat_khau": MK})
-    t = c.get("/health").text
+    # /health chỉ 301 sang /kho-du-lieu (Task 4) — khối sức khoẻ giờ nằm ở đó.
+    t = c.get("/kho-du-lieu").text
     assert "Chưa sao lưu" not in t
     assert "máy trong công ty" in t
 
 
 def test_ban_o_may_ca_nhan_van_nap_duoc(khach):
+    """/nap giờ LUÔN 301 sang /kho-du-lieu#nap (Task 4) — theo tới đích để
+    xác nhận khối nạp vẫn còn, còn hiện."""
     c = khach(mat_khau=None)
-    assert c.get("/nap").status_code == 200
-    assert "Nạp dữ liệu OBC" in c.get("/nap").text
+    r = c.get("/nap", follow_redirects=False)
+    assert r.status_code == 301
+    assert r.headers["location"] == "/kho-du-lieu#nap"
+    t = c.get("/kho-du-lieu").text
+    assert 'id="nap"' in t and "Nạp dữ liệu OBC" in t
 
 
 def test_trang_chi_doc_khong_phu_thuoc_pandas():

@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from fastapi.testclient import TestClient
 from kome.web.app import create_app
@@ -84,8 +85,18 @@ def test_health_hien_lan_nap_GAN_NHAT_khong_phai_lon_nhat(conn, test_db_url):
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/health")
     assert r.status_code == 200
-    assert "60" in r.text and "900,000" in r.text
-    assert "18,000" not in r.text and "400,000,000" not in r.text
+    # Đợt 2a (Task 4): /health giờ là màn gộp /kho-du-lieu, và màn đó thêm
+    # khối "Lô nạp gần nhất" (Task 2/3) liệt kê MỖI lô riêng lẻ — khối đó
+    # ĐÚNG PHẢI hiện cả 18.000 vì nó trả lời câu khác ("lịch sử nạp gồm
+    # những gì"), không phải câu bảng trạng thái trả lời ("lần nạp GẦN NHẤT
+    # của loại này là gì"). Cô lập đúng khối bằng neo `id="suc-khoe"`
+    # (_suc_khoe.html), KHÔNG bằng chuỗi tiêu đề: cắt theo chuỗi vỡ âm thầm
+    # nếu đảo thứ tự khối, hoặc nếu "Lô nạp gần nhất" bị ẩn ở bản chỉ-đọc.
+    m = re.search(r'<section id="suc-khoe">(.*?)</section>', r.text, re.S)
+    assert m, "thiếu khối id=\"suc-khoe\""
+    khoi = m.group(1)
+    assert "60" in khoi and "900,000" in khoi
+    assert "18,000" not in khoi and "400,000,000" not in khoi
 
 
 def test_health_liet_ke_ngay_lam_viec_bi_thieu(conn, test_db_url, batch):
@@ -149,11 +160,20 @@ def test_loi_ngoai_du_kien_hien_tieng_viet_khong_lo_chuoi_ngoai_le(
 
 
 def test_trang_phu_du_lieu_mo_duoc_va_nhom_theo_ky_cong_ty(conn, test_db_url):
-    """Trang /phu-du-lieu: nhóm theo kỳ kế toán CỦA CÔNG TY (1/8 → 31/7)."""
+    """Trang /phu-du-lieu: nhóm theo kỳ kế toán CỦA CÔNG TY (1/8 → 31/7).
+
+    Đợt 2a (Task 4): /phu-du-lieu chỉ 301 sang /kho-du-lieu#theo-thang, và
+    tiêu đề trang giờ là "Kho dữ liệu" (dùng chung cho cả ba khối cũ) —
+    không còn tiêu đề riêng "Bảng phủ dữ liệu". Mọi nội dung khác (kỳ kế
+    toán, cột, tổng kết) vẫn nguyên vẹn, chỉ nằm trong màn gộp.
+
+    KHÔNG kiểm "Kho dữ liệu": chuỗi đó nằm trong sidebar của MỌI trang, nên
+    vẫn xanh kể cả khi redirect đi lạc sang "/" hay "/bao-cao". Kiểm neo
+    `id="theo-thang"` — chỉ có trên đúng khối bảng tháng của màn này."""
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/phu-du-lieu")
     assert r.status_code == 200
-    assert "Bảng phủ dữ liệu" in r.text
+    assert 'id="theo-thang"' in r.text
     # Trang phải gọi kỳ theo SỐ mà công ty tự dùng (Kỳ 7), không phải năm kết thúc
     assert "Kỳ 7 (2025-08 → 2026-07)" in r.text
     assert "1/8 → 31/7" in r.text
@@ -171,12 +191,19 @@ def test_trang_phu_du_lieu_mo_duoc_va_nhom_theo_ky_cong_ty(conn, test_db_url):
 def test_phu_du_lieu_phan_biet_bang_MAU_NEN_khong_chi_bang_ky_tu(conn, test_db_url):
     """[IMPORTANT] Trang này để LIẾC MẮT là thấy. Nếu "có" và "không" chỉ khác
     nhau ở một ký tự nhỏ thì người đọc phải dò từng ô — đúng lúc cần thấy
-    ngay thì lại không thấy."""
+    ngay thì lại không thấy.
+
+    phu_du_lieu.html (đã xoá ở Task 4) mang theo một khối <style> RIÊNG định
+    nghĩa lại ba lớp này — trùng với kome.css nhưng vô hại vì cùng giá trị.
+    Xoá template đó bỏ luôn bản trùng, chỉ còn định nghĩa DUY NHẤT ở
+    /static/kome.css (nơi _bang_ngay.html / _bang_thang.html của màn gộp đã
+    dùng từ trước) — kiểm màu nền ở đúng chỗ nó còn được định nghĩa."""
     client = TestClient(create_app(db_url=test_db_url))
-    r = client.get("/phu-du-lieu")
+    css = client.get("/static/kome.css").text.replace(" ", "")
     for lop in ("o-co", "o-khong", "o-ngoai"):
-        assert f"{lop}{{background:" in r.text.replace(" ", ""), f"thiếu màu nền cho .{lop}"
-    assert 'class="o o-ngoai"' in r.text     # tháng trước 2025-03 phải là "ngoài phạm vi"
+        assert f"{lop}{{background:" in css, f"thiếu màu nền cho .{lop}"
+    html = client.get("/phu-du-lieu").text
+    assert 'class="o o-ngoai"' in html     # tháng trước 2025-03 phải là "ngoài phạm vi"
 
 
 def test_phu_du_lieu_ton_trong_db_url_va_khong_lo_thong_tin_ket_noi(
@@ -195,13 +222,18 @@ def test_phu_du_lieu_ton_trong_db_url_va_khong_lo_thong_tin_ket_noi(
 
 
 def test_ba_trang_deu_co_thanh_dieu_huong_di_qua_lai(conn, test_db_url):
-    """Ba trang phải đi lại được với nhau. Trước đây mỗi trang chỉ có một link
-    lẻ ở cuối, và từ /health không có đường nào sang bảng phủ dữ liệu."""
+    """Mọi trang phải đi lại được với nhau qua sidebar.
+
+    Đợt 2a (Task 4): /health và /phu-du-lieu gộp vào /kho-du-lieu, nên
+    sidebar giờ chỉ còn MỘT mục "Kho dữ liệu" thay vì ba mục riêng (trước
+    đây từ /health không có đường nào sang bảng phủ dữ liệu — giờ cả hai
+    nằm trên cùng một màn nên không cần liên kết riêng nữa). Xem thêm
+    tests/test_giao_dien.py::test_sidebar_hien_du_nam_muc_va_ba_nhom."""
     client = TestClient(create_app(db_url=test_db_url))
-    for duong in ("/", "/health", "/phu-du-lieu"):
+    for duong in ("/", "/kho-du-lieu"):
         r = client.get(duong)
         assert r.status_code == 200, duong
-        for link in ('href="/"', 'href="/health"', 'href="/phu-du-lieu"'):
+        for link in ('href="/"', 'href="/kho-du-lieu"'):
             assert link in r.text, f"{duong} thiếu {link}"
 
 

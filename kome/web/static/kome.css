@@ -178,3 +178,66 @@
    .thoat{margin-top:0;margin-left:auto;border-top:0;padding-top:0}
    .noi-dung{max-width:none;width:100%;box-sizing:border-box}
  }
+
+ /* ---- Khối nạp dữ liệu (màn Kho dữ liệu) ------------------------ */
+ .drop{border:2px dashed var(--vien);border-radius:12px;padding:3rem;
+   text-align:center;background:var(--nen-phu)}
+ /* Hai quy tắc này đến từ `upload.html` (xoá ở Task 4) và KHÔNG được chép
+    sang khi trang đó chết — nút "Nạp", nút hành động chính của màn duy nhất
+    có người dùng hằng ngày, thành nút trần mặc định của trình duyệt.
+    Giữ nguyên giá trị cũ, nhưng gắn theo LỚP chứ không phải selector
+    `button` trần: mọi nút khác trong app (đăng nhập, tìm, đăng xuất, Xoá lô)
+    đã có kiểu riêng, một `button{...}` trần sẽ đè lên tất cả. */
+ .nut-nap{font:inherit;padding:.4rem 1rem;border-radius:8px;
+   border:1px solid var(--vien);background:var(--nen-phu);color:var(--chu);
+   cursor:pointer}
+ .chon-file{color:var(--chu)}
+ .kq-ok{color:var(--ok-chu)} .kq-canh{color:var(--canh-chu)} .kq-loi{color:var(--loi-chu)}
+
+ /* ---- Hai bảng phủ dữ liệu (màn Kho dữ liệu) --------------------
+    Chuyển từ <style> của phu_du_lieu.html (Task 2, bước 5). Trang
+    /phu-du-lieu cũ vẫn còn <style> riêng của nó cho tới khi nó chết ở
+    Task 4 — hai định nghĩa trùng giá trị, không phải xung đột.
+
+    .chu-thich và .mau CŨNG được bao_cao.html tự khai riêng trong
+    <style> của chính nó. Thứ tự nguồn chỉ giải quyết được những
+    thuộc tính CẢ HAI cùng khai — thuộc tính chỉ có ở đây thì không có
+    đối thủ và vẫn rò sang /bao-cao. Đã xảy ra thật với .mau (border,
+    line-height, text-align, font-weight), nay bản này định tính bằng
+    .chu-giai. .chu-thich thì an toàn: bao_cao.html khai lại cả color
+    lẫn font-size, đúng hai thuộc tính duy nhất ở đây. */
+ .phu{table-layout:auto}
+ .phu th{background:var(--nen-phu);font-size:.85rem;white-space:nowrap}
+ .phu td,.phu th{text-align:center;border:1px solid var(--vien);padding:.35rem .4rem}
+ .phu td.thang{text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
+ .o{font-weight:700;font-variant-numeric:tabular-nums}
+ .o-co   {background:var(--ok-nen);   color:var(--ok-chu)}
+ .o-khong{background:var(--loi-nen);  color:var(--loi-chu)}
+ .o-ngoai{background:var(--ngoai-nen);color:var(--ngoai-chu)}
+ tr.chot-ky td{border-top:2px solid var(--do);border-bottom:2px solid var(--do)}
+ tr.chot-ky td.thang{background:var(--do-nen);color:var(--do-chu);font-weight:700}
+ .khoi-ky{border:1px solid var(--vien);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.5rem}
+ .khoi-ky h2{margin:.2rem 0 .1rem;font-size:1.15rem}
+ .tom-tat{display:flex;flex-wrap:wrap;gap:1rem;background:var(--nen-phu);
+   border-radius:8px;padding:.5rem .75rem;margin:.5rem 0 .75rem}
+ .tom-tat div{font-size:.95rem}
+ .tom-tat b{display:block;font-size:1.05rem;font-variant-numeric:tabular-nums}
+ .chu-thich{color:var(--chu-nhat);font-size:.9rem}
+ .chu-giai{display:flex;flex-wrap:wrap;gap:.5rem 1.25rem;margin:.5rem 0 1rem}
+ .chu-giai span{display:inline-flex;align-items:center;gap:.4rem}
+ /* PHẢI có `.chu-giai` đứng trước: `bao_cao.html` cũng dùng lớp `.mau` cho ba
+    ô màu chú giải biểu đồ, nhưng chỉ khai width/height/border-radius/display
+    của riêng nó. Bốn thuộc tính còn lại ở đây (border, line-height,
+    text-align, font-weight) không có đối thủ nên rò thẳng sang, thêm cho ba
+    ô đó một viền xám chúng chưa từng có. Bản `.mau` này chỉ phục vụ
+    `_phu_chu_giai.html`, và ở đó nó luôn nằm trong `.chu-giai`. */
+ .chu-giai .mau{display:inline-block;width:1.4rem;height:1.4rem;line-height:1.4rem;
+   text-align:center;border:1px solid var(--vien);border-radius:4px;font-weight:700}
+
+ /* Nút hoàn tác: hành động PHÁ HUỶ, nên mang màu lỗi chứ không phải màu
+    hành động chính — nó không phải thứ ta mời người ta bấm. */
+ .hoan-tac summary{cursor:pointer;color:var(--loi-chu);font-size:.85rem}
+ .hoan-tac p{font-size:.85rem;margin:.4rem 0}
+ .hoan-tac button{font:inherit;padding:.3rem .7rem;border-radius:9px;
+   border:1px solid var(--loi-vien);background:var(--loi-nen);
+   color:var(--loi-chu);cursor:pointer}

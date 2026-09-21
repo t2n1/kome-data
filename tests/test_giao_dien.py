@@ -25,7 +25,7 @@ TEN_FONT = [
 
 # Mọi trang mở được mà không cần tham số. Trang hồ sơ khách và trang lỗi
 # không nằm đây vì chúng cần dữ liệu hoặc một sự cố để hiện ra.
-TRANG = ["/", "/khach-hang", "/bao-cao", "/can-xu-ly", "/health", "/phu-du-lieu"]
+TRANG = ["/", "/khach-hang", "/bao-cao", "/can-xu-ly", "/kho-du-lieu"]
 
 
 def test_css_duoc_phuc_vu(conn, test_db_url):
@@ -177,13 +177,17 @@ def test_khong_goi_ra_ngoai_mang():
             assert x not in text, f"{f.name} gọi ra ngoài mạng: {x}"
 
 
-def test_sidebar_hien_du_bay_muc_va_ba_nhom(conn, test_db_url):
+def test_sidebar_hien_du_nam_muc_va_ba_nhom(conn, test_db_url):
     """Chặn thảm hoạ: đổi khung điều hướng làm rơi mất một trang khỏi
-    sidebar -> trang đó vẫn chạy nhưng không ai vào được nữa."""
+    sidebar -> trang đó vẫn chạy nhưng không ai vào được nữa.
+
+    Đợt 2a gộp /nap + /health + /phu-du-lieu thành một mục "Kho dữ liệu"
+    (Task 4, db/… không liên quan) -> còn 5 mục thay vì 7, nhưng vẫn đúng ba
+    nhóm."""
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/").text
     for duong_dan in ["/", "/bao-cao", "/khach-hang", "/can-xu-ly",
-                      "/nap", "/health", "/phu-du-lieu"]:
+                      "/kho-du-lieu"]:
         assert f'href="{duong_dan}"' in html, f"sidebar thiếu {duong_dan}"
     for nhom in ["TỔNG QUAN", "KHÁCH HÀNG", "HỆ THỐNG"]:
         assert nhom in html, f"sidebar thiếu nhóm {nhom}"
@@ -197,9 +201,14 @@ def test_muc_dang_mo_duoc_danh_dau(conn, test_db_url):
     assert 'href="/bao-cao" class="dang-xem" aria-current="page"' in html
 
 
-def test_ban_chi_doc_an_han_muc_nap(conn, test_db_url, monkeypatch):
-    """Bản chỉ-đọc không nạp được. Hiện mục Nạp ở đó là mời người ta bấm
-    vào một đường dẫn thẳng tới 403.
+def test_ban_chi_doc_van_hien_muc_kho_du_lieu(conn, test_db_url, monkeypatch):
+    """Đợt 2a (Task 4): mục Nạp/Sức khoẻ/Bảng phủ gộp thành một mục "Kho dữ
+    liệu" duy nhất, KHÔNG còn bọc `{% if not chi_doc %}` ở tầng sidebar —
+    màn /kho-du-lieu hiện được ở cả hai bản, chỉ tự ẩn khối nạp và khối hoàn
+    tác BÊN TRONG chính nó. Bất biến "bản chỉ-đọc không mời bấm vào việc
+    không làm được" giờ được canh ở tests/test_kho_du_lieu.py::
+    test_ban_chi_doc_an_o_tha_file và ::test_ban_chi_doc_an_khoi_hoan_tac,
+    không còn ở tầng sidebar này.
 
     Dùng KOME_CHI_DOC chứ KHÔNG dùng VERCEL: đặt VERCEL=1 làm
     `bao_mat.kiem_cau_hinh` ném CauHinhSai ngay lúc dựng app nếu chưa có
@@ -209,8 +218,7 @@ def test_ban_chi_doc_an_han_muc_nap(conn, test_db_url, monkeypatch):
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/").text
-    assert 'href="/nap"' not in html
-    assert 'href="/health"' in html
+    assert 'href="/kho-du-lieu"' in html
 
 
 # Bốn tên lớp badge trạng thái khách hàng, GHÉP Ở TẦNG PYTHON
@@ -300,3 +308,55 @@ def test_moi_trang_that_co_dung_mot_the_viewport(conn, test_db_url):
         html = client.get(duong_dan).text
         so_luong = html.count('name="viewport"')
         assert so_luong == 1, f"{duong_dan} có {so_luong} thẻ viewport, cần đúng 1"
+
+
+# Selector TRẦN bị cấm trong kome.css: những tên mà một template ĐÃ khai lại
+# trong khối <style> của riêng nó. Thứ tự nguồn chỉ phân xử được các thuộc
+# tính CẢ HAI cùng khai; thuộc tính chỉ có trong kome.css thì không có đối
+# thủ và vẫn rò sang trang kia.
+SELECTOR_CAM_TRAN = {
+    ".mau": ("bao_cao.html khai .mau cho ba ô màu chú giải biểu đồ nhưng chỉ "
+             "khai width/height/border-radius/display — border, line-height, "
+             "text-align, font-weight của kome.css rò thẳng sang, thêm cho "
+             "chúng một viền xám chưa từng có. Dùng '.chu-giai .mau'."),
+    "button": ("mọi nút trong app (đăng nhập, tìm, đăng xuất, Xoá lô) đã có "
+               "kiểu riêng theo lớp — một 'button{…}' trần đè lên tất cả. "
+               "Dùng một lớp, ví dụ '.nut-nap'."),
+}
+
+
+def test_khong_co_selector_tran_de_ro_kieu_dang():
+    """[IMPORTANT] Chặn thảm hoạ đã XẢY RA THẬT hai lần trong đợt 2a.
+
+    (1) `.mau` trần trong kome.css rò `border`/`line-height`/`text-align`/
+    `font-weight` sang ba ô màu chú giải của /bao-cao, thêm cho chúng một
+    viền xám không ai yêu cầu. (2) `upload.html` cũ có `button{…}` trần; khi
+    chép sang kome.css thì nó sẽ đè lên MỌI nút khác của app.
+
+    Cả hai đều không làm test nào đỏ và không làm trang lỗi — chúng chỉ vẽ
+    sai, ở một trang khác với trang người sửa đang mở."""
+    css = CSS.read_text(encoding="utf-8")
+    vi_pham = []
+    for ten, vi_sao in SELECTOR_CAM_TRAN.items():
+        # Selector đứng ĐẦU một selector: đầu dòng, hoặc ngay sau `}`/`,`.
+        # `.chu-giai .mau{` và `.o-tim button{` KHÔNG khớp — chúng có một
+        # lớp định tính đứng trước, đúng thứ ta muốn.
+        mau = re.compile(r"(?m)(?:^|[},])\s*" + re.escape(ten) + r"\s*[{,]")
+        if mau.search(css):
+            vi_pham.append(f"{ten}: {vi_sao}")
+    assert not vi_pham, "kome.css có selector trần:\n" + "\n".join(vi_pham)
+
+
+def test_nut_nap_va_o_chon_file_co_kieu_dang():
+    """[IMPORTANT] "Nạp" là nút hành động chính của màn DUY NHẤT có người
+    dùng hằng ngày (13:30, ba file OBC). `upload.html` cũ tạo kiểu cho nó
+    bằng `button{…}` + `input[type=file]{…}`; Task 4 xoá template đó mà không
+    chép hai quy tắc sang kome.css, nên nút thành nút trần mặc định của
+    trình duyệt — nút duy nhất trong app không có kiểu dáng, và không test
+    nào đỏ vì trang vẫn trả 200."""
+    nap = (TEMPLATES / "_nap.html").read_text(encoding="utf-8")
+    css = CSS.read_text(encoding="utf-8")
+    for lop, o in (("nut-nap", 'nút submit "Nạp"'), ("chon-file", "ô chọn file")):
+        assert f'class="{lop}"' in nap, f"_nap.html: {o} chưa mang lớp .{lop}"
+        assert f".{lop}{{" in css.replace(" ", ""), \
+            f"kome.css chưa khai .{lop} — {o} sẽ trần trụi"
