@@ -5,7 +5,7 @@ Hai thứ được canh kỹ nhất ở đây: **cột `best_before` là TEXT v�
 **"không có dòng tồn" khác "tồn bằng 0"** — nhầm hai thứ đó là xếp một mã chưa
 bao giờ nhập kho vào danh sách cần đặt hàng gấp.
 """
-from datetime import timedelta
+from datetime import date, timedelta
 
 from tests.test_khach_hang import _ho_so_khach, _mua, _neo, HOM_NAY
 
@@ -285,3 +285,55 @@ def test_san_pham_theo_thang_gop_dung_thang_va_ma(conn, batch):
     assert float(r[1]) == 12.0          # 2 lần x 6 đơn vị (mặc định của _mua)
     assert r[2] == 200_000              # 2 x (110.000 - 10.000)
     assert r[3] == 60_000               # 2 x 30.000
+
+
+# ---------------------------------------------------------------------------
+# Vòng sửa lần 2: một hồi quy CRITICAL do chính vòng sửa lần 1 gây ra (`NOT
+# moi` trên NULL), cộng công thức "tốc độ theo tuổi mã" cần một cái tên riêng
+# thay vì âm thầm khác nghĩa với cột `toc_do_ngay` đã xuất ra, cộng một khe hở
+# trong regex một chữ số chưa có test nào canh.
+# ---------------------------------------------------------------------------
+
+def test_ma_khong_ban_gi_lau_ngay_van_la_ton_chet_du_khong_co_dong_toc_do_ban(conn, batch):
+    """[CRITICAL] Hồi quy do vòng sửa trước: một mã không bán gì trong 90 ngày
+    thì KHÔNG có dòng nào trong mart.toc_do_ban. Nếu cờ "mã mới" được tính
+    bằng cách JOIN qua view đó, nó sẽ là NULL cho đúng mã cần bị coi là "không
+    mới" nhất -- và `NOT NULL` cũng là NULL, nên nhánh tồn chết không chạy,
+    rơi thẳng xuống 'du'. Một mã tồn 10.000, bán lần cuối cách đây 200 ngày là
+    tồn chết THẬT, không phải 'đủ hàng'."""
+    _san_pham(conn, batch, "K018")
+    _ton(conn, batch, "K018", sl=10_000)
+    _ho_so_khach(conn, batch, "KH018", "Quán K018")
+    _mua(conn, batch, "KH018", HOM_NAY - timedelta(days=200), hang="K018")
+    _neo(conn, batch)
+    r = conn.execute(
+        "SELECT trang_thai FROM mart.san_pham_360 WHERE product_code='K018'").fetchone()
+    assert r[0] == "ton_chet"
+
+
+def test_han_su_dung_ngay_mot_chu_so_thang_ngay_van_doc_duoc(conn, batch):
+    """Regex vừa được nới thành 1-2 chữ số cho tháng/ngày -- phần vừa nới đó
+    chưa có test nào canh trực tiếp bằng đầu vào MỘT chữ số thật (mọi test
+    khác chỉ dùng dạng đệm 0 hai chữ số)."""
+    _san_pham(conn, batch, "K019")
+    dich = date(2028, 6, 9)
+    han = f"{dich.year}年{dich.month}月{dich.day}日"        # '2028年6月9日', không đệm 0
+    _ton(conn, batch, "K019", han=han)
+    _mua(conn, batch, "X0002", HOM_NAY, hang="K019")
+    _neo(conn, batch)
+    r = conn.execute(
+        "SELECT loai_han, han_con_lai FROM mart.ton_hien_tai WHERE product_code='K019'"
+    ).fetchone()
+    assert r[0] == "ngay"
+    assert r[1] == (dich - HOM_NAY).days
+
+
+def test_han_khong_han_co_khoang_trang_toan_giac_van_nhan_dung(conn, batch):
+    """Sửa nhân thể: btrim() trước khi so khớp '賞味期限なし' -- một ô OBC có
+    đệm khoảng trắng ở đuôi (kể cả khoảng trắng TOÀN GIÁC／全角, U+3000) không
+    được rơi nhầm xuống 'khong_ro'."""
+    _san_pham(conn, batch, "K020")
+    _ton(conn, batch, "K020", han="賞味期限なし　")     # có dấu cách toàn giác ở cuối
+    r = conn.execute(
+        "SELECT loai_han FROM mart.ton_hien_tai WHERE product_code='K020'").fetchone()
+    assert r[0] == "khong_han"
