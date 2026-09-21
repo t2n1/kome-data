@@ -143,12 +143,20 @@ dần sang nhà cung cấp khác, từng món một.</p>
    nói gì cả, và ô trống nào cũng dạy người đọc cuộn nhanh qua khu vực đó. #}
 {% if h.goi_y %}
 <h2>Gợi ý hàng chưa từng mua</h2>
+{# Nhãn cột là "Tỷ suất" trơ, ĐÚNG như mọi màn khác (/bao-cao, thẻ đầu trang
+   này, cột trong danh sách khách) — vì nó ĐÚNG LÀ cùng một chỉ số: tỷ số của
+   các tổng, lấy từ mart.ty_suat_mat_hang (migration 021), cùng công thức với
+   mart.ban_theo_san_pham mà /bao-cao đang hiện. Gọi nó là "tỷ suất trung
+   bình" ở riêng đây thì người bán mở hai màn thấy hai cái tên cho cùng một
+   con số và kết luận đó là hai chỉ số khác nhau — đúng sự mơ hồ mà 021 viết
+   ra để loại bỏ. #}
 <p class="ghi-chu">Tám mã khách này <strong>chưa từng mua lần nào</strong>, xếp
-theo tỷ suất lãi gộp trung bình TOÀN CÔNG TY. Đây là gợi ý theo lợi nhuận, không
+theo tỷ suất lãi gộp TOÀN CÔNG TY (lãi gộp cộng dồn chia doanh thu thuần cộng
+dồn của mã đó — cùng con số /bao-cao hiện). Đây là gợi ý theo lợi nhuận, không
 phải theo việc khách có cần hay không — người gọi vẫn là người quyết định.</p>
 <div class="bang-cuon">
 <table>
- <tr><th>Mặt hàng</th><th class="so">Tỷ suất trung bình</th>
+ <tr><th>Mặt hàng</th><th class="so">Tỷ suất</th>
      <th class="so">Đơn giá cao nhất đã bán</th></tr>
  {% for g in h.goi_y %}
  <tr><td>{{ g.ten }}</td>
@@ -181,8 +189,9 @@ phải theo việc khách có cần hay không — người gọi vẫn là ngư
 đơn giá thật trên phiếu là ra ngay những lần bán dưới giá. Mỗi
 <strong>荷姿</strong> (quy cách đóng gói) có giá riêng, và bảng chỉ hiện dòng
 <strong>mới nhất</strong> của từng quy cách — 取引単価データ giữ cả lịch sử giá,
-mỗi lần nạp master thêm một dòng. Tối đa <strong>20 mã đầu</strong> theo mã
-hàng; còn nữa thì tra trong OBC.</p>
+mỗi lần nạp master thêm một dòng. Bảng cắt ở <strong>20 DÒNG</strong> đầu theo
+mã hàng — một mã có cả hai 荷姿 thì chiếm hai dòng, nên đây có thể chỉ là 10 mã;
+còn nữa thì tra trong OBC.</p>
 <div class="bang-cuon">
 <table>
  <tr><th>Mặt hàng</th><th>荷姿</th><th class="so">Giá chưa thuế</th>
