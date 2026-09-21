@@ -111,3 +111,93 @@ def duong_dan_an_toan(tiep: str | None) -> str:
     if tiep and tiep.startswith("/") and not tiep.startswith("//"):
         return tiep
     return "/kho-du-lieu"
+
+
+# ---- Vé theo từng người (đợt 3) ---------------------------------------
+# Cơ chế cũ ở trên suy khoá ký TỪ CHÍNH mật khẩu chung, nên đổi mật khẩu là
+# mọi vé chết ngay. Cách đó không dùng được khi có nhiều tài khoản: đổi mật
+# khẩu MỘT người không được phép làm bốn người còn lại bị đăng xuất.
+#
+# Khoá ký giờ là của HỆ THỐNG (KOME_SESSION_SECRET), không phải mật khẩu của
+# ai cả. Thu hồi quyền vì thế tách làm hai mức:
+#   * đổi KOME_SESSION_SECRET -> đăng xuất TẤT CẢ (dùng khi nghi rò rỉ)
+#   * đổi mật khẩu một người  -> chỉ họ, ở lượt đăng nhập kế tiếp
+# Vé đang có hiệu lực của người bị đổi mật khẩu sống tới hết hạn (12 giờ).
+# Vô hiệu hoá tức thì cần kho phiên, mà kho phiên phá luật Vercel.
+#
+# Riêng quyền vào Kho dữ liệu KHÔNG nằm trong vé mà tra CSDL mỗi lượt gọi —
+# xem kome/web/app.py. Đó là màn có nút xoá, thu hồi phải ăn ngay.
+
+
+def bi_mat_phien() -> str | None:
+    """Khoá ký vé, hoặc None nếu không đặt (máy trong công ty, không có cổng)."""
+    return os.environ.get("KOME_SESSION_SECRET", "").strip() or None
+
+
+def kiem_cau_hinh_phien(bi_mat: str | None, cong_khai: bool) -> None:
+    """Gọi lúc dựng app. Ném CauHinhSai nếu cấu hình không an toàn.
+
+    Cùng hình dạng với kiem_cau_hinh() của cơ chế mật khẩu chung mà nó thay
+    thế: một bản chạy công khai KHÔNG CÓ CỔNG NÀO là hỏng theo cách tệ nhất,
+    nên phải chết lúc khởi động, nơi người triển khai đọc được nhật ký Vercel.
+
+    CỐ Ý không kiểm "đã có tài khoản nào trong CSDL chưa": làm vậy là buộc
+    việc dựng app phụ thuộc CSDL, và một CSDL chậm sẽ thành app không khởi
+    động được.
+    """
+    if bi_mat is None:
+        if cong_khai:
+            raise CauHinhSai(
+                "Trang đang chạy trên hạ tầng công khai nhưng chưa đặt biến môi "
+                "trường KOME_SESSION_SECRET.\n"
+                "Vào Vercel → Settings → Environment Variables, thêm "
+                "KOME_SESSION_SECRET là một chuỗi ngẫu nhiên dài ít nhất "
+                f"{DAI_TOI_THIEU} ký tự, rồi triển khai lại."
+            )
+        return
+    if len(bi_mat) < DAI_TOI_THIEU:
+        raise CauHinhSai(
+            f"KOME_SESSION_SECRET chỉ dài {len(bi_mat)} ký tự — phải từ "
+            f"{DAI_TOI_THIEU} trở lên.\n"
+            "Đây là khoá ký vé đăng nhập: đoán ra nó là tự ký được vé cho bất "
+            "kỳ tài khoản nào, không cần biết mật khẩu của ai."
+        )
+
+
+def _ky(noi_dung: str, bi_mat: str) -> str:
+    return hmac.new(bi_mat.encode("utf-8"), noi_dung.encode("utf-8"),
+                    hashlib.sha256).hexdigest()
+
+
+def tao_ve_cho(id_nguoi: int, bi_mat: str, bay_gio: float | None = None) -> str:
+    """Vé `<id>.<hạn>.<chữ ký>`, hết hạn sau HAN_PHIEN_GIAY."""
+    het = int((bay_gio if bay_gio is not None else time.time()) + HAN_PHIEN_GIAY)
+    than = f"{id_nguoi}.{het}"
+    return f"{than}.{_ky(than, bi_mat)}"
+
+
+def doc_ve(ve: str | None, bi_mat: str, bay_gio: float | None = None) -> int | None:
+    """id người trong vé, hoặc None nếu vé sai chữ ký / hết hạn / méo mó.
+
+    CHỮ KÝ PHỦ CẢ id LẪN HẠN. Ký riêng phần hạn thôi thì sửa một con số trong
+    cookie là hoá thân thành người khác mà chữ ký vẫn đúng — kể cả thành người
+    có quyền bấm nút xoá dữ liệu.
+
+    Giữ nguyên thứ tự "so chữ ký TRƯỚC khi đọc hạn" của cơ chế cũ:
+    hmac.compare_digest chạy hết thời gian như nhau dù sai ở ký tự nào, nên
+    không đo được chữ ký đúng là gì.
+    """
+    if not ve:
+        return None
+    phan = ve.split(".")
+    if len(phan) != 3:
+        return None
+    ma, het, chu_ky = phan
+    if not hmac.compare_digest(chu_ky, _ky(f"{ma}.{het}", bi_mat)):
+        return None
+    try:
+        if (bay_gio if bay_gio is not None else time.time()) >= int(het):
+            return None
+        return int(ma)
+    except ValueError:
+        return None

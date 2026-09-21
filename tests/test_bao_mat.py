@@ -81,6 +81,75 @@ def test_khong_lam_ban_dap_chuyen_huong(tiep, mong):
     assert bao_mat.duong_dan_an_toan(tiep) == mong
 
 
+# ---- Vé theo từng người (đợt 3) ---------------------------------------
+
+BI_MAT = "bi-mat-phien-du-dai-2026"
+
+
+def test_ve_mang_dung_id_nguoi_dang_nhap():
+    assert bao_mat.doc_ve(bao_mat.tao_ve_cho(7, BI_MAT), BI_MAT) == 7
+
+
+def test_doi_id_trong_ve_khong_hoa_than_duoc_thanh_nguoi_khac():
+    """[CRITICAL] Đây là chỗ dễ sai nhất của cả đợt. Nếu chữ ký chỉ phủ phần
+    HẠN mà không phủ ID, thì sửa một con số trong cookie là thành người khác —
+    ví dụ thành đúng người có quyền vào Kho dữ liệu, nơi có nút xoá cả tháng
+    doanh thu. Chữ ký PHẢI phủ cả hai."""
+    ve = bao_mat.tao_ve_cho(7, BI_MAT)
+    ma, het, chu_ky = ve.split(".")
+    assert bao_mat.doc_ve(f"1.{het}.{chu_ky}", BI_MAT) is None
+    assert bao_mat.doc_ve(f"999.{het}.{chu_ky}", BI_MAT) is None
+
+
+def test_ve_het_han_thi_vo_hieu_du_chu_ky_dung():
+    ve = bao_mat.tao_ve_cho(7, BI_MAT, bay_gio=1_000_000)
+    assert bao_mat.doc_ve(ve, BI_MAT, bay_gio=1_000_000 + bao_mat.HAN_PHIEN_GIAY - 1) == 7
+    assert bao_mat.doc_ve(ve, BI_MAT, bay_gio=1_000_000 + bao_mat.HAN_PHIEN_GIAY + 1) is None
+
+
+def test_doi_bi_mat_phien_huy_moi_ve_dang_luu_hanh():
+    """[IMPORTANT] Không có kho phiên ở máy chủ, nên đổi KOME_SESSION_SECRET
+    là cách DUY NHẤT đăng xuất tất cả mọi người cùng lúc khi nghi rò rỉ."""
+    assert bao_mat.doc_ve(bao_mat.tao_ve_cho(7, BI_MAT), BI_MAT + "-moi") is None
+
+
+def test_ve_meo_mo_bi_tu_choi():
+    ma, het, chu_ky = bao_mat.tao_ve_cho(7, BI_MAT).split(".")
+    assert bao_mat.doc_ve(None, BI_MAT) is None
+    assert bao_mat.doc_ve("", BI_MAT) is None
+    assert bao_mat.doc_ve("khong-co-dau-cham", BI_MAT) is None
+    assert bao_mat.doc_ve(f"{het}.{chu_ky}", BI_MAT) is None          # thiếu id
+    assert bao_mat.doc_ve(f"7.{het}.{chu_ky}.thua", BI_MAT) is None   # thừa đoạn
+    assert bao_mat.doc_ve(f"7.khong-phai-so.{chu_ky}", BI_MAT) is None
+    assert bao_mat.doc_ve(f"khong-phai-so.{het}.{chu_ky}", BI_MAT) is None
+
+
+def test_hai_nguoi_khac_nhau_khong_bao_gio_dung_chung_ve():
+    a = bao_mat.tao_ve_cho(7, BI_MAT, bay_gio=1_000_000)
+    b = bao_mat.tao_ve_cho(8, BI_MAT, bay_gio=1_000_000)
+    assert a != b
+
+
+def test_cong_khai_ma_thieu_bi_mat_phien_thi_app_chet_ngay():
+    """[CRITICAL] Bỏ mật khẩu chung là bỏ luôn chốt an toàn cũ. Chốt mới phải
+    cùng hình dạng: công khai mà không có khoá ký thì KHÔNG dựng app."""
+    with pytest.raises(bao_mat.CauHinhSai, match="KOME_SESSION_SECRET"):
+        bao_mat.kiem_cau_hinh_phien(None, cong_khai=True)
+    with pytest.raises(bao_mat.CauHinhSai, match="ký tự"):
+        bao_mat.kiem_cau_hinh_phien("ngan", cong_khai=True)
+    # Máy trong công ty: không có khoá cũng không sao, không có cổng đăng nhập.
+    bao_mat.kiem_cau_hinh_phien(None, cong_khai=False)
+
+
+def test_bi_mat_phien_doc_tu_bien_moi_truong(monkeypatch):
+    monkeypatch.delenv("KOME_SESSION_SECRET", raising=False)
+    assert bao_mat.bi_mat_phien() is None
+    monkeypatch.setenv("KOME_SESSION_SECRET", "   ")
+    assert bao_mat.bi_mat_phien() is None      # khoảng trắng = chưa đặt
+    monkeypatch.setenv("KOME_SESSION_SECRET", f"  {BI_MAT}  ")
+    assert bao_mat.bi_mat_phien() == BI_MAT
+
+
 # ---- Cấu hình phải an toàn ngay từ lúc khởi động ------------------------
 
 def test_tren_vercel_ma_khong_co_mat_khau_thi_app_chet_ngay(khach):
