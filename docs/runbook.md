@@ -108,14 +108,18 @@ Lưu ý:
   liệu hằng ngày. Tài khoản `postgres` (superuser hiện tại) **chỉ dùng khi
   chạy migration** (`python -m db.migrate` hoặc tương đương), không dùng cho
   vận hành thường ngày.
-- **Web app của Giai đoạn 0 chạy bằng `kome_ingest_user`** — chính là
-  `DATABASE_URL` ở trên. Trang **Kho dữ liệu** (nạp, sức khoẻ, hoàn tác) đều
-  cần ghi và xoá trong `core`, nên không dùng `kome_app_user` được.
-- `kome_app_user` **chưa dùng ở Giai đoạn 0** — dành cho ứng dụng CRM ở Giai
-  đoạn 2 (đọc `core`/`mart`, đọc-ghi `app` — **không ghi được vào `core`**, kể
-  cả khi có bug trong code). Nó cũng không đọc được `meta.ingest_batch` nên
-  không mở được trang **Kho dữ liệu**. `kome_report_user` chỉ đọc, dùng cho công cụ
-  báo cáo/BI bên ngoài nếu có.
+- **Trang Kho dữ liệu (nạp, sức khoẻ, hoàn tác) chạy bằng `kome_ingest_user`**
+  — chính là `DATABASE_URL` ở trên. Màn đó cần ghi và xoá trong `core`, nên
+  không dùng `kome_app_user` được.
+- **Từ Đợt 3, `kome_app_user` chạy đăng nhập và mọi trang chỉ đọc** (Tổng
+  quan, Khách hàng, Cần xử lý, Báo cáo) — biến `DATABASE_URL_APP` trong
+  `.env` (cách ghép chuỗi kết nối: xem `docs/trien-khai-vercel.md` mục 2c).
+  Đọc `core`/`mart`, đọc-ghi `app` — **không ghi được vào `core`**, kể cả khi
+  có bug trong code. Có SELECT trên `meta.ingest_batch` (cấp từ
+  `db/migrations/019_danh_tinh.sql`) — đủ cho ô "hôm nay đã có dữ liệu chưa"
+  ở trang chủ. Vẫn **không** mở được trang **Kho dữ liệu** — màn đó luôn đi
+  qua `kome_ingest_user`/`DATABASE_URL` như dòng trên. `kome_report_user` chỉ
+  đọc, dùng cho công cụ báo cáo/BI bên ngoài nếu có.
 - **Migration luôn chạy bằng `postgres`**, không bao giờ bằng `kome_ingest_user`:
   `ALTER DEFAULT PRIVILEGES` trong migration không có `FOR ROLE`, chạy bằng vai
   trò khác thì quyền mặc định cho bảng mới sẽ âm thầm không áp dụng.
