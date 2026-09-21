@@ -25,7 +25,7 @@ TEN_FONT = [
 
 # Mọi trang mở được mà không cần tham số. Trang hồ sơ khách và trang lỗi
 # không nằm đây vì chúng cần dữ liệu hoặc một sự cố để hiện ra.
-TRANG = ["/", "/khach-hang", "/bao-cao", "/can-xu-ly", "/health", "/phu-du-lieu"]
+TRANG = ["/", "/khach-hang", "/bao-cao", "/can-xu-ly", "/kho-du-lieu"]
 
 
 def test_css_duoc_phuc_vu(conn, test_db_url):
@@ -177,13 +177,17 @@ def test_khong_goi_ra_ngoai_mang():
             assert x not in text, f"{f.name} gọi ra ngoài mạng: {x}"
 
 
-def test_sidebar_hien_du_bay_muc_va_ba_nhom(conn, test_db_url):
+def test_sidebar_hien_du_nam_muc_va_ba_nhom(conn, test_db_url):
     """Chặn thảm hoạ: đổi khung điều hướng làm rơi mất một trang khỏi
-    sidebar -> trang đó vẫn chạy nhưng không ai vào được nữa."""
+    sidebar -> trang đó vẫn chạy nhưng không ai vào được nữa.
+
+    Đợt 2a gộp /nap + /health + /phu-du-lieu thành một mục "Kho dữ liệu"
+    (Task 4, db/… không liên quan) -> còn 5 mục thay vì 7, nhưng vẫn đúng ba
+    nhóm."""
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/").text
     for duong_dan in ["/", "/bao-cao", "/khach-hang", "/can-xu-ly",
-                      "/nap", "/health", "/phu-du-lieu"]:
+                      "/kho-du-lieu"]:
         assert f'href="{duong_dan}"' in html, f"sidebar thiếu {duong_dan}"
     for nhom in ["TỔNG QUAN", "KHÁCH HÀNG", "HỆ THỐNG"]:
         assert nhom in html, f"sidebar thiếu nhóm {nhom}"
@@ -197,9 +201,14 @@ def test_muc_dang_mo_duoc_danh_dau(conn, test_db_url):
     assert 'href="/bao-cao" class="dang-xem" aria-current="page"' in html
 
 
-def test_ban_chi_doc_an_han_muc_nap(conn, test_db_url, monkeypatch):
-    """Bản chỉ-đọc không nạp được. Hiện mục Nạp ở đó là mời người ta bấm
-    vào một đường dẫn thẳng tới 403.
+def test_ban_chi_doc_van_hien_muc_kho_du_lieu(conn, test_db_url, monkeypatch):
+    """Đợt 2a (Task 4): mục Nạp/Sức khoẻ/Bảng phủ gộp thành một mục "Kho dữ
+    liệu" duy nhất, KHÔNG còn bọc `{% if not chi_doc %}` ở tầng sidebar —
+    màn /kho-du-lieu hiện được ở cả hai bản, chỉ tự ẩn khối nạp và khối hoàn
+    tác BÊN TRONG chính nó. Bất biến "bản chỉ-đọc không mời bấm vào việc
+    không làm được" giờ được canh ở tests/test_kho_du_lieu.py::
+    test_ban_chi_doc_an_o_tha_file và ::test_ban_chi_doc_an_khoi_hoan_tac,
+    không còn ở tầng sidebar này.
 
     Dùng KOME_CHI_DOC chứ KHÔNG dùng VERCEL: đặt VERCEL=1 làm
     `bao_mat.kiem_cau_hinh` ném CauHinhSai ngay lúc dựng app nếu chưa có
@@ -209,8 +218,7 @@ def test_ban_chi_doc_an_han_muc_nap(conn, test_db_url, monkeypatch):
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/").text
-    assert 'href="/nap"' not in html
-    assert 'href="/health"' in html
+    assert 'href="/kho-du-lieu"' in html
 
 
 # Bốn tên lớp badge trạng thái khách hàng, GHÉP Ở TẦNG PYTHON

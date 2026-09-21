@@ -6,7 +6,6 @@ from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from kome.config import SPECS
 from kome.bao_cao import tinh_bao_cao, ve_bieu_do
 from kome.coverage import tinh_bang_ngay, tinh_bang_phu
 from kome import khach_hang as KH
@@ -226,15 +225,6 @@ def create_app(db_url: str | None = None) -> FastAPI:
         except Exception as e:
             return _loi(request, "mở trang tổng quan", e, chung)
 
-    @app.get("/nap", response_class=HTMLResponse)
-    def trang_nap(request: Request):
-        if chi_doc:
-            return _cam(request)
-        try:
-            return _ve(request, "upload.html", {"results": None, "trang": "nap"})
-        except Exception as e:
-            return _loi(request, "mở trang nạp dữ liệu", e, chung)
-
     @app.get("/khach-hang", response_class=HTMLResponse)
     def ds_khach(request: Request, tim: str = "", loc: str = "",
                  sap: str = "doanh_thu", trang: int = 1):
@@ -283,7 +273,12 @@ def create_app(db_url: str | None = None) -> FastAPI:
                         with staged.open("wb") as out:
                             shutil.copyfileobj(f.file, out)
                         results.append(ingest(conn, staged, archive_dir))
-            return _ve(request, "upload.html", {"results": results, "trang": "nap"})
+            backup_dir = Path(os.environ.get("BACKUP_DIR", "./backups"))
+            with open_conn() as conn:
+                ctx = _du_lieu_kho(conn)
+            ctx["backup"] = None if chi_doc else backup_status(backup_dir)
+            return _ve(request, "kho_du_lieu.html",
+                       {**ctx, "results": results, "trang": "kho-du-lieu"})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e, chung)
 
@@ -318,49 +313,28 @@ def create_app(db_url: str | None = None) -> FastAPI:
         except Exception as e:
             return _loi(request, "mở màn kho dữ liệu", e, chung)
 
-    @app.get("/health", response_class=HTMLResponse)
-    def health(request: Request):
-        try:
-            # BACKUP_DIR đọc mỗi lần gọi, không chốt lúc tạo app — test và
-            # người vận hành đổi biến môi trường thì trang phải thấy ngay.
-            backup_dir = Path(os.environ.get("BACKUP_DIR", "./backups"))
-            with open_conn() as conn:
-                # DISTINCT ON: lần nạp GẦN NHẤT của từng loại file.
-                # max(loaded_at), max(row_count), max(total_amount) là ba hàm
-                # độc lập lấy từ ba dòng khác nhau — sau một lần đối soát tháng
-                # ~18.000 dòng thì trang LUÔN hiện 18.000, kể cả hôm nay OBC
-                # xuất cắt cụt còn 60 dòng.
-                rows = conn.execute(
-                    """SELECT DISTINCT ON (spec_name)
-                              spec_name, loaded_at, row_count, total_amount
-                       FROM meta.ingest_batch WHERE undone_at IS NULL
-                       ORDER BY spec_name, loaded_at DESC"""
-                ).fetchall()
-                ky = _ky_du_lieu(conn)
-                tuoi = tinh_tuoi(conn)
-            seen = {r[0]: r for r in rows}
-            status = [
-                {"name": s.display_name,
-                 "last": seen[k][1] if k in seen else None,
-                 "rows": seen[k][2] if k in seen else 0,
-                 "total": seen[k][3] if k in seen else 0,
-                 # File master / bảng giá KHÔNG mang giá trị tiền: total_column
-                 # để trống CÓ CHỦ Ý (xem kome/config.py). Cột "Tổng tiền" phải
-                 # hiện "—", không phải "¥0" — ¥0 làm người đọc tưởng hệ thống
-                 # đếm hụt tiền và đi báo lỗi không tồn tại.
-                 "co_tien": s.total_column is not None}
-                for k, s in SPECS.items()
-            ]
-            # Bản chỉ-đọc KHÔNG nói gì về sao lưu. Sao lưu chạy trên máy nội
-            # bộ, nơi có file .zip; máy chủ công khai không nhìn thấy thư mục
-            # đó nên sẽ luôn kết luận "chưa sao lưu" — một dải đỏ vĩnh viễn
-            # dạy người đọc bỏ qua dải đỏ, đúng thứ hệ thống này cần họ tin.
-            backup = None if chi_doc else backup_status(backup_dir)
-            return _ve(request, "health.html",
-                       {"status": status, "backup": backup, "ky": ky,
-                        "tuoi": tuoi, "trang": "suc-khoe"})
-        except Exception as e:
-            return _loi(request, "mở trang sức khoẻ dữ liệu", e, chung)
+    # Ba địa chỉ cũ -> màn gộp. 301 chứ không 302: chúng biến mất vĩnh viễn,
+    # và 301 cho trình duyệt cập nhật dấu trang. Neo để người bấm dấu trang cũ
+    # rơi đúng khối họ vẫn mở, không phải cuộn đi tìm.
+    #
+    # /nap VẪN chuyển hướng ở bản chỉ-đọc, không trả 403: màn đích tự ẩn khối
+    # nạp, còn 403 cho một dấu trang cũ là phạt người dùng vì một thay đổi họ
+    # không gây ra.
+    #
+    # Viết ba hàm rời chứ không một vòng lặp sinh route: ba dòng lặp lại đọc
+    # thẳng hơn một closure sinh hàm, và repo này chọn "không ma thuật" (R2).
+
+    @app.get("/nap", include_in_schema=False)
+    def _cu_nap():
+        return RedirectResponse("/kho-du-lieu#nap", status_code=301)
+
+    @app.get("/health", include_in_schema=False)
+    def _cu_health():
+        return RedirectResponse("/kho-du-lieu", status_code=301)
+
+    @app.get("/phu-du-lieu", include_in_schema=False)
+    def _cu_phu_du_lieu():
+        return RedirectResponse("/kho-du-lieu#theo-thang", status_code=301)
 
     @app.get("/bao-cao", response_class=HTMLResponse)
     def bao_cao(request: Request, ky: int | None = None):
@@ -378,29 +352,6 @@ def create_app(db_url: str | None = None) -> FastAPI:
         except Exception as e:
             return _loi(request, "mở trang báo cáo", e, chung)
 
-    @app.get("/phu-du-lieu", response_class=HTMLResponse)
-    def phu_du_lieu(request: Request):
-        """Bảng phủ dữ liệu: liếc mắt là thấy tháng/kỳ nào đang thiếu.
-
-        Cách tính nằm ở kome/coverage.py — DÙNG CHUNG với lệnh terminal
-        scripts/bang_phu_du_lieu.py. Trang này chỉ hiển thị.
-
-        open_conn() để tôn trọng create_app(db_url=…): gọi connect() không
-        tham số ở đây sẽ âm thầm đọc CSDL THẬT trong khi test tưởng mình
-        đang dùng CSDL thử nghiệm.
-        """
-        try:
-            with open_conn() as conn:
-                bang = tinh_bang_phu(conn)
-                bang_ngay = tinh_bang_ngay(conn)
-            # Mẫu KHÔNG in `bang.database`: tên CSDL là thông tin kết nối,
-            # còn trang này thì ai mở cũng xem được. Terminal in được vì chỉ
-            # người chạy lệnh mới thấy.
-            return _ve(request, "phu_du_lieu.html",
-                       {"bang": bang, "bang_ngay": bang_ngay, "trang": "phu"})
-        except Exception as e:
-            return _loi(request, "mở trang bảng phủ dữ liệu", e, chung)
-
     @app.post("/undo/{batch_id}")
     def undo(request: Request, batch_id: int):
         if chi_doc:
@@ -409,7 +360,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
             from kome.pipeline import undo_batch
             with open_conn() as conn:
                 undo_batch(conn, batch_id)
-            return RedirectResponse("/health", status_code=303)
+            return RedirectResponse("/kho-du-lieu", status_code=303)
         except Exception as e:
             return _loi(request, "hoàn tác lần nạp dữ liệu", e, chung)
 

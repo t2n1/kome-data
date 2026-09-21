@@ -9,7 +9,10 @@
 
    `trang`: đánh dấu mục đang xem. Trang lỗi không truyền biến này nên không
    mục nào sáng — đúng, vì trang lỗi không thuộc mục nào cả.
-   `chi_doc`: bản Vercel không nạp được, ẩn hẳn mục Nạp.
+
+   Mục "Kho dữ liệu" KHÔNG bọc `{% if not chi_doc %}`: màn đó hiện được ở cả
+   hai bản, chỉ khác là bản chỉ-đọc tự ẩn khối nạp và khối hoàn tác bên
+   trong chính nó (xem kho_du_lieu.html), không phải ẩn cả mục điều hướng.
 
    QUAN TRỌNG — partial này MỞ `<main class="noi-dung">` ở cuối và KHÔNG
    ĐÓNG nó. Mọi template include partial này BẮT BUỘC phải tự thêm dòng
@@ -28,11 +31,7 @@
     <a href="/can-xu-ly"{% if trang == 'can-xu-ly' %} class="dang-xem" aria-current="page"{% endif %}>Cần xử lý</a>
 
     <p class="nhom">HỆ THỐNG</p>
-    {% if not chi_doc %}
-    <a href="/nap"{% if trang == 'nap' %} class="dang-xem" aria-current="page"{% endif %}>Nạp từ OBC</a>
-    {% endif %}
-    <a href="/health"{% if trang == 'suc-khoe' %} class="dang-xem" aria-current="page"{% endif %}>Sức khoẻ dữ liệu</a>
-    <a href="/phu-du-lieu"{% if trang == 'phu' %} class="dang-xem" aria-current="page"{% endif %}>Bảng phủ dữ liệu</a>
+    <a href="/kho-du-lieu"{% if trang == 'kho-du-lieu' %} class="dang-xem" aria-current="page"{% endif %}>Kho dữ liệu</a>
   </nav>
 
   {% if co_mat_khau %}

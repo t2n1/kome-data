@@ -107,3 +107,41 @@ def test_hoan_tac_fact_khong_hien_canh_bao_se_trong(conn, test_db_url):
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/kho-du-lieu").text
     assert "sẽ trống hoàn toàn" not in html
+
+
+def test_ba_dia_chi_cu_chuyen_huong_301(conn, test_db_url):
+    """[IMPORTANT] Ba địa chỉ này nằm trong runbook và trong dấu trang của
+    người dùng. Trả 404 là phạt họ vì một thay đổi họ không gây ra.
+
+    follow_redirects=False: TestClient mặc định ĐI THEO chuyển hướng, nên
+    không tắt thì test này xanh cả khi route trả 200 mà chẳng chuyển hướng gì.
+    """
+    client = TestClient(create_app(db_url=test_db_url))
+    mong_doi = {"/health": "/kho-du-lieu",
+                "/nap": "/kho-du-lieu#nap",
+                "/phu-du-lieu": "/kho-du-lieu#theo-thang"}
+    for cu, moi in mong_doi.items():
+        r = client.get(cu, follow_redirects=False)
+        assert r.status_code == 301, f"{cu} trả {r.status_code}, phải 301"
+        assert r.headers["location"] == moi, f"{cu} trỏ sai đích"
+
+
+def test_nap_van_chuyen_huong_o_ban_chi_doc(conn, test_db_url, monkeypatch):
+    """Dấu trang /nap cũ trên bản công khai phải rơi vào màn (tự ẩn khối
+    nạp), không phải một trang 403. 403 cho một dấu trang cũ là phạt người
+    dùng vì một thay đổi họ không gây ra."""
+    monkeypatch.setenv("KOME_CHI_DOC", "1")
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/nap", follow_redirects=False)
+    assert r.status_code == 301
+
+
+def test_upload_render_man_gop(conn, test_db_url):
+    """Nạp xong phải rơi lại vào màn gộp kèm kết quả — không phải một
+    template đã bị xoá."""
+    client = TestClient(create_app(db_url=test_db_url))
+    with open("tests/fixtures/zaiko_cat_cut.xlsx", "rb") as f:
+        r = client.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", f)})
+    assert r.status_code == 200
+    assert 'id="theo-thang"' in r.text, "phải là màn gộp, không phải trang nạp cũ"
+    assert "nghi file xuất một phần" in r.text, "kết quả nạp vẫn phải hiện"
