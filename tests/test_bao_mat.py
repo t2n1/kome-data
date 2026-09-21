@@ -305,6 +305,70 @@ def test_static_khong_bi_chan_boi_cong_dang_nhap(khach):
     assert r.headers["location"] == "/dang-nhap"
 
 
+# ---- Hai kết nối, hai vai trò CSDL --------------------------------------
+
+def test_db_url_truyen_tay_thang_bien_moi_truong(monkeypatch, test_db_url, conn):
+    """[CRITICAL] `create_app(db_url=…)` phải kéo theo CẢ kết nối app.
+
+    Nếu `db_url_app` đi lấy thẳng DATABASE_URL_APP từ môi trường, test sẽ chạy
+    trên CSDL thử nghiệm nhưng ĐỌC `app.nguoi_dung` của CSDL THẬT — và hỏng
+    kiểu đó thì không có gì đỏ, chỉ có một bộ test nói dối.
+
+    Cách canh: trỏ DATABASE_URL_APP vào một máy chủ không tồn tại. Luật còn
+    đúng thì trang đọc vẫn mở bình thường; luật bị phá thì route đi tìm máy
+    chủ ma, ngoại lệ rơi vào `_loi` và trả 500.
+    """
+    monkeypatch.setenv("DATABASE_URL_APP", "postgresql://khong-ton-tai/khong-co")
+    c = TestClient(create_app(db_url=test_db_url))
+    assert c.get("/khach-hang").status_code == 200
+
+
+def test_trang_chi_doc_khong_duoc_dung_ket_noi_nap_du_lieu():
+    """[CRITICAL] Chỉ ba route THẬT SỰ ghi/xoá được dùng `open_conn`
+    (DATABASE_URL, vai trò kome_ingest_user — ghi được vào `core`). Mọi route
+    còn lại phải đi `open_app_conn` (kome_app_user, KHÔNG ghi được vào `core`).
+
+    Không có test này thì regression im lặng tuyệt đối: trong test hai kết nối
+    luôn trỏ cùng một CSDL, nên một route đọc lỡ dùng `open_conn` vẫn xanh hết
+    — cho tới đúng ngày DATABASE_URL_APP được đặt thật ở máy chủ, lúc đó trang
+    đó âm thầm chạy bằng vai trò ghi được vào `core`, tức phá Luật số một.
+
+    Duyệt MỌI hàm có decorator trong `create_app` chứ không liệt kê cứng tên
+    năm route đọc: route thêm về sau phải tự động bị canh, đúng tinh thần
+    "quên gắn cho route mới thì có thứ báo" của chính middleware.
+
+    Soi mã nguồn bằng ast, cùng kiểu với
+    test_trang_chi_doc_khong_phu_thuoc_pandas ở trên.
+    """
+    import ast
+    import inspect
+
+    import kome.web.app as A
+
+    DUOC_GHI = {"upload", "kho_du_lieu", "undo"}
+
+    tao = next(n for n in ast.parse(inspect.getsource(A)).body
+               if isinstance(n, ast.FunctionDef) and n.name == "create_app")
+    ten_route, vi_pham = set(), []
+    for n in ast.walk(tao):
+        # `decorator_list` là thứ phân biệt route/middleware với mấy hàm phụ
+        # trong create_app (_ve, _cam, _du_lieu_kho — chúng nhận conn sẵn).
+        if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) or not n.decorator_list:
+            continue
+        ten_route.add(n.name)
+        if n.name in DUOC_GHI:
+            continue
+        if any(isinstance(g, ast.Call) and isinstance(g.func, ast.Name)
+               and g.func.id == "open_conn" for g in ast.walk(n)):
+            vi_pham.append(n.name)
+    # Đổi tên một route ghi (hoặc đổi cách khai báo route) làm vòng duyệt trên
+    # rỗng đi mà test vẫn xanh — khẳng định này bắt chính nó mất hiệu lực.
+    assert DUOC_GHI <= ten_route, \
+        f"không thấy đủ ba route ghi dữ liệu — test mất hiệu lực: {sorted(ten_route)}"
+    assert not vi_pham, \
+        f"route chỉ đọc dùng open_conn (vai trò ghi được vào core): {vi_pham}"
+
+
 # ---- Chế độ chỉ-đọc ----------------------------------------------------
 
 def test_tren_vercel_khong_nap_va_khong_hoan_tac_duoc(khach):
