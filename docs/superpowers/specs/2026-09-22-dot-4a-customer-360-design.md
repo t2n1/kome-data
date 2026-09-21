@@ -214,7 +214,7 @@ về **cùng một tập mã khách**.
 |---|---|
 | Toàn bộ danh bạ | không lọc |
 | Im lặng ≥ 2× nhịp | `ty_le_im_lang >= 2` |
-| Hạng S·A đang tụt | hạng S hoặc A, doanh thu tháng này < 80% trung bình 3 tháng trước |
+| Hạng S·A đang tụt | hạng S hoặc A, doanh thu **30 ngày gần nhất** < 80% trung bình của **ba kỳ 30 ngày** liền trước |
 | Khách mới chưa quay lại | `lan_dau` trong 90 ngày gần nhất **và** `ty_le_im_lang >= 1.2` |
 
 Khách OBC đã đánh dấu `※廃業※` / `※取引停止※` **không** vào nhóm nào ngoài "Toàn bộ" —
@@ -276,7 +276,7 @@ token, nên không cần thêm biến CSS mới.
 | R2 | Trang hồ sơ vốn đã ~900 ms; thêm 2 truy vấn nữa | Trung bình | §6.2 giới hạn 8 truy vấn, có test đếm. Nếu vượt thì gộp tiếp, không nới trần |
 | R3 | 8 khách không có tỉnh → khối "Tập trung ở đâu" thiếu họ | Thấp | Hiện một dòng "không rõ tỉnh: 8" thay vì bỏ im lặng |
 | R4 | Chỉ 532/1.710 khách có 直送先 | Thấp | Khối tự ẩn khi khách không có, không hiện bảng rỗng |
-| R5 | "Hạng S·A đang tụt" cần doanh thu tháng này, mà tháng hiện tại luôn dở dang | Trung bình | So với **cùng số ngày đã trôi** của 3 tháng trước, không so tháng đủ với tháng dở |
+| R5 | So doanh thu "tháng này" với tháng trước là so một tháng **dở dang** với một tháng đủ — khách nào cũng trông như đang tụt vào ngày mùng 3 | Trung bình | Dùng **cửa sổ trượt 30 ngày** tính từ `mart.moc_thoi_gian.hom_nay`, so với ba cửa sổ 30 ngày liền trước. Mọi kỳ đều dài bằng nhau nên không có kỳ nào dở dang |
 | R6 | Nhịp theo mã làm `khach_mat_hang` nặng thêm | Thấp | Đã đo: view hiện tại 10 ms CSDL. Thêm một hàm cửa sổ trong cùng lượt quét. Task 1 đo lại |
 
 ---
