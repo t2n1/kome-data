@@ -1,5 +1,18 @@
 # Đặc tả thiết kế — Đăng nhập theo người dùng + Dashboard + CRM đợt 1
 
+> **⚠️ Tài liệu này đã được TÁCH LÀM ĐÔI (2026-09-21).** Lộ trình 24 màn §2
+> chia nó thành hai đợt:
+>
+> - **Phần danh tính (§5.1, §5.3, §5.4) bị thay thế** bởi
+>   `2026-09-21-dot-3-danh-tinh-design.md`. Một **tiền đề ở đây đã sai**: tài
+>   liệu này đóng khung việc lọc theo `salesperson_code` như một *ranh giới
+>   bảo mật* ("sale chỉ thấy khách của mình") và đòi một test canh việc chặn
+>   lộ dữ liệu khách của người khác. Chủ sở hữu đã quyết ngược lại — năm sale
+>   **không cần giấu nhau**; bộ lọc chỉ là mặc định tiện dụng. Test đó đã bị
+>   **bỏ**, không phải giữ. Cột `vai_tro` cũng bị bỏ, thay bằng một boolean
+>   `duoc_vao_kho_du_lieu`.
+> - **Phần CRM** vẫn còn hiệu lực, xếp ở đợt 7.
+
 **Ngày:** 2026-09-17
 **Công ty:** 株式会社KOME — bán buôn thực phẩm Việt Nam tại Nhật
 **Phạm vi tài liệu:** Giai đoạn 2 (CRM nội bộ) — **đợt 1**: thay cơ chế đăng nhập chung

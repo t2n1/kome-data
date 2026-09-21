@@ -41,13 +41,42 @@ sao và cách đưa lên.
 
 | Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
-| Trang không mở, Vercel báo lỗi khởi động | Thiếu `KOME_MAT_KHAU`, hoặc mật khẩu ngắn dưới 12 ký tự | Vercel → Settings → Environment Variables → sửa → **Redeploy** |
+| Trang không mở, Vercel báo lỗi khởi động | Thiếu `KOME_SESSION_SECRET`, hoặc chuỗi ngắn dưới 12 ký tự | Vercel → Settings → Environment Variables → sửa → **Redeploy** |
 | Mở được một lúc rồi báo lỗi đỏ | `DATABASE_URL` đang dùng **cổng 5432** thay vì **6543** | Đổi sang chuỗi Transaction pooler (cổng 6543) → Redeploy |
-| Cần chặn một người đã nghỉ việc | Họ vẫn nhớ mật khẩu chung | Đổi `KOME_MAT_KHAU` rồi Redeploy — **mọi** lần đăng nhập đang có hiệu lực bị huỷ ngay |
+| Cần chặn một người đã nghỉ việc | Tài khoản của họ vẫn còn | Xoá tài khoản: họ bị chặn ở **lượt bấm kế tiếp**, không cần chờ hết phiên. Nghi lộ khoá ký thì đổi `KOME_SESSION_SECRET` → **mọi người** phải đăng nhập lại |
 
 Trang trên mạng **không nạp dữ liệu được** và điều đó là cố ý, không phải hỏng:
 mỗi lần gửi bị Vercel chặn ở 4,5 MB còn một file `売上伝票データ` nặng khoảng
 100 MB. Nạp dữ liệu vẫn làm ở máy trong công ty như thường lệ.
+
+---
+
+## Tài khoản đăng nhập
+
+    python scripts/tao_nguoi_dung.py                      xem danh sách
+    python scripts/tao_nguoi_dung.py them an --sale 0104
+    python scripts/tao_nguoi_dung.py them minh --kho-du-lieu
+    python scripts/tao_nguoi_dung.py doi-mat-khau an
+    python scripts/tao_nguoi_dung.py quyen an --kho-du-lieu
+    python scripts/tao_nguoi_dung.py quyen an --bo-kho-du-lieu
+
+`--sale <mã>` gắn tài khoản với một trong 5 người phụ trách của OBC
+(`core.dim_salesperson`) — trang khách hàng khi đó mặc định chỉ hiện khách của
+họ. Bỏ `--sale` cho người không phụ trách khách nào (chủ DN, kế toán, kho): họ
+thấy toàn bộ.
+
+`--kho-du-lieu` mở màn Kho dữ liệu, tức **nạp file VÀ hoàn tác một lần nạp**.
+Hoàn tác nhầm lô đối soát tháng sẽ xoá cả một tháng doanh thu khỏi kho. Chỉ
+cấp cho người phụ trách nạp và chủ doanh nghiệp.
+
+**Phải đặt `KOME_SESSION_SECRET` trong `.env` của máy trong công ty.** Để
+trống thì trang chạy KHÔNG có đăng nhập và KHÔNG có phân quyền — ai mở được
+trang cũng bấm được nút Hoàn tác. Đây cũng đúng là máy DUY NHẤT nạp và hoàn
+tác được, nên để trống là vô hiệu hoá toàn bộ phần bảo vệ của đợt 3.
+
+Quên mật khẩu: không có luồng tự phục hồi (cố ý — 5–7 người, một luồng khôi
+phục qua email là thêm một cửa để tấn công). Người quản trị đặt lại bằng
+`doi-mat-khau`.
 
 ---
 

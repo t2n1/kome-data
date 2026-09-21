@@ -77,7 +77,8 @@ việc này để lại cho Giai đoạn 1.
    | Name | Value |
    |---|---|
    | `DATABASE_URL` | chuỗi kết nối **cổng 6543** ở mục 2b |
-   | `KOME_MAT_KHAU` | mật khẩu ở mục 2a |
+   | `KOME_SESSION_SECRET` | chuỗi ngẫu nhiên, tối thiểu 12 ký tự |
+   | `DATABASE_URL_APP` | chuỗi kết nối cùng CSDL, user `kome_app_user`, **cổng 6543** |
 
 4. **Deploy**. Chờ khoảng 1–2 phút.
 5. Mở địa chỉ Vercel đưa ra. Phải thấy trang đăng nhập 🔒.
@@ -112,10 +113,10 @@ Mở địa chỉ Vercel bằng **cửa sổ ẩn danh** (Ctrl+Shift+N) rồi so
 
 ## 5. Việc phải làm định kỳ
 
-- **Đổi `KOME_MAT_KHAU` mỗi khi có người nghỉ việc.** Đổi xong, mọi vé đăng
-  nhập đang lưu hành hết hiệu lực ngay — không có kho phiên ở máy chủ, nên đây
-  là cách duy nhất "đuổi" một người đã biết mật khẩu cũ.
-  Vào Vercel → Settings → Environment Variables → sửa → **Redeploy**.
+- **Người nghỉ việc thì xoá tài khoản của họ** — `scripts/tao_nguoi_dung.py`
+  trên máy trong công ty; họ bị chặn ở lượt bấm kế tiếp. Chỉ đổi
+  `KOME_SESSION_SECRET` khi nghi khoá ký bị lộ, vì đổi nó là bắt **tất cả mọi
+  người** đăng nhập lại.
 - Vé đăng nhập tự hết hạn sau **12 giờ**, nên máy để quên ở văn phòng không
   mở được vào sáng hôm sau.
 
@@ -160,7 +161,7 @@ khi triển khai:
 
 - Cổng đăng nhập (`kome/web/app.py`, middleware `chan_cua`) **miễn trừ
   `/static/` có chủ ý**, cùng với `/dang-nhap`. Trang đăng nhập là màn hình
-  ĐẦU TIÊN của bản Vercel — nơi `KOME_MAT_KHAU` luôn bắt buộc — và nó cần
+  ĐẦU TIÊN của bản Vercel — nơi `KOME_SESSION_SECRET` luôn bắt buộc — và nó cần
   chính `/static/kome.css` cùng các file font để hiển thị có kiểu dáng
   *trước khi* ai đăng nhập được. Nếu sau này có người "siết lại" cổng đăng
   nhập và bỏ miễn trừ này, `/dang-nhap` của bản công khai sẽ hiện trơ trụi,
