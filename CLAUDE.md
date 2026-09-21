@@ -43,11 +43,15 @@ git — xem `docs/runbook.md`):
   **Web app của Giai đoạn 0 chạy bằng vai trò này** (`kome_ingest_user` trong
   `DATABASE_URL`) — nó vừa nạp dữ liệu vừa phục vụ trang `/kho-du-lieu` và
   `/undo/{batch_id}`.
-- `kome_app` — **chưa ai dùng ở Giai đoạn 0**; dành cho ứng dụng CRM ở Giai
-  đoạn 2. Chỉ SELECT trên `core`/`mart`; đọc-ghi trên `app`. **Không có quyền
-  UPDATE/DELETE trên `core`** — kể cả nếu code lỡ viết nhầm câu lệnh, CSDL sẽ
-  từ chối. Lưu ý nó KHÔNG có SELECT trên `meta.ingest_batch`, nên không chạy
-  được trang `/kho-du-lieu` hiện tại.
+- `kome_app` — từ Đợt 3 (`019_danh_tinh.sql`), đây là vai trò chạy đăng nhập
+  và **mọi trang chỉ đọc** (`kome_app_user` trong `DATABASE_URL_APP`, xem mục
+  "Danh tính và quyền" bên dưới). Chỉ SELECT trên `core`/`mart`; đọc-ghi trên
+  `app`. **Không có quyền UPDATE/DELETE trên `core`** — kể cả nếu code lỡ
+  viết nhầm câu lệnh, CSDL sẽ từ chối. Có SELECT trên `meta.ingest_batch`
+  (cấp từ `019_danh_tinh.sql`, nhắc lại quyền đã cấp ở `009_roles.sql`) — cần
+  cho ô "hôm nay đã có dữ liệu chưa" ở trang `/`. Vẫn KHÔNG chạy được trang
+  `/kho-du-lieu` (nạp/hoàn tác), vì màn đó cần ghi/xoá `core` — trang đó luôn
+  đi qua `kome_ingest` qua `DATABASE_URL`.
 - `kome_report` — chỉ SELECT, mọi schema (`core`, `mart`, `app`). Dùng cho
   công cụ báo cáo/BI ngoài ứng dụng chính.
 - `postgres` (superuser hiện tại của Supabase) — chỉ dùng để chạy migration,
