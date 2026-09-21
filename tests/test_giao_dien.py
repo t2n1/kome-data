@@ -146,7 +146,13 @@ def test_du_bay_file_font_va_khong_rong():
     glyph thật đòi giải nén woff2 (`fonttools` + `brotli`) — thêm một phụ
     thuộc mới, trái R1 (giảm tối đa số thứ có thể hỏng). Nếu một ngày IBM
     phát hành bản đầy đủ nhỏ hơn ngưỡng này, test sẽ báo động giả — người
-    đọc cần biết đây là đại diện, không phải phép đo chính xác."""
+    đọc cần biết đây là đại diện, không phải phép đo chính xác.
+
+    `OFL.txt` (nguyên văn giấy phép SIL Open Font License) đi kèm ở đây
+    KHÔNG vì thẩm mỹ mà vì đây là NGHĨA VỤ GIẤY PHÉP: OFL bắt buộc file
+    giấy phép phải đi kèm khi phân phối lại font. Không có test nào canh
+    nó thì ai dọn thư mục `fonts/` xoá nhầm sẽ không bị bắt — hậu quả là
+    vi phạm giấy phép, nằm ngoài phạm vi kỹ thuật thuần tuý."""
     for ten in TEN_FONT:
         f = FONTS / ten
         assert f.exists(), f"thiếu {ten}"
@@ -154,6 +160,9 @@ def test_du_bay_file_font_va_khong_rong():
             f"{ten} nhỏ hơn 35.000 byte — có thể là bản subset -Latin1 "
             "thiếu glyph tiếng Việt, không phải bản đầy đủ"
         )
+    ofl = FONTS / "OFL.txt"
+    assert ofl.exists(), "thiếu OFL.txt — nghĩa vụ giấy phép SIL OFL của IBM Plex"
+    assert ofl.stat().st_size > 0, "OFL.txt rỗng — không tính là kèm giấy phép"
 
 
 def test_khong_goi_ra_ngoai_mang():
@@ -230,14 +239,23 @@ def test_ten_badge_khong_duoc_dung_lam_lop_tran_trong_css():
     tức luôn có một lớp khác đứng ngay trước, không đứng trần một mình.
 
     Khớp selector trần: một `.` đứng ở đầu selector (đầu file, sau khoảng
-    trắng/xuống dòng, sau dấu phẩy, hoặc sau `{` đóng khối trước) theo sau
-    là đúng một trong bốn tên rồi hết từ (không phải tiền tố của tên dài
-    hơn như `.loi-hop`)."""
-    css = CSS.read_text(encoding="utf-8")
-    tran = re.compile(r'(?:^|[\s,{])\.(' + "|".join(TEN_BADGE) + r')(?![\w-])')
-    khop = [m.group(1) for m in tran.finditer(css)]
-    assert not khop, (
-        f"lớp badge dùng TRẦN (không có định tính) trong kome.css: {khop} -- "
+    trắng/xuống dòng, sau dấu phẩy, sau `{` đóng khối trước, hoặc sau `}`
+    đóng khối liền trước — CSS nén kiểu `}.canh{` không có khoảng trắng)
+    theo sau là đúng một trong bốn tên rồi hết từ (không phải tiền tố của
+    tên dài hơn như `.loi-hop`).
+
+    Quét CẢ kome.css LẪN mọi template (*.html): thảm hoạ `.canh` thật sự
+    nằm trong một khối `<style>` của template (Task 4), không phải trong
+    kome.css -- một test chỉ soi kome.css sẽ không bao giờ bắt được lần
+    tái diễn tiếp theo, đúng như nó đã không bắt được lần đầu."""
+    tran = re.compile(r'(?:^|[\s,{}])\.(' + "|".join(TEN_BADGE) + r')(?![\w-])')
+    vi_pham = []
+    for f in [CSS] + sorted(TEMPLATES.glob("*.html")):
+        text = f.read_text(encoding="utf-8")
+        for m in tran.finditer(text):
+            vi_pham.append(f"{f.name}: .{m.group(1)}")
+    assert not vi_pham, (
+        f"lớp badge dùng TRẦN (không có định tính): {vi_pham} -- "
         "badge trạng thái sẽ ăn nguyên kiểu dáng của bất cứ thứ gì đang mượn "
         "tên này (xem docstring)"
     )
@@ -249,10 +267,17 @@ def test_moi_template_dung_nav_deu_dong_main():
     ở cuối. Ghi chú giải thích chuyện này nằm trong bản mô tả nhiệm vụ,
     tức NGOÀI repo -- người mở `_nav.html` sáu tháng nữa không có nó trong
     tay nếu chỉ đọc code. Không viết cứng số lượng file: tự tìm mọi
-    template include `_nav.html`, để thêm trang mới cũng được canh."""
+    template include `_nav.html`, để thêm trang mới cũng được canh.
+
+    Tìm bằng REGEX, không khớp chuỗi y hệt `{% include "_nav.html" %}`:
+    một template dùng `{%- include -%}` (cắt khoảng trắng) hoặc nháy đơn
+    `'_nav.html'` sẽ bị chuỗi y hệt BỎ QUA LẶNG LẼ -- một test canh một
+    bất biến giòn (chỉ đúng cho đúng một cách viết cú pháp Jinja) thì
+    không canh gì cả."""
+    mau_include = re.compile(r'\{%-?\s*include\s*["\']_nav\.html["\']')
     dung_nav = [
         f for f in sorted(TEMPLATES.glob("*.html"))
-        if '{% include "_nav.html" %}' in f.read_text(encoding="utf-8")
+        if mau_include.search(f.read_text(encoding="utf-8"))
     ]
     assert dung_nav, "không tìm thấy template nào include _nav.html"
     for f in dung_nav:
@@ -261,3 +286,17 @@ def test_moi_template_dung_nav_deu_dong_main():
             f"{f.name} include _nav.html (mở <main> không đóng) nhưng có "
             f"{text.count('</main>')} thẻ </main>, cần đúng 1"
         )
+
+
+def test_moi_trang_that_co_dung_mot_the_viewport(conn, test_db_url):
+    """Thiếu <meta name="viewport"> -> điện thoại dựng viewport ảo ~980px,
+    quy tắc gập sidebar ở @media (max-width:720px) trong kome.css không bao
+    giờ kích hoạt, dù CSS đúng 100%. Thẻ này đặt DUY NHẤT một chỗ trong
+    _chung.html (một nhà, mọi trang include) — template không được tự khai
+    thêm bản của riêng mình, kẻo có trang thành 2 thẻ (trình duyệt dùng thẻ
+    ĐẦU, nhưng 2 thẻ là dấu hiệu code trùng lặp không ai dọn)."""
+    client = TestClient(create_app(db_url=test_db_url))
+    for duong_dan in TRANG:
+        html = client.get(duong_dan).text
+        so_luong = html.count('name="viewport"')
+        assert so_luong == 1, f"{duong_dan} có {so_luong} thẻ viewport, cần đúng 1"
