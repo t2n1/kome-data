@@ -306,10 +306,24 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
     địa chỉ đã chết như thể chúng còn sống: nhãn nút, đích mặc định sau đăng
     nhập, và comment/docstring mô tả hành vi đã sai kể từ khi gộp thành
     /kho-du-lieu. Ba định nghĩa route redirect thật (gần cuối
-    kome/web/app.py, ví dụ `@app.get("/nap", ...)`), một comment mô tả
-    đúng ngay hành vi của route đó, và dòng khai báo hằng
-    `DUONG_KHO_DU_LIEU` (Task 5 — ba địa chỉ cũ vẫn phải bị chặn 403 như
-    chính /kho-du-lieu) là HỢP LỆ và phải giữ nguyên."""
+    kome/web/app.py, ví dụ `@app.get("/nap", ...)`) và một comment mô tả
+    đúng ngay hành vi của route đó là HỢP LỆ và phải giữ nguyên — đó là nơi
+    ba địa chỉ cũ còn được phép tồn tại trong code, theo nghĩa "vẫn đang là
+    địa chỉ thật, chỉ 301 đi nơi khác".
+
+    Task 5 thêm đúng MỘT chỗ hợp lệ thứ ba: hằng `DUONG_KHO_DU_LIEU` trong
+    kome/web/app.py, nơi liệt kê nguyên văn ba địa chỉ cũ để CHẶN QUYỀN (một
+    lý do khác hẳn — không khẳng định chúng còn là trang riêng). Miễn trừ
+    này gắn vào ĐÚNG các dòng của câu lệnh gán đó bằng AST
+    (`lineno..end_lineno` của node `Assign`), KHÔNG phải bằng một chuỗi
+    marker rải trong `hop_le`: một marker theo chuỗi con sẽ miễn trừ VĨNH
+    VIỄN mọi dòng tương lai chứa chuỗi đó ở bất cứ đâu trong file — kể cả
+    một comment sai sự thật kiểu "mặc định về /nap (xem DUONG_KHO_DU_LIEU)",
+    tức đúng loại khẳng định-điều-đã-sai mà chính test này sinh ra để bắt.
+    AST không có lỗ hổng đó vì nó gắn miễn trừ vào một câu lệnh cụ thể, không
+    gắn vào một mẩu văn bản có thể bị chép sang chỗ khác."""
+    import ast
+
     canh = [
         Path("kome/web/templates/chi_doc.html"),
         Path("kome/web/bao_mat.py"),
@@ -317,16 +331,37 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
         Path("kome/web/app.py"),
     ]
     cu = ("/phu-du-lieu", "/health", "/nap")
-    # Định nghĩa route redirect thật (`@app.get("/nap", ...)`), comment mô
-    # tả đúng ngay hành vi của chính route /nap đó, và dòng khai báo
-    # `DUONG_KHO_DU_LIEU` (Task 5: ba địa chỉ cũ vẫn thuộc màn Kho dữ liệu
-    # cho mục đích chặn quyền, dù chỉ 301) — những chỗ DUY NHẤT được phép
-    # nhắc địa chỉ cũ như một địa chỉ còn tồn tại (nó thật sự còn tồn tại,
-    # chỉ để 301 đi nơi khác).
-    hop_le = ("@app.get(", "VẪN chuyển hướng ở bản chỉ-đọc", "DUONG_KHO_DU_LIEU")
+    # Định nghĩa route redirect thật (`@app.get("/nap", ...)`) và comment mô
+    # tả đúng ngay hành vi của chính route /nap đó — hai chỗ DUY NHẤT (ngoài
+    # câu lệnh gán DUONG_KHO_DU_LIEU, miễn trừ riêng bằng AST ở dưới) được
+    # phép nhắc địa chỉ cũ như một địa chỉ còn tồn tại.
+    hop_le = ("@app.get(", "VẪN chuyển hướng ở bản chỉ-đọc")
+
+    app_py = Path("kome/web/app.py")
+    dong_app = app_py.read_text(encoding="utf-8").splitlines()
+    # Miễn trừ theo KHOẢNG DÒNG của chính câu lệnh gán, không theo chuỗi
+    # con: xuống dòng lại tuple này (thao tác vô hại) không được làm test ở
+    # đây đỏ, và một comment tương lai nhắc tên hằng ở nơi khác thì KHÔNG
+    # được ăn theo miễn trừ này. Kéo thêm lên các dòng comment đứng NGAY
+    # TRÊN câu lệnh (không cách dòng trống) — comment giải thích chính hằng
+    # đó cũng hợp lệ, nhưng chỉ khi nó dính liền, không phải bất cứ đâu.
+    cay = ast.parse("\n".join(dong_app))
+    dong_mien_tru = set()
+    for n in ast.walk(cay):
+        if isinstance(n, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "DUONG_KHO_DU_LIEU"
+                for t in n.targets):
+            bat_dau = n.lineno
+            while bat_dau > 1 and dong_app[bat_dau - 2].strip().startswith("#"):
+                bat_dau -= 1
+            dong_mien_tru.update(range(bat_dau, n.end_lineno + 1))
+
     loi = []
     for f in canh:
+        mien_tru_file = dong_mien_tru if f == app_py else set()
         for i, dong in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if i in mien_tru_file:
+                continue
             if any(h in dong for h in hop_le):
                 continue
             if any(d in dong for d in cu):

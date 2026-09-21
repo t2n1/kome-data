@@ -36,9 +36,10 @@ TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 SO_NGAY_SOAT = 30
 
 # Mọi đường dẫn thuộc màn Kho dữ liệu — màn DUY NHẤT có nút xoá dữ liệu.
-# Ba địa chỉ cũ nằm trong DUONG_KHO_DU_LIEU dù chúng chỉ 301: để hở chúng là
-# để người không có quyền dò ra cấu trúc màn bị cấm.
-DUONG_KHO_DU_LIEU = ("/kho-du-lieu", "/upload", "/undo", "/nap", "/health", "/phu-du-lieu")
+# Ba địa chỉ cũ (/nap, /health, /phu-du-lieu) nằm trong danh sách dù chúng chỉ
+# 301: để hở chúng là để người không có quyền dò ra cấu trúc màn bị cấm.
+DUONG_KHO_DU_LIEU = ("/kho-du-lieu", "/upload", "/undo",
+                     "/nap", "/health", "/phu-du-lieu")
 
 
 def _thuoc_kho_du_lieu(duong: str) -> bool:
