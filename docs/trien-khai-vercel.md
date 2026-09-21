@@ -129,6 +129,33 @@ mã nguồn không phải đổi dòng nào.
 
 ---
 
+## 7. Thư mục tĩnh (`static/`) đi cùng nhánh giao diện mới
+
+Nhánh đưa app sang bảng màu/font mới thêm một thư mục tĩnh thật:
+`kome/web/static/kome.css` và 7 file font `.woff2`. Ba điều cần biết trước
+khi triển khai:
+
+- Bản Vercel phục vụ `/static/kome.css` và các file font qua chính
+  `StaticFiles` mount **trong `app.py`** (FastAPI), **không** qua tầng tĩnh
+  riêng của Vercel. `.vercelignore` **không được** loại `kome/web/static/` —
+  loại mất là toàn bộ giao diện vỡ ngay, không phải một tính năng nhỏ mất đi.
+
+- **Bẫy triệu chứng đánh lừa:** nếu thư mục `static` không lên được máy chủ
+  (ví dụ do `.vercelignore` loại nhầm), `StaticFiles(directory=…)` ném lỗi
+  **ngay lúc dựng app** — nên **mọi** đường dẫn, kể cả `/dang-nhap`, đều trả
+  về **500**. Trông y hệt code Python hỏng, không hề giống một file tĩnh bị
+  thiếu; đừng mất thời gian soát logic route trước khi soát `.vercelignore`.
+
+- **Bẫy im lặng:** nếu chỉ riêng file **font** 404 (ví dụ quên add vào git),
+  `font-display:swap` trong `kome.css` lặng lẽ rơi về font hệ thống. Trang
+  vẫn trả **200**, giao diện vẫn "chạy được", không test tự động nào biết —
+  test font chỉ soát file trong repo, không soát việc file đó có LÊN được
+  máy chủ hay không. Sau **mỗi lần triển khai**, tự mở
+  `https://<deploy>/static/fonts/IBMPlexSans-Regular.woff2` bằng tay xem có
+  trả về 200 không.
+
+---
+
 ## Nguồn
 
 - [Vercel Functions Limits](https://vercel.com/docs/functions/limitations)
