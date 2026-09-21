@@ -1,10 +1,76 @@
-<!-- Danh sách khách hàng: tìm kiếm + lọc theo trạng thái quan hệ. -->
+<!-- Danh sách khách hàng: danh sách làm việc + ba khối phân tích + tìm kiếm
+     và năm bộ lọc (trạng thái, nhóm việc, hạng doanh thu 12 tháng, tỉnh,
+     người phụ trách).
+
+     Biểu đồ phân bố vẽ bằng <div> định vị — KHÔNG một dòng JavaScript
+     nào, cùng nếp với kome/bao_cao.py::ve_bieu_do (SVG tự tính toạ độ). -->
 <!doctype html><html lang="vi"><meta charset="utf-8">
 <title>KOME — khách hàng</title>
 {% include "_chung.html" %}
+<style>
+ /* Bốn nút "danh sách làm việc". Nút, không phải chip: mỗi nút mang một con
+    số và một câu mô tả, nên nó cần chiều cao chứ không phải một viên tròn. */
+ .viec{display:grid;grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr));
+   gap:.6rem;margin:1rem 0}
+ .viec a{display:block;background:var(--nen-the);border:1px solid var(--vien);
+   border-radius:11px;padding:.65rem .8rem;text-decoration:none;color:var(--chu)}
+ .viec a.dang-xem{border-color:var(--do);background:var(--do-nen)}
+ .viec .dem{font-size:1.45rem;font-weight:600;line-height:1.2;
+   font-family:var(--font-so);font-variant-numeric:tabular-nums}
+ .viec .ten{font-size:.9rem;font-weight:600;margin-top:.1rem}
+ .viec .mo-ta{color:var(--chu-nhat);font-size:.76rem;line-height:1.35;margin-top:.2rem}
+
+ /* Ba khối phân tích cạnh nhau. auto-fit + minmax: màn hẹp tự xuống một cột,
+    không cần media query riêng. */
+ .luoi-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));
+   gap:.75rem;margin:1rem 0}
+ .o-pt{background:var(--nen-the);border:1px solid var(--vien);border-radius:11px;
+   padding:.75rem .9rem;min-width:0}
+ .o-pt h2{font-size:.92rem;margin:0 0 .5rem;border-top:0;padding-top:0}
+ .o-pt table{font-size:.85rem}
+ .o-pt td,.o-pt th{padding:.3rem .25rem}
+ /* Một dòng của biểu đồ phân bố: nhãn · máng · số. Máng có nền riêng để
+    thanh 0% vẫn nhìn thấy được là "có mục này, giá trị bằng 0". */
+ .dong-hang{display:grid;grid-template-columns:1.4rem 1fr 3.2rem;align-items:center;
+   gap:.45rem;margin:.3rem 0;font-size:.85rem}
+ .dong-hang .so{text-align:right;font-family:var(--font-so);
+   font-variant-numeric:tabular-nums}
+ .mang{background:var(--nen-phu);border-radius:99px;height:.6rem;overflow:hidden}
+ .mang > i{display:block;height:100%;background:var(--lien-ket);opacity:.72;
+   border-radius:99px}
+
+ /* Dải hai ô chọn (người phụ trách, tỉnh) — dùng form GET, không JavaScript,
+    nên phải có nút gửi. */
+ .o-loc{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.5rem 0}
+ .o-loc label{font-size:.85rem;color:var(--chu-nhat);display:inline-flex;
+   align-items:center;gap:.35rem}
+ .o-loc select{font:inherit;font-size:.9rem;padding:.3rem .5rem;border-radius:9px;
+   border:1px solid var(--vien);background:var(--nen);color:var(--chu);max-width:14rem}
+ .o-loc button{font:inherit;font-size:.9rem;padding:.32rem 1rem;border-radius:9px;
+   border:1px solid var(--vien);background:var(--nen-phu);color:var(--chu);cursor:pointer}
+</style>
 {% include "_nav.html" %}
 <h1>Khách hàng</h1>
-{% set giu = "&tat_ca=1" if tat_ca else "" %}
+
+{# `giu` — MỘT biến duy nhất mang mọi bộ lọc qua mọi liên kết của trang.
+   Sót nó ở một liên kết là người đang lọc bấm một cái rồi bị ném về danh
+   sách đầy mà không có gì giải thích. Có test canh (tests/test_khach_hang.py
+   ::test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket — test đó phải GIEO dữ
+   liệu thì bảng mới render, nên nó nằm cùng chỗ với các hàm gieo).
+
+   Năm mảnh tách riêng KHÔNG phải là "biến thứ hai để giữ bộ lọc": chúng là
+   nguyên liệu của chính `giu`. Mỗi ô ĐIỀU KHIỂN một bộ lọc (nút nhóm việc,
+   chip hạng) phải tự đặt tham số của nó, nên nó ghép các mảnh CÒN LẠI —
+   dùng `giu` ở đó thì tham số cũ và tham số mới cùng có mặt trong một URL,
+   và trình duyệt lấy cái đầu tiên, tức bấm xong không đổi gì. #}
+{% set g_tat_ca = "&tat_ca=1" if tat_ca else "" %}
+{% set g_nhom = ("&nhom=" ~ t.nhom|urlencode) if t.nhom else "" %}
+{% set g_hang = ("&hang=" ~ t.hang|urlencode) if t.hang else "" %}
+{% set g_tinh = ("&tinh=" ~ t.tinh|urlencode) if t.tinh else "" %}
+{% set g_nv   = ("&nv=" ~ nv|urlencode) if nv else "" %}
+{% set giu = g_tat_ca ~ g_nhom ~ g_hang ~ g_tinh ~ g_nv %}
+{# Phần chung của mọi liên kết ĐỔI bộ lọc: giữ ô tìm và thứ tự sắp xếp. #}
+{% set g_tim = "&tim=" ~ t.tim|urlencode ~ "&loc=" ~ t.loc|urlencode ~ "&sap=" ~ t.sap|urlencode %}
 
 {# Mặc định tiện dụng, KHÔNG phải hàng rào: năm sale không cần giấu nhau
    (đặc tả đợt 3 §5). Liên kết bỏ lọc phải hiện rõ, và con số trên nó lấy
@@ -18,29 +84,154 @@
 <p class="ghi-chu">Đang xem khách của <strong>{{ t.ten_sale }}</strong>{%
   if not t.tim and not t.loc %} ({{ "{:,}".format(t.tong) }} khách){%
   else %} (đang hiện {{ "{:,}".format(t.tong) }} khách khớp){% endif %}.
-  <a href="/khach-hang?tat_ca=1">Xem tất cả {{ "{:,}".format(t.tong_tat_ca) }} khách →</a></p>
+  <a href="/khach-hang?tat_ca=1">Xem tất cả {{ "{:,}".format(tq.tong_tat_ca) }} khách →</a></p>
 {% endif %}
+
+{# ---- Khối 1: danh sách làm việc ------------------------------------
+   Bốn nút = bốn câu hỏi khác nhau, không phải bốn cách xếp cùng một danh
+   sách. Số đếm lấy từ mart.khach_nhom_viec (migration 020), nên nó luôn
+   khớp với chính bộ lọc mà nút đó bật. #}
+{% set nhom_viec = [
+     ("",    "Toàn bộ danh bạ", tq.tong,
+      "Mọi khách trong danh bạ, kể cả khách OBC đã đánh dấu ngừng giao dịch."),
+     ("im",  "Im lặng ≥ 2× nhịp", tq.nhom.im,
+      "Đã im quá hai lần nhịp mua RIÊNG của chính họ — đang rời đi."),
+     ("tut", "Hạng S·A đang tụt", tq.nhom.tut,
+      "Hai bậc trên theo doanh thu 12 tháng, mà 30 ngày gần nhất tụt dưới 80% trung bình ba kỳ 30 ngày trước đó."),
+     ("moi", "Khách mới chưa quay lại", tq.nhom.moi,
+      "Đơn đầu trong vòng 90 ngày mà đã im quá 1,2 lần nhịp."),
+] %}
+<div class="viec">
+{% for ma, ten, so, mo_ta in nhom_viec %}
+  <a href="/khach-hang?nhom={{ ma }}{{ g_tim }}{{ g_tat_ca }}{{ g_hang }}{{ g_tinh }}{{ g_nv }}"{%
+     if t.nhom == ma or (not t.nhom and not ma) %} class="dang-xem" aria-current="page"{% endif %}>
+    <div class="dem">{{ "{:,}".format(so) }}</div>
+    <div class="ten">{{ ten }}</div>
+    <div class="mo-ta">{{ mo_ta }}</div></a>
+{% endfor %}
+</div>
+
+{# ---- Ba khối phân tích --------------------------------------------- #}
+<div class="luoi-3">
+  <div class="o-pt">
+    <h2>Phân bố theo hạng doanh thu 12 tháng</h2>
+    {% for ma, so in tq.hang %}
+    <div class="dong-hang">
+      <span>{{ ma }}</span>
+      <span class="mang"><i style="width:{{ "%.1f"|format(100 * so / tq.tong) if tq.tong else 0 }}%"></i></span>
+      <span class="so">{{ "{:,}".format(so) }}</span>
+    </div>
+    {% endfor %}
+    <p class="ghi-chu">Chỉ số của CHÚNG TA (S = 5% doanh thu 12 tháng cao nhất).
+    KHÁC 得意先ランク của OBC — hai con số trả lời hai câu hỏi khác nhau.</p>
+  </div>
+
+  <div class="o-pt">
+    <h2>Tập trung ở đâu</h2>
+    {% if tq.tinh %}
+    <table>
+     {% for ten, so in tq.tinh %}
+     <tr><td>{{ ten }}</td><td class="so">{{ "{:,}".format(so) }}</td></tr>
+     {% endfor %}
+    </table>
+    <p class="ghi-chu">Tám tỉnh đông nhất. &ldquo;(không rõ)&rdquo; là khách có
+    dòng bán nhưng chưa có hồ sơ 得意先全情報.</p>
+    {% else %}
+    <div class="trong">Chưa có khách nào.</div>
+    {% endif %}
+  </div>
+
+  <div class="o-pt">
+    <h2>Tải của từng nhân viên</h2>
+    <div class="bang-cuon">
+    <table>
+     <tr><th>担当者</th><th class="so">Khách</th><th class="so">Doanh thu</th>
+         <th class="so">Cần gọi</th></tr>
+     {% for n in tq.nhan_vien %}
+     <tr><td>{{ n.ten }}</td>
+      <td class="so">{{ "{:,}".format(n.so_khach) }}</td>
+      <td class="so">¥{{ "{:,}".format(n.doanh_thu) }}</td>
+      <td class="so">{{ "{:,}".format(n.canh_bao) }}</td></tr>
+     {% endfor %}
+    </table>
+    </div>
+    <p class="ghi-chu">Xếp theo TIỀN đang gánh, không theo số khách.</p>
+  </div>
+</div>
 
 <form class="o-tim" method="get" action="/khach-hang">
   <input type="search" name="tim" value="{{ t.tim }}" placeholder="Tên, mã, điện thoại, địa chỉ…">
   <input type="hidden" name="loc" value="{{ t.loc }}">
   <input type="hidden" name="sap" value="{{ t.sap }}">
+  {# Bốn ô ẩn này là phiên bản `giu` của form: không có chúng thì bấm "Tìm"
+     lúc đang lọc sẽ âm thầm xoá cả bốn bộ lọc. #}
+  <input type="hidden" name="nhom" value="{{ t.nhom or '' }}">
+  <input type="hidden" name="hang" value="{{ t.hang or '' }}">
+  <input type="hidden" name="tinh" value="{{ t.tinh or '' }}">
+  <input type="hidden" name="nv" value="{{ nv }}">
   {% if tat_ca %}<input type="hidden" name="tat_ca" value="1">{% endif %}
   <button type="submit">Tìm</button>
   {% if t.tim %}<a class="loc" href="/khach-hang?loc={{ t.loc }}{{ giu }}" style="align-self:center">Xoá tìm</a>{% endif %}
 </form>
 
-{# Bộ đếm KHÔNG theo ô tìm và KHÔNG theo bộ lọc trạng thái đang bật — nếu
+{# Bộ đếm KHÔNG theo ô tìm và KHÔNG theo bộ lọc TRẠNG THÁI đang bật — nếu
    không thì bấm vào một mục xong các con số khác về 0 hết và không ai quay
-   lại được. Nhưng nó CÓ theo bộ lọc sale: đang xem khách của mình mà bộ đếm
-   khoe con số toàn công ty thì bấm vào một mục xong ra danh sách ngắn hơn hẳn
-   số vừa đọc. Xem kome/khach_hang.py::danh_sach. #}
+   lại được. Nhưng nó CÓ theo bốn bộ lọc còn lại (sale, nhóm việc, hạng,
+   tỉnh), vì liên kết của chính mỗi chip mang `giu` — tức mang cả bốn thứ đó
+   theo. Bộ đếm không co theo chúng thì chip nói "Tất cả (1.710)" rồi bấm vào
+   ra 216 khách. Xem kome/khach_hang.py::tong_quan_danh_ba. #}
 <div class="loc">
-  <a href="/khach-hang?tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if not t.loc %} class="dang-xem"{% endif %}>Tất cả ({{ "{:,}".format(t.dem_trang_thai.values()|sum) }})</a>
+  <a href="/khach-hang?tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if not t.loc %} class="dang-xem"{% endif %}>Tất cả ({{ "{:,}".format(tq.dem_trang_thai.values()|sum) }})</a>
   {% for ma, (nhan, mau) in trang_thai.items() %}
-  <a href="/khach-hang?loc={{ ma }}&tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if t.loc == ma %} class="dang-xem"{% endif %}>{{ nhan }} ({{ "{:,}".format(t.dem_trang_thai.get(ma, 0)) }})</a>
+  <a href="/khach-hang?loc={{ ma }}&tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if t.loc == ma %} class="dang-xem"{% endif %}>{{ nhan }} ({{ "{:,}".format(tq.dem_trang_thai.get(ma, 0)) }})</a>
   {% endfor %}
 </div>
+
+{# Chip hạng doanh thu 12 tháng. Ghép tay `g_hang` bị BỎ RA khỏi liên kết —
+   chính chip này đặt tham số `hang`. #}
+<div class="loc">
+  <span class="nhom">Hạng doanh thu 12 tháng</span>
+  <a href="/khach-hang?hang={{ g_tim }}{{ g_tat_ca }}{{ g_nhom }}{{ g_tinh }}{{ g_nv }}"{% if not t.hang %} class="dang-xem"{% endif %}>Tất cả</a>
+  {% for ma, so in tq.hang %}
+  <a href="/khach-hang?hang={{ ma }}{{ g_tim }}{{ g_tat_ca }}{{ g_nhom }}{{ g_tinh }}{{ g_nv }}"{% if t.hang == ma %} class="dang-xem"{% endif %}>{{ ma }} ({{ "{:,}".format(so) }})</a>
+  {% endfor %}
+</div>
+
+{# Hai ô chọn còn lại. Form GET riêng: <select> không tự gửi được nếu không
+   có JavaScript, nên nó cần một nút "Lọc" của chính nó. #}
+<form class="o-loc" method="get" action="/khach-hang">
+  <input type="hidden" name="tim" value="{{ t.tim }}">
+  <input type="hidden" name="loc" value="{{ t.loc }}">
+  <input type="hidden" name="sap" value="{{ t.sap }}">
+  <input type="hidden" name="nhom" value="{{ t.nhom or '' }}">
+  <input type="hidden" name="hang" value="{{ t.hang or '' }}">
+  {% if tat_ca %}<input type="hidden" name="tat_ca" value="1">{% endif %}
+  {# Mục đầu mang GIÁ TRỊ QUY ƯỚC `nv_moi_nguoi`, không mang chuỗi rỗng:
+     chuỗi rỗng nghĩa là "không chọn gì" và trang rơi về mặc định lọc theo
+     người đang đăng nhập (đợt 3) — tức chọn "mọi người" xong danh sách
+     không đổi. Và `nv_chon` đọc từ bộ lọc THỰC SỰ đang áp dụng (`t.sale`),
+     nên khi đang ở mặc định thì ô chọn hiện đúng tên người đó thay vì nói
+     dối là "mọi người". Cùng bất biến với ô Tỉnh ngay dưới. #}
+  <label>担当者
+    <select name="nv">
+      <option value="{{ nv_moi_nguoi }}"{% if nv_chon == nv_moi_nguoi %} selected{% endif %}>— mọi người phụ trách —</option>
+      {% for n in tq.nhan_vien %}
+      <option value="{{ n.ma }}"{% if nv_chon == n.ma %} selected{% endif %}>{{ n.ten }} ({{ n.so_khach }})</option>
+      {% endfor %}
+    </select></label>
+  {# `tinh_chon` do route dựng: (giá trị trên URL, nhãn, số khách). Hai việc
+     nó làm mà `tq.tinh` không làm được — (1) mục "(không rõ)" mang giá trị
+     quy ước `__trong` vì nhãn đó không nằm trong CSDL, (2) tỉnh đang lọc mà
+     không thuộc top 8 vẫn có một option của chính nó, kèm số khách None. #}
+  <label>Tỉnh
+    <select name="tinh">
+      <option value="">— mọi tỉnh —</option>
+      {% for gia_tri, ten, so in tinh_chon %}
+      <option value="{{ gia_tri }}"{% if t.tinh == gia_tri %} selected{% endif %}>{{ ten }}{% if so is not none %} ({{ so }}){% endif %}</option>
+      {% endfor %}
+    </select></label>
+  <button type="submit">Lọc</button>
+</form>
 
 <p class="ghi-chu">Trạng thái so số ngày im lặng với <strong>nhịp mua riêng của
 từng khách</strong>, không với một ngưỡng chung: 90 ngày im lặng là thảm hoạ với
