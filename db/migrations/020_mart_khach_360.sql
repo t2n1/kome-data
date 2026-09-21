@@ -148,6 +148,15 @@ WHERE h.hang IN ('S', 'A') AND k.trang_thai <> 'ngung_giao_dich'
 
 UNION ALL
 -- khách mới (đơn đầu trong 90 ngày) mà đã im quá 1,2 lần nhịp
+--
+-- CỐ Ý lọc bằng ty_le_im_lang >= 1,2 chứ KHÔNG qua trang_thai như nhánh
+-- 'im' ở trên. "Khách mới" theo định nghĩa có rất ít lần mua — thường đúng
+-- 2 — nên trang_thai của họ gần như luôn là 'chua_du_lich_su'. Lọc qua
+-- trang_thai thì nhóm này gần như luôn rỗng, mất đúng lý do nó tồn tại.
+-- Còn nhóm 'im' nói "khách này đang rời đi" — một khẳng định mạnh mà hai
+-- điểm dữ liệu không đủ để đưa ra, nên nó CẦN cổng trang_thai chặn lại. Hai
+-- nhóm chịu được mức chắc chắn khác nhau, nên cố ý dùng hai ngưỡng khác
+-- nhau — không phải một chỗ sót lại quên đồng bộ với nhánh 'im'.
 SELECT customer_code, 'moi'
 FROM mart.khach_360 k
 CROSS JOIN mart.moc_thoi_gian m
