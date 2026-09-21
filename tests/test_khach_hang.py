@@ -33,11 +33,44 @@ def _ho_so_khach(conn, batch, ma, ten, **kw):
     conn.execute(
         """INSERT INTO core.dim_customer
              (customer_code, valid_from, valid_to, is_current, customer_name,
-              phone, prefecture, city, address, salesperson_code, batch_id)
-           VALUES (%s, '2025-01-01', '9999-12-31', true, %s, %s, %s, %s, %s, %s, %s)""",
+              phone, prefecture, city, address, salesperson_code,
+              price_level_code, batch_id)
+           VALUES (%s, '2025-01-01', '9999-12-31', true, %s, %s, %s, %s, %s, %s,
+                   %s, %s)""",
         (ma, ten, kw.get("phone", "080-0000-0000"), kw.get("prefecture", "東京都"),
          kw.get("city", "渋谷区"), kw.get("address", "1-1-1"),
-         kw.get("salesperson_code", "0104"), b))
+         kw.get("salesperson_code", "0104"), kw.get("price_level_code"), b))
+    conn.commit()
+
+
+def _hang_master(conn, batch, *cap):
+    """Vài dòng core.dim_product. Khối "gợi ý" đi TỪ bảng mã hàng, nên không
+    có dòng nào ở đây thì nó luôn rỗng và test hoá ra chẳng kiểm gì."""
+    b = batch(abs(hash(("hang",) + cap)) % 40_000 + 200_000)
+    for ma, ten in cap:
+        conn.execute(
+            """INSERT INTO core.dim_product (product_code, product_name, batch_id)
+               VALUES (%s, %s, %s)""", (ma, ten, b))
+    conn.commit()
+
+
+def _bang_gia(conn, batch, bac: str, ma_hang: str, gia: int):
+    b = batch(abs(hash(("gia", bac, ma_hang))) % 40_000 + 250_000)
+    conn.execute(
+        """INSERT INTO core.fact_price_list
+             (product_code, pack_code, price_level, valid_from, price_ex_tax,
+              price_in_tax, unit_cost, batch_id)
+           VALUES (%s, '02', %s, '2026-01-01', %s, %s, 0, %s)""",
+        (ma_hang, bac, gia, gia, b))
+    conn.commit()
+
+
+def _diem_giao(conn, batch, ma_khach: str, ma_diem: str, ten: str):
+    b = batch(abs(hash(("giao", ma_diem))) % 40_000 + 300_000)
+    conn.execute(
+        """INSERT INTO core.dim_shipto
+             (shipto_code, shipto_name, customer_code, address, batch_id)
+           VALUES (%s, %s, %s, '2-2-2', %s)""", (ma_diem, ten, ma_khach, b))
     conn.commit()
 
 
@@ -483,3 +516,102 @@ def test_ba_bo_loc_moi_ket_hop_duoc_voi_nhau_va_voi_sale(conn, batch):
 
     assert {k.ma for k in KH.danh_sach(conn, hang="B", sale="0104").khach} == {"K0001"}
     assert {k.ma for k in KH.danh_sach(conn, hang="D", sale="0104").khach} == {"K0002"}
+
+
+# ---- Hồ sơ 360°: bốn khối mới trong HAI truy vấn (task 6 đợt 4a) --------
+
+def test_ho_so_khong_qua_8_truy_van(conn, batch, monkeypatch):
+    """[IMPORTANT] Mỗi vòng hỏi qua pooler Tokyo mất ~47 ms chỉ riêng mạng.
+    Trang hồ sơ chậm dần từng đợt là cách nó chết mà không ai thấy ngày nào
+    nó chết."""
+    _ho_so_khach(conn, batch, "Q0001", "Quán đếm")
+    _mua(conn, batch, "Q0001", HOM_NAY - timedelta(days=3))
+    _neo(conn, batch)
+    dem = {"n": 0}
+    that = conn.execute
+    def demo(*a, **k):
+        dem["n"] += 1
+        return that(*a, **k)
+    monkeypatch.setattr(conn, "execute", demo)
+    KH.ho_so(conn, "Q0001")
+    assert dem["n"] <= 8, f"ho_so() chạy {dem['n']} truy vấn"
+
+
+def test_ho_so_mang_bon_khoi_moi(conn, batch):
+    """Bốn khối mới phải có DỮ LIỆU THẬT, không chỉ có mặt dưới dạng danh
+    sách rỗng — một khối luôn rỗng thì không ai phát hiện nó hỏng."""
+    _ho_so_khach(conn, batch, "B0001", "Quán bốn khối", price_level_code="03")
+    # XT07: mua đều 7 ngày/lần, lần cuối 30 ngày trước -> dự kiến 23 ngày
+    # trước, tức QUÁ HẠN 23 ngày, nhưng chưa quá 90 ngày nên đây KHÔNG phải
+    # "đã ngừng mua" — đúng khoảng trống mà khối "tháng này chưa mua" lấp.
+    for i in range(4):
+        _mua(conn, batch, "B0001", HOM_NAY - timedelta(days=30 + i * 7))
+    # XT09 bán cho một khách KHÁC -> có tỷ suất để xếp hạng gợi ý, và B0001
+    # chưa từng mua nó.
+    _mua(conn, batch, "000000000998", HOM_NAY - timedelta(days=5), hang="XT09")
+    _hang_master(conn, batch, ("XT07", "Gạo Japonica"), ("XT09", "Nước mắm"))
+    _bang_gia(conn, batch, "03", "XT07", 5250)
+    _diem_giao(conn, batch, "B0001", "SH01", "Kho Shibuya")
+    _neo(conn, batch)
+
+    h = KH.ho_so(conn, "B0001")
+    assert [m["ma"] for m in h.chua_mua_thang] == ["XT07"]
+    assert h.chua_mua_thang[0]["tre"] == 23
+    assert "XT09" in {g["ma"] for g in h.goi_y}
+    assert [b["ma"] for b in h.bac_gia] == ["XT07"]
+    assert [d["ma"] for d in h.diem_giao] == ["SH01"]
+    # Mặt hàng còn trong hạn mua bình thường KHÔNG được coi là "chưa mua"
+    assert "XT09" not in {m["ma"] for m in h.chua_mua_thang}
+
+
+def test_goi_y_khong_bao_gio_chua_ma_da_mua(conn, batch):
+    """Gợi ý bán thứ họ vừa mua tuần trước làm người dùng bỏ luôn cả khối."""
+    _ho_so_khach(conn, batch, "G0001", "Quán gợi ý")
+    _mua(conn, batch, "G0001", HOM_NAY - timedelta(days=7), hang="XT07")
+    # Bảng mã hàng phải có dòng, nếu không khối gợi ý luôn rỗng và khẳng
+    # định bên dưới đúng một cách vô nghĩa.
+    _hang_master(conn, batch, ("XT07", "Gạo Japonica"), ("XT09", "Nước mắm"))
+    _mua(conn, batch, "000000000998", HOM_NAY - timedelta(days=5), hang="XT09")
+    _neo(conn, batch)
+    h = KH.ho_so(conn, "G0001")
+    assert h.goi_y, "khối gợi ý rỗng — test không kiểm được gì"
+    assert "XT07" not in {g["ma"] for g in h.goi_y}
+
+
+def test_khach_khong_co_diem_giao_thi_khoi_tu_an(conn, batch, test_db_url):
+    """Chỉ 532/1.710 khách có 直送先. Hiện một bảng rỗng cho 1.178 khách còn
+    lại là dạy người ta cuộn nhanh — và ô THẬT nằm giữa những ô trống sẽ bị
+    cuộn qua theo."""
+    from fastapi.testclient import TestClient
+    from kome.web.app import create_app
+
+    _ho_so_khach(conn, batch, "D0001", "Quán không điểm giao")
+    _ho_so_khach(conn, batch, "D0002", "Quán có điểm giao")
+    for ma in ("D0001", "D0002"):
+        _mua_deu(conn, batch, ma, nhip=7, so_lan=4)
+    _diem_giao(conn, batch, "D0002", "SH02", "Kho Nagoya")
+    _neo(conn, batch)
+
+    c = TestClient(create_app(db_url=test_db_url))
+    html = c.get("/khach-hang/D0001").text
+    assert "直送先" not in html
+    assert "直送先" in c.get("/khach-hang/D0002").text, \
+        "khối tự ẩn cả khi khách CÓ điểm giao — ẩn nhầm còn tệ hơn hiện rỗng"
+
+
+def test_hai_bang_mat_hang_co_cot_nhip_va_tre(conn, batch, test_db_url):
+    """Ba cột nhịp đã nằm sẵn trong mart.khach_mat_hang từ task 1-2; không
+    đưa lên trang thì chúng chỉ là chi phí tính toán không ai đọc."""
+    from fastapi.testclient import TestClient
+    from kome.web.app import create_app
+
+    _ho_so_khach(conn, batch, "N0001", "Quán nhịp")
+    _mua_deu(conn, batch, "N0001", nhip=7, so_lan=5)
+    for i in range(4):          # món đã bỏ hẳn -> bảng "đã ngừng mua"
+        _mua(conn, batch, "N0001", HOM_NAY - timedelta(days=120 + i * 7),
+             hang="XT08")
+    _neo(conn, batch)
+
+    html = TestClient(create_app(db_url=test_db_url)).get("/khach-hang/N0001").text
+    for cot in ("Nhịp", "Dự kiến lần tới", "Trễ"):
+        assert cot in html, f"bảng mặt hàng thiếu cột {cot}"

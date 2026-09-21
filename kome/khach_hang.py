@@ -89,6 +89,13 @@ class HoSo:
     mat_hang: list[dict]
     da_ngung_mua: list[dict]
     lan_mua_gan_day: list[dict]
+    # Bốn khối của đợt 4a, lấy trong ĐÚNG HAI truy vấn (xem ho_so()).
+    # `bac_gia` ở đây là BẢNG GIÁ của bậc giá khách đang hưởng — khác
+    # `ho_so["bac_gia"]`, vốn chỉ là MÃ bậc ('01'..'10') lấy từ dim_customer.
+    chua_mua_thang: list[dict] = field(default_factory=list)
+    goi_y: list[dict] = field(default_factory=list)
+    bac_gia: list[dict] = field(default_factory=list)
+    diem_giao: list[dict] = field(default_factory=list)
 
 
 _COT = """customer_code, ten, prefecture, city, phone, salesperson_code,
@@ -238,8 +245,93 @@ def ho_so(conn, ma: str) -> HoSo | None:
            FROM mart.lan_mua WHERE customer_code = %s
            GROUP BY sales_date ORDER BY sales_date DESC LIMIT 12""", (ma,)).fetchall()]
 
+    # ---- Bốn khối mới của đợt 4a, gộp thành ĐÚNG HAI truy vấn -----------
+    # NGÂN SÁCH TRUY VẤN: hàm này chạy 8 lượt hỏi, và 8 là TRẦN. Đo thật
+    # 2026-09-22: một round-trip rỗng tới pooler Tokyo mất 47 ms, một lượt
+    # hỏi thật ~260 ms. Trang hồ sơ chậm dần từng đợt là cách nó chết mà
+    # không ai thấy ngày nào nó chết. Có test canh —
+    # tests/test_khach_hang.py::test_ho_so_khong_qua_8_truy_van.
+    #
+    # HAI truy vấn chứ không MỘT: gộp cả bốn khối vào một UNION ALL bốn tầng
+    # thì mỗi nhánh phải đệm NULL cho khớp kiểu của ba nhánh kia, và câu lệnh
+    # đó khó đọc hơn đúng cái nó tiết kiệm (47 ms).
+    #
+    # Ba cột `chu`/`so_a`/`so_b` mang nghĩa KHÁC NHAU theo `khoi` — đó là cái
+    # giá của việc gộp, và vòng lặp Python ngay dưới là chỗ duy nhất biết quy
+    # ước đó. `xep` là khoá sắp xếp của từng nhánh (doanh thu cho 'chua', tỷ
+    # suất cho 'goi_y'); ORDER BY nằm ở lớp NGOÀI vì thứ tự dòng giữa các
+    # nhánh của UNION ALL không được Postgres bảo đảm.
+    them = conn.execute("""
+        SELECT khoi, ma, ten, chu, so_a, so_b FROM (
+            (SELECT 'chua'::text AS khoi, h.product_code AS ma,
+                    h.ten_hang AS ten, h.lan_cuoi::text AS chu,
+                    h.tre_ngay::numeric AS so_a, NULL::numeric AS so_b,
+                    h.doanh_thu_thuan::numeric AS xep
+               FROM mart.khach_mat_hang h, mart.moc_thoi_gian m
+              WHERE h.customer_code = %s AND h.so_lan >= 3
+                AND h.tre_ngay IS NOT NULL AND m.hom_nay - h.lan_cuoi <= 90
+              ORDER BY h.doanh_thu_thuan DESC
+              LIMIT 10)
+            UNION ALL
+            (SELECT 'goi_y', p.product_code,
+                    coalesce(nullif(p.product_name, ''), p.product_code),
+                    ''::text, g.ty_suat, g.gia::numeric, g.ty_suat
+               FROM core.dim_product p
+               LEFT JOIN LATERAL (
+                    SELECT avg(f.gross_profit::numeric
+                               / nullif(f.amount - f.tax_amount, 0)) AS ty_suat,
+                           max(f.unit_price) AS gia
+                      FROM core.fact_sales_line f
+                     WHERE f.product_code = p.product_code) g ON true
+              WHERE NOT EXISTS (SELECT 1 FROM mart.khach_mat_hang h
+                                 WHERE h.customer_code = %s
+                                   AND h.product_code = p.product_code)
+                AND g.ty_suat IS NOT NULL
+              ORDER BY g.ty_suat DESC
+              LIMIT 8)
+        ) u ORDER BY khoi, xep DESC
+    """, (ma, ma)).fetchall()
+
+    chua_mua, goi_y = [], []
+    for khoi, ma_hang, ten_hang, chu, so_a, so_b in them:
+        if khoi == "chua":
+            chua_mua.append({"ma": ma_hang, "ten": ten_hang, "lan_cuoi": chu,
+                             "tre": int(so_a) if so_a is not None else None})
+        else:
+            goi_y.append({"ma": ma_hang, "ten": ten_hang,
+                          "ty_suat": float(so_a) if so_a is not None else None,
+                          "gia": int(so_b) if so_b is not None else None})
+
+    # Truy vấn B: bảng giá của bậc giá khách đang hưởng + điểm giao thẳng.
+    # `'gia'` xếp trước `'giao'` theo bảng chữ cái, nên ORDER BY khoi, ma giữ
+    # đúng thứ tự hai khối mà không cần thêm cột nào.
+    hai = conn.execute("""
+        SELECT khoi, ma, ten, c1, c2 FROM (
+            (SELECT 'gia'::text AS khoi, pl.product_code AS ma,
+                    coalesce(nullif(p.product_name, ''), pl.product_code) AS ten,
+                    pl.price_ex_tax::text AS c1, pl.valid_from::text AS c2
+               FROM core.fact_price_list pl
+               JOIN mart.khach_360 k ON k.customer_code = %s
+                                    AND k.price_level_code = pl.price_level
+               LEFT JOIN core.dim_product p ON p.product_code = pl.product_code
+              ORDER BY pl.product_code
+              LIMIT 20)
+            UNION ALL
+            (SELECT 'giao', shipto_code, coalesce(nullif(shipto_name, ''), shipto_code),
+                    coalesce(address, ''), ''
+               FROM core.dim_shipto WHERE customer_code = %s)
+        ) u ORDER BY khoi, ma
+    """, (ma, ma)).fetchall()
+
+    bac_gia = [{"ma": r[1], "ten": r[2], "gia": int(r[3]), "tu_ngay": r[4]}
+               for r in hai if r[0] == "gia"]
+    diem_giao = [{"ma": r[1], "ten": r[2], "dia_chi": r[3]}
+                 for r in hai if r[0] == "giao"]
+
     return HoSo(khach=k, ho_so=ho, thang=thang, mat_hang=mat_hang,
-                da_ngung_mua=da_ngung, lan_mua_gan_day=gan_day)
+                da_ngung_mua=da_ngung, lan_mua_gan_day=gan_day,
+                chua_mua_thang=chua_mua, goi_y=goi_y, bac_gia=bac_gia,
+                diem_giao=diem_giao)
 
 
 def can_xu_ly(conn, gioi_han: int = 100, sale: str | None = None) -> list[Khach]:
