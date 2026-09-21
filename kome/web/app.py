@@ -360,13 +360,29 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang,
                                  sale=sale, ten_sale=ten_sale, nhom=nhom,
                                  hang=hang, tinh=tinh)
+            # Ô chọn Tỉnh: (giá trị trên URL, nhãn, số khách). Nhãn "(không
+            # rõ)" do coalesce() sinh ra lúc hiển thị và KHÔNG nằm trong CSDL,
+            # nên nó đi trên URL bằng giá trị quy ước KH.TINH_TRONG — đổ thẳng
+            # nhãn ra `value` thì bấm vào nó luôn trả danh sách rỗng.
+            tinh_chon = [(KH.TINH_TRONG if ten == KH.KHONG_RO else ten, ten, so)
+                         for ten, so in tq.tinh]
+            # Danh sách chỉ có 8 tỉnh đông nhất CỦA PHẠM VI ĐANG XEM, mà phạm
+            # vi co theo sale/nv. Tỉnh đang lọc không nằm trong đó thì ô chọn
+            # hiện "— mọi tỉnh —" trong khi danh sách vẫn đang bị lọc và mọi
+            # liên kết vẫn mang `tinh=…`: ô điều khiển nói một đằng, dữ liệu
+            # một nẻo, và bấm "Lọc" lần nữa là bộ lọc biến mất mà không ai
+            # nhấn nút nào để xoá nó.
+            if tinh and tinh not in [g for g, _, _ in tinh_chon]:
+                tinh_chon.append(
+                    (tinh, KH.KHONG_RO if tinh == KH.TINH_TRONG else tinh, None))
             # Ba bộ lọc mới đọc lại từ `t` (t.nhom/t.hang/t.tinh) chứ không
             # truyền thêm bản sao vào ctx: hai nguồn cho cùng một giá trị là
             # hai chỗ có thể trôi khỏi nhau. `nv` thì KHÔNG có trong `t` vì
             # nó không phải tham số của danh_sach() — nó đi qua `sale`.
             return _ve(request, "khach_hang.html",
                        {"t": t, "tq": tq, "trang_thai": KH.TRANG_THAI,
-                        "trang": "khach", "tat_ca": bool(tat_ca), "nv": nv})
+                        "trang": "khach", "tat_ca": bool(tat_ca), "nv": nv,
+                        "tinh_chon": tinh_chon})
         except Exception as e:
             return _loi(request, "mở danh sách khách hàng", e)
 

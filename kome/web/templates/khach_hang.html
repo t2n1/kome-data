@@ -1,5 +1,5 @@
 <!-- Danh sách khách hàng: danh sách làm việc + ba khối phân tích + tìm kiếm
-     và bốn bộ lọc (trạng thái, nhóm việc, hạng doanh thu 12 tháng, tỉnh,
+     và năm bộ lọc (trạng thái, nhóm việc, hạng doanh thu 12 tháng, tỉnh,
      người phụ trách).
 
      Biểu đồ phân bố vẽ bằng <div> định vị — KHÔNG một dòng JavaScript
@@ -211,11 +211,15 @@
       <option value="{{ n.ma }}"{% if nv == n.ma %} selected{% endif %}>{{ n.ten }} ({{ n.so_khach }})</option>
       {% endfor %}
     </select></label>
+  {# `tinh_chon` do route dựng: (giá trị trên URL, nhãn, số khách). Hai việc
+     nó làm mà `tq.tinh` không làm được — (1) mục "(không rõ)" mang giá trị
+     quy ước `__trong` vì nhãn đó không nằm trong CSDL, (2) tỉnh đang lọc mà
+     không thuộc top 8 vẫn có một option của chính nó, kèm số khách None. #}
   <label>Tỉnh
     <select name="tinh">
       <option value="">— mọi tỉnh —</option>
-      {% for ten, so in tq.tinh %}
-      <option value="{{ ten }}"{% if t.tinh == ten %} selected{% endif %}>{{ ten }} ({{ so }})</option>
+      {% for gia_tri, ten, so in tinh_chon %}
+      <option value="{{ gia_tri }}"{% if t.tinh == gia_tri %} selected{% endif %}>{{ ten }}{% if so is not none %} ({{ so }}){% endif %}</option>
       {% endfor %}
     </select></label>
   <button type="submit">Lọc</button>

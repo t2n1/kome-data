@@ -43,6 +43,28 @@ def _ho_so_khach(conn, batch, ma, ten, **kw):
     conn.commit()
 
 
+def _mua_nhieu(conn, batch, dong, ma_lo="L"):
+    """Nhiều dòng bán trong MỘT lần nạp.
+
+    `_mua` mở một lô và một lượt hỏi cho MỖI dòng; test cần 40 khách nền để
+    thang hạng doanh thu có ý nghĩa thì đó là 40 vòng qua pooler Tokyo. Hàm
+    này gộp thành một `executemany`.
+
+    `dong`: các bộ (mã khách, ngày, tiền đã gồm thuế, mã hàng).
+    """
+    from kome.loaders import sales
+    b = batch(abs(hash((ma_lo, len(dong), dong[0]))) % 30_000 + 400_000)
+    sales.load(conn, pd.DataFrame([{
+        "slip_no": f"{ma_lo}{i}", "line_seq": 1, "sales_date": ngay,
+        "customer_code": ma, "product_code": hang, "pack_code": "02",
+        "case_qty": 1, "qty": 6, "unit_price": 5250, "unit_cost": 3210,
+        "amount": tien, "tax_amount": tien // 11,
+        "cost": tien - tien // 11 - tien // 4, "gross_profit": tien // 4,
+        "paid_amount": 0, "batch_id": b,
+    } for i, (ma, ngay, tien, hang) in enumerate(dong)]), HOM_NAY, b)
+    conn.commit()
+
+
 def _hang_master(conn, batch, *cap):
     """Vài dòng core.dim_product. Khối "gợi ý" đi TỪ bảng mã hàng, nên không
     có dòng nào ở đây thì nó luôn rỗng và test hoá ra chẳng kiểm gì."""
@@ -54,14 +76,21 @@ def _hang_master(conn, batch, *cap):
     conn.commit()
 
 
-def _bang_gia(conn, batch, bac: str, ma_hang: str, gia: int):
-    b = batch(abs(hash(("gia", bac, ma_hang))) % 40_000 + 250_000)
+def _bang_gia(conn, batch, bac: str, ma_hang: str, gia: int,
+              quy_cach: str = "02", tu_ngay: str = "2026-01-01"):
+    """Một dòng core.fact_price_list.
+
+    `quy_cach` (荷姿区分) và `tu_ngay` để ngỏ vì khoá của bảng là
+    (product_code, pack_code, price_level, valid_from) — cùng một mã hàng có
+    nhiều dòng thật, và trang chỉ được hiện dòng MỚI NHẤT của TỪNG quy cách.
+    """
+    b = batch(abs(hash(("gia", bac, ma_hang, quy_cach, tu_ngay))) % 40_000 + 250_000)
     conn.execute(
         """INSERT INTO core.fact_price_list
              (product_code, pack_code, price_level, valid_from, price_ex_tax,
               price_in_tax, unit_cost, batch_id)
-           VALUES (%s, '02', %s, '2026-01-01', %s, %s, 0, %s)""",
-        (ma_hang, bac, gia, gia, b))
+           VALUES (%s, %s, %s, %s, %s, %s, 0, %s)""",
+        (ma_hang, quy_cach, bac, tu_ngay, gia, gia, b))
     conn.commit()
 
 
@@ -613,5 +642,160 @@ def test_hai_bang_mat_hang_co_cot_nhip_va_tre(conn, batch, test_db_url):
     _neo(conn, batch)
 
     html = TestClient(create_app(db_url=test_db_url)).get("/khach-hang/N0001").text
+    # Khớp CHÍNH ô tiêu đề `<th>`: ba chữ này đều có mặt trong đoạn văn giải
+    # thích ngay trên bảng, nên khớp chuỗi trần thì cột biến mất test vẫn xanh.
     for cot in ("Nhịp", "Dự kiến lần tới", "Trễ"):
-        assert cot in html, f"bảng mặt hàng thiếu cột {cot}"
+        assert f'<th class="so">{cot}</th>' in html, f"bảng mặt hàng thiếu cột {cot}"
+
+
+# ---- Vòng sửa sau review đợt 4a ---------------------------------------
+
+def test_ty_suat_goi_y_la_TY_SO_CUA_CAC_TONG(conn, batch):
+    """[CRITICAL] Trung bình của TỶ SỐ TỪNG DÒNG khác tỷ số của các TỔNG, và
+    ở đây bản sai nguy hiểm hơn là chuyện thuần khiết: một dòng doanh thu
+    thuần vài yên cho ra tỷ số hàng chục lần, mà khối gợi ý xếp theo tỷ suất
+    giảm dần rồi lấy 8 dòng đầu — nên đúng những mã rác đó chiếm trọn tám
+    dòng gợi ý của MỌI khách. 赤伝 (số âm, luật dự án cấm lọc bỏ) làm mẫu số
+    âm nhỏ, nên chuyện này có thật.
+
+    XT09 bán hai lần: một dòng bình thường (lãi 30.000/doanh thu thuần
+    100.000 = 30%) và một dòng tí hon (5/1 = 500%).
+      * tỷ số của các tổng   = 30.005 / 100.001 ≈ 30,0%   <- ĐÚNG
+      * trung bình các tỷ số = (0,3 + 5,0) / 2 = 265%     <- SAI
+    """
+    _ho_so_khach(conn, batch, "T0001", "Quán tỷ suất")
+    _mua(conn, batch, "T0001", HOM_NAY - timedelta(days=7), hang="XT07")
+    _hang_master(conn, batch, ("XT07", "Gạo Japonica"), ("XT09", "Nước mắm"))
+    _mua(conn, batch, "000000000998", HOM_NAY - timedelta(days=5), hang="XT09")
+    _mua(conn, batch, "000000000998", HOM_NAY - timedelta(days=6),
+         tien=11, tax=10, gp=5, hang="XT09")
+    _neo(conn, batch)
+
+    g = next(g for g in KH.ho_so(conn, "T0001").goi_y if g["ma"] == "XT09")
+    assert abs(g["ty_suat"] - 0.30) < 0.01, \
+        f"tỷ suất {g['ty_suat']:.4f} — trung bình của các tỷ số (~2,65) chứ không phải tỷ số của các tổng"
+
+
+def test_ty_suat_mat_hang_dung_cung_cong_thuc_voi_bao_cao(conn, batch):
+    """Chỉ số chỉ có MỘT nhà. mart.ty_suat_mat_hang và mart.ban_theo_san_pham
+    (014) phải trả cùng một con số khi kho chỉ có một kỳ kế toán — khác nhau
+    là một trong hai đang tính sai."""
+    _mua(conn, batch, "000000000998", HOM_NAY, hang="XT09")
+    _mua(conn, batch, "000000000998", HOM_NAY - timedelta(days=1),
+         tien=11, tax=10, gp=5, hang="XT09")
+    a = conn.execute("SELECT ty_suat FROM mart.ty_suat_mat_hang "
+                     "WHERE product_code = 'XT09'").fetchone()[0]
+    b = conn.execute("SELECT ty_suat FROM mart.ban_theo_san_pham "
+                     "WHERE product_code = 'XT09'").fetchone()[0]
+    assert abs(float(a) - float(b)) < 1e-9
+
+
+def test_loc_tinh_trong_tim_dung_khach_chua_co_ho_so(conn, batch):
+    """[IMPORTANT] Khối "Tập trung ở đâu" nói "(không rõ): N", bấm vào phải ra
+    ĐÚNG N khách đó. Đổ thẳng nhãn "(không rõ)" vào `<option value>` thì
+    `danh_sach` chạy `prefecture = '(không rõ)'` — không dòng nào khớp, và
+    người dùng thấy hai con số mâu thuẫn trên cùng một màn hình. Đúng nhóm
+    khách cần dọn (có dòng bán nhưng chưa có hồ sơ 得意先全情報) lại là nhóm
+    không có đường nào mở ra."""
+    _ho_so_khach(conn, batch, "P0001", "Quán có tỉnh", prefecture="愛知県")
+    _mua(conn, batch, "P0001", HOM_NAY - timedelta(days=3))
+    _mua(conn, batch, "000000000998", HOM_NAY - timedelta(days=3))  # không hồ sơ
+    _neo(conn, batch)
+
+    t = KH.danh_sach(conn, tinh=KH.TINH_TRONG)
+    assert {k.ma for k in t.khach} == {"000000000998", "000000000999"}
+    tq = KH.tong_quan_danh_ba(conn)
+    assert dict(tq.tinh)[KH.KHONG_RO] == t.tong, \
+        "con số trong khối phân tích và số dòng bộ lọc trả về phải khớp"
+
+
+def test_bang_gia_chi_hien_gia_MOI_NHAT_cua_TUNG_QUY_CACH(conn, batch):
+    """[IMPORTANT] kome/loaders/price.py ghi một dòng MỚI mỗi lần nạp master,
+    và khoá bảng có cả `pack_code`. Không lọc thì sau ba lần nạp trang hiện
+    cùng một tên hàng SÁU LẦN với sáu con số khác nhau (3 lần nạp × 2 quy
+    cách), dưới nhãn "giá đáng lẽ phải bán". Đây là màn hình người ta nhìn
+    TRƯỚC KHI báo giá cho khách."""
+    _ho_so_khach(conn, batch, "V0001", "Quán bảng giá", price_level_code="03")
+    _mua(conn, batch, "V0001", HOM_NAY - timedelta(days=3))
+    _hang_master(conn, batch, ("XT07", "Gạo Japonica"))
+    _bang_gia(conn, batch, "03", "XT07", 1000, quy_cach="00", tu_ngay="2026-01-01")
+    _bang_gia(conn, batch, "03", "XT07", 1200, quy_cach="00", tu_ngay="2026-06-01")
+    _bang_gia(conn, batch, "03", "XT07", 5000, quy_cach="02", tu_ngay="2026-06-01")
+    _neo(conn, batch)
+
+    bg = KH.ho_so(conn, "V0001").bac_gia
+    assert [b["gia"] for b in bg] == [1200, 5000], \
+        "giá cũ vẫn còn, hoặc hai quy cách bị trộn làm một"
+    assert [b["quy_cach"] for b in bg] == ["バラ (lẻ)", "ケース (thùng)"]
+    assert all(b["tu_ngay"] == "2026-06-01" for b in bg)
+
+
+def test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket(conn, batch, test_db_url,
+                                                     monkeypatch):
+    """[IMPORTANT] Sót một liên kết là người đang lọc bấm một cái bị ném về
+    danh sách đầy mà không hiểu vì sao.
+
+    Test này PHẢI gieo dữ liệu. Bản đầu chạy trên CSDL vừa bị TRUNCATE nên
+    `t.khach` rỗng, nhánh `{% if t.khach %}` không render, và BỐN liên kết
+    sắp xếp cùng HAI liên kết phân trang — đúng những cái nó nói mình bảo vệ
+    — không hề có mặt trong HTML được kiểm. Ngưỡng 8 vẫn đạt nhờ các chip,
+    nên xoá `giu` khỏi chính nút "Sau →" mà test vẫn xanh.
+    """
+    import re as _re
+
+    from fastapi.testclient import TestClient
+    from kome.web.app import create_app
+
+    # 40 khách nền doanh thu nhỏ. Hạng 'S' là 5% trên cùng theo cume_dist,
+    # nên với ít hơn ~20 khách thì KHÔNG AI là 'S' và bộ lọc hang=S trả về
+    # danh sách rỗng — tức cái lỗ cũ quay lại.
+    _mua_nhieu(conn, batch,
+               [(f"F{i:03d}", HOM_NAY - timedelta(days=3), 1_100, "XT07")
+                for i in range(40)], ma_lo="F")
+    # Hai khách mục tiêu: 愛知県, doanh thu lớn nhất kho (-> 'S'), im 40 ngày
+    # trên nhịp 7 ngày (-> nhóm việc 'im').
+    for ma in ("A0001", "A0002"):
+        _ho_so_khach(conn, batch, ma, f"Quán {ma}", prefecture="愛知県")
+    _mua_nhieu(conn, batch,
+               [(ma, HOM_NAY - timedelta(days=40 + i * 7), 5_000_000, "XT07")
+                for ma in ("A0001", "A0002") for i in range(6)], ma_lo="A")
+    _neo(conn, batch)
+
+    monkeypatch.setattr(KH, "MOI_TRANG", 1)      # 2 khách khớp -> 2 trang
+    c = TestClient(create_app(db_url=test_db_url))
+    html = c.get("/khach-hang?nhom=im&hang=S&tinh=愛知県").text
+    assert "Quán A0001" in html, \
+        "không khách nào khớp cả ba bộ lọc — test lại không đi qua thứ nó bảo vệ"
+
+    def _lien_ket(mau, ten):
+        m = _re.search(r'href="(/khach-hang\?' + mau + r'[^"]*)"', html)
+        assert m, f"không thấy liên kết {ten} trong HTML"
+        for ky in ("nhom=im", "hang=S", "tinh="):
+            assert ky in m.group(1), f"liên kết {ten} rơi mất {ky}"
+
+    for sap in ("doanh_thu", "ty_suat", "im_lang", "gan_nhat"):
+        _lien_ket("sap=" + sap, f"sắp xếp {sap}")
+    _lien_ket("trang=2", "phân trang 'Sau →'")
+
+    assert html.count("nhom=im") >= 8, "bộ lọc nhóm rơi khỏi một số liên kết"
+    assert "hang=S" in html and "tinh=" in html
+
+
+def test_o_chon_tinh_khong_am_tham_xoa_bo_loc_dang_bat(conn, batch, test_db_url):
+    """[IMPORTANT] Danh sách `<option>` chỉ có 8 tỉnh đông nhất CỦA PHẠM VI
+    ĐANG XEM, mà phạm vi co theo sale/nv. Tỉnh đang lọc không nằm trong đó
+    thì `<select>` hiện "— mọi tỉnh —" trong khi danh sách vẫn đang bị lọc và
+    mọi liên kết vẫn mang `tinh=…`: ô điều khiển nói một đằng, dữ liệu một
+    nẻo. Bấm "Lọc" lần nữa là bộ lọc biến mất mà không ai nhấn nút nào để
+    xoá nó."""
+    from fastapi.testclient import TestClient
+    from kome.web.app import create_app
+
+    _ho_so_khach(conn, batch, "O0001", "Quán Tokyo", prefecture="東京都")
+    _mua(conn, batch, "O0001", HOM_NAY - timedelta(days=3))
+    _neo(conn, batch)
+
+    c = TestClient(create_app(db_url=test_db_url))
+    html = c.get("/khach-hang?tinh=沖縄県").text
+    assert '<option value="沖縄県" selected>' in html, \
+        "tỉnh đang lọc không có option của chính nó — ô chọn sẽ âm thầm xoá bộ lọc"

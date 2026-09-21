@@ -19,6 +19,22 @@ TRANG_THAI = {
     "ngung_giao_dich": ("Ngừng giao dịch", "nhat"),
 }
 
+# Nhãn hiển thị cho khách chưa có hồ sơ 得意先全情報 (prefecture NULL hoặc
+# rỗng), và GIÁ TRỊ QUY ƯỚC mang nhãn đó đi trên URL.
+#
+# Vì sao phải là hai chuỗi khác nhau: đổ thẳng nhãn ra `<option value>` thì
+# bấm vào nó gửi `tinh=(không rõ)`, rồi câu SQL chạy `prefecture = '(không
+# rõ)'` — không dòng nào khớp. Khối "Tập trung ở đâu" nói "(không rõ): 37"
+# ngay phía trên, bấm vào ra "Không có khách nào khớp": hai con số mâu thuẫn
+# trên cùng một màn hình, và đúng nhóm khách CẦN dọn lại là nhóm không có
+# đường nào mở ra.
+KHONG_RO = "(không rõ)"
+TINH_TRONG = "__trong"
+
+# 荷姿区分 — hai mã thật sự có trong dữ liệu (xem CLAUDE.md). Mã lạ thì hiện
+# nguyên mã chứ không đoán: một nhãn đoán sai còn tệ hơn một mã khó đọc.
+QUY_CACH = {"00": "バラ (lẻ)", "02": "ケース (thùng)"}
+
 # Cột được phép sắp xếp. Danh sách trắng, KHÔNG ghép thẳng tham số URL vào câu
 # SQL — đó là đường mở cho SQL injection, và trang này sắp nằm trên Internet.
 SAP_XEP = {
@@ -153,7 +169,12 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
                                      WHERE hd.customer_code = mart.khach_360.customer_code
                                        AND hd.hang = %s)""")
         tham_so.append(hang)
-    if tinh:
+    if tinh == TINH_TRONG:
+        # Nhóm "(không rõ)": khách có dòng bán nhưng chưa có hồ sơ
+        # 得意先全情報. `prefecture = '(không rõ)'` không bao giờ khớp gì —
+        # nhãn đó do coalesce() sinh ra lúc HIỂN THỊ, không nằm trong CSDL.
+        dieu_kien.append("(prefecture IS NULL OR prefecture = '')")
+    elif tinh:
         dieu_kien.append("prefecture = %s")
         tham_so.append(tinh)
     where = ("WHERE " + " AND ".join(dieu_kien)) if dieu_kien else ""
@@ -275,19 +296,14 @@ def ho_so(conn, ma: str) -> HoSo | None:
             UNION ALL
             (SELECT 'goi_y', p.product_code,
                     coalesce(nullif(p.product_name, ''), p.product_code),
-                    ''::text, g.ty_suat, g.gia::numeric, g.ty_suat
+                    ''::text, t.ty_suat, t.gia_cao_nhat::numeric, t.ty_suat
                FROM core.dim_product p
-               LEFT JOIN LATERAL (
-                    SELECT avg(f.gross_profit::numeric
-                               / nullif(f.amount - f.tax_amount, 0)) AS ty_suat,
-                           max(f.unit_price) AS gia
-                      FROM core.fact_sales_line f
-                     WHERE f.product_code = p.product_code) g ON true
+               JOIN mart.ty_suat_mat_hang t ON t.product_code = p.product_code
               WHERE NOT EXISTS (SELECT 1 FROM mart.khach_mat_hang h
                                  WHERE h.customer_code = %s
                                    AND h.product_code = p.product_code)
-                AND g.ty_suat IS NOT NULL
-              ORDER BY g.ty_suat DESC
+                AND t.ty_suat IS NOT NULL
+              ORDER BY t.ty_suat DESC
               LIMIT 8)
         ) u ORDER BY khoi, xep DESC
     """, (ma, ma)).fetchall()
@@ -303,27 +319,37 @@ def ho_so(conn, ma: str) -> HoSo | None:
                           "gia": int(so_b) if so_b is not None else None})
 
     # Truy vấn B: bảng giá của bậc giá khách đang hưởng + điểm giao thẳng.
-    # `'gia'` xếp trước `'giao'` theo bảng chữ cái, nên ORDER BY khoi, ma giữ
-    # đúng thứ tự hai khối mà không cần thêm cột nào.
+    # `'gia'` xếp trước `'giao'` theo bảng chữ cái, nên ORDER BY khoi, ma, c2
+    # giữ đúng thứ tự hai khối mà không cần thêm cột nào.
+    #
+    # DISTINCT ON (product_code, pack_code) ... ORDER BY valid_from DESC:
+    # core.fact_price_list giữ LỊCH SỬ giá — kome/loaders/price.py ghi một
+    # dòng MỚI mỗi lần nạp master, và khoá bảng có cả `pack_code`. Không lọc
+    # thì sau ba lần nạp trang hiện cùng một tên hàng SÁU LẦN với sáu con số
+    # khác nhau (3 lần nạp × 2 quy cách 00/02), dưới nhãn "giá đáng lẽ phải
+    # bán" — trên đúng màn hình người ta nhìn TRƯỚC KHI báo giá cho khách.
     hai = conn.execute("""
-        SELECT khoi, ma, ten, c1, c2 FROM (
-            (SELECT 'gia'::text AS khoi, pl.product_code AS ma,
+        SELECT khoi, ma, ten, c1, c2, c3 FROM (
+            (SELECT DISTINCT ON (pl.product_code, pl.pack_code)
+                    'gia'::text AS khoi, pl.product_code AS ma,
                     coalesce(nullif(p.product_name, ''), pl.product_code) AS ten,
-                    pl.price_ex_tax::text AS c1, pl.valid_from::text AS c2
+                    pl.price_ex_tax::text AS c1, pl.pack_code AS c2,
+                    pl.valid_from::text AS c3
                FROM core.fact_price_list pl
                JOIN mart.khach_360 k ON k.customer_code = %s
                                     AND k.price_level_code = pl.price_level
                LEFT JOIN core.dim_product p ON p.product_code = pl.product_code
-              ORDER BY pl.product_code
+              ORDER BY pl.product_code, pl.pack_code, pl.valid_from DESC
               LIMIT 20)
             UNION ALL
             (SELECT 'giao', shipto_code, coalesce(nullif(shipto_name, ''), shipto_code),
-                    coalesce(address, ''), ''
+                    coalesce(address, ''), '', ''
                FROM core.dim_shipto WHERE customer_code = %s)
-        ) u ORDER BY khoi, ma
+        ) u ORDER BY khoi, ma, c2
     """, (ma, ma)).fetchall()
 
-    bac_gia = [{"ma": r[1], "ten": r[2], "gia": int(r[3]), "tu_ngay": r[4]}
+    bac_gia = [{"ma": r[1], "ten": r[2], "gia": int(r[3]),
+                "quy_cach": QUY_CACH.get(r[4], r[4]), "tu_ngay": r[5]}
                for r in hai if r[0] == "gia"]
     diem_giao = [{"ma": r[1], "ten": r[2], "dia_chi": r[3]}
                  for r in hai if r[0] == "giao"]
@@ -418,6 +444,11 @@ def tong_quan_danh_ba(conn, sale: str | None = None) -> TongQuan:
           {dk}
          GROUP BY h.hang
         UNION ALL
+        -- Chuỗi '(không rõ)' dưới đây PHẢI khớp hằng KHONG_RO ở đầu module
+        -- (trang so nhãn này để biết mục nào cần giá trị URL quy ước
+        -- TINH_TRONG). Để literal chứ không truyền tham số: nhánh `sale`
+        -- đang sinh đúng bốn placeholder theo thứ tự văn bản (`p * 4`), thêm
+        -- một cái nữa ở giữa là một chỗ rất dễ đếm lệch về sau.
         SELECT 'tinh', coalesce(nullif(k.prefecture, ''), '(không rõ)'), count(*), 0, 0
           FROM mart.khach_360 k {dk}
          GROUP BY 2
@@ -437,9 +468,9 @@ def tong_quan_danh_ba(conn, sale: str | None = None) -> TongQuan:
     # lúc dữ liệu đủ lớn để thấy sự khác biệt, còn CSDL thử nghiệm nhỏ (1-2
     # tỉnh) không bao giờ lộ ra lỗi này.
     tinh_rows = lay("tinh")
-    tinh_that = sorted(((t, n) for t, n, _, _ in tinh_rows if t != "(không rõ)"),
+    tinh_that = sorted(((t, n) for t, n, _, _ in tinh_rows if t != KHONG_RO),
                         key=lambda x: -x[1])[:8]
-    khong_ro = next(((t, n) for t, n, _, _ in tinh_rows if t == "(không rõ)"), None)
+    khong_ro = next(((t, n) for t, n, _, _ in tinh_rows if t == KHONG_RO), None)
     tinh = tinh_that + ([khong_ro] if khong_ro else [])
     return TongQuan(
         nhom={k: nhom.get(k, 0) for k in ("im", "tut", "moi")},

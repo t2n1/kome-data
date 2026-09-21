@@ -1,6 +1,9 @@
 """Test của đợt 1 — nền giao diện.
 
-Không có test nào ở đây chạm CSDL. Chúng đọc file và đọc HTML trả về.
+Phần lớn test ở đây chỉ đọc file (kome.css, template, font) hoặc đọc HTML
+trả về. Một số cần fixture `conn` để dựng app — chúng KHÔNG gieo dữ liệu, chỉ
+cần schema có mặt. Test giao diện nào phải GIEO dữ liệu mới kiểm được thì nằm
+ở tests/test_khach_hang.py, nơi có sẵn các hàm gieo.
 """
 import re
 from pathlib import Path
@@ -364,15 +367,6 @@ def test_nut_nap_va_o_chon_file_co_kieu_dang():
 
 # ---- Trang danh sách khách: 4 khối + 3 bộ lọc (task 5 đợt 4a) ----------
 
-def test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket(conn, test_db_url):
-    """Sót một liên kết là người đang lọc bấm một cái bị ném về danh sách đầy
-    mà không hiểu vì sao."""
-    c = TestClient(create_app(db_url=test_db_url))
-    html = c.get("/khach-hang?nhom=im&hang=S&tinh=愛知県").text
-    assert html.count("nhom=im") >= 8, "bộ lọc nhóm rơi khỏi một số liên kết"
-    assert "hang=S" in html and "tinh=" in html
-
-
 def test_trang_danh_sach_co_du_bon_khoi_va_ba_bo_loc(conn, test_db_url):
     """[IMPORTANT] Bốn khối là bốn câu hỏi khác nhau; thiếu một khối thì
     không test nào khác đỏ, vì trang vẫn trả 200 và vẫn có danh sách."""
@@ -386,8 +380,10 @@ def test_trang_danh_sach_co_du_bon_khoi_va_ba_bo_loc(conn, test_db_url):
     for tieu_de in ("hạng doanh thu 12 tháng", "Tập trung ở đâu",
                     "Tải của từng nhân viên"):
         assert tieu_de in html, f"thiếu khối: {tieu_de}"
-    # Ba bộ lọc: chip hạng, select người phụ trách, select tỉnh
-    assert 'name="nv"' in html and 'name="tinh"' in html
+    # Ba bộ lọc: chip hạng, select người phụ trách, select tỉnh. Phải khớp
+    # CHÍNH thẻ <select> — `name="nv"` khớp cả ô ẩn của form tìm kiếm, nên
+    # xoá hẳn hai ô chọn mà test vẫn xanh.
+    assert '<select name="nv"' in html and '<select name="tinh"' in html
     assert "hang=S" in html and "hang=D" in html
 
 
@@ -401,6 +397,9 @@ def test_nhan_hang_khong_bao_gio_tro_troi(conn, test_db_url):
     assert "hạng doanh thu 12 tháng" in html
     # Ngoại lệ DUY NHẤT: tên nút nhóm việc "Hạng S·A đang tụt" — câu mô tả
     # ngay dưới nó đã viết đủ chữ "theo doanh thu 12 tháng".
-    tro_troi = re.findall(r"hạng(?! doanh thu 12 tháng)(?! s·a)", html)
+    # Nhận CẢ HAI cách viết: đặc tả nói "hạng theo doanh thu 12 tháng", còn
+    # tiêu đề khối trong bản mô tả là "Phân bố theo hạng doanh thu 12 tháng".
+    # Cấm một trong hai là bắt người viết sau chọn giữa đặc tả và test.
+    tro_troi = re.findall(r"hạng(?! (?:theo )?doanh thu 12 tháng)(?! s·a)", html)
     assert not tro_troi, \
         f"{len(tro_troi)} chỗ ghi 'hạng' trơ trọi — sẽ bị đối chiếu nhầm với 得意先ランク"

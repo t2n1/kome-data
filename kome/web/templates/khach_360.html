@@ -178,12 +178,17 @@ phải theo việc khách có cần hay không — người gọi vẫn là ngư
 {% if h.bac_gia %}
 <h2>Bảng giá của bậc {{ h.ho_so.bac_gia }} (売価No.)</h2>
 <p class="ghi-chu">Giá <strong>đáng lẽ phải bán</strong> cho khách này. So với
-đơn giá thật trên phiếu là ra ngay những lần bán dưới giá.</p>
+đơn giá thật trên phiếu là ra ngay những lần bán dưới giá. Mỗi
+<strong>荷姿</strong> (quy cách đóng gói) có giá riêng, và bảng chỉ hiện dòng
+<strong>mới nhất</strong> của từng quy cách — 取引単価データ giữ cả lịch sử giá,
+mỗi lần nạp master thêm một dòng. Tối đa <strong>20 mã đầu</strong> theo mã
+hàng; còn nữa thì tra trong OBC.</p>
 <div class="bang-cuon">
 <table>
- <tr><th>Mặt hàng</th><th class="so">Giá chưa thuế</th><th class="so">Áp dụng từ</th></tr>
+ <tr><th>Mặt hàng</th><th>荷姿</th><th class="so">Giá chưa thuế</th>
+     <th class="so">Áp dụng từ</th></tr>
  {% for b in h.bac_gia %}
- <tr><td>{{ b.ten }}</td>
+ <tr><td>{{ b.ten }}</td><td>{{ b.quy_cach }}</td>
   <td class="so">¥{{ "{:,}".format(b.gia) }}</td>
   <td class="so">{{ b.tu_ngay }}</td></tr>
  {% endfor %}

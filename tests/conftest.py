@@ -1,4 +1,5 @@
 from datetime import date
+import itertools
 import os
 from pathlib import Path
 
@@ -143,14 +144,26 @@ def batch(conn):
     Mọi bảng fact/dim đều có batch_id REFERENCES meta.ingest_batch(batch_id),
     nên test nào ghi dữ liệu cũng phải có lô thật — truyền số 1 tuỳ tiện sẽ
     vi phạm khoá ngoại.
+
+    Digest kèm một BỘ ĐẾM tăng dần, không chỉ có `n`. Các hàm gieo dữ liệu
+    sinh `n` bằng `abs(hash(...)) % 90_000`, mà một test gieo vài chục dòng
+    thì hai giá trị băm trùng nhau là chuyện đủ thường xuyên để xảy ra thật
+    (đã xảy ra: `duplicate key value violates unique constraint
+    "ingest_batch_digest_active"` giữa lúc chạy một test chẳng liên quan gì
+    tới digest). Vì hash của str được ngẫu nhiên hoá theo từng tiến trình,
+    lỗi đó đổi chỗ mỗi lần chạy và không tái hiện được. KHÔNG test nào khẳng
+    định trên giá trị digest của fixture này, nên thêm bộ đếm không đổi gì
+    ngoài việc bỏ hẳn lớp lỗi đó.
     """
+    dem = itertools.count()
+
     def _make(n: int = 1, ngay: date = date(2026, 1, 1)) -> int:
         row = conn.execute(
             """INSERT INTO meta.ingest_batch
                  (spec_name, source_file, digest, archived_to, row_count, data_date)
                VALUES ('test', 'test.xlsx', %s, '/tmp/test.xlsx', 0, %s)
                RETURNING batch_id""",
-            (f"digest-{n}", ngay),
+            (f"digest-{n}-{next(dem)}", ngay),
         ).fetchone()
         conn.commit()
         return row[0]
