@@ -5,9 +5,27 @@ Hai thứ được canh kỹ nhất ở đây: **cột `best_before` là TEXT v�
 **"không có dòng tồn" khác "tồn bằng 0"** — nhầm hai thứ đó là xếp một mã chưa
 bao giờ nhập kho vào danh sách cần đặt hàng gấp.
 """
-from datetime import date, timedelta
+from datetime import timedelta
 
 from tests.test_khach_hang import _ho_so_khach, _mua, _neo, HOM_NAY
+
+
+def _ban_qty(conn, batch, ma_khach, ngay, ma_hang, qty,
+             tien=110_000, tax=10_000, gp=30_000):
+    """Một dòng bán với SỐ LƯỢNG tuỳ ý — âm để mô phỏng 赤伝 (hàng trả lại).
+    `_mua` ép cứng qty=6 nên không dùng được cho các test cần số lượng khác."""
+    import pandas as pd
+    from kome.loaders import sales
+    b = batch(abs(hash((ma_khach, ngay, ma_hang, qty))) % 90_000 + 1)
+    sales.load(conn, pd.DataFrame([{
+        "slip_no": f"Q{ma_khach[-4:]}{ngay:%m%d}{ma_hang}", "line_seq": 1,
+        "sales_date": ngay, "customer_code": ma_khach, "product_code": ma_hang,
+        "pack_code": "02", "case_qty": 1, "qty": qty, "unit_price": 5250,
+        "unit_cost": 3210, "amount": tien, "tax_amount": tax,
+        "cost": tien - tax - gp, "gross_profit": gp, "paid_amount": 0,
+        "batch_id": b,
+    }]), ngay, b)
+    conn.commit()
 
 
 def _ton(conn, batch, ma_hang, kho="0001", sl=100, gia=1000, han="2028年06月09日"):
@@ -117,6 +135,9 @@ def test_ma_ton_nhieu_ban_cham_la_ton_chet(conn, batch):
         "SELECT trang_thai, du_ban_ngay FROM mart.san_pham_360 WHERE product_code='K007'"
     ).fetchone()
     assert r[0] == "ton_chet"
+    # Mẫu số "công bằng cho hàng mới": lần bán đầu 82 ngày trước -> mẫu số
+    # least(90, 82+1)=83, không phải 90. so_luong_90n=18 (3 lần x 6 đơn vị).
+    assert abs(float(r[1]) - 10_000 * 83 / 18) < 0.01
 
 
 def test_ma_khong_co_dong_ton_thi_ton_la_NULL_khong_phai_0(conn, batch):
@@ -160,3 +181,107 @@ def test_ten_kho_lay_tu_dim_warehouse(conn, batch):
     r = conn.execute(
         "SELECT ten_kho FROM mart.ton_hien_tai WHERE product_code='K011'").fetchone()
     assert r[0] == "Kho 9999"
+
+
+# ---------------------------------------------------------------------------
+# Vòng sửa sau review: "không biết tồn" khác "tồn bằng 0" trong CHÍNH
+# trang_thai (không chỉ ở cột ton), ngoại lệ "mã mới" không được đè het_hang,
+# tốc độ âm do 赤伝, mẫu số 90 cố định thổi phồng mã mới, và loai_han bắt-tất
+# sai.
+# ---------------------------------------------------------------------------
+
+def test_khong_co_dong_ton_nhung_van_ban_thi_chua_ro_ton_khong_phai_het_hang(conn, batch):
+    """[CRITICAL] Một mã không nằm trong bản xuất 在庫一覧 (90/232 mã) mà vẫn
+    bán đều không được hiện 'hết hàng, đặt gấp' — đó là khẳng định chắc chắn
+    về một con số ta không biết. Phải có nhãn RIÊNG cho 'không biết'."""
+    _san_pham(conn, batch, "K012")
+    _ho_so_khach(conn, batch, "KH012", "Quán K012")
+    _mua(conn, batch, "KH012", HOM_NAY - timedelta(days=3), hang="K012")
+    _neo(conn, batch)
+    r = conn.execute(
+        "SELECT ton, trang_thai FROM mart.san_pham_360 WHERE product_code='K012'"
+    ).fetchone()
+    assert r[0] is None
+    assert r[1] == "chua_ro_ton"
+
+
+def test_ma_moi_ton_0_van_la_het_hang_khong_phai_du(conn, batch):
+    """[CRITICAL] Ngoại lệ 'mã mới ra mắt' chỉ được phép chắn nhãn tồn chết,
+    KHÔNG được đè lên hết hàng: một mã ra mắt 20 ngày trước, bán 2 lần, tồn về
+    0 vẫn đang cần nhập hàng GẤP, không phải 'đủ hàng'."""
+    _san_pham(conn, batch, "K013")
+    _ton(conn, batch, "K013", sl=0)
+    _ho_so_khach(conn, batch, "KH013", "Quán K013")
+    _mua(conn, batch, "KH013", HOM_NAY - timedelta(days=20), hang="K013")
+    _mua(conn, batch, "KH013", HOM_NAY - timedelta(days=10), hang="K013")
+    _neo(conn, batch)
+    r = conn.execute(
+        "SELECT trang_thai FROM mart.san_pham_360 WHERE product_code='K013'").fetchone()
+    assert r[0] == "het_hang"
+
+
+def test_toc_do_am_do_hang_tra_lai_khong_bao_gio_la_sap_thieu(conn, batch):
+    """[CRITICAL] 赤伝 (hàng trả lại) giữ số ÂM theo luật của dự án, nên tổng
+    số lượng 90 ngày có thể ÂM khi cửa sổ đó chỉ toàn hàng trả. toc_do_ngay ÂM
+    mà đọc thành 'sắp thiếu' thì giục nhập hàng cho một mã đang chảy ngược."""
+    _san_pham(conn, batch, "K014")
+    _ton(conn, batch, "K014", sl=500)
+    _ho_so_khach(conn, batch, "KH014", "Quán K014")
+    _mua(conn, batch, "KH014", HOM_NAY - timedelta(days=200), hang="K014")
+    _ban_qty(conn, batch, "KH014", HOM_NAY - timedelta(days=5), "K014", qty=-2)
+    _neo(conn, batch)
+    r = conn.execute(
+        "SELECT trang_thai, du_ban_ngay FROM mart.san_pham_360 WHERE product_code='K014'"
+    ).fetchone()
+    assert r[0] == "ton_chet"
+    assert r[1] is None, "tốc độ âm không chia được -- không phải 0, không phải vô cực"
+
+
+def test_mau_so_dong_khong_thoi_phong_du_ban_ngay_cho_ma_moi(conn, batch):
+    """Mẫu số CỐ ĐỊNH 90 (của mart.toc_do_ban) làm tốc độ một mã mới ra mắt
+    thấp hơn thật, rồi 'còn đủ bán bao nhiêu ngày' bị thổi phồng đúng bấy
+    nhiêu lần -- đẩy một mã đang bán tốt vào nhãn tồn chết."""
+    _san_pham(conn, batch, "K015")
+    _ton(conn, batch, "K015", sl=200)
+    _ho_so_khach(conn, batch, "KH015", "Quán K015")
+    _ban_qty(conn, batch, "KH015", HOM_NAY - timedelta(days=20), "K015", qty=10)
+    _ban_qty(conn, batch, "KH015", HOM_NAY - timedelta(days=10), "K015", qty=10)
+    _ban_qty(conn, batch, "KH015", HOM_NAY, "K015", qty=10)
+    _neo(conn, batch)
+    r = conn.execute(
+        "SELECT trang_thai, du_ban_ngay FROM mart.san_pham_360 WHERE product_code='K015'"
+    ).fetchone()
+    assert r[0] != "ton_chet"
+    # Mẫu số động: least(90, 20+1)=21 -> tốc độ = 30/21. Mẫu số 90 cố định
+    # (bản trước sửa) sẽ cho 200/(30/90)=600 ngày -> sai sang 'ton_chet'.
+    assert abs(float(r[1]) - 200 / (30 / 21)) < 0.01
+
+
+def test_han_su_dung_khong_doc_duoc_la_khong_ro_khong_phai_khong_han(conn, batch):
+    """[CRITICAL] Một chuỗi không khớp regex ngày và không đúng y hệt
+    '賞味期限なし' (ví dụ OBC đổi mẫu xuất sang '2028/06/09') là 'không đọc
+    được', KHÔNG được ngầm hiểu thành 'không có hạn sử dụng' -- lô đó sẽ biến
+    mất khỏi mọi cảnh báo hạn một cách im lặng."""
+    _san_pham(conn, batch, "K017")
+    _ton(conn, batch, "K017", han="2028/06/09")
+    r = conn.execute(
+        "SELECT loai_han, han_con_lai FROM mart.ton_hien_tai WHERE product_code='K017'"
+    ).fetchone()
+    assert r[0] == "khong_ro"
+    assert r[1] is None
+
+
+def test_san_pham_theo_thang_gop_dung_thang_va_ma(conn, batch):
+    """View thứ tư -- chưa có test nào trước vòng sửa này. Một lỗi tên cột
+    trong GROUP BY sẽ lọt thẳng tới task 2 nếu không canh ở đây."""
+    _san_pham(conn, batch, "K016")
+    _ho_so_khach(conn, batch, "KH016", "Quán K016")
+    _mua(conn, batch, "KH016", HOM_NAY, hang="K016")
+    _mua(conn, batch, "KH016", HOM_NAY - timedelta(days=5), hang="K016")
+    r = conn.execute(
+        """SELECT thang, so_luong, doanh_thu_thuan, lai_gop
+           FROM mart.san_pham_theo_thang WHERE product_code='K016'""").fetchone()
+    assert r[0] == f"{HOM_NAY:%Y-%m}"
+    assert float(r[1]) == 12.0          # 2 lần x 6 đơn vị (mặc định của _mua)
+    assert r[2] == 200_000              # 2 x (110.000 - 10.000)
+    assert r[3] == 60_000               # 2 x 30.000
