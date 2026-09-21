@@ -211,6 +211,19 @@ def test_mat_hang_da_ngung_mua(conn, batch):
     assert "XT07" not in bo, "món vẫn đang mua không được coi là đã bỏ"
 
 
+def test_ho_so_mang_nhip_theo_tung_ma(conn, batch):
+    """Ba khối của trang hồ sơ cần nhịp theo mã. Lấy nó từ mart chứ không tính
+    ở Python — định nghĩa chỉ số chỉ có một nhà."""
+    _ho_so_khach(conn, batch, "MH01", "Quán mặt hàng")
+    for i in range(5):
+        _mua(conn, batch, "MH01", HOM_NAY - timedelta(days=i * 7), hang="XT07")
+    _neo(conn, batch)
+    h = KH.ho_so(conn, "MH01")
+    m = next(x for x in h.mat_hang if x["ma"] == "XT07")
+    assert m["nhip"] == 7
+    assert m["du_kien"] is not None
+
+
 def test_can_xu_ly_xep_theo_TIEN_khong_theo_muc_im_lang(conn, batch):
     """Gọi lại khách ¥5 triệu im 3× nhịp đáng hơn khách ¥50.000 im 10× nhịp,
     dù con số thứ hai trông đáng báo động hơn."""

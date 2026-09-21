@@ -178,20 +178,24 @@ def ho_so(conn, ma: str) -> HoSo | None:
            FROM mart.khach_theo_thang WHERE customer_code = %s
            ORDER BY thang""", (ma,)).fetchall()]
 
+    # `nhip` là numeric từ Postgres — ép sang int khi HIỂN THỊ ở template
+    # (`|int`), không ép ở đây: None phải đi qua nguyên vẹn để template hiện
+    # "—" cho mã chưa đủ lịch sử để tính nhịp.
     mat_hang = [dict(zip(("ma", "ten", "doanh_thu", "lai_gop", "so_luong",
-                          "so_lan", "lan_cuoi"), h))
+                          "so_lan", "lan_cuoi", "nhip", "du_kien"), h))
                 for h in conn.execute(
         """SELECT product_code, ten_hang, doanh_thu_thuan, lai_gop, so_luong,
-                  so_lan, lan_cuoi
+                  so_lan, lan_cuoi, nhip_ngay, du_kien_lan_toi
            FROM mart.khach_mat_hang WHERE customer_code = %s
            ORDER BY doanh_thu_thuan DESC LIMIT 15""", (ma,)).fetchall()]
 
     # Mặt hàng khách TỪNG mua đều rồi NGỪNG hẳn. Đây là tín hiệu sớm hơn nhiều
     # so với việc khách ngừng mua toàn bộ: họ đang chuyển dần sang nhà cung cấp
     # khác, từng món một, và không ai để ý cho tới khi mất luôn khách.
-    da_ngung = [dict(zip(("ma", "ten", "so_lan", "lan_cuoi", "doanh_thu"), h))
+    da_ngung = [dict(zip(("ma", "ten", "so_lan", "lan_cuoi", "doanh_thu", "tre"), h))
                 for h in conn.execute(
-        """SELECT h.product_code, h.ten_hang, h.so_lan, h.lan_cuoi, h.doanh_thu_thuan
+        """SELECT h.product_code, h.ten_hang, h.so_lan, h.lan_cuoi,
+                  h.doanh_thu_thuan, h.tre_ngay
            FROM mart.khach_mat_hang h, mart.moc_thoi_gian m
            WHERE h.customer_code = %s
              AND h.so_lan >= 3
