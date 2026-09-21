@@ -28,8 +28,6 @@ SCRYPT_P = 1
 DAI_HASH = 32
 DAI_SALT = 16
 
-_COT = """id, ten_dang_nhap, salesperson_code, duoc_vao_kho_du_lieu"""
-
 # Truy vấn dùng chung cho kiem_tra/theo_id/liet_ke. LEFT JOIN chứ không JOIN:
 # người không phụ trách khách nào (chủ DN, kế toán) có salesperson_code NULL
 # và vẫn phải đăng nhập được.
