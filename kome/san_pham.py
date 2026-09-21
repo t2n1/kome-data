@@ -78,14 +78,13 @@ SAP_XEP = {
 #
 # MỘT hằng cho CẢ ô tổng quan lẫn bảng cận hạn: ô nói "12 lô cận hạn" mà bảng
 # ngay dưới liệt kê 30 dòng là hai con số mâu thuẫn trên cùng một màn hình.
+#
+# CHẶN DƯỚI là 0, không phải âm vô cực: "đã quá hạn" và "sắp hết hạn" là HAI
+# việc khác nhau với hàng thực phẩm. Không có chặn dưới thì một lô quá hạn còn
+# sót trong bản xuất đứng vĩnh viễn ở đầu bảng (xếp tăng dần theo số ngày còn
+# lại) và cộng vào ô đếm mãi mãi — cái đang cần XỬ LÝ NGAY bị trộn vào danh
+# sách cái cần theo dõi. Lô quá hạn có khối riêng: `Kho.qua_han`.
 CAN_HAN_NGAY = 90
-
-# Khách im lặng bao nhiêu ngày với MỘT mã thì coi là "đã ngừng mua mã này".
-# Cùng một con số, cùng một vị từ với khối "đã ngừng mua" của
-# kome/khach_hang.py::ho_so() — hai màn hỏi đúng cùng một câu, nên phải trả
-# lời giống nhau; lệch nhau là hai trang nói hai điều về cùng một cặp
-# (khách, mã).
-NGUNG_MUA_NGAY = 90
 
 
 @dataclass
@@ -154,6 +153,9 @@ class Kho:
     ds_kho: list[tuple[str, str]]
     kho: str
     loc: str
+    # Lô ĐÃ quá hạn, tách hẳn khỏi `can_han` (lô sắp hết hạn). Trộn hai thứ là
+    # trộn "xử lý ngay" với "theo dõi" — xem ghi chú ở CAN_HAN_NGAY.
+    qua_han: list[dict] = field(default_factory=list)
 
 
 _COT = """product_code, ten_hang, nhom, doanh_thu_thuan, lai_gop, ty_suat,
@@ -274,6 +276,24 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
     # Hai khối khách gộp làm MỘT lượt hỏi: cùng một view, cùng bộ cột, chỉ khác
     # vị từ — đúng ca mà UNION ALL không phải đệm NULL cho nhánh nào.
     #
+    # "ĐÃ NGỪNG MUA MÃ NÀY" SO VỚI NHỊP RIÊNG CỦA TỪNG CẶP (khách, mã), không
+    # với một ngưỡng chung. Đó là bất biến của cả dự án — đo thật: ngưỡng chung
+    # 90 ngày bỏ sót 49 khách đang rời đi và báo động nhầm 34 khách vẫn mua
+    # bình thường. Khách mua 7 ngày/lần im 60 ngày đã rời đi từ lâu; khách mua
+    # 120 ngày/lần im 100 ngày vẫn đang mua bình thường — một con số 90 không
+    # phân biệt được hai người đó.
+    #
+    # `tre_ngay` = số ngày quá NGÀY DỰ KIẾN MUA LẠI (lan_cuoi + nhip_ngay), do
+    # mart.khach_mat_hang tính sẵn cho đúng cặp này. Nên
+    #     tre_ngay >= nhip_ngay  ⟺  im lặng >= 2 × nhịp riêng
+    # tức ĐÚNG ngưỡng 'canh_bao' mà mart.khach_360 dùng cho quan hệ khách hàng.
+    # Viết bằng hai cột có sẵn của chính view đang đọc, nên không có hằng số
+    # ngày nào của riêng file này để trôi khỏi định nghĩa ở mart.
+    #
+    # `tre_ngay` là NULL khi cặp (khách, mã) chưa đủ 3 lần mua để nói về nhịp —
+    # và NULL rơi vào nhánh "đang mua", đúng ý: chưa đủ lịch sử thì chưa được
+    # kết luận là đã mất. Đó cũng là lý do nhánh dưới không cần `so_lan >= 3`.
+    #
     # `xep` là hạng TRONG TỪNG NHÁNH, tính bằng row_number() theo đúng khoá mà
     # nhánh đó dùng để cắt top-N. ORDER BY ở lớp NGOÀI đọc `xep` chứ không tin
     # vào thứ tự dòng của nhánh — thứ tự đó không được bảo đảm qua UNION ALL,
@@ -295,8 +315,8 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
                       AS xep
                FROM mart.khach_mat_hang h
                LEFT JOIN mart.khach_360 k ON k.customer_code = h.customer_code
-               CROSS JOIN mart.moc_thoi_gian m
-              WHERE h.product_code = %s AND m.hom_nay - h.lan_cuoi <= %s
+              WHERE h.product_code = %s
+                AND (h.tre_ngay IS NULL OR h.tre_ngay < h.nhip_ngay)
               ORDER BY h.doanh_thu_thuan DESC NULLS LAST
               LIMIT 20)
             UNION ALL
@@ -307,13 +327,11 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
                     row_number() OVER (ORDER BY h.doanh_thu_thuan DESC NULLS LAST)
                FROM mart.khach_mat_hang h
                LEFT JOIN mart.khach_360 k ON k.customer_code = h.customer_code
-               CROSS JOIN mart.moc_thoi_gian m
-              WHERE h.product_code = %s AND h.so_lan >= 3
-                AND m.hom_nay - h.lan_cuoi > %s
+              WHERE h.product_code = %s AND h.tre_ngay >= h.nhip_ngay
               ORDER BY h.doanh_thu_thuan DESC NULLS LAST
               LIMIT 10)
         ) u ORDER BY khoi, xep
-    """, (ma, NGUNG_MUA_NGAY, ma, NGUNG_MUA_NGAY)).fetchall()
+    """, (ma, ma)).fetchall()
 
     def _khach(r):
         return {"ma": r[1], "ten": r[2], "doanh_thu": int(r[3] or 0),
@@ -323,9 +341,11 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
     khach_mua = [_khach(r) for r in khach if r[0] == "mua"]
     khach_ngung = [_khach(r) for r in khach if r[0] == "ngung"]
 
+    # `nhan_han`/`mau_han` là CHUỖI ở cả hai màn — xem ghi chú ở kho_hang::_dong.
     ton = [{"kho": t[0], "ten_kho": t[1], "so_luong": _so(t[2]),
             "gia_tri": int(t[3] or 0), "best_before": t[4], "loai_han": t[5],
-            "nhan_han": LOAI_HAN.get(t[5], (t[5], "nhat")),
+            "nhan_han": LOAI_HAN.get(t[5], (t[5] or "—", "nhat"))[0],
+            "mau_han": LOAI_HAN.get(t[5], (t[5] or "—", "nhat"))[1],
             "han_con_lai": t[6]}
            for t in conn.execute(
         """SELECT warehouse_code, ten_kho, so_luong, gia_tri, best_before,
@@ -355,11 +375,26 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
 
     ĐÚNG HAI lượt hỏi (đặc tả 4b §5.5), có test canh.
 
-    BỘ LỌC CHỈ ÁP CHO BẢNG TỒN. Bốn ô tổng quan, bảng "giá trị theo kho" và
-    khối cận hạn đều KHÔNG lọc — mỗi cái trong số đó là ô ĐIỀU KHIỂN hoặc nhãn
-    của chính bộ lọc mang tên nó, và một ô điều khiển tự lọc theo mình thì bấm
-    vào một mục xong các con số khác về 0 hết, không ai quay lại được (bài học
-    của `tong_quan_danh_ba` ở đợt 4a).
+    HAI BỘ LỌC, VÀ MỖI KHỐI THEO ĐÚNG NHỮNG BỘ LỌC NÓ KHÔNG ĐIỀU KHIỂN. Quy
+    tắc (của `tong_quan_danh_ba` đợt 4a, và của `danh_sach()` ngay trên):
+
+      * Khối NỘI DUNG theo MỌI bộ lọc: bảng tồn, khối cận hạn, khối quá hạn,
+        ô đếm "số lô cận hạn" — cả `kho` lẫn `loc`.
+      * Khối ĐIỀU KHIỂN không theo bộ lọc của CHÍNH NÓ, nhưng vẫn theo bộ lọc
+        kia: "giá trị theo kho" và danh sách kho điều khiển `kho` nên không
+        theo `kho`, nhưng CÓ theo `loc`. Hai ô đếm trạng thái điều khiển `loc`
+        nên không theo `loc`.
+
+    Vì sao: một ô điều khiển tự lọc theo mình thì bấm vào một mục xong các con
+    số khác về 0 hết, không ai quay lại được. Còn một con số KHÔNG theo bộ lọc
+    trực giao thì tệ ngược lại — chọn `loc='ton_chet'` mà "giá trị theo kho"
+    vẫn hiện tổng TOÀN BỘ kho là hai con số cạnh nhau trên một màn hình, không
+    con số nào nói mình đang nói về tập nào.
+
+    NGOẠI LỆ CÓ CHỦ Ý: hai ô đếm "số mã hết hàng"/"số mã sắp thiếu" không theo
+    `kho`. `trang_thai` là thuộc tính của MỘT MÃ tính trên tổng mọi kho (xem
+    migration 023) — không có thứ gọi là "mã hết hàng ở kho 0001". Lọc chúng
+    theo kho là bịa ra một con số không có định nghĩa nào ở `mart`.
     """
     # Lượt hỏi 1: bốn ô tổng quan + giá trị theo kho + danh sách kho + ngày
     # chụp. ORDER BY ở LỚP NGOÀI, không trong nhánh.
@@ -372,7 +407,19 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     # Danh sách kho đọc từ core.dim_warehouse chứ không từ chính các dòng tồn:
     # một kho tạm thời trống vẫn phải có trong ô lọc, và tên kho là tên nghiệp
     # vụ của OBC (`1002 新・賞味期限用`) — không viết cứng tên nào.
-    tq = conn.execute("""
+    # Hai mảnh vị từ, dựng MỘT LẦN rồi dùng lại ở cả hai lượt hỏi — chép tay
+    # là hai bộ lọc sẽ trôi khỏi nhau, đúng lớp lỗi mà `_vi_tu` ở trên né.
+    # `dk_kho` cần bí danh `t` (mart.ton_hien_tai), `dk_loc` cần bí danh `s`
+    # (mart.san_pham_360), nên mọi nhánh dùng chúng phải có đủ hai bí danh đó.
+    dk_kho = "AND t.warehouse_code = %s" if kho else ""
+    p_kho = [kho] if kho else []
+    dk_loc = "AND s.trang_thai = %s" if loc in TRANG_THAI_TON else ""
+    p_loc = [loc] if loc in TRANG_THAI_TON else []
+
+    # THỨ TỰ THAM SỐ = thứ tự VĂN BẢN các mảnh xuất hiện bên dưới: nhánh
+    # 'can_han' (CAN_HAN_NGAY, kho, loc), rồi 'gia_tri_ton_chet' (loc), rồi
+    # 'kho' (loc).
+    tq = conn.execute(f"""
         SELECT khoi, khoa, ten, so, so2, ngay FROM (
             SELECT 'o'::text AS khoi, 'het_hang'::text AS khoa, ''::text AS ten,
                    count(*)::numeric AS so, 0::numeric AS so2, NULL::date AS ngay
@@ -382,17 +429,21 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
               FROM mart.san_pham_360 WHERE trang_thai = 'sap_thieu'
             UNION ALL
             SELECT 'o', 'can_han', '', count(*), 0, NULL
-              FROM mart.ton_hien_tai
-             WHERE loai_han = 'ngay' AND han_con_lai <= %s
+              FROM mart.ton_hien_tai t
+              LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
+             WHERE t.loai_han = 'ngay' AND t.han_con_lai BETWEEN 0 AND %s
+                   {dk_kho} {dk_loc}
             UNION ALL
             SELECT 'o', 'gia_tri_ton_chet', '', coalesce(sum(t.gia_tri), 0), 0, NULL
               FROM mart.ton_hien_tai t
               JOIN mart.san_pham_360 s ON s.product_code = t.product_code
-             WHERE s.trang_thai = 'ton_chet'
+             WHERE s.trang_thai = 'ton_chet' {dk_loc}
             UNION ALL
             SELECT 'kho', t.warehouse_code, t.ten_kho,
                    coalesce(sum(t.gia_tri), 0), count(*), NULL
               FROM mart.ton_hien_tai t
+              LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
+             WHERE true {dk_loc}
              GROUP BY t.warehouse_code, t.ten_kho
             UNION ALL
             SELECT 'dsk', w.warehouse_code, w.warehouse_name, 0, 0, NULL
@@ -401,7 +452,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
             SELECT 'ngay', '', '', 0, 0, max(snapshot_date)
               FROM core.fact_inventory_daily
         ) u ORDER BY khoi, khoa
-    """, (CAN_HAN_NGAY,)).fetchall()
+    """, [CAN_HAN_NGAY] + p_kho + p_loc + p_loc + p_loc).fetchall()
 
     o_tong_quan = {r[1]: int(r[3]) for r in tq if r[0] == "o"}
     theo_kho = [{"ma": r[1], "ten": r[2], "gia_tri": int(r[3]),
@@ -409,10 +460,14 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     ds_kho = [(r[1], r[2]) for r in tq if r[0] == "dsk"]
     ngay_chup = next((r[5] for r in tq if r[0] == "ngay"), None)
 
-    # Lượt hỏi 2: bảng tồn (có lọc) + khối cận hạn. Cùng một view, cùng bộ
-    # cột — lại đúng ca UNION ALL không phải đệm NULL cho nhánh nào.
+    # Lượt hỏi 2: bảng tồn + khối cận hạn + khối quá hạn, cả ba đều theo CẢ
+    # HAI bộ lọc (chúng là khối nội dung, không điều khiển gì). Cùng một view,
+    # cùng bộ cột — lại đúng ca UNION ALL không phải đệm NULL cho nhánh nào.
     #
-    # KHÔNG có LIMIT ở hai nhánh: một ảnh chụp 在庫一覧 là ~177 dòng và bị chặn
+    # BA nhánh chứ không hai: `han_con_lai < 0` là ĐÃ QUÁ HẠN, một việc khác
+    # hẳn "sắp hết hạn" với hàng thực phẩm. Xem ghi chú ở CAN_HAN_NGAY.
+    #
+    # KHÔNG có LIMIT ở nhánh nào: một ảnh chụp 在庫一覧 là ~177 dòng và bị chặn
     # trên bởi (số mã × số kho) = 232 × 2. Đặt LIMIT ở đây là tạo ra đúng loại
     # mâu thuẫn mà ô tổng quan sinh ra để tránh — ô nói "12 lô cận hạn" còn
     # bảng ngay dưới nó chỉ liệt kê 10.
@@ -420,15 +475,6 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     # LEFT JOIN san_pham_360: một mã có trong bản xuất tồn kho nhưng chưa có
     # trong 商品マスタ vẫn phải hiện ở bảng tồn. INNER JOIN làm nó biến mất khỏi
     # đúng màn hình lẽ ra phải phát hiện ra nó.
-    dk, p = [], []
-    if kho:
-        dk.append("t.warehouse_code = %s")
-        p.append(kho)
-    if loc in TRANG_THAI_TON:
-        dk.append("s.trang_thai = %s")
-        p.append(loc)
-    where = ("WHERE " + " AND ".join(dk)) if dk else ""
-
     rows = conn.execute(f"""
         SELECT khoi, ma, ten, kho, ten_kho, so_luong, gia_tri, best_before,
                loai_han, han_con_lai, trang_thai
@@ -440,7 +486,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                     row_number() OVER (ORDER BY t.gia_tri DESC NULLS LAST) AS xep
                FROM mart.ton_hien_tai t
                LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
-              {where})
+              WHERE true {dk_kho} {dk_loc})
             UNION ALL
             (SELECT 'han', t.product_code,
                     coalesce(s.ten_hang, t.product_code),
@@ -449,21 +495,39 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                     row_number() OVER (ORDER BY t.han_con_lai)
                FROM mart.ton_hien_tai t
                LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
-              WHERE t.loai_han = 'ngay' AND t.han_con_lai <= %s)
+              WHERE t.loai_han = 'ngay' AND t.han_con_lai BETWEEN 0 AND %s
+                    {dk_kho} {dk_loc})
+            UNION ALL
+            (SELECT 'qua', t.product_code,
+                    coalesce(s.ten_hang, t.product_code),
+                    t.warehouse_code, t.ten_kho, t.so_luong, t.gia_tri,
+                    t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
+                    row_number() OVER (ORDER BY t.han_con_lai)
+               FROM mart.ton_hien_tai t
+               LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
+              WHERE t.loai_han = 'ngay' AND t.han_con_lai < 0
+                    {dk_kho} {dk_loc})
         ) u ORDER BY khoi, xep
-    """, p + [CAN_HAN_NGAY]).fetchall()
+    """, p_kho + p_loc + [CAN_HAN_NGAY] + p_kho + p_loc
+         + p_kho + p_loc).fetchall()
 
     def _dong(r):
+        # `nhan_*`/`mau_*` là CHUỖI, không phải tuple — cùng hình dạng với
+        # SanPham.nhan_trang_thai/.mau. Một cái tên trả hai kiểu khác nhau ở
+        # hai màn là bắt template viết `d.nhan_trang_thai[0]` ở màn này và
+        # `sp.nhan_trang_thai` ở màn kia, rồi một ngày viết nhầm chỗ.
+        nhan_han, mau_han = LOAI_HAN.get(r[8], (r[8] or "—", "nhat"))
+        nhan_tt, mau_tt = TRANG_THAI_TON.get(r[10], (r[10] or "—", "nhat"))
         return {"ma": r[1], "ten": r[2], "kho": r[3], "ten_kho": r[4],
                 "so_luong": _so(r[5]), "gia_tri": int(r[6] or 0),
                 "best_before": r[7], "loai_han": r[8],
-                "nhan_han": LOAI_HAN.get(r[8], (r[8], "nhat")),
+                "nhan_han": nhan_han, "mau_han": mau_han,
                 "han_con_lai": r[9], "trang_thai": r[10],
-                "nhan_trang_thai": TRANG_THAI_TON.get(
-                    r[10], (r[10] or "—", "nhat"))}
+                "nhan_trang_thai": nhan_tt, "mau": mau_tt}
 
     return Kho(ngay_chup=ngay_chup, o_tong_quan=o_tong_quan,
                dong=[_dong(r) for r in rows if r[0] == "dong"],
                theo_kho=theo_kho,
                can_han=[_dong(r) for r in rows if r[0] == "han"],
+               qua_han=[_dong(r) for r in rows if r[0] == "qua"],
                ds_kho=ds_kho, kho=kho, loc=loc)

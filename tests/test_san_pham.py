@@ -85,7 +85,11 @@ def test_ho_so_san_pham_khong_qua_5_truy_van(conn, batch, monkeypatch):
     _gia(conn, batch, "P002", "03", 5250)
     _neo(conn, batch)
     dem = _dem_truy_van(conn, monkeypatch)
-    SP.ho_so(conn, "P002")
+    # Giữ kết quả và khẳng định nó KHÔNG rỗng: một hồi quy làm câu đầu không
+    # khớp dòng nào thì hàm thoát sớm bằng `return None` sau ĐÚNG MỘT truy
+    # vấn, và một test chỉ đếm sẽ xanh rỡ trong khi trang đã trắng.
+    h = SP.ho_so(conn, "P002")
+    assert h is not None and h.sp.ma == "P002"
     assert dem["n"] <= 5, f"ho_so() chạy {dem['n']} truy vấn"
 
 
@@ -96,8 +100,20 @@ def test_kho_hang_khong_qua_2_truy_van(conn, batch, monkeypatch):
     _mua(conn, batch, "KP03", HOM_NAY - timedelta(days=3), hang="P003")
     _neo(conn, batch)
     dem = _dem_truy_van(conn, monkeypatch)
-    SP.kho_hang(conn)
+    k = SP.kho_hang(conn)
+    assert k.dong, "đếm một hàm trả về rỗng thì không đếm gì cả"
     assert dem["n"] <= 2, f"kho_hang() chạy {dem['n']} truy vấn"
+
+
+def test_kho_hang_co_loc_van_khong_qua_2_truy_van(conn, batch, monkeypatch):
+    """Hai bộ lọc thêm mảnh WHERE vào cả hai câu lệnh — chúng không được phép
+    đẻ ra một lượt hỏi thứ ba."""
+    _san_pham(conn, batch, "P003B")
+    _ton(conn, batch, "P003B", sl=100)
+    _neo(conn, batch)
+    dem = _dem_truy_van(conn, monkeypatch)
+    SP.kho_hang(conn, kho="0001", loc="chua_ro_ton")
+    assert dem["n"] <= 2, f"kho_hang(có lọc) chạy {dem['n']} truy vấn"
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +187,91 @@ def test_loc_theo_kho_chi_giu_dong_cua_kho_do(conn, batch):
     # Bảng "giá trị theo kho" là Ô ĐIỀU KHIỂN của chính bộ lọc kho — nó KHÔNG
     # tự lọc theo mình, kẻo bấm vào một kho xong không còn đường quay lại.
     assert {t["ma"] for t in k.theo_kho} == {"0001", "1002"}
+
+
+def test_loc_trang_thai_lam_co_lai_CA_bang_ton_lan_gia_tri_theo_kho(conn, batch):
+    """[IMPORTANT] Bộ lọc trạng thái phải kéo theo MỌI con số nội dung trên
+    màn, không chỉ cái bảng. Chọn "tồn chết" mà ô "giá trị theo kho" vẫn hiện
+    tổng của toàn bộ kho là hai con số cạnh nhau trên một màn hình, không con
+    số nào nói mình đang nói về tập nào."""
+    _san_pham(conn, batch, "P040")                      # -> ton_chet
+    _ton(conn, batch, "P040", sl=10, gia=1000)          # giá trị 10.000
+    _ho_so_khach(conn, batch, "KP40", "Quán P040")
+    _mua(conn, batch, "KP40", HOM_NAY - timedelta(days=200), hang="P040")
+    _san_pham(conn, batch, "P041")                      # -> sap_thieu
+    _ton(conn, batch, "P041", sl=5, gia=1000)           # giá trị 5.000
+    _ho_so_khach(conn, batch, "KP41", "Quán P041")
+    for i in range(5):
+        _mua(conn, batch, "KP41", HOM_NAY - timedelta(days=i * 7), hang="P041")
+    _neo(conn, batch)
+
+    k = SP.kho_hang(conn)
+    assert {d["ma"]: d["trang_thai"] for d in k.dong} == {
+        "P040": "ton_chet", "P041": "sap_thieu"}
+    assert [t["gia_tri"] for t in k.theo_kho] == [15_000]
+
+    k = SP.kho_hang(conn, loc="ton_chet")
+    assert [d["ma"] for d in k.dong] == ["P040"]
+    assert [t["gia_tri"] for t in k.theo_kho] == [10_000], \
+        "giá trị theo kho phải nói về CÙNG tập dòng mà bảng đang hiện"
+    assert k.o_tong_quan["gia_tri_ton_chet"] == 10_000
+
+    k = SP.kho_hang(conn, loc="sap_thieu")
+    assert [t["gia_tri"] for t in k.theo_kho] == [5_000]
+    assert k.o_tong_quan["gia_tri_ton_chet"] == 0
+    # Bảng "giá trị theo kho" vẫn là ô ĐIỀU KHIỂN của bộ lọc kho, nên nó không
+    # được tự lọc theo `kho` — bấm một kho xong phải còn đường quay lại.
+    assert [t["ma"] for t in SP.kho_hang(conn, kho="0001").theo_kho] == ["0001"]
+
+
+def test_loc_theo_kho_lam_co_lai_ca_khoi_can_han(conn, batch):
+    """Khối cận hạn là khối NỘI DUNG, không điều khiển gì — nó phải theo bộ
+    lọc kho, và ô đếm "số lô cận hạn" phải đi theo nó."""
+    _san_pham(conn, batch, "P042")
+    _san_pham(conn, batch, "P043")
+    sap = HOM_NAY + timedelta(days=10)
+    han = f"{sap.year}年{sap.month:02d}月{sap.day:02d}日"
+    _ton(conn, batch, "P042", kho="0001", han=han)
+    _ton(conn, batch, "P043", kho="1002", han=han)
+    _neo(conn, batch)
+
+    k = SP.kho_hang(conn)
+    assert {d["ma"] for d in k.can_han} == {"P042", "P043"}
+    assert k.o_tong_quan["can_han"] == 2
+
+    k = SP.kho_hang(conn, kho="1002")
+    assert [d["ma"] for d in k.can_han] == ["P043"]
+    assert k.o_tong_quan["can_han"] == 1, "ô đếm phải đi theo chính bảng nó gắn nhãn"
+
+
+def test_lo_da_qua_han_tach_khoi_lo_sap_het_han(conn, batch):
+    """[IMPORTANT] Với hàng thực phẩm, "đã quá hạn" và "sắp hết hạn" là hai
+    việc khác nhau. Trộn chung thì một lô quá hạn còn sót trong bản xuất đứng
+    vĩnh viễn ở đầu bảng (xếp tăng dần) và cộng vào ô đếm mãi mãi — cái cần xử
+    lý NGAY bị chôn trong danh sách cái cần theo dõi."""
+    _san_pham(conn, batch, "P044")
+    truoc = HOM_NAY - timedelta(days=5)
+    _ton(conn, batch, "P044",
+         han=f"{truoc.year}年{truoc.month:02d}月{truoc.day:02d}日")
+    _neo(conn, batch)
+    k = SP.kho_hang(conn)
+    assert [d["ma"] for d in k.qua_han] == ["P044"]
+    assert k.qua_han[0]["han_con_lai"] == -5
+    assert k.can_han == [] and k.o_tong_quan["can_han"] == 0
+
+
+def test_nhan_hien_thi_cung_mot_KIEU_o_ca_hai_man(conn, batch):
+    """`nhan_trang_thai` phải là CHUỖI ở cả hai màn. Cùng một tên trả hai kiểu
+    khác nhau là bắt template viết `d.nhan_trang_thai[0]` ở màn này và
+    `sp.nhan_trang_thai` ở màn kia — rồi một ngày viết nhầm chỗ."""
+    _san_pham(conn, batch, "P045")
+    _ton(conn, batch, "P045", sl=50)
+    _neo(conn, batch)
+    sp = next(h for h in SP.danh_sach(conn).hang if h.ma == "P045")
+    d = SP.kho_hang(conn).dong[0]
+    assert isinstance(sp.nhan_trang_thai, str) and isinstance(sp.mau, str)
+    assert d["nhan_trang_thai"] == sp.nhan_trang_thai and d["mau"] == sp.mau
+    assert isinstance(d["nhan_han"], str) and isinstance(d["mau_han"], str)
 
 
 def test_can_han_chi_gom_lo_co_HAN_THAT(conn, batch):
@@ -274,8 +375,8 @@ def test_ho_so_co_du_nam_khoi(conn, batch):
     rỗng — một khối luôn rỗng thì không ai phát hiện nó hỏng."""
     _san_pham(conn, batch, "P019", ten="Gạo ST25")
     _ton(conn, batch, "P019", sl=300)
-    _gia(conn, batch, "P019", "03", 5250, quy_cach="02")
-    _gia(conn, batch, "P019", "03", 460, quy_cach="00")
+    _gia(conn, batch, "P019", "03", 5250, quy_cach="02", tu_ngay="2026-06-01")
+    _gia(conn, batch, "P019", "03", 460, quy_cach="00", tu_ngay="2026-01-01")
     # Khách đang mua: mua gần đây.
     _ho_so_khach(conn, batch, "KP19", "Quán đang mua")
     for i in range(3):
@@ -295,6 +396,51 @@ def test_ho_so_co_du_nam_khoi(conn, batch):
     # Bảng giá: MỖI 荷姿 một dòng, và nhãn quy cách phải đọc được.
     assert sorted(g["quy_cach"] for g in h.bac_gia) == \
         sorted([SP.QUY_CACH["00"], SP.QUY_CACH["02"]])
+
+
+def test_bac_gia_chi_hien_dong_MOI_NHAT_cua_tung_quy_cach(conn, batch):
+    """[CRITICAL] core.fact_price_list giữ LỊCH SỬ giá — mỗi lần nạp master là
+    một dòng MỚI. Không lọc thì sau ba lần nạp, một bậc giá hiện ba con số khác
+    nhau dưới nhãn "giá đáng lẽ phải bán", trên đúng màn hình người ta nhìn
+    TRƯỚC KHI báo giá cho khách.
+
+    Hai dòng phải khác `valid_from` thật — hai dòng cùng ngày thì DISTINCT ON
+    chẳng phải chọn gì, và bỏ hẳn nó đi test vẫn xanh."""
+    _san_pham(conn, batch, "P022")
+    _gia(conn, batch, "P022", "03", 5000, quy_cach="02", tu_ngay="2026-01-01")
+    _gia(conn, batch, "P022", "03", 5250, quy_cach="02", tu_ngay="2026-06-01")
+    _gia(conn, batch, "P022", "03", 460, quy_cach="00", tu_ngay="2026-01-01")
+    _neo(conn, batch)
+
+    bg = SP.ho_so(conn, "P022").bac_gia
+    assert len(bg) == 2, "mỗi (bậc, quy cách) đúng MỘT dòng, không phải cả lịch sử"
+    assert sorted((g["quy_cach"], g["gia"]) for g in bg) == sorted(
+        [(SP.QUY_CACH["02"], 5250), (SP.QUY_CACH["00"], 460)])
+
+
+def test_khach_ngung_mua_ma_nay_so_voi_NHIP_RIENG_khong_nguong_chung(conn, batch):
+    """[CRITICAL] Bất biến của cả dự án: trạng thái quan hệ so với nhịp mua
+    RIÊNG, không với một ngưỡng chung. Đo thật (đợt 3): ngưỡng chung 90 ngày bỏ
+    sót 49 khách đang rời đi và báo động nhầm 34 khách vẫn mua bình thường.
+
+    Hai khách dưới đây nằm HAI PHÍA của ranh giới thật mà lại CÙNG PHÍA của
+    ngưỡng 90 ngày — nên một cài đặt dùng 90 sẽ xếp cả hai vào một rổ."""
+    _san_pham(conn, batch, "P023")
+    # Mua 7 ngày/lần, im 60 ngày = 8,5 lần nhịp -> ĐÃ NGỪNG mua mã này.
+    # Ngưỡng chung 90 ngày sẽ bảo khách này "vẫn đang mua".
+    _ho_so_khach(conn, batch, "KP23", "Quán mua dày")
+    for i in range(4):
+        _mua(conn, batch, "KP23", HOM_NAY - timedelta(days=60 + i * 7), hang="P023")
+    # Mua 120 ngày/lần, im 100 ngày = chưa tới một nhịp -> VẪN ĐANG MUA.
+    # Ngưỡng chung 90 ngày sẽ bảo khách này "đã ngừng".
+    _ho_so_khach(conn, batch, "KP24", "Quán mua thưa")
+    for i in range(4):
+        _mua(conn, batch, "KP24", HOM_NAY - timedelta(days=100 + i * 120), hang="P023")
+    _neo(conn, batch)
+
+    h = SP.ho_so(conn, "P023")
+    assert [k["ma"] for k in h.khach_ngung] == ["KP23"]
+    assert [k["ma"] for k in h.khach_mua] == ["KP24"]
 
 
 def test_ho_so_hien_dung_cot_toc_do_giai_thich_du_ban_ngay(conn, batch):
