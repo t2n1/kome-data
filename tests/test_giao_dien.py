@@ -308,3 +308,55 @@ def test_moi_trang_that_co_dung_mot_the_viewport(conn, test_db_url):
         html = client.get(duong_dan).text
         so_luong = html.count('name="viewport"')
         assert so_luong == 1, f"{duong_dan} có {so_luong} thẻ viewport, cần đúng 1"
+
+
+# Selector TRẦN bị cấm trong kome.css: những tên mà một template ĐÃ khai lại
+# trong khối <style> của riêng nó. Thứ tự nguồn chỉ phân xử được các thuộc
+# tính CẢ HAI cùng khai; thuộc tính chỉ có trong kome.css thì không có đối
+# thủ và vẫn rò sang trang kia.
+SELECTOR_CAM_TRAN = {
+    ".mau": ("bao_cao.html khai .mau cho ba ô màu chú giải biểu đồ nhưng chỉ "
+             "khai width/height/border-radius/display — border, line-height, "
+             "text-align, font-weight của kome.css rò thẳng sang, thêm cho "
+             "chúng một viền xám chưa từng có. Dùng '.chu-giai .mau'."),
+    "button": ("mọi nút trong app (đăng nhập, tìm, đăng xuất, Xoá lô) đã có "
+               "kiểu riêng theo lớp — một 'button{…}' trần đè lên tất cả. "
+               "Dùng một lớp, ví dụ '.nut-nap'."),
+}
+
+
+def test_khong_co_selector_tran_de_ro_kieu_dang():
+    """[IMPORTANT] Chặn thảm hoạ đã XẢY RA THẬT hai lần trong đợt 2a.
+
+    (1) `.mau` trần trong kome.css rò `border`/`line-height`/`text-align`/
+    `font-weight` sang ba ô màu chú giải của /bao-cao, thêm cho chúng một
+    viền xám không ai yêu cầu. (2) `upload.html` cũ có `button{…}` trần; khi
+    chép sang kome.css thì nó sẽ đè lên MỌI nút khác của app.
+
+    Cả hai đều không làm test nào đỏ và không làm trang lỗi — chúng chỉ vẽ
+    sai, ở một trang khác với trang người sửa đang mở."""
+    css = CSS.read_text(encoding="utf-8")
+    vi_pham = []
+    for ten, vi_sao in SELECTOR_CAM_TRAN.items():
+        # Selector đứng ĐẦU một selector: đầu dòng, hoặc ngay sau `}`/`,`.
+        # `.chu-giai .mau{` và `.o-tim button{` KHÔNG khớp — chúng có một
+        # lớp định tính đứng trước, đúng thứ ta muốn.
+        mau = re.compile(r"(?m)(?:^|[},])\s*" + re.escape(ten) + r"\s*[{,]")
+        if mau.search(css):
+            vi_pham.append(f"{ten}: {vi_sao}")
+    assert not vi_pham, "kome.css có selector trần:\n" + "\n".join(vi_pham)
+
+
+def test_nut_nap_va_o_chon_file_co_kieu_dang():
+    """[IMPORTANT] "Nạp" là nút hành động chính của màn DUY NHẤT có người
+    dùng hằng ngày (13:30, ba file OBC). `upload.html` cũ tạo kiểu cho nó
+    bằng `button{…}` + `input[type=file]{…}`; Task 4 xoá template đó mà không
+    chép hai quy tắc sang kome.css, nên nút thành nút trần mặc định của
+    trình duyệt — nút duy nhất trong app không có kiểu dáng, và không test
+    nào đỏ vì trang vẫn trả 200."""
+    nap = (TEMPLATES / "_nap.html").read_text(encoding="utf-8")
+    css = CSS.read_text(encoding="utf-8")
+    for lop, o in (("nut-nap", 'nút submit "Nạp"'), ("chon-file", "ô chọn file")):
+        assert f'class="{lop}"' in nap, f"_nap.html: {o} chưa mang lớp .{lop}"
+        assert f".{lop}{{" in css.replace(" ", ""), \
+            f"kome.css chưa khai .{lop} — {o} sẽ trần trụi"

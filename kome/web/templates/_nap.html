@@ -9,8 +9,8 @@
 <section id="nap">
 <h2>Nạp dữ liệu OBC</h2>
 <form method="post" action="/upload" enctype="multipart/form-data">
-  <div class="drop">Kéo thả file Excel vào đây<br><input type="file" name="files" multiple required></div>
-  <p><button type="submit">Nạp</button></p>
+  <div class="drop">Kéo thả file Excel vào đây<br><input class="chon-file" type="file" name="files" multiple required></div>
+  <p><button class="nut-nap" type="submit">Nạp</button></p>
 </form>
 {% if results %}<h3>Kết quả</h3><ul>
 {% for r in results %}<li>
