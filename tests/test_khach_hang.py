@@ -399,3 +399,28 @@ def test_tong_quan_khong_ro_tinh_van_duoc_dem(conn, batch):
     _neo(conn, batch)
     tq = KH.tong_quan_danh_ba(conn)
     assert any(t[0] == "(không rõ)" for t in tq.tinh)
+
+
+# ---- Ba bộ lọc mới: nhóm việc, hạng, tỉnh (task 4 đợt 4a) --------------
+
+def test_loc_theo_nhom_viec(conn, batch):
+    for ma, ngung in (("L0001", 40), ("L0002", 2)):
+        _ho_so_khach(conn, batch, ma, f"Quán {ma}")
+        for i in range(6):
+            _mua(conn, batch, ma, HOM_NAY - timedelta(days=ngung + i * 7))
+    _neo(conn, batch)
+    t = KH.danh_sach(conn, nhom="im")
+    assert "L0001" in {k.ma for k in t.khach}
+    assert "L0002" not in {k.ma for k in t.khach}
+
+
+def test_ba_bo_loc_moi_ket_hop_duoc_voi_nhau_va_voi_sale(conn, batch):
+    """Bấm hai bộ lọc mà một cái im lặng bị bỏ là người dùng đọc sai danh sách
+    mà không có gì báo."""
+    _ho_so_khach(conn, batch, "K0001", "Quán K", salesperson_code="0104",
+                 prefecture="愛知県")
+    _mua(conn, batch, "K0001", HOM_NAY - timedelta(days=3))
+    _neo(conn, batch)
+    t = KH.danh_sach(conn, tinh="愛知県", sale="0104")
+    assert "K0001" in {k.ma for k in t.khach}
+    assert KH.danh_sach(conn, tinh="東京都", sale="0104").tong == 0

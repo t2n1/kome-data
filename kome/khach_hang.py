@@ -73,6 +73,12 @@ class TrangKhach:
     sale: str | None = None
     ten_sale: str | None = None
     tong_tat_ca: int = 0
+    # Ba bộ lọc mới của trang danh sách (đợt 4a): nhóm việc ('im'/'tut'/'moi'),
+    # hạng doanh thu ('S'..'D'), và tỉnh — trang đọc lại để giữ nguyên lựa
+    # chọn qua các liên kết phân trang/sắp xếp.
+    nhom: str | None = None
+    hang: str | None = None
+    tinh: str | None = None
 
 
 @dataclass
@@ -103,7 +109,8 @@ def _khach(r) -> Khach:
 
 def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
               trang: int = 1, sale: str | None = None,
-              ten_sale: str | None = None) -> TrangKhach:
+              ten_sale: str | None = None, nhom: str | None = None,
+              hang: str | None = None, tinh: str | None = None) -> TrangKhach:
     """Danh sách khách, có tìm kiếm và lọc theo trạng thái.
 
     `sale` là MẶC ĐỊNH TIỆN DỤNG, không phải hàng rào bảo mật: công ty năm
@@ -124,6 +131,21 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
     if sale:
         dieu_kien.append("salesperson_code = %s")
         tham_so.append(sale)
+    if nhom:
+        # EXISTS chứ không JOIN: một khách có thể ở nhiều nhóm, JOIN sẽ nhân
+        # đôi dòng và làm `tong` đếm sai.
+        dieu_kien.append("""EXISTS (SELECT 1 FROM mart.khach_nhom_viec v
+                                     WHERE v.customer_code = mart.khach_360.customer_code
+                                       AND v.nhom = %s)""")
+        tham_so.append(nhom)
+    if hang:
+        dieu_kien.append("""customer_code IN (SELECT customer_code
+                                                FROM mart.hang_doanh_thu
+                                               WHERE hang = %s)""")
+        tham_so.append(hang)
+    if tinh:
+        dieu_kien.append("prefecture = %s")
+        tham_so.append(tinh)
     where = ("WHERE " + " AND ".join(dieu_kien)) if dieu_kien else ""
 
     tong = conn.execute(
@@ -152,7 +174,8 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
     return TrangKhach(
         khach=[_khach(r) for r in rows], tong=tong, trang=trang,
         so_trang=max(1, -(-tong // MOI_TRANG)), tim=tim, loc=loc, sap=sap,
-        dem_trang_thai=dem, sale=sale, ten_sale=ten_sale, tong_tat_ca=tong_tat_ca)
+        dem_trang_thai=dem, sale=sale, ten_sale=ten_sale, tong_tat_ca=tong_tat_ca,
+        nhom=nhom, hang=hang, tinh=tinh)
 
 
 def ho_so(conn, ma: str) -> HoSo | None:

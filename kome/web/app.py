@@ -331,15 +331,18 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
 
     @app.get("/khach-hang", response_class=HTMLResponse)
     def ds_khach(request: Request, tim: str = "", loc: str = "",
-                 sap: str = "doanh_thu", trang: int = 1, tat_ca: int = 0):
+                 sap: str = "doanh_thu", trang: int = 1, tat_ca: int = 0,
+                 nhom: str = "", hang: str = "", tinh: str = ""):
         try:
             sale, ten_sale = _sale_dang_loc(request, tat_ca)
             with open_app_conn() as conn:
                 t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang,
-                                 sale=sale, ten_sale=ten_sale)
+                                 sale=sale, ten_sale=ten_sale, nhom=nhom,
+                                 hang=hang, tinh=tinh)
             return _ve(request, "khach_hang.html",
                        {"t": t, "trang_thai": KH.TRANG_THAI, "trang": "khach",
-                        "tat_ca": bool(tat_ca)})
+                        "tat_ca": bool(tat_ca), "nhom": nhom, "hang": hang,
+                        "tinh": tinh})
         except Exception as e:
             return _loi(request, "mở danh sách khách hàng", e)
 
