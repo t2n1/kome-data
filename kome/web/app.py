@@ -317,13 +317,26 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         except Exception as e:
             return _loi(request, "mở trang tổng quan", e)
 
-    def _sale_dang_loc(request: Request, tat_ca: int) -> tuple[str | None, str | None]:
+    def _sale_dang_loc(request: Request, tat_ca: int,
+                       nv: str = "") -> tuple[str | None, str | None]:
         """(mã sale, tên người) đang lọc, hoặc (None, None) nếu xem tất cả.
 
         Không có người đăng nhập (máy trong công ty không bật cổng) hoặc người
         đó không phụ trách khách nào (chủ DN, kế toán, kho) => KHÔNG lọc gì.
         Lọc theo NULL thì họ mở lên thấy danh sách rỗng và tưởng mất dữ liệu.
+
+        `nv` là lựa chọn TƯỜNG MINH từ ô lọc "Người phụ trách" trên trang danh
+        sách. Nó thắng cả mặc định theo người đăng nhập lẫn `tat_ca`: người ta
+        vừa chọn một cái tên thì không có cách đọc nào khác. Tên đi kèm trả
+        None vì ở đây chưa có CSDL trong tay — route tra tên từ
+        `mart.tai_nhan_vien` (đã nằm sẵn trong `tong_quan_danh_ba`), không tốn
+        thêm một vòng hỏi nào.
+
+        Vẫn KHÔNG phải hàng rào bảo mật: năm sale ai cũng biết khách của ai
+        (đặc tả đợt 3 §5), nên chọn mã của người khác là hợp lệ.
         """
+        if nv:
+            return nv, None
         nguoi = getattr(request.state, "nguoi", None)
         if tat_ca or nguoi is None or not nguoi.salesperson_code:
             return None, None
@@ -332,17 +345,28 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     @app.get("/khach-hang", response_class=HTMLResponse)
     def ds_khach(request: Request, tim: str = "", loc: str = "",
                  sap: str = "doanh_thu", trang: int = 1, tat_ca: int = 0,
-                 nhom: str = "", hang: str = "", tinh: str = ""):
+                 nhom: str = "", hang: str = "", tinh: str = "", nv: str = ""):
         try:
-            sale, ten_sale = _sale_dang_loc(request, tat_ca)
+            sale, ten_sale = _sale_dang_loc(request, tat_ca, nv)
             with open_app_conn() as conn:
+                # CÙNG một khối `with`, và tổng quan chạy TRƯỚC danh sách:
+                # bảng "Tải của từng nhân viên" trong `tq` là chỗ duy nhất
+                # biết mã sale nào ứng với tên nào, mà dải bộ lọc cần cái tên
+                # đó để nói rõ đang xem khách của ai.
+                tq = KH.tong_quan_danh_ba(conn, sale)
+                if nv and ten_sale is None:
+                    ten_sale = next((n["ten"] for n in tq.nhan_vien
+                                     if n["ma"] == nv), nv)
                 t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang,
                                  sale=sale, ten_sale=ten_sale, nhom=nhom,
                                  hang=hang, tinh=tinh)
+            # Ba bộ lọc mới đọc lại từ `t` (t.nhom/t.hang/t.tinh) chứ không
+            # truyền thêm bản sao vào ctx: hai nguồn cho cùng một giá trị là
+            # hai chỗ có thể trôi khỏi nhau. `nv` thì KHÔNG có trong `t` vì
+            # nó không phải tham số của danh_sach() — nó đi qua `sale`.
             return _ve(request, "khach_hang.html",
-                       {"t": t, "trang_thai": KH.TRANG_THAI, "trang": "khach",
-                        "tat_ca": bool(tat_ca), "nhom": nhom, "hang": hang,
-                        "tinh": tinh})
+                       {"t": t, "tq": tq, "trang_thai": KH.TRANG_THAI,
+                        "trang": "khach", "tat_ca": bool(tat_ca), "nv": nv})
         except Exception as e:
             return _loi(request, "mở danh sách khách hàng", e)
 

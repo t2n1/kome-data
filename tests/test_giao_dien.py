@@ -360,3 +360,47 @@ def test_nut_nap_va_o_chon_file_co_kieu_dang():
         assert f'class="{lop}"' in nap, f"_nap.html: {o} chưa mang lớp .{lop}"
         assert f".{lop}{{" in css.replace(" ", ""), \
             f"kome.css chưa khai .{lop} — {o} sẽ trần trụi"
+
+
+# ---- Trang danh sách khách: 4 khối + 3 bộ lọc (task 5 đợt 4a) ----------
+
+def test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket(conn, test_db_url):
+    """Sót một liên kết là người đang lọc bấm một cái bị ném về danh sách đầy
+    mà không hiểu vì sao."""
+    c = TestClient(create_app(db_url=test_db_url))
+    html = c.get("/khach-hang?nhom=im&hang=S&tinh=愛知県").text
+    assert html.count("nhom=im") >= 8, "bộ lọc nhóm rơi khỏi một số liên kết"
+    assert "hang=S" in html and "tinh=" in html
+
+
+def test_trang_danh_sach_co_du_bon_khoi_va_ba_bo_loc(conn, test_db_url):
+    """[IMPORTANT] Bốn khối là bốn câu hỏi khác nhau; thiếu một khối thì
+    không test nào khác đỏ, vì trang vẫn trả 200 và vẫn có danh sách."""
+    c = TestClient(create_app(db_url=test_db_url))
+    html = c.get("/khach-hang").text
+    # Khối 1: danh sách làm việc — bốn nút
+    for ten in ("Toàn bộ danh bạ", "Im lặng", "đang tụt", "Khách mới"):
+        assert ten in html, f"thiếu nút nhóm việc: {ten}"
+    # Ba khối phân tích
+    assert "luoi-3" in html, "ba khối phân tích không nằm trong .luoi-3"
+    for tieu_de in ("hạng doanh thu 12 tháng", "Tập trung ở đâu",
+                    "Tải của từng nhân viên"):
+        assert tieu_de in html, f"thiếu khối: {tieu_de}"
+    # Ba bộ lọc: chip hạng, select người phụ trách, select tỉnh
+    assert 'name="nv"' in html and 'name="tinh"' in html
+    assert "hang=S" in html and "hang=D" in html
+
+
+def test_nhan_hang_khong_bao_gio_tro_troi(conn, test_db_url):
+    """[IMPORTANT] core.dim_customer.rank_code (得意先ランク của OBC, 10 nhóm
+    không có tên ở đâu) cũng tồn tại. Gọi tắt chỉ số của ta là "hạng" thì sáu
+    tháng nữa sẽ có người đối chiếu với OBC, thấy lệch, và không biết tin cái
+    nào. Cả hai đều đúng — chúng trả lời hai câu khác nhau."""
+    c = TestClient(create_app(db_url=test_db_url))
+    html = c.get("/khach-hang").text.lower()
+    assert "hạng doanh thu 12 tháng" in html
+    # Ngoại lệ DUY NHẤT: tên nút nhóm việc "Hạng S·A đang tụt" — câu mô tả
+    # ngay dưới nó đã viết đủ chữ "theo doanh thu 12 tháng".
+    tro_troi = re.findall(r"hạng(?! doanh thu 12 tháng)(?! s·a)", html)
+    assert not tro_troi, \
+        f"{len(tro_troi)} chỗ ghi 'hạng' trơ trọi — sẽ bị đối chiếu nhầm với 得意先ランク"
