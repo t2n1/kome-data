@@ -128,21 +128,40 @@ def chay(argv: list[str], conn, doc_mat_khau=None) -> int:
         return liet_ke(conn)
 
     lenh, *phan_con_lai = argv
+    # ten lấy phần tử KHÔNG bắt đầu bằng "--", nên nếu mã sale vô tình đứng
+    # trước tên (ví dụ "them --sale 0104 an") thì "0104" bị chọn làm ten thay
+    # vì là chuỗi không "--" đầu tiên — script vẫn chạy, chỉ tạo nhầm tài
+    # khoản tên "0104". Chấp nhận được cho một script chạy tay: hậu quả tự
+    # bộc lộ ngay ở dòng "Đã tạo '0104'" in ra, người gõ thấy sai liền.
     ten = next((a for a in phan_con_lai if not a.startswith("--")), None)
     kho = "--kho-du-lieu" in phan_con_lai
     bo_kho = "--bo-kho-du-lieu" in phan_con_lai
     sale = None
+    sale_thieu_gia_tri = False
     if "--sale" in phan_con_lai:
         i = phan_con_lai.index("--sale")
-        sale = phan_con_lai[i + 1] if i + 1 < len(phan_con_lai) else None
+        if i + 1 < len(phan_con_lai):
+            sale = phan_con_lai[i + 1]
+        else:
+            sale_thieu_gia_tri = True
 
     if lenh not in ("them", "doi-mat-khau", "quyen") or not ten:
         print(f"Không hiểu lệnh. Cách dùng:\n{HUONG_DAN}")
+        return 2
+    if sale_thieu_gia_tri:
+        print("Thiếu mã sale sau --sale. Ví dụ:  "
+              f"python scripts/tao_nguoi_dung.py them {ten} --sale 0104")
         return 2
     if lenh == "them":
         return them(conn, ten, sale, kho, doc_mat_khau)
     if lenh == "doi-mat-khau":
         return doi_mat_khau(conn, ten, doc_mat_khau)
+    if kho and bo_kho:
+        # Hai cờ trái nhau: cấp và bỏ quyền cùng lúc là dấu hiệu người gõ
+        # không chắc mình muốn gì. Không được im lặng chọn nhánh cấp quyền —
+        # đó là nhánh nguy hiểm hơn, mở đường vào nút Hoàn tác (xoá dữ liệu).
+        print("Vừa --kho-du-lieu vừa --bo-kho-du-lieu — chỉ chọn một.")
+        return 2
     if not kho and not bo_kho:
         print("Lệnh quyền cần --kho-du-lieu hoặc --bo-kho-du-lieu.")
         return 2

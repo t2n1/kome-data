@@ -91,3 +91,21 @@ def test_ma_sale_khong_co_that_bao_loi_de_hieu(conn, capsys):
     conn.rollback()
     ra = capsys.readouterr().out
     assert "9999" in ra
+
+
+def test_hai_co_quyen_mau_thuan_thi_bao_loi_khong_doi_gi(conn):
+    """Vừa --kho-du-lieu vừa --bo-kho-du-lieu là dấu hiệu người gõ không chắc
+    mình muốn gì. Không được im lặng chọn nhánh cấp quyền — đó là nhánh nguy
+    hiểm hơn (mở đường vào nút Hoàn tác)."""
+    ND.tao(conn, "an", MK)
+    conn.commit()
+    assert chay(["quyen", "an", "--kho-du-lieu", "--bo-kho-du-lieu"], conn, _doc()) != 0
+    conn.commit()
+    assert ND.kiem_tra(conn, "an", MK).duoc_vao_kho_du_lieu is False
+
+
+def test_sale_thieu_gia_tri_bao_loi_khong_tao_gi(conn):
+    """Quên gõ mã sau --sale không được âm thầm tạo tài khoản không gán sale."""
+    assert chay(["them", "an", "--sale"], conn, _doc(MK, MK)) != 0
+    conn.rollback()
+    assert ND.liet_ke(conn) == []
