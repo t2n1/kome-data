@@ -32,34 +32,46 @@ GROUP BY customer_code, product_code;
 
 -- Thêm ba cột vào cuối khach_mat_hang. CREATE OR REPLACE giữ nguyên thứ tự và
 -- kiểu của 9 cột cũ (bắt buộc của Postgres) và chỉ nối thêm ở cuối.
+--
+-- "Ngày dự kiến mua lại" (lan_cuoi + nhip_ngay) chỉ được TÍNH MỘT LẦN ở lớp
+-- con `x`, rồi tái dùng cho cả `du_kien_lan_toi` lẫn `tre_ngay` ở lớp ngoài.
+-- Viết biểu thức đó ba lần (đã từng làm) là ba chỗ phải sửa giống hệt nhau
+-- mỗi khi đổi công thức — sửa một chỗ quên hai chỗ là đúng loại lỗi cả file
+-- này cảnh báo. Dùng `nhip_ngay * interval '1 day'` thay vì nối chuỗi
+-- `(nhip_ngay || ' days')::interval`: nối chuỗi phụ thuộc cách Postgres IN
+-- một numeric ra text (locale, ký số thập phân), còn nhân với interval thì
+-- không.
 CREATE OR REPLACE VIEW mart.khach_mat_hang AS
-SELECT f.customer_code, f.product_code,
-       coalesce(nullif(s.product_name, ''), f.product_code) AS ten_hang,
-       sum(f.amount - f.tax_amount) AS doanh_thu_thuan,
-       sum(f.gross_profit)          AS lai_gop,
-       sum(f.qty)                   AS so_luong,
-       count(DISTINCT f.sales_date) AS so_lan,
-       min(f.sales_date)            AS lan_dau,
-       max(f.sales_date)            AS lan_cuoi,
-       -- Dưới 2 khoảng cách = dưới 3 lần mua: không đủ để nói về "nhịp".
-       -- NULL chứ không phải một con số, để trang hiện `—`.
-       CASE WHEN n.so_khoang >= 2 THEN n.nhip_ngay END AS nhip_ngay,
-       CASE WHEN n.so_khoang >= 2
-            THEN max(f.sales_date) + (n.nhip_ngay || ' days')::interval
-       END::date AS du_kien_lan_toi,
+SELECT customer_code, product_code, ten_hang, doanh_thu_thuan, lai_gop,
+       so_luong, so_lan, lan_dau, lan_cuoi, nhip_ngay, du_kien_lan_toi,
        -- Chỉ tính khi ĐÃ quá hạn. Số âm ở cột "trễ" sẽ bị đọc thành "sớm",
-       -- mà đó không phải điều cột này nói.
-       CASE WHEN n.so_khoang >= 2
-             AND m.hom_nay > max(f.sales_date) + (n.nhip_ngay || ' days')::interval
-            THEN m.hom_nay - (max(f.sales_date) + (n.nhip_ngay || ' days')::interval)::date
-       END AS tre_ngay
-FROM core.fact_sales_line f
-LEFT JOIN core.dim_product s ON s.product_code = f.product_code
-LEFT JOIN mart.nhip_mat_hang n
-       ON n.customer_code = f.customer_code AND n.product_code = f.product_code
-CROSS JOIN mart.moc_thoi_gian m
-GROUP BY f.customer_code, f.product_code, s.product_name,
-         n.so_khoang, n.nhip_ngay, m.hom_nay;
+       -- mà đó không phải điều cột này nói. du_kien_lan_toi NULL thì so sánh
+       -- ra NULL luôn, không cần lặp lại điều kiện so_khoang >= 2 ở đây.
+       CASE WHEN hom_nay > du_kien_lan_toi THEN hom_nay - du_kien_lan_toi END AS tre_ngay
+FROM (
+    SELECT f.customer_code, f.product_code,
+           coalesce(nullif(s.product_name, ''), f.product_code) AS ten_hang,
+           sum(f.amount - f.tax_amount) AS doanh_thu_thuan,
+           sum(f.gross_profit)          AS lai_gop,
+           sum(f.qty)                   AS so_luong,
+           count(DISTINCT f.sales_date) AS so_lan,
+           min(f.sales_date)            AS lan_dau,
+           max(f.sales_date)            AS lan_cuoi,
+           -- Dưới 2 khoảng cách = dưới 3 lần mua: không đủ để nói về "nhịp".
+           -- NULL chứ không phải một con số, để trang hiện `—`.
+           CASE WHEN n.so_khoang >= 2 THEN n.nhip_ngay END AS nhip_ngay,
+           CASE WHEN n.so_khoang >= 2
+                THEN (max(f.sales_date) + n.nhip_ngay * interval '1 day')::date
+           END AS du_kien_lan_toi,
+           m.hom_nay AS hom_nay
+    FROM core.fact_sales_line f
+    LEFT JOIN core.dim_product s ON s.product_code = f.product_code
+    LEFT JOIN mart.nhip_mat_hang n
+           ON n.customer_code = f.customer_code AND n.product_code = f.product_code
+    CROSS JOIN mart.moc_thoi_gian m
+    GROUP BY f.customer_code, f.product_code, s.product_name,
+             n.so_khoang, n.nhip_ngay, m.hom_nay
+) x;
 
 
 -- Hạng theo DOANH THU 12 THÁNG — chỉ số của CHÚNG TA, không phải 得意先ランク
@@ -97,12 +109,24 @@ FROM xh;
 -- nhóm; đưa vào đây là nhân đôi 1.710 dòng cho mỗi lần đọc view.
 --
 -- Khách OBC đã đánh dấu ※廃業※ / ※取引停止※ không vào nhóm nào: doanh nghiệp
--- đã phá sản thì im lặng là đúng, không phải bất thường (migration 016).
+-- đã phá sản thì im lặng là đúng, không phải bất thường (migration 016). Cả
+-- ba nhánh dưới đây loại khách đó qua `trang_thai <> 'ngung_giao_dich'` —
+-- KHÔNG qua `dau_hieu_obc IS NULL`. Hai cột đó của 016 nói hai điều khác
+-- nhau: `dau_hieu_obc` là NGUYÊN VĂN cụm ※…※ đầu tiên (cắt ở 20 ký tự, có
+-- thể là một ghi chú vô hại không liên quan gì tới đóng cửa), còn `da_ngung`
+-- (mà `trang_thai='ngung_giao_dich'` dựa vào) là kết quả so khớp từ khoá
+-- đóng cửa thật, không giới hạn độ dài. Lấy nhầm cột thì lệch hai chiều: một
+-- ghi chú ※…※ bất kỳ loại oan khách còn sống khỏi mọi nhóm việc, còn một dấu
+-- đóng cửa dài hơn 20 ký tự lại cho khách đã phá sản quay về danh sách gọi.
 CREATE VIEW mart.khach_nhom_viec AS
--- im lặng quá 2 lần nhịp mua riêng của chính khách đó
+-- im lặng quá 2 lần nhịp mua riêng của chính khách đó. Lọc thẳng bằng
+-- trang_thai — nhóm việc "im" và trang /can-xu-ly phải trả lời CÙNG một câu
+-- hỏi, nên dùng CHUNG một điều kiện chứ không viết lại bằng ty_le_im_lang:
+-- ty_le_im_lang không tự loại khách 'chua_du_lich_su' (dưới 3 lần mua, xem
+-- comment ở khach_mat_hang phía trên) như trang_thai đã làm.
 SELECT customer_code, 'im' AS nhom
 FROM mart.khach_360
-WHERE ty_le_im_lang >= 2 AND dau_hieu_obc IS NULL
+WHERE trang_thai IN ('canh_bao', 'da_roi_bo')
 
 UNION ALL
 -- hạng S/A mà 30 ngày gần nhất tụt dưới 80% trung bình ba kỳ 30 ngày trước đó.
@@ -113,7 +137,7 @@ SELECT k.customer_code, 'tut'
 FROM mart.khach_360 k
 JOIN mart.hang_doanh_thu h ON h.customer_code = k.customer_code
 CROSS JOIN mart.moc_thoi_gian m
-WHERE h.hang IN ('S', 'A') AND k.dau_hieu_obc IS NULL
+WHERE h.hang IN ('S', 'A') AND k.trang_thai <> 'ngung_giao_dich'
   AND (SELECT coalesce(sum(doanh_thu_thuan), 0) FROM mart.lan_mua l
        WHERE l.customer_code = k.customer_code
          AND l.sales_date > m.hom_nay - 30)
@@ -129,7 +153,7 @@ FROM mart.khach_360 k
 CROSS JOIN mart.moc_thoi_gian m
 WHERE k.lan_dau > m.hom_nay - 90
   AND k.ty_le_im_lang >= 1.2
-  AND k.dau_hieu_obc IS NULL;
+  AND k.trang_thai <> 'ngung_giao_dich';
 
 
 -- Tải của từng nhân viên. LEFT JOIN từ dim_salesperson chứ không JOIN từ
