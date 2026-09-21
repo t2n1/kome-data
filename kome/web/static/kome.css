@@ -154,7 +154,7 @@
     "Thành phần dùng lại" phía trên), nên scope trong `.dieu-huong` để đổi
     kiểu một bên không kéo theo bên kia. */
  .dieu-huong .nhom{margin:.9rem 0 .25rem;padding:0 .55rem;font-size:.68rem;font-weight:600;
-   letter-spacing:.1em;color:var(--chu-nhat)}
+   letter-spacing:.1em;color:var(--chu-nhat);align-self:stretch}
  .dieu-huong .nhom:first-child{margin-top:0}
  .dieu-huong a{padding:.42rem .55rem;border-radius:8px;font-size:.85rem;
    text-decoration:none;color:var(--chu-thuong)}
