@@ -35,6 +35,18 @@ TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 # Cửa sổ soát ngày thiếu trên /kho-du-lieu (tính lùi từ ngày bán gần nhất).
 SO_NGAY_SOAT = 30
 
+# Mọi đường dẫn thuộc màn Kho dữ liệu — màn DUY NHẤT có nút xoá dữ liệu.
+# Ba địa chỉ cũ nằm trong DUONG_KHO_DU_LIEU dù chúng chỉ 301: để hở chúng là
+# để người không có quyền dò ra cấu trúc màn bị cấm.
+DUONG_KHO_DU_LIEU = ("/kho-du-lieu", "/upload", "/undo", "/nap", "/health", "/phu-du-lieu")
+
+
+def _thuoc_kho_du_lieu(duong: str) -> bool:
+    """`/undo/12` cũng thuộc màn này, nên so bằng tiền tố có ranh giới `/`
+    chứ không so bằng nhau — nhưng `/khach-hang` KHÔNG được dính vào
+    `/kho-du-lieu` chỉ vì cùng vài ký tự đầu."""
+    return any(duong == d or duong.startswith(d + "/") for d in DUONG_KHO_DU_LIEU)
+
 
 def _chi_doc() -> bool:
     """Trang có ở chế độ CHỈ ĐỌC không (ẩn hẳn phần nạp dữ liệu)?
@@ -149,8 +161,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         # KOME_SESSION_SECRET thì không có cổng, và /dang-nhap thì chạy
         # TRƯỚC khi ai kịp là ai.
         nguoi = getattr(request.state, "nguoi", None)
+        # `nguoi is None` = không có cổng đăng nhập (máy trong công ty để
+        # trống KOME_SESSION_SECRET) -> mọi thứ mở, y như trước đợt 3.
+        hien_kho = nguoi is None or nguoi.duoc_vao_kho_du_lieu
         return TEMPLATES.TemplateResponse(
-            request, ten, {**ctx, **chung, "nguoi": nguoi}, **kw)
+            request, ten, {**ctx, **chung, "nguoi": nguoi, "hien_kho": hien_kho}, **kw)
 
     def _chi_gui_qua_https(request: Request) -> bool:
         """Có gắn cờ Secure lên cookie không (cấm trình duyệt gửi qua HTTP)?
@@ -208,6 +223,12 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 return resp
 
             request.state.nguoi = nguoi
+            if not nguoi.duoc_vao_kho_du_lieu and _thuoc_kho_du_lieu(request.url.path):
+                # 403 kèm trang giải thích, KHÔNG chuyển hướng im lặng: người
+                # gõ thẳng địa chỉ cần biết vì sao mình không vào được, không
+                # phải tự hỏi trang có hỏng không.
+                return _ve(request, "cam_kho_du_lieu.html",
+                           {"trang": None}, status_code=403)
             return await call_next(request)
 
         @app.get("/dang-nhap", response_class=HTMLResponse)

@@ -306,9 +306,10 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
     địa chỉ đã chết như thể chúng còn sống: nhãn nút, đích mặc định sau đăng
     nhập, và comment/docstring mô tả hành vi đã sai kể từ khi gộp thành
     /kho-du-lieu. Ba định nghĩa route redirect thật (gần cuối
-    kome/web/app.py, ví dụ `@app.get("/nap", ...)`) và một comment mô tả
-    đúng ngay hành vi của route đó là HỢP LỆ và phải giữ nguyên — đó là nơi
-    DUY NHẤT ba địa chỉ cũ còn được phép tồn tại trong code."""
+    kome/web/app.py, ví dụ `@app.get("/nap", ...)`), một comment mô tả
+    đúng ngay hành vi của route đó, và dòng khai báo hằng
+    `DUONG_KHO_DU_LIEU` (Task 5 — ba địa chỉ cũ vẫn phải bị chặn 403 như
+    chính /kho-du-lieu) là HỢP LỆ và phải giữ nguyên."""
     canh = [
         Path("kome/web/templates/chi_doc.html"),
         Path("kome/web/bao_mat.py"),
@@ -316,11 +317,13 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
         Path("kome/web/app.py"),
     ]
     cu = ("/phu-du-lieu", "/health", "/nap")
-    # Định nghĩa route redirect thật (`@app.get("/nap", ...)`) và comment mô
-    # tả đúng ngay hành vi của chính route /nap đó — hai chỗ DUY NHẤT được
-    # phép nhắc địa chỉ cũ như một địa chỉ còn tồn tại (nó thật sự còn tồn
-    # tại, chỉ để 301 đi nơi khác).
-    hop_le = ("@app.get(", "VẪN chuyển hướng ở bản chỉ-đọc")
+    # Định nghĩa route redirect thật (`@app.get("/nap", ...)`), comment mô
+    # tả đúng ngay hành vi của chính route /nap đó, và dòng khai báo
+    # `DUONG_KHO_DU_LIEU` (Task 5: ba địa chỉ cũ vẫn thuộc màn Kho dữ liệu
+    # cho mục đích chặn quyền, dù chỉ 301) — những chỗ DUY NHẤT được phép
+    # nhắc địa chỉ cũ như một địa chỉ còn tồn tại (nó thật sự còn tồn tại,
+    # chỉ để 301 đi nơi khác).
+    hop_le = ("@app.get(", "VẪN chuyển hướng ở bản chỉ-đọc", "DUONG_KHO_DU_LIEU")
     loi = []
     for f in canh:
         for i, dong in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):

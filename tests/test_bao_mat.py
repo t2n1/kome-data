@@ -456,3 +456,82 @@ def test_trang_chi_doc_khong_phu_thuoc_pandas():
             muc.add(n.module or "")
     assert not any(m.startswith(("kome.pipeline", "pandas", "calamine")) for m in muc), \
         f"app.py nhập ở mức ngoài cùng: {sorted(muc)}"
+
+
+# ---- Quyền vào màn Kho dữ liệu (đợt 3) ---------------------------------
+
+def test_khong_co_quyen_thi_moi_duong_vao_kho_du_lieu_deu_403(khach):
+    """[CRITICAL] Màn Kho dữ liệu là màn có nút xoá. Đợt 2a đã phát hiện bấm
+    nhầm lô đối soát sẽ xoá CẢ MỘT THÁNG doanh thu — trước đợt 3, bất kỳ ai
+    biết mật khẩu chung đều bấm được nút đó.
+
+    Chặn cả POST: ẩn cái nút đi mà vẫn nhận POST thì người gõ thẳng địa chỉ
+    (hoặc một trang lạ tự gửi form) vẫn xoá được dữ liệu."""
+    c = khach(kho_du_lieu=False)
+    _vao(c)
+    r = c.get("/kho-du-lieu")
+    assert r.status_code == 403
+    assert "在庫一覧" not in r.text, "trang 403 vẫn lộ nội dung màn Kho dữ liệu"
+    assert c.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", b"x")}).status_code == 403
+    assert c.post("/undo/1").status_code == 403
+
+
+def test_ba_dia_chi_cu_cung_bi_chan(khach):
+    """/nap, /health, /phu-du-lieu chỉ 301 sang /kho-du-lieu, nhưng để hở
+    chúng thì người không có quyền vẫn dò được cấu trúc màn bị cấm."""
+    c = khach(kho_du_lieu=False)
+    _vao(c)
+    for d in ("/nap", "/health", "/phu-du-lieu"):
+        assert c.get(d).status_code == 403, d
+
+
+def test_trang_403_noi_ro_vi_sao_chu_khong_chuyen_huong_im_lang(khach):
+    """Người gõ thẳng địa chỉ cần biết vì sao mình không vào được, không phải
+    tự hỏi trang có hỏng không."""
+    c = khach(kho_du_lieu=False)
+    _vao(c)
+    t = c.get("/kho-du-lieu").text
+    assert "không có quyền" in t
+    assert 'href="/"' in t          # còn đường quay ra
+
+
+def test_co_quyen_thi_van_vao_binh_thuong(khach):
+    c = khach(kho_du_lieu=True)
+    _vao(c)
+    assert c.get("/kho-du-lieu").status_code == 200
+
+
+def test_bo_co_quyen_thi_luot_goi_KE_TIEP_da_bi_chan(khach, conn):
+    """[CRITICAL] Thu hồi quyền phá huỷ mà phải đợi 12 giờ cho vé hết hạn là
+    không thu hồi được. Cờ quyền CỐ Ý không nằm trong vé, chính vì chuyện
+    này — nó được tra lại ở mỗi lượt gọi."""
+    from kome.web import nguoi_dung as ND
+    c = khach(kho_du_lieu=True)
+    _vao(c)
+    assert c.get("/kho-du-lieu").status_code == 200
+    ND.dat_quyen(conn, "an", False)
+    conn.commit()
+    assert c.get("/kho-du-lieu").status_code == 403
+
+
+def test_khong_co_quyen_thi_sidebar_khong_moi_bam_vao_kho_du_lieu(khach):
+    """Một liên kết luôn dẫn tới trang từ chối thì tệ hơn là không có."""
+    c = khach(kho_du_lieu=False)
+    _vao(c)
+    t = c.get("/khach-hang").text
+    assert 'href="/kho-du-lieu"' not in t
+    assert 'href="/khach-hang"' in t        # các mục khác vẫn còn
+
+
+def test_co_quyen_thi_sidebar_van_co_muc_kho_du_lieu(khach):
+    c = khach(kho_du_lieu=True)
+    _vao(c)
+    assert 'href="/kho-du-lieu"' in c.get("/khach-hang").text
+
+
+def test_khong_co_cong_dang_nhap_thi_khong_chan_ai(khach):
+    """Máy trong công ty để trống KOME_SESSION_SECRET: không có đăng nhập thì
+    cũng không có khái niệm quyền — mọi thứ mở như trước đợt 3."""
+    c = khach(bi_mat=None, tai_khoan=False)
+    assert c.get("/kho-du-lieu").status_code == 200
+    assert 'href="/kho-du-lieu"' in c.get("/khach-hang").text
