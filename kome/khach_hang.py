@@ -247,3 +247,68 @@ def ve_duong(thang: list[dict], rong: int = 640, cao: int = 120) -> dict:
             "vung": f"{le},{cao-le} " + " ".join(f"{x},{y}" for x, y, _ in diem)
                     + f" {round(le + (n-1)*buoc, 1)},{cao-le}",
             "dinh": dinh}
+
+
+@dataclass
+class TongQuan:
+    """Bốn khối phân tích của trang danh sách, lấy trong MỘT truy vấn."""
+    nhom: dict[str, int]
+    tong: int
+    hang: list[tuple[str, int]]
+    tinh: list[tuple[str, int]]
+    nhan_vien: list[dict]
+
+
+# Thứ tự hiển thị của hạng. S trước D, không phải thứ tự bảng chữ cái ngẫu
+# nhiên mà Postgres trả về.
+THU_TU_HANG = ("S", "A", "B", "C", "D")
+
+
+def tong_quan_danh_ba(conn, sale: str | None = None) -> TongQuan:
+    """Bốn khối phân tích của trang danh sách trong ĐÚNG MỘT truy vấn.
+
+    Vì sao gộp: đo thật (2026-09-22) một round-trip rỗng tới pooler Tokyo mất
+    47 ms, còn CSDL tính xong mỗi khối trong ~10 ms. Bốn khối rời nhau là bốn
+    vòng chờ mạng cho một thứ người ta nhìn một lần.
+
+    `sale` lọc theo người phụ trách, cùng nếp `danh_sach()` — mặc định tiện
+    dụng, không phải hàng rào.
+    """
+    dk = "WHERE k.salesperson_code = %s" if sale else ""
+    p = [sale] if sale else []
+    rows = conn.execute(f"""
+        SELECT 'nhom' AS khoi, v.nhom AS khoa, count(*) AS so, 0::bigint AS tien
+          FROM mart.khach_nhom_viec v
+          JOIN mart.khach_360 k ON k.customer_code = v.customer_code
+          {dk}
+         GROUP BY v.nhom
+        UNION ALL
+        SELECT 'tong', '', count(*), 0 FROM mart.khach_360 k {dk}
+        UNION ALL
+        SELECT 'hang', h.hang, count(*), 0
+          FROM mart.hang_doanh_thu h
+          JOIN mart.khach_360 k ON k.customer_code = h.customer_code
+          {dk}
+         GROUP BY h.hang
+        UNION ALL
+        SELECT 'tinh', coalesce(nullif(k.prefecture, ''), '(không rõ)'), count(*), 0
+          FROM mart.khach_360 k {dk}
+         GROUP BY 2
+        UNION ALL
+        SELECT 'nv', t.salesperson_code || '|' || t.ten, t.so_khach, t.doanh_thu
+          FROM mart.tai_nhan_vien t
+    """, p * 4).fetchall()
+
+    lay = lambda khoi: [(r[1], r[2], r[3]) for r in rows if r[0] == khoi]
+    nhom = {k: n for k, n, _ in lay("nhom")}
+    hang = dict((k, n) for k, n, _ in lay("hang"))
+    tinh = sorted(lay("tinh"), key=lambda x: -x[1])[:9]
+    return TongQuan(
+        nhom={k: nhom.get(k, 0) for k in ("im", "tut", "moi")},
+        tong=next((n for _, n, _ in lay("tong")), 0),
+        hang=[(h, hang.get(h, 0)) for h in THU_TU_HANG],
+        tinh=[(t, n) for t, n, _ in tinh],
+        nhan_vien=[{"ma": k.split("|")[0], "ten": k.split("|", 1)[1],
+                    "so_khach": n, "doanh_thu": int(d)}
+                   for k, n, d in sorted(lay("nv"), key=lambda x: -x[2])],
+    )

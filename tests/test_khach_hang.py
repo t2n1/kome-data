@@ -364,3 +364,38 @@ def test_can_xu_ly_loc_duoc_theo_sale(conn, batch):
     _neo(conn, batch)
     assert {k.ma for k in KH.can_xu_ly(conn, sale="0104")} == {"R0104"}
     assert {k.ma for k in KH.can_xu_ly(conn)} == {"R0104", "R0102"}
+
+
+# ---- Tổng quan danh bạ: bốn khối trong một truy vấn (task 3 đợt 4a) ----
+
+def test_tong_quan_danh_ba_chay_dung_MOT_truy_van(conn, batch, monkeypatch):
+    """[IMPORTANT] Bốn khối phân tích = bốn vòng Tokyo nếu làm ẩu. Đo thật:
+    một round-trip rỗng đã 47 ms, nên bốn khối rời nhau cộng thêm ~1 giây vào
+    mỗi lần mở trang danh sách."""
+    _ho_so_khach(conn, batch, "TQ01", "Quán TQ", salesperson_code="0104")
+    _mua(conn, batch, "TQ01", HOM_NAY - timedelta(days=3))
+    _neo(conn, batch)
+
+    dem = {"n": 0}
+    that = conn.execute
+    def demo(*a, **k):
+        dem["n"] += 1
+        return that(*a, **k)
+    monkeypatch.setattr(conn, "execute", demo)
+    tq = KH.tong_quan_danh_ba(conn)
+    assert dem["n"] == 1, f"chạy {dem['n']} truy vấn, phải đúng 1"
+
+    assert tq.tong >= 1
+    assert [h[0] for h in tq.hang] == ["S", "A", "B", "C", "D"]
+    assert len(tq.nhan_vien) == 5
+    assert set(tq.nhom) == {"im", "tut", "moi"}
+
+
+def test_tong_quan_khong_ro_tinh_van_duoc_dem(conn, batch):
+    """8 khách không có tỉnh (đo thật). Bỏ im lặng thì tổng của khối 'Tập trung
+    ở đâu' không khớp tổng danh bạ và không ai biết vì sao."""
+    _ho_so_khach(conn, batch, "KT01", "Quán không tỉnh", prefecture="")
+    _mua(conn, batch, "KT01", HOM_NAY - timedelta(days=3))
+    _neo(conn, batch)
+    tq = KH.tong_quan_danh_ba(conn)
+    assert any(t[0] == "(không rõ)" for t in tq.tinh)
