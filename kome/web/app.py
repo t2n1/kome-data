@@ -146,8 +146,23 @@ def create_app(db_url: str | None = None) -> FastAPI:
     if mk:
         @app.middleware("http")
         async def chan_cua(request: Request, call_next):
-            if request.url.path == "/dang-nhap" or bao_mat.ve_hop_le(
-                    request.cookies.get(bao_mat.TEN_COOKIE), mk):
+            # Miễn trừ /static/ CÓ CHỦ Ý — đây là một lỗ thủng trong cổng
+            # bảo mật, không phải sót. /static/ chỉ chứa kome.css và font:
+            # tài sản thiết kế thuần tuý, không một byte dữ liệu kinh doanh
+            # nào (doanh thu, khách hàng, giá vốn...) đi qua đường này, nên
+            # miễn trừ không mở lộ gì. Trước khi CSS được tách ra thư mục
+            # riêng (nhánh giao diện, Task 1), nó nằm inline trong
+            # _chung.html nên /dang-nhap tự mang theo kiểu dáng và không
+            # cần miễn trừ này; từ khi CSS/font chuyển ra /static/, thiếu
+            # dòng này thì CHÍNH trang đăng nhập — màn hình ĐẦU TIÊN của
+            # bản Vercel, nơi mật khẩu LUÔN bắt buộc — bị 303 mất cả
+            # CSS lẫn font, hiện trơ trụi trước khi ai kịp đăng nhập.
+            # Có test canh: tests/test_bao_mat.py::
+            # test_static_khong_bi_chan_boi_cong_dang_nhap.
+            if (request.url.path == "/dang-nhap"
+                    or request.url.path.startswith("/static/")
+                    or bao_mat.ve_hop_le(
+                        request.cookies.get(bao_mat.TEN_COOKIE), mk)):
                 return await call_next(request)
             tiep = request.url.path
             if request.url.query:

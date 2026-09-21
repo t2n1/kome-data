@@ -154,6 +154,15 @@ khi triển khai:
   `https://<deploy>/static/fonts/IBMPlexSans-Regular.woff2` bằng tay xem có
   trả về 200 không.
 
+- Cổng đăng nhập (`kome/web/app.py`, middleware `chan_cua`) **miễn trừ
+  `/static/` có chủ ý**, cùng với `/dang-nhap`. Trang đăng nhập là màn hình
+  ĐẦU TIÊN của bản Vercel — nơi `KOME_MAT_KHAU` luôn bắt buộc — và nó cần
+  chính `/static/kome.css` cùng các file font để hiển thị có kiểu dáng
+  *trước khi* ai đăng nhập được. Nếu sau này có người "siết lại" cổng đăng
+  nhập và bỏ miễn trừ này, `/dang-nhap` của bản công khai sẽ hiện trơ trụi,
+  không CSS không font — có test canh:
+  `tests/test_bao_mat.py::test_static_khong_bi_chan_boi_cong_dang_nhap`.
+
 ---
 
 ## Nguồn
