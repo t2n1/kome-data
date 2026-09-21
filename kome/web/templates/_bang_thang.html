@@ -1,0 +1,45 @@
+<section id="theo-thang">
+<h2 style="font-size:1.15rem;margin-top:2rem;padding-top:.6rem;
+           border-top:1px solid var(--vien)">Theo tháng, nhóm theo kỳ kế toán</h2>
+<p class="chu-thich">Mỗi dòng là một tháng, mỗi cột là một loại file xuất từ OBC.
+Nhóm theo <strong>kỳ kế toán của công ty: 1/8 → 31/7 năm sau</strong> (không phải
+năm tài chính Nhật chuẩn 1/4 → 31/3).</p>
+<p class="chu-thich">Bảng này có đủ 7 loại file và trải toàn bộ lịch sử. Dùng để
+soát lịch sử; muốn biết hôm qua có sót ngày nào thì xem bảng ngày ở trên.</p>
+
+{% for k in bang.ky %}
+<div class="khoi-ky">
+  <h2>{{ k.nhan }}</h2>
+  <div class="chu-thich">{{ k.dau }} → {{ k.cuoi }}{% if not k.du_12_thang %}
+    · <strong>kỳ không đủ 12 tháng trong phạm vi dữ liệu</strong> — đừng đem so tổng
+    kỳ này với kỳ khác{% endif %}</div>
+  <div class="tom-tat">
+    <div>Doanh thu thuần<b>¥{{ "{:,}".format(k.doanh_thu_thuan) }}</b></div>
+    <div>Lãi gộp<b>¥{{ "{:,}".format(k.lai_gop) }}</b></div>
+    <div>Tỷ suất lãi gộp<b>{% if k.ty_suat is none %}<span class="khong-ap-dung">chưa có doanh thu</span>{% else %}{{ "{:.1%}".format(k.ty_suat) }}{% endif %}</b></div>
+  </div>
+  <table class="phu">
+    <tr><th>Tháng</th><th>Tháng thứ<br>trong kỳ</th>
+    {% for c in bang.cot %}<th title="{{ c.chu_giai }}">{{ c.nhan }}</th>{% endfor %}</tr>
+    {% for t in k.thang %}
+    <tr{% if t.la_thang_chot_ky %} class="chot-ky"{% endif %}>
+      <td class="thang">{{ t.thang }}{% if t.la_thang_chot_ky %} · chốt kỳ{% endif %}</td>
+      <td>{{ t.company_fy_month }}</td>
+      {% for o in t.o %}<td class="o o-{{ o.trang_thai }}" title="{{ o.cot.chu_giai }}: {{ o.mo_ta }}">{{ o.ky_hieu }}</td>{% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endfor %}
+
+<h2>Chú giải cột</h2>
+<table>
+{% for c in bang.cot %}<tr><td><strong>{{ c.nhan }}</strong></td><td>{{ c.ten_obc }}</td><td>{{ c.mo_ta }}</td></tr>{% endfor %}
+</table>
+
+<h2>Loại dữ liệu CHƯA vào kho</h2>
+<table>
+{% for l in bang.thieu_bo_nap %}<tr><td>{{ l.ten_obc }}</td><td>{{ l.mo_ta }}</td><td>{{ l.ghi_chu }}</td></tr>{% endfor %}
+</table>
+
+</section>

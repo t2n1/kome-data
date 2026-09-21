@@ -1,0 +1,32 @@
+<!-- kome/web/templates/kho_du_lieu.html
+     Màn Kho dữ liệu — gộp /nap + /health + /phu-du-lieu.
+
+     Thứ tự khối có chủ ý: trả lời "tôi phải làm gì ngay bây giờ" trước
+     (khối tuổi dữ liệu), rồi mới tới "có gì sai không" (sức khoẻ), cuối
+     cùng là sổ sách (hai bảng phủ). Khối tuổi dữ liệu và khối nạp đứng
+     cạnh nhau vì khối trên nói thiếu file nào, khối dưới là chỗ thả file
+     đó vào — hôm nay hai thứ ấy nằm ở hai trang khác nhau. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<title>KOME — kho dữ liệu</title>
+{% include "_chung.html" %}
+{% include "_nav.html" %}
+<h1>Kho dữ liệu</h1>
+{# _tuoi_du_lieu.html dùng chung với "/" và "/health" nên KHÔNG được sửa —
+   bọc section#hom-nay ở NGOÀI thay vì thêm id vào chính partial đó. #}
+<section id="hom-nay">
+{% include "_tuoi_du_lieu.html" %}
+</section>
+{# Bản chỉ-đọc (Vercel) không nạp được: mỗi yêu cầu bị chặn ở 4,5 MB còn
+   売上伝票データ nặng ~100 MB, và ổ đĩa là tạm nên lớp raw không tồn tại
+   được. Ẩn hẳn khối, không hiện một nút luôn báo lỗi. #}
+{% if not chi_doc %}{% include "_nap.html" %}{% endif %}
+{% include "_suc_khoe.html" %}
+{% include "_phu_chu_giai.html" %}
+{# _bang_ngay.html cũng dùng chung với "/phu-du-lieu" nên KHÔNG được sửa —
+   cùng lý do bọc ở ngoài như trên. #}
+<section id="theo-ngay">
+{% include "_bang_ngay.html" %}
+</section>
+{% include "_bang_thang.html" %}
+</html>
+</main>

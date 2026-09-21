@@ -12,6 +12,7 @@ from kome.coverage import tinh_bang_ngay, tinh_bang_phu
 from kome import khach_hang as KH
 from kome.db import connect
 from kome.env import nap_env
+from kome.nhat_ky_nap import lo_nap_gan_nhat, trang_thai_nap
 from kome.tuoi_du_lieu import tinh_tuoi
 from kome.web import bao_mat
 from ops.backup import backup_status
@@ -285,6 +286,37 @@ def create_app(db_url: str | None = None) -> FastAPI:
             return _ve(request, "upload.html", {"results": results, "trang": "nap"})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e, chung)
+
+    def _du_lieu_kho(conn):
+        """Mọi thứ màn Kho dữ liệu cần, gom một chỗ.
+
+        Route GET và route POST /upload đều render cùng màn này, nên cùng
+        gọi hàm này — tách ra để hai chỗ không bao giờ trôi khỏi nhau.
+        """
+        return {"status": trang_thai_nap(conn),
+                "ky": _ky_du_lieu(conn),
+                "tuoi": tinh_tuoi(conn),
+                "bang": tinh_bang_phu(conn),
+                "bang_ngay": tinh_bang_ngay(conn),
+                "lo": lo_nap_gan_nhat(conn)}
+
+    @app.get("/kho-du-lieu", response_class=HTMLResponse)
+    def kho_du_lieu(request: Request):
+        try:
+            # BACKUP_DIR đọc mỗi lần gọi, không chốt lúc tạo app — test và
+            # người vận hành đổi biến môi trường thì trang phải thấy ngay.
+            backup_dir = Path(os.environ.get("BACKUP_DIR", "./backups"))
+            with open_conn() as conn:
+                ctx = _du_lieu_kho(conn)
+            # Bản chỉ-đọc KHÔNG nói gì về sao lưu: sao lưu chạy trên máy nội
+            # bộ, máy chủ công khai không nhìn thấy thư mục .zip đó nên sẽ
+            # luôn kết luận "chưa sao lưu" — một dải đỏ vĩnh viễn dạy người
+            # đọc bỏ qua dải đỏ.
+            ctx["backup"] = None if chi_doc else backup_status(backup_dir)
+            return _ve(request, "kho_du_lieu.html",
+                       {**ctx, "trang": "kho-du-lieu"})
+        except Exception as e:
+            return _loi(request, "mở màn kho dữ liệu", e, chung)
 
     @app.get("/health", response_class=HTMLResponse)
     def health(request: Request):

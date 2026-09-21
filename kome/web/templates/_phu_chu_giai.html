@@ -1,0 +1,23 @@
+<div class="chu-giai">
+  <span><i class="mau o-co">●</i> có dữ liệu trong kho</span>
+  <span><i class="mau o-khong">·</i> không có dữ liệu</span>
+  <span><i class="mau o-ngoai">—</i> ngoài phạm vi</span>
+  <span><i class="mau o-co">7</i> cột tồn kho: SỐ NGÀY có ảnh chụp</span>
+  <span><i class="mau" style="background:var(--do-nen);color:var(--do-chu)">7月</i> tháng chốt kỳ</span>
+</div>
+
+<div class="ky">
+📌 <strong>Ràng buộc vĩnh viễn:</strong> dữ liệu bán hàng bắt đầu từ
+<strong>{{ bang.dau_du_lieu }}</strong>. Trước mốc đó <strong>không tồn tại</strong> —
+công ty không còn lưu (đặc tả §2.2.1). Các tháng trước mốc hiện là
+<strong>“ngoài phạm vi”</strong>, đó <em>không phải</em> là thiếu dữ liệu và
+<em>không</em> có gì để đi tìm.
+</div>
+
+<div class="ngay-thieu">
+⚠️ <strong>Hạn chế cần biết:</strong> ô “không có dữ liệu” <strong>không phân biệt
+được</strong> hai trường hợp: (a) chưa bao giờ xuất file cho tháng đó, và (b) đã xuất
+nhưng file bị cổng kiểm tra chặn (bản xuất thiếu dòng, sai mẫu…). Cổng kiểm tra chặn
+<strong>trước khi</strong> ghi nhật ký nạp, nên kho không hề biết file đó từng tồn tại.
+Muốn biết chắc thì đối chiếu với thư mục xuất của OBC.
+</div>
