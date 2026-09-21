@@ -78,6 +78,34 @@ def test_app_ghi_duoc_bang_tai_khoan(fresh_conn):
     assert all(r), f"kome_app thiếu quyền trên app.nguoi_dung: {r}"
 
 
+def test_app_lam_duoc_viec_cua_script_tai_khoan(fresh_conn):
+    """Cùng loại lỗi với test_ingest_lam_duoc_viec_cua_no, ở đầu bên kia.
+
+    scripts/tao_nguoi_dung.py là đường DUY NHẤT tạo tài khoản đăng nhập, và từ
+    đợt 3 thì không có tài khoản nghĩa là không ai vào được màn Kho dữ liệu —
+    tức quy trình 13:30 đứng hẳn, không có luồng tự phục hồi nào. Script từng
+    nối bằng `DATABASE_URL`, mà docs/runbook.md dạy đặt `kome_ingest_user` vào
+    đó: `kome_ingest` không có cả USAGE trên schema `app`, nên NGAY KHI chủ sở
+    hữu làm đúng theo runbook thì mọi lệnh của script — kể cả lệnh liệt kê —
+    chết bằng "permission denied for schema app". Hôm nay nó chạy được chỉ vì
+    .env còn dùng siêu người dùng `postgres`.
+
+    Vì vậy script nối bằng `DATABASE_URL_APP` (`kome_app`), và test này khẳng
+    định vai trò đó thật sự làm được việc của script: USAGE trên schema `app`
+    (thiếu nó thì hỏng TRƯỚC cả quyền bảng) cộng SELECT/INSERT/UPDATE trên
+    `app.nguoi_dung` — liệt kê, `them`, `doi-mat-khau` và `quyen`.
+    """
+    apply_all(fresh_conn, Path("db/migrations"))
+    r = fresh_conn.execute(
+        """SELECT has_schema_privilege('kome_app', 'app', 'USAGE'),
+                  has_table_privilege('kome_app', 'app.nguoi_dung', 'SELECT'),
+                  has_table_privilege('kome_app', 'app.nguoi_dung', 'INSERT'),
+                  has_table_privilege('kome_app', 'app.nguoi_dung', 'UPDATE')"""
+    ).fetchone()
+    assert r[0] is True, "kome_app không có USAGE trên schema app -> script chết ngay lệnh đầu"
+    assert all(r), f"kome_app thiếu quyền cho scripts/tao_nguoi_dung.py: {r}"
+
+
 def test_report_khong_doc_duoc_bam_mat_khau(fresh_conn):
     """kome_report là vai trò cho công cụ báo cáo/BI ngoài ứng dụng chính.
     ALTER DEFAULT PRIVILEGES của 009 cấp cho nó SELECT trên MỌI bảng schema

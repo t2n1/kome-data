@@ -529,6 +529,63 @@ def test_co_quyen_thi_sidebar_van_co_muc_kho_du_lieu(khach):
     assert 'href="/kho-du-lieu"' in c.get("/khach-hang").text
 
 
+def _no(*a, **k):
+    """Giả lập một lỗi ngoài dự kiến (CSDL rụng, truy vấn hỏng…)."""
+    raise RuntimeError("CSDL rung giua chung")
+
+
+def test_trang_loi_van_con_duong_ve_kho_du_lieu(khach, monkeypatch):
+    """[IMPORTANT] error.html KHÔNG có liên kết nào của riêng nó — chỉ ba bước
+    "chụp màn hình, gửi cho người phụ trách, đừng thử lại" — nên sidebar là lối
+    ra duy nhất. Đợt 3 bọc mục Kho dữ liệu trong `{% if hien_kho %}`, mà `_loi`
+    lúc đó dựng ngữ cảnh bằng một đường riêng không có biến đó: Jinja Undefined
+    là falsy, mục biến mất khỏi CHÍNH trang lỗi, kể cả với người CÓ quyền.
+    Nghĩa là nạp file gặp lỗi lúc 13:30 thì người phụ trách đứng lại trên một
+    trang không có cách nào quay về /kho-du-lieu ngoài gõ tay địa chỉ."""
+    from kome import khach_hang as KH
+    c = khach(kho_du_lieu=True)
+    _vao(c)
+    monkeypatch.setattr(KH, "danh_sach", _no)
+    r = c.get("/khach-hang")
+    assert r.status_code == 500
+    assert "Hệ thống gặp lỗi" in r.text
+    assert 'href="/kho-du-lieu"' in r.text, "trang lỗi mất đường về Kho dữ liệu"
+
+
+def test_trang_loi_van_khong_moi_nguoi_khong_co_quyen(khach, monkeypatch):
+    """Chiều ngược lại của test trên: gộp ngữ cảnh về một chỗ không được biến
+    trang lỗi thành kẽ hở mời người không có quyền bấm vào màn bị cấm."""
+    from kome import khach_hang as KH
+    c = khach(kho_du_lieu=False)
+    _vao(c)
+    monkeypatch.setattr(KH, "danh_sach", _no)
+    r = c.get("/khach-hang")
+    assert r.status_code == 500
+    assert 'href="/kho-du-lieu"' not in r.text
+
+
+def test_csdl_hong_o_cong_dang_nhap_van_ra_trang_loi_tieng_viet(
+        khach, monkeypatch, capsys):
+    """[IMPORTANT] Middleware `chan_cua` tra app.nguoi_dung ở MỌI lượt gọi, nên
+    một lần Supabase trục trặc biến MỌI trang thành 500 trần của Starlette
+    (tiếng Anh, đầy dấu vết ngăn xếp) — công ty không có nhân sự IT và `_loi`
+    tồn tại chính xác vì lý do đó. Trước đợt 3 cổng là HMAC thuần, không chạm
+    CSDL, nên lưới bắt lỗi của từng route là đủ; giờ thì không.
+
+    Cũng kiểm hai chuyện dễ mất: lỗi vẫn ghi ra nhật ký máy chủ (không nuốt),
+    và KHÔNG bị hiểu thành "chưa đăng nhập" rồi đá về /dang-nhap — trang đó
+    cũng tra CSDL và cũng hỏng, người dùng chỉ thấy một vòng lặp."""
+    from kome.web import nguoi_dung as ND
+    c = khach()
+    _vao(c)
+    monkeypatch.setattr(ND, "theo_id", _no)
+    r = c.get("/khach-hang")
+    assert r.status_code == 500, "lỗi CSDL trong middleware không ra trang lỗi"
+    assert "Hệ thống gặp lỗi" in r.text
+    assert "RuntimeError" not in r.text, "chuỗi ngoại lệ gốc lọt lên trang"
+    assert "CSDL rung giua chung" in capsys.readouterr().out, "lỗi bị nuốt"
+
+
 def test_khong_co_cong_dang_nhap_thi_khong_chan_ai(khach):
     """Máy trong công ty để trống KOME_SESSION_SECRET: không có đăng nhập thì
     cũng không có khái niệm quyền — mọi thứ mở như trước đợt 3."""

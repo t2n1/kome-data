@@ -9,7 +9,9 @@ Chạy (từ thư mục dự án, cả PowerShell lẫn Git Bash đều được
     python scripts/tao_nguoi_dung.py quyen an --bo-kho-du-lieu
     (thêm --test ở cuối để chạy trên CSDL thử nghiệm)
 
-Script tự đọc .env, không cần nạp biến môi trường trước.
+Script tự đọc .env, không cần nạp biến môi trường trước. Nó nối bằng
+`DATABASE_URL_APP` (vai trò `kome_app` — vai trò DUY NHẤT có quyền trên schema
+`app`), lùi về `DATABASE_URL` nếu biến đó còn trống.
 
 MẬT KHẨU LUÔN NHẬP QUA BÀN PHÍM, không bao giờ nhận qua tham số dòng lệnh:
 tham số nằm lại trong lịch sử shell và trong danh sách tiến trình, nơi ai
@@ -174,6 +176,21 @@ if __name__ == "__main__":
     from kome.env import nap_env
 
     nap_env()
-    url = os.environ["DATABASE_URL_TEST" if "--test" in sys.argv else "DATABASE_URL"]
+    # Nối bằng DATABASE_URL_APP (vai trò `kome_app`), KHÔNG phải DATABASE_URL.
+    # Bảng app.nguoi_dung nằm trong schema `app`, mà `kome_ingest` — vai trò
+    # mà docs/runbook.md dạy đặt vào DATABASE_URL cho việc nạp dữ liệu hằng
+    # ngày — không có cả USAGE trên schema đó. Đọc thẳng DATABASE_URL thì ngay
+    # khi chủ sở hữu làm đúng theo runbook, MỌI lệnh của script (kể cả liệt kê)
+    # chết bằng "permission denied for schema app" — tức không tạo nổi tài
+    # khoản, không ai đăng nhập được, không ai nạp được dữ liệu lúc 13:30, và
+    # không có luồng tự phục hồi nào. Có test canh:
+    # tests/test_roles.py::test_app_lam_duoc_viec_cua_script_tai_khoan.
+    #
+    # Lùi về DATABASE_URL khi DATABASE_URL_APP còn trống: máy chưa tách hai
+    # chuỗi kết nối (hoặc còn dùng `postgres`) vẫn chạy script được như cũ.
+    if "--test" in sys.argv:
+        url = os.environ["DATABASE_URL_TEST"]
+    else:
+        url = os.environ.get("DATABASE_URL_APP") or os.environ["DATABASE_URL"]
     with connect(url) as c:
         sys.exit(chay(sys.argv[1:], c))

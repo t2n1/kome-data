@@ -74,6 +74,50 @@ trống thì trang chạy KHÔNG có đăng nhập và KHÔNG có phân quyền 
 trang cũng bấm được nút Hoàn tác. Đây cũng đúng là máy DUY NHẤT nạp và hoàn
 tác được, nên để trống là vô hiệu hoá toàn bộ phần bảo vệ của đợt 3.
 
+### Bật đăng nhập trên máy trong công ty — làm ĐÚNG THỨ TỰ NÀY
+
+Bốn bước dưới đây chạy **một lần**, và **thứ tự là bắt buộc**. Đặt khoá ký
+trước khi có tài khoản là tự khoá mình ra ngoài: cổng đăng nhập bật lên ngay,
+mà chưa có ai để đăng nhập, nên trang chỉ trả về màn đăng nhập từ chối mọi
+lần thử — kể cả màn **Kho dữ liệu** lúc 13:30 hôm sau.
+
+1. **Tạo tài khoản người phụ trách nạp, CÓ `--kho-du-lieu`** (nhập mật khẩu
+   hai lần khi được hỏi):
+
+   ```bash
+   python scripts/tao_nguoi_dung.py them <tên người phụ trách nạp> --kho-du-lieu
+   ```
+
+2. **Xem lại danh sách, chắc chắn tài khoản đó có chữ `CÓ` ở cột Kho dữ liệu:**
+
+   ```bash
+   python scripts/tao_nguoi_dung.py
+   ```
+
+   Không thấy dòng nào, hoặc cột đó là `—`? **Dừng ở đây**, sửa xong mới đi
+   tiếp — bước 3 làm cho sai lầm này không sửa được qua trình duyệt nữa.
+
+3. *Rồi mới* **đặt `KOME_SESSION_SECRET` vào `.env`** (chuỗi ngẫu nhiên, từ 12
+   ký tự trở lên) và khởi động lại trang.
+
+4. **Đăng nhập và mở `/kho-du-lieu` một lần, TRƯỚC 13:30 hôm sau.** Đây là
+   bước duy nhất chứng minh cả chuỗi chạy được. Để tới đúng 13:30 mới thử là
+   đem một việc hằng ngày ra làm chuột bạch, giữa lúc không còn thời gian sửa.
+
+**Nếu lỡ làm ngược thứ tự** (đặt khoá ký trước, chưa có tài khoản nào có
+quyền): trang khoá tất cả mọi người, nhưng `scripts/tao_nguoi_dung.py` **vẫn
+chạy được** — nó nối thẳng vào CSDL, không đi qua cổng đăng nhập. Quay lại
+bước 1, tạo tài khoản, rồi đăng nhập lại; không cần đổi gì trong `.env`.
+Tài khoản đã có sẵn mà quên cấp quyền thì cấp thêm bằng
+`python scripts/tao_nguoi_dung.py quyen <tên> --kho-du-lieu` — có hiệu lực
+ngay ở lượt bấm kế tiếp của họ, không phải đăng nhập lại.
+
+Để script chạy được, `.env` phải có **`DATABASE_URL_APP`** (vai trò
+`kome_app_user`) — xem mục "Tạo tài khoản đăng nhập cho từng vai trò" bên
+dưới. Bảng tài khoản nằm trong schema `app`, mà `kome_ingest_user` (vai trò
+của `DATABASE_URL`) **không có quyền nào** ở đó; thiếu `DATABASE_URL_APP` thì
+script lùi về `DATABASE_URL` và mọi lệnh báo `permission denied for schema app`.
+
 Quên mật khẩu: không có luồng tự phục hồi (cố ý — 5–7 người, một luồng khôi
 phục qua email là thêm một cửa để tấn công). Người quản trị đặt lại bằng
 `doi-mat-khau`.
@@ -120,6 +164,12 @@ Lưu ý:
   ở trang chủ. Vẫn **không** mở được trang **Kho dữ liệu** — màn đó luôn đi
   qua `kome_ingest_user`/`DATABASE_URL` như dòng trên. `kome_report_user` chỉ
   đọc, dùng cho công cụ báo cáo/BI bên ngoài nếu có.
+- **`scripts/tao_nguoi_dung.py` cũng đi bằng `DATABASE_URL_APP`**, không phải
+  `DATABASE_URL`: bảng tài khoản nằm trong schema `app`, mà `kome_ingest` không
+  có cả quyền `USAGE` trên schema đó. Đặt `DATABASE_URL` sang
+  `kome_ingest_user` mà quên `DATABASE_URL_APP` thì mọi lệnh của script — kể cả
+  lệnh liệt kê — báo `permission denied for schema app`, tức không tạo nổi tài
+  khoản để ai đăng nhập.
 - **Migration luôn chạy bằng `postgres`**, không bao giờ bằng `kome_ingest_user`:
   `ALTER DEFAULT PRIVILEGES` trong migration không có `FOR ROLE`, chạy bằng vai
   trò khác thì quyền mặc định cho bảng mới sẽ âm thầm không áp dụng.

@@ -9,8 +9,15 @@
 {# Mặc định tiện dụng, KHÔNG phải hàng rào: năm sale không cần giấu nhau
    (đặc tả đợt 3 §5). Liên kết bỏ lọc phải hiện rõ, và con số trên nó lấy
    từ truy vấn chứ không viết cứng. #}
+{# `t.tong` là số dòng KHỚP truy vấn, nên nó co theo cả ô tìm lẫn bộ lọc trạng
+   thái. In thẳng nó ra sau "khách của X" thì sale tìm "Quán A" đọc được
+   "(1 khách)" ngay cạnh "Xem tất cả 2.080 khách" — hai con số cùng một dòng
+   nói hai chuyện khác nhau mà không có gì nói cho biết. Chỉ khi không tìm và
+   không lọc thì `t.tong` mới đúng là "số khách của người này". #}
 {% if t.sale %}
-<p class="ghi-chu">Đang xem khách của <strong>{{ t.ten_sale }}</strong> ({{ "{:,}".format(t.tong) }} khách).
+<p class="ghi-chu">Đang xem khách của <strong>{{ t.ten_sale }}</strong>{%
+  if not t.tim and not t.loc %} ({{ "{:,}".format(t.tong) }} khách){%
+  else %} (đang hiện {{ "{:,}".format(t.tong) }} khách khớp){% endif %}.
   <a href="/khach-hang?tat_ca=1">Xem tất cả {{ "{:,}".format(t.tong_tat_ca) }} khách →</a></p>
 {% endif %}
 
@@ -23,8 +30,11 @@
   {% if t.tim %}<a class="loc" href="/khach-hang?loc={{ t.loc }}{{ giu }}" style="align-self:center">Xoá tìm</a>{% endif %}
 </form>
 
-{# Bộ đếm tính trên TOÀN BỘ khách, không theo bộ lọc đang bật — nếu không thì
-   bấm vào một mục xong các con số khác về 0 hết và không ai quay lại được. #}
+{# Bộ đếm KHÔNG theo ô tìm và KHÔNG theo bộ lọc trạng thái đang bật — nếu
+   không thì bấm vào một mục xong các con số khác về 0 hết và không ai quay
+   lại được. Nhưng nó CÓ theo bộ lọc sale: đang xem khách của mình mà bộ đếm
+   khoe con số toàn công ty thì bấm vào một mục xong ra danh sách ngắn hơn hẳn
+   số vừa đọc. Xem kome/khach_hang.py::danh_sach. #}
 <div class="loc">
   <a href="/khach-hang?tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if not t.loc %} class="dang-xem"{% endif %}>Tất cả ({{ "{:,}".format(t.dem_trang_thai.values()|sum) }})</a>
   {% for ma, (nhan, mau) in trang_thai.items() %}
