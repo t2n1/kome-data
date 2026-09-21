@@ -43,3 +43,32 @@ def test_ban_chi_doc_an_o_tha_file(conn, test_db_url, monkeypatch):
     html = client.get("/kho-du-lieu").text
     assert 'id="nap"' not in html
     assert "在庫一覧" in html, "khối chỉ-đọc khác vẫn phải hiện"
+
+
+def test_khoi_hoan_tac_hien_lo_va_giau_nut_sau_mot_buoc(conn, test_db_url):
+    """[IMPORTANT] Hoàn tác XOÁ dữ liệu khỏi core và không thể hoàn lại.
+    Nút không được nằm trần trên một màn người ta mở mỗi ngày: <details>
+    bắt người bấm đọc hậu quả trước khi thấy cái nút."""
+    conn.execute("DELETE FROM meta.ingest_batch")
+    conn.execute(
+        """INSERT INTO meta.ingest_batch
+             (spec_name, source_file, digest, archived_to, row_count,
+              total_amount, data_date)
+           VALUES ('zaiko', '在庫一覧_20260101.xlsx', 'dg1', 'test', 177, 0, '2026-01-01')""")
+    conn.commit()
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/kho-du-lieu").text
+
+    assert "在庫一覧_20260101.xlsx" in html
+    assert "<details" in html and "Hoàn tác" in html
+    assert "177" in html, "phải nói rõ sẽ xoá bao nhiêu dòng"
+    assert "Không thể hoàn lại" in html
+
+
+def test_ban_chi_doc_an_khoi_hoan_tac(conn, test_db_url, monkeypatch):
+    """Bản công khai không hoàn tác được (route trả 403). Hiện nút ở đó là
+    mời người ta bấm một thứ chắc chắn thất bại — và là nút XOÁ."""
+    monkeypatch.setenv("KOME_CHI_DOC", "1")
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/kho-du-lieu").text
+    assert "/undo/" not in html

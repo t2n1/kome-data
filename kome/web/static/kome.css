@@ -215,3 +215,11 @@
  .chu-giai span{display:inline-flex;align-items:center;gap:.4rem}
  .mau{display:inline-block;width:1.4rem;height:1.4rem;line-height:1.4rem;
    text-align:center;border:1px solid var(--vien);border-radius:4px;font-weight:700}
+
+ /* Nút hoàn tác: hành động PHÁ HUỶ, nên mang màu lỗi chứ không phải màu
+    hành động chính — nó không phải thứ ta mời người ta bấm. */
+ .hoan-tac summary{cursor:pointer;color:var(--loi-chu);font-size:.85rem}
+ .hoan-tac p{font-size:.85rem;margin:.4rem 0}
+ .hoan-tac button{font:inherit;padding:.3rem .7rem;border-radius:9px;
+   border:1px solid var(--loi-vien);background:var(--loi-nen);
+   color:var(--loi-chu);cursor:pointer}
