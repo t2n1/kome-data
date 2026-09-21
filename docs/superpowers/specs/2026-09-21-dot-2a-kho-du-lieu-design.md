@@ -48,11 +48,11 @@ ma trận khoá · file này nối đi đâu · cột trong từng file.
 ### 2.3 Không đụng tới
 
 CSDL (không migration), `kome/pipeline.py`, 5 cổng kiểm tra,
-`kome/tuoi_du_lieu.py`, `kome/config.py`. Đợt này **chỉ đổi tầng web**.
+`kome/tuoi_du_lieu.py`, `kome/config.py`, `kome/coverage.py`. Đợt này **chỉ
+đổi tầng web**, cộng một module đọc mới (`kome/nhat_ky_nap.py`, §4.3).
 
-`kome/coverage.py` được **thêm hai hàm đọc** (§4.3) nhưng các hàm tính sẵn có
-(`tinh_bang_ngay`, `tinh_bang_phu`) không đổi một dòng — bảng phủ và lệnh
-terminal `scripts/bang_phu_du_lieu.py` phải cho ra đúng số như trước.
+`tinh_bang_ngay` và `tinh_bang_phu` không đổi một dòng — bảng phủ trên web và
+lệnh terminal `scripts/bang_phu_du_lieu.py` phải cho ra đúng số như trước.
 
 ---
 
@@ -125,8 +125,17 @@ dòng 300–320). Đợt này **tách nó thành một hàm có tên** đặt c�
 mới không phình ra: route `/kho-du-lieu` gọi bảy thứ, nếu một trong bảy là hai
 mươi dòng SQL nội tuyến thì hàm route không còn đọc trọn được nữa.
 
-`lo_nap_gan_nhat` và hàm tách ở trên đều đặt ở `kome/coverage.py` — cùng nhà với
-các hàm đọc `meta.ingest_batch` khác, không tạo module mới cho hai truy vấn.
+Hai hàm này đặt ở **`kome/nhat_ky_nap.py` (module mới)**, không nhét vào
+`kome/coverage.py`. Lý do: docstring của `coverage.py` khai rõ nó là "MỘT nơi
+duy nhất tính **bảng phủ**", đọc thẳng từ kho chứ không đếm tên file — còn hai
+hàm này đọc **nhật ký nạp** (`meta.ingest_batch`: lô nào đã vào, lúc nào, bao
+nhiêu dòng). Hai câu hỏi khác nhau trên hai nguồn khác nhau; gộp vào một file
+làm mờ đúng ranh giới mà docstring kia dựng lên.
+
+`trang_thai_nap` trả về **đúng shape dict mà `health.html` đang dùng**
+(`name` / `last` / `rows` / `total` / `co_tien`) chứ không đổi sang dataclass —
+để việc tách partial là một phép chuyển nguyên văn, không lẫn hai loại thay đổi
+vào một bước.
 
 `lo_nap_gan_nhat` đọc `meta.ingest_batch`:
 
