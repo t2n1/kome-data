@@ -1,9 +1,55 @@
 """Test màn Kho dữ liệu — màn gộp của /nap + /health + /phu-du-lieu."""
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from kome.web.app import create_app
+
+
+def _lo(conn, spec_name, ten_file, ngay, row_count, digest, tong_tien=0):
+    """Một dòng meta.ingest_batch, trả về batch_id."""
+    return conn.execute(
+        """INSERT INTO meta.ingest_batch
+             (spec_name, source_file, digest, archived_to, row_count,
+              total_amount, data_date)
+           VALUES (%s, %s, %s, 'test', %s, %s, %s)
+           RETURNING batch_id""",
+        (spec_name, ten_file, digest, row_count, tong_tien, ngay)).fetchone()[0]
+
+
+def _ban_hang(conn, batch_id, phieu):
+    """Upsert dòng bán hàng theo ĐÚNG khoá thật (slip_no, line_seq, source).
+
+    Cùng khoá thì lô sau dán batch_id của mình lên dòng của lô trước — chính
+    là cơ chế biến một lần bấm Hoàn tác thành "mất cả tháng doanh thu"."""
+    for slip, seq in phieu:
+        conn.execute(
+            """INSERT INTO core.fact_sales_line
+                 (slip_no, line_seq, sales_date, customer_code, product_code,
+                  amount, batch_id, source)
+               VALUES (%s, %s, '2026-09-01', 'C1', 'P1', 1000, %s, 'uriage')
+               ON CONFLICT (slip_no, line_seq, source)
+                 DO UPDATE SET batch_id = EXCLUDED.batch_id""",
+            (slip, seq, batch_id))
+
+
+def _nha_cung_cap(conn, batch_id, so_dong):
+    conn.execute(
+        """INSERT INTO core.dim_supplier (supplier_code, supplier_name, batch_id)
+           SELECT 'S' || g, 'NCC ' || g, %s FROM generate_series(1, %s) g""",
+        (batch_id, so_dong))
+
+
+def _khoi_hoan_tac(html: str) -> dict[int, str]:
+    """Tách từng khối <details> hoàn tác, khoá theo số lô trong form action.
+
+    Kiểm cả trang bằng `in html` là không đủ khi có NHIỀU lô: một câu đúng
+    cho lô này vẫn làm test xanh trong khi lô kia nói sai."""
+    khoi = {}
+    for m in re.finditer(r'<details class="hoan-tac">(.*?)</details>', html, re.S):
+        khoi[int(re.search(r"/undo/(\d+)", m.group(1)).group(1))] = m.group(1)
+    return khoi
 
 # Mỗi khối một dấu hiệu nhận biết ổn định (không phải chuỗi trang trí dễ đổi).
 DAU_HIEU_KHOI = {
@@ -52,18 +98,15 @@ def test_khoi_hoan_tac_hien_lo_va_giau_nut_sau_mot_buoc(conn, test_db_url):
     Nút không được nằm trần trên một màn người ta mở mỗi ngày: <details>
     bắt người bấm đọc hậu quả trước khi thấy cái nút."""
     conn.execute("DELETE FROM meta.ingest_batch")
-    conn.execute(
-        """INSERT INTO meta.ingest_batch
-             (spec_name, source_file, digest, archived_to, row_count,
-              total_amount, data_date)
-           VALUES ('zaiko', '在庫一覧_20260101.xlsx', 'dg1', 'test', 177, 0, '2026-01-01')""")
+    b = _lo(conn, "shiiresaki", "仕入先_20260908.xlsx", "2026-09-08", 3, "dg1")
+    _nha_cung_cap(conn, b, 3)
     conn.commit()
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/kho-du-lieu").text
 
-    assert "在庫一覧_20260101.xlsx" in html
+    assert "仕入先_20260908.xlsx" in html
     assert "<details" in html and "Hoàn tác" in html
-    assert "177" in html, "phải nói rõ sẽ xoá bao nhiêu dòng"
+    assert "3 dòng" in _khoi_hoan_tac(html)[b], "phải nói rõ sẽ xoá bao nhiêu dòng"
     assert "Không thể hoàn lại" in html
 
 
@@ -77,38 +120,80 @@ def test_ban_chi_doc_an_khoi_hoan_tac(conn, test_db_url, monkeypatch):
 
 
 def test_hoan_tac_master_upsert_hien_canh_bao_se_trong(conn, test_db_url):
-    """[IMPORTANT] Bốn loại master (shohin/shiiresaki/chokusousaki/tanka) nạp
-    bằng upsert: mỗi lần nạp dán batch_id MỚI lên mọi dòng, nên hoàn tác
-    (`DELETE WHERE batch_id`) quét sạch CẢ BẢNG chứ không lùi về lô trước —
-    khác hẳn ba loại fact/SCD2 còn lại. Sự cố thật đã xảy ra vì thiếu cảnh báo
-    này: hoàn tác một lô shiiresaki 49 dòng, tưởng lùi về 48, thực tế còn 0."""
+    """[IMPORTANT] File master nạp bằng upsert theo khoá KHÔNG có ngày: mỗi
+    lần nạp dán batch_id MỚI lên mọi dòng, nên hoàn tác (`DELETE WHERE
+    batch_id`) quét sạch CẢ BẢNG chứ không lùi về lô trước. Sự cố thật đã xảy
+    ra vì thiếu cảnh báo này: hoàn tác một lô shiiresaki 49 dòng, tưởng lùi
+    về 48, thực tế core.dim_supplier còn 0.
+
+    Cảnh báo giờ đến từ phép ĐẾM (49 dòng của lô = 49 dòng của bảng), không
+    từ một danh sách loại file đoán trước."""
     conn.execute("DELETE FROM meta.ingest_batch")
-    conn.execute(
-        """INSERT INTO meta.ingest_batch
-             (spec_name, source_file, digest, archived_to, row_count,
-              total_amount, data_date)
-           VALUES ('shiiresaki', '仕入先_20260908.xlsx', 'dg2', 'test', 49, 0, '2026-09-08')""")
+    b = _lo(conn, "shiiresaki", "仕入先_20260908.xlsx", "2026-09-08", 49, "dg2")
+    _nha_cung_cap(conn, b, 49)
     conn.commit()
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/kho-du-lieu").text
-    assert "sẽ trống hoàn toàn" in html
-    assert "không lùi về lần nạp trước" in html
+    khoi = _khoi_hoan_tac(client.get("/kho-du-lieu").text)[b]
+    assert "49 dòng" in khoi
+    assert "sẽ trống hoàn toàn" in khoi
+    assert "không lùi về lần nạp trước" in khoi
 
 
-def test_hoan_tac_fact_khong_hien_canh_bao_se_trong(conn, test_db_url):
-    """Ba loại fact/SCD2 (uriage/meisai/zaiko/tokuisaki) lùi đúng một lô khi
-    hoàn tác. Dán cảnh báo "sẽ trống" lên cả loại không cần sẽ dạy người đọc
-    coi thường cảnh báo — quan trọng ngang test trên."""
+def test_hoan_tac_uriage_doi_soat_thang_noi_dung_so_dong_se_mat(conn, test_db_url):
+    """[IMPORTANT] TEST QUAN TRỌNG NHẤT CỦA ĐỢT NÀY.
+
+    Đối soát tháng là việc THƯỜNG KỲ (CLAUDE.md: "đầu mỗi tháng xuất lại toàn
+    bộ tháng trước"). Khoá của core.fact_sales_line là (slip_no, line_seq,
+    source) — KHÔNG có ngày — nên lô đối soát dán batch_id của nó lên cả
+    tháng, kể cả dòng do các lô hằng ngày trước đó nạp vào. Một lần bấm Hoàn
+    tác lô ấy là mất cả tháng doanh thu.
+
+    Bản cũ của màn hình KHÔNG cảnh báo gì cho uriage và in `row_count` của
+    file như thể đó là số dòng sẽ mất. Test này là thứ duy nhất chặn được
+    kịch bản đó tái diễn.
+
+    Dựng thu nhỏ: lô 1 nạp 2 phiếu, lô 2 nạp lại 3 phiếu CHỒNG lên. Màn phải
+    nói lô 2 xoá 3 dòng (không phải "3 dòng file mang vào" một cách tình cờ —
+    xem test cùng tên ở tests/test_nhat_ky_nap.py đo thẳng con số), phải nói
+    bảng doanh thu sẽ trống, và phải nói THẲNG rằng lô 1 không còn giữ dòng
+    nào thay vì hứa xoá 2 dòng nó từng nạp."""
     conn.execute("DELETE FROM meta.ingest_batch")
-    conn.execute(
-        """INSERT INTO meta.ingest_batch
-             (spec_name, source_file, digest, archived_to, row_count,
-              total_amount, data_date)
-           VALUES ('uriage', '売上伝票データ_20260916.xlsx', 'dg3', 'test', 100, 5000, '2026-09-16')""")
+    b1 = _lo(conn, "uriage", "売上伝票データ_20260901.xlsx", "2026-09-01", 2, "dg3")
+    _ban_hang(conn, b1, [("A", 1), ("B", 1)])
+    b2 = _lo(conn, "uriage", "売上伝票データ_20260930.xlsx", "2026-09-30", 3, "dg4")
+    _ban_hang(conn, b2, [("A", 1), ("B", 1), ("C", 1)])
     conn.commit()
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/kho-du-lieu").text
-    assert "sẽ trống hoàn toàn" not in html
+    khoi = _khoi_hoan_tac(client.get("/kho-du-lieu").text)
+
+    assert "3 dòng" in khoi[b2], "lô đối soát đang giữ 3 dòng, phải nói đúng 3"
+    assert "doanh thu" in khoi[b2], "phải nói rõ mất dòng của BẢNG NÀO"
+    assert "lô TRƯỚC nạp vào" in khoi[b2], \
+        "phải nói rõ số này gồm cả dòng của lô trước bị đè lên"
+    assert "sẽ trống hoàn toàn" in khoi[b2]
+    assert "Không thể hoàn lại" in khoi[b2]
+
+    assert "không còn giữ dòng nào" in khoi[b1]
+    assert "2 dòng" not in khoi[b1], \
+        "row_count cũ (2) là con số GÂY HIỂU NHẦM — hoàn tác lô 1 xoá 0 dòng"
+
+
+def test_khong_doa_se_trong_khi_bang_con_dong_cua_lo_khac(conn, test_db_url):
+    """Cảnh báo "sẽ trống hoàn toàn" phải IM khi nó không đúng. Dán cảnh báo
+    nặng lên ca không cần dạy người đọc coi thường mọi cảnh báo — nguy hiểm
+    ngang việc thiếu cảnh báo, và đó đúng là lỗi cũ với `tanka` (khoá bảng
+    giá CÓ valid_from nên lô sau không đè lô trước)."""
+    conn.execute("DELETE FROM meta.ingest_batch")
+    b1 = _lo(conn, "uriage", "売上伝票データ_20260901.xlsx", "2026-09-01", 1, "dg5")
+    _ban_hang(conn, b1, [("A", 1)])
+    b2 = _lo(conn, "uriage", "売上伝票データ_20260902.xlsx", "2026-09-02", 1, "dg6")
+    _ban_hang(conn, b2, [("B", 1)])
+    conn.commit()
+    client = TestClient(create_app(db_url=test_db_url))
+    khoi = _khoi_hoan_tac(client.get("/kho-du-lieu").text)
+    assert "1 dòng" in khoi[b2]
+    assert "sẽ trống hoàn toàn" not in khoi[b2]
+    assert "sẽ trống hoàn toàn" not in khoi[b1]
 
 
 def test_ba_dia_chi_cu_chuyen_huong_301(conn, test_db_url):
@@ -165,6 +250,55 @@ def test_tai_lieu_khong_con_tro_toi_ba_dia_chi_cu():
             if any(d in dong for d in cu):
                 loi.append(f"{f}:{i}: {dong.strip()[:70]}")
     assert not loi, "tài liệu còn trỏ tới địa chỉ cũ:\n" + "\n".join(loi)
+
+
+# Lời MÔ TẢ đã sai kể từ khi ba trang gộp làm một. Khác với địa chỉ cũ, những
+# câu này không chứa dấu `/` nào nên test trên không thấy — mà chúng nguy hiểm
+# hơn: một ô kiểm tay mô tả sai thì LUÔN XANH, kể cả khi bất biến nó canh đã
+# vỡ hoàn toàn.
+#
+# Mỗi mẫu đi kèm danh sách MIỄN TRỪ: những chữ làm câu đó thành lời kể về quá
+# khứ chứ không phải mô tả hiện tại. "Ba trang cũ nay chỉ còn 301 về
+# /kho-du-lieu" (CLAUDE.md) là câu ĐÚNG và phải giữ; "Bản chạy ở máy có đủ cả
+# ba trang" là câu SAI. Phân biệt bằng chữ "cũ" trên cùng dòng.
+MO_TA_DA_SAI = {
+    "ba trang": (
+        "nạp/sức khoẻ/bảng phủ nay là MỘT màn /kho-du-lieu, không còn ba trang",
+        ("cũ",)),
+    "hai trang": (
+        "bản Vercel mở CÙNG màn đó, chỉ ẩn hai khối — không phải 'chỉ có hai trang'",
+        ("cũ",)),
+    "thanh menu": (
+        "ô kiểm 'thanh menu không có mục Nạp dữ liệu' nay LUÔN xanh: mục đó đã "
+        "biến mất khỏi CẢ HAI bản. Phải soát trong màn: không có ô kéo–thả file "
+        "và không có nút Hoàn tác",
+        ()),
+    "📥": (
+        "biểu tượng của mục menu Nạp dữ liệu — mục đó không còn trong sidebar",
+        ()),
+}
+
+
+def test_tai_lieu_khong_con_mo_ta_sai_cau_truc_man_hinh():
+    """[IMPORTANT] Test địa chỉ cũ ở trên chỉ bắt được CHUỖI ĐƯỜNG DẪN. Câu
+    "Bản chạy ở máy có đủ cả ba trang…" trong runbook không chứa đường dẫn
+    nào nên nó lọt qua — mà người mở runbook lúc đang hỏng thì đọc câu đó,
+    không đọc code.
+
+    Nguy hiểm nhất là ô kiểm tay trong docs/trien-khai-vercel.md: "Thanh menu
+    không có mục 📥 Nạp dữ liệu". Mục đó đã biến mất khỏi sidebar ở CẢ HAI
+    bản, nên ô kiểm ấy nay xanh kể cả khi bất biến chỉ-đọc vỡ hoàn toàn — và
+    nó là cổng kiểm TAY duy nhất cho bất biến đó."""
+    canh = [Path("docs/runbook.md"), Path("CLAUDE.md"),
+            Path("docs/trien-khai-vercel.md")]
+    loi = []
+    for f in canh:
+        for i, dong in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            thap = dong.lower()
+            for mau, (vi_sao, mien_tru) in MO_TA_DA_SAI.items():
+                if mau in thap and not any(x in thap for x in mien_tru):
+                    loi.append(f"{f}:{i}: “{mau}” — {vi_sao}")
+    assert not loi, "tài liệu còn mô tả cấu trúc màn hình đã cũ:\n" + "\n".join(loi)
 
 
 def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
