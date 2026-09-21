@@ -186,6 +186,11 @@ def doc_ve(ve: str | None, bi_mat: str, bay_gio: float | None = None) -> int | N
     Giữ nguyên thứ tự "so chữ ký TRƯỚC khi đọc hạn" của cơ chế cũ:
     hmac.compare_digest chạy hết thời gian như nhau dù sai ở ký tự nào, nên
     không đo được chữ ký đúng là gì.
+
+    So trên BYTES (encode trước khi đưa vào compare_digest), không so thẳng
+    str: cookie là dữ liệu trình duyệt gửi lên, ai cũng nhét được ký tự ngoài
+    ASCII vào; compare_digest ném TypeError với hai str như vậy, và vé "méo
+    mó" khi đó không trả None như docstring hứa mà làm sập cả lượt gọi.
     """
     if not ve:
         return None
@@ -193,7 +198,8 @@ def doc_ve(ve: str | None, bi_mat: str, bay_gio: float | None = None) -> int | N
     if len(phan) != 3:
         return None
     ma, het, chu_ky = phan
-    if not hmac.compare_digest(chu_ky, _ky(f"{ma}.{het}", bi_mat)):
+    if not hmac.compare_digest(chu_ky.encode("utf-8"),
+                               _ky(f"{ma}.{het}", bi_mat).encode("utf-8")):
         return None
     try:
         if (bay_gio if bay_gio is not None else time.time()) >= int(het):

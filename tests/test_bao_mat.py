@@ -122,6 +122,12 @@ def test_ve_meo_mo_bi_tu_choi():
     assert bao_mat.doc_ve(f"7.{het}.{chu_ky}.thua", BI_MAT) is None   # thừa đoạn
     assert bao_mat.doc_ve(f"7.khong-phai-so.{chu_ky}", BI_MAT) is None
     assert bao_mat.doc_ve(f"khong-phai-so.{het}.{chu_ky}", BI_MAT) is None
+    # Cookie là dữ liệu trình duyệt gửi lên, ai cũng nhét được ký tự ngoài
+    # ASCII vào — compare_digest so hai str như vậy ném TypeError thay vì
+    # trả về khác nhau, nên phải so trên bytes. Không có dòng này thì một
+    # cookie rác không đưa người dùng về trang đăng nhập mà làm sập 500,
+    # lặp lại ở mọi lượt gọi vì cookie hỏng vẫn còn trong trình duyệt.
+    assert bao_mat.doc_ve(f"7.{het}.chu-ky-có-dấu", BI_MAT) is None
 
 
 def test_hai_nguoi_khac_nhau_khong_bao_gio_dung_chung_ve():
