@@ -43,6 +43,26 @@ def test_db_url() -> str:
     return url
 
 
+@pytest.fixture(autouse=True)
+def _khong_cong_dang_nhap(monkeypatch):
+    """[QUAN TRỌNG] Mặc định MỌI test dựng app KHÔNG có cổng đăng nhập.
+
+    conftest gọi nap_env() nên pytest ĐỌC .env — và từ đợt 3, .env của máy
+    trong công ty có KOME_SESSION_SECRET (docs/runbook.md bảo đặt). Không có
+    fixture này thì mọi test dựng app tự mọc cổng đăng nhập và ~30 test đỏ
+    hàng loạt với 303 /dang-nhap, vì một lý do chẳng liên quan gì tới thứ
+    chúng kiểm — mà chỉ đỏ trên máy có .env, không đỏ trong CI.
+
+    DATABASE_URL_APP cũng phải gỡ: test luôn truyền db_url tường minh, nhưng
+    để biến đó sót lại là để một đường cho test đọc nhầm CSDL THẬT.
+
+    Test nào CẦN cổng thì tự đặt lại — xem fixture `khach` ở
+    tests/test_bao_mat.py.
+    """
+    monkeypatch.delenv("KOME_SESSION_SECRET", raising=False)
+    monkeypatch.delenv("DATABASE_URL_APP", raising=False)
+
+
 @pytest.fixture(scope="session")
 def _session_conn(test_db_url):
     """Một kết nối duy nhất cho cả phiên test, schema đã dựng sẵn.

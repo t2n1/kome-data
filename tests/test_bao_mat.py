@@ -2,33 +2,44 @@
 
 Trang này hiển thị doanh thu, lãi gộp, giá vốn từng mặt hàng và danh sách
 2.080 khách hàng. Mọi test ở đây bảo vệ đúng một câu: **không ai xem được
-thứ đó nếu không có mật khẩu**, và **không ai nạp/xoá dữ liệu qua bản công
+thứ đó nếu không đăng nhập**, và **không ai nạp/xoá dữ liệu qua bản công
 khai**.
 """
-import time
-
 import pytest
 from fastapi.testclient import TestClient
 
 from kome.web import bao_mat
 from kome.web.app import create_app
 
-MK = "mat-khau-du-dai-2026"
+MK = "mat-khau-cua-an-2026"
+BI_MAT = "bi-mat-phien-du-dai-2026"
 
 
 @pytest.fixture
-def khach(monkeypatch, test_db_url):
-    """Trình duyệt KHÔNG tự đi theo chuyển hướng — phải thấy tận mắt mã 303."""
-    def _tao(mat_khau: str | None = MK, vercel: bool = False):
+def khach(monkeypatch, test_db_url, conn):
+    """Trình duyệt KHÔNG tự đi theo chuyển hướng — phải thấy tận mắt mã 303.
+
+    `bi_mat=None` => KHÔNG có cổng đăng nhập (máy trong công ty để trống
+    KOME_SESSION_SECRET). Đó cũng là mặc định của mọi test khác trong repo,
+    xem fixture autouse `_khong_cong_dang_nhap` ở conftest.py.
+    """
+    from kome.web import nguoi_dung as ND
+
+    def _tao(bi_mat: str | None = BI_MAT, vercel: bool = False,
+             tai_khoan: bool = True, kho_du_lieu: bool = True,
+             sale: str | None = None):
         monkeypatch.delenv("KOME_CHI_DOC", raising=False)
-        if mat_khau is None:
-            monkeypatch.delenv("KOME_MAT_KHAU", raising=False)
+        if bi_mat is None:
+            monkeypatch.delenv("KOME_SESSION_SECRET", raising=False)
         else:
-            monkeypatch.setenv("KOME_MAT_KHAU", mat_khau)
+            monkeypatch.setenv("KOME_SESSION_SECRET", bi_mat)
         if vercel:
             monkeypatch.setenv("VERCEL", "1")
         else:
             monkeypatch.delenv("VERCEL", raising=False)
+        if tai_khoan:
+            ND.tao(conn, "an", MK, salesperson_code=sale, kho_du_lieu=kho_du_lieu)
+            conn.commit()
         # vercel=True => base_url https: bản công khai LUÔN chạy HTTPS, và
         # cookie phiên ở đó mang cờ Secure nên trình duyệt không gửi lại qua
         # HTTP. Giả lập bằng http:// sẽ dựng nên một thế giới không có thật,
@@ -38,53 +49,12 @@ def khach(monkeypatch, test_db_url):
     return _tao
 
 
-# ---- Vé đăng nhập ------------------------------------------------------
-
-def test_ve_hop_le_chi_voi_dung_mat_khau():
-    ve = bao_mat.tao_ve(MK)
-    assert bao_mat.ve_hop_le(ve, MK)
-    assert not bao_mat.ve_hop_le(ve, "mat-khau-khac-dai")
-
-
-def test_ve_het_han_sau_han_phien():
-    """[IMPORTANT] Vé không hết hạn nghĩa là một máy tính bị mượn hôm nay vẫn
-    xem được số liệu công ty vào năm sau."""
-    ve = bao_mat.tao_ve(MK, bay_gio=1_000_000)
-    assert bao_mat.ve_hop_le(ve, MK, bay_gio=1_000_000 + bao_mat.HAN_PHIEN_GIAY - 1)
-    assert not bao_mat.ve_hop_le(ve, MK, bay_gio=1_000_000 + bao_mat.HAN_PHIEN_GIAY + 1)
-
-
-def test_ve_gia_mao_bi_tu_choi():
-    """Sửa hạn trong vé mà không ký lại thì chữ ký không khớp."""
-    het, _, chu_ky = bao_mat.tao_ve(MK, bay_gio=time.time()).partition(".")
-    xa = str(int(het) + 10 * 365 * 24 * 3600)
-    assert not bao_mat.ve_hop_le(f"{xa}.{chu_ky}", MK)
-    assert not bao_mat.ve_hop_le("khong-co-dau-cham", MK)
-    assert not bao_mat.ve_hop_le(f"khong-phai-so.{chu_ky}", MK)
-    assert not bao_mat.ve_hop_le(None, MK)
-
-
-def test_doi_mat_khau_huy_moi_ve_dang_luu_hanh():
-    """[IMPORTANT] Không có kho phiên ở máy chủ (bắt buộc, để chạy được trên
-    Vercel), nên đổi mật khẩu là cách DUY NHẤT chặn người đã nghỉ việc."""
-    assert not bao_mat.ve_hop_le(bao_mat.tao_ve(MK), MK + "-moi")
-
-
-@pytest.mark.parametrize("tiep,mong", [
-    ("/phu-du-lieu", "/phu-du-lieu"),
-    ("https://site-gia.example", "/kho-du-lieu"),   # địa chỉ tuyệt đối
-    ("//site-gia.example", "/kho-du-lieu"),         # cũng là tuyệt đối
-    (None, "/kho-du-lieu"),
-])
-def test_khong_lam_ban_dap_chuyen_huong(tiep, mong):
-    """Trang đăng nhập của công ty không được đẩy người dùng sang site lạ."""
-    assert bao_mat.duong_dan_an_toan(tiep) == mong
+def _vao(c, ten: str = "an", mat_khau: str = MK):
+    """Đăng nhập, trả về phản hồi của POST /dang-nhap."""
+    return c.post("/dang-nhap", data={"ten": ten, "mat_khau": mat_khau})
 
 
 # ---- Vé theo từng người (đợt 3) ---------------------------------------
-
-BI_MAT = "bi-mat-phien-du-dai-2026"
-
 
 def test_ve_mang_dung_id_nguoi_dang_nhap():
     assert bao_mat.doc_ve(bao_mat.tao_ve_cho(7, BI_MAT), BI_MAT) == 7
@@ -156,29 +126,44 @@ def test_bi_mat_phien_doc_tu_bien_moi_truong(monkeypatch):
     assert bao_mat.bi_mat_phien() == BI_MAT
 
 
+# ---- Chuyển hướng sau khi đăng nhập ------------------------------------
+
+@pytest.mark.parametrize("tiep,mong", [
+    ("/khach-hang", "/khach-hang"),
+    ("https://site-gia.example", "/"),   # địa chỉ tuyệt đối
+    ("//site-gia.example", "/"),         # cũng là tuyệt đối
+    (None, "/"),
+])
+def test_khong_lam_ban_dap_chuyen_huong(tiep, mong):
+    """Trang đăng nhập của công ty không được đẩy người dùng sang site lạ.
+
+    Đích mặc định là "/" chứ KHÔNG còn là /kho-du-lieu (đợt 3): không phải ai
+    cũng vào được màn đó nữa."""
+    assert bao_mat.duong_dan_an_toan(tiep) == mong
+
+
 # ---- Cấu hình phải an toàn ngay từ lúc khởi động ------------------------
 
-def test_tren_vercel_ma_khong_co_mat_khau_thi_app_chet_ngay(khach):
-    """[CRITICAL] Không có mật khẩu + công khai = số liệu công ty mở cho cả
+def test_tren_vercel_ma_khong_co_khoa_ky_thi_app_chet_ngay(khach):
+    """[CRITICAL] Không có cổng + công khai = số liệu công ty mở cho cả
     Internet. Phải nổ lúc dựng app, nơi người triển khai đọc được nhật ký."""
-    with pytest.raises(bao_mat.CauHinhSai, match="KOME_MAT_KHAU"):
-        khach(mat_khau=None, vercel=True)
+    with pytest.raises(bao_mat.CauHinhSai, match="KOME_SESSION_SECRET"):
+        khach(bi_mat=None, vercel=True)
 
 
-def test_mat_khau_qua_ngan_bi_tu_choi(khach):
-    """Mỗi lần gọi trên Vercel là một tiến trình riêng nên không đếm chung
-    được số lần đoán sai — độ dài mật khẩu là lớp bảo vệ duy nhất."""
+def test_khoa_ky_qua_ngan_bi_tu_choi(khach):
     with pytest.raises(bao_mat.CauHinhSai, match="ký tự"):
-        khach(mat_khau="ngan")
+        khach(bi_mat="ngan")
 
 
-def test_chay_o_may_ca_nhan_khong_bat_buoc_mat_khau(khach):
+def test_chay_o_may_ca_nhan_khong_bat_buoc_dang_nhap(khach):
     """Máy trong công ty chạy ở 127.0.0.1 — bắt đăng nhập ở đó chỉ làm chậm
-    công việc hằng ngày mà không chặn được ai.
+    công việc hằng ngày mà không chặn được ai. Để TRỐNG KOME_SESSION_SECRET
+    là không có cổng, y như để trống KOME_MAT_KHAU trước đây.
 
-    Đợt 2a (Task 4): /health giờ chỉ 301 sang /kho-du-lieu — kiểm thẳng màn
-    gộp, /health không còn render nội dung gì để kiểm."""
-    r = khach(mat_khau=None).get("/kho-du-lieu")
+    ĐÁNH ĐỔI PHẢI BIẾT: không có cổng thì cũng KHÔNG CÓ phân quyền — ai mở
+    được trang cũng bấm được nút Hoàn tác. Xem docs/runbook.md."""
+    r = khach(bi_mat=None, tai_khoan=False).get("/kho-du-lieu")
     assert r.status_code == 200
 
 
@@ -186,11 +171,6 @@ def test_chay_o_may_ca_nhan_khong_bat_buoc_mat_khau(khach):
 
 @pytest.mark.parametrize("duong_dan", ["/", "/kho-du-lieu", "/khach-hang"])
 def test_chua_dang_nhap_thi_moi_trang_deu_bi_chan(khach, duong_dan):
-    """Đợt 2a (Task 4): /health và /phu-du-lieu giờ chỉ 301 sang
-    /kho-du-lieu — kiểm chúng ở đây không còn kiểm được gì (redirect rỗng
-    trước khi middleware đăng nhập kịp chạm nội dung). Đổi sang ba trang
-    THẬT SỰ có nội dung, và /kho-du-lieu PHẢI có mặt vì đó đúng là trang
-    giờ mang nhật ký nạp, bảng phủ dữ liệu và khối Hoàn tác."""
     r = khach().get(duong_dan)
     assert r.status_code == 303
     assert r.headers["location"] == "/dang-nhap"
@@ -199,55 +179,92 @@ def test_chua_dang_nhap_thi_moi_trang_deu_bi_chan(khach, duong_dan):
 
 def test_dang_nhap_dung_thi_xem_duoc_va_sai_thi_khong(khach):
     c = khach()
-    r = c.post("/dang-nhap", data={"mat_khau": "doan-bua-mot-cai"})
+    r = _vao(c, mat_khau="doan-bua-mot-cai")
     assert r.status_code == 401
     assert bao_mat.TEN_COOKIE not in c.cookies
 
-    r = c.post("/dang-nhap", data={"mat_khau": MK})
+    r = _vao(c, ten="khong-co-nguoi-nay")
+    assert r.status_code == 401
+    assert bao_mat.TEN_COOKIE not in c.cookies
+
+    r = _vao(c)
     assert r.status_code == 303
-    # /health giờ chỉ 301 sang /kho-du-lieu (Task 4) — kiểm thẳng màn gộp.
     assert c.get("/kho-du-lieu").status_code == 200
+
+
+def test_dang_nhap_xong_ve_trang_chu_chu_khong_phai_kho_du_lieu(khach):
+    """[IMPORTANT] Không phải ai cũng vào được Kho dữ liệu (đợt 3). Đẩy mọi
+    người vào đó sau khi đăng nhập nghĩa là một sale vừa gõ đúng mật khẩu
+    xong thấy ngay một trang 403 — lời chào tệ nhất có thể."""
+    c = khach(kho_du_lieu=False)
+    assert _vao(c).headers["location"] == "/"
 
 
 def test_dang_nhap_xong_quay_lai_dung_trang_dinh_xem(khach):
     c = khach()
-    c.get("/phu-du-lieu")                       # bị đẩy về /dang-nhap
-    r = c.post("/dang-nhap", data={"mat_khau": MK})
-    assert r.headers["location"] == "/phu-du-lieu"
+    c.get("/khach-hang")                        # bị đẩy về /dang-nhap
+    assert _vao(c).headers["location"] == "/khach-hang"
+
+
+def test_doi_mat_khau_mot_nguoi_khong_lam_nguoi_khac_bi_dang_xuat(khach, conn):
+    """[CRITICAL] Đây ĐÚNG LÀ cái lỗi của cơ chế cũ mà đợt 3 sinh ra để sửa:
+    khoá ký suy từ chính mật khẩu chung, nên đổi mật khẩu là cả công ty bị
+    đăng xuất. Giờ khoá ký là của hệ thống, tách hẳn khỏi mật khẩu của ai."""
+    from kome.web import nguoi_dung as ND
+    c = khach()
+    ND.tao(conn, "binh", "mat-khau-cua-binh-2026")
+    conn.commit()
+    _vao(c)
+    assert c.get("/").status_code == 200
+
+    ND.doi_mat_khau(conn, "binh", "mat-khau-moi-cua-binh")
+    conn.commit()
+    assert c.get("/").status_code == 200, "đổi mật khẩu người khác làm mình văng ra"
+
+
+def test_xoa_tai_khoan_thi_ve_con_han_cung_het_vao_duoc(khach, conn):
+    """[IMPORTANT] Người nghỉ việc phải bị chặn NGAY, không phải chờ 12 giờ
+    cho vé cũ hết hạn. Vé không trạng thái nên chữ ký vẫn đúng — thứ chặn họ
+    là việc middleware tra CSDL mỗi lượt và không thấy tài khoản nữa."""
+    c = khach()
+    _vao(c)
+    assert c.get("/").status_code == 200
+    conn.execute("DELETE FROM app.nguoi_dung WHERE ten_dang_nhap = 'an'")
+    conn.commit()
+    r = c.get("/")
+    assert r.status_code == 303 and r.headers["location"] == "/dang-nhap"
+
+
+def test_doi_khoa_ky_thi_dang_xuat_tat_ca(khach, monkeypatch, test_db_url):
+    """[IMPORTANT] Nghi rò rỉ thì phải có một cái công tắc đăng xuất TẤT CẢ."""
+    c = khach()
+    _vao(c)
+    assert c.get("/").status_code == 200
+    monkeypatch.setenv("KOME_SESSION_SECRET", BI_MAT + "-doi-roi")
+    c2 = TestClient(create_app(db_url=test_db_url), follow_redirects=False)
+    c2.cookies.update(c.cookies)          # cùng cái vé, app đã đổi khoá ký
+    assert c2.get("/").status_code == 303
 
 
 def test_cookie_phien_khong_doc_duoc_bang_javascript(khach):
-    """HttpOnly: một đoạn mã lạ chèn vào trang không đọc được vé để mang đi."""
-    c = khach()
-    r = c.post("/dang-nhap", data={"mat_khau": MK})
-    dat = r.headers["set-cookie"]
+    dat = _vao(khach()).headers["set-cookie"]
     assert "httponly" in dat.lower()
     assert "samesite=lax" in dat.lower()
 
 
 def test_tren_hang_tang_cong_khai_cookie_luon_co_co_secure(khach):
     """[IMPORTANT] Không có cờ Secure thì trình duyệt chịu gửi vé đăng nhập
-    qua HTTP thường, nơi ai chung mạng Wi-Fi cũng đọc được.
-
-    Không suy ra cờ này từ `request.url.scheme`: trên Vercel ứng dụng đứng sau
-    proxy đã gỡ vỏ HTTPS, scheme có thể đọc ra "http" và cờ âm thầm biến mất.
-    """
-    r = khach(vercel=True).post("/dang-nhap", data={"mat_khau": MK})
-    assert "secure" in r.headers["set-cookie"].lower()
+    qua HTTP thường, nơi ai chung mạng Wi-Fi cũng đọc được."""
+    assert "secure" in _vao(khach(vercel=True)).headers["set-cookie"].lower()
 
 
 def test_o_may_ca_nhan_khong_gan_secure(khach):
-    """Ngược lại: máy trong công ty chạy http://127.0.0.1, gắn Secure ở đó là
-    trình duyệt vứt cookie đi và không ai đăng nhập được, không lời giải thích."""
-    r = khach().post("/dang-nhap", data={"mat_khau": MK})
-    assert "secure" not in r.headers["set-cookie"].lower()
+    assert "secure" not in _vao(khach()).headers["set-cookie"].lower()
 
 
 def test_thoat_thi_het_xem_duoc(khach):
-    """/health giờ chỉ 301 sang /kho-du-lieu (Task 4) — kiểm thẳng màn gộp,
-    trạng thái đăng nhập/đăng xuất không đổi."""
     c = khach()
-    c.post("/dang-nhap", data={"mat_khau": MK})
+    _vao(c)
     assert c.get("/kho-du-lieu").status_code == 200
     c.post("/dang-xuat")
     assert c.get("/kho-du-lieu").status_code == 303
@@ -256,7 +273,7 @@ def test_thoat_thi_het_xem_duoc(khach):
 def test_mat_khau_khong_bao_gio_hien_tren_trang(khach):
     """Kể cả trang đăng nhập sai — người đứng sau lưng cũng đọc được màn hình."""
     c = khach()
-    for r in (c.get("/dang-nhap"), c.post("/dang-nhap", data={"mat_khau": "sai"})):
+    for r in (c.get("/dang-nhap"), _vao(c, mat_khau="sai")):
         assert MK not in r.text
 
 
@@ -268,11 +285,11 @@ def test_static_khong_bi_chan_boi_cong_dang_nhap(khach):
     nhập tự mang theo kiểu dáng. Từ khi CSS/font chuyển ra kome/web/static/,
     middleware `chan_cua` (chỉ miễn trừ đúng path "/dang-nhap") đá
     GET /static/kome.css và mọi file font về 303 /dang-nhap — trên bản
-    Vercel (nơi KOME_MAT_KHAU LUÔN bắt buộc), màn hình ĐẦU TIÊN người dùng
-    thấy là một trang trơ trụi, không CSS không font.
+    Vercel (nơi KOME_SESSION_SECRET LUÔN bắt buộc), màn hình ĐẦU TIÊN người
+    dùng thấy là một trang trơ trụi, không CSS không font.
 
-    Bộ test cũ không bắt được vì hầu hết chạy với khach(mat_khau=None) —
-    tức không có middleware nào cả. Test này phải dựng app CÓ mật khẩu."""
+    Bộ test cũ không bắt được vì hầu hết chạy với khach(bi_mat=None) — tức
+    không có middleware nào cả. Test này phải dựng app CÓ cổng đăng nhập."""
     c = khach()
     r = c.get("/static/kome.css")
     assert r.status_code == 200, "CSS bị cổng đăng nhập chặn — /dang-nhap sẽ trơ trụi"
@@ -295,7 +312,7 @@ def test_tren_vercel_khong_nap_va_khong_hoan_tac_duoc(khach):
     ~100 MB, và ổ đĩa ở đó là tạm nên lớp `raw` không tồn tại. Để nút nạp
     sống trên bản công khai là mời người ta nạp nửa chừng rồi hỏng."""
     c = khach(vercel=True)
-    c.post("/dang-nhap", data={"mat_khau": MK})
+    _vao(c)
 
     r = c.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", b"x")})
     assert r.status_code == 403
@@ -322,7 +339,7 @@ def test_ban_chi_doc_an_han_muc_nap_du_lieu(khach):
     trong sidebar biến mất — thay bằng một mục "Kho dữ liệu" duy nhất, còn
     khối nạp bên TRONG màn đó tự ẩn ở bản chỉ-đọc (id="nap")."""
     c = khach(vercel=True)
-    c.post("/dang-nhap", data={"mat_khau": MK})
+    _vao(c)
     t = c.get("/kho-du-lieu").text
     assert "Nạp từ OBC" not in t and 'href="/nap"' not in t
     assert 'id="nap"' not in t
@@ -334,7 +351,7 @@ def test_ban_chi_doc_khong_bao_dong_sao_luu_gia(khach):
     kết luận "chưa sao lưu". Một dải đỏ vĩnh viễn dạy người đọc bỏ qua dải
     đỏ — đúng thứ hệ thống này cần họ tin."""
     c = khach(vercel=True)
-    c.post("/dang-nhap", data={"mat_khau": MK})
+    _vao(c)
     # /health chỉ 301 sang /kho-du-lieu (Task 4) — khối sức khoẻ giờ nằm ở đó.
     t = c.get("/kho-du-lieu").text
     assert "Chưa sao lưu" not in t
@@ -344,7 +361,7 @@ def test_ban_chi_doc_khong_bao_dong_sao_luu_gia(khach):
 def test_ban_o_may_ca_nhan_van_nap_duoc(khach):
     """/nap giờ LUÔN 301 sang /kho-du-lieu#nap (Task 4) — theo tới đích để
     xác nhận khối nạp vẫn còn, còn hiện."""
-    c = khach(mat_khau=None)
+    c = khach(bi_mat=None, tai_khoan=False)
     r = c.get("/nap", follow_redirects=False)
     assert r.status_code == 301
     assert r.headers["location"] == "/kho-du-lieu#nap"
@@ -373,4 +390,5 @@ def test_trang_chi_doc_khong_phu_thuoc_pandas():
             muc |= {a.name for a in n.names}
         elif isinstance(n, ast.ImportFrom):
             muc.add(n.module or "")
-    assert not any(m.startswith(("kome.pipeline", "pandas", "calamine")) for m in muc),         f"app.py nhập ở mức ngoài cùng: {sorted(muc)}"
+    assert not any(m.startswith(("kome.pipeline", "pandas", "calamine")) for m in muc), \
+        f"app.py nhập ở mức ngoài cùng: {sorted(muc)}"

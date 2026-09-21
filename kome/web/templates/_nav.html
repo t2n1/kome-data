@@ -34,8 +34,11 @@
     <a href="/kho-du-lieu"{% if trang == 'kho-du-lieu' %} class="dang-xem" aria-current="page"{% endif %}>Kho dữ liệu</a>
   </nav>
 
-  {% if co_mat_khau %}
-  <form method="post" action="/dang-xuat" class="thoat"><button type="submit">Đăng xuất</button></form>
+  {% if co_dang_nhap %}
+  <div class="thoat">
+    {% if nguoi %}<p class="nhom">{{ nguoi.ten_sale or nguoi.ten_dang_nhap }}</p>{% endif %}
+    <form method="post" action="/dang-xuat"><button type="submit">Đăng xuất</button></form>
+  </div>
   {% endif %}
 </aside>
 <main class="noi-dung">
