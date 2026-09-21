@@ -24,7 +24,11 @@ SCHEMAS = ("core", "mart", "app", "meta")
 #    chèn ~4.380 dòng qua pooler Tokyo).
 #  - core.dim_date: dữ liệu THAM CHIẾU do chính migration nạp, mọi bảng fact
 #    đều có khoá ngoại tới nó. Xoá đi là mọi lần nạp đều vỡ khoá ngoại.
-GIU_LAI = {"meta.schema_migration", "core.dim_date"}
+#  - core.dim_salesperson: y hệt lý do trên — 5 担当者 của OBC do 019 nạp, và
+#    app.nguoi_dung.salesperson_code trỏ khoá ngoại vào đây. Không giữ lại
+#    thì TRUNCATE ... CASCADE cuốn theo cả bảng tài khoản, và mọi test tạo
+#    người dùng có mã sale đều vỡ khoá ngoại ở test thứ hai trở đi.
+GIU_LAI = {"meta.schema_migration", "core.dim_date", "core.dim_salesperson"}
 
 # Nhớ danh sách bảng sau lần tra đầu tiên (xem fixture `conn`).
 _TABLES: list[str] | None = None
