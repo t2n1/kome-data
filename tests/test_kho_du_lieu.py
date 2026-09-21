@@ -315,13 +315,18 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
     kome/web/app.py, nơi liệt kê nguyên văn ba địa chỉ cũ để CHẶN QUYỀN (một
     lý do khác hẳn — không khẳng định chúng còn là trang riêng). Miễn trừ
     này gắn vào ĐÚNG các dòng của câu lệnh gán đó bằng AST
-    (`lineno..end_lineno` của node `Assign`), KHÔNG phải bằng một chuỗi
-    marker rải trong `hop_le`: một marker theo chuỗi con sẽ miễn trừ VĨNH
-    VIỄN mọi dòng tương lai chứa chuỗi đó ở bất cứ đâu trong file — kể cả
-    một comment sai sự thật kiểu "mặc định về /nap (xem DUONG_KHO_DU_LIEU)",
-    tức đúng loại khẳng định-điều-đã-sai mà chính test này sinh ra để bắt.
-    AST không có lỗ hổng đó vì nó gắn miễn trừ vào một câu lệnh cụ thể, không
-    gắn vào một mẩu văn bản có thể bị chép sang chỗ khác."""
+    (`lineno..end_lineno` của node `Assign`, không hơn một dòng), KHÔNG phải
+    bằng một chuỗi marker rải trong `hop_le`: một marker theo chuỗi con sẽ
+    miễn trừ VĨNH VIỄN mọi dòng tương lai chứa chuỗi đó ở bất cứ đâu trong
+    file — kể cả một comment sai sự thật kiểu "mặc định về /nap (xem
+    DUONG_KHO_DU_LIEU)", tức đúng loại khẳng định-điều-đã-sai mà chính test
+    này sinh ra để bắt. Vì lý do tương tự, miễn trừ KHÔNG lan lên comment
+    phía trên câu lệnh (kể cả khi liền kề, không cách dòng trống): comment
+    ngay trên `DUONG_KHO_DU_LIEU` giải thích VÌ SAO cần danh sách này, và
+    cố tình không đánh vần lại ba đường dẫn — nên nó không cần miễn trừ, và
+    nếu sau này ai viết một câu sai sự thật ở đúng chỗ đó (ví dụ "mặc định
+    người mới đăng nhập vẫn được đưa tới /nap") thì test này phải bắt được,
+    không được bỏ qua chỉ vì đứng liền dòng gán."""
     import ast
 
     canh = [
@@ -338,23 +343,20 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
     hop_le = ("@app.get(", "VẪN chuyển hướng ở bản chỉ-đọc")
 
     app_py = Path("kome/web/app.py")
-    dong_app = app_py.read_text(encoding="utf-8").splitlines()
     # Miễn trừ theo KHOẢNG DÒNG của chính câu lệnh gán, không theo chuỗi
     # con: xuống dòng lại tuple này (thao tác vô hại) không được làm test ở
     # đây đỏ, và một comment tương lai nhắc tên hằng ở nơi khác thì KHÔNG
-    # được ăn theo miễn trừ này. Kéo thêm lên các dòng comment đứng NGAY
-    # TRÊN câu lệnh (không cách dòng trống) — comment giải thích chính hằng
-    # đó cũng hợp lệ, nhưng chỉ khi nó dính liền, không phải bất cứ đâu.
-    cay = ast.parse("\n".join(dong_app))
+    # được ăn theo miễn trừ này. KHÔNG lan lên comment phía trên, kể cả liền
+    # kề — comment đó phải tự chịu sự soát của chính guard này.
+    # Duyệt cay.body (mức module) chứ không ast.walk toàn cây: một biến cục
+    # bộ trùng tên DUONG_KHO_DU_LIEU trong một hàm nào đó không được tính.
+    cay = ast.parse(app_py.read_text(encoding="utf-8"))
     dong_mien_tru = set()
-    for n in ast.walk(cay):
+    for n in cay.body:
         if isinstance(n, ast.Assign) and any(
                 isinstance(t, ast.Name) and t.id == "DUONG_KHO_DU_LIEU"
                 for t in n.targets):
-            bat_dau = n.lineno
-            while bat_dau > 1 and dong_app[bat_dau - 2].strip().startswith("#"):
-                bat_dau -= 1
-            dong_mien_tru.update(range(bat_dau, n.end_lineno + 1))
+            dong_mien_tru.update(range(n.lineno, n.end_lineno + 1))
 
     loi = []
     for f in canh:
