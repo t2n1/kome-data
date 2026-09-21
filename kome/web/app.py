@@ -289,14 +289,29 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         except Exception as e:
             return _loi(request, "mở trang tổng quan", e, chung)
 
+    def _sale_dang_loc(request: Request, tat_ca: int) -> tuple[str | None, str | None]:
+        """(mã sale, tên người) đang lọc, hoặc (None, None) nếu xem tất cả.
+
+        Không có người đăng nhập (máy trong công ty không bật cổng) hoặc người
+        đó không phụ trách khách nào (chủ DN, kế toán, kho) => KHÔNG lọc gì.
+        Lọc theo NULL thì họ mở lên thấy danh sách rỗng và tưởng mất dữ liệu.
+        """
+        nguoi = getattr(request.state, "nguoi", None)
+        if tat_ca or nguoi is None or not nguoi.salesperson_code:
+            return None, None
+        return nguoi.salesperson_code, nguoi.ten_sale or nguoi.ten_dang_nhap
+
     @app.get("/khach-hang", response_class=HTMLResponse)
     def ds_khach(request: Request, tim: str = "", loc: str = "",
-                 sap: str = "doanh_thu", trang: int = 1):
+                 sap: str = "doanh_thu", trang: int = 1, tat_ca: int = 0):
         try:
+            sale, ten_sale = _sale_dang_loc(request, tat_ca)
             with open_app_conn() as conn:
-                t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang)
+                t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang,
+                                 sale=sale, ten_sale=ten_sale)
             return _ve(request, "khach_hang.html",
-                       {"t": t, "trang_thai": KH.TRANG_THAI, "trang": "khach"})
+                       {"t": t, "trang_thai": KH.TRANG_THAI, "trang": "khach",
+                        "tat_ca": bool(tat_ca)})
         except Exception as e:
             return _loi(request, "mở danh sách khách hàng", e, chung)
 
@@ -315,11 +330,14 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             return _loi(request, "mở hồ sơ khách hàng", e, chung)
 
     @app.get("/can-xu-ly", response_class=HTMLResponse)
-    def can_xu_ly(request: Request):
+    def can_xu_ly(request: Request, tat_ca: int = 0):
         try:
+            sale, ten_sale = _sale_dang_loc(request, tat_ca)
             with open_app_conn() as conn:
-                ds = KH.can_xu_ly(conn)
-            return _ve(request, "can_xu_ly.html", {"ds": ds, "trang": "can-xu-ly"})
+                ds = KH.can_xu_ly(conn, sale=sale)
+            return _ve(request, "can_xu_ly.html",
+                       {"ds": ds, "trang": "can-xu-ly", "sale": sale,
+                        "ten_sale": ten_sale})
         except Exception as e:
             return _loi(request, "mở danh sách cần xử lý", e, chung)
 

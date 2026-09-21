@@ -535,3 +535,31 @@ def test_khong_co_cong_dang_nhap_thi_khong_chan_ai(khach):
     c = khach(bi_mat=None, tai_khoan=False)
     assert c.get("/kho-du-lieu").status_code == 200
     assert 'href="/kho-du-lieu"' in c.get("/khach-hang").text
+
+
+# ---- Mặc định "khách của tôi" (đợt 3) ----------------------------------
+
+def test_dang_nhap_co_ma_sale_thi_trang_khach_mac_dinh_loc_theo_minh(khach):
+    """Mặc định TIỆN DỤNG, không phải hàng rào: trang nói rõ đang lọc theo ai
+    và có một liên kết hiện rõ để xem tất cả."""
+    c = khach(sale="0104")
+    _vao(c)
+    t = c.get("/khach-hang").text
+    assert "TRAN THI LAN THANH" in t
+    assert "tat_ca=1" in t, "không có đường thoát khỏi bộ lọc"
+
+
+def test_bam_xem_tat_ca_thi_bo_loc(khach):
+    c = khach(sale="0104")
+    _vao(c)
+    r = c.get("/khach-hang?tat_ca=1")
+    assert r.status_code == 200
+    assert "Đang xem khách của" not in r.text
+
+
+def test_nguoi_khong_phu_trach_khach_nao_thay_toan_bo_ngay_tu_dau(khach):
+    """[IMPORTANT] Chủ DN, kế toán, kho có salesperson_code NULL. Lọc theo
+    NULL thì họ mở lên thấy danh sách rỗng và tưởng hệ thống mất dữ liệu."""
+    c = khach(sale=None)
+    _vao(c)
+    assert "Đang xem khách của" not in c.get("/khach-hang").text
