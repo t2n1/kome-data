@@ -24,7 +24,11 @@ SCHEMAS = ("core", "mart", "app", "meta")
 #    chèn ~4.380 dòng qua pooler Tokyo).
 #  - core.dim_date: dữ liệu THAM CHIẾU do chính migration nạp, mọi bảng fact
 #    đều có khoá ngoại tới nó. Xoá đi là mọi lần nạp đều vỡ khoá ngoại.
-GIU_LAI = {"meta.schema_migration", "core.dim_date"}
+#  - core.dim_salesperson: y hệt lý do trên — 5 担当者 của OBC do 019 nạp, và
+#    app.nguoi_dung.salesperson_code trỏ khoá ngoại vào đây. Không giữ lại
+#    thì TRUNCATE ... CASCADE cuốn theo cả bảng tài khoản, và mọi test tạo
+#    người dùng có mã sale đều vỡ khoá ngoại ở test thứ hai trở đi.
+GIU_LAI = {"meta.schema_migration", "core.dim_date", "core.dim_salesperson"}
 
 # Nhớ danh sách bảng sau lần tra đầu tiên (xem fixture `conn`).
 _TABLES: list[str] | None = None
@@ -37,6 +41,26 @@ def test_db_url() -> str:
     assert url != os.environ.get("DATABASE_URL"), \
         "DATABASE_URL_TEST trùng DATABASE_URL — test sẽ xoá sạch CSDL thật"
     return url
+
+
+@pytest.fixture(autouse=True)
+def _khong_cong_dang_nhap(monkeypatch):
+    """[QUAN TRỌNG] Mặc định MỌI test dựng app KHÔNG có cổng đăng nhập.
+
+    conftest gọi nap_env() nên pytest ĐỌC .env — và từ đợt 3, .env của máy
+    trong công ty có KOME_SESSION_SECRET (docs/runbook.md bảo đặt). Không có
+    fixture này thì mọi test dựng app tự mọc cổng đăng nhập và ~30 test đỏ
+    hàng loạt với 303 /dang-nhap, vì một lý do chẳng liên quan gì tới thứ
+    chúng kiểm — mà chỉ đỏ trên máy có .env, không đỏ trong CI.
+
+    DATABASE_URL_APP cũng phải gỡ: test luôn truyền db_url tường minh, nhưng
+    để biến đó sót lại là để một đường cho test đọc nhầm CSDL THẬT.
+
+    Test nào CẦN cổng thì tự đặt lại — xem fixture `khach` ở
+    tests/test_bao_mat.py.
+    """
+    monkeypatch.delenv("KOME_SESSION_SECRET", raising=False)
+    monkeypatch.delenv("DATABASE_URL_APP", raising=False)
 
 
 @pytest.fixture(scope="session")

@@ -14,8 +14,10 @@
  .hop{max-width:24rem;margin:3rem auto;border:1px solid var(--vien);border-radius:12px;
       padding:1.5rem;background:var(--nen-phu)}
  h1{font-size:1.3rem;margin:0 0 1rem}
+ input[type=text],
  input[type=password]{width:100%;box-sizing:border-box;font:inherit;padding:.6rem;
       border-radius:8px;border:1px solid var(--vien);background:var(--nen);color:var(--chu)}
+ label{display:block;margin-top:.75rem}
  button{font:inherit;padding:.5rem 1.25rem;border-radius:8px;border:1px solid var(--vien);
       background:var(--nen);color:var(--chu);cursor:pointer;margin-top:.75rem}
  .sai{background:var(--loi-nen);border:1px solid var(--loi-vien);color:var(--loi-chu);
@@ -24,14 +26,17 @@
 </style>
 <div class="hop">
   <h1>🔒 Dữ liệu KOME</h1>
-  {% if sai %}<div class="sai">Mật khẩu không đúng.</div>{% endif %}
+  {% if sai %}<div class="sai">Tên đăng nhập hoặc mật khẩu không đúng.</div>{% endif %}
   <form method="post" action="/dang-nhap">
-    <label for="mk">Mật khẩu chung của công ty</label>
-    <input id="mk" type="password" name="mat_khau" required autofocus
+    <label for="ten">Tên đăng nhập</label>
+    <input id="ten" type="text" name="ten" required autofocus
+           autocomplete="username">
+    <label for="mk">Mật khẩu</label>
+    <input id="mk" type="password" name="mat_khau" required
            autocomplete="current-password">
     <button type="submit">Vào xem</button>
   </form>
-  <p class="nho">Trang này hiển thị doanh thu, lãi gộp và danh sách khách hàng.
-     Đừng gửi mật khẩu ra ngoài công ty.</p>
+  <p class="nho">Mỗi người một tài khoản riêng. Quên mật khẩu thì nhờ người
+     quản trị đặt lại — không gửi mật khẩu của mình cho ai.</p>
 </div>
 </html>

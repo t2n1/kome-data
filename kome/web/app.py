@@ -14,6 +14,7 @@ from kome.env import nap_env
 from kome.nhat_ky_nap import lo_nap_gan_nhat, trang_thai_nap
 from kome.tuoi_du_lieu import tinh_tuoi
 from kome.web import bao_mat
+from kome.web import nguoi_dung as ND
 from ops.backup import backup_status
 
 # Tự đọc .env khi chạy ở máy trong công ty. `uvicorn kome.web.app:app` khởi
@@ -34,6 +35,19 @@ TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 # Cửa sổ soát ngày thiếu trên /kho-du-lieu (tính lùi từ ngày bán gần nhất).
 SO_NGAY_SOAT = 30
 
+# Mọi đường dẫn thuộc màn Kho dữ liệu — màn DUY NHẤT có nút xoá dữ liệu.
+# Ba địa chỉ cũ ở cuối danh sách vẫn phải chặn dù chúng chỉ còn trả 301: để
+# hở chúng là để người không có quyền dò ra cấu trúc màn bị cấm.
+DUONG_KHO_DU_LIEU = ("/kho-du-lieu", "/upload", "/undo",
+                     "/nap", "/health", "/phu-du-lieu")
+
+
+def _thuoc_kho_du_lieu(duong: str) -> bool:
+    """`/undo/12` cũng thuộc màn này, nên so bằng tiền tố có ranh giới `/`
+    chứ không so bằng nhau — nhưng `/khach-hang` KHÔNG được dính vào
+    `/kho-du-lieu` chỉ vì cùng vài ký tự đầu."""
+    return any(duong == d or duong.startswith(d + "/") for d in DUONG_KHO_DU_LIEU)
+
 
 def _chi_doc() -> bool:
     """Trang có ở chế độ CHỈ ĐỌC không (ẩn hẳn phần nạp dữ liệu)?
@@ -50,20 +64,6 @@ def _chi_doc() -> bool:
     """
     return bao_mat.tren_mang() or os.environ.get("KOME_CHI_DOC", "").strip().lower() in (
         "1", "true", "yes", "co", "có")
-
-
-def _loi(request: Request, viec: str, exc: Exception, chung: dict) -> HTMLResponse:
-    """Trang lỗi tiếng Việt cho mọi lỗi NGOÀI DỰ KIẾN.
-
-    Công ty không có nhân sự IT: trang 500 mặc định của framework (tiếng Anh,
-    đầy dấu vết ngăn xếp) làm người dùng tưởng mình bấm sai rồi thử lại —
-    và đó chính là lúc lô mồ côi biến thành "đã nạp rồi, bỏ qua" màu xanh.
-    Chuỗi ngoại lệ gốc CHỈ ghi ra nhật ký máy chủ, KHÔNG hiện lên trang.
-    """
-    print(f"[KOME] lỗi khi {viec}:\n{traceback.format_exc()}")
-    return TEMPLATES.TemplateResponse(
-        request, "error.html", {"viec": viec, **chung}, status_code=500
-    )
 
 
 def _ky_du_lieu(conn) -> dict:
@@ -96,7 +96,7 @@ def _ky_du_lieu(conn) -> dict:
     return {"dau": dau, "cuoi": cuoi, "thieu": thieu, "tu": tu}
 
 
-def create_app(db_url: str | None = None) -> FastAPI:
+def create_app(db_url: str | None = None, db_url_app: str | None = None) -> FastAPI:
     """db_url=None => lấy DATABASE_URL. Test LUÔN truyền DATABASE_URL_TEST."""
     app = FastAPI(title="KOME — dữ liệu")
     # Phục vụ CSS và font từ đĩa. Dùng StaticFiles có sẵn trong FastAPI —
@@ -110,17 +110,73 @@ def create_app(db_url: str | None = None) -> FastAPI:
     open_conn = lambda: connect(db_url)
     chi_doc = _chi_doc()
 
-    mk = bao_mat.mat_khau()
+    # Hai kết nối, hai vai trò CSDL (đặc tả đợt 3 §6.3):
+    #   open_conn     -> DATABASE_URL     (kome_ingest_user): NẠP và HOÀN TÁC,
+    #                                      chỉ màn Kho dữ liệu dùng
+    #   open_app_conn -> DATABASE_URL_APP (kome_app_user): mọi trang còn lại,
+    #                                      vai trò KHÔNG ghi được vào `core`
+    # Lỡ tay viết một câu UPDATE core.… ở một trang đọc thì chính CSDL từ
+    # chối — lớp an toàn ở tầng quyền, không phụ thuộc review code có bắt
+    # được hay không.
+    #
+    # db_url truyền TƯỜNG MINH (test luôn truyền) thì kết nối app đi theo
+    # đúng CSDL đó. Không có dòng này thì test chạy trên CSDL thử nghiệm
+    # nhưng lại đọc app.nguoi_dung của CSDL THẬT trên máy có DATABASE_URL_APP.
+    if db_url_app is None:
+        db_url_app = db_url if db_url is not None else os.environ.get("DATABASE_URL_APP")
+    if db_url_app is None:
+        # Cảnh báo chứ không chết: vai trò CSDL là lớp phòng thủ thứ hai, còn
+        # cổng đăng nhập mới là thứ chặn người lạ. Giết cả trang vì thiếu một
+        # lớp phòng thủ thứ hai là đổi một rủi ro lấy một sự cố chắc chắn.
+        print("[KOME] CẢNH BÁO: chưa đặt DATABASE_URL_APP — các trang chỉ đọc "
+              "đang chạy bằng vai trò nạp dữ liệu, tức có quyền ghi vào core. "
+              "Xem docs/runbook.md, mục 'Hai kết nối CSDL'.")
+    open_app_conn = lambda: connect(db_url_app)
+
+    bi_mat = bao_mat.bi_mat_phien()
     # Ném CauHinhSai ngay lúc dựng app, trước khi phục vụ dòng nào.
-    bao_mat.kiem_cau_hinh(mk, cong_khai=bao_mat.tren_mang())
+    bao_mat.kiem_cau_hinh_phien(bi_mat, cong_khai=bao_mat.tren_mang())
 
     # Biến mà MỌI trang đều cần để vẽ đúng thanh điều hướng. Gom vào một chỗ
     # để không trang nào bị sót: sót `chi_doc` thì trang đó vẫn mời người ta
     # bấm "Nạp dữ liệu" — một liên kết dẫn thẳng tới 403 trên bản công khai.
-    chung = {"chi_doc": chi_doc, "co_mat_khau": bool(mk)}
+    chung = {"chi_doc": chi_doc, "co_dang_nhap": bool(bi_mat)}
 
     def _ve(request: Request, ten: str, ctx: dict, **kw) -> HTMLResponse:
-        return TEMPLATES.TemplateResponse(request, ten, {**ctx, **chung}, **kw)
+        # `nguoi` gắn bởi middleware chan_cua. getattr có mặc định vì KHÔNG
+        # PHẢI lúc nào cũng có middleware: máy trong công ty để trống
+        # KOME_SESSION_SECRET thì không có cổng, và /dang-nhap thì chạy
+        # TRƯỚC khi ai kịp là ai.
+        nguoi = getattr(request.state, "nguoi", None)
+        # `nguoi is None` = không có cổng đăng nhập (máy trong công ty để
+        # trống KOME_SESSION_SECRET) -> mọi thứ mở, y như trước đợt 3.
+        hien_kho = nguoi is None or nguoi.duoc_vao_kho_du_lieu
+        return TEMPLATES.TemplateResponse(
+            request, ten, {**ctx, **chung, "nguoi": nguoi, "hien_kho": hien_kho}, **kw)
+
+    def _loi(request: Request, viec: str, exc: Exception) -> HTMLResponse:
+        """Trang lỗi tiếng Việt cho mọi lỗi NGOÀI DỰ KIẾN.
+
+        Công ty không có nhân sự IT: trang 500 mặc định của framework (tiếng
+        Anh, đầy dấu vết ngăn xếp) làm người dùng tưởng mình bấm sai rồi thử
+        lại — và đó chính là lúc lô mồ côi biến thành "đã nạp rồi, bỏ qua"
+        màu xanh. Chuỗi ngoại lệ gốc CHỈ ghi ra nhật ký máy chủ, KHÔNG hiện
+        lên trang.
+
+        Dựng ngữ cảnh QUA `_ve`, không dựng riêng một đường thứ hai: error.html
+        include _nav.html, mà thanh điều hướng chỉ hiện mục Kho dữ liệu khi có
+        biến `hien_kho`. Đường dựng riêng trước đây thiếu đúng biến đó, nên
+        người CÓ quyền gặp lỗi lúc nạp file thì đứng lại trên một trang không
+        còn đường nào về /kho-du-lieu — error.html không có liên kết của riêng
+        nó, sidebar là lối ra duy nhất. Cùng lý lẽ với `_du_lieu_kho`: một chỗ
+        dựng thì không bao giờ có hai chỗ trôi khỏi nhau.
+
+        `_ve` KHÔNG chạm CSDL, nên trang này render được cả khi CSDL đang hỏng
+        — điều kiện bắt buộc để middleware dùng nó (xem `chan_cua`).
+        """
+        print(f"[KOME] lỗi khi {viec}:\n{traceback.format_exc()}")
+        return _ve(request, "error.html", {"viec": viec, "trang": None},
+                   status_code=500)
 
     def _chi_gui_qua_https(request: Request) -> bool:
         """Có gắn cờ Secure lên cookie không (cấm trình duyệt gửi qua HTTP)?
@@ -143,52 +199,87 @@ def create_app(db_url: str | None = None) -> FastAPI:
     # Dùng middleware chứ không phải dependency trên từng route: route nào
     # thêm về sau cũng tự động được che. Quên gắn dependency cho một route
     # mới là để hở đúng cái nó hiển thị, mà không có gì báo.
-    if mk:
+    if bi_mat:
         @app.middleware("http")
         async def chan_cua(request: Request, call_next):
-            # Miễn trừ /static/ CÓ CHỦ Ý — đây là một lỗ thủng trong cổng
-            # bảo mật, không phải sót. /static/ chỉ chứa kome.css và font:
-            # tài sản thiết kế thuần tuý, không một byte dữ liệu kinh doanh
-            # nào (doanh thu, khách hàng, giá vốn...) đi qua đường này, nên
-            # miễn trừ không mở lộ gì. Trước khi CSS được tách ra thư mục
-            # riêng (nhánh giao diện, Task 1), nó nằm inline trong
-            # _chung.html nên /dang-nhap tự mang theo kiểu dáng và không
-            # cần miễn trừ này; từ khi CSS/font chuyển ra /static/, thiếu
-            # dòng này thì CHÍNH trang đăng nhập — màn hình ĐẦU TIÊN của
-            # bản Vercel, nơi mật khẩu LUÔN bắt buộc — bị 303 mất cả
-            # CSS lẫn font, hiện trơ trụi trước khi ai kịp đăng nhập.
-            # Có test canh: tests/test_bao_mat.py::
+            # Miễn trừ /static/ CÓ CHỦ Ý — đây là một lỗ thủng trong cổng bảo
+            # mật, không phải sót. /static/ chỉ chứa kome.css và font: tài sản
+            # thiết kế thuần tuý, không một byte dữ liệu kinh doanh nào đi qua
+            # đường này. Thiếu dòng này thì CHÍNH trang đăng nhập — màn hình
+            # ĐẦU TIÊN của bản Vercel — bị 303 mất cả CSS lẫn font. Có test
+            # canh: tests/test_bao_mat.py::
             # test_static_khong_bi_chan_boi_cong_dang_nhap.
             if (request.url.path == "/dang-nhap"
-                    or request.url.path.startswith("/static/")
-                    or bao_mat.ve_hop_le(
-                        request.cookies.get(bao_mat.TEN_COOKIE), mk)):
+                    or request.url.path.startswith("/static/")):
                 return await call_next(request)
-            tiep = request.url.path
-            if request.url.query:
-                tiep += "?" + request.url.query
-            resp = RedirectResponse("/dang-nhap", status_code=303)
-            # Nhớ nơi người ta định đến để đăng nhập xong quay lại đúng chỗ,
-            # nhưng chỉ nhớ trong cookie tạm — không đưa vào địa chỉ, vì địa
-            # chỉ thì lộ ra lịch sử duyệt web và nhật ký máy chủ.
-            resp.set_cookie("kome_tiep", tiep, max_age=600, httponly=True,
-                            samesite="lax", secure=_chi_gui_qua_https(request))
-            return resp
+
+            # Vé chỉ mang ID. Mọi thứ khác (còn tài khoản không, quyền gì) tra
+            # CSDL MỖI LƯỢT — vé sống 12 giờ, mà người nghỉ việc thì phải bị
+            # chặn ngay hôm nay, không phải 12 giờ nữa.
+            ma = bao_mat.doc_ve(request.cookies.get(bao_mat.TEN_COOKIE), bi_mat)
+            nguoi = None
+            if ma is not None:
+                try:
+                    with open_app_conn() as c:
+                        nguoi = ND.theo_id(c, ma)
+                except Exception as e:
+                    # Middleware tra CSDL ở MỌI lượt gọi, nên một lần Supabase
+                    # trục trặc ở đây biến MỌI trang thành 500 trần của
+                    # Starlette — đúng thứ `_loi` sinh ra để tránh. Trước đợt 3
+                    # cổng là HMAC thuần, không chạm CSDL, nên lưới bắt lỗi
+                    # từng đủ; giờ thì không.
+                    #
+                    # KHÔNG coi lỗi CSDL là "chưa đăng nhập": đá về /dang-nhap
+                    # thì trang đăng nhập cũng tra CSDL và cũng hỏng, người
+                    # dùng chỉ thấy một vòng lặp không lời giải thích.
+                    return _loi(request, "kiểm tra phiên đăng nhập", e)
+            if nguoi is None:
+                tiep = request.url.path
+                if request.url.query:
+                    tiep += "?" + request.url.query
+                resp = RedirectResponse("/dang-nhap", status_code=303)
+                # Nhớ nơi người ta định đến để đăng nhập xong quay lại đúng
+                # chỗ, nhưng chỉ nhớ trong cookie tạm — không đưa vào địa chỉ,
+                # vì địa chỉ thì lộ ra lịch sử duyệt web và nhật ký máy chủ.
+                resp.set_cookie("kome_tiep", tiep, max_age=600, httponly=True,
+                                samesite="lax", secure=_chi_gui_qua_https(request))
+                return resp
+
+            request.state.nguoi = nguoi
+            if not nguoi.duoc_vao_kho_du_lieu and _thuoc_kho_du_lieu(request.url.path):
+                # 403 kèm trang giải thích, KHÔNG chuyển hướng im lặng: người
+                # gõ thẳng địa chỉ cần biết vì sao mình không vào được, không
+                # phải tự hỏi trang có hỏng không.
+                return _ve(request, "cam_kho_du_lieu.html",
+                           {"trang": None}, status_code=403)
+            return await call_next(request)
 
         @app.get("/dang-nhap", response_class=HTMLResponse)
         def form_dang_nhap(request: Request):
             return _ve(request, "dang_nhap.html", {"trang": None, "sai": False})
 
         @app.post("/dang-nhap")
-        def nhan_dang_nhap(request: Request, mat_khau: str = Form("")):
-            if not bao_mat.dung_mat_khau(mat_khau, mk):
+        def nhan_dang_nhap(request: Request, ten: str = Form(""),
+                           mat_khau: str = Form("")):
+            # Cùng lý do với try/except của `chan_cua`: /dang-nhap được miễn
+            # trừ khỏi middleware nên lưới bắt lỗi ở đó không với tới đây, mà
+            # đây lại là màn hình ĐẦU TIÊN của bản công khai.
+            try:
+                with open_app_conn() as c:
+                    nguoi = ND.kiem_tra(c, ten.strip(), mat_khau)
+            except Exception as e:
+                return _loi(request, "kiểm tra tên và mật khẩu", e)
+            if nguoi is None:
+                # MỘT thông báo duy nhất cho cả "sai tên" lẫn "sai mật khẩu":
+                # nói rõ cái nào sai là xác nhận giúp người ngoài rằng tên đó
+                # CÓ TỒN TẠI trong công ty.
                 return _ve(request, "dang_nhap.html",
                            {"trang": None, "sai": True}, status_code=401)
             resp = RedirectResponse(
                 bao_mat.duong_dan_an_toan(request.cookies.get("kome_tiep")),
                 status_code=303)
             resp.set_cookie(
-                bao_mat.TEN_COOKIE, bao_mat.tao_ve(mk),
+                bao_mat.TEN_COOKIE, bao_mat.tao_ve_cho(nguoi.id, bi_mat),
                 max_age=bao_mat.HAN_PHIEN_GIAY, httponly=True, samesite="lax",
                 secure=_chi_gui_qua_https(request))
             resp.delete_cookie("kome_tiep")
@@ -211,7 +302,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
         đó vẫn còn trong thanh điều hướng.
         """
         try:
-            with open_conn() as conn:
+            with open_app_conn() as conn:
                 bc = tinh_bao_cao(conn)
                 dem = dict(conn.execute(
                     "SELECT trang_thai, count(*) FROM mart.khach_360 GROUP BY 1"
@@ -224,23 +315,38 @@ def create_app(db_url: str | None = None) -> FastAPI:
                        {"bc": bc, "dem": dem, "so_ngay_ton": so_ngay_ton,
                         "tuoi": tuoi, "trang": "tong-quan"})
         except Exception as e:
-            return _loi(request, "mở trang tổng quan", e, chung)
+            return _loi(request, "mở trang tổng quan", e)
+
+    def _sale_dang_loc(request: Request, tat_ca: int) -> tuple[str | None, str | None]:
+        """(mã sale, tên người) đang lọc, hoặc (None, None) nếu xem tất cả.
+
+        Không có người đăng nhập (máy trong công ty không bật cổng) hoặc người
+        đó không phụ trách khách nào (chủ DN, kế toán, kho) => KHÔNG lọc gì.
+        Lọc theo NULL thì họ mở lên thấy danh sách rỗng và tưởng mất dữ liệu.
+        """
+        nguoi = getattr(request.state, "nguoi", None)
+        if tat_ca or nguoi is None or not nguoi.salesperson_code:
+            return None, None
+        return nguoi.salesperson_code, nguoi.ten_sale or nguoi.ten_dang_nhap
 
     @app.get("/khach-hang", response_class=HTMLResponse)
     def ds_khach(request: Request, tim: str = "", loc: str = "",
-                 sap: str = "doanh_thu", trang: int = 1):
+                 sap: str = "doanh_thu", trang: int = 1, tat_ca: int = 0):
         try:
-            with open_conn() as conn:
-                t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang)
+            sale, ten_sale = _sale_dang_loc(request, tat_ca)
+            with open_app_conn() as conn:
+                t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang,
+                                 sale=sale, ten_sale=ten_sale)
             return _ve(request, "khach_hang.html",
-                       {"t": t, "trang_thai": KH.TRANG_THAI, "trang": "khach"})
+                       {"t": t, "trang_thai": KH.TRANG_THAI, "trang": "khach",
+                        "tat_ca": bool(tat_ca)})
         except Exception as e:
-            return _loi(request, "mở danh sách khách hàng", e, chung)
+            return _loi(request, "mở danh sách khách hàng", e)
 
     @app.get("/khach-hang/{ma}", response_class=HTMLResponse)
     def ho_so_khach(request: Request, ma: str):
         try:
-            with open_conn() as conn:
+            with open_app_conn() as conn:
                 h = KH.ho_so(conn, ma)
             if h is None:
                 return _ve(request, "khong_thay.html",
@@ -249,16 +355,19 @@ def create_app(db_url: str | None = None) -> FastAPI:
             return _ve(request, "khach_360.html",
                        {"h": h, "d": KH.ve_duong(h.thang), "trang": "khach"})
         except Exception as e:
-            return _loi(request, "mở hồ sơ khách hàng", e, chung)
+            return _loi(request, "mở hồ sơ khách hàng", e)
 
     @app.get("/can-xu-ly", response_class=HTMLResponse)
-    def can_xu_ly(request: Request):
+    def can_xu_ly(request: Request, tat_ca: int = 0):
         try:
-            with open_conn() as conn:
-                ds = KH.can_xu_ly(conn)
-            return _ve(request, "can_xu_ly.html", {"ds": ds, "trang": "can-xu-ly"})
+            sale, ten_sale = _sale_dang_loc(request, tat_ca)
+            with open_app_conn() as conn:
+                ds = KH.can_xu_ly(conn, sale=sale)
+            return _ve(request, "can_xu_ly.html",
+                       {"ds": ds, "trang": "can-xu-ly", "sale": sale,
+                        "ten_sale": ten_sale})
         except Exception as e:
-            return _loi(request, "mở danh sách cần xử lý", e, chung)
+            return _loi(request, "mở danh sách cần xử lý", e)
 
     @app.post("/upload", response_class=HTMLResponse)
     def upload(request: Request, files: list[UploadFile]):
@@ -281,7 +390,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
             return _ve(request, "kho_du_lieu.html",
                        {**ctx, "results": results, "trang": "kho-du-lieu"})
         except Exception as e:
-            return _loi(request, "nạp file dữ liệu", e, chung)
+            return _loi(request, "nạp file dữ liệu", e)
 
     def _du_lieu_kho(conn):
         """Mọi thứ màn Kho dữ liệu cần, gom một chỗ.
@@ -312,7 +421,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
             return _ve(request, "kho_du_lieu.html",
                        {**ctx, "trang": "kho-du-lieu"})
         except Exception as e:
-            return _loi(request, "mở màn kho dữ liệu", e, chung)
+            return _loi(request, "mở màn kho dữ liệu", e)
 
     # Ba địa chỉ cũ -> màn gộp. 301 chứ không 302: chúng biến mất vĩnh viễn,
     # và 301 cho trình duyệt cập nhật dấu trang. Neo để người bấm dấu trang cũ
@@ -346,12 +455,12 @@ def create_app(db_url: str | None = None) -> FastAPI:
         chỉ hiển thị. Xem ghi chú đầu kome/bao_cao.py.
         """
         try:
-            with open_conn() as conn:
+            with open_app_conn() as conn:
                 bc = tinh_bao_cao(conn, ky)
             return _ve(request, "bao_cao.html",
                        {"bc": bc, "bd": ve_bieu_do(bc.thang), "trang": "bao-cao"})
         except Exception as e:
-            return _loi(request, "mở trang báo cáo", e, chung)
+            return _loi(request, "mở trang báo cáo", e)
 
     @app.post("/undo/{batch_id}")
     def undo(request: Request, batch_id: int):
@@ -363,7 +472,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
                 undo_batch(conn, batch_id)
             return RedirectResponse("/kho-du-lieu", status_code=303)
         except Exception as e:
-            return _loi(request, "hoàn tác lần nạp dữ liệu", e, chung)
+            return _loi(request, "hoàn tác lần nạp dữ liệu", e)
 
     return app
 

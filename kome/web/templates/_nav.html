@@ -11,8 +11,14 @@
    mục nào sáng — đúng, vì trang lỗi không thuộc mục nào cả.
 
    Mục "Kho dữ liệu" KHÔNG bọc `{% if not chi_doc %}`: màn đó hiện được ở cả
-   hai bản, chỉ khác là bản chỉ-đọc tự ẩn khối nạp và khối hoàn tác bên
-   trong chính nó (xem kho_du_lieu.html), không phải ẩn cả mục điều hướng.
+   hai bản chạy, chỉ khác là bản chỉ-đọc tự ẩn khối nạp và khối hoàn tác bên
+   trong chính nó (xem kho_du_lieu.html).
+
+   Nó CÓ bọc `{% if hien_kho %}` — chuyện khác hẳn: từ đợt 3, chỉ người được
+   cấp cờ `duoc_vao_kho_du_lieu` mới vào được màn đó (đường dẫn trả 403).
+   Mời người ta bấm vào một thứ sẽ từ chối họ thì tệ hơn là không hiện.
+   `hien_kho` do kome/web/app.py::_ve tính, mặc định TRUE khi không có cổng
+   đăng nhập (máy trong công ty).
 
    QUAN TRỌNG — partial này MỞ `<main class="noi-dung">` ở cuối và KHÔNG
    ĐÓNG nó. Mọi template include partial này BẮT BUỘC phải tự thêm dòng
@@ -30,12 +36,17 @@
     <a href="/khach-hang"{% if trang == 'khach' %} class="dang-xem" aria-current="page"{% endif %}>Khách hàng</a>
     <a href="/can-xu-ly"{% if trang == 'can-xu-ly' %} class="dang-xem" aria-current="page"{% endif %}>Cần xử lý</a>
 
+    {% if hien_kho %}
     <p class="nhom">HỆ THỐNG</p>
     <a href="/kho-du-lieu"{% if trang == 'kho-du-lieu' %} class="dang-xem" aria-current="page"{% endif %}>Kho dữ liệu</a>
+    {% endif %}
   </nav>
 
-  {% if co_mat_khau %}
-  <form method="post" action="/dang-xuat" class="thoat"><button type="submit">Đăng xuất</button></form>
+  {% if co_dang_nhap %}
+  <div class="thoat">
+    {% if nguoi %}<p class="nhom">{{ nguoi.ten_sale or nguoi.ten_dang_nhap }}</p>{% endif %}
+    <form method="post" action="/dang-xuat"><button type="submit">Đăng xuất</button></form>
+  </div>
   {% endif %}
 </aside>
 <main class="noi-dung">

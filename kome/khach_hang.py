@@ -68,6 +68,11 @@ class TrangKhach:
     loc: str
     sap: str
     dem_trang_thai: dict[str, int]
+    # Mã sale đang lọc (None = đang xem tất cả), tên người đó để trang nói rõ
+    # "đang lọc theo ai", và tổng số khách TOÀN CÔNG TY cho nút "Xem tất cả".
+    sale: str | None = None
+    ten_sale: str | None = None
+    tong_tat_ca: int = 0
 
 
 @dataclass
@@ -97,8 +102,14 @@ def _khach(r) -> Khach:
 
 
 def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
-              trang: int = 1) -> TrangKhach:
-    """Danh sách khách, có tìm kiếm và lọc theo trạng thái."""
+              trang: int = 1, sale: str | None = None,
+              ten_sale: str | None = None) -> TrangKhach:
+    """Danh sách khách, có tìm kiếm và lọc theo trạng thái.
+
+    `sale` là MẶC ĐỊNH TIỆN DỤNG, không phải hàng rào bảo mật: công ty năm
+    người, ai cũng biết khách của ai, và trang luôn có một liên kết bỏ lọc.
+    Không có kiểm quyền nào ở đây, và đó là cố ý — xem đặc tả đợt 3 §5.
+    """
     dieu_kien, tham_so = [], []
     if tim.strip():
         # Tìm theo tên, mã, điện thoại hoặc địa chỉ cùng lúc — nhân viên không
@@ -110,6 +121,9 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
     if loc in TRANG_THAI:
         dieu_kien.append("trang_thai = %s")
         tham_so.append(loc)
+    if sale:
+        dieu_kien.append("salesperson_code = %s")
+        tham_so.append(sale)
     where = ("WHERE " + " AND ".join(dieu_kien)) if dieu_kien else ""
 
     tong = conn.execute(
@@ -122,15 +136,23 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
             ORDER BY {thu_tu} LIMIT %s OFFSET %s""",
         tham_so + [MOI_TRANG, (trang - 1) * MOI_TRANG]).fetchall()
 
-    # Số lượng từng trạng thái tính trên TOÀN BỘ khách, không theo bộ lọc đang
-    # bật — nếu không thì bấm vào "Cần gọi lại" xong các con số khác về 0 hết.
+    # Số lượng từng trạng thái KHÔNG theo bộ lọc trạng thái đang bật — nếu
+    # không thì bấm vào "Cần gọi lại" xong các con số khác về 0 hết. Nhưng
+    # CÓ theo bộ lọc sale: đang xem khách của mình mà bộ đếm khoe con số toàn
+    # công ty thì bấm vào một mục xong ra danh sách ngắn hơn hẳn số vừa đọc.
+    dem_dk = "WHERE salesperson_code = %s" if sale else ""
     dem = dict(conn.execute(
-        "SELECT trang_thai, count(*) FROM mart.khach_360 GROUP BY 1").fetchall())
+        f"SELECT trang_thai, count(*) FROM mart.khach_360 {dem_dk} GROUP BY 1",
+        [sale] if sale else []).fetchall())
+
+    # Số THẬT cho liên kết "Xem tất cả khách (N)". Viết cứng một con số ở
+    # template là để nó sai đúng vào ngày công ty có thêm khách.
+    tong_tat_ca = conn.execute("SELECT count(*) FROM mart.khach_360").fetchone()[0]
 
     return TrangKhach(
         khach=[_khach(r) for r in rows], tong=tong, trang=trang,
         so_trang=max(1, -(-tong // MOI_TRANG)), tim=tim, loc=loc, sap=sap,
-        dem_trang_thai=dem)
+        dem_trang_thai=dem, sale=sale, ten_sale=ten_sale, tong_tat_ca=tong_tat_ca)
 
 
 def ho_so(conn, ma: str) -> HoSo | None:
@@ -186,18 +208,22 @@ def ho_so(conn, ma: str) -> HoSo | None:
                 da_ngung_mua=da_ngung, lan_mua_gan_day=gan_day)
 
 
-def can_xu_ly(conn, gioi_han: int = 100) -> list[Khach]:
+def can_xu_ly(conn, gioi_han: int = 100, sale: str | None = None) -> list[Khach]:
     """Danh sách việc cần làm: khách đang rời đi, xếp theo tiền đang mất.
 
     Xếp theo DOANH THU chứ không theo mức độ im lặng: gọi lại khách ¥5 triệu
     im 3 lần nhịp thì đáng hơn khách ¥50.000 im 10 lần nhịp, dù con số thứ hai
     trông đáng báo động hơn.
+
+    `sale`: mặc định tiện dụng, như danh_sach() — không phải hàng rào.
     """
+    dieu_kien = "AND salesperson_code = %s" if sale else ""
+    tham_so = ([sale] if sale else []) + [gioi_han]
     return [_khach(r) for r in conn.execute(
         f"""SELECT {_COT} FROM mart.khach_360
-            WHERE trang_thai IN ('canh_bao', 'da_roi_bo')
+            WHERE trang_thai IN ('canh_bao', 'da_roi_bo') {dieu_kien}
             ORDER BY doanh_thu_thuan DESC NULLS LAST LIMIT %s""",
-        (gioi_han,)).fetchall()]
+        tham_so).fetchall()]
 
 
 def ve_duong(thang: list[dict], rong: int = 640, cao: int = 120) -> dict:

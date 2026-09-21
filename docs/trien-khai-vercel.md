@@ -1,7 +1,9 @@
 # Đưa trang lên mạng bằng Vercel
 
 Mục tiêu: có một địa chỉ kiểu `kome-data.vercel.app` để bạn và ban giám đốc mở
-được từ bất cứ đâu, sau khi nhập mật khẩu chung của công ty.
+được từ bất cứ đâu, sau khi đăng nhập bằng tài khoản riêng của mình (xem mục
+"Tài khoản đăng nhập" ở `docs/runbook.md` — mỗi người một tên đăng nhập và
+mật khẩu, không còn mật khẩu chung).
 
 ---
 
@@ -25,15 +27,23 @@ Vercel quyết định (`kome/web/app.py::_chi_doc`). Không có công tắc nà
 
 ## 2. Chuẩn bị 3 thứ trước khi bấm
 
-### a) Mật khẩu chung
+### a) Khoá ký đăng nhập (`KOME_SESSION_SECRET`)
 
-Nghĩ một mật khẩu **ít nhất 12 ký tự**. Trang sẽ từ chối khởi động nếu ngắn
-hơn: mỗi lần gọi trên Vercel là một tiến trình riêng nên không đếm chung được
-số lần đoán sai, độ dài mật khẩu chính là lớp bảo vệ duy nhất.
+**Đây KHÔNG phải mật khẩu của ai cả** — nó là khoá dùng để ký vé đăng nhập
+(cookie `<id>.<hạn>.<HMAC>`) của mọi tài khoản. Không ai gõ nó, không ai cần
+nhớ nó. Sinh một chuỗi ngẫu nhiên **ít nhất 12 ký tự**:
 
-Gợi ý: ghép 4 từ tiếng Việt không dấu, ví dụ `bancom-muagao-thang-tam`.
+```
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
-**Đừng dùng lại mật khẩu OBC, Supabase hay email.**
+Trang sẽ từ chối khởi động nếu ngắn hơn 12 ký tự: mỗi lần gọi trên Vercel là
+một tiến trình riêng nên không đếm chung được số lần đoán sai, độ dài chuỗi
+chính là lớp bảo vệ duy nhất.
+
+Mật khẩu của TỪNG người (để họ tự gõ khi đăng nhập) là chuyện khác, đặt riêng
+bằng `scripts/tao_nguoi_dung.py` — xem "Tài khoản đăng nhập" ở
+`docs/runbook.md`, không đặt ở đây.
 
 ### b) Chuỗi kết nối CSDL — dùng **cổng 6543**, không phải 5432
 
@@ -57,13 +67,24 @@ Dùng sai cổng thì trang hỏng, và hỏng theo kiểu khó đoán nhất: *
 mình thì êm, lên Vercel là lỗi ngay từ lượt xem thứ hai**. `kome/db.py` tự tắt
 câu lệnh chuẩn bị sẵn khi thấy cổng `6543` — đã đo thật, xem ghi chú trong file.
 
-### c) Tài khoản dùng riêng cho trang web (nên làm)
+### c) Tài khoản `kome_app_user` cho `DATABASE_URL_APP` — bắt buộc
 
-Hiện `DATABASE_URL` dùng `kome_ingest_user` — vai trò **ghi được** vào `core`.
-Bản trên Vercel không cần quyền ghi. Nếu tạo được một người dùng chỉ đọc thì
-dù trang bị chiếm cũng không ai xoá được dữ liệu. Lưu ý vai trò `kome_report`
-hiện **không có** quyền đọc `meta.ingest_batch` nên chưa chạy được `/kho-du-lieu` —
-việc này để lại cho Giai đoạn 1.
+Từ Đợt 3, mọi trang **trừ** Kho dữ liệu (đăng nhập, Tổng quan, Khách hàng,
+Cần xử lý, Báo cáo) chạy qua một kết nối riêng, `DATABASE_URL_APP`, dùng vai
+trò **chỉ đọc** `kome_app`. Đây không còn là việc "nên làm": thiếu biến này
+app vẫn chạy nhưng **in cảnh báo**, và các trang đọc âm thầm chạy lại bằng
+`kome_ingest_user` — vai trò **ghi và xoá được** `core` — tức mất đúng lớp
+phòng thủ mà đợt 3 dựng lên (trang bị chiếm thì kẻ chiếm chỉ đọc được, không
+xoá được dữ liệu).
+
+Nếu `kome_app_user` **chưa tồn tại** trên CSDL thật, tạo một lần trên SQL
+Editor của Supabase — lệnh đầy đủ ở mục "Tạo tài khoản đăng nhập cho từng vai
+trò" của `docs/runbook.md`, không chép lại ở đây.
+
+Có tài khoản rồi, ghép chuỗi kết nối **giống hệt cách làm ở mục (b)**: lấy
+chuỗi `DATABASE_URL` cổng 6543, đổi đúng phần tên đăng nhập và mật khẩu từ
+`kome_ingest_user` sang `kome_app_user` (và mật khẩu tương ứng của nó) — giữ
+nguyên máy chủ, cổng `6543` và tên CSDL.
 
 ---
 
@@ -72,12 +93,13 @@ việc này để lại cho Giai đoạn 1.
 1. Vào <https://vercel.com>, đăng nhập **bằng chính tài khoản GitHub** đang
    giữ repo `t2n1/kome-data`.
 2. **Add New… → Project** → chọn `kome-data` → **Import**.
-3. Ở màn hình cấu hình, mục **Environment Variables**, thêm đúng hai biến:
+3. Ở màn hình cấu hình, mục **Environment Variables**, thêm đúng ba biến:
 
    | Name | Value |
    |---|---|
    | `DATABASE_URL` | chuỗi kết nối **cổng 6543** ở mục 2b |
-   | `KOME_MAT_KHAU` | mật khẩu ở mục 2a |
+   | `KOME_SESSION_SECRET` | chuỗi ngẫu nhiên, tối thiểu 12 ký tự |
+   | `DATABASE_URL_APP` | chuỗi kết nối cùng CSDL, user `kome_app_user`, **cổng 6543** |
 
 4. **Deploy**. Chờ khoảng 1–2 phút.
 5. Mở địa chỉ Vercel đưa ra. Phải thấy trang đăng nhập 🔒.
@@ -97,13 +119,22 @@ không phải bấm gì nữa.
 Mở địa chỉ Vercel bằng **cửa sổ ẩn danh** (Ctrl+Shift+N) rồi soát:
 
 - [ ] Vào thẳng `/kho-du-lieu` khi chưa đăng nhập → bị đẩy về trang đăng nhập.
-- [ ] Nhập mật khẩu sai → báo "Mật khẩu không đúng", **không** vào được.
-- [ ] Nhập đúng → thấy bảng sức khoẻ dữ liệu.
-- [ ] Mở `/kho-du-lieu` → **không** thấy ô kéo–thả file, và **không** thấy nút
+- [ ] Đăng nhập bằng một tài khoản đã tạo (`scripts/tao_nguoi_dung.py` ở máy
+      trong công ty, xem `docs/runbook.md`) nhưng gõ sai tên hoặc mật khẩu →
+      báo "Tên đăng nhập hoặc mật khẩu không đúng.", **không** vào được.
+- [ ] Đăng nhập đúng → về thẳng trang **Tổng quan** (`/`), không phải trang
+      Kho dữ liệu — đích mặc định sau đăng nhập là `/`, và không phải tài
+      khoản nào cũng vào được Kho dữ liệu (xem dòng dưới).
+- [ ] Đăng nhập bằng một tài khoản **có** quyền `--kho-du-lieu`, mở
+      `/kho-du-lieu` → **không** thấy ô kéo–thả file, và **không** thấy nút
       **Hoàn tác** nào trong bảng "Lô nạp gần nhất". (Đây là cổng kiểm TAY duy
       nhất cho bất biến chỉ-đọc. Ô kiểm cũ soát mục menu "Nạp dữ liệu" — mục
       đó nay đã biến mất khỏi **cả hai** bản, nên ô kiểm ấy xanh kể cả khi bất
       biến vỡ hoàn toàn.)
+- [ ] Đăng nhập bằng một tài khoản **không** có quyền `--kho-du-lieu`, gõ
+      thẳng `/kho-du-lieu` → nhận trang giải thích **403**, không phải trang
+      trắng hay lỗi khó hiểu — quyền này tách rời khỏi chế độ chỉ-đọc của
+      Vercel, nên phải kiểm cả hai.
 - [ ] Không có dải đỏ "Chưa sao lưu" (sao lưu chạy ở máy công ty, trang này
       không nhìn thấy nên cố ý im lặng).
 - [ ] Bấm **Thoát** → quay về trang đăng nhập.
@@ -112,10 +143,10 @@ Mở địa chỉ Vercel bằng **cửa sổ ẩn danh** (Ctrl+Shift+N) rồi so
 
 ## 5. Việc phải làm định kỳ
 
-- **Đổi `KOME_MAT_KHAU` mỗi khi có người nghỉ việc.** Đổi xong, mọi vé đăng
-  nhập đang lưu hành hết hiệu lực ngay — không có kho phiên ở máy chủ, nên đây
-  là cách duy nhất "đuổi" một người đã biết mật khẩu cũ.
-  Vào Vercel → Settings → Environment Variables → sửa → **Redeploy**.
+- **Người nghỉ việc thì xoá tài khoản của họ** — `scripts/tao_nguoi_dung.py`
+  trên máy trong công ty; họ bị chặn ở lượt bấm kế tiếp. Chỉ đổi
+  `KOME_SESSION_SECRET` khi nghi khoá ký bị lộ, vì đổi nó là bắt **tất cả mọi
+  người** đăng nhập lại.
 - Vé đăng nhập tự hết hạn sau **12 giờ**, nên máy để quên ở văn phòng không
   mở được vào sáng hôm sau.
 
@@ -160,7 +191,7 @@ khi triển khai:
 
 - Cổng đăng nhập (`kome/web/app.py`, middleware `chan_cua`) **miễn trừ
   `/static/` có chủ ý**, cùng với `/dang-nhap`. Trang đăng nhập là màn hình
-  ĐẦU TIÊN của bản Vercel — nơi `KOME_MAT_KHAU` luôn bắt buộc — và nó cần
+  ĐẦU TIÊN của bản Vercel — nơi `KOME_SESSION_SECRET` luôn bắt buộc — và nó cần
   chính `/static/kome.css` cùng các file font để hiển thị có kiểu dáng
   *trước khi* ai đăng nhập được. Nếu sau này có người "siết lại" cổng đăng
   nhập và bỏ miễn trừ này, `/dang-nhap` của bản công khai sẽ hiện trơ trụi,

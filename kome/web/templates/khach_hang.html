@@ -4,21 +4,41 @@
 {% include "_chung.html" %}
 {% include "_nav.html" %}
 <h1>Khách hàng</h1>
+{% set giu = "&tat_ca=1" if tat_ca else "" %}
+
+{# Mặc định tiện dụng, KHÔNG phải hàng rào: năm sale không cần giấu nhau
+   (đặc tả đợt 3 §5). Liên kết bỏ lọc phải hiện rõ, và con số trên nó lấy
+   từ truy vấn chứ không viết cứng. #}
+{# `t.tong` là số dòng KHỚP truy vấn, nên nó co theo cả ô tìm lẫn bộ lọc trạng
+   thái. In thẳng nó ra sau "khách của X" thì sale tìm "Quán A" đọc được
+   "(1 khách)" ngay cạnh "Xem tất cả 2.080 khách" — hai con số cùng một dòng
+   nói hai chuyện khác nhau mà không có gì nói cho biết. Chỉ khi không tìm và
+   không lọc thì `t.tong` mới đúng là "số khách của người này". #}
+{% if t.sale %}
+<p class="ghi-chu">Đang xem khách của <strong>{{ t.ten_sale }}</strong>{%
+  if not t.tim and not t.loc %} ({{ "{:,}".format(t.tong) }} khách){%
+  else %} (đang hiện {{ "{:,}".format(t.tong) }} khách khớp){% endif %}.
+  <a href="/khach-hang?tat_ca=1">Xem tất cả {{ "{:,}".format(t.tong_tat_ca) }} khách →</a></p>
+{% endif %}
 
 <form class="o-tim" method="get" action="/khach-hang">
   <input type="search" name="tim" value="{{ t.tim }}" placeholder="Tên, mã, điện thoại, địa chỉ…">
   <input type="hidden" name="loc" value="{{ t.loc }}">
   <input type="hidden" name="sap" value="{{ t.sap }}">
+  {% if tat_ca %}<input type="hidden" name="tat_ca" value="1">{% endif %}
   <button type="submit">Tìm</button>
-  {% if t.tim %}<a class="loc" href="/khach-hang?loc={{ t.loc }}" style="align-self:center">Xoá tìm</a>{% endif %}
+  {% if t.tim %}<a class="loc" href="/khach-hang?loc={{ t.loc }}{{ giu }}" style="align-self:center">Xoá tìm</a>{% endif %}
 </form>
 
-{# Bộ đếm tính trên TOÀN BỘ khách, không theo bộ lọc đang bật — nếu không thì
-   bấm vào một mục xong các con số khác về 0 hết và không ai quay lại được. #}
+{# Bộ đếm KHÔNG theo ô tìm và KHÔNG theo bộ lọc trạng thái đang bật — nếu
+   không thì bấm vào một mục xong các con số khác về 0 hết và không ai quay
+   lại được. Nhưng nó CÓ theo bộ lọc sale: đang xem khách của mình mà bộ đếm
+   khoe con số toàn công ty thì bấm vào một mục xong ra danh sách ngắn hơn hẳn
+   số vừa đọc. Xem kome/khach_hang.py::danh_sach. #}
 <div class="loc">
-  <a href="/khach-hang?tim={{ t.tim }}&sap={{ t.sap }}"{% if not t.loc %} class="dang-xem"{% endif %}>Tất cả ({{ "{:,}".format(t.dem_trang_thai.values()|sum) }})</a>
+  <a href="/khach-hang?tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if not t.loc %} class="dang-xem"{% endif %}>Tất cả ({{ "{:,}".format(t.dem_trang_thai.values()|sum) }})</a>
   {% for ma, (nhan, mau) in trang_thai.items() %}
-  <a href="/khach-hang?loc={{ ma }}&tim={{ t.tim }}&sap={{ t.sap }}"{% if t.loc == ma %} class="dang-xem"{% endif %}>{{ nhan }} ({{ "{:,}".format(t.dem_trang_thai.get(ma, 0)) }})</a>
+  <a href="/khach-hang?loc={{ ma }}&tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}"{% if t.loc == ma %} class="dang-xem"{% endif %}>{{ nhan }} ({{ "{:,}".format(t.dem_trang_thai.get(ma, 0)) }})</a>
   {% endfor %}
 </div>
 
@@ -32,11 +52,11 @@ khách mua hằng tuần và là bình thường với khách mua hai tháng m�
 <table>
  <tr>
   <th>Khách hàng</th><th>Tỉnh</th><th>Trạng thái</th>
-  <th class="so"><a href="/khach-hang?sap=doanh_thu&loc={{ t.loc }}&tim={{ t.tim }}">Doanh thu</a></th>
-  <th class="so"><a href="/khach-hang?sap=ty_suat&loc={{ t.loc }}&tim={{ t.tim }}">Tỷ suất</a></th>
+  <th class="so"><a href="/khach-hang?sap=doanh_thu&loc={{ t.loc }}&tim={{ t.tim }}{{ giu }}">Doanh thu</a></th>
+  <th class="so"><a href="/khach-hang?sap=ty_suat&loc={{ t.loc }}&tim={{ t.tim }}{{ giu }}">Tỷ suất</a></th>
   <th class="so">Nhịp mua</th>
-  <th class="so"><a href="/khach-hang?sap=im_lang&loc={{ t.loc }}&tim={{ t.tim }}">Im lặng</a></th>
-  <th class="so"><a href="/khach-hang?sap=gan_nhat&loc={{ t.loc }}&tim={{ t.tim }}">Mua gần nhất</a></th>
+  <th class="so"><a href="/khach-hang?sap=im_lang&loc={{ t.loc }}&tim={{ t.tim }}{{ giu }}">Im lặng</a></th>
+  <th class="so"><a href="/khach-hang?sap=gan_nhat&loc={{ t.loc }}&tim={{ t.tim }}{{ giu }}">Mua gần nhất</a></th>
  </tr>
  {% for k in t.khach %}
  <tr>
@@ -55,9 +75,9 @@ khách mua hằng tuần và là bình thường với khách mua hai tháng m�
 
 {% if t.so_trang > 1 %}
 <div class="loc">
-  {% if t.trang > 1 %}<a href="/khach-hang?trang={{ t.trang-1 }}&loc={{ t.loc }}&tim={{ t.tim }}&sap={{ t.sap }}">← Trước</a>{% endif %}
+  {% if t.trang > 1 %}<a href="/khach-hang?trang={{ t.trang-1 }}&loc={{ t.loc }}&tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}">← Trước</a>{% endif %}
   <span class="nhom">Trang {{ t.trang }} / {{ t.so_trang }} · {{ "{:,}".format(t.tong) }} khách</span>
-  {% if t.trang < t.so_trang %}<a href="/khach-hang?trang={{ t.trang+1 }}&loc={{ t.loc }}&tim={{ t.tim }}&sap={{ t.sap }}">Sau →</a>{% endif %}
+  {% if t.trang < t.so_trang %}<a href="/khach-hang?trang={{ t.trang+1 }}&loc={{ t.loc }}&tim={{ t.tim }}&sap={{ t.sap }}{{ giu }}">Sau →</a>{% endif %}
 </div>
 {% endif %}
 {% else %}

@@ -211,10 +211,10 @@ def test_ban_chi_doc_van_hien_muc_kho_du_lieu(conn, test_db_url, monkeypatch):
     không còn ở tầng sidebar này.
 
     Dùng KOME_CHI_DOC chứ KHÔNG dùng VERCEL: đặt VERCEL=1 làm
-    `bao_mat.kiem_cau_hinh` ném CauHinhSai ngay lúc dựng app nếu chưa có
-    KOME_MAT_KHAU (bao_mat.py:55-62), và nếu đặt mật khẩu cho qua thì mọi
-    trang lại chuyển hướng sang /dang-nhap — test sẽ đỏ vì hai lý do chẳng
-    liên quan gì tới sidebar. app.py:48 chỉ sẵn đường này."""
+    `bao_mat.kiem_cau_hinh_phien` ném CauHinhSai ngay lúc dựng app nếu chưa
+    có KOME_SESSION_SECRET, và nếu đặt khoá ký cho qua thì mọi trang lại
+    chuyển hướng sang /dang-nhap — test sẽ đỏ vì hai lý do chẳng liên quan gì
+    tới sidebar. `_chi_doc()` trong app.py chỉ sẵn đường này."""
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/").text

@@ -43,11 +43,15 @@ git — xem `docs/runbook.md`):
   **Web app của Giai đoạn 0 chạy bằng vai trò này** (`kome_ingest_user` trong
   `DATABASE_URL`) — nó vừa nạp dữ liệu vừa phục vụ trang `/kho-du-lieu` và
   `/undo/{batch_id}`.
-- `kome_app` — **chưa ai dùng ở Giai đoạn 0**; dành cho ứng dụng CRM ở Giai
-  đoạn 2. Chỉ SELECT trên `core`/`mart`; đọc-ghi trên `app`. **Không có quyền
-  UPDATE/DELETE trên `core`** — kể cả nếu code lỡ viết nhầm câu lệnh, CSDL sẽ
-  từ chối. Lưu ý nó KHÔNG có SELECT trên `meta.ingest_batch`, nên không chạy
-  được trang `/kho-du-lieu` hiện tại.
+- `kome_app` — từ Đợt 3 (`019_danh_tinh.sql`), đây là vai trò chạy đăng nhập
+  và **mọi trang chỉ đọc** (`kome_app_user` trong `DATABASE_URL_APP`, xem mục
+  "Danh tính và quyền" bên dưới). Chỉ SELECT trên `core`/`mart`; đọc-ghi trên
+  `app`. **Không có quyền UPDATE/DELETE trên `core`** — kể cả nếu code lỡ
+  viết nhầm câu lệnh, CSDL sẽ từ chối. Có SELECT trên `meta.ingest_batch`
+  (cấp từ `019_danh_tinh.sql`, nhắc lại quyền đã cấp ở `009_roles.sql`) — cần
+  cho ô "hôm nay đã có dữ liệu chưa" ở trang `/`. Vẫn KHÔNG chạy được trang
+  `/kho-du-lieu` (nạp/hoàn tác), vì màn đó cần ghi/xoá `core` — trang đó luôn
+  đi qua `kome_ingest` qua `DATABASE_URL`.
 - `kome_report` — chỉ SELECT, mọi schema (`core`, `mart`, `app`). Dùng cho
   công cụ báo cáo/BI ngoài ứng dụng chính.
 - `postgres` (superuser hiện tại của Supabase) — chỉ dùng để chạy migration,
@@ -72,6 +76,10 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
 | `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
+
+Trang `/khach-hang` và `/can-xu-ly` mặc định chỉ hiện khách của người đang
+đăng nhập; `?tat_ca=1` bỏ lọc. Người có `salesperson_code` NULL (chủ DN, kế
+toán) thấy toàn bộ ngay từ đầu.
 
 Ba trang cũ — nạp (`nap`), sức khoẻ (`health`), độ phủ dữ liệu (`phu-du-lieu`)
 — nay chỉ còn 301 về `/kho-du-lieu`, không render nội dung gì nữa.
@@ -108,7 +116,7 @@ là đúng, không phải bất thường — xem `db/migrations/016_*.sql`.
 | | Máy trong công ty | Vercel (công khai) |
 |---|---|---|
 | Nạp / Hoàn tác | có | **không** |
-| Đăng nhập | không bắt buộc | **bắt buộc** (`KOME_MAT_KHAU`) |
+| Đăng nhập | tài khoản riêng (bật khi có `KOME_SESSION_SECRET`) | **bắt buộc** (`KOME_SESSION_SECRET`) |
 | Cổng CSDL | 5432 (session pooler) | **6543** (transaction pooler) |
 | Gói cài | `pip install -e .` (có pandas) | `requirements.txt` (**không** pandas) |
 | Điểm vào | `uvicorn kome.web.app:app` | `server.py` ở gốc (Vercel tự tìm) |
@@ -129,6 +137,45 @@ chúng, nên nhập ở đầu file sẽ làm trang chết ngay khi khởi độ
 xem — tức là lúc trang đã chạy được một thời gian và có người đang dùng.
 
 Chi tiết triển khai: `docs/trien-khai-vercel.md`.
+
+## Danh tính và quyền (Đợt 3, `db/migrations/019_danh_tinh.sql`)
+
+Mỗi người một tài khoản (`app.nguoi_dung`), mật khẩu băm bằng `scrypt` với
+salt riêng. Vé đăng nhập là cookie `<id>.<hạn>.<HMAC>` ký bằng
+`KOME_SESSION_SECRET` — **khoá của hệ thống, không phải mật khẩu của ai**, nên
+đổi mật khẩu một người không làm bốn người kia bị đăng xuất.
+
+**Bất biến:** chữ ký của vé phải phủ **cả `id` lẫn `hạn`**. Ký riêng phần hạn
+thì sửa một con số trong cookie là hoá thân thành người khác — kể cả thành
+người có quyền bấm nút xoá dữ liệu. Có test canh: `tests/test_bao_mat.py::
+test_doi_id_trong_ve_khong_hoa_than_duoc_thanh_nguoi_khac`.
+
+**Bất biến:** cờ `duoc_vao_kho_du_lieu` **không nằm trong vé** — tra
+`app.nguoi_dung` mỗi lượt gọi. Vé sống 12 giờ, mà thu hồi quyền trên màn có
+nút xoá thì phải ăn ngay hôm nay.
+
+**Bất biến:** lọc theo `salesperson_code` là **mặc định tiện dụng, KHÔNG phải
+hàng rào bảo mật**. Công ty năm người, ai cũng biết khách của ai; đăng nhập
+riêng là để cá nhân hoá, không phải để chặn. Không được thêm kiểm quyền vào
+`/khach-hang` hay `/can-xu-ly`.
+
+**CẠM BẪY — cổng chỉ tồn tại khi có khoá ký.** Để trống `KOME_SESSION_SECRET`
+ở máy trong công ty là **không có đăng nhập và không có phân quyền**: ai mở
+được trang cũng bấm được nút Hoàn tác — nút xoá được cả một tháng doanh thu.
+Bản Vercel không dính (nó từ chối khởi động nếu thiếu khoá), nhưng bản Vercel
+cũng không nạp/hoàn tác được gì. Nói cách khác: **cờ quyền chỉ bảo vệ được cái
+nút nguy hiểm khi máy trong công ty CŨNG đặt `KOME_SESSION_SECRET`.**
+
+Tạo và sửa tài khoản: `python scripts/tao_nguoi_dung.py` (xem `docs/runbook.md`).
+
+### Hai kết nối CSDL
+| Biến | Vai trò | Dùng cho |
+|---|---|---|
+| `DATABASE_URL` | `kome_ingest_user` | Màn Kho dữ liệu: nạp, hoàn tác |
+| `DATABASE_URL_APP` | `kome_app_user` | Đăng nhập và mọi trang chỉ đọc |
+
+Thiếu `DATABASE_URL_APP` thì app vẫn chạy (in cảnh báo) nhưng các trang đọc
+chạy bằng vai trò có quyền ghi vào `core` — mất lớp phòng thủ, không mất trang.
 
 ## Không được tự ý sửa
 - File trong `db/migrations/` đã chạy rồi — chỉ thêm file mới

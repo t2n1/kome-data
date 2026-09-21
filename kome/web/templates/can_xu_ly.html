@@ -4,6 +4,10 @@
 {% include "_chung.html" %}
 {% include "_nav.html" %}
 <h1>Cần xử lý</h1>
+{% if sale %}
+<p class="ghi-chu">Đang xem khách của <strong>{{ ten_sale }}</strong>.
+  <a href="/can-xu-ly?tat_ca=1">Xem tất cả →</a></p>
+{% endif %}
 <p class="ghi-chu">Khách đang im lặng lâu hơn <strong>nhịp mua riêng của chính họ</strong>,
 xếp theo doanh thu luỹ kế — gọi lại khách ¥5 triệu im gấp 3 lần nhịp đáng hơn
 khách ¥50.000 im gấp 10 lần, dù con số thứ hai trông đáng báo động hơn.
@@ -31,7 +35,8 @@ Khách OBC đã đánh dấu ※廃業※ / ※取引停止※ <strong>không</s
 </table>
 </div>
 {% else %}
-<div class="trong">Không có khách nào trong diện cảnh báo.</div>
+<div class="trong">Không có khách nào trong diện cảnh báo{% if sale %} trong
+  danh sách của {{ ten_sale }} — <a href="/can-xu-ly?tat_ca=1">xem tất cả</a>{% endif %}.</div>
 {% endif %}
 </html>
 </main>

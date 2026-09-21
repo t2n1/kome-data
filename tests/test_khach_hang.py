@@ -268,3 +268,86 @@ def test_moi_trang_deu_co_khung_dieu_huong(conn, test_db_url):
         t = c.get(duong).text
         for muc in ('href="/khach-hang"', 'href="/bao-cao"', 'href="/can-xu-ly"'):
             assert muc in t, f"{duong} thiếu {muc}"
+
+
+# ---- Mặc định "khách của tôi" (đợt 3) ----------------------------------
+
+def _hai_sale(conn, batch):
+    """Hai khách của 0104, một khách của 0102."""
+    for ma, ten, sale in (("K0104A", "Quán A", "0104"),
+                          ("K0104B", "Quán B", "0104"),
+                          ("K0102C", "Quán C", "0102")):
+        _ho_so_khach(conn, batch, ma, ten, salesperson_code=sale)
+        _mua_deu(conn, batch, ma, nhip=14, so_lan=5)
+    _neo(conn, batch)
+
+
+# Khách của `_neo` — có dòng bán nhưng không có hồ sơ trong dim_customer, nên
+# vẫn hiện trong mart.khach_360 (view dựng từ bảng bán hàng). Test nào khẳng
+# định một TẬP CHÍNH XÁC phải bỏ nó ra, như các test khác trong file này đã làm.
+NEO = "000000000999"
+
+
+def _tru_neo(khach) -> set[str]:
+    return {k.ma for k in khach} - {NEO}
+
+
+def test_loc_theo_sale_chi_hien_khach_cua_nguoi_do(conn, batch):
+    _hai_sale(conn, batch)
+    t = KH.danh_sach(conn, sale="0104")
+    assert {k.ma for k in t.khach} == {"K0104A", "K0104B"}
+    assert t.tong == 2
+    assert t.sale == "0104"
+
+
+def test_khong_truyen_sale_thi_hien_tat_ca(conn, batch):
+    _hai_sale(conn, batch)
+    t = KH.danh_sach(conn)
+    assert _tru_neo(t.khach) == {"K0104A", "K0104B", "K0102C"}
+    assert t.sale is None
+
+
+def test_bo_dem_trang_thai_di_theo_bo_loc_sale(conn, batch):
+    """Đang lọc "khách của tôi" mà bộ đếm vẫn khoe con số toàn công ty thì
+    bấm vào một mục xong ra danh sách ngắn hơn hẳn con số vừa đọc.
+
+    Dòng thứ hai KHÔNG so với một số cứng: `_neo` chèn thêm một khách neo
+    không mã sale vào `mart.khach_360` (xem `_tru_neo`), nên tổng công ty
+    không phải lúc nào cũng bằng 3. Bất biến thật sự cần canh là bộ đếm CỘNG
+    LẠI đúng bằng `tong` khi không lọc tìm/trạng thái — không phụ thuộc khách
+    neo có mặt hay không.
+    """
+    _hai_sale(conn, batch)
+    assert sum(KH.danh_sach(conn, sale="0104").dem_trang_thai.values()) == 2
+    t = KH.danh_sach(conn)
+    assert sum(t.dem_trang_thai.values()) == t.tong
+
+
+def test_tong_tat_ca_luon_dem_toan_bo_du_dang_loc(conn, batch):
+    """Số trên nút "Xem tất cả khách (N)" phải là số THẬT lấy từ truy vấn,
+    không phải con số của bộ lọc đang bật.
+
+    So với `danh_sach(conn).tong` (không lọc) thay vì một số cứng: khách neo
+    của `_neo` (xem `_tru_neo`) làm tổng công ty không cố định bằng 3. Đây
+    không phải tautology — nó khẳng định đúng hợp đồng của `tong_tat_ca`: bỏ
+    qua bộ lọc sale, nên sẽ đỏ ngay nếu ai đó lỡ cho nó chạy qua bộ lọc.
+    """
+    _hai_sale(conn, batch)
+    assert KH.danh_sach(conn, sale="0104").tong_tat_ca == KH.danh_sach(conn).tong
+
+
+def test_loc_sale_ket_hop_duoc_voi_tim_kiem_va_loc_trang_thai(conn, batch):
+    _hai_sale(conn, batch)
+    t = KH.danh_sach(conn, tim="Quán A", sale="0104")
+    assert [k.ma for k in t.khach] == ["K0104A"]
+    assert KH.danh_sach(conn, tim="Quán C", sale="0104").tong == 0
+
+
+def test_can_xu_ly_loc_duoc_theo_sale(conn, batch):
+    """Khách im lặng của 0102 không được lẫn vào danh sách gọi lại của 0104."""
+    for ma, sale in (("R0104", "0104"), ("R0102", "0102")):
+        _ho_so_khach(conn, batch, ma, f"Quán {ma}", salesperson_code=sale)
+        _mua_deu(conn, batch, ma, nhip=7, so_lan=6, ngung_truoc=90)
+    _neo(conn, batch)
+    assert {k.ma for k in KH.can_xu_ly(conn, sale="0104")} == {"R0104"}
+    assert {k.ma for k in KH.can_xu_ly(conn)} == {"R0104", "R0102"}
