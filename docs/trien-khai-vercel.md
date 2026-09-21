@@ -99,7 +99,11 @@ Mở địa chỉ Vercel bằng **cửa sổ ẩn danh** (Ctrl+Shift+N) rồi so
 - [ ] Vào thẳng `/kho-du-lieu` khi chưa đăng nhập → bị đẩy về trang đăng nhập.
 - [ ] Nhập mật khẩu sai → báo "Mật khẩu không đúng", **không** vào được.
 - [ ] Nhập đúng → thấy bảng sức khoẻ dữ liệu.
-- [ ] Thanh menu **không** có mục "📥 Nạp dữ liệu".
+- [ ] Mở `/kho-du-lieu` → **không** thấy ô kéo–thả file, và **không** thấy nút
+      **Hoàn tác** nào trong bảng "Lô nạp gần nhất". (Đây là cổng kiểm TAY duy
+      nhất cho bất biến chỉ-đọc. Ô kiểm cũ soát mục menu "Nạp dữ liệu" — mục
+      đó nay đã biến mất khỏi **cả hai** bản, nên ô kiểm ấy xanh kể cả khi bất
+      biến vỡ hoàn toàn.)
 - [ ] Không có dải đỏ "Chưa sao lưu" (sao lưu chạy ở máy công ty, trang này
       không nhìn thấy nên cố ý im lặng).
 - [ ] Bấm **Thoát** → quay về trang đăng nhập.

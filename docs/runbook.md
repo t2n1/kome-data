@@ -29,9 +29,11 @@ mục **Kho dữ liệu** (<http://127.0.0.1:8000/kho-du-lieu>). Lệnh này **t
 không cần nạp biến môi trường trước. Cứ để cửa sổ đó mở; đóng cửa sổ là trang
 tắt.
 
-Bản chạy ở máy có **đủ cả ba trang**: nạp dữ liệu, sức khoẻ dữ liệu, bảng phủ
-dữ liệu. Bản trên mạng (Vercel) chỉ có hai trang sau — xem
-[docs/trien-khai-vercel.md](trien-khai-vercel.md) để biết vì sao và cách đưa lên.
+Nạp dữ liệu, sức khoẻ dữ liệu và bảng phủ dữ liệu nay nằm chung trong **một
+màn Kho dữ liệu duy nhất** (những địa chỉ cũ tự chuyển hướng sang đó). Bản trên
+mạng (Vercel) mở **cùng màn này**, chỉ ẩn hai khối: ô kéo–thả file và nút
+**Hoàn tác** — xem [docs/trien-khai-vercel.md](trien-khai-vercel.md) để biết vì
+sao và cách đưa lên.
 
 ---
 
