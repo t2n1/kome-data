@@ -18,7 +18,7 @@ from ops.backup import backup_status
 
 # Tự đọc .env khi chạy ở máy trong công ty. `uvicorn kome.web.app:app` khởi
 # động trong môi trường trống, nên không có dòng này thì trang chạy lên bình
-# thường rồi báo lỗi đỏ ở /health — người dùng đọc thành "hỏng CSDL" chứ
+# thường rồi báo lỗi đỏ ở /kho-du-lieu — người dùng đọc thành "hỏng CSDL" chứ
 # không đọc ra "quên nạp biến môi trường".
 # bat_buoc=False: trên Vercel KHÔNG có file .env (biến lấy từ bảng cấu hình),
 # và biến môi trường đã có sẵn luôn được ưu tiên hơn file.
@@ -31,7 +31,7 @@ nap_env(bat_buoc=False)
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-# Cửa sổ soát ngày thiếu trên /health (tính lùi từ ngày bán gần nhất).
+# Cửa sổ soát ngày thiếu trên /kho-du-lieu (tính lùi từ ngày bán gần nhất).
 SO_NGAY_SOAT = 30
 
 
@@ -70,7 +70,7 @@ def _ky_du_lieu(conn) -> dict:
     """Kỳ dữ liệu bán hàng + các ngày LÀM VIỆC không có dòng nào.
 
     Không có gì khác trong hệ thống phát hiện thiếu hẳn một ngày: nhân viên
-    nghỉ ốm, không ai kéo–thả, hôm sau nạp bình thường và /health xanh hết.
+    nghỉ ốm, không ai kéo–thả, hôm sau nạp bình thường và /kho-du-lieu xanh hết.
     Ba tháng sau báo cáo thiếu một ngày và không ai truy được ngày nào.
 
     Cuối tuần bỏ qua bằng core.dim_date.is_weekend. Ngày lễ Nhật KHÔNG có
@@ -207,7 +207,8 @@ def create_app(db_url: str | None = None) -> FastAPI:
 
         TRƯỚC ĐÂY `/` là trang nạp dữ liệu. Đổi vì nạp dữ liệu là việc của MỘT
         người, MỘT lần mỗi ngày, còn `/` là thứ mọi người mở nhiều lần mỗi
-        ngày. Trang nạp chuyển sang /nap và vẫn nằm trong thanh điều hướng.
+        ngày. Khối nạp giờ nằm trong /kho-du-lieu (Đợt 2a, Task 1-4), và mục
+        đó vẫn còn trong thanh điều hướng.
         """
         try:
             with open_conn() as conn:

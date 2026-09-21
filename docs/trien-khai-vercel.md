@@ -62,7 +62,7 @@ câu lệnh chuẩn bị sẵn khi thấy cổng `6543` — đã đo thật, xem
 Hiện `DATABASE_URL` dùng `kome_ingest_user` — vai trò **ghi được** vào `core`.
 Bản trên Vercel không cần quyền ghi. Nếu tạo được một người dùng chỉ đọc thì
 dù trang bị chiếm cũng không ai xoá được dữ liệu. Lưu ý vai trò `kome_report`
-hiện **không có** quyền đọc `meta.ingest_batch` nên chưa chạy được `/health` —
+hiện **không có** quyền đọc `meta.ingest_batch` nên chưa chạy được `/kho-du-lieu` —
 việc này để lại cho Giai đoạn 1.
 
 ---
@@ -96,7 +96,7 @@ không phải bấm gì nữa.
 
 Mở địa chỉ Vercel bằng **cửa sổ ẩn danh** (Ctrl+Shift+N) rồi soát:
 
-- [ ] Vào thẳng `/health` khi chưa đăng nhập → bị đẩy về trang đăng nhập.
+- [ ] Vào thẳng `/kho-du-lieu` khi chưa đăng nhập → bị đẩy về trang đăng nhập.
 - [ ] Nhập mật khẩu sai → báo "Mật khẩu không đúng", **không** vào được.
 - [ ] Nhập đúng → thấy bảng sức khoẻ dữ liệu.
 - [ ] Thanh menu **không** có mục "📥 Nạp dữ liệu".

@@ -1,4 +1,6 @@
 """Test màn Kho dữ liệu — màn gộp của /nap + /health + /phu-du-lieu."""
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from kome.web.app import create_app
@@ -145,3 +147,51 @@ def test_upload_render_man_gop(conn, test_db_url):
     assert r.status_code == 200
     assert 'id="theo-thang"' in r.text, "phải là màn gộp, không phải trang nạp cũ"
     assert "nghi file xuất một phần" in r.text, "kết quả nạp vẫn phải hiện"
+
+
+def test_tai_lieu_khong_con_tro_toi_ba_dia_chi_cu():
+    """[IMPORTANT] runbook.md là thứ người KHÔNG rành kỹ thuật mở ra đúng
+    lúc đang hỏng. Một địa chỉ sai trong đó nguy hiểm hơn một địa chỉ sai
+    trong code: code thì test bắt được, còn sổ tay thì không gì bắt —
+    trừ test này."""
+    canh = [Path("docs/runbook.md"), Path("CLAUDE.md"),
+            Path("docs/trien-khai-vercel.md")]
+    cu = ("/phu-du-lieu", "/health", "/nap")
+    loi = []
+    for f in canh:
+        for i, dong in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            # Chỉ bắt địa chỉ dùng như ĐƯỜNG DẪN (có dấu / đứng trước),
+            # không bắt chữ "nạp" tiếng Việt hay tên biến.
+            if any(d in dong for d in cu):
+                loi.append(f"{f}:{i}: {dong.strip()[:70]}")
+    assert not loi, "tài liệu còn trỏ tới địa chỉ cũ:\n" + "\n".join(loi)
+
+
+def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
+    """[IMPORTANT] Soát Task 4 tìm thêm bốn chỗ trong code còn trỏ tới ba
+    địa chỉ đã chết như thể chúng còn sống: nhãn nút, đích mặc định sau đăng
+    nhập, và comment/docstring mô tả hành vi đã sai kể từ khi gộp thành
+    /kho-du-lieu. Ba định nghĩa route redirect thật (gần cuối
+    kome/web/app.py, ví dụ `@app.get("/nap", ...)`) và một comment mô tả
+    đúng ngay hành vi của route đó là HỢP LỆ và phải giữ nguyên — đó là nơi
+    DUY NHẤT ba địa chỉ cũ còn được phép tồn tại trong code."""
+    canh = [
+        Path("kome/web/templates/chi_doc.html"),
+        Path("kome/web/bao_mat.py"),
+        Path("kome/web/templates/kho_du_lieu.html"),
+        Path("kome/web/app.py"),
+    ]
+    cu = ("/phu-du-lieu", "/health", "/nap")
+    # Định nghĩa route redirect thật (`@app.get("/nap", ...)`) và comment mô
+    # tả đúng ngay hành vi của chính route /nap đó — hai chỗ DUY NHẤT được
+    # phép nhắc địa chỉ cũ như một địa chỉ còn tồn tại (nó thật sự còn tồn
+    # tại, chỉ để 301 đi nơi khác).
+    hop_le = ("@app.get(", "VẪN chuyển hướng ở bản chỉ-đọc")
+    loi = []
+    for f in canh:
+        for i, dong in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if any(h in dong for h in hop_le):
+                continue
+            if any(d in dong for d in cu):
+                loi.append(f"{f}:{i}: {dong.strip()[:70]}")
+    assert not loi, "code còn nhắc địa chỉ cũ như thể còn sống:\n" + "\n".join(loi)

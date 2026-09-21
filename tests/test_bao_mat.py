@@ -72,9 +72,9 @@ def test_doi_mat_khau_huy_moi_ve_dang_luu_hanh():
 
 @pytest.mark.parametrize("tiep,mong", [
     ("/phu-du-lieu", "/phu-du-lieu"),
-    ("https://site-gia.example", "/health"),   # địa chỉ tuyệt đối
-    ("//site-gia.example", "/health"),         # cũng là tuyệt đối
-    (None, "/health"),
+    ("https://site-gia.example", "/kho-du-lieu"),   # địa chỉ tuyệt đối
+    ("//site-gia.example", "/kho-du-lieu"),         # cũng là tuyệt đối
+    (None, "/kho-du-lieu"),
 ])
 def test_khong_lam_ban_dap_chuyen_huong(tiep, mong):
     """Trang đăng nhập của công ty không được đẩy người dùng sang site lạ."""

@@ -41,13 +41,13 @@ git — xem `docs/runbook.md`):
   vai trò DUY NHẤT được ghi vào `core`. DELETE trên `core` là BẮT BUỘC: nút
   Hoàn tác chạy `DELETE FROM core.… WHERE batch_id = %s` (`010_*.sql`).
   **Web app của Giai đoạn 0 chạy bằng vai trò này** (`kome_ingest_user` trong
-  `DATABASE_URL`) — nó vừa nạp dữ liệu vừa phục vụ trang `/health` và
+  `DATABASE_URL`) — nó vừa nạp dữ liệu vừa phục vụ trang `/kho-du-lieu` và
   `/undo/{batch_id}`.
 - `kome_app` — **chưa ai dùng ở Giai đoạn 0**; dành cho ứng dụng CRM ở Giai
   đoạn 2. Chỉ SELECT trên `core`/`mart`; đọc-ghi trên `app`. **Không có quyền
   UPDATE/DELETE trên `core`** — kể cả nếu code lỡ viết nhầm câu lệnh, CSDL sẽ
   từ chối. Lưu ý nó KHÔNG có SELECT trên `meta.ingest_batch`, nên không chạy
-  được trang `/health` hiện tại.
+  được trang `/kho-du-lieu` hiện tại.
 - `kome_report` — chỉ SELECT, mọi schema (`core`, `mart`, `app`). Dùng cho
   công cụ báo cáo/BI ngoài ứng dụng chính.
 - `postgres` (superuser hiện tại của Supabase) — chỉ dùng để chạy migration,
@@ -71,8 +71,10 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang` |
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
-| `/nap` | Kéo–thả file OBC (ẩn ở bản Vercel) | — |
-| `/health`, `/phu-du-lieu` | Sức khoẻ & độ phủ dữ liệu (bảng **theo ngày** 90 ngày gần nhất cho 3 nguồn hằng ngày, rồi bảng theo tháng đủ 7 loại file) | `meta.ingest_batch` |
+| `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
+
+Ba trang cũ — nạp (`nap`), sức khoẻ (`health`), độ phủ dữ liệu (`phu-du-lieu`)
+— nay chỉ còn 301 về `/kho-du-lieu`, không render nội dung gì nữa.
 
 **Bất biến:** trạng thái quan hệ khách hàng so số ngày im lặng với **nhịp mua
 riêng của từng khách** (trung vị khoảng cách giữa các lần mua), KHÔNG với một
