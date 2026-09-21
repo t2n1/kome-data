@@ -71,15 +71,45 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
 | `/` | Tổng quan + ô "hôm nay đã có dữ liệu chưa" | `mart.tong_theo_ky`, `mart.khach_360`, `meta.ingest_batch` |
-| `/khach-hang` | Danh sách + tìm kiếm + lọc theo trạng thái | `mart.khach_360` |
-| `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang` |
+| `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
+| `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
 | `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
 
+**Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
+tháng**, KHÔNG phải `得意先ランク` của OBC. `core.dim_customer.rank_code` có tồn tại
+(10 nhóm) nhưng không file xuất nào ta nạp có TÊN của các mã đó, nên nó không dùng
+được để hiển thị. Nhãn trên trang phải luôn đọc là "hạng theo doanh thu 12 tháng" —
+gọi tắt là "hạng" thì sẽ có người đối chiếu với OBC rồi thấy lệch và không biết tin
+cái nào.
+
+**Bất biến:** `kome/khach_hang.py::ho_so()` chạy **không quá 8 truy vấn**, và bốn
+khối phân tích của `/khach-hang` chạy trong **một**. Đo thật 2026-09-22: CSDL tính
+xong một khối trong ~10 ms, nhưng một round-trip tới pooler Tokyo mất 47 ms và một
+lượt hỏi thật mất ~260 ms. Nút thắt là **số lượt hỏi**, không phải sức tính — nên
+tối ưu đúng là gộp truy vấn, không phải materialized view. Có test đếm.
+
+**Bất biến:** nhịp mua theo từng mã (`mart.nhip_mat_hang`) dùng **cùng công thức
+trung vị** với nhịp mua của khách (`mart.nhip_mua`). Một khái niệm một công thức;
+hai chỗ tính khác nhau là hai con số cùng tên nói hai điều.
+
+**Bất biến:** tỷ suất lãi gộp — ở BẤT KỲ view nào trong `mart` (`ty_suat_mat_hang`,
+`ban_theo_*`, `khach_360.ty_suat`) — luôn là **tỷ số của các TỔNG**
+(`sum(lãi gộp) / sum(doanh thu thuần)`), KHÔNG BAO GIỜ là trung bình của các tỷ số
+từng dòng. Bản đầu của khối "Gợi ý hàng chưa từng mua" (đợt 4a) tính
+`avg(gross_profit / (amount - tax_amount))` và hậu quả có thật: một dòng doanh thu
+thuần vài yên (mẫu số nhỏ do 赤伝 — phiếu đỏ, số ÂM, luật không được lọc bỏ) cho ra
+tỷ số hàng chục lần, khối xếp giảm dần theo tỷ suất rồi lấy 8 mã đầu, nên **những mã
+rác đó chiếm trọn tám dòng gợi ý của MỌI khách**. Sửa ở `mart.ty_suat_mat_hang`
+(migration `021`). Có test canh:
+`tests/test_khach_hang.py::test_ty_suat_goi_y_la_TY_SO_CUA_CAC_TONG`.
+
 Trang `/khach-hang` và `/can-xu-ly` mặc định chỉ hiện khách của người đang
 đăng nhập; `?tat_ca=1` bỏ lọc. Người có `salesperson_code` NULL (chủ DN, kế
-toán) thấy toàn bộ ngay từ đầu.
+toán) thấy toàn bộ ngay từ đầu. Riêng `/khach-hang` còn nhận `?nv=<mã sale>` để
+chủ động xem danh bạ của MỘT người phụ trách khác — cùng nếp đợt 3: mặc định
+tiện dụng, không phải hàng rào, không kiểm quyền, và luôn còn liên kết bỏ lọc.
 
 Ba trang cũ — nạp (`nap`), sức khoẻ (`health`), độ phủ dữ liệu (`phu-du-lieu`)
 — nay chỉ còn 301 về `/kho-du-lieu`, không render nội dung gì nữa.

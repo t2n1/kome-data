@@ -311,6 +311,16 @@ token, nên không cần thêm biến CSS mới.
 - [ ] `CLAUDE.md` ghi chỉ số mới và bất biến 8-truy-vấn; `runbook.md` không cần đổi
 - [ ] `pytest -v` xanh toàn bộ
 - [ ] Mở `/khach-hang` và một hồ sơ khách thật, **xem bằng mắt**: không ô trống, không số lệch
+- [ ] **KIỂM TAY (chỉ chủ sở hữu, sau khi chạy `python db/migrate.py` lên production —
+      xem `docs/runbook.md`):** migration 020 mới chạy trên CSDL thử nghiệm (gần như
+      rỗng), nên chi phí thật của `mart.khach_mat_hang` sau khi thêm nhịp theo mã CHƯA
+      đo được. Chạy lệnh dưới đây **hai lần liên tiếp** và lấy con số LẦN THỨ HAI (lần
+      đầu là cache lạnh — đã đo trên view cũ: 272 ms lần đầu rồi 7 ms các lần sau).
+      Ngưỡng: dưới **100 ms** ở lần thứ hai. Vượt thì báo lại, đừng tự tối ưu.
+
+      ```bash
+      python -u -c "import os;from kome.db import connect;from kome.env import nap_env;nap_env(bat_buoc=False);c=connect(os.environ['DATABASE_URL']);[print([r[0] for r in c.execute('EXPLAIN (ANALYZE, TIMING OFF) SELECT * FROM mart.khach_mat_hang WHERE customer_code=%s',('000000009292',)).fetchall()][-1]) for _ in range(2)]"
+      ```
 
 ---
 
