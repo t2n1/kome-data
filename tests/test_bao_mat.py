@@ -109,8 +109,13 @@ def test_chay_o_may_ca_nhan_khong_bat_buoc_mat_khau(khach):
 
 # ---- Cổng chặn trên mọi trang ------------------------------------------
 
-@pytest.mark.parametrize("duong_dan", ["/", "/health", "/phu-du-lieu"])
+@pytest.mark.parametrize("duong_dan", ["/", "/kho-du-lieu", "/khach-hang"])
 def test_chua_dang_nhap_thi_moi_trang_deu_bi_chan(khach, duong_dan):
+    """Đợt 2a (Task 4): /health và /phu-du-lieu giờ chỉ 301 sang
+    /kho-du-lieu — kiểm chúng ở đây không còn kiểm được gì (redirect rỗng
+    trước khi middleware đăng nhập kịp chạm nội dung). Đổi sang ba trang
+    THẬT SỰ có nội dung, và /kho-du-lieu PHẢI có mặt vì đó đúng là trang
+    giờ mang nhật ký nạp, bảng phủ dữ liệu và khối Hoàn tác."""
     r = khach().get(duong_dan)
     assert r.status_code == 303
     assert r.headers["location"] == "/dang-nhap"

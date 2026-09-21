@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from fastapi.testclient import TestClient
 from kome.web.app import create_app
@@ -88,8 +89,12 @@ def test_health_hien_lan_nap_GAN_NHAT_khong_phai_lon_nhat(conn, test_db_url):
     # khối "Lô nạp gần nhất" (Task 2/3) liệt kê MỖI lô riêng lẻ — khối đó
     # ĐÚNG PHẢI hiện cả 18.000 vì nó trả lời câu khác ("lịch sử nạp gồm
     # những gì"), không phải câu bảng trạng thái trả lời ("lần nạp GẦN NHẤT
-    # của loại này là gì"). Cô lập đúng khối "Sức khoẻ dữ liệu" trước khi so.
-    khoi = r.text.split("Sức khoẻ dữ liệu", 1)[1].split("Lô nạp gần nhất", 1)[0]
+    # của loại này là gì"). Cô lập đúng khối bằng neo `id="suc-khoe"`
+    # (_suc_khoe.html), KHÔNG bằng chuỗi tiêu đề: cắt theo chuỗi vỡ âm thầm
+    # nếu đảo thứ tự khối, hoặc nếu "Lô nạp gần nhất" bị ẩn ở bản chỉ-đọc.
+    m = re.search(r'<section id="suc-khoe">(.*?)</section>', r.text, re.S)
+    assert m, "thiếu khối id=\"suc-khoe\""
+    khoi = m.group(1)
     assert "60" in khoi and "900,000" in khoi
     assert "18,000" not in khoi and "400,000,000" not in khoi
 
@@ -160,11 +165,15 @@ def test_trang_phu_du_lieu_mo_duoc_va_nhom_theo_ky_cong_ty(conn, test_db_url):
     Đợt 2a (Task 4): /phu-du-lieu chỉ 301 sang /kho-du-lieu#theo-thang, và
     tiêu đề trang giờ là "Kho dữ liệu" (dùng chung cho cả ba khối cũ) —
     không còn tiêu đề riêng "Bảng phủ dữ liệu". Mọi nội dung khác (kỳ kế
-    toán, cột, tổng kết) vẫn nguyên vẹn, chỉ nằm trong màn gộp."""
+    toán, cột, tổng kết) vẫn nguyên vẹn, chỉ nằm trong màn gộp.
+
+    KHÔNG kiểm "Kho dữ liệu": chuỗi đó nằm trong sidebar của MỌI trang, nên
+    vẫn xanh kể cả khi redirect đi lạc sang "/" hay "/bao-cao". Kiểm neo
+    `id="theo-thang"` — chỉ có trên đúng khối bảng tháng của màn này."""
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/phu-du-lieu")
     assert r.status_code == 200
-    assert "Kho dữ liệu" in r.text
+    assert 'id="theo-thang"' in r.text
     # Trang phải gọi kỳ theo SỐ mà công ty tự dùng (Kỳ 7), không phải năm kết thúc
     assert "Kỳ 7 (2025-08 → 2026-07)" in r.text
     assert "1/8 → 31/7" in r.text
