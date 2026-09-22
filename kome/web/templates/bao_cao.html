@@ -43,8 +43,15 @@
       vertical-align:middle;margin:0 0 0 .5rem}
  .thanh-tien-do .day{position:absolute;inset:0 auto 0 0;background:var(--do);
       border-radius:999px}
+ {# [Vòng soát cuối 2, việc 5] `margin-left:-1px` dịch vạch mốc sang trái
+    nửa chiều rộng của chính nó — ở đúng 100% (cuối tháng, đã đạt hết mốc),
+    `left:100%` đặt trọn cả ô 2px NẰM NGOÀI khung (khung rộng đúng 100% của
+    chính nó), và `overflow:hidden` của `.thanh-tien-do` cắt mất toàn bộ:
+    vạch BIẾN MẤT đúng vào ngày cần thấy nó nhất. Dịch nửa chiều rộng ra
+    ngoài (thay vì để cả khối) giữ lại MỘT NỬA vạch trong mọi trường hợp
+    0–100%, thay vì mất trắng ở hai đầu mút. #}
  .thanh-tien-do .moc{position:absolute;top:-3px;bottom:-3px;width:2px;
-      background:var(--chu-nhat)}
+      margin-left:-1px;background:var(--chu-nhat)}
  .thanh-nhan{display:flex;justify-content:space-between;font-size:.85rem;
       color:var(--chu-nhat)}
 </style>
@@ -122,8 +129,11 @@ Ngày làm việc chưa trừ ngày lễ Nhật.</p>
   <div class="gia">{% if td.muc_tieu_den_hom_nay is not none %}¥{{ "{:,}".format(td.muc_tieu_den_hom_nay) }}{% else %}—{% endif %}</div>
   {# Con số in ra ngay cạnh vạch mốc: bất biến "mã hoá bằng màu phải kèm thứ
      đọc được" (_chung.html:76-77). Cùng lý do ở thẻ Tiến độ: chỉ tiêu = 0
-     không có mẫu số để chia — in "—", không chia cho 0. #}
-  <div class="nhan">{% if td.muc_tieu and td.muc_tieu_den_hom_nay is not none %}{{ "%.1f"|format(td.muc_tieu_den_hom_nay / td.muc_tieu * 100) }}% chỉ tiêu{% else %}—{% endif %}</div></div>
+     không có mẫu số để chia — in "—", không chia cho 0.
+     [Vòng soát cuối 2, việc 4] `td.pct_moc_chi_tieu` tính MỘT LẦN ở Python
+     (kome/bao_cao.py) — công thức này từng chép tay hai lần trong chính
+     file này (đây và nhãn thanh tiến độ toàn nhóm bên dưới). #}
+  <div class="nhan">{% if td.pct_moc_chi_tieu is not none %}{{ "%.1f"|format(td.pct_moc_chi_tieu) }}% chỉ tiêu{% else %}—{% endif %}</div></div>
 </div>
 
 {# [Vòng soát cuối, việc 9] Đặc tả §7.1 đòi "thanh tiến độ toàn nhóm + vạch
@@ -140,7 +150,7 @@ Ngày làm việc chưa trừ ngày lễ Nhật.</p>
 </div>
 <div class="thanh-nhan">
  <span>{% if td.tien_do is not none %}{{ "%.1f"|format(td.tien_do * 100) }}% đạt{% else %}—{% endif %}</span>
- <span>Vạch mốc — {% if td.muc_tieu and td.muc_tieu_den_hom_nay is not none %}{{ "%.1f"|format(td.muc_tieu_den_hom_nay / td.muc_tieu * 100) }}% chỉ tiêu{% else %}—{% endif %}</span>
+ <span>Vạch mốc — {% if td.pct_moc_chi_tieu is not none %}{{ "%.1f"|format(td.pct_moc_chi_tieu) }}% chỉ tiêu{% else %}—{% endif %}</span>
 </div>
 {% endif %}
 
@@ -209,10 +219,12 @@ Ngày làm việc chưa trừ ngày lễ Nhật.</p>
       {% endif %}
       {% else %}—{% endif %}</td>
   <td class="so">{% if n.muc_tieu_den_hom_nay is not none %}¥{{ "{:,}".format(n.muc_tieu_den_hom_nay) }}{% else %}—{% endif %}</td>
-  {# [Vòng soát cuối, việc 2/3] `co_cung_ky`/`tang_truong` đọc THẲNG từ
-     mart.ban_theo_nhan_vien_thang_so_sanh (027) — không còn phép chia nào ở
-     đây, chỉ nhân 100 và định dạng. `co_cung_ky` FALSE = tháng cùng kỳ
-     KHÔNG TỒN TẠI trong kho (dữ liệu bán bắt đầu 2025-03-03); TRUE nhưng
+  {# [Vòng soát cuối 2, việc 1] `co_cung_ky`/`tang_truong` đọc THẲNG từ
+     mart.tien_do_ngan_sach (028) — không còn phép chia nào ở đây, chỉ nhân
+     100 và định dạng. `co_cung_ky` FALSE = tháng cùng kỳ KHÔNG TỒN TẠI
+     trong kho, tính cho CẢ CÔNG TY (dữ liệu bán bắt đầu 2025-03-03), KHÔNG
+     phải riêng người này — một người có chỉ tiêu mà 0 doanh thu THÁNG NÀY
+     vẫn phải đọc được cùng kỳ NĂM NGOÁI nếu nó có thật. TRUE nhưng
      `tang_truong` None = tồn tại nhưng doanh thu cùng kỳ ≤ 0 (không có mẫu
      số dương để chia — KHÔNG in phần trăm ngược dấu như bản Jinja cũ từng
      làm với mẫu số ÂM do 赤伝). Hai tình huống đó khác "chưa đặt" (None) ở
