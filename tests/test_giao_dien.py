@@ -28,7 +28,8 @@ TEN_FONT = [
 
 # Mọi trang mở được mà không cần tham số. Trang hồ sơ khách và trang lỗi
 # không nằm đây vì chúng cần dữ liệu hoặc một sự cố để hiện ra.
-TRANG = ["/", "/khach-hang", "/bao-cao", "/can-xu-ly", "/kho-du-lieu"]
+TRANG = ["/", "/khach-hang", "/bao-cao", "/can-xu-ly", "/kho-du-lieu",
+         "/san-pham", "/kho-hang"]
 
 
 def test_css_duoc_phuc_vu(conn, test_db_url):

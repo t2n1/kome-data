@@ -36,6 +36,16 @@
     <a href="/khach-hang"{% if trang == 'khach' %} class="dang-xem" aria-current="page"{% endif %}>Khách hàng</a>
     <a href="/can-xu-ly"{% if trang == 'can-xu-ly' %} class="dang-xem" aria-current="page"{% endif %}>Cần xử lý</a>
 
+    {# Nhóm HÀNG HOÁ đứng GIỮA khách hàng và hệ thống, không phải cuối:
+       hai màn này là việc hằng ngày (mã nào sắp hết, lô nào sắp hết hạn),
+       còn nhóm HỆ THỐNG là việc kỹ thuật một người làm một lần mỗi ngày. #}
+    <p class="nhom">HÀNG HOÁ</p>
+    <a href="/san-pham"{% if trang == 'san-pham' %} class="dang-xem" aria-current="page"{% endif %}>Sản phẩm</a>
+    <a href="/kho-hang"{% if trang == 'kho-hang' %} class="dang-xem" aria-current="page"{% endif %}>Kho hàng</a>
+
+    {# `hien_kho` CHỈ bọc nhóm HỆ THỐNG — "Kho hàng" (tồn kho, việc của người
+       bán) không liên quan gì tới "Kho dữ liệu" (nút xoá dữ liệu, cần quyền
+       riêng từ đợt 3). Hai cái tên gần nhau, hai quyền khác nhau. #}
     {% if hien_kho %}
     <p class="nhom">HỆ THỐNG</p>
     <a href="/kho-du-lieu"{% if trang == 'kho-du-lieu' %} class="dang-xem" aria-current="page"{% endif %}>Kho dữ liệu</a>

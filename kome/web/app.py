@@ -9,6 +9,10 @@ from fastapi.templating import Jinja2Templates
 from kome.bao_cao import tinh_bao_cao, ve_bieu_do
 from kome.coverage import tinh_bang_ngay, tinh_bang_phu
 from kome import khach_hang as KH
+# Nhập ở mức ngoài cùng được: kome/san_pham.py chỉ dùng dataclasses/datetime
+# (+ psycopg qua `conn` truyền vào), KHÔNG kéo pandas hay python-calamine —
+# đúng ràng buộc mà test_trang_chi_doc_khong_phu_thuoc_pandas canh.
+from kome import san_pham as SP
 from kome.db import connect
 from kome.env import nap_env
 from kome.nhat_ky_nap import lo_nap_gan_nhat, trang_thai_nap
@@ -431,6 +435,60 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         "ten_sale": ten_sale})
         except Exception as e:
             return _loi(request, "mở danh sách cần xử lý", e)
+
+    # ---- Hàng hoá: sản phẩm và kho hàng (đợt 4b) ------------------------
+    # Cả ba route đều `open_app_conn` — chúng chỉ đọc. Có test duyệt AST canh
+    # (tests/test_bao_mat.py::test_trang_chi_doc_khong_duoc_dung_ket_noi_nap_du_lieu).
+    #
+    # Mọi chỉ số nằm ở schema `mart` (migration 023) và mọi nhãn ở
+    # kome/san_pham.py — ba route này chỉ lấy dữ liệu rồi giao cho template,
+    # y hệt cặp route khách hàng ngay trên.
+
+    @app.get("/san-pham", response_class=HTMLResponse)
+    def ds_san_pham(request: Request, tim: str = "", loc: str = "",
+                    sap: str = "doanh_thu", trang: int = 1):
+        try:
+            with open_app_conn() as conn:
+                t = SP.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang)
+            return _ve(request, "san_pham.html",
+                       {"t": t, "trang_thai": SP.TRANG_THAI_TON,
+                        "trang": "san-pham"})
+        except Exception as e:
+            return _loi(request, "mở danh sách sản phẩm", e)
+
+    @app.get("/san-pham/{ma}", response_class=HTMLResponse)
+    def ho_so_san_pham(request: Request, ma: str):
+        try:
+            with open_app_conn() as conn:
+                h = SP.ho_so(conn, ma)
+            if h is None:
+                return _ve(request, "khong_thay.html",
+                           {"thu": f"mã hàng {ma}", "trang": "san-pham",
+                            "ve": "/san-pham", "ve_ten": "danh sách sản phẩm"},
+                           status_code=404)
+            # Mượn KH.ve_duong: nó chỉ TÍNH TOẠ ĐỘ từ cột `doanh_thu` của một
+            # danh sách theo tháng — hình học thuần tuý, không một định nghĩa
+            # chỉ số nào. Chép sang kome/san_pham.py là hai bản cùng công thức
+            # sẽ trôi khỏi nhau, đúng lớp lỗi mà `_vi_tu` né ở tầng SQL.
+            return _ve(request, "san_pham_360.html",
+                       {"h": h, "d": KH.ve_duong(h.thang), "trang": "san-pham"})
+        except Exception as e:
+            return _loi(request, "mở hồ sơ sản phẩm", e)
+
+    @app.get("/kho-hang", response_class=HTMLResponse)
+    def man_kho_hang(request: Request, kho: str = "", loc: str = ""):
+        try:
+            with open_app_conn() as conn:
+                k = SP.kho_hang(conn, kho=kho, loc=loc)
+            # `can_han_ngay` đi ra template để tiêu đề khối và nhãn ô đếm đọc
+            # CÙNG một hằng với truy vấn đã lọc (kome/san_pham.py::
+            # CAN_HAN_NGAY). Viết cứng "90 ngày" vào HTML là để sẵn một ngày
+            # ô đếm nói 60 còn tiêu đề vẫn nói 90.
+            return _ve(request, "kho_hang.html",
+                       {"k": k, "trang_thai": SP.TRANG_THAI_TON,
+                        "can_han_ngay": SP.CAN_HAN_NGAY, "trang": "kho-hang"})
+        except Exception as e:
+            return _loi(request, "mở màn kho hàng", e)
 
     @app.post("/upload", response_class=HTMLResponse)
     def upload(request: Request, files: list[UploadFile]):

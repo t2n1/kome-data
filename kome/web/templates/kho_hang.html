@@ -1,0 +1,195 @@
+<!-- Màn Kho hàng: bốn ô tổng quan, hai bộ lọc, khối quá hạn, khối cận hạn,
+     bảng tồn, bảng giá trị theo kho.
+
+     Ngày chụp nằm NGAY ĐẦU TRANG: đây là ảnh chụp 在庫一覧 lúc 13:30, không
+     phải tồn kho lúc này. Một màn tồn kho không ghi ngày sẽ được đọc là "bây
+     giờ", và chênh lệch một ngày trong kho thực phẩm là chênh lệch thật.
+
+     Không một dòng JavaScript nào — <select> cần một nút "Lọc" của chính nó. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<title>KOME — kho hàng</title>
+{% include "_chung.html" %}
+<style>
+ /* Dải ô chọn kho. Cùng kiểu với .o-loc của khach_hang.html nhưng tên riêng:
+    hai màn khai cùng một tên lớp là hai định nghĩa sẽ trôi khỏi nhau. */
+ .o-kho{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.5rem 0}
+ .o-kho label{font-size:.85rem;color:var(--chu-nhat);display:inline-flex;
+   align-items:center;gap:.35rem}
+ .o-kho select{font:inherit;font-size:.9rem;padding:.3rem .5rem;border-radius:9px;
+   border:1px solid var(--vien);background:var(--nen);color:var(--chu);max-width:16rem}
+ .o-kho button{font:inherit;font-size:.9rem;padding:.32rem 1rem;border-radius:9px;
+   border:1px solid var(--vien);background:var(--nen-phu);color:var(--chu);cursor:pointer}
+ .ma-hang{color:var(--chu-nhat);font-size:.76rem;font-family:var(--font-so)}
+ h2{font-size:1.05rem;margin:1.75rem 0 .5rem;padding-top:.5rem;
+   border-top:1px solid var(--vien)}
+</style>
+{% include "_nav.html" %}
+{# Bộ lọc trạng thái THẬT SỰ đang áp dụng. kome/san_pham.py bỏ qua một `loc`
+   không có trong TRANG_THAI_TON (`if loc in TRANG_THAI_TON`), nên dữ liệu
+   dưới tay là dữ liệu KHÔNG lọc — template phải đọc nó cùng một cách. Tra
+   thẳng `k.loc` thì một ký tự gõ nhầm trên thanh địa chỉ vừa làm dải chip nói
+   dối ("đang lọc" trong khi bảng hiện mọi dòng) vừa làm cả trang trả 500 ở
+   câu `trang_thai[k.loc][0]` bên dưới. #}
+{% set loc = k.loc if k.loc in trang_thai else "" %}
+<h1>Kho hàng</h1>
+
+{% if k.ngay_chup %}
+<p class="ghi-chu">Ảnh chụp <strong>在庫一覧 ngày {{ k.ngay_chup }}</strong> —
+đây là tồn kho lúc xuất file, không phải tồn kho lúc này.</p>
+{% else %}
+<div class="trong">Chưa có bản xuất 在庫一覧 nào trong kho dữ liệu.</div>
+{% endif %}
+
+<div class="the-so">
+  <div><div class="nhan">Mã hết hàng</div><div class="gia">{{ "{:,}".format(k.o_tong_quan.get('het_hang', 0)) }}</div></div>
+  <div><div class="nhan">Mã sắp thiếu</div><div class="gia">{{ "{:,}".format(k.o_tong_quan.get('sap_thieu', 0)) }}</div></div>
+  <div><div class="nhan">Lô cận hạn (≤ {{ can_han_ngay }} ngày)</div><div class="gia">{{ "{:,}".format(k.o_tong_quan.get('can_han', 0)) }}</div></div>
+  <div><div class="nhan">Giá trị tồn chết</div><div class="gia">¥{{ "{:,}".format(k.o_tong_quan.get('gia_tri_ton_chet', 0)) }}</div></div>
+</div>
+
+{# Ghi rõ PHẠM VI của hai ô đầu, và ghi ngay dưới chúng. Chúng đứng cạnh hai ô
+   CÓ theo bộ lọc, nên không nói ra thì bốn con số cạnh nhau mà không con số
+   nào cho biết mình đang nói về tập nào. #}
+<p class="ghi-chu">Hai ô đầu luôn đếm trên <strong>mọi kho</strong>, kể cả khi
+đang lọc theo một kho: trạng thái là thuộc tính của một <em>mã</em> tính trên
+tổng mọi kho — &ldquo;mã hết hàng ở kho 0001&rdquo; không có định nghĩa nào.
+Hai ô sau thì đi theo cả hai bộ lọc bên dưới.</p>
+
+{# Hai bộ lọc. Ô chọn kho là form GET riêng vì <select> không tự gửi được nếu
+   không có JavaScript; dải chip trạng thái là liên kết thuần. Mỗi ô mang theo
+   bộ lọc KIA — sót nó là bấm một cái thì bộ lọc còn lại âm thầm biến mất. #}
+<form class="o-kho" method="get" action="/kho-hang">
+  <input type="hidden" name="loc" value="{{ loc }}">
+  <label>Kho
+    <select name="kho">
+      <option value="">— mọi kho —</option>
+      {% for ma, ten in k.ds_kho %}
+      <option value="{{ ma }}"{% if k.kho == ma %} selected{% endif %}>{{ ma }} {{ ten }}</option>
+      {% endfor %}
+      {# Kho đang lọc mà KHÔNG có trong core.dim_warehouse vẫn phải có một mục
+         của chính nó. Khác `loc`, tầng Python lọc theo MỌI giá trị `kho` chứ
+         không có danh sách trắng — nên bảng bên dưới đang thật sự bị lọc (và
+         rỗng), trong khi ô chọn không có mục nào khớp thì trình duyệt hiện
+         "— mọi kho —": ô điều khiển nói ngược hẳn với dữ liệu nó điều khiển.
+         Cùng bất biến với ô Tỉnh của khach_hang.html. #}
+      {% if k.kho and k.kho not in k.ds_kho|map(attribute=0)|list %}
+      <option value="{{ k.kho }}" selected>{{ k.kho }} (không có trong danh sách kho)</option>
+      {% endif %}
+    </select></label>
+  <button type="submit">Lọc</button>
+</form>
+
+<div class="loc">
+  <span class="nhom">Trạng thái</span>
+  <a href="/kho-hang?kho={{ k.kho|urlencode }}"{% if not loc %} class="dang-xem"{% endif %}>Tất cả</a>
+  {% for ma, (nhan, mau) in trang_thai.items() %}
+  <a href="/kho-hang?loc={{ ma }}&kho={{ k.kho|urlencode }}"{% if loc == ma %} class="dang-xem"{% endif %}>{{ nhan }}</a>
+  {% endfor %}
+</div>
+
+{# ---- Lô ĐÃ quá hạn ------------------------------------------------------
+   Khối RIÊNG, và đứng TRƯỚC khối cận hạn. Với hàng thực phẩm "đã quá hạn" là
+   việc phải xử lý ngay, còn "sắp hết hạn" là việc theo dõi — trộn chung thì
+   lô quá hạn đứng lẫn trong một danh sách dài và được đọc như mọi dòng khác. #}
+<h2>Đã quá hạn</h2>
+{% if k.qua_han %}
+<p class="ghi-chu">Những lô đã <strong>qua ngày 賞味期限</strong> nhưng vẫn còn
+trong bản xuất tồn kho. Đây là việc xử lý ngay, không phải việc theo dõi.</p>
+<div class="bang-cuon">
+<table>
+ <tr><th>Mặt hàng</th><th>Kho</th><th class="so">Số lượng</th>
+     <th class="so">Giá trị</th><th class="so">賞味期限</th><th class="so">Quá</th></tr>
+ {% for d in k.qua_han %}
+ <tr><td><a href="/san-pham/{{ d.ma }}">{{ d.ten }}</a>
+      <div class="ma-hang">{{ d.ma }}</div></td>
+  <td>{{ d.ten_kho or d.kho }}</td>
+  <td class="so">{% if d.so_luong is not none %}{{ "%.2f"|format(d.so_luong) }}{% else %}—{% endif %}</td>
+  <td class="so">¥{{ "{:,}".format(d.gia_tri) }}</td>
+  <td class="so">{{ d.best_before or "—" }}</td>
+  <td class="so">{{ -d.han_con_lai }} ngày</td></tr>
+ {% endfor %}
+</table>
+</div>
+{% else %}
+<div class="trong">Không lô nào quá hạn. Tốt.</div>
+{% endif %}
+
+<h2>Sắp hết hạn trong {{ can_han_ngay }} ngày</h2>
+{# Chỉ lô có hạn THẬT (`loai_han = 'ngay'`). `賞味期限なし` là hàng không có hạn
+   dùng — xếp nó vào danh sách cần xả là sai nghiệp vụ. #}
+{% if k.can_han %}
+<div class="bang-cuon">
+<table>
+ <tr><th>Mặt hàng</th><th>Kho</th><th class="so">Số lượng</th>
+     <th class="so">Giá trị</th><th class="so">賞味期限</th><th class="so">Còn</th></tr>
+ {% for d in k.can_han %}
+ <tr><td><a href="/san-pham/{{ d.ma }}">{{ d.ten }}</a>
+      <div class="ma-hang">{{ d.ma }}</div></td>
+  <td>{{ d.ten_kho or d.kho }}</td>
+  <td class="so">{% if d.so_luong is not none %}{{ "%.2f"|format(d.so_luong) }}{% else %}—{% endif %}</td>
+  <td class="so">¥{{ "{:,}".format(d.gia_tri) }}</td>
+  <td class="so">{{ d.best_before or "—" }}</td>
+  <td class="so">{{ d.han_con_lai }} ngày</td></tr>
+ {% endfor %}
+</table>
+</div>
+{% else %}
+<div class="trong">Không lô nào cận hạn. Chỉ tính lô có hạn thật —
+<strong>賞味期限なし</strong> là hàng không có hạn dùng, không phải hàng chưa rõ hạn.</div>
+{% endif %}
+
+<h2>Tồn kho hiện tại</h2>
+<p class="ghi-chu">Xếp theo <strong>giá trị</strong> giảm dần. Bảng đi theo cả
+hai bộ lọc ở trên. Nhãn hạn có bốn giá trị và hai giá trị cuối
+<strong>không giống nhau</strong>: &ldquo;Không có hạn dùng&rdquo; là lời khẳng
+định về hàng (<strong>賞味期限なし</strong>), còn &ldquo;Không đọc được hạn&rdquo;
+là lời thú nhận về dữ liệu — ô đó có chữ mà ta chưa đọc ra ngày.</p>
+{% if k.dong %}
+<div class="bang-cuon">
+<table>
+ <tr><th>Mặt hàng</th><th>Kho</th><th>Trạng thái</th><th class="so">Số lượng</th>
+     <th class="so">Giá trị</th><th>Hạn sử dụng</th><th class="so">Còn lại</th></tr>
+ {% for d in k.dong %}
+ <tr><td><a href="/san-pham/{{ d.ma }}">{{ d.ten }}</a>
+      <div class="ma-hang">{{ d.ma }}</div></td>
+  <td>{{ d.ten_kho or d.kho }}</td>
+  <td><span class="vien {{ d.mau }}">{{ d.nhan_trang_thai }}</span></td>
+  {# KHÔNG `|int`: `83.75 ケース` là số thật trong dữ liệu OBC. #}
+  <td class="so">{% if d.so_luong is not none %}{{ "%.2f"|format(d.so_luong) }}{% else %}—{% endif %}</td>
+  <td class="so">¥{{ "{:,}".format(d.gia_tri) }}</td>
+  <td><span class="vien {{ d.mau_han }}">{{ d.nhan_han }}</span>
+      {% if d.best_before %}<span class="khong-ap-dung">{{ d.best_before }}</span>{% endif %}</td>
+  <td class="so">{% if d.han_con_lai is not none %}{{ d.han_con_lai }} ngày{% else %}—{% endif %}</td></tr>
+ {% endfor %}
+</table>
+</div>
+{% else %}
+<div class="trong">Không dòng tồn nào khớp bộ lọc.</div>
+{% endif %}
+
+<h2>Giá trị theo kho</h2>
+{# Bảng này là Ô ĐIỀU KHIỂN của chính bộ lọc kho, nên nó CỐ Ý không tự lọc
+   theo kho — bấm vào một kho xong phải còn đường quay lại. Nhưng nó CÓ theo
+   bộ lọc trạng thái. Phải nói ra cả hai vế: nó đứng ngay dưới một bảng ĐÃ lọc
+   theo kho, và hai con số cạnh nhau mà không cái nào nói mình nói về tập nào
+   thì người đọc sẽ tự ghép chúng lại. #}
+<p class="ghi-chu">Bảng này luôn liệt kê <strong>mọi kho</strong> — nó là ô
+điều khiển của chính bộ lọc kho, tự lọc theo mình thì bấm vào một kho xong
+không còn đường quay lại.{% if loc %} Nhưng nó <strong>có</strong> theo bộ
+lọc trạng thái đang bật ({{ trang_thai[loc][0] }}).{% endif %}</p>
+{% if k.theo_kho %}
+<div class="bang-cuon">
+<table>
+ <tr><th>Kho</th><th class="so">Số dòng tồn</th><th class="so">Giá trị</th></tr>
+ {% for w in k.theo_kho %}
+ <tr><td><a href="/kho-hang?kho={{ w.ma|urlencode }}{% if loc %}&loc={{ loc }}{% endif %}">{{ w.ma }} {{ w.ten }}</a></td>
+  <td class="so">{{ "{:,}".format(w.so_dong) }}</td>
+  <td class="so">¥{{ "{:,}".format(w.gia_tri) }}</td></tr>
+ {% endfor %}
+</table>
+</div>
+{% else %}
+<div class="trong">Chưa có dòng tồn nào.</div>
+{% endif %}
+</html>
+</main>
