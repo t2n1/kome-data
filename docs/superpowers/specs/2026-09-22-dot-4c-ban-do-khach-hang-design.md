@@ -66,7 +66,23 @@ chỉ lộ ra khi lọc theo người phụ trách. Bảng tra vẫn phải đ�
 Muốn có điểm từng khách thì phải geocode 1.710 địa chỉ qua dịch vụ ngoài: tốn tiền, gửi
 địa chỉ khách ra bên thứ ba, và cần một bước chạy định kỳ mà pipeline nạp hiện không có.
 
-**Độ phân giải thật của dữ liệu là CẤP TỈNH.** Mọi thứ vẽ mịn hơn thế đều là bịa.
+~~**Độ phân giải thật của dữ liệu là CẤP TỈNH.** Mọi thứ vẽ mịn hơn thế đều là bịa.~~
+
+> **[SAI — đã sửa 2026-09-22, xem `2026-09-22-khao-sat-toa-do-khach-hang.md`]** Câu trên
+> nhảy từ "không có vĩ độ/kinh độ" sang "vậy thì chỉ còn cấp tỉnh", bỏ qua cột `postcode`
+> ngay bên cạnh. Đo thật: **2.072/2.080 khách có mã bưu điện**, và chúng cho **1.325 mã
+> phân biệt** cho 1.709 khách — trung bình 1,29 khách/mã, **83,6% mã chỉ có đúng một
+> khách**. Nghĩa là độ phân giải thật là **cấp mã bưu điện**, không phải cấp tỉnh: 東京都
+> đi từ MỘT chấm lên **135 chấm**, 大阪府 từ một lên 140.
+>
+> Điều còn đúng nguyên: **OBC không cho toạ độ**, và biến mã bưu điện thành toạ độ vẫn cần
+> một bảng tra. Cái sai là kết luận "vậy thì cấp tỉnh" — bảng tra đó có sẵn, công khai,
+> miễn phí, dùng được ngoại tuyến (`KEN_ALL` của 日本郵便 ghép với 位置参照情報), nên không
+> một địa chỉ khách nào phải rời khỏi máy công ty.
+>
+> Hệ quả cho thiết kế: lý lẽ "chấm 290 khách 東京都 lên cùng một toạ độ là vẽ ra độ chính
+> xác không tồn tại" (§4.2) **không còn áp dụng** — 234 khách Tokyo nằm ở 135 chỗ khác
+> nhau và ta biết là chỗ nào. Việc này đang ĐẬU LẠI theo yêu cầu của chủ dự án.
 
 ### 3.3 Chỗ đông nhất cũng là chỗ nhỏ nhất trên bản đồ thật
 
