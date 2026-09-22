@@ -313,9 +313,12 @@ sách đó (§7.3). Đây là hai câu hỏi khác nhau — "đặt chỉ tiêu 
 nào" — nên hai màn đếm khác nhau là đúng.
 
 **Kỳ chưa có dòng bán nào vẫn phải chọn được.** Chỉ tiêu được đặt TRƯỚC khi bán — danh
-sách kỳ trên màn này lấy từ `core.dim_date` (mọi kỳ có trong lịch), **không** lấy từ
-`mart.tong_theo_ky` (chỉ những kỳ đã có doanh thu). Lấy nhầm nguồn thì không ai đặt
-được chỉ tiêu cho năm sau, và lỗi chỉ lộ ra đúng lúc cần dùng.
+sách kỳ trên màn này lấy từ `core.dim_date` (mọi kỳ có ĐỦ 12 tháng trong lịch — dải
+`core.dim_date` phủ 2024-01-01 → 2035-12-31, nên hai đầu, kỳ 2024 và kỳ 2036, chỉ nằm
+MỘT PHẦN trong lịch và phải bị loại, không thì bấm Lưu trên một cột không tồn tại là
+`ForeignKeyViolation` trần), **không** lấy từ `mart.tong_theo_ky` (chỉ những kỳ đã có
+doanh thu). Lấy nhầm nguồn thì không ai đặt được chỉ tiêu cho năm sau, và lỗi chỉ lộ ra
+đúng lúc cần dùng.
 
 ### 6.2 Nhập số
 

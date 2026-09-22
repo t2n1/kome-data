@@ -78,8 +78,9 @@ doanh nghiệp.
 
 **Phải đặt `KOME_SESSION_SECRET` trong `.env` của máy trong công ty.** Để
 trống thì trang chạy KHÔNG có đăng nhập và KHÔNG có phân quyền — ai mở được
-trang cũng bấm được nút Hoàn tác. Đây cũng đúng là máy DUY NHẤT nạp và hoàn
-tác được, nên để trống là vô hiệu hoá toàn bộ phần bảo vệ của đợt 3.
+trang cũng bấm được nút Hoàn tác **và** sửa được màn Ngân sách. Đây cũng đúng
+là máy DUY NHẤT nạp và hoàn tác được, nên để trống là vô hiệu hoá toàn bộ
+phần bảo vệ của cả đợt 3 lẫn đợt 5a.
 
 ### Bật đăng nhập trên máy trong công ty — làm ĐÚNG THỨ TỰ NÀY
 
