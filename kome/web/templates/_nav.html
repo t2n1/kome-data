@@ -70,11 +70,26 @@
     {% endif %}
   </nav>
 
-  {% if co_dang_nhap %}
-  <div class="thoat">
-    {% if nguoi %}<p class="nhom">{{ nguoi.ten_sale or nguoi.ten_dang_nhap }}</p>{% endif %}
-    <form method="post" action="/dang-xuat"><button type="submit"><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M11.4 5.4V4a1.6 1.6 0 0 0-1.6-1.6H4.6A1.6 1.6 0 0 0 3 4v10a1.6 1.6 0 0 0 1.6 1.6h5.2a1.6 1.6 0 0 0 1.6-1.6v-1.4"></path><path d="M7.4 9h8"></path><path d="M13 6.6 15.4 9 13 11.4"></path></svg>Đăng xuất</button></form>
+  <div class="chan-ben">
+    {% if co_dang_nhap %}
+    <div class="thoat">
+      {% if nguoi %}<p class="nhom">{{ nguoi.ten_sale or nguoi.ten_dang_nhap }}</p>{% endif %}
+      <form method="post" action="/dang-xuat"><button type="submit"><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M11.4 5.4V4a1.6 1.6 0 0 0-1.6-1.6H4.6A1.6 1.6 0 0 0 3 4v10a1.6 1.6 0 0 0 1.6 1.6h5.2a1.6 1.6 0 0 0 1.6-1.6v-1.4"></path><path d="M7.4 9h8"></path><path d="M13 6.6 15.4 9 13 11.4"></path></svg>Đăng xuất</button></form>
+    </div>
+    {% endif %}
+    {# Đợt 4d (Task 2) — nút đổi giao diện sáng/tối. Bốn LIÊN KẾT
+       ?che_do=…, không phải nút JS: kome/web/app.py::doi_giao_dien lưu
+       cookie kome_giao_dien rồi chuyển hướng về đúng trang này. Đặt NGOÀI
+       khối {% if co_dang_nhap %} ở trên — máy trong công ty để trống
+       KOME_SESSION_SECRET (không có cổng đăng nhập nào cả) vẫn phải thấy
+       bốn nút này, y hệt cách "Kho dữ liệu" không bị `co_dang_nhap` che
+       (chỉ `hien_kho` mới có quyền che một mục). #}
+    <div class="giao-dien">
+      <a href="/giao-dien?che_do=sang"{% if che_do_giao_dien == 'sang' %} class="dang-xem" aria-current="true"{% endif %}>Sáng</a>
+      <a href="/giao-dien?che_do=toi"{% if che_do_giao_dien == 'toi' %} class="dang-xem" aria-current="true"{% endif %}>Tối</a>
+      <a href="/giao-dien?che_do=he-thong"{% if che_do_giao_dien == 'he-thong' %} class="dang-xem" aria-current="true"{% endif %}>Theo hệ thống</a>
+      <a href="/giao-dien?che_do=theo-gio"{% if che_do_giao_dien == 'theo-gio' %} class="dang-xem" aria-current="true"{% endif %}>Theo giờ</a>
+    </div>
   </div>
-  {% endif %}
 </aside>
 <main class="noi-dung">

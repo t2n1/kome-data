@@ -456,3 +456,129 @@ def test_logo_hien_trong_sidebar(conn, test_db_url):
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/").text
     assert "/static/kome-logo.png" in html
+
+
+# ---- Nút đổi giao diện sáng/tối (đợt 4d, Task 2) ------------------------
+# KHÔNG một dòng JS: lựa chọn lưu bằng cookie `kome_giao_dien`, máy chủ
+# render thẳng `data-theme` lên phần tử gốc bằng một thẻ <html> THỨ HAI ở
+# giữa thân trang -- trình duyệt GỘP thuộc tính đó vào phần tử <html> có
+# thật theo đúng thuật toán phân tích HTML5 (xử lý thẻ mở "html" lặp lại),
+# không cần JavaScript. File này không có fixture `client` chung (xem chú
+# thích Task 1 ở trên) -- mọi test tự dựng TestClient tại chỗ.
+
+def test_mac_dinh_theo_he_thong_thi_KHONG_dat_data_theme(conn, test_db_url):
+    # Không đặt thuộc tính = để @media (prefers-color-scheme) quyết định.
+    # Đặt cứng một giá trị mặc định là ép mọi người dùng mới vào một chế độ.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    assert "data-theme=" not in html
+
+
+def test_chon_sang_thi_ep_sang_KE_CA_khi_he_thong_dang_toi(conn, test_db_url):
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/giao-dien?che_do=sang", follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert "kome_giao_dien=sang" in r.headers["set-cookie"]
+    html = client.get("/", cookies={"kome_giao_dien": "sang"}).text
+    assert 'data-theme="sang"' in html
+
+
+def test_chon_toi_dat_data_theme_toi(conn, test_db_url):
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/", cookies={"kome_giao_dien": "toi"}).text
+    assert 'data-theme="toi"' in html
+
+
+def test_che_do_la_bay_khong_lam_no_trang(conn, test_db_url):
+    # Tham số URL gõ sai không được làm trang chết, và giá trị đó không bao
+    # giờ được PHẢN CHIẾU nguyên văn vào cookie hay HTML -- data-theme render
+    # ra chỉ có thể là "sang"/"toi", do chính route tính, không bao giờ chép
+    # thẳng từ tham số hay cookie.
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/giao-dien?che_do=<script>", follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert "<script>" not in r.headers["set-cookie"]
+    html = client.get("/", cookies={"kome_giao_dien": "<script>"}).text
+    assert "<script>" not in html
+    assert "data-theme=" not in html
+
+
+def test_theo_gio_doi_theo_gio_NHAT_khong_theo_gio_may_chu(conn, test_db_url, monkeypatch):
+    # CSDL chạy UTC; lấy giờ máy chủ thì 18:00 giờ Nhật vẫn là 09:00 UTC và
+    # trang sáng trưng suốt buổi tối -- cùng cái bẫy mà ô "hôm nay đã có dữ
+    # liệu chưa" đã ghi trong CLAUDE.md. Dùng lại ĐÚNG hàm giờ Nhật của
+    # kome/tuoi_du_lieu.py (`_bay_gio`, cùng chỗ test_web.py monkeypatch),
+    # không viết bản giờ Nhật thứ hai.
+    from datetime import datetime
+    from kome.tuoi_du_lieu import MUI_GIO
+    client = TestClient(create_app(db_url=test_db_url))
+
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 20, 0, tzinfo=MUI_GIO))
+    html = client.get("/", cookies={"kome_giao_dien": "theo-gio"}).text
+    assert 'data-theme="toi"' in html
+
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 10, 0, tzinfo=MUI_GIO))
+    html = client.get("/", cookies={"kome_giao_dien": "theo-gio"}).text
+    assert 'data-theme="sang"' in html
+
+
+def test_hai_khoi_mau_toi_trong_css_GIONG_HET_NHAU():
+    # Bảng tối phải viết HAI lần (một trong @media, một cho
+    # :root[data-theme="toi"]) vì CSS không gộp được hai selector đó vào một
+    # khối. Hai bản trôi khỏi nhau là chọn "tối" tay ra một bộ màu khác với
+    # "tối" theo hệ thống -- và không ai thấy cho tới khi nhìn hai máy cạnh
+    # nhau.
+    css = CSS.read_text(encoding="utf-8")
+    khoi = re.findall(r"/\* BANG-TOI \*/(.*?)/\* HET-BANG-TOI \*/", css, re.S)
+    assert len(khoi) == 2, f"cần đúng 2 khối BANG-TOI, thấy {len(khoi)}"
+    assert khoi[0].strip() == khoi[1].strip()
+
+
+def test_ban_toi_ap_dung_du_khi_chon_tay():
+    # :root[data-theme="toi"] phải tồn tại NGOÀI khối @media -- chọn "Tối"
+    # bằng tay phải thắng cả khi hệ thống đang để sáng.
+    css = CSS.read_text(encoding="utf-8")
+    assert ':root[data-theme="toi"]' in css.replace(" ", "")
+
+
+def test_ban_sang_chon_tay_thang_he_thong_dang_toi():
+    # Selector trong khối @media (prefers-color-scheme: dark) phải là
+    # :root:not([data-theme="sang"]), không phải :root trần -- nếu không,
+    # chọn "Sáng" bằng tay không có tác dụng gì với người đang ở hệ thống
+    # tối, đúng những người bấm nút đó.
+    css = CSS.read_text(encoding="utf-8")
+    assert ':root:not([data-theme="sang"])' in css.replace(" ", "")
+
+
+def test_nut_doi_giao_dien_hien_KE_CA_khong_co_cong_dang_nhap(conn, test_db_url):
+    # Máy trong công ty để trống KOME_SESSION_SECRET vẫn phải thấy bốn nút
+    # này -- không được đặt trong khối {% if co_dang_nhap %}.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    for nhan in ("Sáng", "Tối", "Theo hệ thống", "Theo giờ"):
+        assert nhan in html, f"thiếu nút đổi giao diện: {nhan}"
+    for che_do in ("sang", "toi", "he-thong", "theo-gio"):
+        assert f"/giao-dien?che_do={che_do}" in html
+
+
+def test_giao_dien_chuyen_huong_chi_ve_duong_dan_noi_bo(conn, test_db_url):
+    # Referer ngoài không được dùng để mở cửa chuyển hướng ra ngoài -- chỉ
+    # giữ lại PATH, bỏ nếu không bắt đầu bằng "/". Domain trong Referer không
+    # quan trọng ở đây vì RedirectResponse trả về một path (không phải một
+    # URL tuyệt đối), nên trình duyệt vẫn ở lại đúng máy chủ KOME -- nhưng
+    # path phải khớp đúng trang đã gọi nó.
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/giao-dien?che_do=toi",
+                   headers={"referer": "http://may-la.example/khach-hang?tim=x"},
+                   follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert r.headers["location"] == "/khach-hang"
+
+
+def test_giao_dien_khong_co_referer_thi_ve_trang_chu(conn, test_db_url):
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/giao-dien?che_do=toi", follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert r.headers["location"] == "/"

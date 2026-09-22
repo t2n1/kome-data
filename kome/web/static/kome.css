@@ -80,28 +80,70 @@
       đang ở bảng màu nào để không chìm vào --nen-the tối. */
    --logo-nen:#FFFFFF;
  }
+ /* Đợt 4d (Task 2) — nút đổi giao diện sáng/tối, KHÔNG JS: máy chủ render
+    thuộc tính data-theme lên <html> theo cookie kome_giao_dien (xem
+    kome/web/app.py, _chung.html). CSS không gộp được hai selector
+    "@media (prefers-color-scheme: dark) :root" và ":root[data-theme=toi]"
+    vào MỘT khối, nên bảng màu tối phải viết HAI LẦN — bọc bằng cặp mốc chú
+    thích BANG-TOI và HET-BANG-TOI để có test canh hai bản GIỐNG HỆT nhau
+    (tests/test_giao_dien.py::test_hai_khoi_mau_toi_trong_css_GIONG_HET_NHAU).
+    Hai bản trôi khỏi nhau là chọn "tối" tay ra một bộ màu khác "tối" theo
+    hệ thống, và không ai thấy cho tới khi đặt hai máy cạnh nhau. */
  @media (prefers-color-scheme: dark){
+   /* :root:not([data-theme="sang"]) chứ KHÔNG PHẢI :root trần — chọn
+      "Sáng" bằng tay phải thắng cả khi hệ thống đang để tối. :root trần ở
+      đây là nút "Sáng" bấm vào không có tác dụng gì với đúng những người
+      cần bấm nó (máy đang ở chế độ tối). */
+   :root:not([data-theme="sang"]){
+   /* BANG-TOI */
    /* Từng cặp lấy từ bảng MAP trong kome-theme.js của gói thiết kế —
       không tự pha. #D62C27 không có trong bảng đó: thiết kế giữ nguyên
       đỏ công ty ở cả hai chế độ. */
-   :root{
-     --nen:#17140F; --nen-the:#211D17; --nen-phu:#262019;
-     --vien:#342E26; --vien-phu:#2B251D; --vien-dam:#4A4239;
-     --chu:#F4EFE6; --chu-thuong:#D6CFC2; --chu-nhat:#A79F92; --chu-mo:#978F83;
-     --lien-ket:#E2A72E;
-     --do:#D62C27; --do-chu:#F0776F; --do-nen:#3A1E1C;
-     --ok-nen:#16301F;  --ok-vien:#3FA06C;  --ok-chu:#5FC492;
-     --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
-     --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
-     --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
-     /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
-        đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —
-        cùng lý do --lien-ket đảo hướng giữa hai chế độ. --map-chu-alt theo
-        đó cũng đảo: chữ TỐI trên nền bậc cao sáng màu ở chế độ này. */
-     --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
-     --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
-     --logo-nen:#FBF9F5;
+   --nen:#17140F; --nen-the:#211D17; --nen-phu:#262019;
+   --vien:#342E26; --vien-phu:#2B251D; --vien-dam:#4A4239;
+   --chu:#F4EFE6; --chu-thuong:#D6CFC2; --chu-nhat:#A79F92; --chu-mo:#978F83;
+   --lien-ket:#E2A72E;
+   --do:#D62C27; --do-chu:#F0776F; --do-nen:#3A1E1C;
+   --ok-nen:#16301F;  --ok-vien:#3FA06C;  --ok-chu:#5FC492;
+   --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
+   --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
+   --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
+   /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
+      đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —
+      cùng lý do --lien-ket đảo hướng giữa hai chế độ. --map-chu-alt theo
+      đó cũng đảo: chữ TỐI trên nền bậc cao sáng màu ở chế độ này. */
+   --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
+   --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
+   --logo-nen:#FBF9F5;
+   /* HET-BANG-TOI */
    }
+ }
+ /* Chọn "Tối" bằng tay: phải áp dụng NGOÀI khối @media ở trên, đè được cả
+    khi hệ thống đang để sáng — đây là bản sao Y HỆT của khối phía trên
+    (giữa hai mốc BANG-TOI/HET-BANG-TOI), không phải một bảng màu tối
+    thứ hai được pha riêng. */
+ :root[data-theme="toi"]{
+   /* BANG-TOI */
+   /* Từng cặp lấy từ bảng MAP trong kome-theme.js của gói thiết kế —
+      không tự pha. #D62C27 không có trong bảng đó: thiết kế giữ nguyên
+      đỏ công ty ở cả hai chế độ. */
+   --nen:#17140F; --nen-the:#211D17; --nen-phu:#262019;
+   --vien:#342E26; --vien-phu:#2B251D; --vien-dam:#4A4239;
+   --chu:#F4EFE6; --chu-thuong:#D6CFC2; --chu-nhat:#A79F92; --chu-mo:#978F83;
+   --lien-ket:#E2A72E;
+   --do:#D62C27; --do-chu:#F0776F; --do-nen:#3A1E1C;
+   --ok-nen:#16301F;  --ok-vien:#3FA06C;  --ok-chu:#5FC492;
+   --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
+   --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
+   --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
+   /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
+      đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —
+      cùng lý do --lien-ket đảo hướng giữa hai chế độ. --map-chu-alt theo
+      đó cũng đảo: chữ TỐI trên nền bậc cao sáng màu ở chế độ này. */
+   --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
+   --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
+   --logo-nen:#FBF9F5;
+   /* HET-BANG-TOI */
  }
  html{background:var(--nen)}
  body{font:16px/1.6 var(--font-ui);background:var(--nen);color:var(--chu);
@@ -198,11 +240,27 @@
     màu cứng sẽ lộ ra ngay ở đó). */
  .ic{width:1.05em;height:1.05em;flex-shrink:0;fill:none;stroke:currentColor;
    stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
- .thoat{margin-top:auto;border-top:1px solid var(--vien);padding-top:.7rem}
+ /* Chân sidebar: bọc chung .thoat (đăng xuất, CHỈ hiện khi có cổng đăng
+    nhập) và .giao-dien (nút đổi sáng/tối, đợt 4d Task 2 — hiện KỂ CẢ khi
+    không có cổng). margin-top:auto đặt trên WRAPPER, không phải trên từng
+    khối con: hai auto-margin liền nhau trong cùng một trục flex chia đôi
+    khoảng trống còn lại, đẩy .thoat và .giao-dien tách xa nhau thay vì
+    dính sát đáy — một wrapper duy nhất tránh đúng lỗi đó. */
+ .chan-ben{margin-top:auto}
+ .thoat{border-top:1px solid var(--vien);padding-top:.7rem}
  .thoat button{display:flex;align-items:center;gap:.55rem;font:inherit;width:100%;
    text-align:left;padding:.4rem .55rem;border-radius:8px;border:0;
    background:transparent;color:var(--chu-nhat);cursor:pointer}
  .thoat button:hover{background:var(--nen-phu);color:var(--chu)}
+ /* Bốn liên kết ?che_do=… — LIÊN KẾT, không phải nút bấm JS. border-top
+    riêng: khi không có .thoat phía trên (máy trong công ty để trống
+    KOME_SESSION_SECRET), khối này vẫn cần một đường phân cách với <nav>. */
+ .giao-dien{display:flex;flex-direction:column;gap:.1rem;
+   border-top:1px solid var(--vien);padding-top:.6rem;margin-top:.6rem}
+ .giao-dien a{display:block;padding:.35rem .55rem;border-radius:8px;
+   font-size:.8rem;text-decoration:none;color:var(--chu-nhat)}
+ .giao-dien a:hover{background:var(--nen-phu);color:var(--chu)}
+ .giao-dien a.dang-xem{background:var(--do-nen);color:var(--do-chu);font-weight:600}
 
  /* Màn hẹp: sidebar nằm ngang trên đầu thay vì chiếm 196px của 375px. */
  @media (max-width:720px){
@@ -211,7 +269,9 @@
      align-items:center;gap:.25rem;border-right:0;border-bottom:1px solid var(--vien)}
    .dieu-huong{flex-direction:row;flex-wrap:wrap}
    .dieu-huong .nhom{display:none}
-   .thoat{margin-top:0;margin-left:auto;border-top:0;padding-top:0}
+   .chan-ben{margin-top:0;margin-left:auto;display:flex;align-items:center;gap:.5rem}
+   .thoat{border-top:0;padding-top:0}
+   .giao-dien{flex-direction:row;flex-wrap:wrap;border-top:0;padding-top:0;margin-top:0}
    .noi-dung{max-width:none;width:100%;box-sizing:border-box}
  }
 
