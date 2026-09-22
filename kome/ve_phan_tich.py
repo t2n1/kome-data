@@ -64,6 +64,12 @@ def _squarify(gia_tri: list[float], x: float, y: float, w: float, h: float
     """
     if not gia_tri:
         return []
+    assert all(v > 0 for v in gia_tri), (
+        "_squarify chỉ nhận giá trị DƯƠNG — lọc số 0/âm ở tầng gọi trước khi "
+        "gọi hàm này. Một giá trị 0 lọt vào một hàng có phần tử khác 0 sẽ "
+        "chia cho 0 trong công thức tỷ lệ khung xấu nhất (worst-ratio) bên "
+        "dưới; assert ở đây báo lỗi ngay tại chỗ thay vì một ZeroDivisionError "
+        "khó dò ở sâu bên trong vòng lặp.")
     tong = sum(gia_tri)
     if tong <= 0:
         return []
@@ -136,7 +142,15 @@ def _squarify(gia_tri: list[float], x: float, y: float, w: float, h: float
 def ve_duong_nho(so: list[int | float | None], rong: int = 120, cao: int = 32) -> dict:
     """Đường nhỏ (sparkline) cho một ô chỉ số. `None` cắt đường thành đoạn
     mới — KHÔNG nối liền qua tháng thiếu dữ liệu, cùng nếp `ve_bieu_do` với
-    tháng không có cùng kỳ."""
+    tháng không có cùng kỳ.
+
+    [Vòng soát 1, minor 4] Một đoạn chỉ có ĐÚNG MỘT điểm (số liệu đứng lẻ,
+    kẹp giữa hai `None` hoặc ở đầu/cuối) vẫn có mặt trong `doan` (một
+    `<polyline>` một điểm không vẽ được đường, template có thể bỏ qua), NHƯNG
+    toạ độ của nó còn được liệt riêng trong `diem_don` (list `(x, y)`) để
+    template vẽ một CHẤM tròn cho điểm đứng lẻ đó — không thì tháng duy nhất
+    có số liệu giữa hai tháng thiếu dữ liệu biến mất khỏi biểu đồ hoàn toàn.
+    """
     gia_tri = [v for v in so if v is not None]
     if not gia_tri:
         return {"co": False}
@@ -148,20 +162,27 @@ def ve_duong_nho(so: list[int | float | None], rong: int = 120, cao: int = 32) -
     buoc = rong_ve / max(len(so) - 1, 1)
 
     doan: list[str] = []
-    dang_ve: list[str] = []
+    diem_don: list[tuple[float, float]] = []
+    dang_ve: list[tuple[float, float]] = []
+
+    def flush() -> None:
+        if not dang_ve:
+            return
+        if len(dang_ve) == 1:
+            diem_don.append(dang_ve[0])
+        doan.append(" ".join(f"{x},{y}" for x, y in dang_ve))
+        dang_ve.clear()
+
     for i, v in enumerate(so):
         if v is None:
-            if dang_ve:
-                doan.append(" ".join(dang_ve))
-                dang_ve = []
+            flush()
             continue
-        x = le + i * buoc
-        y = le + cao_ve - cao_ve * (v - day) / khoang
-        dang_ve.append(f"{round(x, 1)},{round(y, 1)}")
-    if dang_ve:
-        doan.append(" ".join(dang_ve))
+        x = round(le + i * buoc, 1)
+        y = round(le + cao_ve - cao_ve * (v - day) / khoang, 1)
+        dang_ve.append((x, y))
+    flush()
 
-    return {"co": True, "rong": rong, "cao": cao, "doan": doan}
+    return {"co": True, "rong": rong, "cao": cao, "doan": doan, "diem_don": diem_don}
 
 
 # ---- Đóng góp ngành (thanh lệch hai phía) -----------------------------------
@@ -202,24 +223,50 @@ def ve_cay_o(nhom: "list[tuple[str, int, float | None, list[tuple[str, str, int]
     """Treemap hai tầng: ngành -> tối đa `toi_da_ma` mã lớn nhất + một ô
     "(khác)" cho phần còn lại. Diện tích ÂM không vẽ được — ngành/mã doanh
     thu <= 0 bị BỎ và cộng dồn vào `khong_ve` (spec §4.2: lặng lẽ bỏ là tổng
-    cây ô lệch tổng ô chỉ số mà không ai biết vì sao, nên phải in ra)."""
+    cây ô lệch tổng ô chỉ số mà không ai biết vì sao, nên phải in ra).
+
+    [Vòng soát 1] Đối soát tổng: `dt_nganh` (doanh thu NGÀNH, số liệu chính
+    thức từ mart) và tổng các mã trong `mat_hang` là HAI nguồn khác nhau,
+    không nhất thiết khớp nhau tuyệt đối. Bản đầu lấy
+    `con_lai = dt_nganh - sum(mã được vẽ riêng)` làm ô "(khác)" — sai ở hai
+    chỗ: (1) một mã ÂM trong danh sách đã bị cộng riêng vào `khong_ve`, rồi
+    `dt_nganh` (chưa trừ mã đó) lại kéo theo đúng khoản âm đó một lần NỮA vào
+    "(khác)" -> đếm hai lần; (2) nếu `dt_nganh` nhỏ hơn tổng vài mã dương nhỏ
+    (dt_nganh không bao trọn hết danh sách mã), `con_lai` có thể ÂM và cả cụm
+    mã nhỏ đó biến mất khỏi cây ô mà không cộng vào đâu cả.
+
+    Sửa: diện tích của MỘT NGÀNH luôn là `doanh_thu_ve` = TỔNG CÁC MÃ DƯƠNG
+    của chính ngành đó (không phải `dt_nganh`) — "(khác)" =
+    `doanh_thu_ve - tổng mã được vẽ riêng`, LUÔN >= 0 theo xây dựng nên không
+    còn ca mất mã. Ngành không có danh sách mã (hoặc mọi mã đều <= 0) thì vẽ
+    thẳng `dt_nganh` làm diện tích (không có ô mã con nào tách ra được).
+    `dt_nganh` (net, SỐ THẬT theo mart, dùng để in `<title>`) vẫn được giữ
+    nguyên trong khoá `doanh_thu` của mỗi ngành; khoá MỚI `doanh_thu_ve` là
+    giá trị THỰC SỰ dùng để tính diện tích — hai con số có thể khác nhau và
+    ĐỀU phải hiển thị được, không được lẫn vào nhau.
+
+    Bất biến đối soát (có test canh): với MỌI `dt_nganh` đầu vào,
+    `sum(doanh_thu_ve của các ngành được vẽ) + khong_ve == sum(dt_nganh đầu
+    vào)` — miễn `dt_nganh` của mỗi ngành đúng bằng tổng các mã (dương và âm)
+    của chính nó, tức dữ liệu mart nhất quán giữa hai tầng.
+
+    `so_ma_khong_ve` đếm SỐ MÃ bị bỏ — gồm cả mã nằm trong một ngành bị bỏ
+    TOÀN BỘ (ngành đó không tách mã ra được nữa vì cả ngành đã biến mất khỏi
+    cây ô, nhưng số mã trong danh sách gốc của nó vẫn được đếm vào đây, để
+    câu "N mã doanh thu âm" trên trang không thiếu mã của những ngành đó).
+    Số đếm này KHÔNG cộng dồn được thành tiền — tiền dồn hết vào `khong_ve`
+    (một số nguyên yên), tách bạch "đếm mã" và "cộng tiền" là hai việc khác
+    nhau.
+    """
     khong_ve = 0
     so_ma_khong_ve = 0
-    nganh_duong = []
+    nganh_giu = []  # (nganh, dt_nganh, tt_nganh, doanh_thu_ve, mat_hang_duong)
     for nganh, dt_nganh, tt_nganh, mat_hang in nhom:
         if dt_nganh is None or dt_nganh <= 0:
             khong_ve += dt_nganh or 0
+            so_ma_khong_ve += len(mat_hang)
             continue
-        nganh_duong.append((nganh, dt_nganh, tt_nganh, mat_hang))
 
-    if not nganh_duong:
-        return {"co": False, "khong_ve": int(khong_ve), "so_ma_khong_ve": so_ma_khong_ve}
-
-    nganh_sap = sorted(nganh_duong, key=lambda t: t[1], reverse=True)
-    o_nganh = _squarify([t[1] for t in nganh_sap], 0, 0, rong, cao)
-
-    ket_qua_nganh = []
-    for (nganh, dt_nganh, tt_nganh, mat_hang), (x, y, w, h) in zip(nganh_sap, o_nganh):
         mh_duong = []
         for _ma, ten, dt in mat_hang:
             if dt is None or dt <= 0:
@@ -227,9 +274,30 @@ def ve_cay_o(nhom: "list[tuple[str, int, float | None, list[tuple[str, str, int]
                 so_ma_khong_ve += 1
                 continue
             mh_duong.append((ten, dt))
+
+        doanh_thu_ve = sum(dt for _, dt in mh_duong)
+        if doanh_thu_ve <= 0:
+            # Không có mã nào dương để tách (danh sách rỗng, hoặc mọi mã đều
+            # <= 0 dù dt_nganh > 0) -> vẽ thẳng dt_nganh, không có ô mã con.
+            doanh_thu_ve = dt_nganh
+            mh_duong = []
+
+        nganh_giu.append((nganh, dt_nganh, tt_nganh, doanh_thu_ve, mh_duong))
+
+    if not nganh_giu:
+        return {"co": False, "khong_ve": int(khong_ve), "so_ma_khong_ve": so_ma_khong_ve}
+
+    # Squarify tầng 1 theo doanh_thu_ve (giá trị THỰC SỰ vẽ), không theo
+    # dt_nganh — hai con số lệch nhau khi ngành có mã âm hoặc mã không bao
+    # trọn dt_nganh (xem docstring ở trên).
+    nganh_sap = sorted(nganh_giu, key=lambda t: t[3], reverse=True)
+    o_nganh = _squarify([t[3] for t in nganh_sap], 0, 0, rong, cao)
+
+    ket_qua_nganh = []
+    for (nganh, dt_nganh, tt_nganh, doanh_thu_ve, mh_duong), (x, y, w, h) in zip(nganh_sap, o_nganh):
         mh_sap = sorted(mh_duong, key=lambda t: t[1], reverse=True)
         ve_rieng = mh_sap[:toi_da_ma]
-        con_lai = dt_nganh - sum(dt for _, dt in ve_rieng)
+        con_lai = doanh_thu_ve - sum(dt for _, dt in ve_rieng)
 
         items = list(ve_rieng)
         if con_lai > 1e-9:
@@ -245,8 +313,8 @@ def ve_cay_o(nhom: "list[tuple[str, int, float | None, list[tuple[str, str, int]
             "nganh": nganh, "x": round(x, 1), "y": round(y, 1),
             "w": round(w, 1), "h": round(h, 1),
             "bac": bac_tang_truong(tt_nganh),
-            "doanh_thu": int(dt_nganh), "tang_truong": tt_nganh,
-            "ma": ma_ra})
+            "doanh_thu": int(dt_nganh), "doanh_thu_ve": int(doanh_thu_ve),
+            "tang_truong": tt_nganh, "ma": ma_ra})
 
     return {"co": True, "rong": rong, "cao": cao, "nganh": ket_qua_nganh,
             "khong_ve": int(khong_ve), "so_ma_khong_ve": so_ma_khong_ve}
@@ -299,7 +367,14 @@ def ve_pareto(tt: "TapTrung | None", rong: int = 720, cao: int = 260) -> dict:
     """Cột doanh thu mỗi khách (khách âm — 赤伝 của riêng họ — vẫn có cột,
     cao 0) + đường luỹ kế trên trục 0–100% bên phải. Luỹ kế bị KẸP [0, 1]
     khi vẽ (một khách âm có thể đẩy luỹ kế nhất thời > 100%); số ĐỌC ĐƯỢC
-    (`KhachTapTrung.luy_ke`) giữ nguyên, không kẹp — chỉ toạ độ vẽ mới kẹp."""
+    (`KhachTapTrung.luy_ke`) giữ nguyên, không kẹp — chỉ toạ độ vẽ mới kẹp.
+
+    [Vòng soát 1, minor 3] Trả `"doan": list[str]` (nhiều đoạn `<polyline>`),
+    KHÔNG phải một `"duong"` duy nhất: `luy_ke` từng khách hàng CÓ THỂ `None`
+    (chưa tính được, cùng nếp `khach_mat_hang.nhip_ngay` chưa đủ dữ liệu), và
+    một chuỗi điểm duy nhất sẽ NỐI LIỀN qua đúng khách đó như thể luỹ kế của
+    nó bằng khách trước — sai. Cắt đoạn tại `None`, cùng cơ chế với
+    `ve_duong_nho`/`ve_bieu_do::duong_ck`."""
     if tt is None or not tt.dong:
         return {"co": False}
 
@@ -310,17 +385,24 @@ def ve_pareto(tt: "TapTrung | None", rong: int = 720, cao: int = 260) -> dict:
     buoc = rong_ve / len(tt.dong)
     rong_cot = max(buoc * 0.7, 2)
 
-    cot, duong = [], []
+    cot, doan = [], []
+    dang_ve: list[str] = []
     for i, d in enumerate(tt.dong):
         x = le_t + i * buoc
         h = max(cao_ve * (d.doanh_thu / dinh), 0) if d.doanh_thu > 0 else 0
         cot.append({"x": round(x + (buoc - rong_cot) / 2, 1),
                     "y": round(le_tren + cao_ve - h, 1),
                     "w": round(rong_cot, 1), "h": round(h, 1), "khach": d})
-        if d.luy_ke is not None:
-            lk = max(0.0, min(d.luy_ke, 1.0))
-            y = le_tren + cao_ve - cao_ve * lk
-            duong.append(f"{round(x + buoc / 2, 1)},{round(y, 1)}")
+        if d.luy_ke is None:
+            if dang_ve:
+                doan.append(" ".join(dang_ve))
+                dang_ve = []
+            continue
+        lk = max(0.0, min(d.luy_ke, 1.0))
+        y = le_tren + cao_ve - cao_ve * lk
+        dang_ve.append(f"{round(x + buoc / 2, 1)},{round(y, 1)}")
+    if dang_ve:
+        doan.append(" ".join(dang_ve))
 
     return {"co": True, "rong": rong, "cao": cao, "cot": cot,
-            "duong": " ".join(duong), "dinh": dinh}
+            "doan": doan, "dinh": dinh}

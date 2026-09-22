@@ -48,6 +48,15 @@ def test_squarify_mot_phan_tu_lap_day_toan_bo_khung():
     assert o == [(5, 5, 30, 20)]
 
 
+def test_squarify_gia_tri_0_nem_assert_khong_zerodivisionerror():
+    """[Vòng soát 1, minor 2] Một giá trị 0 lẫn trong hàng có phần tử khác 0
+    chia cho 0 ở công thức worst-ratio — assert phải chặn TRƯỚC khi rơi vào
+    đó, không để lộ ZeroDivisionError khó dò."""
+    import pytest
+    with pytest.raises(AssertionError):
+        _squarify([50, 0, 20], 0, 0, 100, 40)
+
+
 # ---- bac_tang_truong -------------------------------------------------------
 
 def test_bac_tang_truong_none_la_khong():
@@ -81,6 +90,17 @@ def test_ve_duong_nho_cat_doan_tai_none():
 
 def test_ve_duong_nho_toan_none():
     assert ve_duong_nho([None, None]) == {"co": False}
+
+
+def test_ve_duong_nho_diem_don_cho_diem_dung_le():
+    """[Vòng soát 1, minor 4] Một điểm đứng lẻ giữa hai None vẫn phải có mặt
+    trong diem_don để template vẽ chấm — không thì tháng đó biến mất khỏi
+    biểu đồ."""
+    d = ve_duong_nho([1, None, 5, None, 3])
+    assert len(d["doan"]) == 3          # ba đoạn: [1], [5], [3] — đều lẻ
+    assert len(d["diem_don"]) == 3
+    xs = [x for x, _ in d["diem_don"]]
+    assert xs == sorted(xs)             # đúng thứ tự thời gian
 
 
 # ---- ve_bieu_do (thêm duong_ck) --------------------------------------------
@@ -189,6 +209,65 @@ def test_ve_cay_o_rong_khi_khong_con_nganh_duong():
     assert cq["khong_ve"] == -50
 
 
+# ---- Đối soát tổng (soát vòng 1) --------------------------------------------
+# `dt_nganh` PHẢI bằng đúng tổng các mã (dương + âm) của chính ngành đó để
+# bất biến đối soát có ý nghĩa — đây là giả định của MART (hai tầng dữ liệu
+# nhất quán), không phải một ràng buộc riêng của lớp vẽ.
+
+def _tong_dau_vao(nhom):
+    return sum(dt_nganh for _, dt_nganh, _, _ in nhom)
+
+
+def _tong_ve(cq):
+    return sum(n["doanh_thu_ve"] for n in cq["nganh"])
+
+
+def test_doi_soat_a_nganh_duong_co_mot_ma_am():
+    # dt_nganh = 1000 + (-100) = 900, đúng tổng hai mã.
+    nhom = [("Gạo", 900, 0.1, [("G1", "Gạo ST25", 1000), ("G2", "Phí trả hàng", -100)])]
+    cq = ve_cay_o(nhom)
+    assert cq["nganh"][0]["doanh_thu"] == 900         # net, để hiện <title>
+    assert cq["nganh"][0]["doanh_thu_ve"] == 1000      # diện tích thực vẽ
+    assert cq["khong_ve"] == -100
+    assert _tong_ve(cq) + cq["khong_ve"] == _tong_dau_vao(nhom)
+    # không mã nào mất: mã dương duy nhất phải được vẽ riêng (không có "khác"
+    # vì chỉ một mã dương, con_lai = 0).
+    ten_ma = [m["ten"] for m in cq["nganh"][0]["ma"]]
+    assert ten_ma == ["Gạo ST25"]
+
+
+def test_doi_soat_b_hon_5_ma_duong_cong_mot_ma_am():
+    duong = [("M1", "Mã 1", 300), ("M2", "Mã 2", 150), ("M3", "Mã 3", 100),
+             ("M4", "Mã 4", 80), ("M5", "Mã 5", 50), ("M6", "Mã 6", 20)]
+    am = ("M7", "Phí", -40)
+    tong_duong = sum(dt for _, _, dt in duong)          # 700
+    dt_nganh = tong_duong + am[2]                        # 660, đúng tổng mã
+    nhom = [("Gạo", dt_nganh, None, duong + [am])]
+    cq = ve_cay_o(nhom, toi_da_ma=5)
+    n = cq["nganh"][0]
+    assert n["doanh_thu"] == dt_nganh
+    assert n["doanh_thu_ve"] == tong_duong               # 700, không đếm mã âm
+    assert cq["khong_ve"] == -40
+    assert cq["so_ma_khong_ve"] == 1
+    assert _tong_ve(cq) + cq["khong_ve"] == _tong_dau_vao(nhom)
+    # Không mã dương nào mất: 5 mã lớn nhất vẽ riêng, mã thứ 6 (20) nằm trọn
+    # trong "(khác)".
+    ten_rieng = {m["ten"] for m in n["ma"] if m["ten"] != "(khác)"}
+    assert ten_rieng == {"Mã 1", "Mã 2", "Mã 3", "Mã 4", "Mã 5"}
+    khac = next(m for m in n["ma"] if m["ten"] == "(khác)")
+    assert khac["doanh_thu"] == 20
+
+
+def test_doi_soat_c_ca_nganh_am():
+    nhom = [("Gạo", 900, 0.1, [("G1", "Gạo ST25", 900)]),
+            ("Chiết khấu", -50, None, [("C1", "Chiết khấu A", -30), ("C2", "Chiết khấu B", -20)])]
+    cq = ve_cay_o(nhom)
+    assert cq["khong_ve"] == -50
+    assert cq["so_ma_khong_ve"] == 2   # cả hai mã của ngành bị bỏ đều được đếm
+    assert len(cq["nganh"]) == 1
+    assert _tong_ve(cq) + cq["khong_ve"] == _tong_dau_vao(nhom)
+
+
 # ---- ve_nhiet ---------------------------------------------------------------
 
 def _nt(thang, nganh, dt, dt_ck, tang_truong):
@@ -237,9 +316,19 @@ def test_ve_pareto_luy_ke_qua_100_ke_o_mep_tren():
     pr = ve_pareto(tt)
     assert pr["co"] is True
     # điểm đầu tiên (luỹ kế 1.4, bị kẹp về 1.0) phải nằm ở mép trên của khung vẽ
-    x0, y0 = pr["duong"].split(" ")[0].split(",")
+    x0, y0 = pr["doan"][0].split(" ")[0].split(",")
     assert abs(float(y0) - 16.0) < 1e-6  # LE_TREN
 
 
 def test_ve_pareto_rong_khong_co_khach():
     assert ve_pareto(TapTrung(dong=[], so_khach=0, luy_ke_top10=None)) == {"co": False}
+
+
+def test_ve_pareto_luy_ke_none_cat_doan():
+    """[Vòng soát 1, minor 3] Một khách chưa tính được luỹ kế (None) không
+    được nối liền với khách kế bên — đường luỹ kế phải đứt tại đó."""
+    tt = TapTrung(dong=[_kt("K1", 500, 1, 0.5), _kt("K2", 300, 2, None),
+                        _kt("K3", 200, 3, 1.0)],
+                  so_khach=3, luy_ke_top10=None)
+    pr = ve_pareto(tt)
+    assert len(pr["doan"]) == 2
