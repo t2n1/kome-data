@@ -85,9 +85,17 @@
       khong, vì đây là "không có DỮ LIỆU", không phải "có dữ liệu, không so
       được". --duong-ck: đường doanh thu cùng kỳ nét đứt trên biểu đồ 12
       tháng (ve_bieu_do::duong_ck) — dùng lại tông --lien-ket, khác --ok-vien
-      (đường tỷ suất) và --do (cột tháng chốt) đã có trên cùng biểu đồ. */
-   --nhiet-g2:#F3C4C0; --nhiet-g1:#F8DEDB; --nhiet-0:#E6E2D9;
-   --nhiet-t1:#D9EDE1; --nhiet-t2:#B9DFC7;
+      (đường tỷ suất) và --do (cột tháng chốt) đã có trên cùng biểu đồ.
+      [Vòng soát 1, I-4] Bậc chẵn (g2/t2, cực trị) đậm/bão hoà HƠN HẲN bậc lẻ
+      (g1/t1, nhẹ) và bậc 0 (gần như bằng nền/viền trang) — khoảng cách độ
+      sáng phải đủ RỘNG để mắt phân biệt được 5 bậc liền kề nhau trên một
+      lưới nhỏ (~40px/ô), không chỉ đủ tương phản với CHỮ đè lên. Bản đồ
+      nhiệt (kome/web/templates/bao_cao.html) LUÔN vẽ viền `var(--vien)`
+      quanh mỗi ô (`.nhiet-bang td`) — hai bậc gần màu nền/viền nhất
+      (--nhiet-0, --nhiet-khong) không có viền sẽ lẫn hẳn vào khoảng trống
+      giữa các ô. */
+   --nhiet-g2:#E8938C; --nhiet-g1:#F5D2CD; --nhiet-0:#E6E2D9;
+   --nhiet-t1:#CFEBDC; --nhiet-t2:#8FCDA9;
    --nhiet-khong:#F0EDE6; --nhiet-soc:#D8D3C8;
    --duong-ck:#8A5E06;
    /* Nền bọc logo sidebar (đợt 4d, Task 1) — README gói thiết kế: "logo
@@ -142,8 +150,8 @@
    --logo-nen:#FBF9F5;
    /* [Đợt 5b Task 4] Bậc màu tăng trưởng — bản tối, cùng công thức đảo
       đậm/nhạt như --map-* ở trên (bậc cực trị phải NỔI trên nền sẫm). */
-   --nhiet-g2:#5A2422; --nhiet-g1:#42221F; --nhiet-0:#342E26;
-   --nhiet-t1:#1F3A2A; --nhiet-t2:#1B4A30;
+   --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
+   --nhiet-t1:#20452F; --nhiet-t2:#1E6E45;
    --nhiet-khong:#2B251D; --nhiet-soc:#4A4239;
    --duong-ck:#E2A72E;
    /* HET-BANG-TOI */
@@ -183,8 +191,8 @@
    --logo-nen:#FBF9F5;
    /* [Đợt 5b Task 4] Bậc màu tăng trưởng — bản tối, cùng công thức đảo
       đậm/nhạt như --map-* ở trên (bậc cực trị phải NỔI trên nền sẫm). */
-   --nhiet-g2:#5A2422; --nhiet-g1:#42221F; --nhiet-0:#342E26;
-   --nhiet-t1:#1F3A2A; --nhiet-t2:#1B4A30;
+   --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
+   --nhiet-t1:#20452F; --nhiet-t2:#1E6E45;
    --nhiet-khong:#2B251D; --nhiet-soc:#4A4239;
    --duong-ck:#E2A72E;
    /* HET-BANG-TOI */

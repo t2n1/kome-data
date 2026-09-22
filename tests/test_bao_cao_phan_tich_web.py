@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from kome.bao_cao import tinh_bao_cao, NGANH_TRONG, nhom_theo_nganh
+from kome.ve_phan_tich import ve_cay_o, ve_nhiet
 from kome.web.app import create_app
 
 TEMPLATE = (Path(__file__).resolve().parent.parent
@@ -83,13 +84,17 @@ def test_kho_hai_nam_tra_200_va_hien_khoi_moi(client, conn, batch):
 
 
 def test_co_doi_chieu_hien_dung_cau(client, conn, batch):
-    """[Chữ bắt buộc] Ô chỉ số khi có đối chiếu: 'so cùng kỳ · {n} tháng đối
-    chiếu ({tu} → {den})'."""
+    """[Chữ bắt buộc, M-7 soát chặt] Ô chỉ số khi có đối chiếu: đúng NGUYÊN
+    VĂN 'so cùng kỳ · {n} tháng đối chiếu ({tu} → {den})' — không đoán bừa
+    bằng `or`, lấy thẳng {n}/{tu}/{den} thật từ `tinh_bao_cao`."""
     _hai_nam(conn, batch)
+    bc = tinh_bao_cao(conn, 2026)
+    ck = bc.cung_ky
+    assert ck.so_thang > 0
+    cau = (f"so cùng kỳ · {ck.so_thang} tháng đối chiếu "
+           f"({ck.tu} → {ck.den})")
     r = client.get("/bao-cao?ky=2026")
-    assert "so cùng kỳ · " in r.text
-    assert "tháng đối chiếu (" in r.text
-    assert "2025-08 → 2026-07" in r.text or "→ 2026-07)" in r.text
+    assert cau in r.text, f"thiếu đúng câu: {cau!r}"
 
 
 def test_khong_co_doi_chieu_hien_dung_cau(client, conn, batch):
@@ -106,11 +111,17 @@ def test_khong_co_doi_chieu_hien_dung_cau(client, conn, batch):
 
 
 def test_ty_suat_so_bang_diem_khong_bang_phan_tram(client, conn, batch):
-    """Tỷ suất so cùng kỳ dùng chữ 'điểm', không phải '%'."""
+    """[M-7 soát chặt] Tỷ suất so cùng kỳ dùng chữ 'điểm' — kiểm NGAY TRONG
+    ô chỉ số 'Tỷ suất lãi gộp', không phải bất kỳ đâu trên trang (một chữ
+    'điểm' lạc ở khối khác vẫn làm test cũ xanh giả)."""
     _hai_nam(conn, batch)
     r = client.get("/bao-cao?ky=2026")
-    assert "điểm" in r.text
-    assert "% điểm" not in r.text, "tỷ suất phải so bằng ĐIỂM, không phải %"
+    m = re.search(r'<div class="nhan">Tỷ suất lãi gộp</div>.*?</div>\s*</div>',
+                  r.text, re.S)
+    assert m, "không tìm thấy ô chỉ số Tỷ suất lãi gộp"
+    khoi = m.group(0)
+    assert "điểm" in khoi
+    assert "% điểm" not in khoi, "tỷ suất phải so bằng ĐIỂM, không phải %"
 
 
 def test_nganh_trong_khop_chu_view_tra_ra(conn, batch):
@@ -194,9 +205,12 @@ def test_khong_co_ma_mau_hex_trong_template():
 
 
 def test_moi_rect_circle_du_lieu_co_title(client, conn, batch):
-    """Mọi <rect>/<circle> DỮ LIỆU trong các SVG mới (đóng góp, cây ô, bản đồ
-    nhiệt, Pareto) phải có <title> ghi số thật — cách duy nhất có 'tooltip'
-    khi trang không dùng JavaScript nào."""
+    """[M-7 soát chặt] Mọi <rect>/<circle> DỮ LIỆU trong ba SVG còn lại
+    (đóng góp, cây ô, Pareto — bản đồ nhiệt nay là <table>, xem I-2/test
+    riêng bên dưới) phải có <title> ghi số thật. Bắt CẢ dạng tự đóng
+    (`<rect .../>`, không thể mang <title> con) lẫn cặp mở/đóng thiếu
+    <title> — bản trước chỉ bắt cặp mở/đóng, một phần tử tự đóng lọt qua
+    hoàn toàn không bị phát hiện."""
     _nganh(conn, batch, "AA01", "Đồ khô")
     _hai_nam(conn, batch)
     _nganh(conn, batch, "PH01", "Phí")
@@ -210,21 +224,97 @@ def test_moi_rect_circle_du_lieu_co_title(client, conn, batch):
     r = client.get("/bao-cao?ky=2026")
     assert r.status_code == 200
     html = r.text
-    # Bốn SVG mới của spec §4.2: đóng góp, cây ô, bản đồ nhiệt, Pareto — tìm
-    # bằng chính aria-label của mỗi svg rồi kiểm RIÊNG bên trong từng khối
-    # (sparkline của ô chỉ số là trang trí, aria-hidden, không tính).
     nhan = ("Chênh lệch doanh thu theo ngành so cùng kỳ",
             "Doanh thu theo ngành hàng và mặt hàng",
-            "Tăng trưởng doanh thu theo tháng và ngành",
             "Doanh thu và luỹ kế của 20 khách hàng lớn nhất")
     for n in nhan:
         m_svg = re.search(rf'aria-label="{re.escape(n)}">(.*?)</svg>', html, re.S)
         assert m_svg, f"không tìm thấy SVG '{n}'"
         khoi = m_svg.group(1)
         for tag in ("rect", "circle"):
+            # Dạng tự đóng — không thể chứa <title> con, nên CHÍNH việc tự
+            # đóng đã là lỗi cho một phần tử dữ liệu.
+            for m in re.finditer(rf"<{tag}\b[^>]*?/>", khoi):
+                pytest.fail(f"<{tag}> tự đóng trong '{n}', không thể có "
+                            f"<title>: {m.group(0)[:120]!r}")
             for m in re.finditer(rf"<{tag}\b[^>]*>((?:(?!</{tag}>).)*)</{tag}>", khoi, re.S):
                 assert "<title>" in m.group(1), \
                     f"<{tag}> trong '{n}' không có <title>: {m.group(0)[:120]!r}"
+
+
+def test_ban_do_nhiet_la_bang_html_co_scope(client, conn, batch):
+    """[I-1, I-2] Bản đồ nhiệt là <table>, không phải SVG — có <th scope>
+    cho cả hàng lẫn cột, phần trăm in thẳng trong ô, và ba trạng thái MỚI
+    (chưa tới tháng / không bán tháng này / không có cùng kỳ) phải phân
+    biệt được bằng chữ trong `title`."""
+    _hai_nam(conn, batch)
+    r = client.get("/bao-cao?ky=2026")
+    assert '<table class="nhiet-bang">' in r.text
+    assert 'scope="col"' in r.text and 'scope="row"' in r.text
+    assert "không bán tháng này" in r.text
+    assert "chưa tới tháng" in r.text
+
+
+def test_nhiet_khong_gan_nhan_sai_thang_chua_toi_hay_khong_ban(conn, batch):
+    """[CRITICAL, I-1] Kỳ ĐANG DIỄN RA (chưa đủ 12 tháng dữ liệu): tháng SAU
+    ngày bán cuối cùng phải là 'chua_toi' (không phải 'khong_ck' — kỳ CHƯA
+    ĐI TỚI tháng đó, không phải 'thiếu so sánh'), và một ngành có bán ở kỳ
+    trước nhưng THẬT SỰ không bán gì ở một tháng đã qua của kỳ này phải là
+    'khong_ban' — cả hai đều KHÁC 'khong_ck' (dành cho tháng có doanh thu
+    nhưng không có dòng cùng kỳ)."""
+    _nganh(conn, batch, "AA01", "Đồ khô")
+    # Kỳ 2026 (2025-08..2026-07) chỉ có MỘT tháng bán (2025-08) — kỳ dở dang.
+    _ban(conn, batch, date(2025, 8, 15), "AA01")
+    bc = tinh_bao_cao(conn, 2026)
+    thang_cuoi = bc.ky.ngay_cuoi.strftime("%Y-%m")
+    assert thang_cuoi == "2025-08"
+    thang_ky = [f"2025-{t:02d}" for t in range(8, 13)] + [f"2026-{t:02d}" for t in range(1, 8)]
+    nh = ve_nhiet(bc.nganh_thang, thang_ky, thang_cuoi)
+    o = {c["thang"]: c for c in nh["o"] if c["nganh"] == "Đồ khô"}
+    assert o["2025-08"]["bac"] not in ("chua_toi",), "tháng có bán không được là 'chưa tới'"
+    assert o["2025-09"]["bac"] == "chua_toi", "tháng SAU ngày bán cuối phải là 'chưa tới'"
+    assert o["2026-07"]["bac"] == "chua_toi"
+
+
+def test_nhiet_khong_ban_that_su_khac_khong_co_cung_ky(conn, batch):
+    """[I-1] Một ngành bán liên tục hai năm rồi NGỪNG hẳn một tháng cụ thể ở
+    năm sau (0 đồng CẢ hai năm ở đúng tháng đó không đúng kịch bản này — ở
+    đây ta chỉ cần MỘT tháng đã qua, trong dải kỳ, mà ngành không có dòng
+    nào cả hai phía) phải mang bậc 'khong_ban', không lẫn với 'khong_ck'."""
+    _nganh(conn, batch, "AA01", "Đồ khô")
+    # Bán đủ 12 tháng của kỳ 2026 TRỪ tháng 2026-03 — kỳ đã đi hết
+    # (ngay_cuoi = 2026-07-31) nên 2026-03 không phải "chưa tới".
+    for i in range(12):
+        th = (8 - 1 + i) % 12 + 1
+        y = 2025 + (8 - 1 + i) // 12
+        if f"{y}-{th:02d}" == "2026-03":
+            continue
+        _ban(conn, batch, date(y, th, 11), "AA01", n=i + 1)
+    bc = tinh_bao_cao(conn, 2026)
+    thang_cuoi = bc.ky.ngay_cuoi.strftime("%Y-%m")
+    assert thang_cuoi == "2026-07"
+    thang_ky = [f"2025-{t:02d}" for t in range(8, 13)] + [f"2026-{t:02d}" for t in range(1, 8)]
+    nh = ve_nhiet(bc.nganh_thang, thang_ky, thang_cuoi)
+    o = {c["thang"]: c for c in nh["o"] if c["nganh"] == "Đồ khô"}
+    assert o["2026-03"]["bac"] == "khong_ban"
+
+
+def test_cay_o_khong_de_nhan_nganh_len_ma_khi_co_ma_tach_rieng(conn, batch):
+    """[I-3] Khi ngành tách được mã (n['ma'] không rỗng), `ve_cay_o` vẫn trả
+    đủ dữ liệu để template BỎ nhãn ngành (kiểm ở mức HTML bằng cách ngành có
+    mã thì mọi `<text>` bên trong ô ngành đó — nếu có — phải là nhãn MÃ, tức
+    `m['nhan']`); ô quá nhỏ phải có `nhan=None` để không vẽ chữ tràn."""
+    nhom = [("Gạo", 1000, 0.1, [("G1", "Gạo ST25", 900), ("G2", "Gạo Jasmine", 100)])]
+    cq = ve_cay_o(nhom, rong=720, cao=360)
+    n = cq["nganh"][0]
+    assert n["ma"], "ngành phải tách được mã ở khung 720x360"
+    for m in n["ma"]:
+        assert "nhan" in m
+    # Một ô quá nhỏ (khung tí hon) không được gán nhãn nào.
+    cq_nho = ve_cay_o(nhom, rong=20, cao=10)
+    n_nho = cq_nho["nganh"][0]
+    for m in n_nho["ma"]:
+        assert m["nhan"] is None, "ô quá nhỏ phải có nhan=None, không cắt bừa"
 
 
 def test_hai_khoi_mau_toi_trong_css_van_xanh():

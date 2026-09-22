@@ -62,12 +62,38 @@
  .spark{display:block;margin-top:.4rem}
  .cay-o-nganh{stroke:var(--nen-the);stroke-width:1.5}
  .cay-o-ma{stroke:var(--nen-the);stroke-width:1}
- .bac-g2{fill:var(--nhiet-g2)} .bac-g1{fill:var(--nhiet-g1)}
- .bac-0{fill:var(--nhiet-0)} .bac-t1{fill:var(--nhiet-t1)}
- .bac-t2{fill:var(--nhiet-t2)} .bac-khong{fill:var(--nhiet-khong)}
- .nhiet-khong-ck{fill:url(#kome-soc-nhiet)}
- .nhiet-nhan{font-size:9px;fill:var(--chu-nhat)}
+ {# [Vòng soát 1, I-4] Bậc màu tăng trưởng dùng CHUNG cho cây ô (SVG, thuộc
+    tính `fill`) và bản đồ nhiệt (nay là <table>, thuộc tính `background`)
+    — mỗi lớp khai cả hai để một khối màu phục vụ được cả hai nơi vẽ. Viền
+    `var(--vien)` LUÔN có trên ô nhiệt (đặt ở `.nhiet-bang td` bên dưới):
+    trước bản sửa, ô bậc "0" (gần như không tăng trưởng) và ô "khong"/
+    "khong_ck" (không tính được %) trùng gần hệt màu nền trang — không có
+    viền thì mắt không tách được đâu là một Ô, đâu là khoảng trống giữa các
+    ô. #}
+ .bac-g2{fill:var(--nhiet-g2);background:var(--nhiet-g2)}
+ .bac-g1{fill:var(--nhiet-g1);background:var(--nhiet-g1)}
+ .bac-0{fill:var(--nhiet-0);background:var(--nhiet-0)}
+ .bac-t1{fill:var(--nhiet-t1);background:var(--nhiet-t1)}
+ .bac-t2{fill:var(--nhiet-t2);background:var(--nhiet-t2)}
+ .bac-khong{fill:var(--nhiet-khong);background:var(--nhiet-khong)}
+ {# "không có cùng kỳ": sọc chéo CSS (repeating-linear-gradient), không còn
+    <pattern> SVG — bản đồ nhiệt đã chuyển sang <table>, xem I-2. #}
+ .bac-khong_ck{background:repeating-linear-gradient(45deg,var(--nhiet-khong),
+   var(--nhiet-khong) 3px,var(--nhiet-soc) 3px,var(--nhiet-soc) 6px)}
+ {# Hai bậc MỚI (I-1): "chưa tới tháng" (kỳ chưa đi tới, không phải thiếu so
+    sánh) dùng nền TRỐNG mờ; "không bán tháng này" (ngành thật sự 0 đồng cả
+    hai năm) dùng nền hơi đậm hơn nền trang — cả hai đều tái dùng token màu
+    ĐÃ CÓ (`--nen-phu`/`--vien-phu`/`--chu-mo`), không thêm biến CSS mới. #}
+ .bac-chua_toi{background:var(--nen-phu);color:var(--chu-mo)}
+ .bac-khong_ban{background:var(--vien-phu);color:var(--chu-nhat)}
+ .nhiet-bang{border-collapse:collapse;font-size:.82rem}
+ .nhiet-bang th,.nhiet-bang td{border:1px solid var(--vien);padding:.25rem .4rem;
+      text-align:center;white-space:nowrap}
+ .nhiet-bang th[scope="row"]{text-align:right;font-weight:400;
+      max-width:9rem;white-space:normal}
+ .nhiet-bang td{font-variant-numeric:tabular-nums}
  details > summary{cursor:pointer;font-weight:600;margin:1rem 0 .5rem}
+ .khoi-rong{color:var(--chu-nhat);font-size:.9rem;font-style:italic}
 </style>
 {% include "_nav.html" %}
 {# [Đợt 5b Task 4] Hai macro dùng chung cho bốn ô chỉ số — một công thức
@@ -87,7 +113,9 @@
 {% macro so_ky_truoc(cung_ky, tang, don_vi) %}
 {% if cung_ky and cung_ky.so_thang > 0 %}
 {% if tang is not none %}<span class="{{ 'manh' if tang >= 0 else 'yeu' }}">{{
-    "%+.1f"|format(tang * 100) }}{{ don_vi }}</span>{% else %}<span>—</span>{% endif %}
+    "%+.1f"|format(tang * 100) }}{{ don_vi }}</span>{% else %}<span
+    title="Mẫu số cùng kỳ ≤ 0 (赤伝 — phiếu đỏ có thể làm doanh thu/lãi gộp
+    cùng kỳ năm trước âm) — không tính được %, không phải bằng 0">—</span>{% endif %}
 so cùng kỳ · {{ cung_ky.so_thang }} tháng đối chiếu ({{ cung_ky.tu }} → {{ cung_ky.den }})
 {% else %}
 chưa có cùng kỳ để so — dữ liệu bắt đầu 2025-03-03
@@ -335,7 +363,7 @@ bên trái kéo XUỐNG.</p>
 {% if dg.co %}
 <div class="khung-bd">
 <svg viewBox="0 0 {{ dg.rong }} {{ dg.cao }}" width="100%" height="{{ dg.cao }}"
-     role="img" aria-label="Chênh lệch doanh thu theo ngành so cùng kỳ">
+     role="group" aria-label="Chênh lệch doanh thu theo ngành so cùng kỳ">
  <line x1="{{ dg.x0 }}" y1="0" x2="{{ dg.x0 }}" y2="{{ dg.cao }}" stroke="var(--vien-dam)"/>
  {% for t in dg.thanh %}
  <rect x="{{ t.x }}" y="{{ t.y }}" width="{{ t.w }}" height="{{ dg.cao_hang }}" rx="2"
@@ -343,12 +371,21 @@ bên trái kéo XUỐNG.</p>
   <title>{{ t.nganh }}: {{ "%+d"|format(t.chenh_lech) }} yên so cùng kỳ{% if
     t.tang_truong is not none %} ({{ "%+.1f"|format(t.tang_truong*100) }}%){% endif %}</title>
  </rect>
+ {# [Vòng soát 1, M-1] Nhãn TÊN ngành đứng cạnh gốc trục (đầu thanh), nhãn
+    SỐ TIỀN đứng ở ĐẦU MÚT thanh — tức phía ĐỐI DIỆN trục so với tên ngành —
+    để không đè lên nhau khi thanh ngắn. Định dạng ¥{:+,} cùng nếp mọi số
+    tiền có dấu khác trên trang. #}
  <text x="{{ dg.x0 - 4 if t.am else dg.x0 + 4 }}" y="{{ t.y + dg.cao_hang/2 + 3 }}"
        font-size="10" fill="var(--chu-nhat)"
        text-anchor="{{ 'end' if t.am else 'start' }}">{{ t.nganh }}</text>
+ <text x="{{ t.x - 4 if t.am else t.x + t.w + 4 }}" y="{{ t.y + dg.cao_hang/2 + 3 }}"
+       font-size="9.5" fill="var(--chu-nhat)"
+       text-anchor="{{ 'end' if t.am else 'start' }}">¥{{ "{:+,}".format(t.chenh_lech) }}</text>
  {% endfor %}
 </svg>
 </div>
+{% else %}
+<p class="khoi-rong">Chưa có dữ liệu để vẽ khối này.</p>
 {% endif %}
 {% else %}
 <p class="ghi-chu">Kỳ này không có tháng nào để so cùng kỳ.</p>
@@ -361,8 +398,14 @@ màu trung tính.</p>
 {% if co.co %}
 <div class="khung-bd">
 <svg viewBox="0 0 {{ co.rong }} {{ co.cao }}" width="100%" height="{{ co.cao }}"
-     role="img" aria-label="Doanh thu theo ngành hàng và mặt hàng">
+     role="group" aria-label="Doanh thu theo ngành hàng và mặt hàng">
  {% for n in co.nganh %}
+ {# [Vòng soát 1, I-3] Nhãn tên ngành ở NGAY TRÊN NỀN NGÀNH bị bỏ khi ngành
+    đó có mã tách riêng (`n.ma` không rỗng) — nó sẽ đè lên đúng những ô mã
+    ở góc trên-trái. Tên ngành + tăng trưởng khi đó chuyển hẳn vào <title>
+    của TỪNG ô mã bên dưới (đọc được khi rê chuột vào bất kỳ ô mã nào, đúng
+    những gì <text> từng làm) — chỉ ngành KHÔNG tách được mã nào (n.ma rỗng,
+    cả khung là một ô liền) mới còn hiện tên ngay trên nền. #}
  <rect x="{{ n.x }}" y="{{ n.y }}" width="{{ n.w }}" height="{{ n.h }}"
        class="cay-o-nganh bac-{{ n.bac }}">
   <title>{{ n.nganh }}: ¥{{ "{:,}".format(n.doanh_thu) }}{% if n.tang_truong is not none %} · {{ "%+.1f"|format(n.tang_truong*100) }}% so cùng kỳ{% else %} · không có cùng kỳ{% endif %}</title>
@@ -370,71 +413,75 @@ màu trung tính.</p>
  {% for m in n.ma %}
  <rect x="{{ m.x }}" y="{{ m.y }}" width="{{ m.w }}" height="{{ m.h }}" class="cay-o-ma"
        fill="var(--nen-the)" opacity=".18">
-  <title>{{ n.nganh }} — {{ m.ten }}: ¥{{ "{:,}".format(m.doanh_thu) }}</title>
+  <title>{{ n.nganh }}{% if n.tang_truong is not none %} ({{ "%+.1f"|format(n.tang_truong*100) }}% so cùng kỳ){% else %} (không có cùng kỳ){% endif %} — {{ m.ten }}: ¥{{ "{:,}".format(m.doanh_thu) }}</title>
  </rect>
- {% if m.w > 42 and m.h > 13 %}
- <text x="{{ m.x + 3 }}" y="{{ m.y + 11 }}" font-size="9" fill="var(--chu)">{{
-   m.ten[:16] }}</text>
+ {% if m.nhan %}
+ <text x="{{ m.x + 3 }}" y="{{ m.y + 11 }}" font-size="11" fill="var(--chu)">{{ m.nhan }}</text>
  {% endif %}
  {% endfor %}
- {% if n.w > 55 and n.h > 16 %}
+ {% if not n.ma and n.w > 55 and n.h > 16 %}
  <text x="{{ n.x + 4 }}" y="{{ n.y + 13 }}" font-size="10.5" font-weight="600"
        fill="var(--chu)">{{ n.nganh }}</text>
  {% endif %}
  {% endfor %}
 </svg>
 </div>
-{% if co.khong_ve %}
-{# Chữ khẳng định bởi test — bao gồm cả ngành có tổng ÂM (khong_ve cộng dồn
-   CẢ mã đơn lẻ âm/0 LẪN ngành bị bỏ toàn bộ, xem docstring ve_cay_o). #}
-<p class="ghi-chu">Không vẽ: ¥{{ "{:,}".format(co.khong_ve) }} của {{ co.so_ma_khong_ve }} mã (doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)</p>
+{% else %}
+<p class="khoi-rong">Chưa có dữ liệu để vẽ khối này.</p>
 {% endif %}
+{# [Vòng soát 1, M-3] Dòng "Không vẽ" đứng NGOÀI `{% if co.co %}`: cả kỳ có
+   thể chỉ toàn ngành âm/bằng 0 (co.co = False, không có gì để vẽ) mà tổng
+   tiền bị bỏ vẫn phải in ra — trong `co.co` thì đúng, nhưng khi đó dòng này
+   không bao giờ chạy tới, và số tiền lệch giữa ô chỉ số và cây ô biến mất
+   không dấu vết. #}
+{% if co.khong_ve %}
+<p class="ghi-chu">Không vẽ: ¥{{ "{:,}".format(co.khong_ve) }} của {{ co.so_ma_khong_ve }} mã (doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)</p>
 {% endif %}
 
 <h2>Tăng trưởng theo tháng và ngành</h2>
 {% if nh.co %}
-{% set ncot = nh.thang|length %}
-{% set le = 132 %} {% set o_rong = 46 %} {% set o_cao = 22 %} {% set dau = 16 %}
-<div class="khung-bd">
-<svg viewBox="0 0 {{ le + ncot*o_rong }} {{ dau + nh.nganh|length*o_cao }}" width="100%"
-     height="{{ dau + nh.nganh|length*o_cao }}" role="img"
-     aria-label="Tăng trưởng doanh thu theo tháng và ngành">
- <defs>
-  <pattern id="kome-soc-nhiet" width="6" height="6" patternTransform="rotate(45)"
-           patternUnits="userSpaceOnUse">
-   <rect width="6" height="6" fill="var(--nhiet-khong)"/>
-   <line x1="0" y1="0" x2="0" y2="6" stroke="var(--nhiet-soc)" stroke-width="3"/>
-  </pattern>
- </defs>
- {% for th in nh.thang %}
- <text x="{{ le + loop.index0*o_rong + o_rong/2 }}" y="{{ dau - 5 }}" font-size="9"
-       text-anchor="middle" class="nhiet-nhan">{{ th[5:] }}</text>
+{# [Vòng soát 1, I-2] Bản đồ nhiệt là MỘT BẢNG HTML, không phải SVG: nhãn
+   ngành/tháng là chữ thật (không cắt/đè như <text> SVG), % in thẳng trong
+   từng ô, và bảng tự có ngữ nghĩa hỗ trợ công nghệ trợ năng (th scope) mà
+   không cần role/aria-label rời. Hình học lưới (hàng/cột) đã chuyển hẳn
+   vào `ve_nhiet` (khoá `hang`) — ở đây chỉ có hai vòng lặp lồng thẳng,
+   không còn phép chia nguyên `loop.index0 // len(thang)` nào trong Jinja. #}
+<div class="bang-cuon">
+<table class="nhiet-bang">
+ <tr><th scope="col"></th>
+  {% for th in nh.thang %}<th scope="col">{{ th[5:] }}</th>{% endfor %}</tr>
+ {% for h in nh.hang %}
+ <tr><th scope="row">{{ h.nganh }}</th>
+ {% for o in h.o %}
+  {% if o.bac == 'chua_toi' %}
+  <td class="bac-chua_toi" title="{{ o.nganh }} · {{ o.thang }}: chưa tới tháng này trong kỳ">—</td>
+  {% elif o.bac == 'khong_ban' %}
+  <td class="bac-khong_ban" title="{{ o.nganh }} · {{ o.thang }}: không bán tháng này (và tháng cùng kỳ năm trước cũng vậy)">¥0</td>
+  {% elif o.bac == 'khong_ck' %}
+  <td class="bac-khong_ck" title="{{ o.nganh }} · {{ o.thang }}: không có cùng kỳ (¥{{ '{:,}'.format(o.doanh_thu) }})">—</td>
+  {% elif o.tang_truong is not none %}
+  <td class="bac-{{ o.bac }}" title="{{ o.nganh }} · {{ o.thang }}: {{ '%+.1f'|format(o.tang_truong*100) }}% so cùng kỳ (¥{{ '{:,}'.format(o.doanh_thu) }})">{{ '%+.0f'|format(o.tang_truong*100) }}%</td>
+  {% else %}
+  <td class="bac-khong" title="{{ o.nganh }} · {{ o.thang }}: mẫu số cùng kỳ ≤ 0, không tính được % (¥{{ '{:,}'.format(o.doanh_thu) }})">—</td>
+  {% endif %}
  {% endfor %}
- {% for nganh in nh.nganh %}
- <text x="{{ le - 6 }}" y="{{ dau + loop.index0*o_cao + o_cao/2 + 3 }}" font-size="10"
-       text-anchor="end" fill="var(--chu-nhat)">{{ nganh }}</text>
+ </tr>
  {% endfor %}
- {% for o in nh.o %}
- {% set hang = loop.index0 // ncot %} {% set cot = loop.index0 % ncot %}
- <rect x="{{ le + cot*o_rong + 1 }}" y="{{ dau + hang*o_cao + 1 }}"
-       width="{{ o_rong - 2 }}" height="{{ o_cao - 2 }}" rx="2"
-       class="{{ 'nhiet-khong-ck' if o.bac == 'khong_ck' else 'bac-' ~ o.bac }}">
-  <title>{{ o.nganh }} · {{ o.thang }}: {% if o.bac == 'khong_ck' %}không có cùng kỳ{% elif o.tang_truong is not none %}{{ "%+.1f"|format(o.tang_truong*100) }}%{% else %}—{% endif %} (¥{{ "{:,}".format(o.doanh_thu) }})</title>
- </rect>
- {% endfor %}
-</svg>
+</table>
 </div>
 <div class="chu-thich">
- <span><i class="mau" style="background:var(--nhiet-g2)"></i> ≤ −20%</span>
- <span><i class="mau" style="background:var(--nhiet-g1)"></i> −20…−5%</span>
- <span><i class="mau" style="background:var(--nhiet-0)"></i> −5…+5%</span>
- <span><i class="mau" style="background:var(--nhiet-t1)"></i> +5…+20%</span>
- <span><i class="mau" style="background:var(--nhiet-t2)"></i> ≥ +20%</span>
- <span><i class="mau" style="background:var(--nhiet-khong)"></i> có cùng kỳ, không tính được %</span>
- <span><i class="mau" style="background:repeating-linear-gradient(45deg,
-   var(--nhiet-khong),var(--nhiet-khong) 2px,var(--nhiet-soc) 2px,var(--nhiet-soc) 4px)"></i>
-   không có cùng kỳ</span>
+ <span><i class="mau bac-g2"></i> ≤ −20%</span>
+ <span><i class="mau bac-g1"></i> −20…−5%</span>
+ <span><i class="mau bac-0"></i> −5…+5%</span>
+ <span><i class="mau bac-t1"></i> +5…+20%</span>
+ <span><i class="mau bac-t2"></i> ≥ +20%</span>
+ <span><i class="mau bac-khong"></i> có cùng kỳ, không tính được %</span>
+ <span><i class="mau bac-khong_ck"></i> không có cùng kỳ</span>
+ <span><i class="mau bac-khong_ban"></i> không bán tháng này</span>
+ <span><i class="mau bac-chua_toi"></i> chưa tới tháng</span>
 </div>
+{% else %}
+<p class="khoi-rong">Chưa có dữ liệu để vẽ khối này.</p>
 {% endif %}
 
 <h2>Doanh thu tập trung ở khách nào</h2>
@@ -445,7 +492,17 @@ màu trung tính.</p>
 {% if pa.co %}
 <div class="khung-bd">
 <svg viewBox="0 0 {{ pa.rong }} {{ pa.cao }}" width="100%" height="{{ pa.cao }}"
-     role="img" aria-label="Doanh thu và luỹ kế của 20 khách hàng lớn nhất">
+     role="group" aria-label="Doanh thu và luỹ kế của 20 khách hàng lớn nhất">
+  {# [Vòng soát 1, M-2] Vài vạch chia trục luỹ kế bên phải (0/50/100%) —
+     trục % không có nhãn nào trước bản sửa, người đọc không biết đường luỹ
+     kế đang ở khoảng nào của thang 0–100%. #}
+  {% for pct, nhan_pct in ((0, "0%"), (0.5, "50%"), (1.0, "100%")) %}
+  {% set y = 16 + (pa.cao - 16 - 34) * (1 - pct) %}
+  <line x1="0" y1="{{ y }}" x2="{{ pa.rong }}" y2="{{ y }}" stroke="var(--vien)"
+        stroke-width="1" stroke-dasharray="2 3"/>
+  <text x="{{ pa.rong - 4 }}" y="{{ y - 3 }}" font-size="9" text-anchor="end"
+        fill="var(--chu-nhat)">{{ nhan_pct }}</text>
+  {% endfor %}
   {% for c in pa.cot %}
   <rect x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}" rx="2"
         fill="var(--lien-ket)" opacity=".72">
@@ -455,12 +512,22 @@ màu trung tính.</p>
   {% for seg in pa.doan %}
   <polyline points="{{ seg }}" fill="none" stroke="var(--do)" stroke-width="2"/>
   {% endfor %}
+  {# Chấm luỹ kế riêng từng điểm, kèm <title> — polyline không có "tooltip"
+     tại từng điểm, chỉ có ở phần tử `<circle>` này. #}
+  {% for d in pa.diem %}
+  <circle cx="{{ d.x }}" cy="{{ d.y }}" r="2.5" fill="var(--do)">
+   <title>Hạng {{ d.khach.thu_hang }} — {{ d.khach.ten }}: luỹ kế {{ "%.1f"|format(d.khach.luy_ke*100) }}%</title>
+  </circle>
+  {% endfor %}
 </svg>
 </div>
 <div class="chu-thich">
   <span><i class="mau" style="background:var(--lien-ket);opacity:.72"></i> Doanh thu (cột)</span>
   <span><i class="mau" style="background:var(--do)"></i> Luỹ kế (đường, trục 0–100%)</span>
+  <span>Đỉnh trục cột: ¥{{ "{:,}".format(pa.dinh) }}</span>
 </div>
+{% else %}
+<p class="khoi-rong">Chưa có dữ liệu để vẽ khối này.</p>
 {% endif %}
 <div class="bang-cuon">
 <table>

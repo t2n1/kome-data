@@ -750,6 +750,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             # template, không tính chỉ số nào ở đây.
             nhom = nhom_theo_nganh(bc.nganh_ky, bc.hang_theo_nganh)
             thang_ky = thang_cua_ky(bc.ky.company_fy)
+            # [Vòng soát 1, I-1] Ranh giới "tháng chưa tới" của bản đồ nhiệt —
+            # LẤY TỪ `bc.ky.ngay_cuoi` đã có sẵn (ngày bán mới nhất của CHÍNH
+            # kỳ đang xem), không hỏi CSDL thêm câu nào. None khi kho rỗng.
+            thang_cuoi = (bc.ky.ngay_cuoi.strftime("%Y-%m")
+                          if bc.ky.ngay_cuoi else None)
             so_nho = {
                 "dt": ve_duong_nho([o.doanh_thu for o in bc.thang]),
                 "lg": ve_duong_nho([o.lai_gop for o in bc.thang]),
@@ -762,7 +767,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         "so_nho": so_nho,
                         "dg": ve_dong_gop(bc.nganh_ky),
                         "co": ve_cay_o(nhom),
-                        "nh": ve_nhiet(bc.nganh_thang, thang_ky),
+                        "nh": ve_nhiet(bc.nganh_thang, thang_ky, thang_cuoi),
                         "pa": ve_pareto(bc.tap_trung)})
         except Exception as e:
             return _loi(request, "mở trang báo cáo", e)

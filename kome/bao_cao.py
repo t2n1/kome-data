@@ -293,12 +293,21 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
     # (4) Mọi mặt hàng của kỳ, dùng cho cây ô VÀ để suy ra bảng "hang" (top
     # 10 lãi gộp) bằng cách sắp xếp trong Python — tiết kiệm một lượt hỏi so
     # với hỏi riêng ORDER BY lai_gop DESC LIMIT 10 như bản cũ.
-    hang_theo_nganh = [dict(zip(("ma", "ten", "nhom", "doanh_thu", "lai_gop",
-                                 "ty_suat", "so_khach"), r)) for r in conn.execute(
-        """SELECT product_code, ten_hang, food_category_name, doanh_thu_thuan,
-                  lai_gop, ty_suat, so_khach_mua
-           FROM mart.ban_theo_san_pham WHERE company_fy = %s""",
-        (ky.company_fy,)).fetchall()]
+    # [Vòng soát 1, I-3] `doanh_thu`/`lai_gop` ép về `int` ngay tại đây —
+    # trước bản sửa chúng là `Decimal` thẳng từ psycopg (SUM của Postgres),
+    # và `kome.ve_phan_tich._nhan_vua_o` (Task 4) trừ một hằng số Python
+    # `float` vào bề rộng ô suy ra từ các giá trị này -> `Decimal - float`
+    # ném `TypeError` giữa lúc mở trang. Tiền luôn là số nguyên yên (bất
+    # biến CLAUDE.md) — sửa ở NGUỒN, không vá riêng một hàm hình học.
+    hang_theo_nganh = [
+        {"ma": r[0], "ten": r[1], "nhom": r[2], "doanh_thu": int(r[3] or 0),
+         "lai_gop": int(r[4] or 0), "ty_suat": float(r[5]) if r[5] is not None else None,
+         "so_khach": r[6]}
+        for r in conn.execute(
+            """SELECT product_code, ten_hang, food_category_name, doanh_thu_thuan,
+                      lai_gop, ty_suat, so_khach_mua
+               FROM mart.ban_theo_san_pham WHERE company_fy = %s""",
+            (ky.company_fy,)).fetchall()]
     hang = sorted(hang_theo_nganh, key=lambda h: h["lai_gop"], reverse=True)[:TOP]
 
     # (5) Người phụ trách — không đổi.

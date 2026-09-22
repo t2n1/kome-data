@@ -216,6 +216,42 @@ def ve_dong_gop(dong: "list[NganhKy]", rong: int = 720) -> dict:
             "cao_hang": cao_hang, "thanh": thanh}
 
 
+# ---- Nhãn cắt gọn cho ô cây ô ------------------------------------------------
+
+_CO_CHU_TREEMAP = 11.0   # px — cỡ chữ TỐI THIỂU cho nhãn trong ô cây ô.
+_LE_NHAN = 6.0           # px — chừa hai bên (padding trái phải trong ô).
+
+
+def _rong_chu(ten: str) -> float:
+    """Ước lượng bề rộng chuỗi ở cỡ `_CO_CHU_TREEMAP`: 1em cho ký tự
+    "full-width" (có dấu/CJK, ord > 127 — rộng gần bằng cỡ chữ), 0,6em cho
+    ký tự ASCII thường ("half-width" — hẹp hơn). Không đo DOM thật (không có
+    trình duyệt ở tầng Python) — đây là ước lượng đủ dùng để quyết định CẮT
+    hay KHÔNG, không phải một phép đo chính xác."""
+    return sum(_CO_CHU_TREEMAP if ord(c) > 127 else _CO_CHU_TREEMAP * 0.6
+               for c in ten)
+
+
+def _nhan_vua_o(ten: str, w: float, h: float) -> str | None:
+    """[Vòng soát 1, I-3] Nhãn đã CẮT GỌN để vừa khung `w`×`h` ở cỡ chữ
+    >= `_CO_CHU_TREEMAP`px — None khi ô quá nhỏ để đặt dù một ký tự kèm dấu
+    ba chấm. Trước bản sửa, template tự in `ten[:14]`/`ten[:16]` TRẦN không
+    biết kích thước ô thật — nhãn dài tràn ra ngoài ô hẹp, nhãn ngắn bỏ phí
+    ô rộng. Cắt ở ĐÂY (nơi biết `w`/`h` thật, tính bằng squarify) thay vì ở
+    template."""
+    if h < _CO_CHU_TREEMAP + 4:
+        return None
+    kha_dung = float(w) - _LE_NHAN
+    if kha_dung <= 0:
+        return None
+    if _rong_chu(ten) <= kha_dung:
+        return ten
+    cat = ten
+    while cat and _rong_chu(cat + "…") > kha_dung:
+        cat = cat[:-1]
+    return f"{cat}…" if cat else None
+
+
 # ---- Cây ô (treemap hai tầng) ------------------------------------------------
 
 def ve_cay_o(nhom: "list[tuple[str, int, float | None, list[tuple[str, str, int]]]]",
@@ -305,8 +341,12 @@ def ve_cay_o(nhom: "list[tuple[str, int, float | None, list[tuple[str, str, int]
         items_sap = sorted(items, key=lambda t: t[1], reverse=True)
 
         o_mh = _squarify([v for _, v in items_sap], x, y, w, h) if items_sap else []
+        # [Vòng soát 1, I-3] `nhan`: nhãn ĐÃ CẮT để vừa đúng khung ô này —
+        # None khi ô quá nhỏ, template khi đó bỏ hẳn <text> (không đoán bừa
+        # bằng ten[:N] không biết kích thước ô thật).
         ma_ra = [{"ten": ten, "x": round(xx, 1), "y": round(yy, 1),
-                  "w": round(ww, 1), "h": round(hh, 1), "doanh_thu": int(dt)}
+                  "w": round(ww, 1), "h": round(hh, 1), "doanh_thu": int(dt),
+                  "nhan": _nhan_vua_o(ten, ww, hh)}
                  for (ten, dt), (xx, yy, ww, hh) in zip(items_sap, o_mh)]
 
         ket_qua_nganh.append({
@@ -322,11 +362,29 @@ def ve_cay_o(nhom: "list[tuple[str, int, float | None, list[tuple[str, str, int]
 
 # ---- Bản đồ nhiệt ngành x tháng --------------------------------------------
 
-def ve_nhiet(dong: "list[NganhThang]", thang: list[str]) -> dict:
+def ve_nhiet(dong: "list[NganhThang]", thang: list[str],
+             thang_cuoi_co_du_lieu: str | None = None) -> dict:
     """Lưới ngành × tháng. Hàng xếp theo TỔNG doanh thu kỳ giảm dần (tính
     bằng `sorted` trên dữ liệu đã có — chỉ để SẮP XẾP HIỂN THỊ, không phải
     một chỉ số mới). Luôn đủ 12 cột kể cả tháng ngành đó không có dòng bán —
-    ô thiếu KHÔNG được tô như 0%, phải có nhãn riêng "không có cùng kỳ"."""
+    ô thiếu KHÔNG được tô như 0%, phải có nhãn riêng.
+
+    [Vòng soát 1, I-1] `thang_cuoi_co_du_lieu` (chuỗi "YYYY-MM", thường là
+    `bc.ky.ngay_cuoi` định dạng lại — KHÔNG hỏi CSDL thêm) tách MỘT ô thiếu
+    dòng (`d is None`) thành HAI tình huống khác hẳn nhau, thứ mà bản trước
+    gộp chung vào "khong_ck" (không có cùng kỳ) — sai cho cả hai:
+      * tháng SAU `thang_cuoi_co_du_lieu`: kỳ CHƯA ĐI TỚI tháng đó — bậc
+        "chua_toi". Tô như "không có cùng kỳ" ở đây nói dối: tháng chưa xảy
+        ra không phải tháng thiếu SO SÁNH.
+      * tháng <= `thang_cuoi_co_du_lieu` nhưng ngành không có dòng: ngành
+        THẬT SỰ không bán gì tháng đó (và cũng không bán ở tháng cùng kỳ,
+        nếu không đã có dòng qua nhánh FULL JOIN của mart) — bậc
+        "khong_ban", khác "không có cùng kỳ" (bậc "khong_ck", dành cho
+        trường hợp CÓ dòng doanh thu tháng này nhưng KHÔNG có dòng cùng kỳ
+        năm trước, `d.co_cung_ky is False`).
+    Để `None` (mặc định, ví dụ khi gọi rời khỏi `/bao-cao`) giữ NGUYÊN hành
+    vi cũ — mọi ô thiếu dòng đều "khong_ck" — vì khi đó không biết ranh giới
+    kỳ ở đâu để phân biệt hai tình huống trên."""
     if not dong:
         return {"co": False}
 
@@ -337,28 +395,44 @@ def ve_nhiet(dong: "list[NganhThang]", thang: list[str]) -> dict:
     nganh_sap = sorted(tong_nganh, key=lambda n: tong_nganh[n], reverse=True)
 
     o = []
+    hang = []
     for nganh in nganh_sap:
+        o_hang = []
         for th in thang:
             d = tra_cuu.get((nganh, th))
-            if d is None:
-                o.append({"thang": th, "nganh": nganh, "bac": "khong_ck",
-                          "tang_truong": None, "doanh_thu": 0, "co_cung_ky": False})
+            if d is None and thang_cuoi_co_du_lieu is not None and th > thang_cuoi_co_du_lieu:
+                cell = {"thang": th, "nganh": nganh, "bac": "chua_toi",
+                        "tang_truong": None, "doanh_thu": None, "co_cung_ky": False}
+            elif d is None and thang_cuoi_co_du_lieu is not None:
+                cell = {"thang": th, "nganh": nganh, "bac": "khong_ban",
+                        "tang_truong": None, "doanh_thu": 0, "co_cung_ky": False}
+            elif d is None:
+                cell = {"thang": th, "nganh": nganh, "bac": "khong_ck",
+                        "tang_truong": None, "doanh_thu": 0, "co_cung_ky": False}
             elif not d.co_cung_ky:
-                o.append({"thang": th, "nganh": nganh, "bac": "khong_ck",
-                          "tang_truong": d.tang_truong, "doanh_thu": d.doanh_thu,
-                          "co_cung_ky": False})
+                cell = {"thang": th, "nganh": nganh, "bac": "khong_ck",
+                        "tang_truong": d.tang_truong, "doanh_thu": d.doanh_thu,
+                        "co_cung_ky": False}
             elif d.tang_truong is None:
                 # co_cung_ky=True nhưng tang_truong None -> mẫu số cùng kỳ <= 0.
-                o.append({"thang": th, "nganh": nganh, "bac": "khong",
-                          "tang_truong": None, "doanh_thu": d.doanh_thu,
-                          "co_cung_ky": True})
+                cell = {"thang": th, "nganh": nganh, "bac": "khong",
+                        "tang_truong": None, "doanh_thu": d.doanh_thu,
+                        "co_cung_ky": True}
             else:
-                o.append({"thang": th, "nganh": nganh,
-                          "bac": bac_tang_truong(d.tang_truong),
-                          "tang_truong": d.tang_truong, "doanh_thu": d.doanh_thu,
-                          "co_cung_ky": True})
+                cell = {"thang": th, "nganh": nganh,
+                        "bac": bac_tang_truong(d.tang_truong),
+                        "tang_truong": d.tang_truong, "doanh_thu": d.doanh_thu,
+                        "co_cung_ky": True}
+            o.append(cell)
+            o_hang.append(cell)
+        hang.append({"nganh": nganh, "o": o_hang})
 
-    return {"co": True, "nganh": nganh_sap, "thang": thang, "o": o}
+    # `hang`: MỘT dòng = MỘT ngành, kèm sẵn 12 ô theo đúng thứ tự `thang` —
+    # [Vòng soát 1, I-2] để template dựng <table> bằng một vòng lặp lồng
+    # đơn giản, không cần tự chia hàng/cột bằng `loop.index0 // len(thang)`
+    # (phép chia nguyên đó từng nằm trong Jinja, nay chuyển hẳn vào đây).
+    # `o` (phẳng) giữ lại để không phá vỡ test cũ tham chiếu trực tiếp.
+    return {"co": True, "nganh": nganh_sap, "thang": thang, "o": o, "hang": hang}
 
 
 # ---- Pareto khách hàng -------------------------------------------------------
@@ -385,7 +459,7 @@ def ve_pareto(tt: "TapTrung | None", rong: int = 720, cao: int = 260) -> dict:
     buoc = rong_ve / len(tt.dong)
     rong_cot = max(buoc * 0.7, 2)
 
-    cot, doan = [], []
+    cot, doan, diem = [], [], []
     dang_ve: list[str] = []
     for i, d in enumerate(tt.dong):
         x = le_t + i * buoc
@@ -401,8 +475,13 @@ def ve_pareto(tt: "TapTrung | None", rong: int = 720, cao: int = 260) -> dict:
         lk = max(0.0, min(d.luy_ke, 1.0))
         y = le_tren + cao_ve - cao_ve * lk
         dang_ve.append(f"{round(x + buoc / 2, 1)},{round(y, 1)}")
+        # [Vòng soát 1, M-2] Chấm tròn RIÊNG tại mỗi điểm luỹ kế, kèm
+        # <title> "luỹ kế X%" — polyline không tự có "tooltip" tại từng
+        # điểm, chỉ vẽ được đường. `khach`/`luy_ke` giữ nguyên (không kẹp)
+        # để template in đúng số đọc được, toạ độ `y` mới là giá trị kẹp.
+        diem.append({"x": round(x + buoc / 2, 1), "y": round(y, 1), "khach": d})
     if dang_ve:
         doan.append(" ".join(dang_ve))
 
     return {"co": True, "rong": rong, "cao": cao, "cot": cot,
-            "doan": doan, "dinh": dinh}
+            "doan": doan, "diem": diem, "dinh": dinh}
