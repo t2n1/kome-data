@@ -487,6 +487,37 @@ def _khoi(html: str, tu: str, den: str | None = None) -> str:
     return phan.split(den, 1)[0] if den and den in phan else phan
 
 
+def _chu(html: str) -> str:
+    """Chữ trần của một mẩu HTML — bỏ thẻ, gộp khoảng trắng."""
+    import re
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+
+
+def _o(html: str, khoa: str, cot: str, sau: str | None = None) -> str:
+    """Chữ trong ô ở CỘT `cot` của HÀNG chứa `khoa` (trong khối bắt đầu ở `sau`).
+
+    Vì sao cần: khẳng định "chuỗi X có mặt đâu đó trong trang" — thậm chí
+    "trong dòng" — KHÔNG canh được một bất biến về một Ô. Một mã chưa bán gì
+    thì tỷ suất, tốc độ, còn-đủ-bán, bán-gần-nhất trên chính dòng đó đều đã là
+    "—", nên `assert "—" in dong` vẫn xanh khi ô Tồn bị đổi thành `sp.ton or 0`
+    — đúng hồi quy mà test mang tên. Y hệt: một nhãn in sẵn trong đoạn văn giải
+    thích ngay trên bảng làm mọi `assert nhan in html` thành vô nghĩa.
+
+    Chỉ số cột tra theo TÊN ở hàng tiêu đề chứ không viết cứng, để đổi thứ tự
+    cột thì test đi theo chứ không đỏ oan.
+    """
+    import re
+    if sau is not None:
+        html = _khoi(html, sau)
+    bang = next((b for b in re.findall(r"<table>.*?</table>", html, re.S)
+                 if khoa in b), None)
+    assert bang, f"không thấy bảng nào chứa {khoa!r}"
+    dau = [_chu(t) for t in re.findall(r"<th[^>]*>(.*?)</th>", bang, re.S)]
+    assert cot in dau, f"bảng không có cột {cot!r} (có: {dau})"
+    dong = next(d for d in re.findall(r"<tr>(.*?)</tr>", bang, re.S) if khoa in d)
+    return _chu(re.findall(r"<td[^>]*>(.*?)</td>", dong, re.S)[dau.index(cot)])
+
+
 def test_ba_trang_moi_mo_duoc_va_khong_co_javascript(conn, batch, test_db_url):
     """[IMPORTANT] Ba trang phải mở được, và mã không tồn tại phải trả 404 chứ
     không phải 500 — gõ nhầm một ký tự trong địa chỉ là chuyện thường ngày."""
@@ -520,27 +551,37 @@ def test_ba_muc_dieu_huong_moi_co_mat(conn, batch, test_db_url):
 def test_cot_ton_hien_gach_ngang_chu_khong_phai_0(conn, batch, test_db_url):
     """[CRITICAL] 90/232 mã không có dòng nào trong 在庫一覧. Hiện `0` ở cột Tồn
     cho chúng là nói với người giữ kho rằng kho đã hết — và họ sẽ đi đặt hàng
-    cho một mã có thể đang đầy kho. Khẳng định trên ĐÚNG DÒNG của mã đó, không
-    phải trên cả trang: cả trang thì luôn có một số 0 ở đâu đó."""
-    import re
+    cho một mã có thể đang đầy kho.
+
+    Khẳng định trên ĐÚNG Ô, không phải đúng dòng: mã này chưa bán gì nên tỷ
+    suất, tốc độ, còn-đủ-bán và bán-gần-nhất trên chính dòng đó cũng là "—",
+    nên một `assert "—" in dong` vẫn xanh khi ô Tồn bị đổi thành
+    `sp.ton or 0`."""
     _san_pham(conn, batch, "P101", ten="Hàng chưa rõ tồn")
     _neo(conn, batch)
     html = _khach_web(test_db_url).get("/san-pham").text
 
-    dong = re.search(r"<tr>(?:(?!</tr>).)*?/san-pham/P101.*?</tr>", html, re.S)
-    assert dong, "không thấy dòng của P101 trong bảng"
-    assert "—" in dong.group(0), "cột Tồn của mã không có dòng tồn phải là —"
-    assert "Chưa rõ tồn" in dong.group(0), \
+    assert _o(html, "/san-pham/P101", "Tồn") == "—", \
+        "ô Tồn của mã không có dòng tồn phải là — , không bao giờ là 0"
+    assert _o(html, "/san-pham/P101", "Trạng thái") == "Chưa rõ tồn", \
         "nhãn phải nói 'chưa rõ', không phải 'hết hàng'"
 
 
 def test_trang_san_pham_hien_du_SAU_nhan_trang_thai(conn, batch, test_db_url):
     """Sáu nhãn, không phải bốn. Thiếu một nhãn thì trang hiện mã thô
-    (`chua_ro_ton`) cho đúng nhóm mã đông nhất — 90/232 mã."""
+    (`chua_ro_ton`) cho đúng nhóm mã đông nhất — 90/232 mã.
+
+    Khẳng định trong CHÍNH DẢI CHIP, không trên cả trang: đoạn văn giải thích
+    ngay dưới dải chip đã in sẵn "Chưa rõ tồn" và "Ngừng kinh doanh" — đúng hai
+    nhãn MỚI của migration 023 — nên `assert nhan in html` canh rỗng đúng hai
+    nhãn đáng canh nhất."""
+    import re
     _neo(conn, batch)
     html = _khach_web(test_db_url).get("/san-pham").text
+    chip = re.search(r'<div class="loc">.*?</div>', html, re.S)
+    assert chip, "không thấy dải chip trạng thái"
     for ma, (nhan, _mau) in SP.TRANG_THAI_TON.items():
-        assert nhan in html, f"dải chip thiếu nhãn {ma} ({nhan})"
+        assert nhan in chip.group(0), f"dải chip thiếu nhãn {ma} ({nhan})"
 
 
 def test_trang_360_hien_toc_do_THEO_TUOI_khong_phai_toc_do_ngay(conn, batch,
@@ -568,8 +609,16 @@ def test_kho_hang_hien_ngay_chup_va_du_BON_loai_han(conn, batch, test_db_url):
     """[IMPORTANT] Ảnh chụp 13:30 hôm trước đọc thành "bây giờ" là sai lệch cả
     một ngày tồn kho. Và `khong_ro` ("ta không đọc được ô này") phải hiện KHÁC
     `khong_han` ("hàng này không có hạn") — gộp làm một là biến một lời thú
-    nhận về dữ liệu thành một lời khẳng định về hàng."""
+    nhận về dữ liệu thành một lời khẳng định về hàng.
+
+    Khẳng định trên ĐÚNG Ô của ĐÚNG LÔ, không trên cả trang: đoạn văn giải
+    thích ngay trên bảng đã in nguyên văn cả bốn nhãn, nên gộp hai nhãn
+    `khong_han`/`khong_ro` làm một — đúng hồi quy bị cấm — vẫn qua được một
+    `assert nhan in html`. Và ngày chụp phải nằm ở ĐẦU TRANG (trước khối đầu
+    tiên), không phải lẫn đâu đó phía dưới."""
     sap = HOM_NAY + timedelta(days=10)
+    mong_doi = {"P103": "ngay", "P104": "khong_han", "P105": "trong",
+                "P106": "khong_ro"}
     for ma, han in (("P103", f"{sap.year}年{sap.month:02d}月{sap.day:02d}日"),
                     ("P104", "賞味期限なし"), ("P105", ""), ("P106", "2028/06/09")):
         _san_pham(conn, batch, ma)
@@ -577,9 +626,16 @@ def test_kho_hang_hien_ngay_chup_va_du_BON_loai_han(conn, batch, test_db_url):
     _neo(conn, batch)
 
     html = _khach_web(test_db_url).get("/kho-hang").text
-    assert str(HOM_NAY) in html, "trang không nói ra ngày chụp 在庫一覧"
-    for ma, (nhan, _mau) in SP.LOAI_HAN.items():
-        assert nhan in html, f"bảng tồn thiếu nhãn hạn {ma} ({nhan})"
+    dau_trang = html.split("</h1>", 1)[1].split("<h2", 1)[0]
+    assert str(HOM_NAY) in dau_trang, \
+        "ngày chụp 在庫一覧 phải nằm ở đầu trang, trước khối đầu tiên"
+
+    for ma, khoa in mong_doi.items():
+        o = _o(html, ma, "Hạn sử dụng", sau="Tồn kho hiện tại")
+        assert SP.LOAI_HAN[khoa][0] in o, f"{ma}: ô hạn không mang nhãn {khoa}"
+        for khac, (nhan, _mau) in SP.LOAI_HAN.items():
+            assert khac == khoa or nhan not in o, \
+                f"{ma}: ô hạn mang CẢ nhãn {khac} — hai loại hạn đang bị gộp"
 
 
 def test_kho_hang_tach_khoi_QUA_HAN_khoi_khoi_can_han(conn, batch, test_db_url):
@@ -608,13 +664,25 @@ def test_kho_hang_noi_ro_con_so_nao_la_cua_MOI_KHO(conn, batch, test_db_url):
     trạng thái (`trang_thai` là thuộc tính của một MÃ tính trên tổng mọi kho —
     "mã hết hàng ở kho 0001" không có định nghĩa nào ở mart). Không ghi rõ thì
     chúng đứng cạnh những con số ĐÃ lọc, và không con số nào nói mình đang nói
-    về tập nào."""
+    về tập nào.
+
+    Mỗi khẳng định neo vào ĐÚNG KHỐI mà nó nói về, không đếm chuỗi trên cả
+    trang: riêng mục `<option>— mọi kho —</option>` của ô lọc cộng với một câu
+    duy nhất đã đủ cho `html.count("mọi kho") >= 2`, nên xoá hẳn lời chú thích
+    của hai ô đếm mà test vẫn xanh."""
     _san_pham(conn, batch, "P109")
     _ton(conn, batch, "P109", kho="0001")
     _neo(conn, batch)
     html = _khach_web(test_db_url).get("/kho-hang?kho=0001").text
-    assert html.count("mọi kho") >= 2, \
-        "phải ghi rõ ở CẢ hai ô đếm trạng thái LẪN bảng giá trị theo kho"
+
+    # (1) Lời chú thích của bốn ô tổng quan: giữa khối thẻ số và ô lọc đầu tiên.
+    o_dem = _khoi(html, 'class="the-so"', "<form")
+    assert "mọi kho" in o_dem, \
+        "hai ô đếm trạng thái không nói ra rằng chúng đếm trên mọi kho"
+    # (2) Lời chú thích của bảng giá trị theo kho: giữa tiêu đề và chính bảng.
+    theo_kho = _khoi(html, "Giá trị theo kho", "<table")
+    assert "mọi kho" in theo_kho, \
+        "bảng giá trị theo kho không nói ra rằng nó luôn liệt kê mọi kho"
 
 
 def test_bo_loc_la_tren_URL_khong_lam_do_trang(conn, batch, test_db_url):
@@ -646,3 +714,31 @@ def test_bo_loc_la_tren_URL_khong_lam_do_trang(conn, batch, test_db_url):
     r = c.get("/kho-hang?kho=khong-co-that")
     assert r.status_code == 200
     assert '<option value="khong-co-that" selected' in r.text
+
+
+def test_o_gia_tri_ton_chet_di_theo_CA_bo_loc_kho(conn, batch):
+    """[CRITICAL] Ô "Giá trị tồn chết" là một con số YÊN mà người giữ kho hành
+    động theo (xả hay không xả), và nó đứng ngay trên một bảng ĐÃ lọc theo kho.
+    Không lọc theo kho thì mở `?kho=0001` sẽ thấy bảng chỉ còn kho 0001 mà thẻ
+    vẫn là tổng MỌI kho — công ty có 2 kho nên sai số có thể gần 2×.
+
+    Đây KHÁC hai ô đếm trạng thái: `trang_thai` là thuộc tính của một MÃ tính
+    trên tổng mọi kho nên "mã hết hàng ở kho 0001" vô nghĩa, còn `gia_tri` thì
+    có theo từng kho — "phần hàng chết đang chiếm chỗ tại kho này" là một câu
+    hỏi có nghĩa và tính được, đúng câu hỏi của người vừa lọc theo kho."""
+    _san_pham(conn, batch, "P050")
+    _ton(conn, batch, "P050", kho="0001", sl=10, gia=1000)      # 10.000
+    _ton(conn, batch, "P050", kho="1002", sl=5, gia=1000)       #  5.000
+    _ho_so_khach(conn, batch, "KP50", "Quán P050")
+    _mua(conn, batch, "KP50", HOM_NAY - timedelta(days=200), hang="P050")
+    _neo(conn, batch)
+
+    assert SP.kho_hang(conn).o_tong_quan["gia_tri_ton_chet"] == 15_000
+    assert SP.kho_hang(conn, kho="0001").o_tong_quan["gia_tri_ton_chet"] == 10_000
+    assert SP.kho_hang(conn, kho="1002").o_tong_quan["gia_tri_ton_chet"] == 5_000
+    # Hai bộ lọc cùng lúc vẫn phải đúng — thứ tự tham số của câu lệnh gộp là
+    # chỗ dễ lệch nhất khi thêm một mảnh vị từ.
+    assert SP.kho_hang(conn, kho="0001",
+                       loc="ton_chet").o_tong_quan["gia_tri_ton_chet"] == 10_000
+    assert SP.kho_hang(conn, kho="0001",
+                       loc="du").o_tong_quan["gia_tri_ton_chet"] == 0

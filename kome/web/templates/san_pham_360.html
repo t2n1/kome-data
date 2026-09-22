@@ -133,6 +133,13 @@ lần. Đây là tín hiệu sớm — họ đang chuyển dần sang nhà cung 
 {% endif %}
 
 <h2>Tồn theo kho</h2>
+{# Cột "Còn lại" đếm từ mart.moc_thoi_gian (ngày BÁN mới nhất), còn bảng tồn
+   lấy ảnh chụp 在庫一覧 mới nhất — hai bản xuất khác nhau, hai ngày có thể
+   lệch. Không nói ra thì người đọc trừ ngược ra ngày hết hạn và lệch đúng
+   bằng khoảng cách đó. #}
+<p class="ghi-chu">Từ ảnh chụp <strong>在庫一覧</strong> mới nhất. Cột
+&ldquo;Còn lại&rdquo; đếm từ <strong>mốc thời gian của kho dữ liệu</strong>
+(ngày bán mới nhất), có thể lệch vài ngày so với ngày chụp tồn kho.</p>
 {% if h.ton %}
 <div class="bang-cuon">
 <table>

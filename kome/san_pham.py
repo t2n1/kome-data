@@ -379,7 +379,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     tắc (của `tong_quan_danh_ba` đợt 4a, và của `danh_sach()` ngay trên):
 
       * Khối NỘI DUNG theo MỌI bộ lọc: bảng tồn, khối cận hạn, khối quá hạn,
-        ô đếm "số lô cận hạn" — cả `kho` lẫn `loc`.
+        ô đếm "số lô cận hạn", ô "giá trị tồn chết" — cả `kho` lẫn `loc`.
       * Khối ĐIỀU KHIỂN không theo bộ lọc của CHÍNH NÓ, nhưng vẫn theo bộ lọc
         kia: "giá trị theo kho" và danh sách kho điều khiển `kho` nên không
         theo `kho`, nhưng CÓ theo `loc`. Hai ô đếm trạng thái điều khiển `loc`
@@ -392,9 +392,17 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     con số nào nói mình đang nói về tập nào.
 
     NGOẠI LỆ CÓ CHỦ Ý: hai ô đếm "số mã hết hàng"/"số mã sắp thiếu" không theo
-    `kho`. `trang_thai` là thuộc tính của MỘT MÃ tính trên tổng mọi kho (xem
-    migration 023) — không có thứ gọi là "mã hết hàng ở kho 0001". Lọc chúng
-    theo kho là bịa ra một con số không có định nghĩa nào ở `mart`.
+    `kho`, và cũng không theo `loc` (chúng điều khiển `loc`). `trang_thai` là
+    thuộc tính của MỘT MÃ tính trên tổng mọi kho (xem migration 023) — không
+    có thứ gọi là "mã hết hàng ở kho 0001". Lọc chúng theo kho là bịa ra một
+    con số không có định nghĩa nào ở `mart`.
+
+    Ô "giá trị tồn chết" thì KHÔNG nằm trong ngoại lệ đó, dù nó cũng nói về
+    `trang_thai`: cái được cộng là `gia_tri`, và giá trị thì CÓ theo từng kho.
+    "Phần hàng chết đang chiếm chỗ tại kho này" là câu hỏi có nghĩa và tính
+    được — đúng câu hỏi của người vừa lọc theo kho. Bỏ `{dk_kho}` ở đó thì một
+    con số YÊN của mọi kho đứng ngay trên một bảng chỉ còn một kho, và công ty
+    có 2 kho nên sai số gần 2× — trên đúng con số dùng để quyết định xả hàng.
     """
     # Lượt hỏi 1: bốn ô tổng quan + giá trị theo kho + danh sách kho + ngày
     # chụp. ORDER BY ở LỚP NGOÀI, không trong nhánh.
@@ -417,8 +425,8 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     p_loc = [loc] if loc in TRANG_THAI_TON else []
 
     # THỨ TỰ THAM SỐ = thứ tự VĂN BẢN các mảnh xuất hiện bên dưới: nhánh
-    # 'can_han' (CAN_HAN_NGAY, kho, loc), rồi 'gia_tri_ton_chet' (loc), rồi
-    # 'kho' (loc).
+    # 'can_han' (CAN_HAN_NGAY, kho, loc), rồi 'gia_tri_ton_chet' (kho, loc),
+    # rồi 'kho' (loc).
     tq = conn.execute(f"""
         SELECT khoi, khoa, ten, so, so2, ngay FROM (
             SELECT 'o'::text AS khoi, 'het_hang'::text AS khoa, ''::text AS ten,
@@ -437,7 +445,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
             SELECT 'o', 'gia_tri_ton_chet', '', coalesce(sum(t.gia_tri), 0), 0, NULL
               FROM mart.ton_hien_tai t
               JOIN mart.san_pham_360 s ON s.product_code = t.product_code
-             WHERE s.trang_thai = 'ton_chet' {dk_loc}
+             WHERE s.trang_thai = 'ton_chet' {dk_kho} {dk_loc}
             UNION ALL
             SELECT 'kho', t.warehouse_code, t.ten_kho,
                    coalesce(sum(t.gia_tri), 0), count(*), NULL
@@ -452,7 +460,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
             SELECT 'ngay', '', '', 0, 0, max(snapshot_date)
               FROM core.fact_inventory_daily
         ) u ORDER BY khoi, khoa
-    """, [CAN_HAN_NGAY] + p_kho + p_loc + p_loc + p_loc).fetchall()
+    """, [CAN_HAN_NGAY] + p_kho + p_loc + p_kho + p_loc + p_loc).fetchall()
 
     o_tong_quan = {r[1]: int(r[3]) for r in tq if r[0] == "o"}
     theo_kho = [{"ma": r[1], "ten": r[2], "gia_tri": int(r[3]),

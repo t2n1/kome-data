@@ -35,7 +35,15 @@
 
 {% if k.ngay_chup %}
 <p class="ghi-chu">Ảnh chụp <strong>在庫一覧 ngày {{ k.ngay_chup }}</strong> —
-đây là tồn kho lúc xuất file, không phải tồn kho lúc này.</p>
+đây là tồn kho lúc xuất file, không phải tồn kho lúc này.
+{# HAI NGÀY KHÁC NHAU, và phải nói ra. Bảng tồn lấy ảnh chụp 在庫一覧 mới nhất,
+   còn số ngày "còn"/"quá" đếm từ mart.moc_thoi_gian (ngày BÁN mới nhất, xem
+   migration 023: `best_before - m.hom_nay`). Hai bản xuất khác nhau nên hai
+   ngày có thể lệch — không ghi rõ thì người đọc trừ ngược ra ngày hết hạn từ
+   con số "còn N ngày" và lệch đúng bằng khoảng cách đó. #}
+Số ngày &ldquo;còn&rdquo;/&ldquo;quá&rdquo; ở các bảng dưới đếm từ <strong>mốc
+thời gian của kho dữ liệu</strong> (ngày bán mới nhất), có thể lệch vài ngày so
+với ngày chụp tồn kho này.</p>
 {% else %}
 <div class="trong">Chưa có bản xuất 在庫一覧 nào trong kho dữ liệu.</div>
 {% endif %}
@@ -50,10 +58,14 @@
 {# Ghi rõ PHẠM VI của hai ô đầu, và ghi ngay dưới chúng. Chúng đứng cạnh hai ô
    CÓ theo bộ lọc, nên không nói ra thì bốn con số cạnh nhau mà không con số
    nào cho biết mình đang nói về tập nào. #}
-<p class="ghi-chu">Hai ô đầu luôn đếm trên <strong>mọi kho</strong>, kể cả khi
-đang lọc theo một kho: trạng thái là thuộc tính của một <em>mã</em> tính trên
-tổng mọi kho — &ldquo;mã hết hàng ở kho 0001&rdquo; không có định nghĩa nào.
-Hai ô sau thì đi theo cả hai bộ lọc bên dưới.</p>
+<p class="ghi-chu">Hai ô đầu <strong>không theo bộ lọc nào</strong> bên dưới:
+chúng luôn đếm trên <strong>mọi kho</strong> vì trạng thái là thuộc tính của
+một <em>mã</em> tính trên tổng mọi kho (&ldquo;mã hết hàng ở kho 0001&rdquo;
+không có định nghĩa nào), và cũng không theo bộ lọc trạng thái vì chính chúng
+là nhãn của bộ lọc đó. Hai ô sau thì đi theo cả hai bộ lọc.
+<strong>Tồn chết</strong> gộp hai nhóm: mã <em>không bán gì suốt 90 ngày</em>
+và mã còn <em>đủ bán trên 180 ngày</em> — mã vừa ra mắt trong 90 ngày không bao
+giờ bị gọi là tồn chết.</p>
 
 {# Hai bộ lọc. Ô chọn kho là form GET riêng vì <select> không tự gửi được nếu
    không có JavaScript; dải chip trạng thái là liên kết thuần. Mỗi ô mang theo
