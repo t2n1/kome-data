@@ -30,6 +30,12 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
    OBC đổi mẫu xuất, hoặc quan sát cũ chỉ đúng cho một cấu hình xuất khác.
    File master và `在庫一覧` thì header ở dòng 1.
 5. `担当者` của OBC (5 người) KHÁC người nhập đơn trên web (7 tài khoản, gồm 2 arubaito).
+6. Tên kho của OBC là **tên nghiệp vụ**, không phải địa điểm: `1002 新・賞味期限用`
+   nghĩa là "ngăn dùng cho hạn sử dụng", không phải một địa chỉ kho. Gói thiết kế đợt
+   4b có viết cứng ba tên `Osaka` / `Nagoya` / `Kho lạnh Osaka` — **không có thật**.
+   Thực tế công ty chỉ có HAI kho: `0001 茨城第１倉庫（出荷専用）` và `1002 新・賞味期限用`.
+   Đặt tên kho cứng ở đâu đó (thay vì đọc từ `core.dim_warehouse`) là thêm một kho ảo
+   vào mọi bộ lọc.
 
 ## Bốn vai trò CSDL (Task 13, `db/migrations/009_roles.sql`)
 Luật số một ("OBC chỉ đọc") không chỉ là quy ước trong code — nó là ràng
@@ -75,6 +81,9 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
+| `/san-pham` | Danh mục mã hàng + tìm kiếm + lọc theo trạng thái tồn | `mart.san_pham_360` |
+| `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
+| `/kho-hang` | Bốn ô tổng quan tồn kho · bảng tồn · cận hạn/quá hạn · giá trị theo kho | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` |
 | `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
 
 **Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
@@ -167,6 +176,31 @@ thiếu. Ba ràng buộc của ô đó:
 **Bất biến:** khách OBC đã đánh dấu `※廃業※` / `※取引停止※` trong TÊN (281/2.077
 khách) không bao giờ vào danh sách gọi lại. Doanh nghiệp đã phá sản thì im lặng
 là đúng, không phải bất thường — xem `db/migrations/016_*.sql`.
+
+**Bất biến:** `mart.toc_do_ban` dùng **trung bình 90 ngày**, còn `mart.nhip_mua` dùng
+**trung vị** — KHÁC NHAU CÓ CHỦ Ý. `toc_do_ban` trả lời "bao nhiêu ngày nữa thì hết
+hàng" (một phép chia trên tổng lượng, nên trung bình đúng); `nhip_mua` trả lời "khoảng
+cách điển hình giữa hai lần mua" (nơi một kỳ nghỉ Tết làm trung bình lệch). Đừng "sửa
+cho nhất quán".
+
+**Bất biến:** `core.fact_inventory_daily.best_before` là **TEXT** và chứa cả giá trị chữ
+`賞味期限なし` lẫn chuỗi rỗng. **Không bao giờ `to_date()` trần trên cột này** — một giá
+trị chữ làm cả truy vấn nổ và trang trắng, mà nó chỉ nổ khi trong kho có đúng loại hàng
+đó, tức sau khi đã triển khai. `mart.ton_hien_tai` kiểm dạng bằng regex trước và phân
+**BỐN** loại: `ngay` / `khong_han` / `trong` / `khong_ro` (chuỗi không rỗng nhưng không
+khớp regex ngày và không đúng y hệt `賞味期限なし` — "không đọc được", KHÁC "không có
+hạn dùng").
+
+**Bất biến:** `mart.san_pham_360.ton` là **NULL** khi mã không có dòng tồn nào, không
+phải `0`. 90/232 mã chưa từng có dòng trong `在庫一覧`. "Không biết" khác "bằng không" —
+hiện `0` là nói kho đã hết, và người đọc sẽ đi đặt hàng.
+
+**Bất biến:** hai ô đếm trạng thái ở đầu `/kho-hang` KHÔNG co theo bộ lọc kho và
+KHÔNG co theo bộ lọc trạng thái, còn ô "Giá trị tồn chết" thì co theo **cả hai**.
+Khác nhau có chủ ý và trang phải nói ra: ô đếm là để so sánh giữa các kho nên phải
+đứng yên, còn "giá trị tồn chết của kho này" là con số người ta dùng để quyết định
+thanh lý — hiện tổng mọi kho bên cạnh một bảng đã lọc thì sai gần 2× ở công ty hai
+kho.
 
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |
