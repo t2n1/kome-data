@@ -5,6 +5,8 @@ Trang này hiển thị doanh thu, lãi gộp, giá vốn từng mặt hàng và
 thứ đó nếu không đăng nhập**, và **không ai nạp/xoá dữ liệu qua bản công
 khai**.
 """
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -656,3 +658,25 @@ def test_nguoi_khong_phu_trach_khach_nao_thay_toan_bo_ngay_tu_dau(khach):
     c = khach(sale=None)
     _vao(c)
     assert "Đang xem khách của" not in c.get("/khach-hang").text
+
+
+def test_nut_dang_xuat_co_icon_VA_van_con_chu(khach):
+    """Đợt 4d: nút Đăng xuất nằm NGOÀI <nav> và chỉ render khi có cổng đăng
+    nhập, nên test icon ở tests/test_giao_dien.py không với tới được nó.
+
+    Cùng bất biến với các mục điều hướng: icon là trang trí, chữ mới là nhãn.
+    Đây là nút DUY NHẤT trong sidebar kết thúc một phiên làm việc — một cái
+    nút chỉ có hình thì người mới sẽ phải đoán, và đoán sai ở đây nghĩa là
+    bấm nhầm rồi mất chỗ đang làm dở.
+    """
+    c = khach()
+    _vao(c)
+    html = c.get("/").text
+    thoat = re.search(r'<div class="thoat">(.*?)</div>', html, re.S).group(1)
+    the_svg = re.findall(r"<svg[^>]*>", thoat)
+    assert the_svg, "nút Đăng xuất thiếu icon"
+    for the in the_svg:
+        assert 'aria-hidden="true"' in the, the
+        assert 'focusable="false"' in the, the
+    chu = re.sub(r"<svg.*?</svg>", "", thoat, flags=re.S)
+    assert "Đăng xuất" in chu

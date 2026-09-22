@@ -428,10 +428,26 @@ def test_moi_muc_dieu_huong_co_icon_VA_van_con_chu(conn, test_db_url):
 
 def test_icon_dieu_huong_an_voi_trinh_doc_man_hinh(conn, test_db_url):
     # Đọc hai lần cùng một mục còn tệ hơn không có icon.
+    #
+    # Quét CẢ sidebar (`<aside class="thanh-ben">`), không chỉ `<nav>`: nút
+    # Đăng xuất nằm NGOÀI <nav>, ở khối `.thoat`, và nó cũng có icon. Bản đầu
+    # của test này chỉ soi trong <nav> nên nút đó không được canh — ai lỡ bỏ
+    # `aria-hidden` của riêng nó thì người dùng trình đọc màn hình nghe icon
+    # đọc thành một mục thứ hai, và không test nào đỏ.
+    #
+    # Nút Đăng xuất chỉ render khi CÓ cổng đăng nhập, mà fixture autouse
+    # `_khong_cong_dang_nhap` tắt cổng cho mọi test ở đây — nên ca đó được
+    # canh riêng ở tests/test_bao_mat.py, nơi đã có sẵn một phiên đăng nhập.
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/").text
-    nav = re.search(r'<nav class="dieu-huong">(.*?)</nav>', html, re.S).group(1)
-    for the in re.findall(r"<svg[^>]*>", nav):
+    ben = re.search(r'<aside class="thanh-ben">(.*?)</aside>', html, re.S).group(1)
+    the_svg = re.findall(r"<svg[^>]*>", ben)
+    # 7 chứ không phải 9: nhóm HỆ THỐNG bị `hien_kho` bọc (đợt 3 — chỉ người
+    # có quyền mới thấy "Kho dữ liệu"), và nút Đăng xuất chỉ render khi có
+    # cổng đăng nhập. Con số này canh "mọi mục đang hiện đều có icon", còn
+    # việc đủ mục hay không là việc của test khác.
+    assert len(the_svg) >= 7, "thiếu icon ở sidebar"
+    for the in the_svg:
         assert 'aria-hidden="true"' in the, the
         assert 'focusable="false"' in the, the
 
