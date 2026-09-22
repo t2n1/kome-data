@@ -29,7 +29,15 @@ SCHEMAS = ("core", "mart", "app", "meta")
 #    app.nguoi_dung.salesperson_code trỏ khoá ngoại vào đây. Không giữ lại
 #    thì TRUNCATE ... CASCADE cuốn theo cả bảng tài khoản, và mọi test tạo
 #    người dùng có mã sale đều vỡ khoá ngoại ở test thứ hai trở đi.
-GIU_LAI = {"meta.schema_migration", "core.dim_date", "core.dim_salesperson"}
+#  - core.dim_prefecture: bảng tra 47 tỉnh gieo TĨNH bởi 025_ban_do_tinh.sql,
+#    không phải dữ liệu của riêng một test. Không giữ lại thì test đầu tiên
+#    trong phiên TRUNCATE sạch 47 dòng đó trước khi thân test kịp chạy, và
+#    không migration nào chạy lại để nạp lại — mọi test đọc dim_prefecture
+#    sau đó thấy bảng RỖNG dù migration đã chạy đúng, một lỗi trông giống hệt
+#    "migration quên INSERT" nhưng thật ra là fixture xoá mất dữ liệu tham
+#    chiếu (đã bắt được lỗi này thật khi viết test_ban_do.py).
+GIU_LAI = {"meta.schema_migration", "core.dim_date", "core.dim_salesperson",
+           "core.dim_prefecture"}
 
 # Nhớ danh sách bảng sau lần tra đầu tiên (xem fixture `conn`).
 _TABLES: list[str] | None = None

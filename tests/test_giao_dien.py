@@ -28,8 +28,16 @@ TEN_FONT = [
 
 # Mọi trang mở được mà không cần tham số. Trang hồ sơ khách và trang lỗi
 # không nằm đây vì chúng cần dữ liệu hoặc một sự cố để hiện ra.
+#
+# [Vòng soát toàn nhánh, mục 5] Danh sách này thiếu /ban-do (đợt 4c) — nên
+# hai test dưới (nối tới CSS, đúng một thẻ viewport) KHÔNG phủ trang đó: gỡ
+# `{% include "_chung.html" %}` khỏi ban_do.html là trang trơ trụi và mất thẻ
+# viewport (sidebar không gập trên điện thoại) mà cả bộ test vẫn xanh.
+# (/san-pham và /kho-hang của đợt 4b thì ĐÃ có sẵn — bản soát ghi chúng cũng
+# thiếu, nhưng đo lại trên nhánh này thì không.) Thêm một trang mới thì THÊM
+# VÀO ĐÂY — đây là chỗ duy nhất canh khung chung của mọi trang.
 TRANG = ["/", "/khach-hang", "/bao-cao", "/can-xu-ly", "/kho-du-lieu",
-         "/san-pham", "/kho-hang"]
+         "/san-pham", "/kho-hang", "/ban-do"]
 
 
 def test_css_duoc_phuc_vu(conn, test_db_url):
@@ -404,3 +412,247 @@ def test_nhan_hang_khong_bao_gio_tro_troi(conn, test_db_url):
     tro_troi = re.findall(r"hạng(?! (?:theo )?doanh thu 12 tháng)(?! s·a)", html)
     assert not tro_troi, \
         f"{len(tro_troi)} chỗ ghi 'hạng' trơ trọi — sẽ bị đối chiếu nhầm với 得意先ランク"
+
+
+# ---- Icon và logo sidebar (đợt 4d, Task 1) ------------------------------
+# File này không có fixture `client` chung (khác tests/test_ban_do.py, nơi
+# đợt 4c thêm một fixture riêng cho Task 3 của nó) — mọi test ở đây tự dựng
+# TestClient(create_app(...)) tại chỗ, nên ba test dưới theo đúng cách đó.
+
+def test_moi_muc_dieu_huong_co_icon_VA_van_con_chu(conn, test_db_url):
+    # Icon là trang trí, chữ mới là nhãn. Bất biến "màu/hình phải kèm thứ đọc
+    # được" (_chung.html:76-77) áp cả ở đây: bỏ chữ đi thì sidebar thành tám ô
+    # vuông không ai đoán được.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    nav = re.search(r'<nav class="dieu-huong">(.*?)</nav>', html, re.S).group(1)
+    muc = re.findall(r"<a [^>]*href=\"(/[^\"]*)\"[^>]*>(.*?)</a>", nav, re.S)
+    assert len(muc) >= 8
+    for duong_dan, ben_trong in muc:
+        assert "<svg" in ben_trong, f"{duong_dan} thiếu icon"
+        chu = re.sub(r"<svg.*?</svg>", "", ben_trong, flags=re.S).strip()
+        assert len(chu) >= 3, f"{duong_dan} mất chữ, chỉ còn icon"
+
+
+def test_icon_dieu_huong_an_voi_trinh_doc_man_hinh(conn, test_db_url):
+    # Đọc hai lần cùng một mục còn tệ hơn không có icon.
+    #
+    # Quét CẢ sidebar (`<aside class="thanh-ben">`), không chỉ `<nav>`: nút
+    # Đăng xuất nằm NGOÀI <nav>, ở khối `.thoat`, và nó cũng có icon. Bản đầu
+    # của test này chỉ soi trong <nav> nên nút đó không được canh — ai lỡ bỏ
+    # `aria-hidden` của riêng nó thì người dùng trình đọc màn hình nghe icon
+    # đọc thành một mục thứ hai, và không test nào đỏ.
+    #
+    # Nút Đăng xuất chỉ render khi CÓ cổng đăng nhập, mà fixture autouse
+    # `_khong_cong_dang_nhap` tắt cổng cho mọi test ở đây — nên ca đó được
+    # canh riêng ở tests/test_bao_mat.py, nơi đã có sẵn một phiên đăng nhập.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    ben = re.search(r'<aside class="thanh-ben">(.*?)</aside>', html, re.S).group(1)
+    the_svg = re.findall(r"<svg[^>]*>", ben)
+    # 7 chứ không phải 9: nhóm HỆ THỐNG bị `hien_kho` bọc (đợt 3 — chỉ người
+    # có quyền mới thấy "Kho dữ liệu"), và nút Đăng xuất chỉ render khi có
+    # cổng đăng nhập. Con số này canh "mọi mục đang hiện đều có icon", còn
+    # việc đủ mục hay không là việc của test khác.
+    assert len(the_svg) >= 7, "thiếu icon ở sidebar"
+    for the in the_svg:
+        assert 'aria-hidden="true"' in the, the
+        assert 'focusable="false"' in the, the
+
+
+def test_logo_hien_trong_sidebar(conn, test_db_url):
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    assert "/static/kome-logo.png" in html
+
+
+# ---- Nút đổi giao diện sáng/tối (đợt 4d, Task 2) ------------------------
+# KHÔNG một dòng JS: lựa chọn lưu bằng cookie `kome_giao_dien`, máy chủ
+# render thẳng `data-theme` lên phần tử gốc bằng một thẻ <html> THỨ HAI ở
+# giữa thân trang -- trình duyệt GỘP thuộc tính đó vào phần tử <html> có
+# thật theo đúng thuật toán phân tích HTML5 (xử lý thẻ mở "html" lặp lại),
+# không cần JavaScript. File này không có fixture `client` chung (xem chú
+# thích Task 1 ở trên) -- mọi test tự dựng TestClient tại chỗ.
+
+def test_mac_dinh_theo_he_thong_thi_KHONG_dat_data_theme(conn, test_db_url):
+    # Không đặt thuộc tính = để @media (prefers-color-scheme) quyết định.
+    # Đặt cứng một giá trị mặc định là ép mọi người dùng mới vào một chế độ.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    assert "data-theme=" not in html
+
+
+def test_chon_sang_thi_ep_sang_KE_CA_khi_he_thong_dang_toi(conn, test_db_url):
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/giao-dien?che_do=sang", follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert "kome_giao_dien=sang" in r.headers["set-cookie"]
+    html = client.get("/", cookies={"kome_giao_dien": "sang"}).text
+    assert 'data-theme="sang"' in html
+
+
+def test_chon_toi_dat_data_theme_toi(conn, test_db_url):
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/", cookies={"kome_giao_dien": "toi"}).text
+    assert 'data-theme="toi"' in html
+
+
+def test_che_do_la_bay_khong_lam_no_trang(conn, test_db_url):
+    # Tham số URL gõ sai không được làm trang chết, và giá trị đó không bao
+    # giờ được PHẢN CHIẾU nguyên văn vào cookie hay HTML -- data-theme render
+    # ra chỉ có thể là "sang"/"toi", do chính route tính, không bao giờ chép
+    # thẳng từ tham số hay cookie.
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/giao-dien?che_do=<script>", follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert "<script>" not in r.headers["set-cookie"]
+    html = client.get("/", cookies={"kome_giao_dien": "<script>"}).text
+    assert "<script>" not in html
+    assert "data-theme=" not in html
+
+
+def test_theo_gio_doi_theo_gio_NHAT_khong_theo_gio_may_chu(conn, test_db_url, monkeypatch):
+    # CSDL chạy UTC; lấy giờ máy chủ thì 18:00 giờ Nhật vẫn là 09:00 UTC và
+    # trang sáng trưng suốt buổi tối -- cùng cái bẫy mà ô "hôm nay đã có dữ
+    # liệu chưa" đã ghi trong CLAUDE.md. Dùng lại ĐÚNG hàm giờ Nhật của
+    # kome/tuoi_du_lieu.py (`_bay_gio`, cùng chỗ test_web.py monkeypatch),
+    # không viết bản giờ Nhật thứ hai.
+    from datetime import datetime
+    from kome.tuoi_du_lieu import MUI_GIO
+    client = TestClient(create_app(db_url=test_db_url))
+
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 20, 0, tzinfo=MUI_GIO))
+    html = client.get("/", cookies={"kome_giao_dien": "theo-gio"}).text
+    assert 'data-theme="toi"' in html
+
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 10, 0, tzinfo=MUI_GIO))
+    html = client.get("/", cookies={"kome_giao_dien": "theo-gio"}).text
+    assert 'data-theme="sang"' in html
+
+
+def test_theo_gio_canh_dung_ranh_gioi_18_va_6_gio(conn, test_db_url, monkeypatch):
+    # Vòng soát 1, mục 4: test trước đó chỉ gieo 20:00 và 10:00 -- cả hai đều
+    # nằm SÂU trong vùng, nên đổi hằng số GIO_BAT_DAU_TOI/GIO_KET_THUC_TOI
+    # (kome/web/app.py) thành bất kỳ giá trị nào cũng không làm nó đỏ. Test
+    # này gieo ĐÚNG hai mốc biên "18:00-06:00 giờ Nhật là tối" (đặc tả đợt
+    # 4d): 18:00 phải là "toi" (đầu vùng, bao gồm), 06:00 phải là "sang"
+    # (cuối vùng, KHÔNG bao gồm).
+    from datetime import datetime
+    from kome.tuoi_du_lieu import MUI_GIO
+    client = TestClient(create_app(db_url=test_db_url))
+
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 18, 0, tzinfo=MUI_GIO))
+    html = client.get("/", cookies={"kome_giao_dien": "theo-gio"}).text
+    assert 'data-theme="toi"' in html, "18:00 giờ Nhật phải là tối"
+
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 6, 0, tzinfo=MUI_GIO))
+    html = client.get("/", cookies={"kome_giao_dien": "theo-gio"}).text
+    assert 'data-theme="sang"' in html, "06:00 giờ Nhật phải là sáng"
+
+
+def test_hai_khoi_mau_toi_trong_css_GIONG_HET_NHAU():
+    # Bảng tối phải viết HAI lần (một trong @media, một cho
+    # :root[data-theme="toi"]) vì CSS không gộp được hai selector đó vào một
+    # khối. Hai bản trôi khỏi nhau là chọn "tối" tay ra một bộ màu khác với
+    # "tối" theo hệ thống -- và không ai thấy cho tới khi nhìn hai máy cạnh
+    # nhau.
+    css = CSS.read_text(encoding="utf-8")
+    khoi = re.findall(r"/\* BANG-TOI \*/(.*?)/\* HET-BANG-TOI \*/", css, re.S)
+    assert len(khoi) == 2, f"cần đúng 2 khối BANG-TOI, thấy {len(khoi)}"
+    assert khoi[0].strip() == khoi[1].strip()
+
+
+def test_ban_toi_ap_dung_du_khi_chon_tay():
+    # :root[data-theme="toi"] phải tồn tại NGOÀI khối @media -- chọn "Tối"
+    # bằng tay phải thắng cả khi hệ thống đang để sáng.
+    css = CSS.read_text(encoding="utf-8")
+    assert ':root[data-theme="toi"]' in css.replace(" ", "")
+
+
+def test_ban_sang_chon_tay_thang_he_thong_dang_toi():
+    # Selector trong khối @media (prefers-color-scheme: dark) phải là
+    # :root:not([data-theme="sang"]), không phải :root trần -- nếu không,
+    # chọn "Sáng" bằng tay không có tác dụng gì với người đang ở hệ thống
+    # tối, đúng những người bấm nút đó.
+    css = CSS.read_text(encoding="utf-8")
+    assert ':root:not([data-theme="sang"])' in css.replace(" ", "")
+
+
+def test_nut_doi_giao_dien_hien_KE_CA_khong_co_cong_dang_nhap(conn, test_db_url):
+    # Máy trong công ty để trống KOME_SESSION_SECRET vẫn phải thấy bốn nút
+    # này -- không được đặt trong khối {% if co_dang_nhap %}.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    for nhan in ("Sáng", "Tối", "Theo hệ thống", "Theo giờ"):
+        assert nhan in html, f"thiếu nút đổi giao diện: {nhan}"
+    for che_do in ("sang", "toi", "he-thong", "theo-gio"):
+        assert f"/giao-dien?che_do={che_do}" in html
+
+
+def test_giao_dien_chuyen_huong_chi_ve_duong_dan_noi_bo(conn, test_db_url):
+    # Referer ngoài không được dùng để mở cửa chuyển hướng ra ngoài -- chỉ
+    # giữ lại PATH (+ QUERY, xem test dưới), bỏ nếu không bắt đầu bằng "/".
+    # Domain trong Referer không quan trọng ở đây vì RedirectResponse trả về
+    # một path (không phải một URL tuyệt đối), nên trình duyệt vẫn ở lại
+    # đúng máy chủ KOME -- nhưng path phải khớp đúng trang đã gọi nó.
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/giao-dien?che_do=toi",
+                   headers={"referer": "http://may-la.example/khach-hang?tim=x"},
+                   follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert r.headers["location"] == "/khach-hang?tim=x"
+
+
+def test_giao_dien_chuyen_huong_GIU_LAI_bo_loc_tren_query(conn, test_db_url):
+    # Vòng soát 1, mục 1 (lỗi trong brief gốc, không phải lỗi cài đặt): bỏ
+    # query khi chuyển hướng làm người đang lọc /khach-hang mất sạch bộ lọc
+    # (Tỉnh, Sale, nhóm việc...) chỉ vì bấm nút đổi giao diện. An toàn nằm ở
+    # chỗ bỏ scheme+netloc của Referer, KHÔNG nằm ở chỗ bỏ query -- nên query
+    # phải được GIỮ NGUYÊN, kể cả một tham số tiếng Nhật đã mã hoá URL
+    # (`東京都` -- test canh đúng ký tự phần trăm-mã-hoá, không giải mã).
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get(
+        "/giao-dien?che_do=sang",
+        headers={"referer":
+                 "http://may-la.example/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD&nv=03"},
+        follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert r.headers["location"] == "/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD&nv=03"
+
+
+def test_giao_dien_khong_co_referer_thi_ve_trang_chu(conn, test_db_url):
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get("/giao-dien?che_do=toi", follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert r.headers["location"] == "/"
+
+
+def test_color_scheme_nam_trong_khoi_bang_toi():
+    # Vòng soát 1, mục 2: color-scheme:light dark cứng ở :root (khối sáng
+    # gốc) không tự hẹp theo data-theme -- chọn "Tối" trên máy đang để hệ
+    # thống sáng thì trang tối nhưng thanh cuộn/ô <select> vẫn trắng chói
+    # (và ngược lại). color-scheme:dark phải nằm TRONG cặp mốc BANG-TOI/
+    # HET-BANG-TOI để tự nhân đôi sang cả hai khối màu tối, và
+    # :root[data-theme="sang"] phải tự khai color-scheme:light.
+    css = CSS.read_text(encoding="utf-8")
+    khoi = re.findall(r"/\* BANG-TOI \*/(.*?)/\* HET-BANG-TOI \*/", css, re.S)
+    assert len(khoi) == 2
+    for k in khoi:
+        assert "color-scheme:dark" in k.replace(" ", ""), \
+            "color-scheme:dark phải nằm TRONG khối BANG-TOI, không phải bên ngoài"
+    assert ':root[data-theme="sang"]{color-scheme:light}' in css.replace(" ", "").replace("\n", "")
+
+
+def test_giao_dien_co_nhan_nhom_cho_trinh_doc_man_hinh(conn, test_db_url):
+    # Vòng soát 1, mục 3: bốn liên kết không có nhãn nhóm thì người dùng
+    # trình đọc màn hình nghe "Sáng, Tối, Theo hệ thống, Theo giờ" trôi nổi
+    # ở cuối sidebar, không biết đó là nhóm gì -- trong khi bốn nhóm khác
+    # của <nav> đều có <p class="nhom">.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    khoi = re.search(r'<div class="giao-dien">(.*?)</div>', html, re.S).group(1)
+    assert '<p class="nhom">' in khoi and "GIAO DIỆN" in khoi

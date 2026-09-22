@@ -2,6 +2,7 @@
 import os, shutil, tempfile, traceback
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,13 +14,55 @@ from kome import khach_hang as KH
 # (+ psycopg qua `conn` truyền vào), KHÔNG kéo pandas hay python-calamine —
 # đúng ràng buộc mà test_trang_chi_doc_khong_phu_thuoc_pandas canh.
 from kome import san_pham as SP
+# kome/ban_do.py cũng chỉ dùng dataclasses, cùng lý do trên — an toàn nhập ở
+# mức ngoài cùng.
+from kome import ban_do as BD
 from kome.db import connect
 from kome.env import nap_env
 from kome.nhat_ky_nap import lo_nap_gan_nhat, trang_thai_nap
+# Nhập CẢ module (không chỉ `tinh_tuoi`): chế độ "theo-gio" của Task 2 gọi
+# thẳng `TDL._bay_gio()` mỗi request để lấy giờ NHẬT THẬT, và test monkeypatch
+# đúng tên thuộc tính đó trên module (`kome.tuoi_du_lieu._bay_gio`, xem
+# tests/test_web.py). `from kome.tuoi_du_lieu import _bay_gio` sẽ chốt cứng
+# tham chiếu hàm GỐC lúc nhập module — monkeypatch sau đó không còn tác dụng
+# vì nó thay thuộc tính trên module tuoi_du_lieu, không thay biến cục bộ đã
+# bind sẵn ở đây.
+from kome import tuoi_du_lieu as TDL
 from kome.tuoi_du_lieu import tinh_tuoi
 from kome.web import bao_mat
 from kome.web import nguoi_dung as ND
 from ops.backup import backup_status
+
+# Đợt 4d (Task 2) — nút đổi giao diện sáng/tối, KHÔNG JS.
+TEN_COOKIE_GIAO_DIEN = "kome_giao_dien"
+CHE_DO_GIAO_DIEN_HOP_LE = ("he-thong", "sang", "toi", "theo-gio")
+HAN_COOKIE_GIAO_DIEN_GIAY = 365 * 24 * 3600
+# 18:00–06:00 giờ Nhật coi là "tối" cho chế độ theo-gio (đặc tả đợt 4d).
+GIO_BAT_DAU_TOI = 18
+GIO_KET_THUC_TOI = 6
+
+
+def _che_do_giao_dien(request: Request) -> str:
+    """Chế độ NGƯỜI DÙNG ĐÃ CHỌN (chưa quy ra sáng/tối) — giá trị lạ trong
+    cookie (gõ tay, hoặc một cookie cũ từ bản trước) rơi về "he-thong", KHÔNG
+    được làm trang nổ và KHÔNG được lọt nguyên văn ra HTML."""
+    che_do = request.cookies.get(TEN_COOKIE_GIAO_DIEN, "he-thong")
+    return che_do if che_do in CHE_DO_GIAO_DIEN_HOP_LE else "he-thong"
+
+
+def _data_theme(che_do: str) -> str | None:
+    """`data-theme` để render lên <html>, hoặc None để KHÔNG đặt gì (chế độ
+    "he-thong" — nhường quyền quyết định cho @media (prefers-color-scheme)
+    thuần CSS, xem kome.css)."""
+    if che_do in ("sang", "toi"):
+        return che_do
+    if che_do == "theo-gio":
+        # Giờ NHẬT THẬT, không phải giờ máy chủ (CSDL/Vercel chạy UTC) —
+        # dùng lại nguyên hàm của kome/tuoi_du_lieu.py, xem chú thích ở nơi
+        # nhập module phía trên.
+        gio = TDL._bay_gio().hour
+        return "toi" if (gio >= GIO_BAT_DAU_TOI or gio < GIO_KET_THUC_TOI) else "sang"
+    return None
 
 # Tự đọc .env khi chạy ở máy trong công ty. `uvicorn kome.web.app:app` khởi
 # động trong môi trường trống, nên không có dòng này thì trang chạy lên bình
@@ -155,8 +198,17 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         # `nguoi is None` = không có cổng đăng nhập (máy trong công ty để
         # trống KOME_SESSION_SECRET) -> mọi thứ mở, y như trước đợt 3.
         hien_kho = nguoi is None or nguoi.duoc_vao_kho_du_lieu
+        # Chế độ giao diện đọc từ cookie MỖI LƯỢT (không chốt lúc dựng app,
+        # khác `chung` ở trên): mỗi người một lựa chọn riêng trên cùng một
+        # app. `che_do_giao_dien` cho _nav.html biết nút nào đang "đang
+        # chọn"; `data_theme` cho _chung.html biết có đặt thuộc tính gì lên
+        # <html> không (xem kome/web/app.py::_data_theme).
+        che_do = _che_do_giao_dien(request)
         return TEMPLATES.TemplateResponse(
-            request, ten, {**ctx, **chung, "nguoi": nguoi, "hien_kho": hien_kho}, **kw)
+            request, ten,
+            {**ctx, **chung, "nguoi": nguoi, "hien_kho": hien_kho,
+             "che_do_giao_dien": che_do, "data_theme": _data_theme(che_do)},
+            **kw)
 
     def _loi(request: Request, viec: str, exc: Exception) -> HTMLResponse:
         """Trang lỗi tiếng Việt cho mọi lỗi NGOÀI DỰ KIẾN.
@@ -198,6 +250,48 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
 
     def _cam(request: Request) -> HTMLResponse:
         return _ve(request, "chi_doc.html", {"trang": None}, status_code=403)
+
+    @app.get("/giao-dien")
+    def doi_giao_dien(request: Request, che_do: str = "he-thong"):
+        """Đổi chế độ sáng/tối/theo giờ, KHÔNG một dòng JS: lưu cookie rồi
+        chuyển hướng về đúng trang đã gọi nút. Không chạm CSDL — chỉ đọc/ghi
+        cookie, nên route này chạy được cả khi CSDL đang hỏng, cùng nếp với
+        `_loi`/`_ve`.
+
+        Giá trị lạ (gõ tay, hoặc một cookie/tham số từ bản trước) rơi về
+        "he-thong" — KHÔNG được làm trang nổ, và cookie ghi ra CHỈ có thể là
+        một trong bốn giá trị hợp lệ, không bao giờ chép nguyên văn tham số
+        người dùng gửi lên.
+        """
+        if che_do not in CHE_DO_GIAO_DIEN_HOP_LE:
+            che_do = "he-thong"
+
+        # Chỉ chuyển hướng về ĐƯỜNG DẪN NỘI BỘ. Referer là dữ liệu người
+        # dùng gửi lên (qua trình duyệt), KHÔNG phải thứ đáng tin — nhận
+        # nguyên nó rồi RedirectResponse thẳng là mở một cửa chuyển hướng ra
+        # ngoài: `/giao-dien?che_do=sang` kèm Referer giả từ một trang khác
+        # sẽ đẩy người bấm sang nơi khác. Chỉ giữ PATH + QUERY (bỏ scheme/
+        # host) rồi lọc lại bằng ĐÚNG hàm bao_mat.duong_dan_an_toan đã dùng
+        # cho `?tiep=` sau đăng nhập — không viết một bộ lọc đường dẫn thứ
+        # hai. An toàn nằm ở chỗ bỏ scheme+netloc (domain thật của Referer
+        # không quan trọng — dù nó là trang của ai, ta chỉ tự chuyển hướng
+        # NGAY TRÊN máy chủ KOME, chưa bao giờ nhảy sang máy chủ khác),
+        # KHÔNG nằm ở chỗ bỏ query: đích đã là đường dẫn tương đối rồi, nên
+        # giữ nguyên query không mở thêm cửa nào cả — mà bỏ nó thì người
+        # đang lọc `/khach-hang?tinh=...&nv=...` bấm "Tối" xong mất sạch bộ
+        # lọc, phải lọc lại từ đầu (vòng soát 1, mục 1).
+        thamchieu = request.headers.get("referer")
+        duong_thamchieu = None
+        if thamchieu:
+            r = urlparse(thamchieu)
+            duong_thamchieu = r.path + (f"?{r.query}" if r.query else "")
+        dich = bao_mat.duong_dan_an_toan(duong_thamchieu)
+
+        resp = RedirectResponse(dich, status_code=303)
+        resp.set_cookie(
+            TEN_COOKIE_GIAO_DIEN, che_do, max_age=HAN_COOKIE_GIAO_DIEN_GIAY,
+            samesite="lax", secure=_chi_gui_qua_https(request))
+        return resp
 
     # ---- Cổng đăng nhập -------------------------------------------------
     # Dùng middleware chứ không phải dependency trên từng route: route nào
@@ -435,6 +529,38 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         "ten_sale": ten_sale})
         except Exception as e:
             return _loi(request, "mở danh sách cần xử lý", e)
+
+    @app.get("/ban-do", response_class=HTMLResponse)
+    def ban_do_khach_hang(request: Request, tat_ca: int = 0, nv: str = "",
+                          chi_so: str = "khach"):
+        """Bản đồ 47 tỉnh (đợt 4c). Ngân sách CẢ TRANG (không chỉ hàm
+        BD.ban_do()) là 2 lượt hỏi — có test đếm lúc chạy
+        (tests/test_ban_do.py::test_trang_ban_do_khong_qua_2_truy_van), nên
+        route này KHÔNG được tự mở thêm một truy vấn nào (vd một danh sách
+        tên đầy đủ của người phụ trách để đổ vào ô chọn — thứ /khach-hang có
+        nhưng phải trả giá bằng một lượt hỏi riêng của tong_quan_danh_ba()).
+        Vì vậy ô lọc bên dưới chỉ biết TÊN của người đang lọc khi đó là mặc
+        định theo người đăng nhập (miễn phí, lấy từ session) — lọc sang một
+        mã khác qua `?nv=` thì trang chỉ hiện lại đúng mã đó, không tra ra
+        tên, giống hệt cách /can-xu-ly xử lý cùng ràng buộc.
+
+        `sale`/`nv` cùng một nếp với /khach-hang: mặc định tiện dụng theo
+        người đăng nhập, KHÔNG phải hàng rào bảo mật.
+        """
+        try:
+            sale, ten_sale = _sale_dang_loc(request, tat_ca, nv)
+            with open_app_conn() as conn:
+                t = BD.ban_do(conn, sale=sale, chi_so=chi_so)
+            return _ve(request, "ban_do.html",
+                       {"t": t, "trang": "ban-do", "tat_ca": bool(tat_ca),
+                        "nv": nv, "sale": sale, "ten_sale": ten_sale,
+                        "nv_moi_nguoi": KH.NV_MOI_NGUOI, "chi_so_ds": BD.CHI_SO,
+                        # Kích thước một ô lưới là HẰNG của kome/ban_do.py, không
+                        # phải của template — truyền qua context để không viết
+                        # cứng "60" lần thứ hai trong ban_do.html.
+                        "o_rong": BD.O_RONG, "o_cao": BD.O_CAO})
+        except Exception as e:
+            return _loi(request, "mở bản đồ khách hàng", e)
 
     # ---- Hàng hoá: sản phẩm và kho hàng (đợt 4b) ------------------------
     # Cả ba route đều `open_app_conn` — chúng chỉ đọc. Có test duyệt AST canh

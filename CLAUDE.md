@@ -36,6 +36,16 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
    Thực tế công ty chỉ có HAI kho: `0001 茨城第１倉庫（出荷専用）` và `1002 新・賞味期限用`.
    Đặt tên kho cứng ở đâu đó (thay vì đọc từ `core.dim_warehouse`) là thêm một kho ảo
    vào mọi bộ lọc.
+7. `prefecture` của OBC là tên tỉnh chuẩn có hậu tố 都/道/府/県, đủ cả 47 tỉnh, và chỉ
+   **1 trên 1.710 khách** bỏ trống — cột sạch nhất đã gặp, nên khoá nối
+   (`core.dim_prefecture.ten` ↔ `core.dim_customer.prefecture`) là chính chuỗi tên,
+   không cần lớp chuẩn hoá. Đổi một ký tự trong `core.dim_prefecture.ten` là tỉnh đó
+   rỗng vĩnh viễn trên bản đồ khách hàng (`/ban-do`) mà không lỗi nào nổ ra — phép nối
+   chỉ lặng lẽ không khớp dòng nào. Có test canh:
+   `tests/test_ban_do.py::test_ten_tinh_khop_chuoi_OBC_that`,
+   `::test_hau_to_dung_voi_tung_ma_jis_ca_47_dong` (khẳng định hậu tố theo ĐÚNG
+   `ma_jis` — `01`→道, `13`→都, `26`/`27`→府, 43 mã còn lại→県; một điều kiện
+   "hậu tố nằm trong 都/道/府/県" cho `大阪県` lọt qua).
 
 ## Bốn vai trò CSDL (Task 13, `db/migrations/009_roles.sql`)
 Luật số một ("OBC chỉ đọc") không chỉ là quy ước trong code — nó là ràng
@@ -80,11 +90,13 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
+| `/ban-do` | Bản đồ khách hàng — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách | `core.dim_prefecture`, `mart.khach_theo_tinh` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
 | `/san-pham` | Danh mục mã hàng + tìm kiếm + lọc theo trạng thái tồn | `mart.san_pham_360` |
 | `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
 | `/kho-hang` | Bốn ô tổng quan tồn kho · bảng tồn · cận hạn/quá hạn · giá trị theo kho | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
+| `/giao-dien` | Đổi chế độ sáng/tối/theo hệ thống/theo giờ, ghi cookie, chuyển hướng về trang đã gọi | không đọc CSDL — chỉ đọc/ghi cookie |
 
 **Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
 tháng**, KHÔNG phải `得意先ランク` của OBC. `core.dim_customer.rank_code` có tồn tại
@@ -192,6 +204,61 @@ khi danh sách vẫn bị lọc. Cùng lý lẽ với `KH.TINH_TRONG` của ô T
 Ba trang cũ — nạp (`nap`), sức khoẻ (`health`), độ phủ dữ liệu (`phu-du-lieu`)
 — nay chỉ còn 301 về `/kho-du-lieu`, không render nội dung gì nữa.
 
+**Bất biến (Đợt 4d):** icon trong `_nav.html` là TRANG TRÍ, chữ nhãn mới là
+thứ đọc được (`aria-hidden="true" focusable="false"` trên mỗi `<svg>`) — bỏ
+hai thuộc tính đó là trình đọc màn hình đọc icon rồi đọc lại nhãn, và Tab
+dừng ở một phần tử không có gì để bấm. Sáu icon (Tổng quan/Báo cáo/Khách
+hàng/Sản phẩm/Kho hàng/Kho dữ liệu) chép NGUYÊN VĂN từ object `I` trong
+`kome-nav.js` của gói thiết kế, đúng ánh xạ NHÓM của chính gói đó. Hai icon
+còn lại — `bell` cho "Cần xử lý" và `pin` cho "Bản đồ" — là **TA CHỌN**
+trong bộ 24 icon của gói thiết kế, vì gói đó không có mục "Cần xử lý" và gộp
+bản đồ chung vào "Khách hàng & bản đồ" thay vì tách trang riêng như app này.
+Ai chọn cái gì phải ghi rõ ra (xem chú thích đầu `_nav.html`) — không ghi thì
+người sau tưởng cả tám icon đều theo một ánh xạ có sẵn của gói thiết kế, rồi
+đi tìm một ánh xạ không tồn tại khi thêm trang mới.
+
+**Bất biến:** lựa chọn sáng/tối lưu bằng **cookie (`kome_giao_dien`) + render
+phía máy chủ** (`data-theme` trên `<html>`), KHÔNG bằng `localStorage`. Gói
+thiết kế ghi `localStorage`; ta lệch có chủ ý: `localStorage` chỉ đọc được
+SAU khi HTML đã vẽ xong, nên đổi sang nó là mua lại một nháy sai màu ở MỖI
+lần tải trang — trang vẽ sáng rồi giật sang tối ngay khi JS kịp chạy. Cookie
+đọc được ngay lúc server render, nên `data-theme` đã đúng trong chính HTML
+đầu tiên gửi xuống, không có khung hình sai màu nào để thấy.
+
+**Bất biến:** bảng màu tối viết HAI lần trong `kome.css` — một lần trong
+`@media (prefers-color-scheme: dark){ :root:not([data-theme="sang"]) }`
+(chế độ "theo hệ thống"), một lần cho `:root[data-theme="toi"]` (chọn tay) —
+vì CSS không gộp được hai selector đó vào một khối. Hai bản PHẢI giống hệt
+nhau, **kể cả khai báo `color-scheme:dark`, không chỉ các biến màu**: đổi
+biến màu mà quên đổi `color-scheme` là chọn "Tối" trên một máy đang sáng cho
+ra nội dung tối nhưng thanh cuộn và mọi ô `<select>` vẫn trắng chói —
+`color-scheme` điều khiển đúng những phần trình duyệt tự vẽ mà CSS thường
+không chạm tới. Trôi khỏi nhau (dù chỉ một khai báo) là "tối" chọn tay ra
+một bộ màu khác "tối" theo hệ thống, và không ai thấy cho tới khi đặt hai
+máy cạnh nhau. Có test canh:
+`tests/test_giao_dien.py::test_hai_khoi_mau_toi_trong_css_GIONG_HET_NHAU` và
+`::test_color_scheme_nam_trong_khoi_bang_toi`.
+
+**Bất biến:** `/giao-dien` chuyển hướng CHỈ về đường dẫn nội bộ, lọc Referer
+qua đúng `bao_mat.duong_dan_an_toan` đã dùng cho `?tiep=` sau đăng nhập —
+không viết một bộ lọc đường dẫn thứ hai. An toàn nằm ở chỗ bỏ `scheme` +
+`netloc` của Referer, KHÔNG nằm ở chỗ bỏ query: route GIỮ NGUYÊN query khi
+chuyển hướng, vì đích đã là đường dẫn tương đối rồi nên giữ query không mở
+thêm cửa nào — bỏ nó thì người đang lọc `/khach-hang?tinh=...&nv=...` bấm
+"Tối" xong mất sạch bộ lọc, phải lọc lại từ đầu. Có test canh:
+`tests/test_giao_dien.py::test_giao_dien_chuyen_huong_GIU_LAI_bo_loc_tren_query`.
+
+**Bất biến:** `bao_mat.duong_dan_an_toan` chặn cả dạng `/` + gạch chéo ngược
++ tên miền, không chỉ `//tên-miền` — theo chuẩn phân tích URL của WHATWG,
+gạch chéo ngược ngay sau gạch chéo đầu được trình duyệt coi NHƯ một gạch
+chéo, nên `/\site-gia.example` là một địa chỉ tuyệt đối trá hình. Trước bản
+siết (`dfbbcf0`) chuỗi đó vô hại chỉ vì Starlette mã hoá nó thành `%5C`
+trước khi đặt vào header `Location` — tức an toàn phụ thuộc vào hành vi của
+FRAMEWORK, thứ một bản nâng cấp có thể đổi mà không ai đụng tới file này.
+Hàm này dùng chung cho `?tiep=` sau đăng nhập VÀ Referer của `/giao-dien`,
+nên một lỗ ở đây là lỗ ở cả hai cửa. Có test canh:
+`tests/test_bao_mat.py::test_duong_dan_an_toan_chan_ca_dang_gach_cheo_nguoc`.
+
 **Bất biến:** trạng thái quan hệ khách hàng so số ngày im lặng với **nhịp mua
 riêng của từng khách** (trung vị khoảng cách giữa các lần mua), KHÔNG với một
 ngưỡng chung. Đo thật: ngưỡng chung 90 ngày bỏ sót 49 khách đang rời đi và báo
@@ -257,6 +324,45 @@ Khác nhau có chủ ý và trang phải nói ra: ô đếm là để so sánh g
 đứng yên, còn "giá trị tồn chết của kho này" là con số người ta dùng để quyết định
 thanh lý — hiện tổng mọi kho bên cạnh một bảng đã lọc thì sai gần 2× ở công ty hai
 kho.
+
+**Bất biến:** bản đồ tỉnh (`/ban-do`) nối từ `core.dim_prefecture` **LEFT JOIN** sang
+số liệu khách (`mart.khach_theo_tinh`), KHÔNG `GROUP BY` trên khách rồi vẽ ra bấy
+nhiêu ô. Đổi thành `JOIN` (hay để `dim_prefecture` ở vế phải) là tỉnh chưa có khách
+nào — hoặc chưa có khách của MỘT người phụ trách cụ thể khi lọc theo `sale` — biến
+mất khỏi bản đồ, **mà trang vẫn vẽ ra bình thường, chỉ thiếu đúng một ô**, không lỗi
+nào nổ ra để lộ chuyện đó. Điều này đã có thể lộ ra ngay HÔM NAY, không cần lọc gì:
+`core.dim_customer` có đủ 47 tỉnh nhưng `mart.khach_360` chỉ 46 — 和歌山県 có 1 khách
+trong `dim_customer` nhưng khách đó chưa từng có dòng bán nào, nên không có dòng
+trong `khach_360` (view đó dựng từ `mart.lan_mua`, phải có ít nhất một lần bán). Bản
+đồ TỔNG (không lọc gì) phải hiện 和歌山県 là một ô "0 khách" — thấy nó trống là ĐÚNG,
+không phải dấu hiệu phép nối hỏng. Có test canh:
+`tests/test_ban_do.py::test_du_47_o_ke_ca_tinh_khong_co_khach`.
+
+**Bất biến:** `mart.khach_theo_tinh.can_goi` đếm bằng `EXISTS` trên
+`mart.khach_nhom_viec`, KHÔNG `LEFT JOIN` nó — cùng hình mẫu migration `022`. Một
+khách có thể thuộc NHIỀU nhóm việc cùng lúc (`im` và `tut` cùng lúc), nên JOIN thẳng
+sẽ NHÂN DÒNG khách lên và thổi phồng cả `so_khach` lẫn `doanh_thu_12t` của tỉnh đó,
+không chỉ `can_goi` — một tỉnh có nhiều khách vừa `im` vừa `tut` sẽ báo nhiều khách
+hơn số khách nó thật sự có. Có test canh:
+`tests/test_ban_do.py::test_khach_theo_tinh_dung_EXISTS_khong_JOIN_vao_khach_nhom_viec`.
+
+**Bất biến:** mọi liên kết rời `/ban-do` sang `/khach-hang` — ô SVG **và** dòng
+bảng xếp hạng — phải mang theo `tat_ca`/`nv` (biến `giu` của `ban_do.html`).
+`/khach-hang` thiếu hai tham số đó rơi về mặc định lọc theo NGƯỜI ĐANG ĐĂNG
+NHẬP, nên bản đồ vẽ số của "tất cả" (hay của một đồng nghiệp) mà bấm vào lại ra
+danh sách của chính mình — cùng lớp lỗi `kome/khach_hang.py::_vi_tu` đã ghi
+("chip Tất cả (1.710) bấm vào ra 216 khách"), chỉ khác là nó bắc qua HAI MÀN
+chứ không nằm gọn trong một màn.
+Có test canh: `tests/test_ban_do.py::
+test_bam_o_hay_dong_bang_GIU_NGUYEN_bo_loc_nguoi_phu_trach`.
+
+**Bất biến:** bậc màu 0 của bản đồ (`kome/ban_do.py::_tinh_bac`) dành cho **ĐÚNG
+BẰNG 0**, không phải "không dương". Doanh thu 12 tháng của một tỉnh CÓ THỂ ÂM
+(赤伝 — phiếu đỏ, số ÂM, luật cấm lọc bỏ — của một tỉnh chỉ có một hai khách).
+Xếp số âm vào bậc 0 là chú giải ghi "Trống — không có doanh thu 12 tháng" trong
+khi chính ô đó in `¥-123.456`. Số âm tham gia chia phân vị như mọi giá trị khác
+và chú giải in ra khoảng THẬT, kể cả khi khoảng đó âm. Có test canh:
+`tests/test_ban_do.py::test_doanh_thu_AM_khong_roi_vao_bac_TRONG`.
 
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |

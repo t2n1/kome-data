@@ -23,40 +23,79 @@
    QUAN TRỌNG — partial này MỞ `<main class="noi-dung">` ở cuối và KHÔNG
    ĐÓNG nó. Mọi template include partial này BẮT BUỘC phải tự thêm dòng
    `</main>` ở cuối file của chính nó. Có test canh —
-   tests/test_giao_dien.py::test_moi_template_dung_nav_deu_dong_main. #}
+   tests/test_giao_dien.py::test_moi_template_dung_nav_deu_dong_main.
+
+   Đợt 4d (Task 1) — icon và logo. Icon là TRANG TRÍ, không thay chữ (bất
+   biến "màu/hình phải kèm thứ đọc được", _chung.html:76-77): mỗi mục vẫn
+   giữ nguyên nhãn chữ, icon chỉ đứng trước. Icon mang `aria-hidden="true"
+   focusable="false"` để trình đọc màn hình không đọc hai lần và Tab không
+   dừng ở đó. Icon KHÔNG viết màu riêng — `fill:none; stroke:currentColor`
+   trong kome.css nên mục "đang xem" đổi màu chữ thì icon đổi theo, đúng ở
+   cả hai bảng màu sáng/tối.
+
+   Sáu icon (dashboard/chart/user/cube/box/db) chép NGUYÊN VĂN từ object `I`
+   trong kome-nav.js của gói thiết kế, theo đúng ánh xạ NHOM của gói đó.
+   Hai icon còn lại (bell cho "Cần xử lý", pin cho "Bản đồ") do TA CHỌN
+   trong chính bộ 24 icon của gói thiết kế — gói thiết kế không có mục
+   "Cần xử lý" (chỉ có ở app này), và gộp bản đồ chung vào "Khách hàng &
+   bản đồ" thay vì tách riêng. Xem task-1-brief.md, đợt 4d. #}
 <aside class="thanh-ben">
-  <a class="hieu" href="/">KOME</a>
+  <a class="hieu" href="/"><img class="logo" src="/static/kome-logo.png" alt="" width="28" height="28">KOME</a>
 
   <nav class="dieu-huong">
     <p class="nhom">TỔNG QUAN</p>
-    <a href="/"{% if trang == 'tong-quan' %} class="dang-xem" aria-current="page"{% endif %}>Tổng quan</a>
-    <a href="/bao-cao"{% if trang == 'bao-cao' %} class="dang-xem" aria-current="page"{% endif %}>Báo cáo doanh thu</a>
+    <a href="/"{% if trang == 'tong-quan' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><rect x="2.5" y="2.5" width="5" height="5" rx="1"></rect><rect x="10.5" y="2.5" width="5" height="5" rx="1"></rect><rect x="2.5" y="10.5" width="5" height="5" rx="1"></rect><rect x="10.5" y="10.5" width="5" height="5" rx="1"></rect></svg>Tổng quan</a>
+    <a href="/bao-cao"{% if trang == 'bao-cao' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M3 14.5V8m4 6.5V4.5m4 10V10m4 4.5V6"></path></svg>Báo cáo doanh thu</a>
 
     <p class="nhom">KHÁCH HÀNG</p>
-    <a href="/khach-hang"{% if trang == 'khach' %} class="dang-xem" aria-current="page"{% endif %}>Khách hàng</a>
-    <a href="/can-xu-ly"{% if trang == 'can-xu-ly' %} class="dang-xem" aria-current="page"{% endif %}>Cần xử lý</a>
+    <a href="/khach-hang"{% if trang == 'khach' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><circle cx="9" cy="6" r="2.6"></circle><path d="M3.5 15c0-2.8 2.5-4.5 5.5-4.5s5.5 1.7 5.5 4.5"></path></svg>Khách hàng</a>
+    {# bell: TA CHỌN — gói thiết kế không có mục "Cần xử lý". #}
+    <a href="/can-xu-ly"{% if trang == 'can-xu-ly' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M9 2.6a4.2 4.2 0 0 0-4.2 4.2c0 3.4-1.4 4.6-1.4 4.6h11.2s-1.4-1.2-1.4-4.6A4.2 4.2 0 0 0 9 2.6z"></path><path d="M7.6 14a1.6 1.6 0 0 0 2.8 0"></path></svg>Cần xử lý</a>
+    {# pin: TA CHỌN — gói thiết kế gộp bản đồ vào "Khách hàng & bản đồ". #}
+    <a href="/ban-do"{% if trang == 'ban-do' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M9 16s5.2-5 5.2-8.6A5.2 5.2 0 0 0 9 2.2a5.2 5.2 0 0 0-5.2 5.2C3.8 11 9 16 9 16z"></path><circle cx="9" cy="7.3" r="1.8"></circle></svg>Bản đồ</a>
 
     {# Nhóm HÀNG HOÁ đứng GIỮA khách hàng và hệ thống, không phải cuối:
        hai màn này là việc hằng ngày (mã nào sắp hết, lô nào sắp hết hạn),
        còn nhóm HỆ THỐNG là việc kỹ thuật một người làm một lần mỗi ngày. #}
     <p class="nhom">HÀNG HOÁ</p>
-    <a href="/san-pham"{% if trang == 'san-pham' %} class="dang-xem" aria-current="page"{% endif %}>Sản phẩm</a>
-    <a href="/kho-hang"{% if trang == 'kho-hang' %} class="dang-xem" aria-current="page"{% endif %}>Kho hàng</a>
+    <a href="/san-pham"{% if trang == 'san-pham' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M9 2.2 15.4 5.6v6.8L9 15.8 2.6 12.4V5.6z"></path><path d="M2.6 5.6 9 9l6.4-3.4M9 9v6.8"></path></svg>Sản phẩm</a>
+    <a href="/kho-hang"{% if trang == 'kho-hang' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M2.6 5.4 9 2.2l6.4 3.2v7.2L9 15.8l-6.4-3.2z"></path><path d="M2.6 5.4 9 8.6l6.4-3.2M9 8.6v7.2"></path></svg>Kho hàng</a>
 
     {# `hien_kho` CHỈ bọc nhóm HỆ THỐNG — "Kho hàng" (tồn kho, việc của người
        bán) không liên quan gì tới "Kho dữ liệu" (nút xoá dữ liệu, cần quyền
        riêng từ đợt 3). Hai cái tên gần nhau, hai quyền khác nhau. #}
     {% if hien_kho %}
     <p class="nhom">HỆ THỐNG</p>
-    <a href="/kho-du-lieu"{% if trang == 'kho-du-lieu' %} class="dang-xem" aria-current="page"{% endif %}>Kho dữ liệu</a>
+    <a href="/kho-du-lieu"{% if trang == 'kho-du-lieu' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><ellipse cx="9" cy="4.6" rx="6" ry="2.2"></ellipse><path d="M3 4.6v8.8c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4.6"></path><path d="M3 9c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2"></path></svg>Kho dữ liệu</a>
     {% endif %}
   </nav>
 
-  {% if co_dang_nhap %}
-  <div class="thoat">
-    {% if nguoi %}<p class="nhom">{{ nguoi.ten_sale or nguoi.ten_dang_nhap }}</p>{% endif %}
-    <form method="post" action="/dang-xuat"><button type="submit">Đăng xuất</button></form>
+  <div class="chan-ben">
+    {% if co_dang_nhap %}
+    <div class="thoat">
+      {% if nguoi %}<p class="nhom">{{ nguoi.ten_sale or nguoi.ten_dang_nhap }}</p>{% endif %}
+      <form method="post" action="/dang-xuat"><button type="submit"><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M11.4 5.4V4a1.6 1.6 0 0 0-1.6-1.6H4.6A1.6 1.6 0 0 0 3 4v10a1.6 1.6 0 0 0 1.6 1.6h5.2a1.6 1.6 0 0 0 1.6-1.6v-1.4"></path><path d="M7.4 9h8"></path><path d="M13 6.6 15.4 9 13 11.4"></path></svg>Đăng xuất</button></form>
+    </div>
+    {% endif %}
+    {# Đợt 4d (Task 2) — nút đổi giao diện sáng/tối. Bốn LIÊN KẾT
+       ?che_do=…, không phải nút JS: kome/web/app.py::doi_giao_dien lưu
+       cookie kome_giao_dien rồi chuyển hướng về đúng trang này. Đặt NGOÀI
+       khối {% if co_dang_nhap %} ở trên — máy trong công ty để trống
+       KOME_SESSION_SECRET (không có cổng đăng nhập nào cả) vẫn phải thấy
+       bốn nút này, y hệt cách "Kho dữ liệu" không bị `co_dang_nhap` che
+       (chỉ `hien_kho` mới có quyền che một mục).
+
+       Nhãn nhóm "GIAO DIỆN" (vòng soát 1, mục 3) — bốn nhóm ở <nav> phía
+       trên đều có <p class="nhom">, thiếu nó ở đây thì người dùng trình
+       đọc màn hình nghe "Sáng, Tối, Theo hệ thống, Theo giờ" trôi nổi ở
+       cuối sidebar mà không biết đó là nhóm gì. #}
+    <div class="giao-dien">
+      <p class="nhom">GIAO DIỆN</p>
+      <a href="/giao-dien?che_do=sang"{% if che_do_giao_dien == 'sang' %} class="dang-xem" aria-current="true"{% endif %}>Sáng</a>
+      <a href="/giao-dien?che_do=toi"{% if che_do_giao_dien == 'toi' %} class="dang-xem" aria-current="true"{% endif %}>Tối</a>
+      <a href="/giao-dien?che_do=he-thong"{% if che_do_giao_dien == 'he-thong' %} class="dang-xem" aria-current="true"{% endif %}>Theo hệ thống</a>
+      <a href="/giao-dien?che_do=theo-gio"{% if che_do_giao_dien == 'theo-gio' %} class="dang-xem" aria-current="true"{% endif %}>Theo giờ</a>
+    </div>
   </div>
-  {% endif %}
 </aside>
 <main class="noi-dung">

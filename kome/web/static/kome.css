@@ -64,23 +64,106 @@
    --loi-nen:#FDEDEC; --loi-vien:#D62C27; --loi-chu:#B4231C;
    --canh-nen:#FFF9E8;--canh-vien:#E6D08A;--canh-chu:#8A5E06;
    --ngoai-nen:#F0EDE6;--ngoai-chu:#8E8A82;
+   /* Thang màu bản đồ khách hàng (đợt 4c): MỘT TÔNG (hổ phách, cùng họ với
+      --lien-ket) đậm dần theo bậc, KHÔNG đỏ-xanh — khoảng 1/12 nam giới
+      không phân biệt được đỏ với xanh lá. --map-0 là bậc RIÊNG cho "không có
+      khách/doanh thu/cần gọi" (khác "ít"), không nằm trong dải 5 bậc.
+      --map-chu-alt là màu chữ TƯƠNG PHẢN cho các ô nền đậm (bậc 3-5) — xem
+      kome/web/templates/ban_do.html. */
+   --map-0:#EFEBE1; --map-1:#F6E7B8; --map-2:#EDCB78; --map-3:#D9A83E;
+   --map-4:#B37F1E; --map-5:#7A5510; --map-chu-alt:#FFFFFF;
+   /* Nền bọc logo sidebar (đợt 4d, Task 1) — README gói thiết kế: "logo
+      tròn, hiển thị 28px trong sidebar (nền tối thì bọc nền sáng, bo
+      tròn)". Ở chế độ sáng giá trị này trùng --nen-the nên không thấy gì
+      khác; ở chế độ tối nó là màu giấy ấm của --nen (chế độ sáng), NGƯỢC
+      hướng đổi màu thông thường — cố ý, vì logo cần một nền SÁNG bất kể
+      đang ở bảng màu nào để không chìm vào --nen-the tối. */
+   --logo-nen:#FFFFFF;
  }
+ /* Đợt 4d (Task 2) — nút đổi giao diện sáng/tối, KHÔNG JS: máy chủ render
+    thuộc tính data-theme lên <html> theo cookie kome_giao_dien (xem
+    kome/web/app.py, _chung.html). CSS không gộp được hai selector
+    "@media (prefers-color-scheme: dark) :root" và ":root[data-theme=toi]"
+    vào MỘT khối, nên bảng màu tối phải viết HAI LẦN — bọc bằng cặp mốc chú
+    thích BANG-TOI và HET-BANG-TOI để có test canh hai bản GIỐNG HỆT nhau
+    (tests/test_giao_dien.py::test_hai_khoi_mau_toi_trong_css_GIONG_HET_NHAU).
+    Hai bản trôi khỏi nhau là chọn "tối" tay ra một bộ màu khác "tối" theo
+    hệ thống, và không ai thấy cho tới khi đặt hai máy cạnh nhau. */
  @media (prefers-color-scheme: dark){
+   /* :root:not([data-theme="sang"]) chứ KHÔNG PHẢI :root trần — chọn
+      "Sáng" bằng tay phải thắng cả khi hệ thống đang để tối. :root trần ở
+      đây là nút "Sáng" bấm vào không có tác dụng gì với đúng những người
+      cần bấm nó (máy đang ở chế độ tối). */
+   :root:not([data-theme="sang"]){
+   /* BANG-TOI */
+   /* color-scheme PHẢI nằm TRONG cặp mốc BANG-TOI/HET-BANG-TOI (vòng soát
+      1, mục 2): để CHỌN TAY "Tối" trên máy đang để hệ thống sáng cũng đổi
+      được màu thanh cuộn/ô <select>/nút bấm mặc định của trình duyệt —
+      những thứ CSS thường không vẽ được, chỉ color-scheme mới điều khiển.
+      Đặt ở đây (thay vì chỉ một chỗ) để nó tự nhân đôi theo đúng cơ chế
+      chống trôi đã có, và test hai khối GIỐNG HỆT NHAU vẫn canh được nó. */
+   color-scheme:dark;
    /* Từng cặp lấy từ bảng MAP trong kome-theme.js của gói thiết kế —
       không tự pha. #D62C27 không có trong bảng đó: thiết kế giữ nguyên
       đỏ công ty ở cả hai chế độ. */
-   :root{
-     --nen:#17140F; --nen-the:#211D17; --nen-phu:#262019;
-     --vien:#342E26; --vien-phu:#2B251D; --vien-dam:#4A4239;
-     --chu:#F4EFE6; --chu-thuong:#D6CFC2; --chu-nhat:#A79F92; --chu-mo:#978F83;
-     --lien-ket:#E2A72E;
-     --do:#D62C27; --do-chu:#F0776F; --do-nen:#3A1E1C;
-     --ok-nen:#16301F;  --ok-vien:#3FA06C;  --ok-chu:#5FC492;
-     --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
-     --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
-     --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
+   --nen:#17140F; --nen-the:#211D17; --nen-phu:#262019;
+   --vien:#342E26; --vien-phu:#2B251D; --vien-dam:#4A4239;
+   --chu:#F4EFE6; --chu-thuong:#D6CFC2; --chu-nhat:#A79F92; --chu-mo:#978F83;
+   --lien-ket:#E2A72E;
+   --do:#D62C27; --do-chu:#F0776F; --do-nen:#3A1E1C;
+   --ok-nen:#16301F;  --ok-vien:#3FA06C;  --ok-chu:#5FC492;
+   --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
+   --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
+   --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
+   /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
+      đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —
+      cùng lý do --lien-ket đảo hướng giữa hai chế độ. --map-chu-alt theo
+      đó cũng đảo: chữ TỐI trên nền bậc cao sáng màu ở chế độ này. */
+   --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
+   --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
+   --logo-nen:#FBF9F5;
+   /* HET-BANG-TOI */
    }
  }
+ /* Chọn "Tối" bằng tay: phải áp dụng NGOÀI khối @media ở trên, đè được cả
+    khi hệ thống đang để sáng — đây là bản sao Y HỆT của khối phía trên
+    (giữa hai mốc BANG-TOI/HET-BANG-TOI), không phải một bảng màu tối
+    thứ hai được pha riêng. */
+ :root[data-theme="toi"]{
+   /* BANG-TOI */
+   /* color-scheme PHẢI nằm TRONG cặp mốc BANG-TOI/HET-BANG-TOI (vòng soát
+      1, mục 2): để CHỌN TAY "Tối" trên máy đang để hệ thống sáng cũng đổi
+      được màu thanh cuộn/ô <select>/nút bấm mặc định của trình duyệt —
+      những thứ CSS thường không vẽ được, chỉ color-scheme mới điều khiển.
+      Đặt ở đây (thay vì chỉ một chỗ) để nó tự nhân đôi theo đúng cơ chế
+      chống trôi đã có, và test hai khối GIỐNG HỆT NHAU vẫn canh được nó. */
+   color-scheme:dark;
+   /* Từng cặp lấy từ bảng MAP trong kome-theme.js của gói thiết kế —
+      không tự pha. #D62C27 không có trong bảng đó: thiết kế giữ nguyên
+      đỏ công ty ở cả hai chế độ. */
+   --nen:#17140F; --nen-the:#211D17; --nen-phu:#262019;
+   --vien:#342E26; --vien-phu:#2B251D; --vien-dam:#4A4239;
+   --chu:#F4EFE6; --chu-thuong:#D6CFC2; --chu-nhat:#A79F92; --chu-mo:#978F83;
+   --lien-ket:#E2A72E;
+   --do:#D62C27; --do-chu:#F0776F; --do-nen:#3A1E1C;
+   --ok-nen:#16301F;  --ok-vien:#3FA06C;  --ok-chu:#5FC492;
+   --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
+   --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
+   --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
+   /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
+      đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —
+      cùng lý do --lien-ket đảo hướng giữa hai chế độ. --map-chu-alt theo
+      đó cũng đảo: chữ TỐI trên nền bậc cao sáng màu ở chế độ này. */
+   --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
+   --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
+   --logo-nen:#FBF9F5;
+   /* HET-BANG-TOI */
+ }
+ /* Chọn "Sáng" bằng tay: đối xứng với color-scheme:dark ở trên — không cần
+    nhân đôi vào cặp BANG-TOI (nó không nói gì về MÀU, chỉ nói cho trình
+    duyệt biết tô thanh cuộn/ô <select>/nút bấm mặc định theo tông nào),
+    nên đứng riêng một chỗ (vòng soát 1, mục 2). */
+ :root[data-theme="sang"]{color-scheme:light}
  html{background:var(--nen)}
  body{font:16px/1.6 var(--font-ui);background:var(--nen);color:var(--chu);
       max-width:760px;margin:0 auto;padding:1rem}
@@ -149,6 +232,11 @@
  .noi-dung{flex:1;min-width:0;max-width:1400px;padding:1.1rem;padding-bottom:3rem}
  .hieu{display:flex;align-items:center;gap:.5rem;font-weight:700;letter-spacing:.08em;
    font-size:.84rem;text-decoration:none;color:var(--chu);padding:0 .3rem .8rem}
+ /* Logo tròn 28px (đợt 4d, Task 1) — README gói thiết kế: bọc nền sáng ở
+    chế độ tối để không chìm vào --nen-the tối; --logo-nen tự đổi theo chế
+    độ để làm việc đó (xem khối biến màu phía trên). */
+ .hieu .logo{width:28px;height:28px;border-radius:50%;flex-shrink:0;
+   background:var(--logo-nen);object-fit:cover;display:block}
  .dieu-huong{display:flex;flex-direction:column;gap:.12rem}
  /* Nhãn nhóm của sidebar — riêng với `.nhom` dùng lại ở nơi khác (khối
     "Thành phần dùng lại" phía trên), nên scope trong `.dieu-huong` để đổi
@@ -156,17 +244,47 @@
  .dieu-huong .nhom{margin:.9rem 0 .25rem;padding:0 .55rem;font-size:.68rem;font-weight:600;
    letter-spacing:.1em;color:var(--chu-nhat);align-self:stretch}
  .dieu-huong .nhom:first-child{margin-top:0}
- .dieu-huong a{padding:.42rem .55rem;border-radius:8px;font-size:.85rem;
-   text-decoration:none;color:var(--chu-thuong)}
+ .dieu-huong a{display:flex;align-items:center;gap:.55rem;padding:.42rem .55rem;
+   border-radius:8px;font-size:.85rem;text-decoration:none;color:var(--chu-thuong)}
  .dieu-huong a:hover{background:var(--nen-phu)}
  /* Mục đang mở: nền và chữ lấy từ kome-nav.js:146-147 của gói thiết kế
     (KHÔNG theo README của gói — README ghi #FFF4D6 kèm thanh đỏ bên trái,
     lệch với chính prototype của nó). */
  .dieu-huong a.dang-xem{background:var(--do-nen);color:var(--do-chu);font-weight:600}
- .thoat{margin-top:auto;border-top:1px solid var(--vien);padding-top:.7rem}
- .thoat button{font:inherit;width:100%;text-align:left;padding:.4rem .55rem;
-   border-radius:8px;border:0;background:transparent;color:var(--chu-nhat);cursor:pointer}
+ /* Icon sidebar (đợt 4d, Task 1) — 9 icon chép nguyên văn từ kome-nav.js
+    của gói thiết kế (2 icon "ta chọn", xem chú thích trong _nav.html).
+    KHÔNG viết màu riêng: `stroke:currentColor` để icon thừa hưởng màu chữ
+    của chính thẻ cha, nên mục "đang xem" đổi màu chữ thì icon đổi theo,
+    đúng ở cả hai bảng màu sáng/tối (Task 2 sắp thêm nút đổi sáng/tối, lỗi
+    màu cứng sẽ lộ ra ngay ở đó). */
+ .ic{width:1.05em;height:1.05em;flex-shrink:0;fill:none;stroke:currentColor;
+   stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+ /* Chân sidebar: bọc chung .thoat (đăng xuất, CHỈ hiện khi có cổng đăng
+    nhập) và .giao-dien (nút đổi sáng/tối, đợt 4d Task 2 — hiện KỂ CẢ khi
+    không có cổng). margin-top:auto đặt trên WRAPPER, không phải trên từng
+    khối con: hai auto-margin liền nhau trong cùng một trục flex chia đôi
+    khoảng trống còn lại, đẩy .thoat và .giao-dien tách xa nhau thay vì
+    dính sát đáy — một wrapper duy nhất tránh đúng lỗi đó. */
+ .chan-ben{margin-top:auto}
+ .thoat{border-top:1px solid var(--vien);padding-top:.7rem}
+ .thoat button{display:flex;align-items:center;gap:.55rem;font:inherit;width:100%;
+   text-align:left;padding:.4rem .55rem;border-radius:8px;border:0;
+   background:transparent;color:var(--chu-nhat);cursor:pointer}
  .thoat button:hover{background:var(--nen-phu);color:var(--chu)}
+ /* Bốn liên kết ?che_do=… — LIÊN KẾT, không phải nút bấm JS. border-top
+    riêng: khi không có .thoat phía trên (máy trong công ty để trống
+    KOME_SESSION_SECRET), khối này vẫn cần một đường phân cách với <nav>. */
+ .giao-dien{display:flex;flex-direction:column;gap:.1rem;
+   border-top:1px solid var(--vien);padding-top:.6rem;margin-top:.6rem}
+ /* Nhãn nhóm "GIAO DIỆN" (vòng soát 1, mục 3) — kiểu Y HỆT `.dieu-huong
+    .nhom` của bốn nhóm sidebar phía trên, chỉ scope riêng vì .giao-dien
+    đứng NGOÀI .dieu-huong (nó phải hiện cả khi không có cổng đăng nhập). */
+ .giao-dien .nhom{margin:0 0 .25rem;padding:0 .55rem;font-size:.68rem;
+   font-weight:600;letter-spacing:.1em;color:var(--chu-nhat)}
+ .giao-dien a{display:block;padding:.35rem .55rem;border-radius:8px;
+   font-size:.8rem;text-decoration:none;color:var(--chu-nhat)}
+ .giao-dien a:hover{background:var(--nen-phu);color:var(--chu)}
+ .giao-dien a.dang-xem{background:var(--do-nen);color:var(--do-chu);font-weight:600}
 
  /* Màn hẹp: sidebar nằm ngang trên đầu thay vì chiếm 196px của 375px. */
  @media (max-width:720px){
@@ -175,7 +293,10 @@
      align-items:center;gap:.25rem;border-right:0;border-bottom:1px solid var(--vien)}
    .dieu-huong{flex-direction:row;flex-wrap:wrap}
    .dieu-huong .nhom{display:none}
-   .thoat{margin-top:0;margin-left:auto;border-top:0;padding-top:0}
+   .chan-ben{margin-top:0;margin-left:auto;display:flex;align-items:center;gap:.5rem}
+   .thoat{border-top:0;padding-top:0}
+   .giao-dien{flex-direction:row;flex-wrap:wrap;border-top:0;padding-top:0;margin-top:0}
+   .giao-dien .nhom{display:none}
    .noi-dung{max-width:none;width:100%;box-sizing:border-box}
  }
 

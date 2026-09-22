@@ -6,3 +6,23 @@
 <meta name="color-scheme" content="light dark">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/static/kome.css">
+{# Đợt 4d (Task 2) — nút đổi giao diện sáng/tối, KHÔNG một dòng JS. Mỗi
+   template mở bằng `<!doctype html><html lang="vi">` NGAY TRÊN dòng include
+   partial này, và tag đó đã đóng (`>`) từ lâu trước khi tới đây — không có
+   cách nào thêm thuộc tính vào chính tag đó từ một partial được include sau.
+
+   Thay vào đó dùng đúng thuật toán phân tích HTML5 cho "thẻ mở html lặp
+   lại": gặp MỘT thẻ <html> thứ hai ở bất cứ đâu trong tài liệu, trình duyệt
+   KHÔNG tạo phần tử mới — nó gộp mọi thuộc tính của thẻ đó (nếu phần tử gốc
+   chưa có) THẲNG vào phần tử <html> có thật. Đây là hành vi được đặc tả
+   (WHATWG HTML, insertion mode "in body", xử lý start tag "html"), không
+   phải một mẹo trình duyệt-cụ-thể — an toàn dùng ở mọi nơi trong tài liệu.
+
+   `data_theme` do kome/web/app.py::_ve tính mỗi lượt gọi từ cookie
+   kome_giao_dien (+ giờ Nhật thật cho chế độ "theo-gio", dùng lại hàm của
+   kome/tuoi_du_lieu.py — không viết bản giờ Nhật thứ hai). Giá trị luôn là
+   CHÍNH "sang" hoặc "toi" do route tự tính, KHÔNG BAO GIỜ chép thẳng cookie
+   hay tham số URL — cookie mang giá trị lạ (`<script>` chẳng hạn) không có
+   đường nào lọt vào đây. Chế độ "he-thong" (mặc định) không đặt thuộc tính
+   nào — để @media (prefers-color-scheme) trong kome.css tự quyết định. #}
+{% if data_theme %}<html data-theme="{{ data_theme }}">{% endif %}
