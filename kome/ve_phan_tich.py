@@ -185,11 +185,37 @@ def ve_duong_nho(so: list[int | float | None], rong: int = 120, cao: int = 32) -
     return {"co": True, "rong": rong, "cao": cao, "doan": doan, "diem_don": diem_don}
 
 
+# ---- Bề rộng chữ ước lượng (dùng chung nhiều khối) -------------------------
+# Không đo DOM thật (không có trình duyệt ở tầng Python) — chỉ đủ để quyết
+# định CẮT/DỜI chữ hay không, không phải một phép đo chính xác.
+
+def _rong_chu(ten: str, co_chu: float) -> float:
+    """1em cho ký tự "full-width" (có dấu/CJK, ord > 127 — rộng gần bằng cỡ
+    chữ), 0,6em cho ký tự ASCII thường ("half-width")."""
+    return sum(co_chu if ord(c) > 127 else co_chu * 0.6 for c in ten)
+
+
 # ---- Đóng góp ngành (thanh lệch hai phía) -----------------------------------
+
+_CO_CHU_DG_TIEN = 9.5
+_CO_CHU_DG_TEN = 10.0
+_LE_NHAN_DG = 4.0
+
 
 def ve_dong_gop(dong: "list[NganhKy]", rong: int = 720) -> dict:
     """Thanh lệch hai phía quanh trục giữa — ngành nào kéo doanh thu LÊN
-    (chênh lệch dương) nằm bên phải trục, ngành kéo XUỐNG nằm bên trái."""
+    (chênh lệch dương) nằm bên phải trục, ngành kéo XUỐNG nằm bên trái.
+
+    [Vòng soát 1 vòng 2, N-1] Nhãn SỐ TIỀN từng đặt cứng ở "đầu mút thanh +
+    4px" — thanh dài nhất (tỷ lệ 100% so với `max_abs`) chạm gần hết mép
+    khung (`nua_rong = x0 - le`), nên nhãn của CHÍNH NÓ tràn khỏi viewBox mà
+    không cách nào thấy được (chữ bị cắt ở x=716/720, không có lỗi nào nổ
+    ra). Sửa bằng cách ước lượng bề rộng nhãn (`_rong_chu`) rồi tự CHỌN chỗ
+    đặt cho từng thanh: ngoài đầu mút nếu còn đủ chỗ tới mép khung, nếu
+    không thì lùi vào TRONG thân thanh (`nhan_trong=True`, template đổi màu
+    chữ cho tương phản với nền thanh) — cả hai trường hợp toạ độ đều nằm
+    trong `[0, rong]` theo xây dựng, vì "trong thân thanh" không bao giờ
+    vượt quá đầu mút của chính thanh đó."""
     dong_loc = [d for d in dong if d.chenh_lech is not None]
     if not dong_loc:
         return {"co": False}
@@ -208,9 +234,28 @@ def ve_dong_gop(dong: "list[NganhKy]", rong: int = 720) -> dict:
         w = nua_rong * (abs(d.chenh_lech) / max_abs)
         am = d.chenh_lech < 0
         x = (x0 - w) if am else x0
+
+        nhan = f"¥{d.chenh_lech:+,}"
+        rong_nhan = _rong_chu(nhan, _CO_CHU_DG_TIEN)
+        if am:
+            # Thanh kéo dài về TRÁI trục — "ngoài" là xa hơn về bên trái.
+            ngoai_x = x - _LE_NHAN_DG
+            if ngoai_x - rong_nhan >= 0:
+                nhan_x, nhan_neo, nhan_trong = ngoai_x, "end", False
+            else:
+                nhan_x, nhan_neo, nhan_trong = x + _LE_NHAN_DG, "start", True
+        else:
+            ngoai_x = x + w + _LE_NHAN_DG
+            if ngoai_x + rong_nhan <= rong:
+                nhan_x, nhan_neo, nhan_trong = ngoai_x, "start", False
+            else:
+                nhan_x, nhan_neo, nhan_trong = x + w - _LE_NHAN_DG, "end", True
+
         thanh.append({"nganh": d.nganh, "x": round(x, 1), "w": round(w, 1),
                       "y": round(y, 1), "am": am, "chenh_lech": d.chenh_lech,
-                      "tang_truong": d.tang_truong})
+                      "tang_truong": d.tang_truong, "nhan": nhan,
+                      "nhan_x": round(nhan_x, 1), "nhan_neo": nhan_neo,
+                      "nhan_trong": nhan_trong})
 
     return {"co": True, "rong": rong, "cao": cao, "x0": round(x0, 1),
             "cao_hang": cao_hang, "thanh": thanh}
@@ -222,32 +267,23 @@ _CO_CHU_TREEMAP = 11.0   # px — cỡ chữ TỐI THIỂU cho nhãn trong ô c�
 _LE_NHAN = 6.0           # px — chừa hai bên (padding trái phải trong ô).
 
 
-def _rong_chu(ten: str) -> float:
-    """Ước lượng bề rộng chuỗi ở cỡ `_CO_CHU_TREEMAP`: 1em cho ký tự
-    "full-width" (có dấu/CJK, ord > 127 — rộng gần bằng cỡ chữ), 0,6em cho
-    ký tự ASCII thường ("half-width" — hẹp hơn). Không đo DOM thật (không có
-    trình duyệt ở tầng Python) — đây là ước lượng đủ dùng để quyết định CẮT
-    hay KHÔNG, không phải một phép đo chính xác."""
-    return sum(_CO_CHU_TREEMAP if ord(c) > 127 else _CO_CHU_TREEMAP * 0.6
-               for c in ten)
-
-
 def _nhan_vua_o(ten: str, w: float, h: float) -> str | None:
     """[Vòng soát 1, I-3] Nhãn đã CẮT GỌN để vừa khung `w`×`h` ở cỡ chữ
     >= `_CO_CHU_TREEMAP`px — None khi ô quá nhỏ để đặt dù một ký tự kèm dấu
     ba chấm. Trước bản sửa, template tự in `ten[:14]`/`ten[:16]` TRẦN không
     biết kích thước ô thật — nhãn dài tràn ra ngoài ô hẹp, nhãn ngắn bỏ phí
     ô rộng. Cắt ở ĐÂY (nơi biết `w`/`h` thật, tính bằng squarify) thay vì ở
-    template."""
+    template. Dùng `_rong_chu` (đã định nghĩa ở khối "Bề rộng chữ ước
+    lượng" phía trên, chung với `ve_dong_gop`)."""
     if h < _CO_CHU_TREEMAP + 4:
         return None
     kha_dung = float(w) - _LE_NHAN
     if kha_dung <= 0:
         return None
-    if _rong_chu(ten) <= kha_dung:
+    if _rong_chu(ten, _CO_CHU_TREEMAP) <= kha_dung:
         return ten
     cat = ten
-    while cat and _rong_chu(cat + "…") > kha_dung:
+    while cat and _rong_chu(cat + "…", _CO_CHU_TREEMAP) > kha_dung:
         cat = cat[:-1]
     return f"{cat}…" if cat else None
 
@@ -384,7 +420,16 @@ def ve_nhiet(dong: "list[NganhThang]", thang: list[str],
         năm trước, `d.co_cung_ky is False`).
     Để `None` (mặc định, ví dụ khi gọi rời khỏi `/bao-cao`) giữ NGUYÊN hành
     vi cũ — mọi ô thiếu dòng đều "khong_ck" — vì khi đó không biết ranh giới
-    kỳ ở đâu để phân biệt hai tình huống trên."""
+    kỳ ở đâu để phân biệt hai tình huống trên.
+
+    [Vòng soát 1 vòng 2] Điều kiện "tháng chưa tới" kiểm TRƯỚC TIÊN và KHÔNG
+    đòi `d is None` — bản đầu chỉ gán "chua_toi" khi vừa thiếu dòng VỪA ở
+    tương lai, nên một tháng tương lai mà FULL JOIN của mart (029 §3.3) lỡ
+    "chiếu" dữ liệu năm trước sang (ngành có bán ở tháng cùng kỳ năm ngoái,
+    dù CHƯA bán gì ở tháng đang xét) vẫn có `d` khác `None` — lọt thẳng
+    xuống nhánh `co_cung_ky` phía dưới và bị tô như một tháng CÓ SỐ, đúng
+    lỗi gốc mà I-1 tồn tại để sửa. Ranh giới thời gian là một SỰ THẬT VỀ
+    KỲ, không phụ thuộc dòng nào có mặt trong view hay không."""
     if not dong:
         return {"co": False}
 
@@ -400,7 +445,7 @@ def ve_nhiet(dong: "list[NganhThang]", thang: list[str],
         o_hang = []
         for th in thang:
             d = tra_cuu.get((nganh, th))
-            if d is None and thang_cuoi_co_du_lieu is not None and th > thang_cuoi_co_du_lieu:
+            if thang_cuoi_co_du_lieu is not None and th > thang_cuoi_co_du_lieu:
                 cell = {"thang": th, "nganh": nganh, "bac": "chua_toi",
                         "tang_truong": None, "doanh_thu": None, "co_cung_ky": False}
             elif d is None and thang_cuoi_co_du_lieu is not None:
@@ -483,5 +528,14 @@ def ve_pareto(tt: "TapTrung | None", rong: int = 720, cao: int = 260) -> dict:
     if dang_ve:
         doan.append(" ".join(dang_ve))
 
+    # [Vòng soát 1 vòng 2, N-3] Vạch chia trục % (0/50/100) tính TOẠ ĐỘ Y ở
+    # ĐÂY — bản trước lặp lại công thức `le_tren`/`le_duoi` (16/34) TRẦN
+    # ngay trong Jinja, tách khỏi hai hằng số cục bộ của chính hàm này; đổi
+    # `cao`/lề ở một trong hai chỗ mà quên chỗ kia là vạch trục vẽ sai vị
+    # trí mà không lỗi nào nổ ra.
+    truc_pct = [{"pct": p, "nhan": f"{int(p * 100)}%",
+                 "y": round(le_tren + cao_ve * (1 - p), 1)}
+                for p in (0.0, 0.5, 1.0)]
+
     return {"co": True, "rong": rong, "cao": cao, "cot": cot,
-            "doan": doan, "diem": diem, "dinh": dinh}
+            "doan": doan, "diem": diem, "dinh": dinh, "truc_pct": truc_pct}

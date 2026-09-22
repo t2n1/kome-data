@@ -299,16 +299,29 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
     # `float` vào bề rộng ô suy ra từ các giá trị này -> `Decimal - float`
     # ném `TypeError` giữa lúc mở trang. Tiền luôn là số nguyên yên (bất
     # biến CLAUDE.md) — sửa ở NGUỒN, không vá riêng một hàm hình học.
+    # [Vòng soát 1 vòng 2, N-4] `or 0` từng lẫn NULL thật (không nên xảy ra
+    # với SUM trên ít nhất một dòng, nhưng "không biết ≠ bằng 0" là bất biến
+    # chung, không phải ngoại lệ riêng cho cột này) — giữ nguyên `None`, và
+    # `ve_cay_o` (kome/ve_phan_tich.py) đã tự loại mã `dt is None` vào
+    # `khong_ve` từ trước, nên nhánh này KHÔNG cần sửa gì thêm ở phía tiêu
+    # thụ.
     hang_theo_nganh = [
-        {"ma": r[0], "ten": r[1], "nhom": r[2], "doanh_thu": int(r[3] or 0),
-         "lai_gop": int(r[4] or 0), "ty_suat": float(r[5]) if r[5] is not None else None,
+        {"ma": r[0], "ten": r[1], "nhom": r[2],
+         "doanh_thu": int(r[3]) if r[3] is not None else None,
+         "lai_gop": int(r[4]) if r[4] is not None else None,
+         "ty_suat": float(r[5]) if r[5] is not None else None,
          "so_khach": r[6]}
         for r in conn.execute(
             """SELECT product_code, ten_hang, food_category_name, doanh_thu_thuan,
                       lai_gop, ty_suat, so_khach_mua
                FROM mart.ban_theo_san_pham WHERE company_fy = %s""",
             (ky.company_fy,)).fetchall()]
-    hang = sorted(hang_theo_nganh, key=lambda h: h["lai_gop"], reverse=True)[:TOP]
+    # `lai_gop` không nên bao giờ NULL (SUM trên ít nhất một dòng bán), nhưng
+    # sắp xếp vẫn phòng thủ: một None lẫn vào so sánh với int sẽ ném
+    # TypeError giữa lúc mở trang thay vì chỉ xếp nó xuống cuối.
+    hang = sorted(hang_theo_nganh,
+                  key=lambda h: h["lai_gop"] if h["lai_gop"] is not None else -1,
+                  reverse=True)[:TOP]
 
     # (5) Người phụ trách — không đổi.
     nhan_vien = [dict(zip(("ma", "doanh_thu", "lai_gop", "ty_suat", "so_khach",

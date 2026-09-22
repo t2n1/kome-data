@@ -85,7 +85,11 @@
     hai năm) dùng nền hơi đậm hơn nền trang — cả hai đều tái dùng token màu
     ĐÃ CÓ (`--nen-phu`/`--vien-phu`/`--chu-mo`), không thêm biến CSS mới. #}
  .bac-chua_toi{background:var(--nen-phu);color:var(--chu-mo)}
- .bac-khong_ban{background:var(--vien-phu);color:var(--chu-nhat)}
+ {# [Vòng soát 1 vòng 2, N-2] Token RIÊNG cho "không bán tháng này" —
+    trước bản sửa lớp này tái dùng --vien-phu, TRÙNG HỆT --nhiet-khong
+    (bậc "khong"), nên hai trạng thái có `title` khác hẳn nhau lại tô cùng
+    một màu, mắt không tách được. #}
+ .bac-khong_ban{background:var(--nhiet-khong-ban);color:var(--chu-nhat)}
  .nhiet-bang{border-collapse:collapse;font-size:.82rem}
  .nhiet-bang th,.nhiet-bang td{border:1px solid var(--vien);padding:.25rem .4rem;
       text-align:center;white-space:nowrap}
@@ -371,16 +375,20 @@ bên trái kéo XUỐNG.</p>
   <title>{{ t.nganh }}: {{ "%+d"|format(t.chenh_lech) }} yên so cùng kỳ{% if
     t.tang_truong is not none %} ({{ "%+.1f"|format(t.tang_truong*100) }}%){% endif %}</title>
  </rect>
- {# [Vòng soát 1, M-1] Nhãn TÊN ngành đứng cạnh gốc trục (đầu thanh), nhãn
-    SỐ TIỀN đứng ở ĐẦU MÚT thanh — tức phía ĐỐI DIỆN trục so với tên ngành —
-    để không đè lên nhau khi thanh ngắn. Định dạng ¥{:+,} cùng nếp mọi số
-    tiền có dấu khác trên trang. #}
- <text x="{{ dg.x0 - 4 if t.am else dg.x0 + 4 }}" y="{{ t.y + dg.cao_hang/2 + 3 }}"
+ {# [Vòng soát 1 vòng 2, M-1] Tên ngành đứng ở phía ĐỐI DIỆN trục so với
+    CHÍNH THANH của nó — thanh dương (kéo phải) thì tên nằm BÊN TRÁI trục,
+    căn lề PHẢI (kết thúc sát trục); thanh âm (kéo trái) thì tên nằm BÊN
+    PHẢI trục, căn lề TRÁI (bắt đầu sát trục). Bản trước đặt tên CÙNG PHÍA
+    với thanh (chỉ lệch 4px từ trục), nên tên dài đè thẳng lên chính thanh
+    màu của nó. Nhãn SỐ TIỀN (`nhan_x`/`nhan_neo`/`nhan_trong`) tính sẵn ở
+    `ve_dong_gop` — toạ độ đã đảm bảo không tràn khung SVG, xem docstring
+    hàm đó (N-1). #}
+ <text x="{{ dg.x0 + 4 if t.am else dg.x0 - 4 }}" y="{{ t.y + dg.cao_hang/2 + 3 }}"
        font-size="10" fill="var(--chu-nhat)"
-       text-anchor="{{ 'end' if t.am else 'start' }}">{{ t.nganh }}</text>
- <text x="{{ t.x - 4 if t.am else t.x + t.w + 4 }}" y="{{ t.y + dg.cao_hang/2 + 3 }}"
-       font-size="9.5" fill="var(--chu-nhat)"
-       text-anchor="{{ 'end' if t.am else 'start' }}">¥{{ "{:+,}".format(t.chenh_lech) }}</text>
+       text-anchor="{{ 'start' if t.am else 'end' }}">{{ t.nganh }}</text>
+ <text x="{{ t.nhan_x }}" y="{{ t.y + dg.cao_hang/2 + 3 }}" font-size="9.5"
+       fill="{{ 'var(--nen-the)' if t.nhan_trong else 'var(--chu-nhat)' }}"
+       text-anchor="{{ t.nhan_neo }}">{{ t.nhan }}</text>
  {% endfor %}
 </svg>
 </div>
@@ -454,13 +462,18 @@ màu trung tính.</p>
  <tr><th scope="row">{{ h.nganh }}</th>
  {% for o in h.o %}
   {% if o.bac == 'chua_toi' %}
-  <td class="bac-chua_toi" title="{{ o.nganh }} · {{ o.thang }}: chưa tới tháng này trong kỳ">—</td>
+  <td class="bac-chua_toi" title="{{ o.nganh }} · {{ o.thang }}: chưa tới tháng này trong kỳ">·</td>
   {% elif o.bac == 'khong_ban' %}
   <td class="bac-khong_ban" title="{{ o.nganh }} · {{ o.thang }}: không bán tháng này (và tháng cùng kỳ năm trước cũng vậy)">¥0</td>
   {% elif o.bac == 'khong_ck' %}
   <td class="bac-khong_ck" title="{{ o.nganh }} · {{ o.thang }}: không có cùng kỳ (¥{{ '{:,}'.format(o.doanh_thu) }})">—</td>
   {% elif o.tang_truong is not none %}
-  <td class="bac-{{ o.bac }}" title="{{ o.nganh }} · {{ o.thang }}: {{ '%+.1f'|format(o.tang_truong*100) }}% so cùng kỳ (¥{{ '{:,}'.format(o.doanh_thu) }})">{{ '%+.0f'|format(o.tang_truong*100) }}%</td>
+  {# [Vòng soát 1 vòng 2, N-4] Cùng MỘT độ làm tròn (1 chữ số thập phân,
+     dấu chấm) ở cả ô VÀ title — bản trước ô in `%+.0f` (làm tròn số
+     nguyên) trong khi title in `%+.1f`, hai con số cạnh nhau (rê chuột)
+     không khớp nhau, và cả hai đều dùng dấu CHẤM cùng nếp mọi số phần
+     trăm khác trên trang (không đổi sang dấu phẩy). #}
+  <td class="bac-{{ o.bac }}" title="{{ o.nganh }} · {{ o.thang }}: {{ '%+.1f'|format(o.tang_truong*100) }}% so cùng kỳ (¥{{ '{:,}'.format(o.doanh_thu) }})">{{ '%+.1f'|format(o.tang_truong*100) }}%</td>
   {% else %}
   <td class="bac-khong" title="{{ o.nganh }} · {{ o.thang }}: mẫu số cùng kỳ ≤ 0, không tính được % (¥{{ '{:,}'.format(o.doanh_thu) }})">—</td>
   {% endif %}
@@ -493,15 +506,16 @@ màu trung tính.</p>
 <div class="khung-bd">
 <svg viewBox="0 0 {{ pa.rong }} {{ pa.cao }}" width="100%" height="{{ pa.cao }}"
      role="group" aria-label="Doanh thu và luỹ kế của 20 khách hàng lớn nhất">
-  {# [Vòng soát 1, M-2] Vài vạch chia trục luỹ kế bên phải (0/50/100%) —
-     trục % không có nhãn nào trước bản sửa, người đọc không biết đường luỹ
-     kế đang ở khoảng nào của thang 0–100%. #}
-  {% for pct, nhan_pct in ((0, "0%"), (0.5, "50%"), (1.0, "100%")) %}
-  {% set y = 16 + (pa.cao - 16 - 34) * (1 - pct) %}
-  <line x1="0" y1="{{ y }}" x2="{{ pa.rong }}" y2="{{ y }}" stroke="var(--vien)"
+  {# [Vòng soát 1, M-2 / vòng 2, N-3] Vài vạch chia trục luỹ kế bên phải
+     (0/50/100%) — toạ độ `y` tính SẴN ở `ve_pareto` (`pa.truc_pct`), không
+     còn hằng số lề 16/34 chép tay trong Jinja (tách khỏi hai hằng số cục
+     bộ thật của hàm, đổi một bên mà quên bên kia là vạch trục vẽ sai vị
+     trí không lỗi nào nổ ra). #}
+  {% for t in pa.truc_pct %}
+  <line x1="0" y1="{{ t.y }}" x2="{{ pa.rong }}" y2="{{ t.y }}" stroke="var(--vien)"
         stroke-width="1" stroke-dasharray="2 3"/>
-  <text x="{{ pa.rong - 4 }}" y="{{ y - 3 }}" font-size="9" text-anchor="end"
-        fill="var(--chu-nhat)">{{ nhan_pct }}</text>
+  <text x="{{ pa.rong - 4 }}" y="{{ t.y - 3 }}" font-size="9" text-anchor="end"
+        fill="var(--chu-nhat)">{{ t.nhan }}</text>
   {% endfor %}
   {% for c in pa.cot %}
   <rect x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}" rx="2"
@@ -576,8 +590,8 @@ màu trung tính.</p>
      <th class="so">Tỷ suất</th><th class="so">Số khách mua</th></tr>
  {% for h in bc.hang %}
  <tr><td>{{ h.ten }}</td>
-  <td class="so">¥{{ "{:,}".format(h.doanh_thu) }}</td>
-  <td class="so">¥{{ "{:,}".format(h.lai_gop) }}</td>
+  <td class="so">{% if h.doanh_thu is not none %}¥{{ "{:,}".format(h.doanh_thu) }}{% else %}—{% endif %}</td>
+  <td class="so">{% if h.lai_gop is not none %}¥{{ "{:,}".format(h.lai_gop) }}{% else %}—{% endif %}</td>
   <td class="so">{% if h.ty_suat is not none %}{{ "%.1f"|format(h.ty_suat*100) }}%{% else %}—{% endif %}</td>
   <td class="so">{{ h.so_khach }}</td></tr>
  {% endfor %}

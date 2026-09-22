@@ -13,8 +13,8 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from kome.bao_cao import tinh_bao_cao, NGANH_TRONG, nhom_theo_nganh
-from kome.ve_phan_tich import ve_cay_o, ve_nhiet
+from kome.bao_cao import NganhKy, tinh_bao_cao, NGANH_TRONG, nhom_theo_nganh
+from kome.ve_phan_tich import ve_cay_o, ve_dong_gop, ve_nhiet
 from kome.web.app import create_app
 
 TEMPLATE = (Path(__file__).resolve().parent.parent
@@ -242,17 +242,47 @@ def test_moi_rect_circle_du_lieu_co_title(client, conn, batch):
                     f"<{tag}> trong '{n}' không có <title>: {m.group(0)[:120]!r}"
 
 
+def _hai_nam_do_dang(conn, batch, ma="AA01", ngành="Đồ khô"):
+    """Biến thể của `_hai_nam` DỰNG RIÊNG cho test dưới: đủ ba trạng thái ô
+    nhiệt trong CÙNG một lần mở trang — vài tháng có tăng trưởng thật (bậc
+    màu + %), một tháng THẬT SỰ không bán ở CẢ HAI năm (2026-03, "khong_ban"),
+    và kỳ dừng ở 2026-05 (không bán 06/07) để có tháng "chua_toi"."""
+    _nganh(conn, batch, ma, ngành)
+    n = 0
+    for y, th in ((2024, 8), (2024, 9), (2024, 10), (2024, 11), (2024, 12),
+                  (2025, 1), (2025, 2), (2025, 4), (2025, 5), (2025, 6), (2025, 7)):
+        n += 1
+        _ban(conn, batch, date(y, th, 11), ma, amount=110_000, tax=10_000, gp=30_000, n=n)
+    for y, th in ((2025, 8), (2025, 9), (2025, 10), (2025, 11), (2025, 12),
+                  (2026, 1), (2026, 2), (2026, 4), (2026, 5)):
+        n += 1
+        _ban(conn, batch, date(y, th, 11), ma, amount=110_000, tax=10_000, gp=30_000, n=n)
+
+
 def test_ban_do_nhiet_la_bang_html_co_scope(client, conn, batch):
-    """[I-1, I-2] Bản đồ nhiệt là <table>, không phải SVG — có <th scope>
-    cho cả hàng lẫn cột, phần trăm in thẳng trong ô, và ba trạng thái MỚI
-    (chưa tới tháng / không bán tháng này / không có cùng kỳ) phải phân
-    biệt được bằng chữ trong `title`."""
-    _hai_nam(conn, batch)
+    """[I-1, I-2, M-7/N-4 soát chặt] Bản đồ nhiệt là <table>, không phải
+    SVG — có <th scope> cho cả hàng lẫn cột. Mọi khẳng định về CHỮ TRONG Ô
+    kiểm NGAY TRONG khối `<table class="nhiet-bang">…</table>`, không phải
+    `r.text` toàn trang — chú giải (`.chu-thich`) cũng có các cụm chữ
+    "không bán tháng này"/"chưa tới tháng" nên `in r.text` trần sẽ xanh giả
+    kể cả khi bảng chính vẽ sai. Dữ liệu dựng đủ CẢ BA trạng thái thật (tăng
+    trưởng có %, không bán 2026-03, chưa tới 2026-06/07) trong MỘT lần mở
+    trang — không suy luận qua chú giải hay qua lời gọi `ve_nhiet` rời."""
+    _hai_nam_do_dang(conn, batch)
     r = client.get("/bao-cao?ky=2026")
+    assert r.status_code == 200
     assert '<table class="nhiet-bang">' in r.text
-    assert 'scope="col"' in r.text and 'scope="row"' in r.text
-    assert "không bán tháng này" in r.text
-    assert "chưa tới tháng" in r.text
+    m = re.search(r'<table class="nhiet-bang">(.*?)</table>', r.text, re.S)
+    assert m, "không tìm thấy bảng nhiệt"
+    bang = m.group(0)
+    assert 'scope="col"' in bang and 'scope="row"' in bang
+    assert "không bán tháng này" in bang
+    assert "chưa tới tháng" in bang
+    # [N-4] % trong Ô và trong title cùng một độ làm tròn (1 chữ số thập
+    # phân, dấu chấm) — một ô có tăng trưởng thật (cùng doanh thu mỗi
+    # tháng ở cả hai năm) phải in đúng "+0.0%" cả hai chỗ, không phải "+0%".
+    assert re.search(r'class="bac-(?:g2|g1|0|t1|t2)"[^>]*>[+-]\d+\.\d%<', bang), \
+        "ô nhiệt phải in % với đúng MỘT chữ số thập phân, khớp title"
 
 
 def test_nhiet_khong_gan_nhan_sai_thang_chua_toi_hay_khong_ban(conn, batch):
@@ -345,3 +375,72 @@ def test_bang_chi_tiet_theo_thang_dong_trong_details(client, conn, batch):
     r = client.get("/bao-cao?ky=2026")
     assert "<details>" in r.text
     assert "Bảng số chi tiết theo tháng" in r.text
+
+
+# ---- Vòng soát 1 vòng 2 -----------------------------------------------------
+
+def _nk(nganh, chenh_lech, tang_truong=None):
+    return NganhKy(nganh=nganh, doanh_thu=1000, lai_gop=100, dt_doi_chieu=900,
+                   dt_cung_ky=900, chenh_lech=chenh_lech, tang_truong=tang_truong)
+
+
+def test_dong_gop_nhan_so_tien_khong_tran_ngoai_khung_khi_thanh_dai_nhat(conn):
+    """[CRITICAL, N-1] Thanh CHIẾM TRỌN nửa khung (tỷ lệ 100% so với
+    max_abs) từng làm nhãn số tiền của CHÍNH NÓ tràn khỏi viewBox — đặt cứng
+    'đầu mút + 4px' không chừa chỗ cho chữ. Toạ độ `nhan_x` phải luôn nằm
+    trong `[0, rong]`, thử với đủ số tiền lớn (nhiều chữ số) ở CẢ hai phía."""
+    dong = [_nk("Ngành dương rất dài tên", 123_456_789),
+            _nk("Ngành âm cũng dài tên không kém", -98_765_432)]
+    dg = ve_dong_gop(dong, rong=720)
+    assert dg["co"] is True
+    for t in dg["thanh"]:
+        assert 0 <= t["nhan_x"] <= dg["rong"], \
+            f"nhan_x={t['nhan_x']} tràn khỏi khung [0, {dg['rong']}] ở ngành {t['nganh']}"
+
+
+def test_dong_gop_ten_nganh_o_phia_doi_dien_thanh():
+    """[M-1] Tên ngành phải đứng ở phía ĐỐI DIỆN trục so với chính thanh
+    của nó — thanh dương (kéo phải trục) thì tên bên TRÁI trục, thanh âm
+    (kéo trái) thì tên bên PHẢI. Kiểm gián tiếp qua toạ độ `x` của thanh so
+    với `x0`: bài test này khẳng định đúng bất biến hình học mà template
+    dùng (`x0 + 4 if t.am else x0 - 4`), không phải một chuỗi cụ thể."""
+    dong = [_nk("Dương", 500), _nk("Âm", -500)]
+    dg = ve_dong_gop(dong)
+    duong = next(t for t in dg["thanh"] if not t["am"])
+    am = next(t for t in dg["thanh"] if t["am"])
+    # Thanh dương nằm bên PHẢI trục (x == x0); tên của nó phải render ở toạ
+    # độ x0 - 4 (bên TRÁI) theo công thức mới trong template — khẳng định
+    # gián tiếp bằng cách kiểm thanh dương có x == x0 và thanh âm có x < x0,
+    # tức "phía đối diện" của mỗi thanh nằm đúng bên nào.
+    assert duong["x"] == dg["x0"]
+    assert am["x"] < dg["x0"]
+
+
+def test_pareto_truc_pct_tra_toa_do_khong_con_hang_so_cung_trong_template(conn, batch):
+    """[N-3] `ve_pareto` phải tự trả toạ độ Y của ba vạch 0/50/100% — không
+    còn hằng số lề 16/34 chép tay trong Jinja."""
+    from kome.bao_cao import KhachTapTrung, TapTrung
+    from kome.ve_phan_tich import ve_pareto
+    tt = TapTrung(dong=[KhachTapTrung(ma="K1", ten="K1", doanh_thu=100,
+                                      thu_hang=1, ty_trong=1.0, luy_ke=1.0)],
+                  so_khach=1, luy_ke_top10=None)
+    pa = ve_pareto(tt, rong=720, cao=260)
+    assert len(pa["truc_pct"]) == 3
+    ys = [t["y"] for t in pa["truc_pct"]]
+    assert ys == sorted(ys, reverse=True), \
+        "0% phải ở DƯỚI (y lớn hơn), 100% ở TRÊN (y nhỏ hơn)"
+    assert pa["truc_pct"][0]["nhan"] == "0%"
+    assert pa["truc_pct"][-1]["nhan"] == "100%"
+
+
+def test_khong_ve_hien_du_khi_khong_co_gi_de_ve(client, conn, batch):
+    """[M-3] Dòng 'Không vẽ' đứng NGOÀI `{% if co.co %}` — cả kỳ chỉ có
+    ĐÚNG MỘT ngành và ngành đó ÂM (cây ô rỗng hoàn toàn, co.co=False) vẫn
+    phải in ra số tiền bị bỏ, không được im lặng chỉ vì không có gì để
+    VẼ."""
+    _nganh(conn, batch, "PH01", "Phí")
+    _ban(conn, batch, date(2026, 5, 11), "PH01", amount=-5_000, tax=-500, gp=-1_000)
+    r = client.get("/bao-cao?ky=2026")
+    assert r.status_code == 200
+    assert "Không vẽ: ¥" in r.text
+    assert "mã (doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)" in r.text

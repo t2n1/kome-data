@@ -93,10 +93,19 @@
       nhiệt (kome/web/templates/bao_cao.html) LUÔN vẽ viền `var(--vien)`
       quanh mỗi ô (`.nhiet-bang td`) — hai bậc gần màu nền/viền nhất
       (--nhiet-0, --nhiet-khong) không có viền sẽ lẫn hẳn vào khoảng trống
-      giữa các ô. */
+      giữa các ô.
+      [Vòng soát 1 vòng 2, N-2] --nhiet-khong-ban RIÊNG cho "không bán
+      tháng này" (bac "khong_ban") — trước bản sửa ô này tái dùng
+      --vien-phu (qua lớp `.bac-khong_ban` cũ), TRÙNG HỆT --nhiet-khong
+      (bac "khong") ở cả hai giá trị, nên hai Ý NGHĨA KHÁC NHAU ("ngành
+      thật sự không bán gì tháng đó" và "có bán, nhưng mẫu số cùng kỳ ≤ 0
+      không tính được %") lại tô CÙNG MỘT MÀU — mắt không tách được hai
+      trạng thái mà `title` nói khác hẳn nhau. Tông xanh dương nhạt, tách
+      hẳn khỏi trục đỏ/xanh lá của 5 bậc tăng trưởng (để không ai đọc nhầm
+      thành "bậc thứ sáu" của thang đó). */
    --nhiet-g2:#E8938C; --nhiet-g1:#F5D2CD; --nhiet-0:#E6E2D9;
    --nhiet-t1:#CFEBDC; --nhiet-t2:#8FCDA9;
-   --nhiet-khong:#F0EDE6; --nhiet-soc:#D8D3C8;
+   --nhiet-khong:#F0EDE6; --nhiet-khong-ban:#DCE4EC; --nhiet-soc:#D8D3C8;
    --duong-ck:#8A5E06;
    /* Nền bọc logo sidebar (đợt 4d, Task 1) — README gói thiết kế: "logo
       tròn, hiển thị 28px trong sidebar (nền tối thì bọc nền sáng, bo
@@ -152,7 +161,7 @@
       đậm/nhạt như --map-* ở trên (bậc cực trị phải NỔI trên nền sẫm). */
    --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
    --nhiet-t1:#20452F; --nhiet-t2:#1E6E45;
-   --nhiet-khong:#2B251D; --nhiet-soc:#4A4239;
+   --nhiet-khong:#2B251D; --nhiet-khong-ban:#26313B; --nhiet-soc:#4A4239;
    --duong-ck:#E2A72E;
    /* HET-BANG-TOI */
    }
@@ -193,7 +202,7 @@
       đậm/nhạt như --map-* ở trên (bậc cực trị phải NỔI trên nền sẫm). */
    --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
    --nhiet-t1:#20452F; --nhiet-t2:#1E6E45;
-   --nhiet-khong:#2B251D; --nhiet-soc:#4A4239;
+   --nhiet-khong:#2B251D; --nhiet-khong-ban:#26313B; --nhiet-soc:#4A4239;
    --duong-ck:#E2A72E;
    /* HET-BANG-TOI */
  }
