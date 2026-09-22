@@ -17,14 +17,25 @@ from dataclasses import dataclass
 from datetime import date
 
 # Dấu phân cách hàng nghìn mà người ta thật sự gõ: dấu chấm (kiểu Việt), dấu
-# phẩy (kiểu Anh), dấu cách, và dấu cách không ngắt mà Excel hay dán ra.
-_PHAN_CACH = str.maketrans({".": "", ",": "", " ": "", " ": "", "_": ""})
+# phẩy (kiểu Anh), dấu cách ASCII, dấu cách KHÔNG NGẮT (NBSP, U+00A0) mà Excel
+# hay dán ra, dấu cách TOÀN CHIỀU RỘNG (U+3000, bàn phím IME tiếng Nhật gõ
+# ra), dấu cách hẹp không ngắt (U+202F), tab, và gạch dưới.
+#
+# [Vòng soát cuối, việc 1] Danh sách này từng liệt kê " " (ASCII) HAI LẦN
+# trong `dict` literal — Python tự gộp khoá trùng, nên bản "NBSP" biến mất
+# không lỗi nào nổ, còn `_NHOM` bên dưới dùng `\s` (khớp NBSP, U+3000, tab...)
+# nên chuỗi vẫn QUA được kiểm cấu trúc rồi mới nổ `ValueError` trần ở
+# `translate`. Xây CẢ HAI từ đúng MỘT danh sách ký tự này — không viết tay
+# lớp ký tự cho `_NHOM` lần thứ hai — để hai thứ không bao giờ bất đồng lại.
+_KY_TU_PHAN_CACH = [".", ",", " ", " ", "　", " ", "\t", "_"]
+_PHAN_CACH = str.maketrans({c: "" for c in _KY_TU_PHAN_CACH})
 _NGUYEN = re.compile(r"^[0-9]+$")
 # Kiểm CẤU TRÚC NHÓM, không chỉ "bỏ dấu ra rồi xem còn toàn chữ số không":
 # phép kiểm lỏng đó biến `1.5` thành 15, một con số người gõ không hề định
 # nhập, ghi vào CSDL không lỗi nào, và chỉ lộ ra khi ai đó nhìn thấy chỉ tiêu
 # tháng là ¥15. Mọi nhóm sau dấu phân cách phải đúng 3 chữ số.
-_NHOM = re.compile(r"^[0-9]{1,3}(?:[.,\s _][0-9]{3})*$")
+_LOP_KY_TU_PHAN_CACH = "".join(re.escape(c) for c in _KY_TU_PHAN_CACH)
+_NHOM = re.compile(rf"^[0-9]{{1,3}}(?:[{_LOP_KY_TU_PHAN_CACH}][0-9]{{3}})*$")
 
 
 class LoiSo(ValueError):
@@ -41,6 +52,17 @@ def doc_so(chuoi: str | None) -> int | None:
     Chỉ nhận chữ số ASCII: tiền là số nguyên yên nên không có phần thập phân,
     và số âm không phải chỉ tiêu. Chữ số toàn chiều rộng (１２３) bị từ chối
     thay vì âm thầm đổi — người gõ nhầm bảng mã cần biết ngay.
+
+    [Vòng soát cuối, việc 1] `int()` LUÔN đi qua try/except ở đây — không bao
+    giờ để một `ValueError` trần lọt ra khỏi hàm này. `kome/web/app.py` chỉ
+    bắt `except LoiSo`; một ValueError trần rơi xuống `except Exception` của
+    route và thành trang lỗi 500, mất sạch 60 ô người ta vừa gõ. Trước bản
+    sửa này `_NHOM` (dùng `\\s`, khớp cả NBSP/U+3000/tab) và `_PHAN_CACH`
+    (từng thiếu đúng NBSP vì hai khoá `" "` trùng nhau trong `dict` literal)
+    lệch nhau, nên một chuỗi qua được `_NHOM` mà `translate` không dịch hết —
+    `int()` ăn phải một ký tự lạ và ném ValueError trần. Giờ cả hai xây từ
+    cùng một danh sách nên không lệch được nữa, nhưng vẫn bọc `int()` làm lớp
+    phòng thủ thứ hai — hàm này không bao giờ được phép ném gì khác `LoiSo`.
     """
     if chuoi is None:
         return None
@@ -50,7 +72,10 @@ def doc_so(chuoi: str | None) -> int | None:
     if _NGUYEN.match(s):
         return int(s)
     if _NHOM.match(s):
-        return int(s.translate(_PHAN_CACH))
+        try:
+            return int(s.translate(_PHAN_CACH))
+        except ValueError as e:
+            raise LoiSo(chuoi) from e
     raise LoiSo(chuoi)
 
 
@@ -96,9 +121,22 @@ def bang_nhap(conn, company_fy: int | None = None) -> BangNhap:
     Danh sách kỳ lấy từ `core.dim_date`, KHÔNG từ `mart.tong_theo_ky`: chỉ
     tiêu được đặt TRƯỚC khi bán, nên một danh sách chỉ gồm những kỳ đã có
     doanh thu là một danh sách không bao giờ cho đặt chỉ tiêu cho năm sau.
+
+    [CRITICAL, vòng soát cuối việc 5] CHỈ những kỳ có ĐỦ 12 tháng trong
+    `core.dim_date`. Bảng đó phủ 2024-01-01 → 2035-12-31, nên hai kỳ ở hai
+    đầu dải chỉ nằm MỘT PHẦN trong lịch: kỳ 2024 (8月/2023 … 7月/2024) thiếu
+    năm cột đầu, kỳ 2036 (8月/2035 … 7月/2036) thiếu bảy cột cuối. `DISTINCT
+    company_fy` trần vẫn liệt kê cả hai — màn nhập vẽ đủ 12 ô, người dùng gõ
+    số vào một cột không tồn tại trong dim_date, bấm Lưu thì khoá ngoại
+    `app.ngan_sach.thang REFERENCES core.dim_date` ném `ForeignKeyViolation`
+    thẳng ra ngoài, mất cả biểu mẫu. `HAVING count(DISTINCT company_fy_month)
+    = 12` loại đúng hai kỳ cụt đó mà không cần biết ranh giới dải lịch.
     """
     moi_ky = [r[0] for r in conn.execute(
-        "SELECT DISTINCT company_fy FROM core.dim_date ORDER BY 1").fetchall()]
+        """SELECT company_fy FROM core.dim_date
+           GROUP BY company_fy
+           HAVING count(DISTINCT company_fy_month) = 12
+           ORDER BY 1""").fetchall()]
 
     # hom_nay có thể NULL (kho chưa có dòng bán nào) — khi đó rơi về kỳ giữa
     # dải lịch thay vì nổ, để màn nhập vẫn dùng được trước khi nạp dữ liệu.

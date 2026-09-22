@@ -29,10 +29,19 @@ def _ban(conn, batch, ngay: date, sale: str = "0104"):
     ("12,000,000", 12_000_000),
     (" 12 000 000 ", 12_000_000),
     ("0", 0),
+    ("12\xa0000", 12_000),      # NBSP — Excel dán ra kiểu này
+    ("12　000", 12_000),    # dấu cách toàn chiều rộng — IME tiếng Nhật
+    ("12\t000", 12_000),        # tab
 ])
 def test_doc_so_chap_nhan_moi_kieu_dau_phan_cach(chuoi, mong):
     """Người gõ 60 ô sẽ gõ theo thói quen của họ, không theo thói quen của
-    lập trình viên. Ba kiểu phân cách đều phải ra cùng một số."""
+    lập trình viên. Mọi kiểu phân cách đều phải ra cùng một số.
+
+    [CRITICAL, vòng soát cuối việc 1] Ba ca NBSP/U+3000/tab canh đúng lỗi đã
+    đo thật: `_PHAN_CACH` từng có hai khoá `" "` trùng nhau trong `dict`
+    literal (Python tự gộp, NBSP biến mất không lỗi nào nổ) trong khi `_NHOM`
+    dùng `\\s` (khớp cả ba ký tự này) — chuỗi qua được kiểm cấu trúc rồi
+    `int()` ăn phải NBSP/U+3000/tab còn sót lại và ném ValueError TRẦN."""
     assert doc_so(chuoi) == mong
 
 
@@ -77,6 +86,20 @@ def test_ky_CHUA_CO_doanh_thu_nao_van_chon_duoc(conn, batch):
     assert 2027 in b.moi_ky, "kỳ chưa có doanh thu vẫn phải chọn được"
     b27 = bang_nhap(conn, 2027)
     assert b27.thang[0] == "2026-08" and len(b27.thang) == 12
+
+
+def test_ky_CUT_o_hai_dau_dai_lich_KHONG_vao_dai_chip(conn, batch):
+    """[CRITICAL, vòng soát cuối việc 5] core.dim_date phủ 2024-01-01 →
+    2035-12-31. Kỳ 2024 (8月/2023…7月/2024) thiếu năm cột đầu, kỳ 2036
+    (8月/2035…7月/2036) thiếu bảy cột cuối — cả hai chỉ nằm MỘT PHẦN trong
+    lịch. Trước bản sửa `DISTINCT company_fy` liệt kê cả hai, màn nhập vẽ đủ
+    12 ô rồi bấm Lưu ném ForeignKeyViolation trên một cột không tồn tại. Kỳ
+    ĐỦ 12 tháng (2026, 2027) vẫn phải còn nguyên trong dải chip."""
+    _ban(conn, batch, date(2026, 5, 11))
+    b = bang_nhap(conn)
+    assert 2024 not in b.moi_ky, "kỳ 2024 cụt năm cột đầu không được chọn được"
+    assert 2036 not in b.moi_ky, "kỳ 2036 cụt bảy cột cuối không được chọn được"
+    assert 2026 in b.moi_ky and 2027 in b.moi_ky
 
 
 def test_bang_nhap_co_du_nguoi_phu_trach_ke_ca_nguoi_chua_dat_chi_tieu(conn, batch):
