@@ -188,19 +188,26 @@ def chay(argv: list[str], conn, doc_mat_khau=None) -> int:
         print("Thiếu mã sale sau --sale. Ví dụ:  "
               f"python scripts/tao_nguoi_dung.py them {ten} --sale 0104")
         return 2
-    if lenh == "them":
-        return them(conn, ten, sale, kho, ns, doc_mat_khau)
-    if lenh == "doi-mat-khau":
-        return doi_mat_khau(conn, ten, doc_mat_khau)
-    # Hai cờ trái nhau: cấp và bỏ quyền cùng lúc là dấu hiệu người gõ không
-    # chắc mình muốn gì. Không được im lặng chọn nhánh cấp quyền — đó là
-    # nhánh nguy hiểm hơn.
+    # [Vòng soát cuối, việc 10] Hai cờ trái nhau: cấp và bỏ quyền cùng lúc là
+    # dấu hiệu người gõ không chắc mình muốn gì. Không được im lặng chọn
+    # nhánh cấp quyền — đó là nhánh nguy hiểm hơn. Kiểm TRƯỚC CẢ HAI nhánh
+    # `them` và `quyen`, không chỉ `quyen`: `them` cũng đọc `kho`/`ns` (nó
+    # không đọc `bo_kho`/`bo_ns` — hai cờ đó không có nghĩa gì khi TẠO MỚI
+    # một tài khoản), nên trước bản sửa này
+    # `them an --kho-du-lieu --bo-kho-du-lieu` lặng lẽ CẤP quyền Kho dữ liệu:
+    # `bo_kho` bị tính ra nhưng chưa từng được `them()` đọc tới, nên cờ trái
+    # chiều không hề chặn được gì ở nhánh đó. Đợt 5a vừa nhân đôi hình dạng
+    # này cho `--ngan-sach`/`--bo-ngan-sach`.
     if kho and bo_kho:
         print("Vừa --kho-du-lieu vừa --bo-kho-du-lieu — chỉ chọn một.")
         return 2
     if ns and bo_ns:
         print("Vừa --ngan-sach vừa --bo-ngan-sach — chỉ chọn một.")
         return 2
+    if lenh == "them":
+        return them(conn, ten, sale, kho, ns, doc_mat_khau)
+    if lenh == "doi-mat-khau":
+        return doi_mat_khau(conn, ten, doc_mat_khau)
     if not (kho or bo_kho or ns or bo_ns):
         print("Lệnh quyền cần một trong: --kho-du-lieu, --bo-kho-du-lieu, "
               "--ngan-sach, --bo-ngan-sach.")
