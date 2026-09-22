@@ -83,8 +83,14 @@
        khối {% if co_dang_nhap %} ở trên — máy trong công ty để trống
        KOME_SESSION_SECRET (không có cổng đăng nhập nào cả) vẫn phải thấy
        bốn nút này, y hệt cách "Kho dữ liệu" không bị `co_dang_nhap` che
-       (chỉ `hien_kho` mới có quyền che một mục). #}
+       (chỉ `hien_kho` mới có quyền che một mục).
+
+       Nhãn nhóm "GIAO DIỆN" (vòng soát 1, mục 3) — bốn nhóm ở <nav> phía
+       trên đều có <p class="nhom">, thiếu nó ở đây thì người dùng trình
+       đọc màn hình nghe "Sáng, Tối, Theo hệ thống, Theo giờ" trôi nổi ở
+       cuối sidebar mà không biết đó là nhóm gì. #}
     <div class="giao-dien">
+      <p class="nhom">GIAO DIỆN</p>
       <a href="/giao-dien?che_do=sang"{% if che_do_giao_dien == 'sang' %} class="dang-xem" aria-current="true"{% endif %}>Sáng</a>
       <a href="/giao-dien?che_do=toi"{% if che_do_giao_dien == 'toi' %} class="dang-xem" aria-current="true"{% endif %}>Tối</a>
       <a href="/giao-dien?che_do=he-thong"{% if che_do_giao_dien == 'he-thong' %} class="dang-xem" aria-current="true"{% endif %}>Theo hệ thống</a>

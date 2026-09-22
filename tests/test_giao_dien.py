@@ -524,6 +524,28 @@ def test_theo_gio_doi_theo_gio_NHAT_khong_theo_gio_may_chu(conn, test_db_url, mo
     assert 'data-theme="sang"' in html
 
 
+def test_theo_gio_canh_dung_ranh_gioi_18_va_6_gio(conn, test_db_url, monkeypatch):
+    # Vòng soát 1, mục 4: test trước đó chỉ gieo 20:00 và 10:00 -- cả hai đều
+    # nằm SÂU trong vùng, nên đổi hằng số GIO_BAT_DAU_TOI/GIO_KET_THUC_TOI
+    # (kome/web/app.py) thành bất kỳ giá trị nào cũng không làm nó đỏ. Test
+    # này gieo ĐÚNG hai mốc biên "18:00-06:00 giờ Nhật là tối" (đặc tả đợt
+    # 4d): 18:00 phải là "toi" (đầu vùng, bao gồm), 06:00 phải là "sang"
+    # (cuối vùng, KHÔNG bao gồm).
+    from datetime import datetime
+    from kome.tuoi_du_lieu import MUI_GIO
+    client = TestClient(create_app(db_url=test_db_url))
+
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 18, 0, tzinfo=MUI_GIO))
+    html = client.get("/", cookies={"kome_giao_dien": "theo-gio"}).text
+    assert 'data-theme="toi"' in html, "18:00 giờ Nhật phải là tối"
+
+    monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
+                        lambda: datetime(2026, 9, 17, 6, 0, tzinfo=MUI_GIO))
+    html = client.get("/", cookies={"kome_giao_dien": "theo-gio"}).text
+    assert 'data-theme="sang"' in html, "06:00 giờ Nhật phải là sáng"
+
+
 def test_hai_khoi_mau_toi_trong_css_GIONG_HET_NHAU():
     # Bảng tối phải viết HAI lần (một trong @media, một cho
     # :root[data-theme="toi"]) vì CSS không gộp được hai selector đó vào một
@@ -565,16 +587,33 @@ def test_nut_doi_giao_dien_hien_KE_CA_khong_co_cong_dang_nhap(conn, test_db_url)
 
 def test_giao_dien_chuyen_huong_chi_ve_duong_dan_noi_bo(conn, test_db_url):
     # Referer ngoài không được dùng để mở cửa chuyển hướng ra ngoài -- chỉ
-    # giữ lại PATH, bỏ nếu không bắt đầu bằng "/". Domain trong Referer không
-    # quan trọng ở đây vì RedirectResponse trả về một path (không phải một
-    # URL tuyệt đối), nên trình duyệt vẫn ở lại đúng máy chủ KOME -- nhưng
-    # path phải khớp đúng trang đã gọi nó.
+    # giữ lại PATH (+ QUERY, xem test dưới), bỏ nếu không bắt đầu bằng "/".
+    # Domain trong Referer không quan trọng ở đây vì RedirectResponse trả về
+    # một path (không phải một URL tuyệt đối), nên trình duyệt vẫn ở lại
+    # đúng máy chủ KOME -- nhưng path phải khớp đúng trang đã gọi nó.
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/giao-dien?che_do=toi",
                    headers={"referer": "http://may-la.example/khach-hang?tim=x"},
                    follow_redirects=False)
     assert r.status_code in (302, 303)
-    assert r.headers["location"] == "/khach-hang"
+    assert r.headers["location"] == "/khach-hang?tim=x"
+
+
+def test_giao_dien_chuyen_huong_GIU_LAI_bo_loc_tren_query(conn, test_db_url):
+    # Vòng soát 1, mục 1 (lỗi trong brief gốc, không phải lỗi cài đặt): bỏ
+    # query khi chuyển hướng làm người đang lọc /khach-hang mất sạch bộ lọc
+    # (Tỉnh, Sale, nhóm việc...) chỉ vì bấm nút đổi giao diện. An toàn nằm ở
+    # chỗ bỏ scheme+netloc của Referer, KHÔNG nằm ở chỗ bỏ query -- nên query
+    # phải được GIỮ NGUYÊN, kể cả một tham số tiếng Nhật đã mã hoá URL
+    # (`東京都` -- test canh đúng ký tự phần trăm-mã-hoá, không giải mã).
+    client = TestClient(create_app(db_url=test_db_url))
+    r = client.get(
+        "/giao-dien?che_do=sang",
+        headers={"referer":
+                 "http://may-la.example/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD&nv=03"},
+        follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert r.headers["location"] == "/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD&nv=03"
 
 
 def test_giao_dien_khong_co_referer_thi_ve_trang_chu(conn, test_db_url):
@@ -582,3 +621,30 @@ def test_giao_dien_khong_co_referer_thi_ve_trang_chu(conn, test_db_url):
     r = client.get("/giao-dien?che_do=toi", follow_redirects=False)
     assert r.status_code in (302, 303)
     assert r.headers["location"] == "/"
+
+
+def test_color_scheme_nam_trong_khoi_bang_toi():
+    # Vòng soát 1, mục 2: color-scheme:light dark cứng ở :root (khối sáng
+    # gốc) không tự hẹp theo data-theme -- chọn "Tối" trên máy đang để hệ
+    # thống sáng thì trang tối nhưng thanh cuộn/ô <select> vẫn trắng chói
+    # (và ngược lại). color-scheme:dark phải nằm TRONG cặp mốc BANG-TOI/
+    # HET-BANG-TOI để tự nhân đôi sang cả hai khối màu tối, và
+    # :root[data-theme="sang"] phải tự khai color-scheme:light.
+    css = CSS.read_text(encoding="utf-8")
+    khoi = re.findall(r"/\* BANG-TOI \*/(.*?)/\* HET-BANG-TOI \*/", css, re.S)
+    assert len(khoi) == 2
+    for k in khoi:
+        assert "color-scheme:dark" in k.replace(" ", ""), \
+            "color-scheme:dark phải nằm TRONG khối BANG-TOI, không phải bên ngoài"
+    assert ':root[data-theme="sang"]{color-scheme:light}' in css.replace(" ", "").replace("\n", "")
+
+
+def test_giao_dien_co_nhan_nhom_cho_trinh_doc_man_hinh(conn, test_db_url):
+    # Vòng soát 1, mục 3: bốn liên kết không có nhãn nhóm thì người dùng
+    # trình đọc màn hình nghe "Sáng, Tối, Theo hệ thống, Theo giờ" trôi nổi
+    # ở cuối sidebar, không biết đó là nhóm gì -- trong khi bốn nhóm khác
+    # của <nav> đều có <p class="nhom">.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    khoi = re.search(r'<div class="giao-dien">(.*?)</div>', html, re.S).group(1)
+    assert '<p class="nhom">' in khoi and "GIAO DIỆN" in khoi

@@ -270,14 +270,21 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         # dùng gửi lên (qua trình duyệt), KHÔNG phải thứ đáng tin — nhận
         # nguyên nó rồi RedirectResponse thẳng là mở một cửa chuyển hướng ra
         # ngoài: `/giao-dien?che_do=sang` kèm Referer giả từ một trang khác
-        # sẽ đẩy người bấm sang nơi khác. Chỉ giữ PHẦN PATH (bỏ scheme/host)
-        # rồi lọc lại bằng ĐÚNG hàm bao_mat.duong_dan_an_toan đã dùng cho
-        # `?tiep=` sau đăng nhập — không viết một bộ lọc đường dẫn thứ hai.
-        # Path-only nghĩa là domain thật của Referer không quan trọng: dù nó
-        # là trang của ai, ta chỉ lấy `/khach-hang` rồi tự chuyển hướng NGAY
-        # TRÊN máy chủ KOME, chưa bao giờ nhảy sang máy chủ khác.
+        # sẽ đẩy người bấm sang nơi khác. Chỉ giữ PATH + QUERY (bỏ scheme/
+        # host) rồi lọc lại bằng ĐÚNG hàm bao_mat.duong_dan_an_toan đã dùng
+        # cho `?tiep=` sau đăng nhập — không viết một bộ lọc đường dẫn thứ
+        # hai. An toàn nằm ở chỗ bỏ scheme+netloc (domain thật của Referer
+        # không quan trọng — dù nó là trang của ai, ta chỉ tự chuyển hướng
+        # NGAY TRÊN máy chủ KOME, chưa bao giờ nhảy sang máy chủ khác),
+        # KHÔNG nằm ở chỗ bỏ query: đích đã là đường dẫn tương đối rồi, nên
+        # giữ nguyên query không mở thêm cửa nào cả — mà bỏ nó thì người
+        # đang lọc `/khach-hang?tinh=...&nv=...` bấm "Tối" xong mất sạch bộ
+        # lọc, phải lọc lại từ đầu (vòng soát 1, mục 1).
         thamchieu = request.headers.get("referer")
-        duong_thamchieu = urlparse(thamchieu).path if thamchieu else None
+        duong_thamchieu = None
+        if thamchieu:
+            r = urlparse(thamchieu)
+            duong_thamchieu = r.path + (f"?{r.query}" if r.query else "")
         dich = bao_mat.duong_dan_an_toan(duong_thamchieu)
 
         resp = RedirectResponse(dich, status_code=303)

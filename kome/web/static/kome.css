@@ -96,6 +96,13 @@
       cần bấm nó (máy đang ở chế độ tối). */
    :root:not([data-theme="sang"]){
    /* BANG-TOI */
+   /* color-scheme PHẢI nằm TRONG cặp mốc BANG-TOI/HET-BANG-TOI (vòng soát
+      1, mục 2): để CHỌN TAY "Tối" trên máy đang để hệ thống sáng cũng đổi
+      được màu thanh cuộn/ô <select>/nút bấm mặc định của trình duyệt —
+      những thứ CSS thường không vẽ được, chỉ color-scheme mới điều khiển.
+      Đặt ở đây (thay vì chỉ một chỗ) để nó tự nhân đôi theo đúng cơ chế
+      chống trôi đã có, và test hai khối GIỐNG HỆT NHAU vẫn canh được nó. */
+   color-scheme:dark;
    /* Từng cặp lấy từ bảng MAP trong kome-theme.js của gói thiết kế —
       không tự pha. #D62C27 không có trong bảng đó: thiết kế giữ nguyên
       đỏ công ty ở cả hai chế độ. */
@@ -124,6 +131,13 @@
     thứ hai được pha riêng. */
  :root[data-theme="toi"]{
    /* BANG-TOI */
+   /* color-scheme PHẢI nằm TRONG cặp mốc BANG-TOI/HET-BANG-TOI (vòng soát
+      1, mục 2): để CHỌN TAY "Tối" trên máy đang để hệ thống sáng cũng đổi
+      được màu thanh cuộn/ô <select>/nút bấm mặc định của trình duyệt —
+      những thứ CSS thường không vẽ được, chỉ color-scheme mới điều khiển.
+      Đặt ở đây (thay vì chỉ một chỗ) để nó tự nhân đôi theo đúng cơ chế
+      chống trôi đã có, và test hai khối GIỐNG HỆT NHAU vẫn canh được nó. */
+   color-scheme:dark;
    /* Từng cặp lấy từ bảng MAP trong kome-theme.js của gói thiết kế —
       không tự pha. #D62C27 không có trong bảng đó: thiết kế giữ nguyên
       đỏ công ty ở cả hai chế độ. */
@@ -145,6 +159,11 @@
    --logo-nen:#FBF9F5;
    /* HET-BANG-TOI */
  }
+ /* Chọn "Sáng" bằng tay: đối xứng với color-scheme:dark ở trên — không cần
+    nhân đôi vào cặp BANG-TOI (nó không nói gì về MÀU, chỉ nói cho trình
+    duyệt biết tô thanh cuộn/ô <select>/nút bấm mặc định theo tông nào),
+    nên đứng riêng một chỗ (vòng soát 1, mục 2). */
+ :root[data-theme="sang"]{color-scheme:light}
  html{background:var(--nen)}
  body{font:16px/1.6 var(--font-ui);background:var(--nen);color:var(--chu);
       max-width:760px;margin:0 auto;padding:1rem}
@@ -257,6 +276,11 @@
     KOME_SESSION_SECRET), khối này vẫn cần một đường phân cách với <nav>. */
  .giao-dien{display:flex;flex-direction:column;gap:.1rem;
    border-top:1px solid var(--vien);padding-top:.6rem;margin-top:.6rem}
+ /* Nhãn nhóm "GIAO DIỆN" (vòng soát 1, mục 3) — kiểu Y HỆT `.dieu-huong
+    .nhom` của bốn nhóm sidebar phía trên, chỉ scope riêng vì .giao-dien
+    đứng NGOÀI .dieu-huong (nó phải hiện cả khi không có cổng đăng nhập). */
+ .giao-dien .nhom{margin:0 0 .25rem;padding:0 .55rem;font-size:.68rem;
+   font-weight:600;letter-spacing:.1em;color:var(--chu-nhat)}
  .giao-dien a{display:block;padding:.35rem .55rem;border-radius:8px;
    font-size:.8rem;text-decoration:none;color:var(--chu-nhat)}
  .giao-dien a:hover{background:var(--nen-phu);color:var(--chu)}
@@ -272,6 +296,7 @@
    .chan-ben{margin-top:0;margin-left:auto;display:flex;align-items:center;gap:.5rem}
    .thoat{border-top:0;padding-top:0}
    .giao-dien{flex-direction:row;flex-wrap:wrap;border-top:0;padding-top:0;margin-top:0}
+   .giao-dien .nhom{display:none}
    .noi-dung{max-width:none;width:100%;box-sizing:border-box}
  }
 
