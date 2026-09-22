@@ -1,8 +1,10 @@
-"""Đợt 4c — bảng tra 47 tỉnh và view gộp theo tỉnh."""
+"""Đợt 4c — bảng tra 47 tỉnh, view gộp theo tỉnh, và tầng Python dựng bản đồ."""
 import re
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
+
+from kome.ban_do import ban_do
 
 
 # Ba hàm gieo dữ liệu dưới đây chép NGUYÊN VĂN từ tests/test_khach_hang.py —
@@ -163,3 +165,63 @@ def test_khach_theo_tinh_dung_EXISTS_khong_JOIN_vao_khach_nhom_viec(conn):
         "view JOIN thẳng vào khach_nhom_viec — phải dùng EXISTS (subquery), " \
         "nếu không một khách thuộc nhiều nhóm việc sẽ nhân dòng và thổi " \
         "phồng so_khach/doanh_thu_12t của tỉnh đó"
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — kome/ban_do.py: bốn bất biến của đặc tả §8
+# ---------------------------------------------------------------------------
+
+def _hai_tinh(conn, batch):
+    """Hai khách ở hai tỉnh khác nhau — nền chung của ba test dưới."""
+    _ho_so_khach(conn, batch, "BD01", "Quan Tokyo", prefecture="東京都")
+    _ho_so_khach(conn, batch, "BD02", "Quan Osaka", prefecture="大阪府")
+    _mua(conn, batch, "BD01", HOM_NAY - timedelta(days=5))
+    _mua(conn, batch, "BD02", HOM_NAY - timedelta(days=5))
+
+
+def test_du_47_o_ke_ca_tinh_khong_co_khach(conn, batch):
+    # LEFT JOIN từ dim_prefecture, KHÔNG group by trên khách. Gieo khách ở đúng
+    # hai tỉnh; bản đồ vẫn phải có đủ 47 ô, 45 ô trong đó mang số 0.
+    _hai_tinh(conn, batch)
+    t = ban_do(conn)
+    assert len(t.o) == 47
+    assert sum(1 for o in t.o if o.so_khach == 0) == 45
+
+
+def test_tinh_gia_tri_0_khac_bac_thap_nhat(conn, batch):
+    # "Không có khách" khác "ít khách". Cùng màu là bản đồ nói dối về vùng trắng.
+    _hai_tinh(conn, batch)
+    t = ban_do(conn)
+    o = {x.ten: x for x in t.o}
+    assert o["東京都"].so_khach == 1 and o["北海道"].so_khach == 0
+    assert o["北海道"].bac == 0
+    assert o["東京都"].bac >= 1
+
+
+def test_khach_khong_co_tinh_khong_bi_danh_roi_im_lang(conn, batch):
+    # Đúng 1/1.710 khách thật rơi vào ca này. Nó phải hiện thành một con số,
+    # không phải biến mất giữa bản đồ và tổng.
+    _hai_tinh(conn, batch)
+    _ho_so_khach(conn, batch, "BD03", "Khong ro tinh", prefecture="")
+    _mua(conn, batch, "BD03", HOM_NAY - timedelta(days=5))
+    t = ban_do(conn)
+    assert t.khong_ro_tinh == 1
+    assert sum(x.so_khach for x in t.o) + t.khong_ro_tinh == t.tong["so_khach"]
+
+
+def test_ban_do_khong_qua_2_truy_van(conn, batch, monkeypatch):
+    # Đếm LÚC CHẠY, không bằng AST: một truy vấn nằm trong vòng lặp hay trong
+    # một nhánh `if` thì AST đếm là một, còn trang thật chạy bốn mươi bảy lượt.
+    # Cơ chế đếm giống hệt tests/test_khach_hang.py và tests/test_san_pham.py
+    # (bọc conn.execute qua monkeypatch), không dựng cơ chế thứ hai.
+    _hai_tinh(conn, batch)
+    dem = {"n": 0}
+    that = conn.execute
+
+    def demo(*a, **k):
+        dem["n"] += 1
+        return that(*a, **k)
+
+    monkeypatch.setattr(conn, "execute", demo)
+    ban_do(conn)
+    assert dem["n"] <= 2, f"{dem['n']} lượt hỏi, trần là 2"
