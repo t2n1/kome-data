@@ -116,11 +116,26 @@ nhận quyền — **với điều kiện migration chạy bằng vai trò `post
 làm với `app.nguoi_dung`: chỉ tiêu doanh thu là con số nghiệp vụ, không phải hash mật
 khẩu.
 
-Một view của `mart` đọc bảng của `app` chạy được cho **mọi** vai trò đọc `mart` — kể cả
-`kome_ingest`, vai trò KHÔNG có `USAGE` trên schema `app`. Lý do: Postgres kiểm quyền
-trên bảng nền theo **chủ sở hữu view**, và chủ sở hữu ở đây là `postgres`. Đây là hành
-vi đúng và mong muốn, nhưng nó có nghĩa: **đặt gì vào một view của `mart` là công bố
-thứ đó cho mọi vai trò đọc `mart`.** Không đưa cột nhạy cảm nào vào theo đường này.
+Bốn view của `mart` thì **phải `GRANT` tay**, và đây là chỗ dễ quên nhất của cả đợt:
+`ALTER DEFAULT PRIVILEGES IN SCHEMA core, mart` ở `009_roles.sql` (dòng 33) chỉ kể tên
+`kome_app` và `kome_report` — **không có `kome_ingest`**. Vì vậy mọi migration từng
+thêm view vào `mart` (`014`, `020`, `021`, `023`, `024`, `025`) đều kết thúc bằng đúng
+một dòng:
+
+```sql
+GRANT SELECT ON ALL TABLES IN SCHEMA mart TO kome_app, kome_report, kome_ingest;
+```
+
+Quên dòng đó **không làm migration lỗi**. Nó lỗi bằng một `permission denied` nhiều
+tháng sau, giữa lúc có người đang nạp dữ liệu lúc 13:30. Có test canh (§9).
+
+**Hai luật quyền khác nhau, đừng gộp.** Luật vừa nói là về SELECT trên *chính cái
+view*. Luật thứ hai — Postgres kiểm quyền trên **bảng NỀN** theo **chủ sở hữu view**
+(ở đây là `postgres`) — chỉ giải thích một chuyện khác: vì sao `mart.ngan_sach_thang`
+đọc được `app.ngan_sach` **dù `kome_ingest` không hề có `USAGE` trên schema `app`**.
+Gộp hai luật làm một sẽ dẫn tới kết luận sai rằng không cần `GRANT` gì cả. Hệ quả của
+luật thứ hai vẫn đứng và vẫn đáng nhớ: **đặt gì vào một view của `mart` là công bố thứ
+đó cho mọi vai trò đọc `mart`** — không đưa cột nhạy cảm nào vào theo đường này.
 
 ---
 
@@ -422,6 +437,7 @@ Chạy trên CSDL thử nghiệm (`DATABASE_URL_TEST`), tuần tự, như mọi 
 | `test_ngan_sach_truy_van` | `GET` ≤ 4, `POST` ≤ 4 lượt hỏi (§6.3) |
 | `test_ky_chua_co_doanh_thu_van_chon_duoc` | Kỳ không có dòng bán nào vẫn nằm trong dải chip (§6.1) |
 | `test_ty_suat_van_la_ty_so_cua_cac_tong` | `ban_theo_nhan_vien_thang.ty_suat` (§5.3) |
+| `test_bon_view_moi_deu_cap_SELECT_cho_ca_ba_vai_tro` | Bốn view mới của `mart` đều có SELECT cho `kome_app`, `kome_report` **và `kome_ingest`** — vai trò mà `ALTER DEFAULT PRIVILEGES` của `009` không kể tên (§3.3) |
 | `test_migrate` (đã có) | Migration mới chạy được, và chạy lại không hỏng gì |
 
 ---

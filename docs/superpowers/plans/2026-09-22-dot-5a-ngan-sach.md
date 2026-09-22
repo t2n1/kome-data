@@ -399,11 +399,21 @@ COMMENT ON VIEW mart.tien_do_ngan_sach IS
 -- đã làm với app.nguoi_dung: chỉ tiêu doanh thu là con số nghiệp vụ, không
 -- phải hash mật khẩu.
 --
--- LƯU Ý: mart.ngan_sach_thang đọc app.ngan_sach, mà kome_ingest KHÔNG có
--- USAGE trên schema app. View vẫn chạy được cho nó, vì Postgres kiểm quyền
--- trên bảng nền theo CHỦ SỞ HỮU VIEW (ở đây là postgres). Đúng và mong muốn —
--- nhưng nó có nghĩa: đặt gì vào một view của mart là công bố thứ đó cho MỌI
--- vai trò đọc mart. Không đưa cột nhạy cảm nào vào theo đường này.
+-- HAI LUẬT QUYỀN KHÁC NHAU, ĐỪNG GỘP.
+--
+-- (1) SELECT trên CHÍNH CÁI VIEW phải GRANT tay. ALTER DEFAULT PRIVILEGES của
+--     009 (dòng 33) chỉ kể tên kome_app và kome_report — KHÔNG có kome_ingest.
+--     Vì vậy mọi migration từng thêm view vào mart (014, 020, 021, 023, 024,
+--     025) đều kết thúc bằng đúng dòng GRANT ở dưới. Quên nó KHÔNG làm
+--     migration lỗi; nó lỗi bằng một `permission denied` nhiều tháng sau,
+--     giữa lúc có người đang nạp dữ liệu lúc 13:30.
+--
+-- (2) Quyền trên BẢNG NỀN được kiểm theo CHỦ SỞ HỮU VIEW (ở đây là postgres).
+--     Luật này chỉ giải thích một chuyện khác: vì sao mart.ngan_sach_thang đọc
+--     được app.ngan_sach dù kome_ingest không hề có USAGE trên schema app.
+--     Hệ quả của nó vẫn đáng nhớ: đặt gì vào một view của mart là công bố thứ
+--     đó cho MỌI vai trò đọc mart. Không đưa cột nhạy cảm nào vào đường này.
+GRANT SELECT ON ALL TABLES IN SCHEMA mart TO kome_app, kome_report, kome_ingest;
 ```
 
 - [ ] **Step 4: Chạy test để thấy nó xanh**
