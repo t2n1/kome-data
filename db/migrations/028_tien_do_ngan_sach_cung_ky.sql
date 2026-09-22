@@ -76,28 +76,38 @@
 -- Postgres tính CTE MATERIALIZED đúng MỘT LẦN rồi dùng lại, nên
 -- mart.ban_theo_nhan_vien_thang (một GROUP BY trên mart.dong_ban, tức
 -- core.fact_sales_line JOIN dim_date) chỉ bị gộp lại MỘT LẦN cho toàn bộ
--- view — ít hơn cả bản GỐC trước 027 (bản gốc: 2 lần — một ẩn trong view
--- này, một tường minh ở câu ngoài của kome/bao_cao.py).
+-- view.
 --
--- ĐẾM SỐ LẦN GỘP mart.ban_theo_nhan_vien_thang (đọc bằng số node
--- GroupAggregate trên fact_sales_line trong EXPLAIN — CTE Scan lặp lại
--- KHÔNG tính, vì đó là đọc lại kết quả đã gộp, không phải gộp lại):
---   trước 027 (bản gốc, suy từ hình dạng câu lệnh — view của 026 không còn
---   để EXPLAIN trực tiếp): 2 lần — một ẩn trong mart.tien_do_ngan_sach (biến
---   `b`), một tường minh ở câu ngoài kome/bao_cao.py (JOIN `tr` cho cùng kỳ).
---   sau 027, trước bản sửa này (suy từ hình dạng câu lệnh — view
---   ban_theo_nhan_vien_thang_so_sanh đã bị DROP ở chính migration này nên
---   không còn để EXPLAIN trực tiếp): 3 lần — một trong mart.tien_do_ngan_sach,
---   hai nữa bên trong ban_theo_nhan_vien_thang_so_sanh (tự nối `t`/`tr`); CTE
---   MATERIALIZED của kome/bao_cao.py khi đó chỉ bọc MỘT tham chiếu tới view
---   so sánh — nó không gộp được hai tham chiếu NẰM BÊN TRONG chính view đó.
---   sau bản này (028) — ĐO THẬT bằng `EXPLAIN SELECT * FROM
---   mart.tien_do_ngan_sach` ngay sau khi migration này chạy: ĐÚNG 1 node
---   GroupAggregate (dưới "CTE bt"), được quét lại hai lần qua "CTE Scan on
---   bt" và "CTE Scan on bt tr" — quét lại, không gộp lại.
+-- [Vòng soát cuối 3, việc 1] `ct` (câu hỏi "tháng M-12 có tồn tại trong kho
+-- không") KHÔNG hỏi mart.ban_theo_thang nữa — bản trước làm vậy và vô tình
+-- THÊM MỚI một lượt gộp toàn bộ mart.dong_ban (HashAggregate trên
+-- fact_sales_line) mà view GỐC (trước 027) chưa từng có, nên tổng KHÔNG
+-- giảm so với bản gốc (bản gốc: 2 lượt gộp `fact_sales_line`; bản có
+-- `ban_theo_thang`: vẫn 2, không phải 1 như chú thích cũ tuyên bố — phép
+-- đếm lúc đó chỉ tìm node `GroupAggregate` nên bỏ sót đúng node
+-- `HashAggregate` mà `ban_theo_thang` dùng).
+--
+-- Tập giá trị `thang` của mart.ban_theo_thang và của
+-- mart.ban_theo_nhan_vien_thang BẰNG NHAU TUYỆT ĐỐI: cả hai GROUP BY trên
+-- CÙNG mart.dong_ban, chỉ khác độ mịn (thang riêng so với thang +
+-- salesperson_code) — Postgres gộp NULL salesperson_code thành một nhóm
+-- riêng chứ không loại nó, nên không tháng nào "biến mất" ở độ mịn mịn hơn.
+-- Vì vậy `ct AS (SELECT DISTINCT thang FROM bt)` trả lời CHÍNH XÁC câu hỏi
+-- "tháng này có tồn tại trong kho không", chỉ đọc lại CTE `bt` đã có sẵn —
+-- không một lượt gộp mới nào trên fact_sales_line.
+--
+-- ĐO THẬT bằng `EXPLAIN SELECT * FROM mart.tien_do_ngan_sach` ngay sau khi
+-- migration này chạy: xem báo cáo soát cuối (đã dán nguyên văn kế hoạch).
+-- Kỳ vọng: ĐÚNG 1 node gộp trên fact_sales_line (GroupAggregate dưới
+-- "CTE bt"), scan lại hai lần qua "CTE Scan on bt" và "CTE Scan on bt tr",
+-- và một "CTE Scan on ct" đọc lại CHÍNH `bt` — không HashAggregate nào
+-- khác trên fact_sales_line ngoài node gộp duy nhất đó.
 CREATE OR REPLACE VIEW mart.tien_do_ngan_sach AS
 WITH bt AS MATERIALIZED (
     SELECT * FROM mart.ban_theo_nhan_vien_thang
+),
+ct AS (
+    SELECT DISTINCT thang FROM bt
 )
 SELECT coalesce(bt.thang, n.thang)                        AS thang,
        coalesce(bt.company_fy, n.company_fy)              AS company_fy,
@@ -112,9 +122,10 @@ SELECT coalesce(bt.thang, n.thang)                        AS thang,
        -- trang chết; in "∞" thì người đọc tưởng đã vượt mức.
        coalesce(bt.doanh_thu_thuan, 0)::numeric / nullif(n.muc_tieu, 0) AS tien_do,
        -- MỚI (028): so cùng kỳ theo TỪNG NGƯỜI, đúng ba ngữ nghĩa ghi ở trên.
-       -- ct (mart.ban_theo_thang, CẢ CÔNG TY) trả lời "tháng M-12 có tồn tại
-       -- trong kho không" — độc lập với người đang xét. tr (CTE bt tự nối)
-       -- trả lời "người này bán được bao nhiêu ở tháng M-12".
+       -- ct (tập thang PHÂN BIỆT của chính bt — xem chú thích ở trên) trả
+       -- lời "tháng M-12 có tồn tại trong kho không" — độc lập với người
+       -- đang xét. tr (CTE bt tự nối) trả lời "người này bán được bao
+       -- nhiêu ở tháng M-12".
        CASE WHEN ct.thang IS NOT NULL
             THEN coalesce(tr.doanh_thu_thuan, 0)::bigint END      AS cung_ky,
        (ct.thang IS NOT NULL)                                     AS co_cung_ky,
@@ -130,7 +141,7 @@ LEFT JOIN bt                       tr ON tr.salesperson_code
                                      AND tr.thang = to_char(
                                            to_date(coalesce(bt.thang, n.thang), 'YYYY-MM')
                                            - interval '1 year', 'YYYY-MM')
-LEFT JOIN mart.ban_theo_thang      ct ON ct.thang = to_char(
+LEFT JOIN ct                          ON ct.thang = to_char(
                                            to_date(coalesce(bt.thang, n.thang), 'YYYY-MM')
                                            - interval '1 year', 'YYYY-MM');
 
@@ -139,17 +150,20 @@ COMMENT ON VIEW mart.tien_do_ngan_sach IS
    cũng làm mất dòng mà trang vẫn vẽ bình thường. Có test canh cả hai chiều:
    tests/test_ngan_sach_mart.py.
 
-   (028) cung_ky/co_cung_ky/tang_truong: co_cung_ky hỏi CẢ CÔNG TY (qua
-   mart.ban_theo_thang) xem tháng M-12 có tồn tại trong kho không — KHÔNG
+   (028) cung_ky/co_cung_ky/tang_truong: co_cung_ky hỏi CẢ CÔNG TY (qua tập
+   thang phân biệt của chính CTE bt — KHÔNG qua mart.ban_theo_thang, xem chú
+   thích trong migration) xem tháng M-12 có tồn tại trong kho không — KHÔNG
    hỏi riêng người đang xét, vì một người 0 doanh thu tháng M-12 (khác với
    tháng M-12 không tồn tại) vẫn phải đọc được cung_ky = 0, không phải
    "không có dữ liệu". cung_ky là NULL CHỈ KHI co_cung_ky sai. tang_truong
    giữ gate `> 0` (赤伝 làm doanh thu một tháng có thể ÂM). CTE `bt AS
-   MATERIALIZED` được tham chiếu HAI LẦN (vế FULL JOIN chính và vế tra cùng
-   kỳ `tr`) để mart.ban_theo_nhan_vien_thang chỉ bị gộp lại ĐÚNG MỘT LẦN
-   trong cả view — bất biến CLAUDE.md (ca kho_hang()). Đừng "dọn cho gọn"
-   bằng cách bỏ CTE này — thứ trông thừa lại chính là thứ giữ ngân sách
-   truy vấn.';
+   MATERIALIZED` được tham chiếu BA LẦN (vế FULL JOIN chính, vế tra cùng kỳ
+   `tr`, và nguồn của `ct`) để mart.ban_theo_nhan_vien_thang chỉ bị gộp lại
+   ĐÚNG MỘT LẦN trong cả view — bất biến CLAUDE.md (ca kho_hang()). Đừng
+   "dọn cho gọn" bằng cách bỏ CTE này, và đừng đổi `ct` sang đọc thẳng
+   mart.ban_theo_thang — làm vậy sẽ THÊM LẠI một lượt gộp toàn bộ
+   mart.dong_ban mà bản này cố tình tránh (đã từng xảy ra, xem vòng soát
+   cuối 3 trong báo cáo).';
 
 -- 027 dựng mart.ban_theo_nhan_vien_thang_so_sanh cho đúng việc trên nhưng
 -- lọc sai trục (theo tháng đang xét thay vì để mart.tien_do_ngan_sach tự

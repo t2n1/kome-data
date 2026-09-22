@@ -246,6 +246,11 @@ def test_trang_bao_cao_hien_0_dong_khong_hien_khong_co_du_lieu(client, conn, bat
     r = client.get("/bao-cao")
     assert r.status_code == 200
     assert "không có dữ liệu" not in r.text
+    # [Vòng soát cuối 3, việc 2] Dòng này bị bỏ sót ở vòng soát cuối 2 khi
+    # thêm các test kế bên — không vì lý do kỹ thuật nào, chỉ là sơ ý lúc
+    # chỉnh sửa. Không có nó, cái tên "hiện 0 đồng" của test không còn được
+    # kiểm chứng: ô đó đổi thành "—" hay rỗng thì test vẫn xanh.
+    assert "¥0</td>" in r.text
 
 
 # ---- vòng soát cuối 2: hồi quy do chính 027 gây ra -------------------------
@@ -280,9 +285,11 @@ def test_trang_bao_cao_khong_bao_khong_co_du_lieu_khi_cung_ky_co_that(
     r = client.get("/bao-cao?ky=2026")
     assert r.status_code == 200
     assert "¥80,000" in r.text, "phải hiện đúng số cùng kỳ của 0105"
-    # Dòng của 0105 không được nói "không có dữ liệu" — kiểm bằng cách đếm:
-    # trang có ĐÚNG các dòng "không có dữ liệu" đến từ những chỗ khác (nếu
-    # có), không tăng thêm vì ca này.
+    # [Vòng soát cuối 3, việc 2] Chú thích cũ ở đây nói "kiểm bằng cách
+    # đếm" nhưng không có phép đếm nào trong test — sửa cho khớp thứ test
+    # thật sự làm: khẳng định TRỰC TIẾP hai giá trị đọc được (¥80.000 ở
+    # dòng trên, -100.0% ở dòng dưới) thay vì suy luận gián tiếp qua việc
+    # đếm số lần xuất hiện của "không có dữ liệu".
     assert "-100.0%" in r.text or "-100,0%" in r.text
 
 
