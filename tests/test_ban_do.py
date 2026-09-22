@@ -1,6 +1,7 @@
 """Đợt 4c — bảng tra 47 tỉnh, view gộp theo tỉnh, và tầng Python dựng bản đồ."""
 import re
 from datetime import date, timedelta
+from html import unescape
 
 import pandas as pd
 import pytest
@@ -122,33 +123,54 @@ def test_ten_tinh_khop_chuoi_OBC_that(conn, batch):
     assert dem == 1
 
 
-def test_ten_la_ten_ngan_cong_dung_MOT_hau_to_ca_47_dong(conn):
-    # [Vòng sửa 1, hạng mục 4] test_ten_tinh_khop_chuoi_OBC_that ở trên chỉ
-    # phủ ĐÚNG 1/47 chuỗi (東京都). Một tỉnh khác gõ sai hậu tố (vd 大阪県 thay
-    # vì 大阪府) sẽ lọt qua test đó mà không bị bắt — nó chỉ kiểm Tokyo.
+# Hậu tố của từng mã JIS — HẰNG CỐ ĐỊNH của địa lý Nhật Bản, không suy ra
+# được từ chính dữ liệu đang kiểm. Đúng BỐN mã lệch khỏi 県:
+#   01 北海道 (道) · 13 東京都 (都) · 26 京都府 và 27 大阪府 (府).
+# 43 mã còn lại đều là 県. Viết ra ở đây để đọc một cái là biết "mã nào phải
+# mang hậu tố nào" — thứ mà một vòng lặp `in "都道府県"` không nói được.
+HAU_TO_THEO_MA_JIS = {"01": "道", "13": "都", "26": "府", "27": "府"}
+HAU_TO_MAC_DINH = "県"
+
+
+def test_hau_to_dung_voi_tung_ma_jis_ca_47_dong(conn):
+    # [Vòng soát toàn nhánh, mục 2] BẢN TRƯỚC của test này khẳng định
+    # `ten[:-1] == ten_ngan` và `ten[-1] in "都道府県"` — hai điều kiện chỉ nói
+    # về SỰ NHẤT QUÁN NỘI BỘ giữa hai cột, không nói gì về chuỗi OBC thật.
+    # Docstring của nó tuyên bố bắt được "gõ sai hậu tố, vd 大阪県 thay vì
+    # 大阪府", nhưng 大阪県 LỌT QUA CHÍNH NÓ: ten[:-1] = 大阪 = ten_ngan ✓ và
+    # 県 nằm trong "都道府県" ✓. Tức nó canh đúng thứ nó KHÔNG hứa.
     #
-    # Test này quét cả 47 dòng đã gieo: `ten` phải bằng `ten_ngan` nối thêm
-    # ĐÚNG MỘT ký tự hậu tố trong {都, 道, 府, 県} — đúng bất biến đo được
-    # trên CSDL thật (CLAUDE.md: "cả 47 đều có hậu tố 都/道/府/県").
+    # Hồi quy mà nó bỏ lọt là hồi quy đắt nhất của bảng này (bẫy #7 của
+    # CLAUDE.md): một migration sau đổi 大阪府 -> 大阪県 thì 大阪府 rỗng VĨNH
+    # VIỄN trên /ban-do — phép nối (dim_prefecture.ten = dim_customer.
+    # prefecture) chỉ lặng lẽ không khớp dòng nào, trang vẫn vẽ 47 ô bình
+    # thường, không lỗi nào nổ ra.
     #
-    # NGOẠI LỆ DUY NHẤT: 北海道 (ma_jis='01') — hậu tố 道 nằm SẴN TRONG tên
-    # ngắn, nên ten == ten_ngan, không nối thêm gì. Ngoại lệ này viết TƯỜNG
-    # MINH bằng đúng mã JIS '01', KHÔNG bỏ qua bằng một điều kiện chung
-    # chung kiểu "nếu ten == ten_ngan thì cho qua" — làm vậy sẽ vô tình cho
-    # qua CẢ một tỉnh khác lỡ gõ ten_ngan trùng hệt ten (tức bị thiếu mất
+    # 47 hậu tố là HẰNG, nên khẳng định theo ma_jis (HAU_TO_THEO_MA_JIS ở
+    # trên) chứ không theo một tập ký tự cho phép.
+    #
+    # NGOẠI LỆ DUY NHẤT về ten_ngan: 北海道 (ma_jis='01') — hậu tố 道 nằm SẴN
+    # TRONG tên ngắn, nên ten == ten_ngan, không nối thêm gì. Ngoại lệ này
+    # viết TƯỜNG MINH bằng đúng mã JIS '01', KHÔNG bỏ qua bằng một điều kiện
+    # chung chung kiểu "nếu ten == ten_ngan thì cho qua" — làm vậy sẽ vô tình
+    # cho qua CẢ một tỉnh khác lỡ gõ ten_ngan trùng hệt ten (tức bị thiếu mất
     # hậu tố), đúng loại lỗi gõ sai mà test này được viết ra để bắt.
     rows = conn.execute(
         "SELECT ma_jis, ten, ten_ngan FROM core.dim_prefecture ORDER BY ma_jis"
     ).fetchall()
     assert len(rows) == 47
     for ma_jis, ten, ten_ngan in rows:
+        mong_doi = HAU_TO_THEO_MA_JIS.get(ma_jis, HAU_TO_MAC_DINH)
+        assert ten[-1] == mong_doi, (
+            f"{ma_jis}: '{ten}' có hậu tố '{ten[-1]}', phải là '{mong_doi}' — "
+            "sai một ký tự là tỉnh này rỗng vĩnh viễn trên /ban-do, "
+            "phép nối chỉ lặng lẽ không khớp dòng nào"
+        )
         if ma_jis == "01":
             assert ten == ten_ngan == "北海道", "ngoại lệ 北海道 không còn đúng"
             continue
         assert ten[:-1] == ten_ngan, \
             f"{ma_jis}: '{ten}' không phải '{ten_ngan}' + một hậu tố"
-        assert ten[-1] in "都道府県", \
-            f"{ma_jis}: hậu tố '{ten[-1]}' không nằm trong 都/道/府/県"
 
 
 def test_khach_theo_tinh_dung_EXISTS_khong_JOIN_vao_khach_nhom_viec(conn):
@@ -257,6 +279,34 @@ def test_gia_tri_bang_nhau_cung_mot_bac_khong_chong_khoang_chu_giai(conn, batch)
                 f"chú giải chồng khoảng: {khoang[i]} và {khoang[j]}"
 
 
+def test_doanh_thu_AM_khong_roi_vao_bac_TRONG(conn, batch):
+    # [Vòng soát toàn nhánh, mục 3] Doanh thu 12 tháng của một tỉnh CÓ THỂ ÂM:
+    # 赤伝 (phiếu đỏ — hàng trả lại, số ÂM, luật số một cấm lọc bỏ) của một
+    # tỉnh chỉ có một hai khách có thể lớn hơn phần mua vào trong cùng 12
+    # tháng. Bản trước của _tinh_bac() chỉ coi `> 0` là "có giá trị", nên tỉnh
+    # đó rơi vào bậc 0 — bậc mà chú giải gọi là "Trống — không có doanh thu 12
+    # tháng" trong khi CHÍNH Ô ĐÓ in ra `¥-100.000`. Màu nói một đằng, số nói
+    # một nẻo.
+    _ho_so_khach(conn, batch, "BDA1", "Quan Tokyo", prefecture="東京都")
+    _mua(conn, batch, "BDA1", HOM_NAY - timedelta(days=5))
+    _ho_so_khach(conn, batch, "BDA2", "Quan Osaka tra hang", prefecture="大阪府")
+    _mua(conn, batch, "BDA2", HOM_NAY - timedelta(days=5),
+         tien=-110_000, tax=-10_000, gp=-30_000)
+
+    t = ban_do(conn, chi_so="doanh_thu")
+    o = {x.ten: x for x in t.o}
+    assert o["大阪府"].doanh_thu < 0, "fixture hỏng: 赤伝 không cho ra số âm"
+    assert o["大阪府"].bac != 0, \
+        "doanh thu ÂM bị xếp vào bậc 'trống' — ô in số âm mà chú giải nói 'không có'"
+    # Bậc 0 vẫn phải nghĩa là ĐÚNG BẰNG 0, và 45 tỉnh còn lại đúng là như vậy.
+    assert o["北海道"].doanh_thu == 0 and o["北海道"].bac == 0
+    c0 = next(c for c in t.chu_giai if c["bac"] == 0)
+    assert (c0["tu"], c0["den"]) == (0, 0), "bậc 0 phải là khoảng [0, 0]"
+    # Chú giải của bậc chứa 大阪府 in ra khoảng THẬT — kể cả khi khoảng đó âm.
+    c_am = next(c for c in t.chu_giai if c["bac"] == o["大阪府"].bac)
+    assert c_am["tu"] == o["大阪府"].doanh_thu
+
+
 def test_moi_47_tinh_thuoc_dung_mot_vung_trong_VUNG_THU_TU(conn, batch):
     # [Vòng sửa 1] 8 tên vùng là HẰNG PYTHON (VUNG_THU_TU) trong khi giá trị
     # `vung` nằm ở CSDL (core.dim_prefecture.vung, migration 025). Gõ sai
@@ -341,6 +391,96 @@ def test_bam_o_dan_toi_danh_ba_da_loc_dung_tinh(conn, client, batch):
     _hai_tinh(conn, batch)
     html = client.get("/ban-do").text
     assert "/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD" in html
+
+
+def _href(html: str, mau: str, ten_tinh: str) -> str:
+    """href của một liên kết tỉnh, ĐÃ GIẢI MÃ thực thể HTML.
+
+    `html.unescape` chứ không lấy nguyên văn: Jinja bật autoescape nên dấu `&`
+    nối tham số ra HTML thành `&amp;` — ĐÚNG HTML, và trình duyệt tự giải mã
+    thực thể trong giá trị thuộc tính trước khi điều hướng. Một test đọc
+    nguyên văn rồi đưa thẳng cho TestClient sẽ gửi đi `?tinh=…&amp;nv=0104`,
+    tức tham số thật tên là `amp;nv` và `nv` RỖNG — nghĩa là test đó vẫn XANH
+    dù liên kết có mang `nv` hay không, đúng cái nó sinh ra để bắt.
+    """
+    m = re.search(mau.replace("TINH", re.escape(ten_tinh)), html)
+    assert m, f"không tìm thấy liên kết của {ten_tinh}"
+    return unescape(m.group(1))
+
+
+def _href_o_svg(html: str, ten_tinh: str) -> str:
+    """href của thẻ <a> bọc ĐÚNG ô SVG của một tỉnh."""
+    return _href(html, r'<a href="([^"]+)">\s*<g class="o" data-tinh="TINH"',
+                 ten_tinh)
+
+
+def _href_dong_bang(html: str, ten_tinh: str) -> str:
+    """href của thẻ <a> trong dòng bảng xếp hạng của một tỉnh."""
+    return _href(html, r'<td><a href="([^"]+)">TINH</a></td>', ten_tinh)
+
+
+def test_bam_o_hay_dong_bang_GIU_NGUYEN_bo_loc_nguoi_phu_trach(conn, client, batch):
+    # [Vòng soát toàn nhánh, mục 1] Liên kết sang /khach-hang phải MANG THEO
+    # `tat_ca`/`nv`. /khach-hang thiếu hai tham số đó rơi về mặc định lọc theo
+    # NGƯỜI ĐANG ĐĂNG NHẬP, nên: sale bấm "Xem tất cả", thấy ô 東京都 ghi 290
+    # khách, bấm vào ô đó và danh sách mở ra 42 khách của riêng anh ta. Với
+    # `?nv=<đồng nghiệp>` còn tệ hơn — bản đồ vẽ số của người kia, bấm vào ra
+    # khách của chính mình. Cùng lớp lỗi mà kome/khach_hang.py::_vi_tu đã ghi
+    # ("chip 'Tất cả (1.710)' bấm vào ra 216 khách"), chỉ khác là nó nằm giữa
+    # HAI trang thay vì trong một trang.
+    #
+    # Kiểm CẢ HAI lối bấm: ô SVG và dòng bảng. Chúng là hai chỗ viết href
+    # riêng biệt trong template, nên sửa một chỗ quên chỗ kia là chuyện thường.
+    #
+    # HAI khách CÙNG MỘT TỈNH, khác người phụ trách — cố ý: nếu hai khách ở
+    # hai tỉnh khác nhau thì riêng `?tinh=` đã đủ lọc ra đúng một người, và
+    # phép bấm thử bên dưới sẽ XANH kể cả khi `nv` rơi mất.
+    _ho_so_khach(conn, batch, "BD01", "Cua A", prefecture="東京都",
+                 salesperson_code="0102")
+    _ho_so_khach(conn, batch, "BD02", "Cua B", prefecture="東京都",
+                 salesperson_code="0104")
+    _mua(conn, batch, "BD01", HOM_NAY - timedelta(days=5))
+    _mua(conn, batch, "BD02", HOM_NAY - timedelta(days=5))
+
+    html = client.get("/ban-do?tat_ca=1").text
+    for href in (_href_o_svg(html, "東京都"), _href_dong_bang(html, "東京都")):
+        assert "tat_ca=1" in href, \
+            f"bản đồ đang xem TẤT CẢ nhưng liên kết bỏ mất tat_ca: {href}"
+
+    html = client.get("/ban-do?nv=0104").text
+    for href in (_href_o_svg(html, "東京都"), _href_dong_bang(html, "東京都")):
+        assert "nv=0104" in href, \
+            f"bản đồ đang xem khách của 0104 nhưng liên kết bỏ mất nv: {href}"
+    # Và BẤM THẬT vào đó phải ra đúng phạm vi bản đồ đang vẽ: ô 東京都 ghi 1
+    # khách (của 0104), nên danh bạ mở ra phải là đúng khách đó — không phải
+    # cả hai khách của tỉnh.
+    o = dict(re.findall(
+        r'<g class="o" data-tinh="([^"]+)"[^>]*>.*?class="so">([\d.,]+)<',
+        html, re.S))
+    assert o["東京都"] == "1", "fixture hỏng: bản đồ không hề bị lọc theo nv"
+    r = client.get(_href_o_svg(html, "東京都"))
+    assert r.status_code == 200
+    assert "Cua B" in r.text
+    assert "Cua A" not in r.text, \
+        "ô ghi 1 khách nhưng bấm vào ra cả hai — liên kết bỏ rơi bộ lọc nv"
+
+
+def test_cuoi_trang_hien_TONG_de_doi_chieu(conn, client, batch):
+    # [Vòng soát toàn nhánh, mục 4] Dòng "(không rõ tỉnh)" mời người đọc cộng
+    # "47 ô + (không rõ tỉnh)" — phải cho họ chính con số đó để đối chiếu,
+    # nếu không họ tự cộng 47 dòng bằng tay hoặc tin rằng bảng đã là toàn bộ
+    # công ty. TrangBanDo.tong đã được tính sẵn ở tầng Python.
+    _hai_tinh(conn, batch)
+    _ho_so_khach(conn, batch, "BD03", "Khong ro tinh", prefecture=None)
+    _mua(conn, batch, "BD03", HOM_NAY - timedelta(days=5))
+
+    html = client.get("/ban-do").text
+    m = re.search(r'<b data-tong="so_khach">([\d.,]+)</b>', html)
+    assert m, "cuối trang không hiện tổng số khách"
+    # 2 khách trên lưới + 1 khách "(không rõ tỉnh)".
+    assert m.group(1) == "3"
+    assert re.search(r'<b data-tong="doanh_thu">', html), "thiếu tổng doanh thu"
+    assert re.search(r'<b data-tong="can_goi">', html), "thiếu tổng cần gọi"
 
 
 def test_loc_nv_co_ca_ban_do_lan_bang_lan_dai_vung(conn, client, batch):

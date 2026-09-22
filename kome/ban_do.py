@@ -37,8 +37,9 @@ O_RONG = 60
 O_CAO = 60
 KHE = 6
 
-# Số bậc màu cho các ô CÓ giá trị (> 0). Bậc 0 (không có khách/doanh thu/cần
-# gọi) là bậc RIÊNG, không nằm trong 5 bậc này — xem _tinh_bac().
+# Số bậc màu cho các ô CÓ giá trị (khác 0). Bậc 0 (ĐÚNG BẰNG 0 — không có
+# khách/doanh thu/cần gọi) là bậc RIÊNG, không nằm trong 5 bậc này — xem
+# _tinh_bac().
 SO_BAC = 5
 
 
@@ -113,9 +114,20 @@ def _dk_sale(sale: str | None) -> tuple[str, list]:
 def _tinh_bac(gia_tri_theo_o: list[int]) -> list[int]:
     """Bậc màu cho từng ô, theo ĐÚNG THỨ TỰ đưa vào `gia_tri_theo_o`.
 
-    0 -> bậc 0 (bậc RIÊNG, "không có" khác "ít"). Các giá trị > 0 được xếp
-    tăng dần rồi chia `ntile(5)` BẰNG TAY (dữ liệu đã nằm sẵn trong bộ nhớ,
-    không đáng một lượt hỏi CSDL riêng chỉ để gọi ntile()).
+    ĐÚNG BẰNG 0 -> bậc 0 (bậc RIÊNG, "không có" khác "ít"). Mọi giá trị KHÁC
+    0 — kể cả ÂM — được xếp tăng dần rồi chia `ntile(5)` BẰNG TAY (dữ liệu đã
+    nằm sẵn trong bộ nhớ, không đáng một lượt hỏi CSDL riêng chỉ để gọi
+    ntile()).
+
+    [Vòng soát toàn nhánh] ĐIỀU KIỆN LÀ `!= 0`, KHÔNG PHẢI `> 0`. Doanh thu
+    12 tháng của một tỉnh CÓ THỂ ÂM: 赤伝 (phiếu đỏ — hàng trả lại, số ÂM, và
+    luật số một cấm lọc bỏ) của một tỉnh chỉ có một hai khách có thể lớn hơn
+    phần mua vào trong cùng 12 tháng. Với `> 0`, tỉnh đó rơi vào bậc 0, mà bậc
+    0 được chú giải là "Trống — không có doanh thu 12 tháng" trong khi CHÍNH Ô
+    ĐÓ in ra `¥-123.456`: màu nói một đằng, số nói một nẻo, và người đọc không
+    có cách nào biết bên nào sai. Số âm là số liệu THẬT (chỉ là số liệu xấu) —
+    nó tham gia chia phân vị như mọi giá trị khác, nhận bậc thấp nhất vì nó
+    nhỏ nhất, và chú giải in ra đúng khoảng âm đó.
 
     CHIA THEO PHÂN VỊ (số Ô mỗi bậc gần bằng nhau), KHÔNG THEO KHOẢNG GIÁ TRỊ
     ĐỀU: 東京都 (290 khách, đông nhất công ty) kéo trần giá trị lên rất cao so
@@ -141,9 +153,9 @@ def _tinh_bac(gia_tri_theo_o: list[int]) -> list[int]:
     """
     n = len(gia_tri_theo_o)
     bac = [0] * n
-    # Vị trí (chỉ số trong gia_tri_theo_o) của các ô có giá trị > 0, sắp XẾP
-    # TĂNG DẦN theo chính giá trị đó.
-    vi_tri_duong = sorted((i for i in range(n) if gia_tri_theo_o[i] > 0),
+    # Vị trí (chỉ số trong gia_tri_theo_o) của các ô có giá trị KHÁC 0 (âm
+    # cũng vào đây — xem docstring), sắp XẾP TĂNG DẦN theo chính giá trị đó.
+    vi_tri_duong = sorted((i for i in range(n) if gia_tri_theo_o[i] != 0),
                           key=lambda i: gia_tri_theo_o[i])
     so_duong = len(vi_tri_duong)
     if so_duong == 0:
@@ -290,16 +302,19 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
     # [Vòng sửa 1] THÊM mục bậc 0 ("không có", màu RIÊNG theo §5.5) vào chính
     # chu_giai — bản đầu chỉ liệt kê bậc 1..5 nên Task 3 (template) buộc phải
     # tự viết cứng thêm một ô "0 khách" ở đâu đó ngoài danh sách này, đúng
-    # loại logic không được phép nằm trong template. Bậc 0 luôn có giá trị
-    # THẬT bằng 0 (đó chính là định nghĩa của bậc này), không phải None.
-    gia_tri_bac_0 = [o.gia_tri for o in cac_o if o.bac == 0]
-    chu_giai = [{
-        "bac": 0,
-        "so_tinh": len(gia_tri_bac_0),
-        "tu": 0 if gia_tri_bac_0 else None,
-        "den": 0 if gia_tri_bac_0 else None,
-    }]
-    for b in range(1, SO_BAC + 1):
+    # loại logic không được phép nằm trong template. Mục bậc 0 LUÔN có mặt
+    # trong danh sách này (kể cả khi so_tinh = 0) vì nó là một màu riêng trên
+    # bản đồ mà người đọc cần biết nghĩa — template in nó vô điều kiện và
+    # KHÔNG đọc tu/den của nó (nhãn của bậc 0 là chữ, không phải một khoảng).
+    #
+    # [Vòng soát toàn nhánh] Bậc 0 đọc khoảng THẬT từ dữ liệu như năm bậc kia,
+    # không viết cứng `tu=0, den=0`. Hai bản cho cùng kết quả CHỪNG NÀO bậc 0
+    # còn nghĩa là "đúng bằng 0" (xem _tinh_bac) — nhưng bản viết cứng là một
+    # con số không đến từ dữ liệu, tức nó vẫn in "0" kể cả khi bậc 0 một ngày
+    # nào đó chứa thứ khác 0, đúng lỗi vừa sửa (doanh thu âm rơi vào bậc 0 rồi
+    # được chú giải là "không có doanh thu").
+    chu_giai = []
+    for b in range(0, SO_BAC + 1):
         gia_tri_bac = sorted(o.gia_tri for o in cac_o if o.bac == b)
         chu_giai.append({
             "bac": b,

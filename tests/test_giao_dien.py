@@ -28,8 +28,16 @@ TEN_FONT = [
 
 # Mọi trang mở được mà không cần tham số. Trang hồ sơ khách và trang lỗi
 # không nằm đây vì chúng cần dữ liệu hoặc một sự cố để hiện ra.
+#
+# [Vòng soát toàn nhánh, mục 5] Danh sách này thiếu /ban-do (đợt 4c) — nên
+# hai test dưới (nối tới CSS, đúng một thẻ viewport) KHÔNG phủ trang đó: gỡ
+# `{% include "_chung.html" %}` khỏi ban_do.html là trang trơ trụi và mất thẻ
+# viewport (sidebar không gập trên điện thoại) mà cả bộ test vẫn xanh.
+# (/san-pham và /kho-hang của đợt 4b thì ĐÃ có sẵn — bản soát ghi chúng cũng
+# thiếu, nhưng đo lại trên nhánh này thì không.) Thêm một trang mới thì THÊM
+# VÀO ĐÂY — đây là chỗ duy nhất canh khung chung của mọi trang.
 TRANG = ["/", "/khach-hang", "/bao-cao", "/can-xu-ly", "/kho-du-lieu",
-         "/san-pham", "/kho-hang"]
+         "/san-pham", "/kho-hang", "/ban-do"]
 
 
 def test_css_duoc_phuc_vu(conn, test_db_url):

@@ -43,7 +43,9 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
    rỗng vĩnh viễn trên bản đồ khách hàng (`/ban-do`) mà không lỗi nào nổ ra — phép nối
    chỉ lặng lẽ không khớp dòng nào. Có test canh:
    `tests/test_ban_do.py::test_ten_tinh_khop_chuoi_OBC_that`,
-   `::test_ten_la_ten_ngan_cong_dung_MOT_hau_to_ca_47_dong`.
+   `::test_hau_to_dung_voi_tung_ma_jis_ca_47_dong` (khẳng định hậu tố theo ĐÚNG
+   `ma_jis` — `01`→道, `13`→都, `26`/`27`→府, 43 mã còn lại→県; một điều kiện
+   "hậu tố nằm trong 都/道/府/県" cho `大阪県` lọt qua).
 
 ## Bốn vai trò CSDL (Task 13, `db/migrations/009_roles.sql`)
 Luật số một ("OBC chỉ đọc") không chỉ là quy ước trong code — nó là ràng
@@ -343,6 +345,23 @@ sẽ NHÂN DÒNG khách lên và thổi phồng cả `so_khach` lẫn `doanh_thu
 không chỉ `can_goi` — một tỉnh có nhiều khách vừa `im` vừa `tut` sẽ báo nhiều khách
 hơn số khách nó thật sự có. Có test canh:
 `tests/test_ban_do.py::test_khach_theo_tinh_dung_EXISTS_khong_JOIN_vao_khach_nhom_viec`.
+
+**Bất biến:** mọi liên kết rời `/ban-do` sang `/khach-hang` — ô SVG **và** dòng
+bảng xếp hạng — phải mang theo `tat_ca`/`nv` (biến `giu` của `ban_do.html`).
+`/khach-hang` thiếu hai tham số đó rơi về mặc định lọc theo NGƯỜI ĐANG ĐĂNG
+NHẬP, nên bản đồ vẽ số của "tất cả" (hay của một đồng nghiệp) mà bấm vào lại ra
+danh sách của chính mình — cùng lớp lỗi `kome/khach_hang.py::_vi_tu` đã ghi
+("chip Tất cả (1.710) bấm vào ra 216 khách"), chỉ khác là nó nằm giữa HAI trang.
+Có test canh: `tests/test_ban_do.py::
+test_bam_o_hay_dong_bang_GIU_NGUYEN_bo_loc_nguoi_phu_trach`.
+
+**Bất biến:** bậc màu 0 của bản đồ (`kome/ban_do.py::_tinh_bac`) dành cho **ĐÚNG
+BẰNG 0**, không phải "không dương". Doanh thu 12 tháng của một tỉnh CÓ THỂ ÂM
+(赤伝 — phiếu đỏ, số ÂM, luật cấm lọc bỏ — của một tỉnh chỉ có một hai khách).
+Xếp số âm vào bậc 0 là chú giải ghi "Trống — không có doanh thu 12 tháng" trong
+khi chính ô đó in `¥-123.456`. Số âm tham gia chia phân vị như mọi giá trị khác
+và chú giải in ra khoảng THẬT, kể cả khi khoảng đó âm. Có test canh:
+`tests/test_ban_do.py::test_doanh_thu_AM_khong_roi_vao_bac_TRONG`.
 
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |

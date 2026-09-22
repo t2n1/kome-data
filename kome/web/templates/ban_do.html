@@ -48,7 +48,16 @@ nhìn và khó bấm trúng. Ô vuông bằng nhau cho MỌI tỉnh cùng quyề
 được con số, và bấm được — kể cả tỉnh chưa có khách nào.</p>
 
 {# Ba chỉ số để tô màu: liên kết thuần, không JavaScript — đổi chỉ số là tải
-   lại trang với ?chi_so= khác, giữ nguyên bộ lọc người phụ trách đang có. #}
+   lại trang với ?chi_so= khác, giữ nguyên bộ lọc người phụ trách đang có.
+
+   `giu` MANG SẴN dấu `&` đầu mỗi mảnh, nên mọi chỗ nối nó phải là một URL ĐÃ
+   CÓ ít nhất một tham số (`?chi_so=…` hoặc `?tinh=…`). Nó phải đi theo MỌI
+   liên kết rời khỏi trang này — kể cả liên kết sang /khach-hang ở từng ô bản
+   đồ và từng dòng bảng: /khach-hang thiếu `tat_ca`/`nv` sẽ rơi về mặc định
+   lọc theo NGƯỜI ĐANG ĐĂNG NHẬP, nên bản đồ vẽ số của "tất cả" (hay của một
+   đồng nghiệp) mà bấm vào lại ra danh sách của chính mình — đúng lớp lỗi
+   `kome/khach_hang.py::_vi_tu` đã ghi ("chip 'Tất cả (1.710)' bấm vào ra 216
+   khách"), chỉ khác là nó nằm giữa HAI trang thay vì trong một trang. #}
 {% set g_nv = ("&nv=" ~ nv|urlencode) if nv else "" %}
 {% set g_tat_ca = "&tat_ca=1" if tat_ca else "" %}
 {% set giu = g_nv ~ g_tat_ca %}
@@ -100,7 +109,7 @@ nhìn và khó bấm trúng. Ô vuông bằng nhau cho MỌI tỉnh cùng quyề
      style="max-width:100%;height:auto" role="img"
      aria-label="Bản đồ 47 tỉnh, tô theo {{ chi_so_ds[t.chi_so]|lower }}">
 {% for o in t.o %}
-<a href="/khach-hang?tinh={{ o.ten|urlencode }}">
+<a href="/khach-hang?tinh={{ o.ten|urlencode }}{{ giu }}">
   <g class="o" data-tinh="{{ o.ten }}">
     <rect x="{{ o.x }}" y="{{ o.y }}" width="{{ o_rong }}" height="{{ o_cao }}"
           rx="7" fill="{{ MAU_O[o.bac] }}"/>
@@ -151,7 +160,7 @@ khách nào — không phải 0%, vì chưa có khách thì không có gì để
      <th class="so">Tỷ lệ cần gọi</th></tr>
  {% for o in t.bang %}
  <tr>
-  <td><a href="/khach-hang?tinh={{ o.ten|urlencode }}">{{ o.ten }}</a></td>
+  <td><a href="/khach-hang?tinh={{ o.ten|urlencode }}{{ giu }}">{{ o.ten }}</a></td>
   <td>{{ o.vung }}</td>
   <td class="so">{{ "{:,}".format(o.so_khach) }}</td>
   <td class="so">¥{{ "{:,}".format(o.doanh_thu) }}</td>
@@ -165,5 +174,15 @@ khách nào — không phải 0%, vì chưa có khách thì không có gì để
 <p class="ghi-chu">(không rõ tỉnh): {{ "{:,}".format(t.khong_ro_tinh) }} khách — có
 dòng bán nhưng chưa có hồ sơ 得意先全情報 khớp một trong 47 tỉnh ở trên (prefecture
 rỗng hoặc một chuỗi OBC không khớp tên tỉnh nào).</p>
+
+{# Con số để ĐỐI CHIẾU với dòng ngay trên: câu "47 ô + (không rõ tỉnh)" mời
+   người đọc cộng lại, nên phải cho họ thấy tổng — nếu không, họ tự cộng 47
+   dòng bằng tay hoặc (tệ hơn) tin rằng bảng đã là toàn bộ công ty. Tổng này
+   CO theo đúng bộ lọc người phụ trách đang áp dụng, giống bản đồ và bảng. #}
+<p class="ghi-chu">Tổng cộng (47 ô trên bản đồ + (không rõ tỉnh)):
+<b data-tong="so_khach">{{ "{:,}".format(t.tong.so_khach) }}</b> khách ·
+<b data-tong="doanh_thu">¥{{ "{:,}".format(t.tong.doanh_thu) }}</b> doanh thu 12
+tháng · <b data-tong="can_goi">{{ "{:,}".format(t.tong.can_goi) }}</b> khách cần
+gọi lại.</p>
 </html>
 </main>
