@@ -111,32 +111,83 @@ def test_sale_thieu_gia_tri_bao_loi_khong_tao_gi(conn):
     assert ND.liet_ke(conn) == []
 
 
-def test_cap_co_ngan_sach_KHONG_dung_toi_co_kho_du_lieu(conn, capsys):
+def test_cap_co_ngan_sach_KHONG_dung_toi_co_kho_du_lieu(conn):
     """[CRITICAL] Hai cờ độc lập. Một lệnh cấp quyền ngân sách mà âm thầm thu
     hồi quyền Kho dữ liệu là mất quyền nạp dữ liệu của người phụ trách nạp —
-    và không ai biết cho tới 13:30 hôm sau."""
-    from kome.web import nguoi_dung as ND
-    ND.tao(conn, "an", "mat-khau-cua-an-2026", kho_du_lieu=True)
+    và không ai biết cho tới 13:30 hôm sau.
+
+    Đi qua `chay()` (chứ không gọi thẳng `ND.dat_quyen`): đây là code path
+    thật của `scripts/tao_nguoi_dung.py::quyen()`/`chay()` — chỗ đọc
+    `--ngan-sach`/`--bo-ngan-sach` và truyền hai cờ độc lập xuống, và là
+    đúng chỗ lỗi "mất nhánh None" (`kho_du_lieu=kho` thay vì
+    `kho_du_lieu=True if kho else (False if bo_kho else None)`) sẽ xảy ra."""
+    ND.tao(conn, "an", MK, kho_du_lieu=True)
     conn.commit()
-    ND.dat_quyen(conn, "an", ngan_sach=True)
+    assert chay(["quyen", "an", "--ngan-sach"], conn, _doc()) == 0
     conn.commit()
-    n = ND.liet_ke(conn)[0]
+    n = ND.kiem_tra(conn, "an", MK)
     assert n.duoc_vao_kho_du_lieu is True and n.duoc_sua_ngan_sach is True
 
 
 def test_bo_co_ngan_sach(conn):
-    from kome.web import nguoi_dung as ND
-    ND.tao(conn, "an", "mat-khau-cua-an-2026", ngan_sach=True)
+    """Tắt --ngan-sach qua chay() không đụng tới cờ Kho dữ liệu (ở đây đang
+    mặc định False)."""
+    ND.tao(conn, "an", MK, ngan_sach=True)
     conn.commit()
-    ND.dat_quyen(conn, "an", ngan_sach=False)
+    assert chay(["quyen", "an", "--bo-ngan-sach"], conn, _doc()) == 0
     conn.commit()
-    assert ND.liet_ke(conn)[0].duoc_sua_ngan_sach is False
+    n = ND.kiem_tra(conn, "an", MK)
+    assert n.duoc_sua_ngan_sach is False
+    assert n.duoc_vao_kho_du_lieu is False
+
+
+def test_them_voi_co_ngan_sach(conn):
+    """`them ... --ngan-sach` qua chay(): tài khoản mới có cờ ngân sách,
+    KHÔNG có cờ Kho dữ liệu (không đưa --kho-du-lieu)."""
+    assert chay(["them", "chu", "--ngan-sach"], conn, _doc(MK, MK)) == 0
+    conn.commit()
+    n = ND.kiem_tra(conn, "chu", MK)
+    assert n.duoc_sua_ngan_sach is True
+    assert n.duoc_vao_kho_du_lieu is False
+
+
+def test_hai_co_ngan_sach_mau_thuan_thi_bao_loi_khong_doi_gi(conn):
+    """Vừa --ngan-sach vừa --bo-ngan-sach — cùng lớp lỗi với hai cờ Kho dữ
+    liệu trái nhau: từ chối, không đổi gì."""
+    ND.tao(conn, "an", MK)
+    conn.commit()
+    assert chay(["quyen", "an", "--ngan-sach", "--bo-ngan-sach"], conn, _doc()) != 0
+    conn.commit()
+    n = ND.kiem_tra(conn, "an", MK)
+    assert n.duoc_sua_ngan_sach is False
+    assert n.duoc_vao_kho_du_lieu is False
+
+
+def test_quyen_cap_mot_thu_hoi_quyen_kia_cung_mot_lenh(conn):
+    """Cấp Kho dữ liệu và thu hồi Ngân sách trong CÙNG một lệnh — tổ hợp của
+    HAI QUYỀN KHÁC NHAU, hợp lệ, không bị luật "hai cờ trái nhau chỉ chọn
+    một" chặn nhầm (luật đó chỉ áp cho hai cờ của CÙNG một quyền)."""
+    ND.tao(conn, "an", MK, ngan_sach=True)
+    conn.commit()
+    assert chay(["quyen", "an", "--kho-du-lieu", "--bo-ngan-sach"], conn, _doc()) == 0
+    conn.commit()
+    n = ND.kiem_tra(conn, "an", MK)
+    assert n.duoc_vao_kho_du_lieu is True
+    assert n.duoc_sua_ngan_sach is False
+
+
+def test_quyen_cap_ca_hai_quyen_cung_mot_lenh(conn):
+    ND.tao(conn, "an", MK)
+    conn.commit()
+    assert chay(["quyen", "an", "--kho-du-lieu", "--ngan-sach"], conn, _doc()) == 0
+    conn.commit()
+    n = ND.kiem_tra(conn, "an", MK)
+    assert n.duoc_vao_kho_du_lieu is True
+    assert n.duoc_sua_ngan_sach is True
 
 
 def test_liet_ke_hien_cot_ngan_sach(conn, capsys):
-    from kome.web import nguoi_dung as ND
-    from scripts.tao_nguoi_dung import chay
-    ND.tao(conn, "an", "mat-khau-cua-an-2026", ngan_sach=True)
+    ND.tao(conn, "an", MK, ngan_sach=True)
     conn.commit()
     chay([], conn)
     assert "Ngân sách" in capsys.readouterr().out

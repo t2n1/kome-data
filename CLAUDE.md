@@ -467,9 +467,9 @@ riêng là để cá nhân hoá, không phải để chặn. Không được th�
 ở máy trong công ty là **không có đăng nhập và không có phân quyền**: ai mở
 được trang cũng bấm được nút Hoàn tác — nút xoá được cả một tháng doanh thu.
 Bản Vercel không dính (nó từ chối khởi động nếu thiếu khoá), nhưng bản Vercel
-cũng không nạp/hoàn tác được gì. Nói cách khác: **hai cờ quyền (`duoc_vao_kho_du_lieu` và `duoc_sua_ngan_sach`)
-chỉ bảo vệ được nút Hoàn tác và màn Ngân sách khi máy trong công ty CŨNG đặt
-`KOME_SESSION_SECRET`.**
+cũng không nạp/hoàn tác được gì. Nói cách khác: **hai cờ quyền
+(`duoc_vao_kho_du_lieu` và `duoc_sua_ngan_sach`) chỉ bảo vệ được nút Hoàn tác
+và màn Ngân sách khi máy trong công ty CŨNG đặt `KOME_SESSION_SECRET`.**
 
 Tạo và sửa tài khoản: `python scripts/tao_nguoi_dung.py` (xem `docs/runbook.md`).
 
