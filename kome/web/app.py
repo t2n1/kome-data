@@ -7,7 +7,7 @@ from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from kome.bao_cao import tinh_bao_cao, ve_bieu_do
+from kome.bao_cao import tinh_bao_cao, ve_bieu_do, tien_do_ngan_sach, ve_luy_ke
 from kome.coverage import tinh_bang_ngay, tinh_bang_phu
 from kome import khach_hang as KH
 # Nhập ở mức ngoài cùng được: kome/san_pham.py chỉ dùng dataclasses/datetime
@@ -718,14 +718,16 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         """Bảng điều khiển bán hàng. `?ky=` là company_fy (năm KẾT THÚC kỳ),
         bỏ trống thì lấy kỳ gần nhất có dữ liệu.
 
-        Mọi định nghĩa chỉ số nằm ở schema `mart` (migration 014) — trang này
-        chỉ hiển thị. Xem ghi chú đầu kome/bao_cao.py.
+        Mọi định nghĩa chỉ số nằm ở schema `mart` (migration 014 và 026) —
+        trang này chỉ hiển thị. Xem ghi chú đầu kome/bao_cao.py.
         """
         try:
             with open_app_conn() as conn:
                 bc = tinh_bao_cao(conn, ky)
+                td = tien_do_ngan_sach(conn, ky)
             return _ve(request, "bao_cao.html",
-                       {"bc": bc, "bd": ve_bieu_do(bc.thang), "trang": "bao-cao"})
+                       {"bc": bc, "bd": ve_bieu_do(bc.thang), "td": td,
+                        "lk": ve_luy_ke(td), "trang": "bao-cao"})
         except Exception as e:
             return _loi(request, "mở trang báo cáo", e)
 
