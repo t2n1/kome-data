@@ -65,7 +65,7 @@ SQL đã được kiểm trên CSDL thật bằng cách chạy thân view như t
   15. `test_thang_den_hom_nay_29_2_kep_ve_28_2` — hom_nay 2028-02-29 → `den_ngay_ck = 2027-02-28`. (`core.dim_date` phủ tới 2035 nên ngày này hợp lệ.)
   16. `test_thang_den_hom_nay_kho_rong_khong_co_dong`.
   17. `test_ba_vai_tro_deu_SELECT_duoc_moi_view_moi` — nếp `has_table_privilege` của `tests/test_ngan_sach_mart.py:300-313`, danh sách 7 view.
-  18. `test_nganh_so_sanh_chi_quet_fact_sales_line_mot_lan` — `EXPLAIN (FORMAT JSON) SELECT * FROM mart.ban_theo_nganh_thang_so_sanh`, duyệt cây kế hoạch, đếm node có `"Relation Name" == "fact_sales_line"` → đúng 1. Làm tương tự cho `mart.ky_cung_ky`: đếm ≤ 3 (1 nối chính + 2 EXISTS của `doi`) — ghi rõ lý do trong docstring.
+  18. `test_nganh_so_sanh_chi_quet_fact_sales_line_mot_lan` — `EXPLAIN (FORMAT JSON) SELECT * FROM mart.ban_theo_nganh_thang_so_sanh`, duyệt cây kế hoạch, đếm node có `"Relation Name" == "fact_sales_line"` → đúng 1 (đếm tham chiếu quan hệ, không đếm kiểu quét — CSDL test nhỏ nên planner chọn Seq Scan ở mọi chỗ, kiểu quét không phản ánh CSDL thật). KHÔNG viết test EXPLAIN cho `mart.ky_cung_ky` (các EXISTS/min/max của nó là tra chỉ mục trên CSDL thật, nhưng trên CSDL test đều thành Seq Scan — test sẽ khẳng định một điều không đúng ở đâu cả).
 
 - [ ] **Step 2:** Chạy `python -u -m pytest tests/test_phan_tich_mart.py -v`. Fixture `conn` tự áp mọi migration (kể cả 029) lên CSDL test. Test nào đỏ vì SQL sai → sửa `029`, chạy lại. Test nào đỏ vì test sai → sửa test.
 - [ ] **Step 3:** Chạy toàn bộ `python -u -m pytest -q` (foreground). Phải xanh.
