@@ -85,6 +85,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
 | `/kho-hang` | Bốn ô tổng quan tồn kho · bảng tồn · cận hạn/quá hạn · giá trị theo kho | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
+| `/giao-dien` | Đổi chế độ sáng/tối/theo hệ thống/theo giờ, ghi cookie, chuyển hướng về trang đã gọi | không đọc CSDL — chỉ đọc/ghi cookie |
 
 **Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
 tháng**, KHÔNG phải `得意先ランク` của OBC. `core.dim_customer.rank_code` có tồn tại
@@ -191,6 +192,61 @@ khi danh sách vẫn bị lọc. Cùng lý lẽ với `KH.TINH_TRONG` của ô T
 
 Ba trang cũ — nạp (`nap`), sức khoẻ (`health`), độ phủ dữ liệu (`phu-du-lieu`)
 — nay chỉ còn 301 về `/kho-du-lieu`, không render nội dung gì nữa.
+
+**Bất biến (Đợt 4d):** icon trong `_nav.html` là TRANG TRÍ, chữ nhãn mới là
+thứ đọc được (`aria-hidden="true" focusable="false"` trên mỗi `<svg>`) — bỏ
+hai thuộc tính đó là trình đọc màn hình đọc icon rồi đọc lại nhãn, và Tab
+dừng ở một phần tử không có gì để bấm. Sáu icon (Tổng quan/Báo cáo/Khách
+hàng/Sản phẩm/Kho hàng/Kho dữ liệu) chép NGUYÊN VĂN từ object `I` trong
+`kome-nav.js` của gói thiết kế, đúng ánh xạ NHÓM của chính gói đó. Hai icon
+còn lại — `bell` cho "Cần xử lý" và `pin` cho "Bản đồ" — là **TA CHỌN**
+trong bộ 24 icon của gói thiết kế, vì gói đó không có mục "Cần xử lý" và gộp
+bản đồ chung vào "Khách hàng & bản đồ" thay vì tách trang riêng như app này.
+Ai chọn cái gì phải ghi rõ ra (xem chú thích đầu `_nav.html`) — không ghi thì
+người sau tưởng cả tám icon đều theo một ánh xạ có sẵn của gói thiết kế, rồi
+đi tìm một ánh xạ không tồn tại khi thêm trang mới.
+
+**Bất biến:** lựa chọn sáng/tối lưu bằng **cookie (`kome_giao_dien`) + render
+phía máy chủ** (`data-theme` trên `<html>`), KHÔNG bằng `localStorage`. Gói
+thiết kế ghi `localStorage`; ta lệch có chủ ý: `localStorage` chỉ đọc được
+SAU khi HTML đã vẽ xong, nên đổi sang nó là mua lại một nháy sai màu ở MỖI
+lần tải trang — trang vẽ sáng rồi giật sang tối ngay khi JS kịp chạy. Cookie
+đọc được ngay lúc server render, nên `data-theme` đã đúng trong chính HTML
+đầu tiên gửi xuống, không có khung hình sai màu nào để thấy.
+
+**Bất biến:** bảng màu tối viết HAI lần trong `kome.css` — một lần trong
+`@media (prefers-color-scheme: dark){ :root:not([data-theme="sang"]) }`
+(chế độ "theo hệ thống"), một lần cho `:root[data-theme="toi"]` (chọn tay) —
+vì CSS không gộp được hai selector đó vào một khối. Hai bản PHẢI giống hệt
+nhau, **kể cả khai báo `color-scheme:dark`, không chỉ các biến màu**: đổi
+biến màu mà quên đổi `color-scheme` là chọn "Tối" trên một máy đang sáng cho
+ra nội dung tối nhưng thanh cuộn và mọi ô `<select>` vẫn trắng chói —
+`color-scheme` điều khiển đúng những phần trình duyệt tự vẽ mà CSS thường
+không chạm tới. Trôi khỏi nhau (dù chỉ một khai báo) là "tối" chọn tay ra
+một bộ màu khác "tối" theo hệ thống, và không ai thấy cho tới khi đặt hai
+máy cạnh nhau. Có test canh:
+`tests/test_giao_dien.py::test_hai_khoi_mau_toi_trong_css_GIONG_HET_NHAU` và
+`::test_color_scheme_nam_trong_khoi_bang_toi`.
+
+**Bất biến:** `/giao-dien` chuyển hướng CHỈ về đường dẫn nội bộ, lọc Referer
+qua đúng `bao_mat.duong_dan_an_toan` đã dùng cho `?tiep=` sau đăng nhập —
+không viết một bộ lọc đường dẫn thứ hai. An toàn nằm ở chỗ bỏ `scheme` +
+`netloc` của Referer, KHÔNG nằm ở chỗ bỏ query: route GIỮ NGUYÊN query khi
+chuyển hướng, vì đích đã là đường dẫn tương đối rồi nên giữ query không mở
+thêm cửa nào — bỏ nó thì người đang lọc `/khach-hang?tinh=...&nv=...` bấm
+"Tối" xong mất sạch bộ lọc, phải lọc lại từ đầu. Có test canh:
+`tests/test_giao_dien.py::test_giao_dien_chuyen_huong_GIU_LAI_bo_loc_tren_query`.
+
+**Bất biến:** `bao_mat.duong_dan_an_toan` chặn cả dạng `/` + gạch chéo ngược
++ tên miền, không chỉ `//tên-miền` — theo chuẩn phân tích URL của WHATWG,
+gạch chéo ngược ngay sau gạch chéo đầu được trình duyệt coi NHƯ một gạch
+chéo, nên `/\site-gia.example` là một địa chỉ tuyệt đối trá hình. Trước bản
+siết (`dfbbcf0`) chuỗi đó vô hại chỉ vì Starlette mã hoá nó thành `%5C`
+trước khi đặt vào header `Location` — tức an toàn phụ thuộc vào hành vi của
+FRAMEWORK, thứ một bản nâng cấp có thể đổi mà không ai đụng tới file này.
+Hàm này dùng chung cho `?tiep=` sau đăng nhập VÀ Referer của `/giao-dien`,
+nên một lỗ ở đây là lỗ ở cả hai cửa. Có test canh:
+`tests/test_bao_mat.py::test_duong_dan_an_toan_chan_ca_dang_gach_cheo_nguoc`.
 
 **Bất biến:** trạng thái quan hệ khách hàng so số ngày im lặng với **nhịp mua
 riêng của từng khách** (trung vị khoảng cách giữa các lần mua), KHÔNG với một
