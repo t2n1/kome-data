@@ -3,8 +3,23 @@ import re
 from datetime import date, timedelta
 
 import pandas as pd
+import pytest
+from fastapi.testclient import TestClient
 
 from kome.ban_do import ban_do
+from kome.web.app import create_app
+
+
+@pytest.fixture
+def client(conn, test_db_url):
+    """TestClient cho trang /ban-do (Task 3).
+
+    Không có fixture `client` chung nào trong tests/conftest.py — mọi test
+    khác trong dự án tự dựng TestClient(create_app(...)) tại chỗ. Fixture
+    này chỉ gói lại đúng việc đó cho các test của Task 3 bên dưới, và phụ
+    thuộc vào `conn` để đảm bảo CSDL đã được dọn sạch TRƯỚC KHI app dựng lên
+    (test tự gieo dữ liệu qua `conn` ở đầu thân test)."""
+    return TestClient(create_app(db_url=test_db_url))
 
 
 # Ba hàm gieo dữ liệu dưới đây chép NGUYÊN VĂN từ tests/test_khach_hang.py —
@@ -294,3 +309,116 @@ def test_ban_do_khong_qua_2_truy_van(conn, batch, monkeypatch):
     monkeypatch.setattr(conn, "execute", demo)
     ban_do(conn)
     assert dem["n"] <= 2, f"{dem['n']} lượt hỏi, trần là 2"
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — trang /ban-do
+# ---------------------------------------------------------------------------
+
+def _o_svg(html: str) -> list[str]:
+    """Nội dung từng ô của bản đồ, cắt theo <g class="o">…</g>.
+
+    Cắt theo Ô chứ không quét cả TRANG: đoạn văn giải thích phía trên bản đồ
+    có nhắc tên tỉnh và có cả con số, nên một khẳng định quét cả trang sẽ xanh
+    kể cả khi trong SVG không còn chữ nào — đúng lỗi đã bắt ở đợt 4b.
+    """
+    return re.findall(r'<g class="o"[^>]*>(.*?)</g>', html, re.S)
+
+
+def test_moi_o_co_con_so_doc_duoc_chu_khong_chi_co_mau(conn, client, batch):
+    # Bất biến _chung.html:76-77: mã hoá bằng màu phải kèm thứ đọc được.
+    _hai_tinh(conn, batch)
+    html = client.get("/ban-do").text
+    o = _o_svg(html)
+    assert len(o) == 47
+    for noi_dung in o:
+        assert re.search(r">\s*\d[\d.,]*\s*<", noi_dung), noi_dung
+
+
+def test_bam_o_dan_toi_danh_ba_da_loc_dung_tinh(conn, client, batch):
+    # Tên tỉnh là tiếng Nhật -> href phải được mã hoá URL. Quên `|urlencode`
+    # thì liên kết vẫn trông đúng trên trang mà bấm vào ra danh sách rỗng.
+    _hai_tinh(conn, batch)
+    html = client.get("/ban-do").text
+    assert "/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD" in html
+
+
+def test_loc_nv_co_ca_ban_do_lan_bang_lan_dai_vung(conn, client, batch):
+    # Một bộ lọc co bản đồ mà không co bảng là hai con số khác nhau cho cùng
+    # một câu hỏi, trên cùng một màn hình.
+    _ho_so_khach(conn, batch, "BD01", "Cua A", prefecture="東京都",
+                 salesperson_code="0102")
+    _ho_so_khach(conn, batch, "BD02", "Cua B", prefecture="大阪府",
+                 salesperson_code="0104")
+    _mua(conn, batch, "BD01", HOM_NAY - timedelta(days=5))
+    _mua(conn, batch, "BD02", HOM_NAY - timedelta(days=5))
+    html = client.get("/ban-do?nv=0102").text
+    o = {t: n for t, n in re.findall(
+        r'<g class="o" data-tinh="([^"]+)"[^>]*>.*?class="so">([\d.,]+)<', html, re.S)}
+    assert o["東京都"] == "1" and o["大阪府"] == "0"
+    # 大阪府 vẫn phải còn trên bản đồ (ô số 0), không được biến mất khi lọc —
+    # `len(o) == 47` là khẳng định thật, còn `"大阪府" in html` thì không: tên
+    # tỉnh nằm sẵn trong bảng 47 dòng nên chuỗi đó luôn có mặt.
+    assert len(o) == 47
+    # Dải vùng cũng phải co: 関東 còn 1 khách, 近畿 còn 0.
+    vung = dict(re.findall(r'<li class="vung" data-vung="([^"]+)">[^<]*<b>(\d+)</b>', html))
+    assert vung["関東"] == "1" and vung["近畿"] == "0"
+
+
+def test_trang_ban_do_khong_qua_2_truy_van(conn, client, batch, monkeypatch):
+    # Cùng cơ chế đếm với test của tầng Python, nhưng đo TRANG: route có thể
+    # lỡ thêm một lượt hỏi ngoài hàm `ban_do` (vd danh sách người phụ trách).
+    # Đúng cơ chế tests/test_san_pham.py dùng cho /kho-hang (bọc conn.execute
+    # qua monkeypatch), không dựng cơ chế thứ ba. Đo trên MỘT kết nối cụ thể:
+    # route mở kết nối riêng của chính nó qua open_app_conn(), nên phải bọc
+    # NGAY TRƯỚC lượt gọi — không bọc được `conn` của fixture (route không hề
+    # dùng nó) mà phải theo dõi tại tầng psycopg qua kome.db.connect có sẵn
+    # kết nối test, tức bọc lớp Connection.execute của chính module psycopg.
+    _hai_tinh(conn, batch)
+    import psycopg
+    dem = {"n": 0}
+    that = psycopg.Connection.execute
+
+    def demo(self, *a, **k):
+        dem["n"] += 1
+        return that(self, *a, **k)
+
+    monkeypatch.setattr(psycopg.Connection, "execute", demo)
+    r = client.get("/ban-do")
+    assert r.status_code == 200
+    assert dem["n"] <= 2, f"{dem['n']} lượt hỏi, trần là 2"
+
+
+def test_chu_giai_bo_qua_bac_rong_nhung_luon_hien_bac_0(conn, client, batch):
+    # [Bất biến task-3-brief §1] Luật "giá trị bằng nhau phải cùng bậc" khiến
+    # một bậc GIỮA có thể trống (vd [1, 1, 2] cho bậc [1, 1, 3] -> bậc 2
+    # trống). Gieo đúng hình đó: 2 tỉnh 1-khách, 5 tỉnh 2-khách — dồn cụm
+    # khiến bậc 3/4/5 trống hẳn (xem test_ban_do.py::
+    # test_gia_tri_bang_nhau_cung_mot_bac_khong_chong_khoang_chu_giai của
+    # Task 2, cùng dữ liệu). Bậc 0 (40 tỉnh còn lại, 0 khách) PHẢI luôn hiện
+    # vì nó là màu riêng trên bản đồ — người đọc cần biết màu đó nghĩa là gì.
+    mot_khach = ["北海道", "沖縄県"]
+    hai_khach = ["東京都", "大阪府", "愛知県", "福岡県", "宮城県"]
+    for i, tinh in enumerate(mot_khach):
+        ma = f"BDL{i:02d}"
+        _ho_so_khach(conn, batch, ma, f"Quan {tinh} mot", prefecture=tinh)
+        _mua(conn, batch, ma, HOM_NAY - timedelta(days=5))
+    for i, tinh in enumerate(hai_khach):
+        for j in range(2):
+            ma = f"BDK{i:02d}{j}"
+            _ho_so_khach(conn, batch, ma, f"Quan {tinh} {j}", prefecture=tinh)
+            _mua(conn, batch, ma, HOM_NAY - timedelta(days=5))
+
+    t = ban_do(conn)
+    bac_rong = [c["bac"] for c in t.chu_giai
+                if c["bac"] != 0 and c["so_tinh"] == 0]
+    assert bac_rong, "ca gieo phải tạo ra ít nhất một bậc giữa trống (fixture hỏng?)"
+
+    html = client.get("/ban-do").text
+    for b in bac_rong:
+        assert f'data-bac="{b}"' not in html, \
+            f"bậc {b} trống (so_tinh=0) nhưng vẫn bị in ra chú giải"
+    # Bậc 0 luôn hiện, kể cả khi không có tỉnh nào giá trị 0 (không phải ca ở
+    # đây — 40/47 tỉnh còn lại đều 0 khách — nhưng bất biến vẫn phải đúng ở
+    # đây: cứ có mặt trong chu_giai là phải in ra).
+    assert 'data-bac="0"' in html

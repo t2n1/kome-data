@@ -13,6 +13,9 @@ from kome import khach_hang as KH
 # (+ psycopg qua `conn` truyền vào), KHÔNG kéo pandas hay python-calamine —
 # đúng ràng buộc mà test_trang_chi_doc_khong_phu_thuoc_pandas canh.
 from kome import san_pham as SP
+# kome/ban_do.py cũng chỉ dùng dataclasses, cùng lý do trên — an toàn nhập ở
+# mức ngoài cùng.
+from kome import ban_do as BD
 from kome.db import connect
 from kome.env import nap_env
 from kome.nhat_ky_nap import lo_nap_gan_nhat, trang_thai_nap
@@ -435,6 +438,38 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         "ten_sale": ten_sale})
         except Exception as e:
             return _loi(request, "mở danh sách cần xử lý", e)
+
+    @app.get("/ban-do", response_class=HTMLResponse)
+    def ban_do_khach_hang(request: Request, tat_ca: int = 0, nv: str = "",
+                          chi_so: str = "khach"):
+        """Bản đồ 47 tỉnh (đợt 4c). Ngân sách CẢ TRANG (không chỉ hàm
+        BD.ban_do()) là 2 lượt hỏi — có test đếm lúc chạy
+        (tests/test_ban_do.py::test_trang_ban_do_khong_qua_2_truy_van), nên
+        route này KHÔNG được tự mở thêm một truy vấn nào (vd một danh sách
+        tên đầy đủ của người phụ trách để đổ vào ô chọn — thứ /khach-hang có
+        nhưng phải trả giá bằng một lượt hỏi riêng của tong_quan_danh_ba()).
+        Vì vậy ô lọc bên dưới chỉ biết TÊN của người đang lọc khi đó là mặc
+        định theo người đăng nhập (miễn phí, lấy từ session) — lọc sang một
+        mã khác qua `?nv=` thì trang chỉ hiện lại đúng mã đó, không tra ra
+        tên, giống hệt cách /can-xu-ly xử lý cùng ràng buộc.
+
+        `sale`/`nv` cùng một nếp với /khach-hang: mặc định tiện dụng theo
+        người đăng nhập, KHÔNG phải hàng rào bảo mật.
+        """
+        try:
+            sale, ten_sale = _sale_dang_loc(request, tat_ca, nv)
+            with open_app_conn() as conn:
+                t = BD.ban_do(conn, sale=sale, chi_so=chi_so)
+            return _ve(request, "ban_do.html",
+                       {"t": t, "trang": "ban-do", "tat_ca": bool(tat_ca),
+                        "nv": nv, "sale": sale, "ten_sale": ten_sale,
+                        "nv_moi_nguoi": KH.NV_MOI_NGUOI, "chi_so_ds": BD.CHI_SO,
+                        # Kích thước một ô lưới là HẰNG của kome/ban_do.py, không
+                        # phải của template — truyền qua context để không viết
+                        # cứng "60" lần thứ hai trong ban_do.html.
+                        "o_rong": BD.O_RONG, "o_cao": BD.O_CAO})
+        except Exception as e:
+            return _loi(request, "mở bản đồ khách hàng", e)
 
     # ---- Hàng hoá: sản phẩm và kho hàng (đợt 4b) ------------------------
     # Cả ba route đều `open_app_conn` — chúng chỉ đọc. Có test duyệt AST canh

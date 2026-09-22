@@ -64,6 +64,14 @@
    --loi-nen:#FDEDEC; --loi-vien:#D62C27; --loi-chu:#B4231C;
    --canh-nen:#FFF9E8;--canh-vien:#E6D08A;--canh-chu:#8A5E06;
    --ngoai-nen:#F0EDE6;--ngoai-chu:#8E8A82;
+   /* Thang màu bản đồ khách hàng (đợt 4c): MỘT TÔNG (hổ phách, cùng họ với
+      --lien-ket) đậm dần theo bậc, KHÔNG đỏ-xanh — khoảng 1/12 nam giới
+      không phân biệt được đỏ với xanh lá. --map-0 là bậc RIÊNG cho "không có
+      khách/doanh thu/cần gọi" (khác "ít"), không nằm trong dải 5 bậc.
+      --map-chu-alt là màu chữ TƯƠNG PHẢN cho các ô nền đậm (bậc 3-5) — xem
+      kome/web/templates/ban_do.html. */
+   --map-0:#EFEBE1; --map-1:#F6E7B8; --map-2:#EDCB78; --map-3:#D9A83E;
+   --map-4:#B37F1E; --map-5:#7A5510; --map-chu-alt:#FFFFFF;
  }
  @media (prefers-color-scheme: dark){
    /* Từng cặp lấy từ bảng MAP trong kome-theme.js của gói thiết kế —
@@ -79,6 +87,12 @@
      --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
      --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
      --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
+     /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
+        đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —
+        cùng lý do --lien-ket đảo hướng giữa hai chế độ. --map-chu-alt theo
+        đó cũng đảo: chữ TỐI trên nền bậc cao sáng màu ở chế độ này. */
+     --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
+     --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
    }
  }
  html{background:var(--nen)}
