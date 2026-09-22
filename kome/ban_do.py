@@ -55,6 +55,11 @@ class O:
     so_khach: int
     doanh_thu: int
     can_goi: int
+    # can_goi / so_khach. None khi so_khach == 0 — "không biết" khác "0%"
+    # (cùng luật với kome/san_pham.py::_so đối với `ton`). 45/47 ô có
+    # so_khach = 0 ngay khi lọc theo một người phụ trách; một phép chia
+    # thẳng trong template sẽ nổ ZeroDivisionError giữa lúc mở trang.
+    ty_le_can_goi: float | None
     # Giá trị đang được tô màu (= một trong ba cột trên, theo `chi_so` đang
     # chọn) và bậc màu suy ra từ giá trị đó — xem _tinh_bac().
     gia_tri: int
@@ -119,10 +124,20 @@ def _tinh_bac(gia_tri_theo_o: list[int]) -> list[int]:
     (đặc tả §5.5). ntile theo phân vị đảm bảo mỗi bậc có SỐ TỈNH gần bằng
     nhau, dù giá trị của chúng cách nhau bao xa.
 
-    Thuật toán khớp `ntile(n)` của Postgres: n phần tử chia b nhóm, nhóm đầu
-    (n mod b) nhóm nhận thêm 1 phần tử so với các nhóm còn lại; phần tử đứng
-    trước (theo thứ tự đã sắp tăng dần) luôn ở nhóm có số hiệu nhỏ hơn hoặc
-    bằng phần tử đứng sau.
+    [Vòng sửa 1] BẢN ĐẦU chia ntile theo VỊ TRÍ (row_number) như
+    `ntile(5)` thô của Postgres — và đúng như Postgres, ranh giới bậc có thể
+    CẮT NGANG một cụm giá trị bằng nhau. Người soát đo trên CSDL thật, theo
+    từng người phụ trách: 4/5 sale có ít nhất một cặp tỉnh CÙNG một giá trị
+    (vd cùng 1 khách) nhưng bị chia vào HAI bậc màu khác nhau — bậc 1 và bậc
+    2 cùng ghi chú giải "1–1", hai ô cùng số lại khác màu, và với 東京都
+    (nguyên văn người dùng): "tôi không biết màu nào là bậc nào".
+    SỬA: GIÁ TRỊ BẰNG NHAU LUÔN VỀ CÙNG MỘT BẬC — đẩy cả cụm trùng giá trị về
+    bậc của PHẦN TỬ ĐẦU CỤM (phần tử nhỏ nhất/đứng trước nhất trong thứ tự đã
+    sắp tăng dần). Vì mảng bậc-theo-vị-trí không giảm khi vị trí tăng, phần
+    tử đầu cụm luôn nhận bậc NHỎ NHẤT trong cụm — dồn cả cụm về bậc đó không
+    bao giờ làm bậc giảm đi so với ntile thô, chỉ có thể gộp hai bậc liền kề
+    làm một. Hệ quả tất yếu: các bậc không còn chồng khoảng giá trị lên nhau
+    (chú giải không còn hai mục cùng ghi "1–1" hay "2–3"/"3–6" chồng nhau).
     """
     n = len(gia_tri_theo_o)
     bac = [0] * n
@@ -134,12 +149,23 @@ def _tinh_bac(gia_tri_theo_o: list[int]) -> list[int]:
     if so_duong == 0:
         return bac
     co_ban, du = divmod(so_duong, SO_BAC)
+    # Bậc THÔ theo vị trí — đúng ntile(5) chuẩn, CHƯA xử lý cụm trùng giá trị.
+    bac_tho = [0] * so_duong
     con_tro = 0
     for b in range(1, SO_BAC + 1):
         kich_thuoc = co_ban + (1 if b <= du else 0)
         for _ in range(kich_thuoc):
-            bac[vi_tri_duong[con_tro]] = b
+            bac_tho[con_tro] = b
             con_tro += 1
+    # Dồn cụm: mỗi GIÁ TRỊ (không phải mỗi Ô) chỉ có đúng một bậc, nhớ theo
+    # lần gặp ĐẦU TIÊN — vì `vi_tri_duong` đã sắp tăng dần và `bac_tho` không
+    # giảm theo vị trí, lần gặp đầu tiên của một giá trị luôn cho bậc nhỏ
+    # nhất mà giá trị đó có thể nhận.
+    bac_theo_gia_tri: dict[int, int] = {}
+    for idx_trong_duong, i in enumerate(vi_tri_duong):
+        gia_tri = gia_tri_theo_o[i]
+        b = bac_theo_gia_tri.setdefault(gia_tri, bac_tho[idx_trong_duong])
+        bac[i] = b
     return bac
 
 
@@ -185,14 +211,29 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
     # tổng toàn công ty (hoặc tổng của riêng `sale` nếu có lọc) — gộp bằng
     # UNION ALL trong ĐÚNG MỘT câu, theo nếp tong_quan_danh_ba() của
     # kome/khach_hang.py, để không tốn thêm lượt hỏi nào.
+    #
+    # [Vòng sửa 1] CTE `s AS MATERIALIZED`, ghi TƯỜNG MINH — BẢN ĐẦU không có
+    # CTE này, và mỗi nhánh UNION ALL bên dưới tự viết `FROM
+    # mart.khach_theo_tinh` riêng, tức MỖI LẦN THAM CHIẾU LÀ MỘT LẦN DỰNG LẠI
+    # cả view (khach_360 + hang_doanh_thu + EXISTS vào khach_nhom_viec).
+    # Cộng CTE `tinh` của truy vấn A ở trên, một lần mở trang dựng lại
+    # khach_theo_tinh BA LẦN — trong khi ngân sách "<= 2 truy vấn" chỉ đếm SỐ
+    # LƯỢT HỎI, không đếm sức tính, nên nó không hề bắt được lớp lỗi này
+    # (đúng bài học của kome/khach_hang.py::danh_sach và
+    # kome/san_pham.py::kho_hang). Lọc theo `sale` (`{dk_sale}`) nằm TRONG
+    # CTE — vị từ đó vẫn đẩy xuống được, vật hoá ở đây chỉ bỏ đi hai lần dựng
+    # lại thừa của cùng một tập kết quả đã lọc.
     rows_b = conn.execute(f"""
+        WITH s AS MATERIALIZED (
+            SELECT * FROM mart.khach_theo_tinh s WHERE true {dk_sale}
+        )
         SELECT 'khong_ro'::text, coalesce(sum(so_khach),0), coalesce(sum(doanh_thu_12t),0), coalesce(sum(can_goi),0)
-          FROM mart.khach_theo_tinh s
-         WHERE coalesce(s.prefecture, '') NOT IN (SELECT ten FROM core.dim_prefecture) {dk_sale}
+          FROM s
+         WHERE coalesce(s.prefecture, '') NOT IN (SELECT ten FROM core.dim_prefecture)
         UNION ALL
         SELECT 'tong', coalesce(sum(so_khach),0), coalesce(sum(doanh_thu_12t),0), coalesce(sum(can_goi),0)
-          FROM mart.khach_theo_tinh s WHERE true {dk_sale}
-    """, tham_so_sale * 2).fetchall()
+          FROM s
+    """, tham_so_sale).fetchall()
 
     # ---- Từ đây trở xuống: KHÔNG còn lượt hỏi CSDL nào nữa -----------------
 
@@ -205,6 +246,9 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
             "can_goi": int(can_goi),
         }
         d["gia_tri"] = d[_COT_THEO_CHI_SO[chi_so]]
+        # None khi so_khach == 0 — "không biết tỷ lệ" khác "0%" (xem chú
+        # thích của trường này trên dataclass O).
+        d["ty_le_can_goi"] = (d["can_goi"] / d["so_khach"]) if d["so_khach"] else None
         tho.append(d)
 
     bac_theo_o = _tinh_bac([d["gia_tri"] for d in tho])
@@ -218,7 +262,7 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
         O(ma_jis=d["ma_jis"], ten=d["ten"], ten_ngan=d["ten_ngan"],
           ten_latin=d["ten_latin"], vung=d["vung"], hang=d["hang"], cot=d["cot"],
           so_khach=d["so_khach"], doanh_thu=d["doanh_thu"], can_goi=d["can_goi"],
-          gia_tri=d["gia_tri"], bac=bac,
+          ty_le_can_goi=d["ty_le_can_goi"], gia_tri=d["gia_tri"], bac=bac,
           x=(d["cot"] - 1) * (O_RONG + KHE), y=(d["hang"] - 1) * (O_CAO + KHE))
         for d, bac in zip(tho, bac_theo_o)
     ]
@@ -230,6 +274,9 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
             "so_khach": sum(o.so_khach for o in cua_vung),
             "doanh_thu": sum(o.doanh_thu for o in cua_vung),
             "can_goi": sum(o.can_goi for o in cua_vung),
+            # Tổng theo ĐÚNG chi_so đang chọn — để template khỏi phải viết
+            # if/elif ba nhánh (khach/doanh_thu/can_goi) mỗi lần đọc khối này.
+            "gia_tri": sum(o.gia_tri for o in cua_vung),
         }
         for ten_vung in VUNG_THU_TU
         for cua_vung in [[o for o in cac_o if o.vung == ten_vung]]
@@ -237,9 +284,21 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
 
     bang = sorted(cac_o, key=lambda o: (-o.gia_tri, o.ma_jis))
 
-    # Chú giải: khoảng giá trị THẬT (min-max) của từng bậc 1..5, không phải
-    # một nhãn "thấp/cao" suông — người đọc phải thấy con số đứng sau màu.
-    chu_giai = []
+    # Chú giải: khoảng giá trị THẬT (min-max) của từng bậc, không phải một
+    # nhãn "thấp/cao" suông — người đọc phải thấy con số đứng sau màu.
+    #
+    # [Vòng sửa 1] THÊM mục bậc 0 ("không có", màu RIÊNG theo §5.5) vào chính
+    # chu_giai — bản đầu chỉ liệt kê bậc 1..5 nên Task 3 (template) buộc phải
+    # tự viết cứng thêm một ô "0 khách" ở đâu đó ngoài danh sách này, đúng
+    # loại logic không được phép nằm trong template. Bậc 0 luôn có giá trị
+    # THẬT bằng 0 (đó chính là định nghĩa của bậc này), không phải None.
+    gia_tri_bac_0 = [o.gia_tri for o in cac_o if o.bac == 0]
+    chu_giai = [{
+        "bac": 0,
+        "so_tinh": len(gia_tri_bac_0),
+        "tu": 0 if gia_tri_bac_0 else None,
+        "den": 0 if gia_tri_bac_0 else None,
+    }]
     for b in range(1, SO_BAC + 1):
         gia_tri_bac = sorted(o.gia_tri for o in cac_o if o.bac == b)
         chu_giai.append({

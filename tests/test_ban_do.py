@@ -198,15 +198,84 @@ def test_tinh_gia_tri_0_khac_bac_thap_nhat(conn, batch):
     assert o["東京都"].bac >= 1
 
 
-def test_khach_khong_co_tinh_khong_bi_danh_roi_im_lang(conn, batch):
-    # Đúng 1/1.710 khách thật rơi vào ca này. Nó phải hiện thành một con số,
-    # không phải biến mất giữa bản đồ và tổng.
+def test_gia_tri_bang_nhau_cung_mot_bac_khong_chong_khoang_chu_giai(conn, batch):
+    # [Vòng sửa 1] Người soát đo trên CSDL thật, theo từng người phụ trách:
+    # 4/5 sale có ít nhất một cặp tỉnh CÙNG một giá trị nhưng rơi vào HAI bậc
+    # màu khác nhau (vd bậc 1 và bậc 2 cùng ghi chú giải "1–1"; bậc 2 "2–3"
+    # và bậc 3 "3–6" — hai khoảng CHỒNG NHAU tại giá trị 3). Nguyên văn người
+    # dùng: "hai tỉnh cùng 1 khách mà một ô đậm hơn ô kia... tôi không biết
+    # màu nào là bậc nào".
+    #
+    # Gieo đúng hình của ví dụ: hai tỉnh 1-khách, năm tỉnh 2-khách (7 tỉnh có
+    # giá trị dương trên tổng 47, giống ca đo thật gây lỗi). Giá trị bằng
+    # nhau PHẢI về cùng một bậc, và hai giá trị khác nhau (1 và 2) phải khác
+    # bậc — nếu không, ntile thô cũng có thể tình cờ gộp chúng và test sẽ bỏ
+    # sót đúng lỗi cần bắt.
+    mot_khach = ["北海道", "沖縄県"]
+    hai_khach = ["東京都", "大阪府", "愛知県", "福岡県", "宮城県"]
+    for i, tinh in enumerate(mot_khach):
+        ma = f"BDM{i:02d}"
+        _ho_so_khach(conn, batch, ma, f"Quan {tinh} mot", prefecture=tinh)
+        _mua(conn, batch, ma, HOM_NAY - timedelta(days=5))
+    for i, tinh in enumerate(hai_khach):
+        for j in range(2):
+            ma = f"BDH{i:02d}{j}"
+            _ho_so_khach(conn, batch, ma, f"Quan {tinh} {j}", prefecture=tinh)
+            _mua(conn, batch, ma, HOM_NAY - timedelta(days=5))
+
+    t = ban_do(conn)
+    o_theo_ten = {o.ten: o for o in t.o}
+    bac_mot = {o_theo_ten[tinh].bac for tinh in mot_khach}
+    bac_hai = {o_theo_ten[tinh].bac for tinh in hai_khach}
+    assert len(bac_mot) == 1, "các tỉnh cùng 1 khách phải cùng một bậc"
+    assert len(bac_hai) == 1, "các tỉnh cùng 2 khách phải cùng một bậc"
+    assert bac_mot != bac_hai, "hai giá trị khác nhau (1 và 2) phải khác bậc"
+
+    # Không hai mục chú giải nào (trong số các mục CÓ dữ liệu) trùng khoảng
+    # [tu, den] — kể cả chồng một phần, không chỉ chồng hoàn toàn.
+    khoang = [(c["tu"], c["den"]) for c in t.chu_giai if c["tu"] is not None]
+    for i in range(len(khoang)):
+        for j in range(i + 1, len(khoang)):
+            tu_i, den_i = khoang[i]
+            tu_j, den_j = khoang[j]
+            assert den_i < tu_j or den_j < tu_i, \
+                f"chú giải chồng khoảng: {khoang[i]} và {khoang[j]}"
+
+
+def test_moi_47_tinh_thuoc_dung_mot_vung_trong_VUNG_THU_TU(conn, batch):
+    # [Vòng sửa 1] 8 tên vùng là HẰNG PYTHON (VUNG_THU_TU) trong khi giá trị
+    # `vung` nằm ở CSDL (core.dim_prefecture.vung, migration 025). Gõ sai
+    # hoặc đổi tên một vùng ở một migration sau mà quên sửa hằng này thì cả
+    # dải tỉnh của vùng đó biến mất khỏi mọi tổng theo vùng — không lỗi nào
+    # nổ ra, trang vẫn vẽ ra bình thường, chỉ thiếu mấy tỉnh trong khối vùng.
     _hai_tinh(conn, batch)
-    _ho_so_khach(conn, batch, "BD03", "Khong ro tinh", prefecture="")
+    t = ban_do(conn)
+    assert sum(v["so_tinh"] for v in t.vung) == 47
+
+
+def test_khach_khong_co_tinh_khong_bi_danh_roi_im_lang(conn, batch):
+    # [Vòng sửa 1] Bản đầu gieo prefecture="" (chuỗi rỗng) — SAI DẠNG dữ liệu
+    # thật: đo được trên mart.khach_360 có đúng 1 dòng prefecture IS NULL và
+    # 0 dòng chuỗi rỗng (chú thích migration 025 cũng ghi vậy). Với chuỗi
+    # rỗng, `'' NOT IN (danh_sach_47_ten)` luôn TRUE dù có coalesce hay
+    # không (không tên tỉnh nào rỗng), nên test cũ xanh ngay cả khi
+    # coalesce(s.prefecture, '') ở kome/ban_do.py bị xoá mất — với NULL thật,
+    # `NULL NOT IN (...)` trả NULL (không phải TRUE) và WHERE loại thẳng
+    # dòng đó, "(không rõ tỉnh)" sẽ âm thầm hiện 0. Gieo đúng NULL để canh
+    # được ca này.
+    _hai_tinh(conn, batch)
+    _ho_so_khach(conn, batch, "BD03", "Khong ro tinh", prefecture=None)
     _mua(conn, batch, "BD03", HOM_NAY - timedelta(days=5))
     t = ban_do(conn)
     assert t.khong_ro_tinh == 1
-    assert sum(x.so_khach for x in t.o) + t.khong_ro_tinh == t.tong["so_khach"]
+    # KHÔNG dùng "sum(o) + khong_ro_tinh == tong": hai truy vấn A/B cùng
+    # nguồn mart.khach_theo_tinh nên đẳng thức đó gần như tự đúng bất kể
+    # nhánh nào lặng lẽ đánh rớt khách NULL (cả ba số cùng thiếu-hụt một
+    # lượng như nhau). Khẳng định TRỰC TIẾP: khách NULL tỉnh không lọt vào
+    # bất kỳ ô nào trong 47 ô (tổng so_khach trên lưới vẫn đúng 2, không
+    # phải 3) — đây là chỗ một LEFT JOIN sai hoặc một coalesce bị xoá sẽ lộ
+    # ra, khác hẳn việc chỉ so hai tổng cộng dồn.
+    assert sum(o.so_khach for o in t.o) == 2
 
 
 def test_ban_do_khong_qua_2_truy_van(conn, batch, monkeypatch):
