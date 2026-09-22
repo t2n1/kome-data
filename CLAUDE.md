@@ -83,7 +83,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
 | `/san-pham` | Danh mục mã hàng + tìm kiếm + lọc theo trạng thái tồn | `mart.san_pham_360` |
 | `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
-| `/kho-hang` | Bốn ô tổng quan tồn kho · bảng tồn · cận hạn/quá hạn · giá trị theo kho | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` |
+| `/kho-hang` | Bốn ô tổng quan tồn kho · bảng tồn · cận hạn/quá hạn · giá trị theo kho | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
 
 **Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
@@ -182,6 +182,19 @@ là đúng, không phải bất thường — xem `db/migrations/016_*.sql`.
 hàng" (một phép chia trên tổng lượng, nên trung bình đúng); `nhip_mua` trả lời "khoảng
 cách điển hình giữa hai lần mua" (nơi một kỳ nghỉ Tết làm trung bình lệch). Đừng "sửa
 cho nhất quán".
+
+**Bất biến:** `mart.toc_do_ban` có **HAI** cột tốc độ và chúng không thay nhau được.
+`toc_do_ngay` chia cho HẰNG 90; `toc_do_ngay_theo_tuoi` chia cho `least(90, hom_nay -
+lan_dau + 1)` — số ngày mã THỰC SỰ có mặt. Mọi con số dùng để RA QUYẾT ĐỊNH đều đi
+theo cột thứ hai: `san_pham_360.du_ban_ngay` và `san_pham_360.trang_thai`. Với mã đã
+bán quá 90 ngày hai cột BẰNG NHAU, nên lỗi không lộ ra ở phần lớn dữ liệu — nó chỉ
+lộ ở mã mới. Một mã ra mắt 20 ngày bán 30 đơn vị mà chia cho 90 cho ra tốc độ thấp
+hơn thật gần 4,5 lần, và "còn đủ bán bao nhiêu ngày" bị thổi phồng đúng bấy nhiêu
+lần, đẩy một mã đang bán chạy vào nhãn tồn chết. Màn hình phải hiện **đúng cột đã
+dùng để phân loại** — hiện `toc_do_ngay` bên cạnh một nhãn tính từ
+`toc_do_ngay_theo_tuoi` thì người giữ kho đọc được "tốc độ 0,33/ngày · còn đủ 140
+ngày" trên cùng một dòng và không có cách nào đối chiếu. Xem chú thích dài trong
+`db/migrations/023_mart_san_pham.sql`.
 
 **Bất biến:** `core.fact_inventory_daily.best_before` là **TEXT** và chứa cả giá trị chữ
 `賞味期限なし` lẫn chuỗi rỗng. **Không bao giờ `to_date()` trần trên cột này** — một giá
