@@ -347,12 +347,23 @@ RONG, CAO, LE_T, LE_P, LE_TREN, LE_DUOI = 720, 260, 8, 8, 16, 34
 
 
 def ve_bieu_do(thang: list[O]) -> dict:
-    """Toạ độ cột doanh thu + đường tỷ suất lãi gộp, cùng một trục hoành."""
+    """Toạ độ cột doanh thu + đường tỷ suất lãi gộp, cùng một trục hoành.
+
+    [Đợt 5b Task 3] Thêm `duong_ck`: đường nét đứt của doanh thu CÙNG KỲ,
+    cùng thang đo trục doanh thu với cột. `dinh` phải tính trên max của CẢ
+    doanh thu lẫn cùng kỳ — nếu chỉ lấy max(doanh_thu) như bản cũ, tháng nào
+    cùng kỳ năm trước lớn hơn năm nay sẽ vẽ đường cùng kỳ VỌT khỏi khung.
+    Tháng `dt_cung_ky is None` cắt đường thành đoạn mới (cùng nếp
+    `ve_duong_nho`) — KHÔNG vẽ về 0, vì 0 sẽ đọc nhầm thành "cùng kỳ bằng
+    không" thay vì "không có dữ liệu cùng kỳ".
+    """
     if not thang:
         return {"co": False}
     cao_ve = CAO - LE_TREN - LE_DUOI
     rong_ve = RONG - LE_T - LE_P
-    dinh = max((o.doanh_thu for o in thang), default=0) or 1
+    dinh = max([o.doanh_thu for o in thang]
+               + [o.dt_cung_ky for o in thang if o.dt_cung_ky is not None],
+               default=0) or 1
     buoc = rong_ve / len(thang)
     rong_cot = max(buoc * 0.62, 3)
 
@@ -365,6 +376,8 @@ def ve_bieu_do(thang: list[O]) -> dict:
     if hi - lo < 0.01:
         lo, hi = lo - 0.05, hi + 0.05
 
+    doan_ck: list[str] = []
+    dang_ve_ck: list[str] = []
     for i, o in enumerate(thang):
         x = LE_T + i * buoc
         h = max(cao_ve * (o.doanh_thu / dinh), 0) if o.doanh_thu > 0 else 0
@@ -375,8 +388,21 @@ def ve_bieu_do(thang: list[O]) -> dict:
             y = LE_TREN + cao_ve - cao_ve * (o.ty_suat - lo) / (hi - lo)
             diem.append((round(x + buoc / 2, 1), round(y, 1), o))
 
+        xc = x + buoc / 2
+        if o.dt_cung_ky is None:
+            if dang_ve_ck:
+                doan_ck.append(" ".join(dang_ve_ck))
+                dang_ve_ck = []
+            continue
+        hc = max(cao_ve * (o.dt_cung_ky / dinh), 0) if o.dt_cung_ky > 0 else 0
+        yc = LE_TREN + cao_ve - hc
+        dang_ve_ck.append(f"{round(xc, 1)},{round(yc, 1)}")
+    if dang_ve_ck:
+        doan_ck.append(" ".join(dang_ve_ck))
+
     return {"co": True, "rong": RONG, "cao": CAO, "cot": cot, "diem": diem,
             "duong": " ".join(f"{x},{y}" for x, y, _ in diem),
+            "duong_ck": doan_ck,
             "ts_lo": lo, "ts_hi": hi, "dinh_doanh_thu": dinh}
 
 
