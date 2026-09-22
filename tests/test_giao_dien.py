@@ -404,3 +404,39 @@ def test_nhan_hang_khong_bao_gio_tro_troi(conn, test_db_url):
     tro_troi = re.findall(r"hạng(?! (?:theo )?doanh thu 12 tháng)(?! s·a)", html)
     assert not tro_troi, \
         f"{len(tro_troi)} chỗ ghi 'hạng' trơ trọi — sẽ bị đối chiếu nhầm với 得意先ランク"
+
+
+# ---- Icon và logo sidebar (đợt 4d, Task 1) ------------------------------
+# File này không có fixture `client` chung (khác tests/test_ban_do.py, nơi
+# đợt 4c thêm một fixture riêng cho Task 3 của nó) — mọi test ở đây tự dựng
+# TestClient(create_app(...)) tại chỗ, nên ba test dưới theo đúng cách đó.
+
+def test_moi_muc_dieu_huong_co_icon_VA_van_con_chu(conn, test_db_url):
+    # Icon là trang trí, chữ mới là nhãn. Bất biến "màu/hình phải kèm thứ đọc
+    # được" (_chung.html:76-77) áp cả ở đây: bỏ chữ đi thì sidebar thành tám ô
+    # vuông không ai đoán được.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    nav = re.search(r'<nav class="dieu-huong">(.*?)</nav>', html, re.S).group(1)
+    muc = re.findall(r"<a [^>]*href=\"(/[^\"]*)\"[^>]*>(.*?)</a>", nav, re.S)
+    assert len(muc) >= 8
+    for duong_dan, ben_trong in muc:
+        assert "<svg" in ben_trong, f"{duong_dan} thiếu icon"
+        chu = re.sub(r"<svg.*?</svg>", "", ben_trong, flags=re.S).strip()
+        assert len(chu) >= 3, f"{duong_dan} mất chữ, chỉ còn icon"
+
+
+def test_icon_dieu_huong_an_voi_trinh_doc_man_hinh(conn, test_db_url):
+    # Đọc hai lần cùng một mục còn tệ hơn không có icon.
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    nav = re.search(r'<nav class="dieu-huong">(.*?)</nav>', html, re.S).group(1)
+    for the in re.findall(r"<svg[^>]*>", nav):
+        assert 'aria-hidden="true"' in the, the
+        assert 'focusable="false"' in the, the
+
+
+def test_logo_hien_trong_sidebar(conn, test_db_url):
+    client = TestClient(create_app(db_url=test_db_url))
+    html = client.get("/").text
+    assert "/static/kome-logo.png" in html

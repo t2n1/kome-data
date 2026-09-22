@@ -72,6 +72,13 @@
       kome/web/templates/ban_do.html. */
    --map-0:#EFEBE1; --map-1:#F6E7B8; --map-2:#EDCB78; --map-3:#D9A83E;
    --map-4:#B37F1E; --map-5:#7A5510; --map-chu-alt:#FFFFFF;
+   /* Nền bọc logo sidebar (đợt 4d, Task 1) — README gói thiết kế: "logo
+      tròn, hiển thị 28px trong sidebar (nền tối thì bọc nền sáng, bo
+      tròn)". Ở chế độ sáng giá trị này trùng --nen-the nên không thấy gì
+      khác; ở chế độ tối nó là màu giấy ấm của --nen (chế độ sáng), NGƯỢC
+      hướng đổi màu thông thường — cố ý, vì logo cần một nền SÁNG bất kể
+      đang ở bảng màu nào để không chìm vào --nen-the tối. */
+   --logo-nen:#FFFFFF;
  }
  @media (prefers-color-scheme: dark){
    /* Từng cặp lấy từ bảng MAP trong kome-theme.js của gói thiết kế —
@@ -93,6 +100,7 @@
         đó cũng đảo: chữ TỐI trên nền bậc cao sáng màu ở chế độ này. */
      --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
      --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
+     --logo-nen:#FBF9F5;
    }
  }
  html{background:var(--nen)}
@@ -163,6 +171,11 @@
  .noi-dung{flex:1;min-width:0;max-width:1400px;padding:1.1rem;padding-bottom:3rem}
  .hieu{display:flex;align-items:center;gap:.5rem;font-weight:700;letter-spacing:.08em;
    font-size:.84rem;text-decoration:none;color:var(--chu);padding:0 .3rem .8rem}
+ /* Logo tròn 28px (đợt 4d, Task 1) — README gói thiết kế: bọc nền sáng ở
+    chế độ tối để không chìm vào --nen-the tối; --logo-nen tự đổi theo chế
+    độ để làm việc đó (xem khối biến màu phía trên). */
+ .hieu .logo{width:28px;height:28px;border-radius:50%;flex-shrink:0;
+   background:var(--logo-nen);object-fit:cover;display:block}
  .dieu-huong{display:flex;flex-direction:column;gap:.12rem}
  /* Nhãn nhóm của sidebar — riêng với `.nhom` dùng lại ở nơi khác (khối
     "Thành phần dùng lại" phía trên), nên scope trong `.dieu-huong` để đổi
@@ -170,16 +183,25 @@
  .dieu-huong .nhom{margin:.9rem 0 .25rem;padding:0 .55rem;font-size:.68rem;font-weight:600;
    letter-spacing:.1em;color:var(--chu-nhat);align-self:stretch}
  .dieu-huong .nhom:first-child{margin-top:0}
- .dieu-huong a{padding:.42rem .55rem;border-radius:8px;font-size:.85rem;
-   text-decoration:none;color:var(--chu-thuong)}
+ .dieu-huong a{display:flex;align-items:center;gap:.55rem;padding:.42rem .55rem;
+   border-radius:8px;font-size:.85rem;text-decoration:none;color:var(--chu-thuong)}
  .dieu-huong a:hover{background:var(--nen-phu)}
  /* Mục đang mở: nền và chữ lấy từ kome-nav.js:146-147 của gói thiết kế
     (KHÔNG theo README của gói — README ghi #FFF4D6 kèm thanh đỏ bên trái,
     lệch với chính prototype của nó). */
  .dieu-huong a.dang-xem{background:var(--do-nen);color:var(--do-chu);font-weight:600}
+ /* Icon sidebar (đợt 4d, Task 1) — 9 icon chép nguyên văn từ kome-nav.js
+    của gói thiết kế (2 icon "ta chọn", xem chú thích trong _nav.html).
+    KHÔNG viết màu riêng: `stroke:currentColor` để icon thừa hưởng màu chữ
+    của chính thẻ cha, nên mục "đang xem" đổi màu chữ thì icon đổi theo,
+    đúng ở cả hai bảng màu sáng/tối (Task 2 sắp thêm nút đổi sáng/tối, lỗi
+    màu cứng sẽ lộ ra ngay ở đó). */
+ .ic{width:1.05em;height:1.05em;flex-shrink:0;fill:none;stroke:currentColor;
+   stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
  .thoat{margin-top:auto;border-top:1px solid var(--vien);padding-top:.7rem}
- .thoat button{font:inherit;width:100%;text-align:left;padding:.4rem .55rem;
-   border-radius:8px;border:0;background:transparent;color:var(--chu-nhat);cursor:pointer}
+ .thoat button{display:flex;align-items:center;gap:.55rem;font:inherit;width:100%;
+   text-align:left;padding:.4rem .55rem;border-radius:8px;border:0;
+   background:transparent;color:var(--chu-nhat);cursor:pointer}
  .thoat button:hover{background:var(--nen-phu);color:var(--chu)}
 
  /* Màn hẹp: sidebar nằm ngang trên đầu thay vì chiếm 196px của 375px. */
