@@ -31,6 +31,22 @@
  h2{font-size:1.1rem;margin:1.75rem 0 .5rem;padding-top:.5rem;
       border-top:1px solid var(--vien)}
  .ghi-chu{color:var(--chu-nhat);font-size:.85rem;margin:.25rem 0 .75rem}
+ {# [Vòng soát cuối, việc 9] Thanh tiến độ CSS thuần — không một dòng
+    JavaScript, cùng nguyên tắc với ve_bieu_do/ve_luy_ke (SVG tính sẵn ở
+    Python). Chiều rộng `.day` và vị trí `.moc` đều là % đã KẸP về [0,100]
+    ở Python (kome/bao_cao.py::_pct_rong) — CSS ở đây không tự vẽ tràn hay
+    âm, nó chỉ nhận đúng con số đã an toàn. #}
+ .thanh-tien-do{position:relative;height:1.05rem;background:var(--nen-phu);
+      border:1px solid var(--vien);border-radius:999px;overflow:hidden;
+      margin:.35rem 0}
+ .thanh-tien-do.thanh-nho{height:.6rem;width:8rem;display:inline-block;
+      vertical-align:middle;margin:0 0 0 .5rem}
+ .thanh-tien-do .day{position:absolute;inset:0 auto 0 0;background:var(--do);
+      border-radius:999px}
+ .thanh-tien-do .moc{position:absolute;top:-3px;bottom:-3px;width:2px;
+      background:var(--chu-nhat)}
+ .thanh-nhan{display:flex;justify-content:space-between;font-size:.85rem;
+      color:var(--chu-nhat)}
 </style>
 {% include "_nav.html" %}
 <h1>Báo cáo bán hàng</h1>
@@ -94,13 +110,39 @@ Ngày làm việc chưa trừ ngày lễ Nhật.</p>
      phải chia cho 0 ở đây. In "—", không "0%" (nói dối là đã đạt 0% trong
      khi không có mẫu số để tính) và không để trang nổ 500 vì None * 100. #}
   <div class="gia">{% if td.tien_do is not none %}{{ "%.1f"|format(td.tien_do * 100) }}%{% else %}—{% endif %}</div></div>
+ {# [CRITICAL, vòng soát cuối việc 4] Thẻ "Mốc đến hôm nay" phải là MỘT
+    `.the` chứa BA phần tử (nhan tiêu đề · gia số tiền · nhan "% chỉ tiêu"),
+    đóng bằng ĐÚNG MỘT `</div>` cuối cùng cho `.the`. Bản trước đóng `.the`
+    ngay sau `.gia` (`</div></div>` sớm một nhịp), nên dòng "% chỉ tiêu" rơi
+    RA NGOÀI thẻ thành flex-item thứ năm trơ trọi trong `.so-lon`, và
+    `</div>` thừa phía dưới đóng luôn `.so-lon` sớm — con số duy nhất thoả
+    bất biến "màu kèm chữ đọc được" (_chung.html:76-77) của vạch mốc bị bật
+    khỏi thẻ mà HTML không báo lỗi nào. #}
  <div class="the"><div class="nhan">Mốc đến hôm nay</div>
-  <div class="gia">{% if td.muc_tieu_den_hom_nay is not none %}¥{{ "{:,}".format(td.muc_tieu_den_hom_nay) }}{% else %}—{% endif %}</div></div>
+  <div class="gia">{% if td.muc_tieu_den_hom_nay is not none %}¥{{ "{:,}".format(td.muc_tieu_den_hom_nay) }}{% else %}—{% endif %}</div>
   {# Con số in ra ngay cạnh vạch mốc: bất biến "mã hoá bằng màu phải kèm thứ
      đọc được" (_chung.html:76-77). Cùng lý do ở thẻ Tiến độ: chỉ tiêu = 0
      không có mẫu số để chia — in "—", không chia cho 0. #}
   <div class="nhan">{% if td.muc_tieu and td.muc_tieu_den_hom_nay is not none %}{{ "%.1f"|format(td.muc_tieu_den_hom_nay / td.muc_tieu * 100) }}% chỉ tiêu{% else %}—{% endif %}</div></div>
 </div>
+
+{# [Vòng soát cuối, việc 9] Đặc tả §7.1 đòi "thanh tiến độ toàn nhóm + vạch
+   mốc muc_tieu_den_hom_nay" — bản trước chỉ có bốn thẻ KPI, không có thanh
+   nào. `rong_thanh`/`rong_moc` (kome/bao_cao.py) đã KẸP về [0,100] nên CSS
+   ở đây không cần tự phòng tràn/âm. Con số ĐỌC ĐƯỢC đứng cạnh thanh dùng lại
+   đúng `td.tien_do`/`td.muc_tieu_den_hom_nay` — không phải giá trị đã kẹp —
+   nên "vượt chỉ tiêu" vẫn đọc ra trên 100% dù thanh dừng ở mép khung. #}
+{% if td.rong_thanh is not none %}
+<div class="thanh-tien-do" role="img"
+     aria-label="Tiến độ ngân sách toàn nhóm: {{ '%.1f'|format(td.tien_do * 100) if td.tien_do is not none else 0 }} phần trăm">
+ <div class="day" style="width:{{ td.rong_thanh }}%"></div>
+ {% if td.rong_moc is not none %}<div class="moc" style="left:{{ td.rong_moc }}%"></div>{% endif %}
+</div>
+<div class="thanh-nhan">
+ <span>{% if td.tien_do is not none %}{{ "%.1f"|format(td.tien_do * 100) }}% đạt{% else %}—{% endif %}</span>
+ <span>Vạch mốc — {% if td.muc_tieu and td.muc_tieu_den_hom_nay is not none %}{{ "%.1f"|format(td.muc_tieu_den_hom_nay / td.muc_tieu * 100) }}% chỉ tiêu{% else %}—{% endif %}</span>
+</div>
+{% endif %}
 
 <h2>Luỹ kế thực tế so với nhịp ngân sách</h2>
 {% if lk.co %}
@@ -111,6 +153,15 @@ Ngày làm việc chưa trừ ngày lễ Nhật.</p>
            stroke-width="2" stroke-dasharray="5 4"></polyline>
  <polyline points="{{ lk.thuc_te }}" fill="none" stroke="var(--do)"
            stroke-width="2.5"></polyline>
+ {# [Vòng soát cuối, việc 10] Nhãn trục hoành — `ve_luy_ke()` đã trả `nhan`
+    kèm toạ độ `x` tính sẵn (kome/bao_cao.py) từ lần đầu dựng khối này,
+    nhưng template chưa từng dùng tới nên biểu đồ không nói điểm nào là
+    tháng nào. `hien` lọc bớt còn tháng đầu/cuối + mốc quý, tránh 12 nhãn đè
+    lên nhau trên một trục 720px. #}
+ {% for n in lk.nhan if n.hien %}
+ <text x="{{ n.x }}" y="{{ lk.cao - 8 }}" font-size="9" text-anchor="middle"
+       fill="var(--chu-nhat)">{{ n.thang[5:] }}</text>
+ {% endfor %}
 </svg>
 </div>
 <div class="chu-thich">
@@ -144,12 +195,32 @@ Ngày làm việc chưa trừ ngày lễ Nhật.</p>
   <td class="so">{% if n.muc_tieu is not none %}¥{{ "{:,}".format(n.muc_tieu) }}{% else %}—{% endif %}</td>
   <td class="so">{% if n.tien_do is not none %}
       <span class="{{ 'manh' if n.tien_do >= 1 else 'yeu' }}">{{ "%.1f"|format(n.tien_do * 100) }}%</span>
+      {# [Vòng soát cuối, việc 9] Đặc tả §7.3: "Một thanh mỗi người". Đặt
+         ngay trong ô Tiến độ — con số đã in ở dòng trên, thanh chỉ trang trí
+         thêm, không phải nơi duy nhất mang thông tin. `rong_thanh`/
+         `rong_moc` None khi người này chưa có chỉ tiêu (muc_tieu 0/None) —
+         không thanh nào để vẽ, khớp nhánh "—" bên dưới cùng điều kiện. #}
+      {% if n.rong_thanh is not none %}
+      <div class="thanh-tien-do thanh-nho" role="img"
+           aria-label="Tiến độ {{ n.ten or n.ma }}: {{ '%.1f'|format(n.tien_do * 100) }} phần trăm">
+       <div class="day" style="width:{{ n.rong_thanh }}%"></div>
+       {% if n.rong_moc is not none %}<div class="moc" style="left:{{ n.rong_moc }}%"></div>{% endif %}
+      </div>
+      {% endif %}
       {% else %}—{% endif %}</td>
   <td class="so">{% if n.muc_tieu_den_hom_nay is not none %}¥{{ "{:,}".format(n.muc_tieu_den_hom_nay) }}{% else %}—{% endif %}</td>
-  {# Dữ liệu bán bắt đầu 2025-03-03, trước mốc đó KHÔNG TỒN TẠI. Để trống và
-     nói rõ, đúng nếp co_cung_ky của mart.ban_theo_thang_so_sanh. #}
-  <td class="so">{% if n.cung_ky is not none %}¥{{ "{:,}".format(n.cung_ky) }}{% else %}không có dữ liệu{% endif %}</td>
-  <td class="so">{% if n.cung_ky %}{{ "%+.1f"|format((n.thuc_te / n.cung_ky - 1) * 100) }}%{% else %}—{% endif %}</td>
+  {# [Vòng soát cuối, việc 2/3] `co_cung_ky`/`tang_truong` đọc THẲNG từ
+     mart.ban_theo_nhan_vien_thang_so_sanh (027) — không còn phép chia nào ở
+     đây, chỉ nhân 100 và định dạng. `co_cung_ky` FALSE = tháng cùng kỳ
+     KHÔNG TỒN TẠI trong kho (dữ liệu bán bắt đầu 2025-03-03); TRUE nhưng
+     `tang_truong` None = tồn tại nhưng doanh thu cùng kỳ ≤ 0 (không có mẫu
+     số dương để chia — KHÔNG in phần trăm ngược dấu như bản Jinja cũ từng
+     làm với mẫu số ÂM do 赤伝). Hai tình huống đó khác "chưa đặt" (None) ở
+     cột bên trái: `n.cung_ky` bằng 0 vẫn hiện ¥0, không hiện "không có dữ
+     liệu" — cùng nếp `co_cung_ky` của mart.ban_theo_thang_so_sanh. #}
+  <td class="so">{% if n.co_cung_ky %}¥{{ "{:,}".format(n.cung_ky) }}{% else %}không có dữ liệu{% endif %}</td>
+  <td class="so">{% if n.tang_truong is not none %}<span class="{{ 'manh' if n.tang_truong >= 0 else 'yeu' }}">{{ "%+.1f"|format(n.tang_truong * 100) }}%</span>
+      {% elif n.co_cung_ky %}—{% else %}không có dữ liệu{% endif %}</td>
   <td class="so">{% if td.thuc_te %}{{ "%.1f"|format(n.thuc_te / td.thuc_te * 100) }}%{% else %}—{% endif %}</td>
  </tr>
  {% endfor %}

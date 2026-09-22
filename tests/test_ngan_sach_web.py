@@ -130,6 +130,24 @@ def test_mot_o_sai_thi_KHONG_ghi_o_nao(khach, conn, batch):
     assert 'value="9000000"' in r.text
 
 
+def test_o_dan_tu_excel_kem_NBSP_khong_lam_trang_500(khach, conn, batch):
+    """[CRITICAL, vòng soát cuối việc 1] Dán số từ Excel là việc thường ngày
+    ở một công ty Nhật. Trước bản sửa, `'12\\xa0000'` qua được `_NHOM` (nó
+    dùng `\\s`, khớp NBSP) nhưng `_PHAN_CACH` lại thiếu đúng khoá NBSP (hai
+    khoá `" "` trùng nhau trong `dict` literal, Python tự gộp) — `int()` ăn
+    phải NBSP còn sót lại và ném ValueError TRẦN, rơi xuống `except
+    Exception` của route thành trang lỗi 500 và mất sạch biểu mẫu. Giờ ô đó
+    phải hoặc được lưu đúng (đọc ra 12000), hoặc bị từ chối bằng 400 kèm
+    biểu mẫu — không bao giờ 500, và không bao giờ mất dữ liệu."""
+    _ban(conn, batch)
+    c = khach()
+    r = c.post("/ngan-sach", data={"ky": "2026", "o-0104-2026-05": "12\xa0000"})
+    assert r.status_code in (303, 400), f"không được là 500, thấy {r.status_code}"
+    if r.status_code == 303:
+        assert conn.execute(
+            "SELECT muc_tieu FROM app.ngan_sach").fetchone()[0] == 12_000
+
+
 @pytest.mark.parametrize("form", [
     pytest.param({"ky": "2026", "o-": "9000000"}, id="ten_o_meo"),
     pytest.param({"ky": "abc", "o-0104-2026-05": "9000000"}, id="ky_meo"),
@@ -165,6 +183,20 @@ def test_o_chua_dat_hien_TRONG_khong_hien_0(khach, conn, batch):
     html = khach().get("/ngan-sach?ky=2026").text
     o = re.findall(r'name="o-0104-2026-05"[^>]*value="([^"]*)"', html)
     assert o == [""], f"ô chưa đặt phải trống, thấy {o}"
+
+
+def test_o_tong_dung_dau_PHAY_khop_bao_cao(khach, conn, batch):
+    """[Vòng soát cuối, việc 10] Trước bản sửa, ba ô TỔNG ("Cả kỳ"/"Cả nhóm")
+    hiện ¥12.000.000 (dấu chấm) trong khi /bao-cao hiện CÙNG một số tiền
+    kiểu ¥12.000.000 -> ¥12,000,000 (dấu phẩy) — hai trang nói khác nhau về
+    cùng một con số. Chỉ ba ô TỔNG đổi; ô <input> vẫn dấu chấm (quy ước Việt
+    khi GÕ LẠI, xem test_luu_roi_tai_lai_thi_thay_dung_so_vua_nhap)."""
+    _ban(conn, batch)
+    c = khach()
+    c.post("/ngan-sach", data={"ky": "2026", "o-0104-2026-05": "9000000"})
+    html = c.get("/ngan-sach?ky=2026").text
+    assert "¥9,000,000" in html, "ô TỔNG phải dùng dấu phẩy như /bao-cao"
+    assert "¥9.000.000" not in html
 
 
 def test_ky_chua_co_doanh_thu_van_co_trong_dai_chip(khach, conn, batch):
