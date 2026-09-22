@@ -351,7 +351,8 @@ bảng xếp hạng — phải mang theo `tat_ca`/`nv` (biến `giu` của `ban_
 `/khach-hang` thiếu hai tham số đó rơi về mặc định lọc theo NGƯỜI ĐANG ĐĂNG
 NHẬP, nên bản đồ vẽ số của "tất cả" (hay của một đồng nghiệp) mà bấm vào lại ra
 danh sách của chính mình — cùng lớp lỗi `kome/khach_hang.py::_vi_tu` đã ghi
-("chip Tất cả (1.710) bấm vào ra 216 khách"), chỉ khác là nó nằm giữa HAI trang.
+("chip Tất cả (1.710) bấm vào ra 216 khách"), chỉ khác là nó bắc qua HAI MÀN
+chứ không nằm gọn trong một màn.
 Có test canh: `tests/test_ban_do.py::
 test_bam_o_hay_dong_bang_GIU_NGUYEN_bo_loc_nguoi_phu_trach`.
 
