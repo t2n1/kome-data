@@ -125,21 +125,38 @@ cả ba trả cùng một tập khách.
 trung vị** với nhịp mua của khách (`mart.nhip_mua`). Một khái niệm một công thức;
 hai chỗ tính khác nhau là hai con số cùng tên nói hai điều.
 
-**Bất biến:** "cặp (khách, mã) đã ngừng" có **hai** chỗ hiển thị và chỉ **một**
-định nghĩa, cột `mart.khach_mat_hang.ngung_mua` (migration `024`): im lặng **≥ 2×
-nhịp mua riêng của chính cặp đó** (`tre_ngay >= nhip_ngay`; `nhip_ngay` NULL —
-dưới 3 lần mua — là "chưa đủ dữ liệu", KHÔNG phải "đã ngừng") **và** khách chưa bị
-OBC đánh dấu ※廃業※/※取引停止※. Hai chỗ đó — "Mặt hàng đã ngừng mua" của
-`/khach-hang/{mã}` và "Khách đã ngừng mua mã này" của `/san-pham/{mã}` — **ĐỌC**
-cột này, không chỗ nào viết lại vị từ (cùng nếp `022`). Trước `024` chỗ đầu dùng
-ngưỡng chung 90 ngày còn chỗ sau dùng nhịp riêng, nên cùng một cặp cho hai câu
-trả lời ngược nhau ở **cả hai chiều**, và cả hai đều thiếu cổng ※廃業※. `ngung_mua`
-là một **CỘT, không phải bộ lọc dòng**: view vẫn giữ đủ mọi cặp, vì nó còn phục vụ
-khối "khách đang mua mã này" và bảng top-15 mặt hàng — sự thật lịch sử, không phải
-danh sách gọi lại. Khối "Tháng này chưa mua" là **phần bù**: đã quá ngày dự kiến
-mua lại nhưng chưa tới 2× nhịp. Có test canh:
-`tests/test_san_pham.py::test_hai_man_tra_loi_GIONG_NHAU_ve_mot_cap_khach_ma` và
-`::test_khach_da_dong_cua_khong_lot_vao_khoi_goi_lai_nao`.
+**Bất biến:** trạng thái của một **cặp (khách, mã)** có **bốn** khối hiển thị và
+chỉ **một** định nghĩa: cột `mart.khach_mat_hang.trang_thai_cap` (migration `024`)
+— một **NHÃN ba giá trị**, xét theo đúng thứ tự này:
+`'khong_goi'` (khách bị OBC đánh dấu ※廃業※/※取引停止※ — xét **TRƯỚC**, cùng nếp
+`'ngung_giao_dich'` của `016`) · `'ngung'` (im lặng **≥ 2× nhịp mua riêng của
+chính cặp đó**, `tre_ngay >= nhip_ngay`) · `'mua'` (còn lại, gồm cả cặp chưa đủ 3
+lần mua nên `nhip_ngay` NULL — đó là "chưa đủ dữ liệu", KHÔNG phải "đã ngừng").
+Bốn khối — "Mặt hàng đã ngừng mua" và "Tháng này chưa mua" của `/khach-hang/{mã}`,
+"Khách đang mua mã này" và "Khách đã ngừng mua mã này" của `/san-pham/{mã}` —
+**ĐỌC** cột này và **so bằng** (`= 'ngung'`, `= 'mua'`), không chỗ nào viết lại vị
+từ (cùng nếp `022`) và không chỗ nào tự JOIN lấy `da_ngung` nữa: cờ ※廃業※ được
+đọc **đúng một lần**, trong view, từ `mart.dau_hieu_khach` (nhà của nó theo `016`,
+và rẻ hơn `khach_360`).
+
+**NHÃN chứ không phải boolean, và KHÔNG ĐƯỢC dùng `NOT` trên nó.** Bản đầu của
+`024` là boolean `ngung_mua` gói cổng ※廃業※ vào bên trong; phủ định một boolean
+như thế **luôn đúng** với khách đã phá sản, nên mọi khối viết "phần còn lại" bằng
+`NOT ngung_mua` lặng lẽ mở cửa lại cho trọn 281 khách đó — và ba chỗ Python phải
+tự JOIN `da_ngung` để đắp tay, tức một cờ hai nguồn ba chỗ chép, đúng cái bệnh mà
+`021`/`022` tồn tại để dẹp. So bằng với một nhãn không có lỗ đó, và thêm trạng
+thái thứ tư sau này cũng không âm thầm dồn dòng vào khối nào.
+
+Trước `024`, "đã ngừng" ở `/khach-hang/{mã}` dùng ngưỡng chung 90 ngày còn
+`/san-pham/{mã}` dùng nhịp riêng, nên cùng một cặp cho hai câu trả lời ngược nhau
+ở **cả hai chiều**, và cả hai đều thiếu cổng ※廃業※. `trang_thai_cap` là một
+**CỘT, không phải bộ lọc dòng**: view vẫn giữ đủ mọi cặp, vì nó còn phục vụ khối
+"khách đang mua mã này" và bảng top-15 mặt hàng — sự thật lịch sử, không phải danh
+sách gọi lại. Khối "Tháng này chưa mua" là dải giữa: đã quá ngày dự kiến mua lại
+(`tre_ngay IS NOT NULL`) nhưng nhãn vẫn là `'mua'`. Có test canh:
+`tests/test_san_pham.py::test_hai_man_tra_loi_GIONG_NHAU_ve_mot_cap_khach_ma`,
+`::test_khach_da_dong_cua_khong_lot_vao_khoi_goi_lai_nao` và
+`::test_cap_cua_khach_da_dong_cua_mang_NHAN_RIENG_khong_phai_phu_dinh`.
 
 **Bất biến:** khi một câu lệnh tham chiếu **cùng một view của `mart` nhiều hơn một
 lần**, view đó phải vào CTE `AS MATERIALIZED` (ghi **tường minh**, đừng dựa vào mặc

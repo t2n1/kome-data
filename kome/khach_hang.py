@@ -283,11 +283,16 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # so với việc khách ngừng mua toàn bộ: họ đang chuyển dần sang nhà cung cấp
     # khác, từng món một, và không ai để ý cho tới khi mất luôn khách.
     #
-    # ĐỌC `ngung_mua` của mart.khach_mat_hang (migration 024), KHÔNG viết lại
-    # vị từ. Trước 024 chỗ này dùng ngưỡng CHUNG (`hom_nay - lan_cuoi > 90`
+    # ĐỌC `trang_thai_cap` của mart.khach_mat_hang (migration 024), KHÔNG viết
+    # lại vị từ. Trước 024 chỗ này dùng ngưỡng CHUNG (`hom_nay - lan_cuoi > 90`
     # cộng `so_lan >= 3`) còn /san-pham/{mã} dùng nhịp RIÊNG — cùng một cặp
     # (khách, mã) cho hai câu trả lời ngược nhau ở hai màn. Nay một khái niệm
     # một công thức, đúng nếp 021/022.
+    #
+    # SO BẰNG với `'ngung'`, và KHÔNG BAO GIỜ dùng `NOT` trên cột này: nhãn có
+    # ba giá trị, nên phủ định nó là gộp bừa hai giá trị còn lại (trong đó có
+    # `'khong_goi'` — khách ※廃業※) vào một khối. Đó đúng là lý do cột này là
+    # nhãn chứ không phải boolean; xem chú thích của migration 024.
     #
     # `so_lan >= 3` đã bỏ vì THỪA, không phải vì nới lỏng: `nhip_ngay` chỉ có
     # giá trị khi đã có >= 2 khoảng cách, tức >= 3 lần mua (020). Để lại là
@@ -298,7 +303,7 @@ def ho_so(conn, ma: str) -> HoSo | None:
         """SELECT h.product_code, h.ten_hang, h.so_lan, h.lan_cuoi,
                   h.doanh_thu_thuan, h.nhip_ngay, h.du_kien_lan_toi, h.tre_ngay
            FROM mart.khach_mat_hang h
-           WHERE h.customer_code = %s AND h.ngung_mua
+           WHERE h.customer_code = %s AND h.trang_thai_cap = 'ngung'
            ORDER BY h.doanh_thu_thuan DESC LIMIT 10""", (ma,)).fetchall()]
 
     gan_day = [dict(zip(("ngay", "so_phieu", "doanh_thu", "lai_gop"), l))
@@ -335,22 +340,23 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # có số còn hơn có số sai. Bảng giá đúng (tách 荷姿) nằm ở khối "Bảng giá
     # của bậc" ngay dưới, dựng từ core.fact_price_list.
     #
-    # NHÁNH 'chua' LÀ PHẦN BÙ CỦA `ngung_mua`, KHÔNG PHẢI MỘT NGƯỠNG NGÀY
-    # RIÊNG. Nó là dải giữa: đã quá ngày dự kiến mua lại (`tre_ngay IS NOT
-    # NULL`, tức im lặng > 1 nhịp) nhưng CHƯA tới 2 nhịp (`NOT ngung_mua`) —
-    # "còn gọi kịp". Trước 024 vế thứ hai là `hom_nay - lan_cuoi <= 90`, ăn
-    # khớp với ngưỡng 90 của khối "đã ngừng mua" ngay dưới nó. Đổi khối kia
-    # sang nhịp riêng mà để nguyên chỗ này thì hai khối CHỒNG NHAU: một mã
-    # nhịp 7 ngày im 60 ngày vừa "đã ngừng" (60 >= 2x7) vừa "chưa mua tháng
-    # này" (60 <= 90) — cùng một mã, hai kết luận, trên cùng một trang.
+    # NHÁNH 'chua' ĐỌC ĐÚNG NHÃN `'mua'`, KHÔNG PHẢI MỘT NGƯỠNG NGÀY RIÊNG và
+    # cũng không phải phủ định của nhãn "đã ngừng". Nó là dải giữa: đã quá ngày
+    # dự kiến mua lại (`tre_ngay IS NOT NULL`, tức im lặng > 1 nhịp) nhưng CHƯA
+    # tới 2 nhịp (`trang_thai_cap = 'mua'`) — "còn gọi kịp". Trước 024 vế thứ
+    # hai là `hom_nay - lan_cuoi <= 90`, ăn khớp với ngưỡng 90 của khối "đã
+    # ngừng mua" ngay dưới nó. Đổi khối kia sang nhịp riêng mà để nguyên chỗ
+    # này thì hai khối CHỒNG NHAU: một mã nhịp 7 ngày im 60 ngày vừa "đã ngừng"
+    # (60 >= 2x7) vừa "chưa mua tháng này" (60 <= 90) — cùng một mã, hai kết
+    # luận, trên cùng một trang.
     #
-    # `NOT dh.da_ngung` (mart.dau_hieu_khach, migration 016): đây cũng là một
-    # DANH SÁCH GỌI LẠI ("một cuộc điện thoại nhắc là đủ"), nên khách ※廃業※
-    # không được vào. `ngung_mua` đã tự mang cổng đó, nhưng chính vì thế mà
-    # `NOT ngung_mua` LUÔN đúng với khách đã đóng cửa — không chặn ở đây thì
-    # toàn bộ mặt hàng quá hạn của họ dồn hết sang khối này. LEFT JOIN +
-    # coalesce chứ không INNER: khách chưa có dòng 得意先全情報 vẫn phải giữ
-    # được khối của mình.
+    # KHÔNG CÒN JOIN mart.dau_hieu_khach Ở ĐÂY. Đây cũng là một DANH SÁCH GỌI
+    # LẠI ("một cuộc điện thoại nhắc là đủ"), nên khách ※廃業※ không được vào —
+    # và nhãn đã lo việc đó: họ mang `'khong_goi'`, nên `= 'mua'` tự loại họ.
+    # Bản trước của 024 dùng boolean `NOT ngung_mua`, thứ LUÔN đúng với khách
+    # đã đóng cửa vì cổng ※廃業※ nằm gói bên trong chính boolean đó, nên chỗ này
+    # buộc phải tự JOIN lấy `da_ngung` để đắp lại — một cờ, hai nguồn, ba chỗ
+    # chép. Nhãn dẹp cả ba: cờ ※廃業※ nay chỉ được đọc MỘT lần, trong view.
     them = conn.execute("""
         SELECT khoi, ma, ten, chu, so_a FROM (
             (SELECT 'chua'::text AS khoi, h.product_code AS ma,
@@ -358,11 +364,8 @@ def ho_so(conn, ma: str) -> HoSo | None:
                     h.tre_ngay::numeric AS so_a,
                     h.doanh_thu_thuan::numeric AS xep
                FROM mart.khach_mat_hang h
-               LEFT JOIN mart.dau_hieu_khach dh
-                      ON dh.customer_code = h.customer_code
               WHERE h.customer_code = %s
-                AND h.tre_ngay IS NOT NULL AND NOT h.ngung_mua
-                AND NOT coalesce(dh.da_ngung, false)
+                AND h.tre_ngay IS NOT NULL AND h.trang_thai_cap = 'mua'
               ORDER BY h.doanh_thu_thuan DESC
               LIMIT 10)
             UNION ALL

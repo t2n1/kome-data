@@ -306,29 +306,32 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
     # Hai khối khách gộp làm MỘT lượt hỏi: cùng một view, cùng bộ cột, chỉ khác
     # vị từ — đúng ca mà UNION ALL không phải đệm NULL cho nhánh nào.
     #
-    # "ĐÃ NGỪNG MUA MÃ NÀY" ĐỌC `ngung_mua` CỦA mart.khach_mat_hang (migration
-    # 024), không viết lại vị từ ở đây. Đó là định nghĩa DUY NHẤT của khái niệm
-    # "cặp (khách, mã) đã ngừng", dùng chung với khối "Mặt hàng đã ngừng mua"
-    # của /khach-hang/{mã} — trước 024 hai màn có hai công thức và trả lời
-    # ngược nhau về cùng một cặp.
+    # HAI KHỐI ĐỌC `trang_thai_cap` CỦA mart.khach_mat_hang (migration 024),
+    # không viết lại vị từ ở đây. Đó là định nghĩa DUY NHẤT của "cặp (khách,
+    # mã) đang ở trạng thái nào", dùng chung với hai khối của /khach-hang/{mã}
+    # — trước 024 hai màn có hai công thức và trả lời ngược nhau về cùng một
+    # cặp.
     #
-    # `ngung_mua` = im lặng >= 2 × NHỊP RIÊNG của chính cặp đó, VÀ khách chưa
-    # bị OBC đánh dấu ※廃業※. Không phải ngưỡng chung: đo thật, ngưỡng 90 ngày
-    # bỏ sót 49 khách đang rời đi và báo động nhầm 34 khách vẫn mua bình
-    # thường. Khách mua 7 ngày/lần im 60 ngày đã rời đi từ lâu; khách mua 120
-    # ngày/lần im 100 ngày vẫn đang mua bình thường.
+    # Nhãn ba giá trị: `'khong_goi'` (khách bị OBC đánh dấu ※廃業※, xét trước
+    # hết), `'ngung'` (im lặng >= 2 × NHỊP RIÊNG của chính cặp đó), `'mua'`
+    # (còn lại). Không phải ngưỡng chung: đo thật, ngưỡng 90 ngày bỏ sót 49
+    # khách đang rời đi và báo động nhầm 34 khách vẫn mua bình thường. Khách
+    # mua 7 ngày/lần im 60 ngày đã rời đi từ lâu; khách mua 120 ngày/lần im
+    # 100 ngày vẫn đang mua bình thường.
     #
-    # NHÁNH 'mua' KHÔNG PHẢI PHẦN BÙ THUẦN CỦA 'ngung'. Nó còn phải tự loại
-    # khách ※廃業※: `ngung_mua` đã mang cổng đó bên trong, nên `NOT ngung_mua`
-    # LUÔN đúng với một doanh nghiệp đã đóng cửa — không chặn thì họ trượt
-    # thẳng từ khối "đã ngừng" sang khối "ĐANG mua mã này", tức trang khẳng
-    # định một công ty đã phá sản vẫn đang lấy hàng. Cờ `da_ngung` đọc từ
-    # mart.khach_360 (nhà của nó là migration 016) chứ không so chuỗi ※…※ ở
-    # đây — đọc một cờ có sẵn, không chép một vị từ.
+    # MỖI NHÁNH SO BẰNG VỚI ĐÚNG NHÃN CỦA MÌNH, KHÔNG NHÁNH NÀO DÙNG `NOT`.
+    # Hai khối này là DANH SÁCH BÁN HÀNG, nên cả hai đều không được chứa khách
+    # đã đóng cửa — và `'khong_goi'` là một giá trị RIÊNG nên nó tự rơi ra
+    # ngoài cả hai mà không nhánh nào phải biết ※廃業※ là gì. Bản trước của 024
+    # dùng boolean `ngung_mua` gói cổng ※廃業※ vào bên trong, nên `NOT
+    # ngung_mua` LUÔN đúng với một doanh nghiệp đã đóng cửa: họ trượt thẳng từ
+    # khối "đã ngừng" sang khối "ĐANG mua mã này" — trang khẳng định một công
+    # ty đã phá sản vẫn đang lấy hàng — và nhánh 'mua' phải tự JOIN lấy
+    # `k.da_ngung` để đắp lại. Nhãn dẹp chỗ đắp tay đó; `da_ngung` nay chỉ được
+    # đọc một lần, trong view.
     #
-    # Hai khối này là DANH SÁCH BÁN HÀNG, nên cả hai đều không chứa khách đã
-    # đóng cửa. Sự thật lịch sử của cặp đó KHÔNG mất: view vẫn giữ đủ dòng, và
-    # hồ sơ của chính khách ※廃業※ vẫn hiện bảng top-15 mặt hàng như cũ.
+    # Sự thật lịch sử của cặp đó KHÔNG mất: view vẫn giữ đủ dòng, và hồ sơ của
+    # chính khách ※廃業※ vẫn hiện bảng top-15 mặt hàng như cũ.
     #
     # `xep` là hạng TRONG TỪNG NHÁNH, tính bằng row_number() theo đúng khoá mà
     # nhánh đó dùng để cắt top-N. ORDER BY ở lớp NGOÀI đọc `xep` chứ không tin
@@ -339,9 +342,8 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
     # LEFT JOIN khach_360 chứ không JOIN: một khách có dòng bán thì luôn có
     # dòng ở khach_360 hôm nay, nhưng mất tên khách là mất cả DÒNG nếu dùng
     # INNER — và đây là khối "ai đang mua mã này", nơi thiếu một khách nguy
-    # hiểm hơn nhiều so với hiện mã thay cho tên. Cùng lý do,
-    # `NOT coalesce(k.da_ngung, false)`: không có dòng -> không phải đã đóng
-    # cửa -> giữ lại.
+    # hiểm hơn nhiều so với hiện mã thay cho tên. khach_360 ở đây CHỈ để lấy
+    # TÊN: cờ ※廃業※ không còn được đọc ở chỗ này nữa, nó đã nằm trong nhãn.
     #
     # HAI CTE `AS MATERIALIZED`, ghi TƯỜNG MINH: cả hai nhánh đều đọc
     # khach_mat_hang và khach_360, mà Postgres KHÔNG gộp hai truy vấn con
@@ -351,10 +353,10 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
     khach = conn.execute(f"""
         WITH h AS MATERIALIZED (
             SELECT customer_code, doanh_thu_thuan, so_luong, so_lan, lan_cuoi,
-                   nhip_ngay, tre_ngay, ngung_mua
+                   nhip_ngay, tre_ngay, trang_thai_cap
               FROM mart.khach_mat_hang WHERE product_code = %s
         ), k AS MATERIALIZED (
-            SELECT customer_code, ten, da_ngung FROM mart.khach_360
+            SELECT customer_code, ten FROM mart.khach_360
         )
         SELECT khoi, ma, ten, doanh_thu, so_luong, so_lan, lan_cuoi, nhip, tre
         FROM (
@@ -366,7 +368,7 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
                       AS xep
                FROM h
                LEFT JOIN k ON k.customer_code = h.customer_code
-              WHERE NOT h.ngung_mua AND NOT coalesce(k.da_ngung, false)
+              WHERE h.trang_thai_cap = 'mua'
               ORDER BY h.doanh_thu_thuan DESC NULLS LAST
               LIMIT 20)
             UNION ALL
@@ -377,7 +379,7 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
                     row_number() OVER (ORDER BY h.doanh_thu_thuan DESC NULLS LAST)
                FROM h
                LEFT JOIN k ON k.customer_code = h.customer_code
-              WHERE h.ngung_mua
+              WHERE h.trang_thai_cap = 'ngung'
               ORDER BY h.doanh_thu_thuan DESC NULLS LAST
               LIMIT 10)
         ) u ORDER BY khoi, xep

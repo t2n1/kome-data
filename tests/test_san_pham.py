@@ -455,7 +455,7 @@ def test_hai_man_tra_loi_GIONG_NHAU_ve_mot_cap_khach_ma(conn, batch):
     chung trả lời NGƯỢC LẠI nhịp riêng ở CẢ HAI ca, và người bán mở hai màn
     cạnh nhau không có cách nào biết tin màn nào.
 
-    Nay cả hai ĐỌC mart.khach_mat_hang.ngung_mua."""
+    Nay cả hai ĐỌC mart.khach_mat_hang.trang_thai_cap."""
     _san_pham(conn, batch, "P025")
     # Mua 7 ngày/lần, im 60 ngày = 8,5 lần nhịp -> ĐÃ NGỪNG.
     # Ngưỡng chung 90 ngày nói ngược: "vẫn đang mua".
@@ -492,10 +492,10 @@ def test_khach_da_dong_cua_khong_lot_vao_khoi_goi_lai_nao(conn, batch):
     mart.khach_nhom_viec có cổng đó từ migration 016, nhưng mart.khach_mat_hang
     thì KHÔNG — nên /can-xu-ly đúng trong khi khối "Khách đã ngừng mua mã này"
     của /san-pham/{mã} vẫn gọi tên một công ty đã đóng cửa. 024 đưa cổng đó vào
-    chính định nghĩa `ngung_mua`.
+    chính định nghĩa `trang_thai_cap` (giá trị `'khong_goi'`).
 
     Và LỊCH SỬ không được mất theo: hồ sơ của chính khách đó vẫn phải hiện bảng
-    mặt hàng. `ngung_mua` là một CỘT, không phải bộ lọc dòng của view."""
+    mặt hàng. `trang_thai_cap` là một CỘT, không phải bộ lọc dòng của view."""
     _san_pham(conn, batch, "P026")
     _ho_so_khach(conn, batch, "KD01", "※廃業・精算※ QUAN DA DONG CUA")
     # Mua 7 ngày/lần rồi im 60 ngày: đúng hình dạng "đã ngừng" của ca trên.
@@ -515,6 +515,60 @@ def test_khach_da_dong_cua_khong_lot_vao_khoi_goi_lai_nao(conn, batch):
     assert [m["ma"] for m in kh.chua_mua_thang] == []
     assert "P026" in {m["ma"] for m in kh.mat_hang}, \
         "lọc dòng ở view thì hồ sơ khách ※廃業※ trắng trơn — phải là CỘT"
+
+
+def test_cap_cua_khach_da_dong_cua_mang_NHAN_RIENG_khong_phai_phu_dinh(conn, batch):
+    """[CRITICAL] HÌNH DẠNG của định nghĩa, không chỉ kết quả của nó.
+
+    Bản đầu của migration 024 là một boolean `ngung_mua` GÓI cổng ※廃業※ vào
+    bên trong (`tre_ngay >= nhip_ngay AND NOT da_ngung`). Boolean đó không phủ
+    định được: `NOT ngung_mua` LUÔN đúng với khách đã đóng cửa, nên mọi khối
+    viết "phần còn lại" bằng `NOT ngung_mua` lặng lẽ nhận lại trọn 281 khách đã
+    phá sản — và ba chỗ Python phải tự JOIN `da_ngung` để đắp tay lại.
+
+    Nay là một NHÃN ba giá trị và mỗi khối so BẰNG với nhãn của mình, nên khách
+    ※…※ mang `'khong_goi'` — một giá trị RIÊNG, không thuộc khối nào — mà không
+    khối nào phải biết ※廃業※ là gì. Test này khoá đúng điều đó ở tầng CSDL: nếu
+    ai đó gộp `'khong_goi'` trở lại vào `'mua'` hay `'ngung'`, hoặc đổi cột về
+    boolean, dòng dưới đây đỏ trước khi trang kịp gọi tên một công ty đã phá
+    sản.
+
+    KS02 là CHỨNG: cùng mã, cùng nhịp, nhưng còn sống và vẫn mua đều. Không có
+    nó thì "khối 'đang mua' rỗng" có thể chỉ vì khối đó hỏng, và mọi khẳng định
+    ở đây đúng một cách vô nghĩa."""
+    _san_pham(conn, batch, "P027")
+    # ※取引停止※ — một trong bảy cụm mà 016 nhận là "đã đóng cửa / ngừng giao
+    # dịch", và KHÔNG phải cụm ※廃業※ mà test trên đã dùng: cổng là DANH SÁCH TỪ
+    # KHOÁ, không phải một chuỗi.
+    _ho_so_khach(conn, batch, "KD02", "※取引停止※ QUAN BI NGUNG GIAO DICH")
+    # Nhịp 7 ngày, im 60 ngày = 8,5 lần nhịp: đúng hình dạng của `'ngung'` —
+    # nhãn phải là `'khong_goi'` CHỈ vì nhánh ※…※ được xét TRƯỚC.
+    for i in range(4):
+        _mua(conn, batch, "KD02", HOM_NAY - timedelta(days=60 + i * 7), hang="P027")
+    _ho_so_khach(conn, batch, "KS02", "QUAN CON SONG")
+    for i in range(4):
+        _mua(conn, batch, "KS02", HOM_NAY - timedelta(days=i * 7), hang="P027")
+    _neo(conn, batch)
+
+    nhan = dict(conn.execute(
+        """SELECT customer_code, trang_thai_cap FROM mart.khach_mat_hang
+           WHERE product_code = %s""", ("P027",)).fetchall())
+    assert nhan["KD02"] == "khong_goi", \
+        ("khách ※…※ phải mang NHÃN RIÊNG. Gói cổng đó vào một boolean thì phủ "
+         "định boolean đó mở cửa lại đúng cho họ")
+    assert nhan["KS02"] == "mua"
+
+    # /san-pham/{mã}: khối chứng chạy, khách đã đóng cửa không ở khối NÀO.
+    sp = SP.ho_so(conn, "P027")
+    assert [k["ma"] for k in sp.khach_mua] == ["KS02"], \
+        "chặn khỏi khối 'đã ngừng' mà lại rơi sang khối 'ĐANG mua' là tệ hơn"
+    assert [k["ma"] for k in sp.khach_ngung] == []
+
+    # /khach-hang/{mã}: hai khối gọi lại rỗng, lịch sử còn nguyên.
+    kh = KH.ho_so(conn, "KD02")
+    assert [m["ma"] for m in kh.da_ngung_mua] == []
+    assert [m["ma"] for m in kh.chua_mua_thang] == []
+    assert "P027" in {m["ma"] for m in kh.mat_hang}
 
 
 def test_ho_so_hien_dung_cot_toc_do_giai_thich_du_ban_ngay(conn, batch):
