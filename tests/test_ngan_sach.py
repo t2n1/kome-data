@@ -134,6 +134,35 @@ def test_o_de_trong_thi_XOA_chi_tieu_va_ghi_nhat_ky(conn, batch):
     assert _nhat_ky(conn)[-1] == ("0104", date(2026, 5, 1), 9_000_000, None)
 
 
+def test_xoa_dung_CAP_khong_xoa_tich_Descartes(conn, batch):
+    """[CRITICAL] Câu đọc hiện trạng và câu XOÁ của luu() ghép (mã, tháng)
+    theo VỊ TRÍ qua unnest(hai mảng song song). Nếu ai đó đổi sang hai vế lọc
+    độc lập (`salesperson_code = ANY(...) AND thang = ANY(...)`), câu XOÁ sẽ
+    xoá TÍCH DESCARTES của hai danh sách — mất chỉ tiêu của người khác ở
+    tháng không ai yêu cầu xoá. Gieo 4 cặp (2 mã × 2 tháng), xoá đúng 2 cặp
+    CHÉO NHAU, hai cặp còn lại phải còn nguyên."""
+    _ban(conn, batch, date(2026, 5, 11))
+    luu(conn, {
+        ("0104", "2026-05"): 1_000_000,
+        ("0104", "2026-06"): 2_000_000,
+        ("0105", "2026-05"): 3_000_000,
+        ("0105", "2026-06"): 4_000_000,
+    }, None)
+    conn.commit()
+
+    assert luu(conn, {
+        ("0104", "2026-05"): None,
+        ("0105", "2026-06"): None,
+    }, None) == 2
+    conn.commit()
+
+    b = bang_nhap(conn)
+    assert ("0104", "2026-05") not in b.o
+    assert ("0105", "2026-06") not in b.o
+    assert b.o[("0104", "2026-06")] == 2_000_000, "tích Descartes sẽ xoá luôn cặp này"
+    assert b.o[("0105", "2026-05")] == 3_000_000, "tích Descartes sẽ xoá luôn cặp này"
+
+
 def test_luu_giu_nguoi_sua(conn, batch):
     from kome.web import nguoi_dung as ND
     _ban(conn, batch, date(2026, 5, 11))
@@ -151,13 +180,22 @@ def test_luu_khong_qua_4_truy_van(conn, batch, monkeypatch):
     """[IMPORTANT] Mỗi vòng hỏi qua pooler Tokyo mất ~47 ms chỉ riêng mạng.
     60 ô ghi thành 60 câu lệnh là gần ba giây chỉ để bấm một nút Lưu.
 
-    BỐN là trần: đọc hiện trạng · ghi · xoá · nhật ký. Biểu mẫu dưới đây chỉ
-    đặt thêm chỉ tiêu nên nó chạy ba — phép đo vẫn bắt được vòng lặp một câu
-    lệnh mỗi ô, thứ mà ngân sách này tồn tại để cấm."""
+    BỐN là trần: đọc hiện trạng · ghi · xoá · nhật ký. Lượt đo dưới đây vừa
+    ĐẶT ô mới vừa XOÁ ô đã có trong CÙNG một lệnh gọi, để chạm đúng cả bốn
+    câu lệnh — một phiên bản trước của test này chỉ đặt thêm nên không bao
+    giờ chạm nhánh XOÁ, và mốc "≤ 4" chưa từng được đo thật ở nhánh đó."""
     _ban(conn, batch, date(2026, 5, 11))
     gia_tri = {(ma, f"2026-{t:02d}") : 1_000_000
                for ma in ("0002", "0004", "0102", "0104", "0105")
                for t in range(1, 8)}
+
+    # Đặt trước hai ô để lượt đo có cái để XOÁ (chạm cả 4 nhánh: đọc · ghi ·
+    # xoá · nhật ký), rồi để hai ô đó trống trong lượt đo.
+    luu(conn, {("0002", "2026-01"): 500_000, ("0004", "2026-01"): 500_000}, None)
+    conn.commit()
+    gia_tri[("0002", "2026-01")] = None
+    gia_tri[("0004", "2026-01")] = None
+
     dem = {"n": 0}
     that = conn.execute
 

@@ -16,9 +16,6 @@ import re
 from dataclasses import dataclass
 from datetime import date
 
-# Kỳ công ty chạy 1/8 → 31/7 (core.dim_date.company_fy = năm KẾT THÚC kỳ).
-SO_THANG_MOT_KY = 12
-
 # Dấu phân cách hàng nghìn mà người ta thật sự gõ: dấu chấm (kiểu Việt), dấu
 # phẩy (kiểu Anh), dấu cách, và dấu cách không ngắt mà Excel hay dán ra.
 _PHAN_CACH = str.maketrans({".": "", ",": "", " ": "", " ": "", "_": ""})
