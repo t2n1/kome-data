@@ -43,17 +43,27 @@ def tren_mang() -> bool:
 
 
 def duong_dan_an_toan(tiep: str | None) -> str:
-    """Lọc tham số `?tiep=` trước khi chuyển hướng sau khi đăng nhập.
+    r"""Lọc tham số `?tiep=` trước khi chuyển hướng sau khi đăng nhập.
 
     Không lọc thì trang đăng nhập của công ty trở thành bàn đạp chuyển hướng
     sang site giả mạo: `/dang-nhap?tiep=https://site-gia.example` — nạn nhân
     thấy địa chỉ KOME quen thuộc, bấm vào, rồi bị đẩy đi nơi khác.
     `//site-gia.example` cũng là địa chỉ tuyệt đối, nên phải chặn cả nó.
 
+    Chặn cả `/\site-gia.example`: theo chuẩn phân tích URL của WHATWG, dấu
+    gạch chéo ngược ngay sau dấu gạch chéo đầu được coi NHƯ một gạch chéo, nên
+    chuỗi đó là một địa chỉ tuyệt đối trá hình. Hôm nay Starlette mã hoá nó
+    thành `%5C` trước khi đặt vào header `Location` nên nó vô hại — nhưng đó
+    là hành vi của framework, không phải của ta, và một bản nâng cấp đổi nó là
+    lỗ hổng quay lại mà không ai đụng vào file này. Chặn tại đây thì an toàn
+    không còn phụ thuộc vào ai khác.
+
     Đích mặc định là trang chủ chứ không phải /kho-du-lieu: từ đợt 3 không
     phải ai cũng vào được màn đó.
     """
-    if tiep and tiep.startswith("/") and not tiep.startswith("//"):
+    if (tiep and tiep.startswith("/")
+            and not tiep.startswith("//")
+            and not tiep.startswith("/\\")):
         return tiep
     return "/"
 

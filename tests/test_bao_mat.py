@@ -680,3 +680,22 @@ def test_nut_dang_xuat_co_icon_VA_van_con_chu(khach):
         assert 'focusable="false"' in the, the
     chu = re.sub(r"<svg.*?</svg>", "", thoat, flags=re.S)
     assert "Đăng xuất" in chu
+
+
+def test_duong_dan_an_toan_chan_ca_dang_gach_cheo_nguoc():
+    """`/\noi-khac.example` là địa chỉ tuyệt đối trá hình.
+
+    Theo chuẩn phân tích URL của WHATWG, gạch chéo ngược ngay sau gạch chéo
+    đầu được coi NHƯ một gạch chéo, nên chuỗi đó tương đương `//noi-khac…`.
+    Hôm nay Starlette mã hoá nó thành `%5C` trước khi đặt vào header
+    `Location` nên nó vô hại — nhưng đó là hành vi của framework, không phải
+    của ta. Chặn tại hàm này thì an toàn không phụ thuộc vào bản nâng cấp nào.
+    """
+    bs = chr(92)
+    assert bao_mat.duong_dan_an_toan("/" + bs + "noi-khac.example") == "/"
+    assert bao_mat.duong_dan_an_toan("/" + bs + bs + "/noi-khac.example") == "/"
+    # Không được chặn nhầm đường dẫn nội bộ có query — đó là ca CHÍNH của
+    # nút đổi giao diện: bấm "Tối" ở một danh sách đang lọc phải quay lại
+    # đúng danh sách đó, còn nguyên bộ lọc.
+    assert (bao_mat.duong_dan_an_toan("/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD&nv=0102")
+            == "/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD&nv=0102")
