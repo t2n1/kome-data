@@ -102,13 +102,18 @@ hỏi của người dùng là về **khách hàng**.
 Gói thiết kế (`screens/Bản đồ khách hàng.html`) vẽ một màn dựa trên Leaflet + nền
 OpenStreetMap với điểm từng khách. Cắt các phần sau:
 
-- **Nền bản đồ OSM và ba kiểu nền.** Toàn bộ app hôm nay **không có một dòng JS phía
-  máy khách nào và không nạp một tài nguyên ngoài nào** — biểu đồ ở `bao_cao.html`,
-  `khach_360.html`, `san_pham_360.html` đều là SVG dựng sẵn từ Python, font tự host.
-  Thêm Leaflet + tile OSM là thêm dependency ngoài đầu tiên, thêm JS máy khách đầu
-  tiên, và thêm một phụ thuộc mạng vào bên thứ ba cho một công cụ nội bộ.
-- **Điểm từng khách và bản đồ nhiệt.** Không có toạ độ (§3.2). Chấm 290 khách 東京都
-  lên cùng một toạ độ trung tâm tỉnh là vẽ ra một độ chính xác không tồn tại.
+- ~~**Nền bản đồ OSM và ba kiểu nền.**~~ **[ĐÃ LẬT — xem §5.1a]** Lý lẽ ban đầu: toàn
+  bộ app khi đó **không có một dòng JS phía máy khách nào và không nạp một tài nguyên
+  ngoài nào** — biểu đồ ở `bao_cao.html`, `khach_360.html`, `san_pham_360.html` đều là
+  SVG dựng sẵn từ Python, font tự host; thêm Leaflet + tile OSM là thêm dependency ngoài
+  đầu tiên, JS máy khách đầu tiên, và một phụ thuộc mạng vào bên thứ ba cho một công cụ
+  nội bộ. Chi phí đó **vẫn có thật** — chủ dự án biết và vẫn chọn làm giống gói thiết kế.
+  Ba kiểu nền thì vẫn cắt: một nền đủ dùng, và mỗi kiểu nền là một nguồn tile nữa.
+
+- **Điểm từng khách và bản đồ nhiệt** — VẪN CẮT, kể cả sau khi lật §5.1. Không có toạ độ
+  của từng khách (§3.2) và sẽ không có từ OBC. Chấm đặt ở **tâm tỉnh**; nếu sau này có
+  geocode thì đó là một đợt riêng, có quyết định riêng của chủ dự án về việc gửi địa chỉ
+  khách ra dịch vụ ngoài.
 - **Lọc theo "sản phẩm chính".** Cần khái niệm "mã chính của một khách" mà chưa view
   nào định nghĩa. Thêm một định nghĩa chỉ số mới cho một bộ lọc là đi ngược "một khái
   niệm một công thức".
@@ -171,9 +176,36 @@ sẽ lộ rộng hơn — ở gần bốn mươi tỉnh — khi lọc theo một
 47 cặp (hàng, cột) nằm trong bảng, không phải trong `if`/`match` của Python hay trong
 template. Sửa vị trí một ô là sửa một dòng dữ liệu.
 
-Bảng **không** giữ vĩ độ/kinh độ. Lộ trình viết "bảng tra 47 tỉnh → toạ độ"; toạ độ mà
-màn này cần là toạ độ LƯỚI. Vĩ độ/kinh độ chỉ có nghĩa cho một phép chiếu bản đồ thật,
-thứ §5.1 đã bác — thêm hai cột không ai đọc là mời người sau dựng phép chiếu đó.
+> **[Sửa sau khi chủ dự án lật quyết định — 2026-09-22]** Đoạn dưới đây từng nói bảng
+> KHÔNG giữ vĩ độ/kinh độ, vì "toạ độ mà màn này cần là toạ độ LƯỚI" và vĩ độ/kinh độ chỉ
+> có nghĩa cho một phép chiếu bản đồ thật — thứ §5.1 đã bác. **§5.1 nay đã bị lật** (xem
+> §5.1a), nên kết luận đó không còn đứng được: chấm phải đặt được lên một bản đồ thật, tức
+> cần toạ độ thật. Migration `026` thêm `vi_do`/`kinh_do` (tâm 47 tỉnh) vào
+> `core.dim_prefecture`. Phần "vị trí lưới là dữ liệu" thì giữ nguyên và vẫn dùng, vì lưới
+> ô trở thành chế độ phụ (§5.1a).
+
+### 5.1a Lật quyết định: dùng Leaflet + nền OpenStreetMap
+
+**Chủ dự án quyết, sau khi được trình bày đầy đủ lý lẽ của §5.1 và §4.2.** Ghi lại cho rõ
+ai quyết cái gì: ba lý do kỹ thuật ở §3.2/§4.2/§5.1 **vẫn đúng nguyên** — không có toạ độ
+từng khách, 東京都 thành chấm nhỏ trên bản đồ theo tỷ lệ, và đây là phụ thuộc mạng vào bên
+thứ ba đầu tiên của dự án. Chủ dự án biết cả ba và vẫn chọn giống gói thiết kế.
+
+Ba ràng buộc đi kèm, không thương lượng:
+
+1. **Tự host Leaflet trong `static/`, KHÔNG lấy từ CDN.** Dự án đã tự host font theo đúng
+   nếp này. Làm vậy thì phụ thuộc bên thứ ba mới đúng **MỘT** — máy chủ tile của OSM, thứ
+   không tránh được khi đã chọn hướng này — thay vì hai.
+2. **Ghi công OpenStreetMap là BẮT BUỘC**, không phải tuỳ chọn thẩm mỹ: đó là điều kiện
+   trong chính chính sách dùng tile của họ. Thiếu nó là dùng sai giấy phép.
+3. **Trang phải còn dùng được khi tile không tải về.** Máy trong công ty có thể bị tường
+   lửa chặn. Lưới 47 ô của §5.1 KHÔNG bị bỏ — nó thành chế độ phụ (`?che_do=luoi`), và
+   bảng 47 dòng LUÔN hiện dưới bản đồ ở mọi chế độ. Đó cũng là lý do `hang_luoi`/`cot_luoi`
+   không thành cột chết.
+
+Chấm đặt ở **tâm tỉnh**, to nhỏ theo chỉ số — KHÔNG phải vị trí thật của từng khách, vì
+không có toạ độ đó (§3.2). Trang phải nói thẳng điều này ra, không để người đọc tưởng mỗi
+chấm là một cửa hàng.
 
 ### 5.4 Một khách, một tỉnh, không đếm trùng
 
