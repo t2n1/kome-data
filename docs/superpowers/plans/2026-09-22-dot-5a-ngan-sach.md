@@ -1256,7 +1256,12 @@ Trong `kome/web/app.py`, ngay sau route `/bao-cao`:
                                status_code=400)
                 luu(conn, gia_tri, nguoi.id if nguoi else None)
                 conn.commit()
-            return RedirectResponse(f"/ngan-sach?ky={ky or ''}", status_code=303)
+            # `?ky=` (chuỗi rỗng) KHÔNG phải `None` với FastAPI — nó là một
+            # chuỗi không ép được sang `int`, tức 422 chứ không phải "bỏ
+            # trống". Một trang lỗi khó hiểu ngay sau khi vừa lưu THÀNH CÔNG
+            # làm người dùng tưởng mất dữ liệu.
+            return RedirectResponse(
+                f"/ngan-sach?ky={ky}" if ky else "/ngan-sach", status_code=303)
         except Exception as e:
             return _loi(request, "lưu ngân sách", e)
 ```
@@ -1606,8 +1611,10 @@ Thêm vào cuối file (sau `ve_bieu_do`):
 #
 # `thang_cua_ky` NHẬP từ kome/ngan_sach.py chứ không chép lại: "12 tháng của
 # một kỳ, 8月 trước" là một định nghĩa, và hai bản chép của nó là hai thứ sẽ
-# trôi khỏi nhau đúng lúc ai đó đổi năm tài chính của công ty.
-from kome.ngan_sach import thang_cua_ky
+# trôi khỏi nhau đúng lúc ai đó đổi năm tài chính của công ty. Dòng
+# `from kome.ngan_sach import thang_cua_ky` đặt ở KHỐI NHẬP ĐẦU FILE, theo
+# nếp của mọi module khác trong repo — không có vòng nhập nào vì
+# kome/ngan_sach.py không nhập kome/bao_cao.py.
 
 @dataclass(frozen=True)
 class TienDoNguoi:
