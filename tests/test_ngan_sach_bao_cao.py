@@ -101,6 +101,35 @@ def test_ve_luy_ke_khong_no_khi_chua_co_chi_tieu(conn, batch):
     assert ve_luy_ke(tien_do_ngan_sach(conn))["co"] is False
 
 
+def test_ve_luy_ke_tra_toa_do_nhan_truc_hoanh(conn, batch):
+    """[Vòng soát cuối, việc 10] `nhan` từng là list chuỗi TRẦN không kèm
+    toạ độ nên template bỏ qua luôn — biểu đồ luỹ kế không nói điểm nào là
+    tháng nào. Giờ mỗi mục phải mang `x` (toạ độ SVG) và `thang`."""
+    _ban(conn, batch, date(2026, 7, 31), "0104")
+    _chi_tieu(conn, "0104", date(2026, 7, 1), 6_000_000)
+    lk = ve_luy_ke(tien_do_ngan_sach(conn))
+    assert lk["co"] is True
+    assert len(lk["nhan"]) == 12
+    assert lk["nhan"][0]["thang"] == "2025-08"
+    assert lk["nhan"][-1]["thang"] == "2026-07"
+    assert isinstance(lk["nhan"][0]["x"], float)
+    assert lk["nhan"][0]["x"] < lk["nhan"][-1]["x"], "tháng đầu phải ở BÊN TRÁI tháng cuối"
+
+
+def test_luy_ke_chi_tieu_DUNG_BANG_0_giu_nguyen_la_0_khong_thanh_None(conn, batch):
+    """[Vòng soát cuối, việc 10] `ngan_sach=c_ns if c_ns else None` từng lẫn
+    "luỹ kế chỉ tiêu đúng bằng 0" (mọi tháng tới giờ đều đặt = 0, hoặc chưa
+    ai đặt) với "chưa có dữ liệu để vẽ" — đúng cái lẫn 0-khác-chưa-đặt mà cả
+    đợt 5a tồn tại để phân biệt (app.ngan_sach CHECK >= 0 cho phép muc_tieu
+    = 0 là một giá trị ĐÃ ĐẶT). Sau bản sửa (`is not None`), mốc 0 phải giữ
+    nguyên là số 0, không bị đổi thành None và biến mất khỏi đường luỹ kế."""
+    _ban(conn, batch, date(2026, 7, 31), "0104")
+    _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
+    td = tien_do_ngan_sach(conn)
+    thang_7 = next(m for m in td.luy_ke if m.thang == "2026-07")
+    assert thang_7.ngan_sach == 0, "0 hợp lệ phải giữ nguyên 0, không phải None"
+
+
 def test_trang_bao_cao_in_ro_thang_va_ngay_moc(client, conn, batch):
     """Khối phải nói nó đang nói về tháng nào và số liệu tới ngày nào."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
@@ -160,3 +189,102 @@ def test_trang_bao_cao_khong_no_khi_chi_tieu_bang_0(client, conn, batch):
     assert 'class="gia">0.0%' not in r.text, \
         "0% nói dối là đã đạt tiến độ, không phải KHÔNG có mẫu số"
     assert "0.0% chỉ tiêu" not in r.text
+
+
+# ---- vòng soát cuối, việc 2/3: "So cùng kỳ" đọc từ mart, không tính lại ---
+
+def test_cung_ky_AM_khong_ra_phan_tram_NGUOC_DAU(conn, batch):
+    """[CRITICAL, vòng soát cuối việc 2] Doanh thu thuần một tháng của MỘT
+    nhân viên có thể ÂM do 赤伝 (phiếu đỏ, luật cấm lọc bỏ). Bản Jinja cũ tính
+    `(thuc_te / cung_ky - 1) * 100` thẳng trong template: thực tế dương chia
+    cho một mẫu số ÂM (nhưng khác 0) cho ra phần trăm NGƯỢC DẤU — trang nói
+    doanh thu SỤT trong khi thật ra nó TĂNG. `tang_truong` (đọc từ
+    mart.ban_theo_nhan_vien_thang_so_sanh, gate `> 0`) phải là None, KHÔNG
+    phải một con số âm khổng lồ."""
+    _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
+    # Cùng kỳ năm trước (2025-07) của CHÍNH người này: net ÂM (một phiếu đỏ
+    # lớn hơn phần bán được).
+    _ban(conn, batch, date(2025, 7, 11), "0104", amount=-60_000, tax=-10_000,
+         gp=-20_000, khach="000000009293")
+    td = tien_do_ngan_sach(conn)
+    n = next(x for x in td.nguoi if x.ma == "0104")
+    assert n.co_cung_ky is True, "có dòng cùng kỳ (dù âm) thì co_cung_ky phải TRUE"
+    assert n.cung_ky == -50_000
+    assert n.tang_truong is None, \
+        "mẫu số ÂM không có tỷ lệ tăng trưởng nào đọc được — phải là None"
+
+
+def test_trang_bao_cao_khong_hien_phan_tram_nguoc_dau_khi_cung_ky_am(client, conn, batch):
+    _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
+    _ban(conn, batch, date(2025, 7, 11), "0104", amount=-60_000, tax=-10_000,
+         gp=-20_000, khach="000000009293")
+    r = client.get("/bao-cao")
+    assert r.status_code == 200
+    # Công thức cũ (100.000 / -50.000 - 1) * 100 = -300.0%.
+    assert "-300.0%" not in r.text and "+-300.0%" not in r.text
+
+
+def test_cung_ky_TON_TAI_nhung_BAN_0_DONG_hien_0_khong_hien_khong_co_du_lieu(
+        conn, batch):
+    """[IMPORTANT, vòng soát cuối việc 3] "Không có dữ liệu" chỉ đúng khi
+    tháng cùng kỳ KHÔNG TỒN TẠI trong kho (trước 2025-03-03). Một tháng CÓ
+    dữ liệu mà người này bán ròng 0 đồng (ví dụ một dòng amount=tax=gp=0, hay
+    bán rồi trả đủ) là sự thật ¥0 — khác "không biết"."""
+    _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
+    _ban(conn, batch, date(2025, 7, 11), "0104", amount=0, tax=0, gp=0,
+         khach="000000009293")
+    td = tien_do_ngan_sach(conn)
+    n = next(x for x in td.nguoi if x.ma == "0104")
+    assert n.co_cung_ky is True
+    assert n.cung_ky == 0
+
+
+def test_trang_bao_cao_hien_0_dong_khong_hien_khong_co_du_lieu(client, conn, batch):
+    _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
+    _ban(conn, batch, date(2025, 7, 11), "0104", amount=0, tax=0, gp=0,
+         khach="000000009293")
+    r = client.get("/bao-cao")
+    assert r.status_code == 200
+    assert "không có dữ liệu" not in r.text
+    assert "¥0</td>" in r.text
+
+
+# ---- vòng soát cuối, việc 9: thanh tiến độ CSS thuần -----------------------
+
+def test_pct_rong_kep_am_ve_0_khong_ve_am(conn, batch):
+    """[IMPORTANT] Thực tế ÂM (赤伝) không được vẽ thành chiều rộng âm."""
+    from kome.bao_cao import _pct_rong
+    assert _pct_rong(-50_000, 1_000_000) == 0.0
+
+
+def test_pct_rong_kep_vuot_ve_100(conn, batch):
+    """Vượt chỉ tiêu không được vẽ tràn khỏi khung."""
+    from kome.bao_cao import _pct_rong
+    assert _pct_rong(2_000_000, 1_000_000) == 100.0
+
+
+def test_pct_rong_mau_so_0_hoac_None_tra_None(conn, batch):
+    """Chỉ tiêu 0 hoặc chưa đặt: không thanh nào để vẽ, không chia cho 0."""
+    from kome.bao_cao import _pct_rong
+    assert _pct_rong(500_000, 0) is None
+    assert _pct_rong(500_000, None) is None
+
+
+def test_trang_bao_cao_khong_ve_thanh_am_khi_thuc_te_am(client, conn, batch):
+    """[CRITICAL] Toàn nhóm có thực tế ÂM (nhiều 赤伝 hơn doanh số) vẫn phải
+    ra trang 200, không có chiều rộng CSS âm nào lọt ra HTML."""
+    _ban(conn, batch, date(2026, 7, 31), "0104", amount=-60_000, tax=-10_000,
+         gp=-20_000)
+    _chi_tieu(conn, "0104", date(2026, 7, 1), 1_000_000)
+    r = client.get("/bao-cao")
+    assert r.status_code == 200
+    assert "width:-" not in r.text, "không được vẽ chiều rộng thanh ÂM"
+
+
+def test_trang_bao_cao_khong_ve_thanh_khi_chi_tieu_bang_0(client, conn, batch):
+    """Chỉ tiêu bằng 0: không có mẫu số để vẽ thanh nào — không được chia
+    cho 0 làm trang 500."""
+    _ban(conn, batch, date(2026, 7, 31), "0104")
+    _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
+    r = client.get("/bao-cao")
+    assert r.status_code == 200

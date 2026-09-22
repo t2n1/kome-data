@@ -155,13 +155,97 @@ def test_co_moi_mac_dinh_FALSE(conn):
     assert r[0] is False
 
 
+# ---- 027: vòng soát cuối — mart.ban_theo_nhan_vien_thang_so_sanh ----------
+
+def test_so_sanh_cung_ky_AM_khong_ra_tang_truong_nguoc_dau(conn, batch):
+    """[CRITICAL, vòng soát cuối việc 2] Kiểm THẲNG ở tầng view — không qua
+    kome/bao_cao.py — rằng gate `> 0` (không phải `<> 0`) chặn đúng mẫu số
+    ÂM do 赤伝. `100.000 / -50.000 - 1 = -3.0`, tức -300%: một con số nói
+    doanh thu SỤT trong khi thật ra nó TĂNG."""
+    _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
+    _ban(conn, batch, date(2025, 7, 11), "0104", amount=-60_000, tax=-10_000,
+         gp=-20_000, khach="000000009293")
+    r = conn.execute(
+        """SELECT dt_cung_ky, co_cung_ky, tang_truong
+           FROM mart.ban_theo_nhan_vien_thang_so_sanh
+           WHERE thang = '2026-07' AND salesperson_code = '0104'""").fetchone()
+    assert r[0] == -50_000
+    assert r[1] is True, "có dòng cùng kỳ (dù âm) thì co_cung_ky phải TRUE"
+    assert r[2] is None, "mẫu số ÂM không có tỷ lệ tăng trưởng đọc được"
+
+
+def test_so_sanh_cung_ky_TON_TAI_ban_0_dong_khac_KHONG_TON_TAI(conn, batch):
+    """[IMPORTANT, vòng soát cuối việc 3] "co_cung_ky = false" CHỈ đúng khi
+    tháng cùng kỳ KHÔNG có dòng nào trong mart.ban_theo_nhan_vien_thang (ví
+    dụ trước 2025-03-03). Một tháng CÓ dòng mà tổng ròng bằng 0 phải cho
+    `co_cung_ky = true, dt_cung_ky = 0` — khác hẳn "không tồn tại"."""
+    _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
+    _ban(conn, batch, date(2025, 7, 11), "0104", amount=0, tax=0, gp=0,
+         khach="000000009293")
+    r = conn.execute(
+        """SELECT dt_cung_ky, co_cung_ky, tang_truong
+           FROM mart.ban_theo_nhan_vien_thang_so_sanh
+           WHERE thang = '2026-07' AND salesperson_code = '0104'""").fetchone()
+    assert r[0] == 0
+    assert r[1] is True
+    assert r[2] is None, "mẫu số 0 cũng không có tỷ lệ tăng trưởng đọc được"
+
+    # Không CHÈN gì cho 2024-07 (trước cả 2025-03-03) — không có dòng nào để
+    # có, nên co_cung_ky của tháng ĐÓ (nếu nó xuất hiện) phải là false. Kiểm
+    # gián tiếp: 2024-07 không hề có mặt trong view (không có t.thang ứng).
+    khong_co = conn.execute(
+        """SELECT 1 FROM mart.ban_theo_nhan_vien_thang_so_sanh
+           WHERE thang = '2024-07' AND salesperson_code = '0104'""").fetchone()
+    assert khong_co is None
+
+
+# ---- 027: vòng soát cuối — sua_boi ON DELETE SET NULL ----------------------
+
+def test_xoa_tai_khoan_da_tung_sua_ngan_sach_van_xoa_duoc(conn):
+    """[CRITICAL, vòng soát cuối việc 7] docs/runbook.md và
+    scripts/tao_nguoi_dung.py dạy thẳng "cần chặn một người đã nghỉ việc /
+    cần cắt NGAY thì xoá tài khoản: họ bị chặn ở lượt bấm kế tiếp" —
+    kome/web/nguoi_dung.py::theo_id() dựa vào việc DELETE đó THÀNH CÔNG.
+    Trước bản sửa, `sua_boi REFERENCES app.nguoi_dung` (ON DELETE mặc định
+    NO ACTION) chặn đúng thủ tục đó cho tài khoản ĐÃ TỪNG sửa ngân sách —
+    tức chính chủ DN, người CẦN cắt quyền khẩn cấp nhất. Vì
+    app.ngan_sach_nhat_ky không bao giờ xoá dòng, chặn đó là VĨNH VIỄN.
+
+    Sau bản sửa (ON DELETE SET NULL): xoá được, và dòng ngân sách + dòng
+    nhật ký VẪN CÒN NGUYÊN với sua_boi = NULL — giữ lại nhật ký quan trọng
+    hơn giữ lại tên người sửa."""
+    from kome.ngan_sach import luu
+    from kome.web import nguoi_dung as ND
+    uid = ND.tao(conn, "chu", "mat-khau-cua-chu-2026", ngan_sach=True)
+    conn.commit()
+    luu(conn, {("0104", "2026-05"): 9_000_000}, uid)
+    conn.commit()
+
+    conn.execute("DELETE FROM app.nguoi_dung WHERE id = %s", (uid,))
+    conn.commit()
+
+    r = conn.execute(
+        "SELECT muc_tieu, sua_boi FROM app.ngan_sach "
+        "WHERE salesperson_code = '0104' AND thang = '2026-05-01'").fetchone()
+    assert r == (9_000_000, None), "dòng ngân sách phải CÒN, sua_boi thành NULL"
+
+    r2 = conn.execute(
+        "SELECT muc_tieu_moi, sua_boi FROM app.ngan_sach_nhat_ky "
+        "WHERE salesperson_code = '0104' AND thang = '2026-05-01'").fetchone()
+    assert r2 == (9_000_000, None), "dòng nhật ký phải CÒN, sua_boi thành NULL"
+
+
 def test_bon_view_moi_deu_cap_SELECT_cho_ca_ba_vai_tro(conn):
     """[IMPORTANT] ALTER DEFAULT PRIVILEGES của 009 KHÔNG kể tên kome_ingest,
     nên view mới của `mart` không tự có quyền cho vai trò đó. Mọi migration
-    thêm view vào `mart` (014, 020, 021, 023, 024, 025) đều phải kết thúc
-    bằng một dòng GRANT tường minh. Quên dòng đó thì lỗi không nổ ra lúc
+    thêm view vào `mart` (014, 020, 021, 023, 024, 025, 027) đều phải kết
+    thúc bằng một dòng GRANT tường minh. Quên dòng đó thì lỗi không nổ ra lúc
     migration chạy — nó nổ bằng `permission denied` nhiều tháng sau, giữa lúc
-    có người đang nạp dữ liệu lúc 13:30."""
+    có người đang nạp dữ liệu lúc 13:30.
+
+    [Vòng soát cuối, việc 2/3] Mở rộng canh thêm
+    `ban_theo_nhan_vien_thang_so_sanh` (027) — view mới của vòng soát cuối
+    này, cùng lớp lỗi với bốn view kia."""
     thieu = conn.execute(
         """SELECT c.relname, r.rolname
            FROM pg_class c
@@ -170,7 +254,8 @@ def test_bon_view_moi_deu_cap_SELECT_cho_ca_ba_vai_tro(conn):
                       AS r(rolname)
            WHERE n.nspname = 'mart'
              AND c.relname IN ('ngay_kinh_doanh', 'ngan_sach_thang',
-                               'ban_theo_nhan_vien_thang', 'tien_do_ngan_sach')
+                               'ban_theo_nhan_vien_thang', 'tien_do_ngan_sach',
+                               'ban_theo_nhan_vien_thang_so_sanh')
              AND NOT has_table_privilege(r.rolname, c.oid, 'SELECT')
            ORDER BY 1, 2""").fetchall()
     assert thieu == [], f"thiếu SELECT: {thieu}"

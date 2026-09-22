@@ -191,6 +191,25 @@ def ve_bieu_do(thang: list[O]) -> dict:
 # nếp của mọi module khác trong repo — không có vòng nhập nào vì
 # kome/ngan_sach.py không nhập kome/bao_cao.py.
 
+def _pct_rong(tu_so, mau_so) -> float | None:
+    """Phần trăm chiều rộng một thanh/vạch mốc tiến độ, KẸP về [0, 100].
+
+    Hình học thuần tuý cho việc VẼ (cùng nếp `ve_bieu_do`/`ve_luy_ke`), không
+    phải một định nghĩa chỉ số — con số ĐỌC ĐƯỢC đi kèm mỗi thanh vẫn lấy từ
+    `tien_do`/`muc_tieu_den_hom_nay` gốc (không kẹp), chỉ riêng CHIỀU RỘNG là
+    kẹp để không vẽ sai:
+      * mẫu số 0 hoặc NULL (chưa đặt chỉ tiêu, hoặc đặt bằng 0) -> None,
+        KHÔNG chia cho 0 — không thanh nào để vẽ.
+      * tử số ÂM (赤伝 — phiếu đỏ, doanh thu một tháng có thể âm) kẹp về 0:
+        không vẽ chiều rộng âm.
+      * tử số vượt mẫu số (đã vượt chỉ tiêu) kẹp về 100: thanh không tràn
+        khỏi khung.
+    """
+    if not mau_so:
+        return None
+    return max(0.0, min(float(tu_so or 0) / float(mau_so) * 100, 100.0))
+
+
 @dataclass(frozen=True)
 class TienDoNguoi:
     ma: str
@@ -200,6 +219,28 @@ class TienDoNguoi:
     muc_tieu_den_hom_nay: int | None
     tien_do: float | None
     cung_ky: int | None      # doanh thu cùng tháng năm trước, None nếu không có
+    # [Vòng soát cuối, việc 2/3] Hai cột dưới đọc THẲNG từ
+    # mart.ban_theo_nhan_vien_thang_so_sanh (027) — KHÔNG tính lại ở Python
+    # hay Jinja. `co_cung_ky` phân biệt "tháng cùng kỳ không tồn tại trong
+    # kho" (False) với "tồn tại nhưng người này bán 0 đồng" (True, cung_ky
+    # có thể là 0). `tang_truong` đã qua gate `> 0` ở view — không phải
+    # `n.thuc_te / n.cung_ky - 1` như bản Jinja cũ, thứ ăn cả mẫu số ÂM (赤伝)
+    # và in ra phần trăm NGƯỢC DẤU. Template chỉ nhân 100 và định dạng.
+    co_cung_ky: bool
+    tang_truong: float | None
+
+    @property
+    def rong_thanh(self) -> float | None:
+        """[Vòng soát cuối, việc 9] % chiều rộng thanh tiến độ của MỘT
+        người, kẹp [0, 100]. `_pct_rong` trả None khi `muc_tieu` là 0/None —
+        template không vẽ thanh nào cho người chưa được giao chỉ tiêu."""
+        return _pct_rong(self.thuc_te, self.muc_tieu)
+
+    @property
+    def rong_moc(self) -> float | None:
+        """Vị trí % của vạch mốc `muc_tieu_den_hom_nay` trên thanh của
+        người này, kẹp [0, 100]."""
+        return _pct_rong(self.muc_tieu_den_hom_nay, self.muc_tieu)
 
 
 @dataclass(frozen=True)
@@ -223,6 +264,20 @@ class TienDoNganSach:
     nguoi: list[TienDoNguoi]
     luy_ke: list[MocLuyKe]
     co_ngan_sach: bool
+
+    @property
+    def rong_thanh(self) -> float | None:
+        """[Vòng soát cuối, việc 9] % chiều rộng thanh tiến độ TOÀN NHÓM,
+        kẹp [0, 100]. None khi `muc_tieu` (tổng cả công ty) là 0 hoặc chưa
+        đặt — cùng hàm `_pct_rong` dùng cho từng người, một công thức một
+        chỗ."""
+        return _pct_rong(self.thuc_te, self.muc_tieu)
+
+    @property
+    def rong_moc(self) -> float | None:
+        """Vị trí % của vạch mốc `muc_tieu_den_hom_nay` trên thanh toàn
+        nhóm, kẹp [0, 100]."""
+        return _pct_rong(self.muc_tieu_den_hom_nay, self.muc_tieu)
 
 
 def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | None":
@@ -251,17 +306,39 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | 
     # mart.tien_do_ngan_sach và giống nhau ở mọi dòng của cùng một tháng.
     # Một lượt hỏi qua pooler Tokyo mất ~260 ms — không đáng cho hai con số
     # đã nằm sẵn trong kết quả.
+    #
+    # [Vòng soát cuối, việc 2/3/6] `dt_cung_ky`/`co_cung_ky`/`tang_truong`
+    # đọc THẲNG từ mart.ban_theo_nhan_vien_thang_so_sanh (027) — không còn
+    # phép chia nào ở Python hay Jinja, và `tang_truong` đã qua gate `> 0`
+    # đúng trong view (赤伝 làm doanh thu một tháng có thể ÂM).
+    #
+    # CTE `cung_ky` AS MATERIALIZED (ghi tường minh, không dựa vào mặc định
+    # của Postgres 12+): câu này tham chiếu "họ" ban_theo_nhan_vien_thang
+    # HAI LẦN — một lần ẩn bên trong mart.tien_do_ngan_sach (biến `b` trong
+    # định nghĩa view đó), một lần ở đây qua ban_theo_nhan_vien_thang_so_sanh
+    # (chính nó cũng tham chiếu ban_theo_nhan_vien_thang bên trong). Bất biến
+    # CLAUDE.md (ca kho_hang()): Postgres KHÔNG gộp hai lượt quét trùng nhau,
+    # mỗi lần tham chiếu là một lần gộp lại TOÀN BỘ mart.dong_ban. Lọc
+    # `thang = %s` NGAY TRONG CTE — không dựa vào WHERE của câu ngoài, vì
+    # WHERE đó áp lên `t.thang` (cột `coalesce(b.thang, n.thang)` của một
+    # FULL JOIN bên trong mart.tien_do_ngan_sach) và KHÔNG đẩy xuống được
+    # xuyên qua FULL JOIN — để ở ngoài thì nhánh CTE này vẫn gộp lại toàn bộ
+    # lịch sử bán mà không lọc gì.
     dong = conn.execute(
-            """SELECT t.salesperson_code, s.ten, t.thuc_te, t.muc_tieu,
-                      t.muc_tieu_den_hom_nay, t.tien_do, tr.doanh_thu_thuan,
+            """WITH cung_ky AS MATERIALIZED (
+                   SELECT salesperson_code, dt_cung_ky, co_cung_ky, tang_truong
+                   FROM mart.ban_theo_nhan_vien_thang_so_sanh
+                   WHERE thang = %s
+               )
+               SELECT t.salesperson_code, s.ten, t.thuc_te, t.muc_tieu,
+                      t.muc_tieu_den_hom_nay, t.tien_do,
+                      ck.dt_cung_ky, ck.co_cung_ky, ck.tang_truong,
                       t.ngay_kd, t.ngay_kd_da_qua
                FROM mart.tien_do_ngan_sach t
                LEFT JOIN core.dim_salesperson s
                       ON s.salesperson_code = t.salesperson_code
-               LEFT JOIN mart.ban_theo_nhan_vien_thang tr
-                      ON tr.salesperson_code = t.salesperson_code
-                     AND tr.thang = to_char(
-                           to_date(%s, 'YYYY-MM') - interval '1 year', 'YYYY-MM')
+               LEFT JOIN cung_ky ck
+                      ON ck.salesperson_code = t.salesperson_code
                WHERE t.thang = %s
                ORDER BY t.salesperson_code""", (thang, thang)).fetchall()
 
@@ -270,11 +347,17 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | 
         muc_tieu=int(x[3]) if x[3] is not None else None,
         muc_tieu_den_hom_nay=int(x[4]) if x[4] is not None else None,
         tien_do=float(x[5]) if x[5] is not None else None,
-        cung_ky=int(x[6]) if x[6] is not None else None) for x in dong]
+        cung_ky=int(x[6]) if x[6] is not None else None,
+        # `ck.co_cung_ky` là NULL khi không khớp CTE (người này không có
+        # dòng trong ban_theo_nhan_vien_thang cho ĐÚNG tháng đang xét) —
+        # coi như FALSE, cùng nghĩa "không có dữ liệu cùng kỳ để nói".
+        co_cung_ky=bool(x[7]),
+        tang_truong=float(x[8]) if x[8] is not None else None) for x in dong]
     # Tháng không có dòng nào (chọn một kỳ đã qua mà tháng cuối kỳ không có
     # doanh thu lẫn chỉ tiêu) -> 0/0. Khi đó `co_ngan_sach` cũng FALSE nên
     # màn hình hiện khối "chưa đặt chỉ tiêu", không hiện bộ đếm ngày.
-    ngay_kd, ngay_kd_da_qua = (dong[0][7], dong[0][8]) if dong else (0, 0)
+    # Chỉ số cột 9/10 (không còn 7/8): ba cột cung_ky mới chen vào giữa.
+    ngay_kd, ngay_kd_da_qua = (dong[0][9], dong[0][10]) if dong else (0, 0)
 
     # Luỹ kế 12 tháng của kỳ, VÀ tổng cả công ty của tháng đang xét — cùng một
     # câu. Alias bảng nguồn là `b`: câu này chỉ CỘNG DỒN các cột mart đã tính
@@ -301,7 +384,14 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | 
         luy_ke.append(MocLuyKe(
             thang=th,
             thuc_te=c_tt if th <= thang_hom_nay else None,
-            ngan_sach=c_ns if c_ns else None))
+            # [Vòng soát cuối, việc 10] `if c_ns else None` coi 0 và "chưa có
+            # gì" là MỘT — đúng cái lẫn "chỉ tiêu bằng 0 khác chưa đặt" mà cả
+            # đợt 5a này tồn tại để phân biệt (app.ngan_sach CHECK >= 0 cho
+            # phép muc_tieu = 0 là một giá trị ĐÃ ĐẶT). Luỹ kế chỉ tiêu đúng
+            # bằng 0 (ví dụ mọi tháng tới giờ đều đặt = 0) là một sự thật hợp
+            # lệ, không phải "chưa có dữ liệu để vẽ" — `is not None` giữ
+            # đúng con số 0 đó trên đường luỹ kế thay vì bỏ nó khỏi biểu đồ.
+            ngan_sach=c_ns if c_ns is not None else None))
 
     # Tổng công ty của tháng đang xét: dòng CHÍNH LÀ một trong những dòng
     # `theo_thang` vừa gộp — không hỏi thêm câu nào, không cộng gì ở Python.
@@ -345,7 +435,17 @@ def ve_luy_ke(td: "TienDoNganSach | None") -> dict:
             diem.append(f"{round(x, 1)},{round(y, 1)}")
         return " ".join(diem)
 
+    # [Vòng soát cuối, việc 10] Toạ độ trục hoành TÍNH SẴN ở đây, cùng nguyên
+    # tắc với ve_bieu_do (hình học ở Python, template chỉ vẽ). Bản trước trả
+    # `nhan` là một list chuỗi TRẦN không kèm toạ độ — template không biết đặt
+    # nhãn vào đâu nên bỏ qua luôn, và biểu đồ luỹ kế không nói điểm nào là
+    # tháng nào. Chỉ in tháng đầu/cuối và các mốc quý (company_fy_month chia
+    # hết cho 3) — in đủ 12 nhãn trên một trục 720px sẽ đè lên nhau.
+    nhan = [{"x": round(LE_T + i * buoc, 1), "thang": m.thang,
+             "hien": i == 0 or i == len(td.luy_ke) - 1 or (i + 1) % 3 == 0}
+            for i, m in enumerate(td.luy_ke)]
+
     return {"co": True, "rong": RONG, "cao": CAO, "dinh": dinh,
             "thuc_te": _duong(lambda m: m.thuc_te),
             "ngan_sach": _duong(lambda m: m.ngan_sach),
-            "nhan": [m.thang for m in td.luy_ke]}
+            "nhan": nhan}
