@@ -740,6 +740,13 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         Hai bảng tổng cộng từ `b.o` đã nằm sẵn trong bộ nhớ — KHÔNG thêm truy
         vấn nào. Ô chưa đặt không có mặt trong `b.o` nên nó không cộng vào
         tổng, đúng như phải thế: "chưa đặt" không phải "bằng không".
+
+        `co_nguoi`/`co_thang`/`co_bat_ky` (vòng sửa 1): CÓ ít nhất một ô đã
+        đặt cho hàng/cột/toàn bảng đó không. `sum()` trên một dải TRỐNG trả
+        `0`, và một dải TỔNG in thẳng `¥0` cho "chưa đặt gì" là trang tự mâu
+        thuẫn với chính dòng ghi chú "ô trống nghĩa là chưa đặt chỉ tiêu,
+        khác với đặt bằng không" ngay phía trên nó. Ba cờ này để template
+        chọn in `—` thay vì `¥0` khi không có ô nào đứng sau con số đó.
         """
         return {
             "b": b,
@@ -748,6 +755,9 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                            for n in b.nguoi},
             "tong_thang": {th: sum(v for (_, t), v in b.o.items() if t == th)
                            for th in b.thang},
+            "co_nguoi": {n.ma: any(m == n.ma for m, _ in b.o) for n in b.nguoi},
+            "co_thang": {th: any(t == th for _, t in b.o) for th in b.thang},
+            "co_bat_ky": bool(b.o),
         }
 
     @app.get("/ngan-sach", response_class=HTMLResponse)
@@ -775,22 +785,42 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         gõ. Ghi một nửa rồi báo lỗi là để người ta không biết nửa nào đã vào,
         và bắt gõ lại 60 ô vì một ô sai là cách chắc chắn để không ai dùng màn
         này lần thứ hai.
+
+        Vòng sửa 1: `ky` và việc tách tên ô giờ nằm TRONG `try`. Trước đó
+        `int(form.get("ky") or 0)` với `ky=abc`, hay `khoa.split("-", 1)`
+        với một tên ô méo (`o-` không kèm gì, hay `o-abc`) ném ValueError
+        NGOÀI mọi lưới bắt lỗi — ra thẳng "Internal Server Error" trần của
+        Starlette trên đúng màn GHI. Một tên ô méo giờ vào thẳng `loi` như
+        một ô rác — đúng bản chất của nó — thay vì làm nổ cả request; `ky`
+        méo vẫn rơi vào `except Exception` bên dưới, ra trang lỗi tiếng Việt
+        của `_loi` chứ không phải vết ngăn xếp tiếng Anh.
         """
         from kome.ngan_sach import LoiSo, bang_nhap, doc_so, luu
         form = await request.form()
-        ky = int(form.get("ky") or 0) or None
-        da_go = {k[2:]: str(v) for k, v in form.items() if k.startswith("o-")}
-
-        gia_tri, loi = {}, []
-        for khoa, chuoi in da_go.items():
-            ma, thang = khoa.split("-", 1)
-            try:
-                gia_tri[(ma, thang)] = doc_so(chuoi)
-            except LoiSo:
-                loi.append(khoa)
-
         nguoi = getattr(request.state, "nguoi", None)
         try:
+            ky = int(form.get("ky") or 0) or None
+            da_go = {k[2:]: str(v) for k, v in form.items() if k.startswith("o-")}
+
+            gia_tri, loi = {}, []
+            for khoa, chuoi in da_go.items():
+                # rsplit chứ không split: mã (`*コード`) là TEXT không ràng
+                # buộc định dạng, tự nó có thể mang dấu gạch ngang. `thang`
+                # thì LUÔN đúng khuôn 'YYYY-MM' (hai nhóm số ở cuối), nên
+                # tách từ PHẢI sang mới không lừa được. Tên ô không tách ra
+                # đúng ba phần (kể cả rỗng, hay chỉ một khúc chữ) là một ô
+                # rác — vào `loi`, không phải một lỗi lập trình.
+                phan = khoa.rsplit("-", 2)
+                if len(phan) != 3:
+                    loi.append(khoa)
+                    continue
+                ma, nam, thang_phan = phan
+                thang = f"{nam}-{thang_phan}"
+                try:
+                    gia_tri[(ma, thang)] = doc_so(chuoi)
+                except LoiSo:
+                    loi.append(khoa)
+
             with open_app_conn() as conn:
                 if loi:
                     b = bang_nhap(conn, ky)

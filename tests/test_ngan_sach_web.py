@@ -130,6 +130,24 @@ def test_mot_o_sai_thi_KHONG_ghi_o_nao(khach, conn, batch):
     assert 'value="9000000"' in r.text
 
 
+def test_ten_o_meo_mo_khong_no_500_tran_va_khong_ghi_dong_nao(khach, conn, batch):
+    """[Vòng sửa 1, việc 1] Trước bản sửa, `ky = int(form.get("ky") or 0)`
+    và `khoa.split("-", 1)` nằm NGOÀI mọi `try` trong `luu_ngan_sach`. Một
+    tên ô méo (`o-` không kèm gì) ném ValueError ra thẳng "Internal Server
+    Error" trần của Starlette — trên đúng màn GHI, nơi mất nửa chừng dễ bị
+    hiểu nhầm thành mất dữ liệu. Route giờ phải hoặc trả về đúng trang lỗi
+    tiếng Việt của app (`_loi`, 500) hoặc 400 kèm biểu mẫu — KHÔNG BAO GIỜ
+    vết ngăn xếp tiếng Anh trần — và không được ghi dòng nào trong cả hai
+    trường hợp."""
+    _ban(conn, batch)
+    c = khach()
+    r = c.post("/ngan-sach", data={"ky": "2026", "o-": "9000000"})
+    assert r.status_code in (400, 500), \
+        f"phải là 400 (biểu mẫu) hoặc 500 (trang lỗi tiếng Việt), thấy {r.status_code}"
+    assert "Internal Server Error" not in r.text
+    assert conn.execute("SELECT count(*) FROM app.ngan_sach").fetchone()[0] == 0
+
+
 def test_o_chua_dat_hien_TRONG_khong_hien_0(khach, conn, batch):
     """[CRITICAL] Hiện 0 cho thứ chưa biết là nói một điều sai bằng con số."""
     _ban(conn, batch)

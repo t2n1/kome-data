@@ -35,14 +35,14 @@
 
 <div class="chon-ky">
  {% for k in b.moi_ky %}
- <a href="/ngan-sach?ky={{ k }}"{% if k == b.company_fy %} class="dang-xem"{% endif %}>Kỳ {{ k }}</a>
+ <a href="/ngan-sach?ky={{ k }}"{% if k == b.company_fy %} class="dang-xem" aria-current="page"{% endif %}>Kỳ {{ k }}</a>
  {% endfor %}
 </div>
 
 {% if loi %}
 <div class="ngay-thieu">Có {{ loi|length }} ô không đọc được thành số —
-<strong>chưa ô nào được lưu</strong>. Sửa những ô viền đỏ rồi bấm Lưu lại.
-Chỉ nhận chữ số; dấu chấm, dấu phẩy và dấu cách đều bỏ qua được.</div>
+<strong>chưa ô nào được lưu</strong>. Sửa những ô được đánh dấu rồi bấm Lưu
+lại. Chỉ nhận chữ số; dấu chấm, dấu phẩy và dấu cách đều bỏ qua được.</div>
 {% endif %}
 
 <p class="ghi-chu">Ô để trống nghĩa là <strong>chưa đặt chỉ tiêu</strong>.
@@ -68,16 +68,20 @@ và màn Báo cáo hiện chúng khác nhau.</p>
      3. rỗng — CHƯA ĐẶT. Không in 0: "chưa đặt" khác "bằng không". #}
   <td><input type="text" inputmode="numeric" autocomplete="off"
        name="o-{{ khoa }}"
-       {% if khoa in loi %}class="sai"{% endif %}
+       aria-label="{{ n.ten }} — {{ th }}"
+       {% if khoa in loi %}class="sai" aria-invalid="true"{% endif %}
        value="{% if khoa in da_go %}{{ da_go[khoa] }}{% elif khoa in o_txt %}{{ "{:,}".format(o_txt[khoa]).replace(",", ".") }}{% endif %}"></td>
   {% endfor %}
-  <td class="so tong">¥{{ "{:,}".format(tong_nguoi[n.ma]).replace(",", ".") }}</td></tr>
+  {# "—" chứ không ¥0 khi người này chưa có ô nào được đặt: trang tự mâu
+     thuẫn với chính dòng ghi chú "ô trống nghĩa là chưa đặt chỉ tiêu" nếu
+     dải TỔNG lại in ra một con số 0 cụ thể cho đúng cái "chưa đặt" đó. #}
+  <td class="so tong">{% if co_nguoi[n.ma] %}¥{{ "{:,}".format(tong_nguoi[n.ma]).replace(",", ".") }}{% else %}—{% endif %}</td></tr>
  {% endfor %}
  <tr class="tong"><td>Cả nhóm</td>
   {% for th in b.thang %}
-  <td class="so">¥{{ "{:,}".format(tong_thang[th]).replace(",", ".") }}</td>
+  <td class="so">{% if co_thang[th] %}¥{{ "{:,}".format(tong_thang[th]).replace(",", ".") }}{% else %}—{% endif %}</td>
   {% endfor %}
-  <td class="so">¥{{ "{:,}".format(tong_nguoi.values() | sum).replace(",", ".") }}</td></tr>
+  <td class="so">{% if co_bat_ky %}¥{{ "{:,}".format(tong_nguoi.values() | sum).replace(",", ".") }}{% else %}—{% endif %}</td></tr>
 </table>
 </div>
 <button class="luu" type="submit">Lưu</button>
