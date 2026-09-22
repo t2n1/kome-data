@@ -324,8 +324,11 @@ Vì sao chỉ đụng ô đã đổi: `sua_luc`/`sua_boi` phải trả lời "ai
 cuối", không phải "ai bấm Lưu lần cuối". Ghi đè cả 60 ô mỗi lần bấm Lưu là xoá sạch
 thông tin đó và làm nhật ký đầy những dòng không có gì thay đổi.
 
-**Ngân sách truy vấn: `GET` không quá 4 lượt hỏi, `POST` không quá 3.** Có test đếm,
-như các màn khác.
+**Ngân sách truy vấn: `GET` không quá 4 lượt hỏi, `POST` không quá 4** — đọc hiện
+trạng · ghi những ô có giá trị mới · xoá những ô vừa bị để trống · ghi nhật ký. Một
+biểu mẫu chỉ đặt thêm chỉ tiêu (không xoá ô nào) chạy ba. Có test đếm, như các màn
+khác. Con số này đo **số lượt hỏi**, không đo sức tính: thứ nó tồn tại để cấm là vòng
+lặp một câu lệnh mỗi ô — 60 ô × 47 ms là gần ba giây chỉ để bấm một nút Lưu.
 
 ### 6.4 "Chưa đặt" khác "bằng không"
 
@@ -416,7 +419,7 @@ Chạy trên CSDL thử nghiệm (`DATABASE_URL_TEST`), tuần tự, như mọi 
 | `test_thu_hoi_co_an_ngay_khong_doi_het_ve` | Đổi cờ trong CSDL → lượt gọi kế tiếp đã bị chặn, không cần đăng nhập lại (§4.2) |
 | `test_mot_o_sai_thi_khong_ghi_o_nao` | Một ô chữ rác → toàn bộ biểu mẫu không ghi (§6.2) |
 | `test_chi_ghi_nhat_ky_cho_o_da_doi` | Bấm Lưu mà không đổi gì → 0 dòng nhật ký (§6.3) |
-| `test_ngan_sach_truy_van` | `GET` ≤ 4, `POST` ≤ 3 lượt hỏi (§6.3) |
+| `test_ngan_sach_truy_van` | `GET` ≤ 4, `POST` ≤ 4 lượt hỏi (§6.3) |
 | `test_ky_chua_co_doanh_thu_van_chon_duoc` | Kỳ không có dòng bán nào vẫn nằm trong dải chip (§6.1) |
 | `test_ty_suat_van_la_ty_so_cua_cac_tong` | `ban_theo_nhan_vien_thang.ty_suat` (§5.3) |
 | `test_migrate` (đã có) | Migration mới chạy được, và chạy lại không hỏng gì |
