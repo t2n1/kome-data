@@ -36,6 +36,14 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
    Thực tế công ty chỉ có HAI kho: `0001 茨城第１倉庫（出荷専用）` và `1002 新・賞味期限用`.
    Đặt tên kho cứng ở đâu đó (thay vì đọc từ `core.dim_warehouse`) là thêm một kho ảo
    vào mọi bộ lọc.
+7. `prefecture` của OBC là tên tỉnh chuẩn có hậu tố 都/道/府/県, đủ cả 47 tỉnh, và chỉ
+   **1 trên 1.710 khách** bỏ trống — cột sạch nhất đã gặp, nên khoá nối
+   (`core.dim_prefecture.ten` ↔ `core.dim_customer.prefecture`) là chính chuỗi tên,
+   không cần lớp chuẩn hoá. Đổi một ký tự trong `core.dim_prefecture.ten` là tỉnh đó
+   rỗng vĩnh viễn trên bản đồ khách hàng (`/ban-do`) mà không lỗi nào nổ ra — phép nối
+   chỉ lặng lẽ không khớp dòng nào. Có test canh:
+   `tests/test_ban_do.py::test_ten_tinh_khop_chuoi_OBC_that`,
+   `::test_ten_la_ten_ngan_cong_dung_MOT_hau_to_ca_47_dong`.
 
 ## Bốn vai trò CSDL (Task 13, `db/migrations/009_roles.sql`)
 Luật số một ("OBC chỉ đọc") không chỉ là quy ước trong code — nó là ràng
@@ -80,6 +88,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
+| `/ban-do` | Bản đồ khách hàng — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách | `core.dim_prefecture`, `mart.khach_theo_tinh` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
 | `/san-pham` | Danh mục mã hàng + tìm kiếm + lọc theo trạng thái tồn | `mart.san_pham_360` |
 | `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
@@ -313,6 +322,27 @@ Khác nhau có chủ ý và trang phải nói ra: ô đếm là để so sánh g
 đứng yên, còn "giá trị tồn chết của kho này" là con số người ta dùng để quyết định
 thanh lý — hiện tổng mọi kho bên cạnh một bảng đã lọc thì sai gần 2× ở công ty hai
 kho.
+
+**Bất biến:** bản đồ tỉnh (`/ban-do`) nối từ `core.dim_prefecture` **LEFT JOIN** sang
+số liệu khách (`mart.khach_theo_tinh`), KHÔNG `GROUP BY` trên khách rồi vẽ ra bấy
+nhiêu ô. Đổi thành `JOIN` (hay để `dim_prefecture` ở vế phải) là tỉnh chưa có khách
+nào — hoặc chưa có khách của MỘT người phụ trách cụ thể khi lọc theo `sale` — biến
+mất khỏi bản đồ, **mà trang vẫn vẽ ra bình thường, chỉ thiếu đúng một ô**, không lỗi
+nào nổ ra để lộ chuyện đó. Điều này đã có thể lộ ra ngay HÔM NAY, không cần lọc gì:
+`core.dim_customer` có đủ 47 tỉnh nhưng `mart.khach_360` chỉ 46 — 和歌山県 có 1 khách
+trong `dim_customer` nhưng khách đó chưa từng có dòng bán nào, nên không có dòng
+trong `khach_360` (view đó dựng từ `mart.lan_mua`, phải có ít nhất một lần bán). Bản
+đồ TỔNG (không lọc gì) phải hiện 和歌山県 là một ô "0 khách" — thấy nó trống là ĐÚNG,
+không phải dấu hiệu phép nối hỏng. Có test canh:
+`tests/test_ban_do.py::test_du_47_o_ke_ca_tinh_khong_co_khach`.
+
+**Bất biến:** `mart.khach_theo_tinh.can_goi` đếm bằng `EXISTS` trên
+`mart.khach_nhom_viec`, KHÔNG `LEFT JOIN` nó — cùng hình mẫu migration `022`. Một
+khách có thể thuộc NHIỀU nhóm việc cùng lúc (`im` và `tut` cùng lúc), nên JOIN thẳng
+sẽ NHÂN DÒNG khách lên và thổi phồng cả `so_khach` lẫn `doanh_thu_12t` của tỉnh đó,
+không chỉ `can_goi` — một tỉnh có nhiều khách vừa `im` vừa `tut` sẽ báo nhiều khách
+hơn số khách nó thật sự có. Có test canh:
+`tests/test_ban_do.py::test_khach_theo_tinh_dung_EXISTS_khong_JOIN_vao_khach_nhom_viec`.
 
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |
