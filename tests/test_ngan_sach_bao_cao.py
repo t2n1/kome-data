@@ -130,3 +130,33 @@ def test_tien_do_ngan_sach_khong_qua_3_truy_van(conn, batch, monkeypatch):
     monkeypatch.setattr(conn, "execute", demo)
     tien_do_ngan_sach(conn)
     assert dem["n"] <= 3, f"tien_do_ngan_sach() chạy {dem['n']} truy vấn"
+
+
+def test_chi_tieu_bang_0_la_HOP_LE_tien_do_None_khong_no(conn, batch):
+    """[CRITICAL, vòng sửa 2] muc_tieu = 0 là ĐÃ ĐẶT và đặt bằng không — khác
+    "chưa đặt" (không có dòng). CHECK (muc_tieu >= 0) của app.ngan_sach cho
+    phép nó, và màn /ngan-sach nhận nó. tien_do phải None (không có mẫu số
+    để chia), KHÔNG được để lộ ZeroDivisionError."""
+    _ban(conn, batch, date(2026, 7, 31), "0104")
+    _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
+    td = tien_do_ngan_sach(conn)
+    assert td.co_ngan_sach is True
+    assert td.muc_tieu == 0
+    assert td.tien_do is None
+
+
+def test_trang_bao_cao_khong_no_khi_chi_tieu_bang_0(client, conn, batch):
+    """[CRITICAL, vòng sửa 2] Không có test này thì bản sửa chỉ là lời hứa:
+    24 test cũ không ca nào đặt chỉ tiêu bằng 0, nên lỗi 500 (None * 100 và
+    chia cho 0 ở thẻ "Mốc đến hôm nay") lọt qua hết."""
+    _ban(conn, batch, date(2026, 7, 31), "0104")
+    _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
+    r = client.get("/bao-cao")
+    assert r.status_code == 200
+    assert "—" in r.text
+    # So khớp đúng giá trị được RENDER trong ô .gia — không so "0.0%" trần,
+    # vì "30.0%" (Tỷ suất lãi gộp của khối cũ, không liên quan) chứa sẵn
+    # chuỗi con "0.0%" và sẽ làm test đỏ giả (dương tính giả) nếu so trần.
+    assert 'class="gia">0.0%' not in r.text, \
+        "0% nói dối là đã đạt tiến độ, không phải KHÔNG có mẫu số"
+    assert "0.0% chỉ tiêu" not in r.text
