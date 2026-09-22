@@ -109,3 +109,34 @@ def test_sale_thieu_gia_tri_bao_loi_khong_tao_gi(conn):
     assert chay(["them", "an", "--sale"], conn, _doc(MK, MK)) != 0
     conn.rollback()
     assert ND.liet_ke(conn) == []
+
+
+def test_cap_co_ngan_sach_KHONG_dung_toi_co_kho_du_lieu(conn, capsys):
+    """[CRITICAL] Hai cờ độc lập. Một lệnh cấp quyền ngân sách mà âm thầm thu
+    hồi quyền Kho dữ liệu là mất quyền nạp dữ liệu của người phụ trách nạp —
+    và không ai biết cho tới 13:30 hôm sau."""
+    from kome.web import nguoi_dung as ND
+    ND.tao(conn, "an", "mat-khau-cua-an-2026", kho_du_lieu=True)
+    conn.commit()
+    ND.dat_quyen(conn, "an", ngan_sach=True)
+    conn.commit()
+    n = ND.liet_ke(conn)[0]
+    assert n.duoc_vao_kho_du_lieu is True and n.duoc_sua_ngan_sach is True
+
+
+def test_bo_co_ngan_sach(conn):
+    from kome.web import nguoi_dung as ND
+    ND.tao(conn, "an", "mat-khau-cua-an-2026", ngan_sach=True)
+    conn.commit()
+    ND.dat_quyen(conn, "an", ngan_sach=False)
+    conn.commit()
+    assert ND.liet_ke(conn)[0].duoc_sua_ngan_sach is False
+
+
+def test_liet_ke_hien_cot_ngan_sach(conn, capsys):
+    from kome.web import nguoi_dung as ND
+    from scripts.tao_nguoi_dung import chay
+    ND.tao(conn, "an", "mat-khau-cua-an-2026", ngan_sach=True)
+    conn.commit()
+    chay([], conn)
+    assert "Ngân sách" in capsys.readouterr().out

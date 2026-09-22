@@ -92,6 +92,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
 | `/ban-do` | Bản đồ khách hàng — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách | `core.dim_prefecture`, `mart.khach_theo_tinh` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
+| `/ngan-sach` | Đặt chỉ tiêu doanh thu: 5 người phụ trách × 12 tháng một kỳ. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
 | `/san-pham` | Danh mục mã hàng + tìm kiếm + lọc theo trạng thái tồn | `mart.san_pham_360` |
 | `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
 | `/kho-hang` | Bốn ô tổng quan tồn kho · bảng tồn · cận hạn/quá hạn · giá trị theo kho | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
@@ -364,6 +365,57 @@ khi chính ô đó in `¥-123.456`. Số âm tham gia chia phân vị như mọi
 và chú giải in ra khoảng THẬT, kể cả khi khoảng đó âm. Có test canh:
 `tests/test_ban_do.py::test_doanh_thu_AM_khong_roi_vao_bac_TRONG`.
 
+**Bất biến:** `mart.tien_do_ngan_sach` nối chỉ tiêu với thực tế bằng **`FULL
+JOIN`**, không `LEFT JOIN` theo chiều nào cả. Nối từ chỉ tiêu sang thực tế thì
+tháng có doanh thu mà QUÊN đặt chỉ tiêu biến mất khỏi báo cáo; nối ngược lại
+thì người CÓ chỉ tiêu mà bán 0 đồng biến mất — đúng người cần nhìn nhất thì
+không có dòng nào. Cả hai chiều đều mất dòng **mà trang vẫn vẽ ra bình
+thường**, không lỗi nào nổ ra, cùng lớp lỗi đã ghi cho `/ban-do`. Đo thật
+2026-09-22: dữ liệu bán có **6** mã phụ trách (`0000` `0002` `0004` `0102`
+`0104` `0105`) trong khi `core.dim_salesperson` chỉ có **5** — `0000` có 1
+khách và ¥28.981 doanh thu kỳ 7 và không bao giờ đặt được chỉ tiêu (khoá ngoại
+chặn), nên phép nối xuất phát từ chỉ tiêu làm số tiền đó bốc hơi. Màn hình
+hiện nó thành một dòng "(mã không có trong danh sách phụ trách)". Có test
+canh: `tests/test_ngan_sach_mart.py::test_nguoi_co_chi_tieu_ma_KHONG_ban_duoc_dong_nao_van_co_dong`,
+`::test_thang_co_doanh_thu_ma_QUEN_dat_chi_tieu_van_co_dong`,
+`::test_ma_phu_trach_ngoai_dim_salesperson_van_hien_doanh_thu`.
+
+**Bất biến:** `app.ngan_sach.thang` là **`date` mùng 1 có khoá ngoại tới
+`core.dim_date`**, không phải `text 'YYYY-MM'`. `core.dim_date` phủ 2024-01-01
+→ 2035-12-31, và `mart.ngan_sach_thang` nối sang nó để lấy `company_fy` — nên
+một dòng chỉ tiêu ngoài dải lịch **biến mất khỏi mọi báo cáo mà không lỗi nào
+nổ ra**: dữ liệu còn trong bảng, chỉ là không ai nhìn thấy nữa. Khoá ngoại
+biến nó thành một lỗi ghi ngay tại chỗ nhập. Việc đổi `date` sang `'YYYY-MM'`
+xảy ra ở **đúng một chỗ** — `mart.ngan_sach_thang` — vì mọi view khác của
+`mart` đều dùng khoá tháng dạng chuỗi.
+
+**Bất biến:** **không có dòng** trong `app.ngan_sach` = *chưa đặt chỉ tiêu*;
+`muc_tieu = 0` = *đã đặt và đặt bằng không*. Màn nhập để ô trống cho cái thứ
+nhất và in `0` cho cái thứ hai; `kome.ngan_sach.doc_so("")` trả `None` chứ
+không trả `0`. Cùng nếp `mart.san_pham_360.ton` — hiện `0` cho thứ chưa biết
+là nói một điều sai bằng con số. Và `kome.ngan_sach.luu()` **chỉ đụng những ô
+đã đổi**: `sua_luc`/`sua_boi` phải trả lời "ai đổi con số NÀY lần cuối", không
+phải "ai bấm Lưu lần cuối".
+
+**Bất biến:** `core.dim_date` **không có cột ngày lễ Nhật**, nên
+`mart.ngay_kinh_doanh` chỉ loại thứ Bảy và Chủ nhật. Tháng có Tuần lễ Vàng
+(5月) hay Obon (8月) bị đếm thừa 2–4 ngày làm việc và vạch mốc "đáng lẽ đạt
+tới hôm nay" **khắt khe hơn thực tế** ở đúng những tháng đó. Đây là hạn chế
+CÓ TÊN, không phải thiếu sót chưa ai để ý: đừng "sửa" bằng cách bịa một định
+nghĩa thứ hai (ví dụ "ngày có phiếu bán") — hai định nghĩa cùng tên là hai con
+số nói hai điều. Cách sửa đúng là thêm cột ngày lễ vào `core.dim_date`, và đó
+là một việc riêng.
+
+**Bất biến:** `POST /ngan-sach` KHÔNG bị chế độ chỉ-đọc (`_chi_doc`) chặn, nên
+bản Vercel công khai SỬA ĐƯỢC ngân sách — và đó là chủ ý, không phải sót. Lý
+do: `_chi_doc` tồn tại vì **giới hạn nền tảng của luồng NẠP OBC** (mỗi yêu cầu
+bị chặn ở 4,5 MB trong khi `売上伝票データ` nặng ~100 MB; nạp một quý mất ~88
+giây, vượt giới hạn thời gian chạy), **không phải vì phân quyền**. Ghi 60 số
+nguyên nằm thừa trong giới hạn đó. Và bản Vercel là bản chạy **duy nhất bắt
+buộc** có `KOME_SESSION_SECRET`, tức là nơi cờ quyền LUÔN được thi hành — máy
+trong công ty mới là nơi có thể không có cổng nào. Chặn màn nhập ở Vercel là
+lấy nó đi đúng ở chỗ nó an toàn nhất.
+
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |
 |---|---|---|
@@ -415,8 +467,9 @@ riêng là để cá nhân hoá, không phải để chặn. Không được th�
 ở máy trong công ty là **không có đăng nhập và không có phân quyền**: ai mở
 được trang cũng bấm được nút Hoàn tác — nút xoá được cả một tháng doanh thu.
 Bản Vercel không dính (nó từ chối khởi động nếu thiếu khoá), nhưng bản Vercel
-cũng không nạp/hoàn tác được gì. Nói cách khác: **cờ quyền chỉ bảo vệ được cái
-nút nguy hiểm khi máy trong công ty CŨNG đặt `KOME_SESSION_SECRET`.**
+cũng không nạp/hoàn tác được gì. Nói cách khác: **hai cờ quyền (`duoc_vao_kho_du_lieu` và `duoc_sua_ngan_sach`)
+chỉ bảo vệ được nút Hoàn tác và màn Ngân sách khi máy trong công ty CŨNG đặt
+`KOME_SESSION_SECRET`.**
 
 Tạo và sửa tài khoản: `python scripts/tao_nguoi_dung.py` (xem `docs/runbook.md`).
 

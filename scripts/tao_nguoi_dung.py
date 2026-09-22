@@ -7,6 +7,9 @@ Chạy (từ thư mục dự án, cả PowerShell lẫn Git Bash đều được
     python scripts/tao_nguoi_dung.py doi-mat-khau an
     python scripts/tao_nguoi_dung.py quyen an --kho-du-lieu
     python scripts/tao_nguoi_dung.py quyen an --bo-kho-du-lieu
+    python scripts/tao_nguoi_dung.py them chu --ngan-sach
+    python scripts/tao_nguoi_dung.py quyen chu --ngan-sach
+    python scripts/tao_nguoi_dung.py quyen chu --bo-ngan-sach
     (thêm --test ở cuối để chạy trên CSDL thử nghiệm)
 
 Script tự đọc .env, không cần nạp biến môi trường trước. Nó nối bằng
@@ -24,6 +27,14 @@ Dựng màn hình khi số tài khoản đủ nhiều để việc sửa tay th�
 --kho-du-lieu là quyền vào màn Kho dữ liệu: nạp file VÀ hoàn tác một lần nạp.
 Hoàn tác nhầm lô đối soát tháng sẽ xoá cả một tháng doanh thu khỏi kho. Chỉ
 cấp cho người phụ trách nạp và chủ doanh nghiệp.
+
+--ngan-sach là quyền vào màn Ngân sách: đặt và sửa chỉ tiêu doanh thu của
+từng nhân viên từng tháng. Con số đó là thước đo mà cả công ty được đánh giá
+theo. Chỉ cấp cho chủ doanh nghiệp.
+
+CẠM BẪY: cả hai cờ chỉ có tác dụng khi máy này CÓ đặt KOME_SESSION_SECRET.
+Để trống biến đó là không có cổng đăng nhập và không có phân quyền — ai mở
+được trang cũng bấm được nút Hoàn tác VÀ sửa được ngân sách.
 """
 import getpass
 import sys
@@ -38,9 +49,10 @@ from kome.web import nguoi_dung as ND
 DAI_TOI_THIEU = 12
 
 HUONG_DAN = """    python scripts/tao_nguoi_dung.py                        liệt kê tài khoản
-    python scripts/tao_nguoi_dung.py them <tên> [--sale <mã>] [--kho-du-lieu]
+    python scripts/tao_nguoi_dung.py them <tên> [--sale <mã>] [--kho-du-lieu] [--ngan-sach]
     python scripts/tao_nguoi_dung.py doi-mat-khau <tên>
     python scripts/tao_nguoi_dung.py quyen <tên> --kho-du-lieu | --bo-kho-du-lieu
+    python scripts/tao_nguoi_dung.py quyen <tên> --ngan-sach | --bo-ngan-sach
     (thêm --test ở cuối để chạy trên CSDL thử nghiệm)"""
 
 
@@ -62,21 +74,27 @@ def liet_ke(conn) -> int:
     if not ds:
         print("Chưa có tài khoản nào. Tạo bằng:  python scripts/tao_nguoi_dung.py them <tên>")
         return 0
-    print(f"{'Tên đăng nhập':<20}{'Mã sale':<10}{'Phụ trách':<24}Kho dữ liệu")
-    print("-" * 70)
+    print(f"{'Tên đăng nhập':<20}{'Mã sale':<10}{'Phụ trách':<24}"
+          f"{'Kho dữ liệu':<14}Ngân sách")
+    print("-" * 84)
     for n in ds:
         print(f"{n.ten_dang_nhap:<20}{n.salesperson_code or '—':<10}"
-              f"{n.ten_sale or '—':<24}{'CÓ' if n.duoc_vao_kho_du_lieu else '—'}")
+              f"{n.ten_sale or '—':<24}"
+              f"{('CÓ' if n.duoc_vao_kho_du_lieu else '—'):<14}"
+              f"{'CÓ' if n.duoc_sua_ngan_sach else '—'}")
     print("\nKho dữ liệu = được nạp file VÀ hoàn tác lần nạp (xoá dữ liệu khỏi kho).")
+    print("Ngân sách   = được đặt và sửa chỉ tiêu doanh thu của cả công ty.")
     return 0
 
 
-def them(conn, ten: str, sale: str | None, kho_du_lieu: bool, doc_mat_khau) -> int:
+def them(conn, ten: str, sale: str | None, kho_du_lieu: bool,
+         ngan_sach: bool, doc_mat_khau) -> int:
     mk = _hoi_mat_khau(doc_mat_khau)
     if mk is None:
         return 1
     try:
-        ND.tao(conn, ten, mk, salesperson_code=sale, kho_du_lieu=kho_du_lieu)
+        ND.tao(conn, ten, mk, salesperson_code=sale, kho_du_lieu=kho_du_lieu,
+               ngan_sach=ngan_sach)
     except psycopg.errors.UniqueViolation:
         conn.rollback()
         print(f"Đã có tài khoản tên '{ten}'. Đổi mật khẩu bằng:  "
@@ -91,8 +109,10 @@ def them(conn, ten: str, sale: str | None, kho_du_lieu: bool, doc_mat_khau) -> i
     conn.commit()
     print(f"Đã tạo '{ten}'"
           + (f", phụ trách mã {sale}" if sale else ", không phụ trách khách nào")
-          + (", CÓ quyền vào Kho dữ liệu." if kho_du_lieu
-             else ", không có quyền vào Kho dữ liệu."))
+          + (", CÓ quyền vào Kho dữ liệu" if kho_du_lieu
+             else ", không có quyền vào Kho dữ liệu")
+          + (", CÓ quyền sửa Ngân sách." if ngan_sach
+             else ", không có quyền sửa Ngân sách."))
     return 0
 
 
@@ -111,13 +131,25 @@ def doi_mat_khau(conn, ten: str, doc_mat_khau) -> int:
     return 0
 
 
-def quyen(conn, ten: str, kho_du_lieu: bool) -> int:
-    if not ND.dat_quyen(conn, ten, kho_du_lieu):
+def quyen(conn, ten: str, kho_du_lieu: bool | None,
+          ngan_sach: bool | None) -> int:
+    """`None` = KHÔNG đụng tới cờ đó.
+
+    Truyền False thay cho None sẽ làm lệnh "cấp quyền ngân sách" âm thầm thu
+    hồi quyền Kho dữ liệu của cùng người — tức mất quyền nạp dữ liệu của
+    người phụ trách nạp, và không ai biết cho tới 13:30 hôm sau.
+    """
+    if not ND.dat_quyen(conn, ten, kho_du_lieu=kho_du_lieu, ngan_sach=ngan_sach):
         print(f"Không có tài khoản tên '{ten}'. Chạy không tham số để xem danh sách.")
         return 1
     conn.commit()
-    print(f"'{ten}' " + ("GIỜ vào được" if kho_du_lieu else "KHÔNG còn vào được")
-          + " màn Kho dữ liệu. Có hiệu lực ngay ở lượt bấm kế tiếp của họ.")
+    if kho_du_lieu is not None:
+        print(f"'{ten}' " + ("GIỜ vào được" if kho_du_lieu else "KHÔNG còn vào được")
+              + " màn Kho dữ liệu.")
+    if ngan_sach is not None:
+        print(f"'{ten}' " + ("GIỜ sửa được" if ngan_sach else "KHÔNG còn sửa được")
+              + " Ngân sách.")
+    print("Có hiệu lực ngay ở lượt bấm kế tiếp của họ.")
     return 0
 
 
@@ -138,6 +170,8 @@ def chay(argv: list[str], conn, doc_mat_khau=None) -> int:
     ten = next((a for a in phan_con_lai if not a.startswith("--")), None)
     kho = "--kho-du-lieu" in phan_con_lai
     bo_kho = "--bo-kho-du-lieu" in phan_con_lai
+    ns = "--ngan-sach" in phan_con_lai
+    bo_ns = "--bo-ngan-sach" in phan_con_lai
     sale = None
     sale_thieu_gia_tri = False
     if "--sale" in phan_con_lai:
@@ -155,19 +189,26 @@ def chay(argv: list[str], conn, doc_mat_khau=None) -> int:
               f"python scripts/tao_nguoi_dung.py them {ten} --sale 0104")
         return 2
     if lenh == "them":
-        return them(conn, ten, sale, kho, doc_mat_khau)
+        return them(conn, ten, sale, kho, ns, doc_mat_khau)
     if lenh == "doi-mat-khau":
         return doi_mat_khau(conn, ten, doc_mat_khau)
+    # Hai cờ trái nhau: cấp và bỏ quyền cùng lúc là dấu hiệu người gõ không
+    # chắc mình muốn gì. Không được im lặng chọn nhánh cấp quyền — đó là
+    # nhánh nguy hiểm hơn.
     if kho and bo_kho:
-        # Hai cờ trái nhau: cấp và bỏ quyền cùng lúc là dấu hiệu người gõ
-        # không chắc mình muốn gì. Không được im lặng chọn nhánh cấp quyền —
-        # đó là nhánh nguy hiểm hơn, mở đường vào nút Hoàn tác (xoá dữ liệu).
         print("Vừa --kho-du-lieu vừa --bo-kho-du-lieu — chỉ chọn một.")
         return 2
-    if not kho and not bo_kho:
-        print("Lệnh quyền cần --kho-du-lieu hoặc --bo-kho-du-lieu.")
+    if ns and bo_ns:
+        print("Vừa --ngan-sach vừa --bo-ngan-sach — chỉ chọn một.")
         return 2
-    return quyen(conn, ten, kho)
+    if not (kho or bo_kho or ns or bo_ns):
+        print("Lệnh quyền cần một trong: --kho-du-lieu, --bo-kho-du-lieu, "
+              "--ngan-sach, --bo-ngan-sach.")
+        return 2
+    # None = không đụng tới cờ đó. Một lệnh chỉ đổi cờ mà nó nói tới.
+    return quyen(conn, ten,
+                 kho_du_lieu=True if kho else (False if bo_kho else None),
+                 ngan_sach=True if ns else (False if bo_ns else None))
 
 
 if __name__ == "__main__":
