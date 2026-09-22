@@ -12,6 +12,7 @@ không import ngược: `kome/bao_cao.py` không được nhập module này.
 """
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -183,6 +184,57 @@ def ve_duong_nho(so: list[int | float | None], rong: int = 120, cao: int = 32) -
     flush()
 
     return {"co": True, "rong": rong, "cao": cao, "doan": doan, "diem_don": diem_don}
+
+
+# ---- Xu hướng 30 ngày (đợt 5b Task 5, dashboard `/`) -----------------------
+
+def ve_xu_huong(ngay: "list[tuple[date, int]]", rong: int = 720, cao: int = 180) -> dict:
+    """30 ngày cuối thành CỘT, 30 ngày liền trước thành ĐƯỜNG so sánh — xếp
+    theo THỨ TỰ NGÀY (ngày thứ i của đường so với ngày thứ i của cột), KHÔNG
+    theo "cùng thứ trong tuần": giữ đơn giản, chú giải trang phải nói rõ điều
+    này để không ai đọc nhầm thành so sánh có điều chỉnh lịch.
+
+    `ngay` là dãy (ngày, doanh_thu) LIÊN TỤC, CŨ -> MỚI (`mart.ban_theo_ngay`
+    đã nối từ lịch nên ngày không bán vẫn có dòng mang số 0 — không có
+    khoảng trống nào để cắt đoạn, khác `ve_duong_nho`/`ve_bieu_do`).
+
+    Ít hơn 31 ngày dữ liệu (30 ngày để vẽ cột + tối thiểu 1 ngày liền trước để
+    so) thì KHÔNG có đường — không đủ một chu kỳ trước đó để so sánh, và vẽ
+    một đường từ 0 ngày sẽ trông như "sụt về không" trong khi sự thật là
+    "chưa có gì để so".
+    """
+    if not ngay:
+        return {"co": False}
+    cot_ngay = ngay[-30:]
+    duong_ngay = ngay[:-30][-30:]
+    co_duong = len(ngay) >= 31 and bool(duong_ngay)
+
+    le_t, le_p, le_tren, le_duoi = 8, 8, 12, 26
+    cao_ve = cao - le_tren - le_duoi
+    rong_ve = rong - le_t - le_p
+    dinh = max([v for _, v in cot_ngay] + [v for _, v in duong_ngay], default=0) or 1
+    buoc = rong_ve / len(cot_ngay)
+    rong_cot = max(buoc * 0.62, 2)
+
+    cot = []
+    for i, (ng, v) in enumerate(cot_ngay):
+        x = le_t + i * buoc
+        h = max(cao_ve * (v / dinh), 0) if v > 0 else 0
+        cot.append({"x": round(x + (buoc - rong_cot) / 2, 1),
+                    "y": round(le_tren + cao_ve - h, 1),
+                    "w": round(rong_cot, 1), "h": round(h, 1),
+                    "ngay": ng, "gia_tri": v})
+
+    diem = []
+    if co_duong:
+        for i, (ng, v) in enumerate(duong_ngay):
+            x = le_t + i * buoc + buoc / 2
+            y = le_tren + cao_ve - (cao_ve * (v / dinh) if v > 0 else 0)
+            diem.append({"x": round(x, 1), "y": round(y, 1), "ngay": ng, "gia_tri": v})
+
+    return {"co": True, "rong": rong, "cao": cao, "cot": cot,
+            "duong": " ".join(f"{p['x']},{p['y']}" for p in diem),
+            "diem": diem, "dinh": dinh, "co_duong": co_duong}
 
 
 # ---- Bề rộng chữ ước lượng (dùng chung nhiều khối) -------------------------

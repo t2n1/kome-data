@@ -12,9 +12,14 @@ from kome.bao_cao import (tinh_bao_cao, ve_bieu_do, tien_do_ngan_sach, ve_luy_ke
 from kome.coverage import tinh_bang_ngay, tinh_bang_phu
 # kome/ve_phan_tich.py chỉ tính hình học SVG thuần Python (không conn, không
 # pandas) — an toàn nhập ở mức ngoài cùng, cùng lý do với kome/san_pham.py.
-from kome.ve_phan_tich import ve_duong_nho, ve_dong_gop, ve_cay_o, ve_nhiet, ve_pareto
+from kome.ve_phan_tich import (ve_duong_nho, ve_dong_gop, ve_cay_o, ve_nhiet,
+                               ve_pareto, ve_xu_huong)
 from kome.ngan_sach import thang_cua_ky
 from kome import khach_hang as KH
+# kome/tong_quan.py (đợt 5b Task 5) — dữ liệu cho `/`. Chỉ dataclasses +
+# gọi lại các hàm mart/khach_hang/san_pham đã có (+ psycopg qua `conn`),
+# cùng lý do an toàn nhập ở mức ngoài cùng như kome/san_pham.py.
+from kome import tong_quan as TQ
 # Nhập ở mức ngoài cùng được: kome/san_pham.py chỉ dùng dataclasses/datetime
 # (+ psycopg qua `conn` truyền vào), KHÔNG kéo pandas hay python-calamine —
 # đúng ràng buộc mà test_trang_chi_doc_khong_phu_thuoc_pandas canh.
@@ -431,27 +436,30 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
 
     # ---- Các trang ------------------------------------------------------
     @app.get("/", response_class=HTMLResponse)
-    def tong_quan(request: Request):
-        """Trang chủ: công ty đang thế nào, và hôm nay cần làm gì.
+    def trang_chu(request: Request, tat_ca: int = 0):
+        """Trang chủ dùng chung: công ty đang thế nào, và hôm nay cần làm gì.
 
-        TRƯỚC ĐÂY `/` là trang nạp dữ liệu. Đổi vì nạp dữ liệu là việc của MỘT
-        người, MỘT lần mỗi ngày, còn `/` là thứ mọi người mở nhiều lần mỗi
-        ngày. Khối nạp giờ nằm trong /kho-du-lieu (Đợt 2a, Task 1-4), và mục
-        đó vẫn còn trong thanh điều hướng.
+        Đợt 5b Task 5: `/` không còn gọi `tinh_bao_cao` (5 lượt hỏi chỉ để
+        lấy ba con số của KỲ KẾ TOÁN) — mọi khối giờ qua
+        `kome.tong_quan.tong_quan()`, đọc `mart.thang_den_hom_nay` (tháng
+        đến hôm nay). `sale` dùng lại đúng `_sale_dang_loc` (mặc định tiện
+        dụng theo người đăng nhập, `?tat_ca=1` bỏ lọc — cùng nếp
+        `/can-xu-ly`), CHỈ áp cho khối "Cần gọi hôm nay"; các khối số tổng
+        (tháng, xu hướng, sức khoẻ, ngân sách, hàng cận hạn) không lọc theo
+        sale — xem docstring `kome.tong_quan.tong_quan`.
         """
         try:
+            sale, ten_sale = _sale_dang_loc(request, tat_ca)
             with open_app_conn() as conn:
-                bc = tinh_bao_cao(conn)
-                dem = dict(conn.execute(
-                    "SELECT trang_thai, count(*) FROM mart.khach_360 GROUP BY 1"
-                ).fetchall())
-                so_ngay_ton = conn.execute(
-                    "SELECT count(DISTINCT snapshot_date) FROM core.fact_inventory_daily"
-                ).fetchone()[0]
+                tq = TQ.tong_quan(conn, sale)
                 tuoi = tinh_tuoi(conn)
             return _ve(request, "tong_quan.html",
-                       {"bc": bc, "dem": dem, "so_ngay_ton": so_ngay_ton,
-                        "tuoi": tuoi, "trang": "tong-quan"})
+                       {"tq": tq, "tuoi": tuoi, "trang": "tong-quan",
+                        "sale": sale, "ten_sale": ten_sale, "tat_ca": bool(tat_ca),
+                        "xh": ve_xu_huong(tq.ngay),
+                        "doan_suc_khoe": TQ.doan_suc_khoe(tq.dem),
+                        "trang_thai_nhan": KH.TRANG_THAI,
+                        "can_han_ngay": SP.CAN_HAN_NGAY})
         except Exception as e:
             return _loi(request, "mở trang tổng quan", e)
 

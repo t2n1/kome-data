@@ -2,6 +2,8 @@
 CSDL: mọi hàm ở kome/ve_phan_tich.py chỉ nhận dữ liệu đã có sẵn (dataclass
 hoặc tuple đơn giản) và trả toạ độ để template vẽ.
 """
+from datetime import date, timedelta
+
 from kome.bao_cao import NganhKy, NganhThang, O, TapTrung, KhachTapTrung, ve_bieu_do
 from kome.ve_phan_tich import (
     _squarify,
@@ -11,7 +13,17 @@ from kome.ve_phan_tich import (
     ve_duong_nho,
     ve_nhiet,
     ve_pareto,
+    ve_xu_huong,
 )
+
+
+def _ngay(n: int, gia_tri=None):
+    """`n` ngày liên tục, giá trị mặc định tăng dần 1,2,3... (đủ để phân
+    biệt cột với đường trong test), CŨ -> MỚI."""
+    d0 = date(2026, 1, 1)
+    if gia_tri is None:
+        gia_tri = list(range(1, n + 1))
+    return [(d0 + timedelta(days=i), gia_tri[i]) for i in range(n)]
 
 
 # ---- _squarify -----------------------------------------------------------
@@ -332,3 +344,48 @@ def test_ve_pareto_luy_ke_none_cat_doan():
                   so_khach=3, luy_ke_top10=None)
     pr = ve_pareto(tt)
     assert len(pr["doan"]) == 2
+
+
+# ---- ve_xu_huong (đợt 5b Task 5, dashboard `/`) -----------------------------
+
+def test_ve_xu_huong_rong_khong_co_ngay():
+    assert ve_xu_huong([]) == {"co": False}
+
+
+def test_ve_xu_huong_it_hon_31_ngay_khong_co_duong():
+    """30 ngày đúng khít cho cột, không còn ngày nào liền trước để so —
+    KHÔNG được vẽ đường (khác "có đường nhưng đứt")."""
+    r = ve_xu_huong(_ngay(30))
+    assert r["co"] is True
+    assert len(r["cot"]) == 30
+    assert r["co_duong"] is False
+    assert r["diem"] == []
+    assert r["duong"] == ""
+
+
+def test_ve_xu_huong_60_ngay_30_cot_30_diem():
+    r = ve_xu_huong(_ngay(60))
+    assert r["co"] is True
+    assert len(r["cot"]) == 30
+    assert r["co_duong"] is True
+    assert len(r["diem"]) == 30
+    # Cột là 30 ngày CUỐI, đường là 30 ngày NGAY TRƯỚC ĐÓ — không chồng ngày.
+    ngay_cot = {c["ngay"] for c in r["cot"]}
+    ngay_duong = {p["ngay"] for p in r["diem"]}
+    assert ngay_cot.isdisjoint(ngay_duong)
+    assert max(ngay_duong) < min(ngay_cot)
+
+
+def test_ve_xu_huong_dinh_la_max_ca_hai_day():
+    """`dinh` phải tính trên max của CẢ cột lẫn đường — nếu chỉ lấy max(cột),
+    một ngày trong 30 ngày TRƯỚC lớn hơn mọi ngày sau sẽ vẽ đường vọt khung."""
+    gia_tri = [1] * 30 + [1] * 29 + [999]  # ngày cuối cùng (thuộc phần "đường") rất lớn
+    r = ve_xu_huong(_ngay(60, gia_tri))
+    assert r["dinh"] == 999
+
+
+def test_ve_xu_huong_31_ngay_co_dung_1_diem_duong():
+    r = ve_xu_huong(_ngay(31))
+    assert r["co_duong"] is True
+    assert len(r["diem"]) == 1
+    assert len(r["cot"]) == 30
