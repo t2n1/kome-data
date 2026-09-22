@@ -7,8 +7,13 @@ from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from kome.bao_cao import tinh_bao_cao, ve_bieu_do, tien_do_ngan_sach, ve_luy_ke
+from kome.bao_cao import (tinh_bao_cao, ve_bieu_do, tien_do_ngan_sach, ve_luy_ke,
+                          nhom_theo_nganh)
 from kome.coverage import tinh_bang_ngay, tinh_bang_phu
+# kome/ve_phan_tich.py chỉ tính hình học SVG thuần Python (không conn, không
+# pandas) — an toàn nhập ở mức ngoài cùng, cùng lý do với kome/san_pham.py.
+from kome.ve_phan_tich import ve_duong_nho, ve_dong_gop, ve_cay_o, ve_nhiet, ve_pareto
+from kome.ngan_sach import thang_cua_ky
 from kome import khach_hang as KH
 # Nhập ở mức ngoài cùng được: kome/san_pham.py chỉ dùng dataclasses/datetime
 # (+ psycopg qua `conn` truyền vào), KHÔNG kéo pandas hay python-calamine —
@@ -740,9 +745,25 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             with open_app_conn() as conn:
                 bc = tinh_bao_cao(conn, ky)
                 td = tien_do_ngan_sach(conn, ky)
+            # [Đợt 5b Task 4] Bảy khối phân tích mới (spec §5) — mọi hình học
+            # tính sẵn ở kome/ve_phan_tich.py, route chỉ gọi và truyền vào
+            # template, không tính chỉ số nào ở đây.
+            nhom = nhom_theo_nganh(bc.nganh_ky, bc.hang_theo_nganh)
+            thang_ky = thang_cua_ky(bc.ky.company_fy)
+            so_nho = {
+                "dt": ve_duong_nho([o.doanh_thu for o in bc.thang]),
+                "lg": ve_duong_nho([o.lai_gop for o in bc.thang]),
+                "ts": ve_duong_nho([o.ty_suat for o in bc.thang]),
+                "kh": ve_duong_nho([o.so_khach for o in bc.thang]),
+            }
             return _ve(request, "bao_cao.html",
                        {"bc": bc, "bd": ve_bieu_do(bc.thang), "td": td,
-                        "lk": ve_luy_ke(td), "trang": "bao-cao"})
+                        "lk": ve_luy_ke(td), "trang": "bao-cao",
+                        "so_nho": so_nho,
+                        "dg": ve_dong_gop(bc.nganh_ky),
+                        "co": ve_cay_o(nhom),
+                        "nh": ve_nhiet(bc.nganh_thang, thang_ky),
+                        "pa": ve_pareto(bc.tap_trung)})
         except Exception as e:
             return _loi(request, "mở trang báo cáo", e)
 

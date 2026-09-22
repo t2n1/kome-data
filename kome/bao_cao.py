@@ -24,6 +24,18 @@ TOP = 10
 # Số tháng tối thiểu để một kỳ được đem so với kỳ khác.
 DU_MOT_KY = 12
 
+# Nhãn cho mã hàng chưa có ngành (food_category_name rỗng/NULL) — PHẢI khớp
+# TỪNG CHỮ với biểu thức ngành trong mart.ban_theo_nganh_thang (migration
+# 029 §3.1: coalesce(nullif(p.food_category_name,''), '(chưa phân loại)')).
+# Đây là CHỖ THỨ HAI viết ra nhãn này: `bc.hang_theo_nganh` (mart.ban_theo_
+# san_pham) trả `food_category_name` THÔ, chưa qua coalesce đó, nên khi ghép
+# nó vào từng ngành của `bc.nganh_ky` (Task 4, hàm nhom_theo_nganh bên dưới)
+# phải tự coalesce lại — lệch một ký tự ở đây là mã hàng rỗng tách thành một
+# ô "(chưa phân loại)" RIÊNG thứ hai trên cây ô, cạnh ô "(chưa phân loại)"
+# gốc từ mart, mà không lỗi nào nổ ra. Có test so hằng này với giá trị view
+# trả ra (tests/test_bao_cao_phan_tich_web.py).
+NGANH_TRONG = "(chưa phân loại)"
+
 
 @dataclass
 class O:
@@ -336,6 +348,23 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
                   nhan_vien=nhan_vien, canh_bao=canh_bao, cung_ky=cung_ky,
                   nganh_thang=nganh_thang, nganh_ky=nganh_ky, tap_trung=tap_trung,
                   hang_theo_nganh=hang_theo_nganh)
+
+
+def nhom_theo_nganh(nganh_ky: list[NganhKy], hang_theo_nganh: list[dict]
+                     ) -> list[tuple[str, int, float | None, list[tuple[str, str, int]]]]:
+    """Dựng đầu vào `nhom` cho `ve_cay_o` (kome/ve_phan_tich.py): mỗi ngành
+    của kỳ kèm doanh thu/tăng trưởng (từ `nganh_ky` — số liệu CHÍNH THỨC,
+    tăng trưởng tính trên các tháng đối chiếu, mart.nganh_ky_cung_ky) và danh
+    sách mã hàng CỦA CHÍNH ngành đó (gộp từ `hang_theo_nganh`, mart.ban_theo_
+    san_pham). Đây là lắp ráp để HIỂN THỊ (gộp hai nguồn theo tên ngành),
+    không phải một định nghĩa chỉ số mới — công thức doanh thu/tăng trưởng
+    vẫn nguyên từ mart."""
+    theo_nganh: dict[str, list[tuple[str, str, int]]] = {}
+    for h in hang_theo_nganh:
+        nganh = h["nhom"] or NGANH_TRONG
+        theo_nganh.setdefault(nganh, []).append((h["ma"], h["ten"], h["doanh_thu"]))
+    return [(nk.nganh, nk.doanh_thu, nk.tang_truong, theo_nganh.get(nk.nganh, []))
+            for nk in nganh_ky]
 
 
 # ---- Vẽ biểu đồ ---------------------------------------------------------
