@@ -357,15 +357,24 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # đã đóng cửa vì cổng ※廃業※ nằm gói bên trong chính boolean đó, nên chỗ này
     # buộc phải tự JOIN lấy `da_ngung` để đắp lại — một cờ, hai nguồn, ba chỗ
     # chép. Nhãn dẹp cả ba: cờ ※廃業※ nay chỉ được đọc MỘT lần, trong view.
+    # CTE `AS MATERIALIZED`: hai nhánh dưới đây đều đọc mart.khach_mat_hang,
+    # và không CTE thì Postgres dựng view ĐÓ HAI LẦN cho một lần mở trang.
+    # Vị từ `customer_code` nằm TRONG CTE chứ không ngoài — vật hoá cả view
+    # rồi mới lọc một khách là đổi một trang nhanh lấy một lượt quét toàn
+    # bảng, tức đúng thứ mà tối ưu này định tránh.
     them = conn.execute("""
+        WITH h AS MATERIALIZED (
+            SELECT product_code, ten_hang, lan_cuoi, tre_ngay, doanh_thu_thuan,
+                   trang_thai_cap
+              FROM mart.khach_mat_hang WHERE customer_code = %s
+        )
         SELECT khoi, ma, ten, chu, so_a FROM (
             (SELECT 'chua'::text AS khoi, h.product_code AS ma,
                     h.ten_hang AS ten, h.lan_cuoi::text AS chu,
                     h.tre_ngay::numeric AS so_a,
                     h.doanh_thu_thuan::numeric AS xep
-               FROM mart.khach_mat_hang h
-              WHERE h.customer_code = %s
-                AND h.tre_ngay IS NOT NULL AND h.trang_thai_cap = 'mua'
+               FROM h
+              WHERE h.tre_ngay IS NOT NULL AND h.trang_thai_cap = 'mua'
               ORDER BY h.doanh_thu_thuan DESC
               LIMIT 10)
             UNION ALL
@@ -374,14 +383,13 @@ def ho_so(conn, ma: str) -> HoSo | None:
                     ''::text, t.ty_suat, t.ty_suat
                FROM core.dim_product p
                JOIN mart.ty_suat_mat_hang t ON t.product_code = p.product_code
-              WHERE NOT EXISTS (SELECT 1 FROM mart.khach_mat_hang h
-                                 WHERE h.customer_code = %s
-                                   AND h.product_code = p.product_code)
+              WHERE NOT EXISTS (SELECT 1 FROM h
+                                 WHERE h.product_code = p.product_code)
                 AND t.ty_suat IS NOT NULL
               ORDER BY t.ty_suat DESC
               LIMIT 8)
         ) u ORDER BY khoi, xep DESC
-    """, (ma, ma)).fetchall()
+    """, (ma,)).fetchall()
 
     chua_mua, goi_y = [], []
     for khoi, ma_hang, ten_hang, chu, so_a in them:
@@ -524,6 +532,15 @@ def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
     `tong_tat_ca` thì ngược lại: không lọc gì hết. Liên kết của nó
     (`?tat_ca=1`) bỏ MỌI bộ lọc, nên con số phải là con số sau khi bấm.
     """
+    # CTE `AS MATERIALIZED`: câu lệnh này đọc mart.khach_360 SÁU lần. Không
+    # CTE thì Postgres dựng lại view đó sáu lượt — mỗi lượt gộp toàn bộ
+    # mart.lan_mua — cho MỘT lần mở trang. Đây là view đắt nhất trong mart,
+    # và ngân sách "3 lượt hỏi" của trang này đếm SỐ LƯỢT HỎI chứ không đếm
+    # sức tính, nên nó không hề chặn được chuyện đó. Vật hoá ~1.710 dòng một
+    # lần rồi quét lại sáu lượt thì rẻ; dựng lại view sáu lượt mới là cái đắt.
+    # Không có vị từ nào đẩy xuống được ở đây (bộ lọc chỉ theo `sale`, và bốn
+    # trong sáu nhánh cố ý lọc khác nhau), nên CTE không làm mất gì.
+    #
     # Hai mệnh đề WHERE, cùng một hàm dựng (`_vi_tu`) nên không bao giờ trôi
     # khỏi nhau. THỨ TỰ THAM SỐ = thứ tự văn bản các mảnh WHERE bên dưới:
     # bốn lần `{dk}` (nhom, tong, hang, tinh) rồi MỘT lần `{dk_dem}`; hai
@@ -535,18 +552,19 @@ def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
     # chuỗi `khoa` như "mã|tên": nhồi chuỗi thêm một quy ước phải nhớ và một
     # chỗ nữa có thể tách sai (vd tên nhân viên lỡ chứa dấu phân cách).
     rows = conn.execute(f"""
+        WITH k360 AS MATERIALIZED (SELECT * FROM mart.khach_360)
         SELECT 'nhom' AS khoi, v.nhom AS khoa, count(*) AS so, 0::bigint AS tien,
                0::bigint AS canh_bao
           FROM mart.khach_nhom_viec v
-          JOIN mart.khach_360 k ON k.customer_code = v.customer_code
+          JOIN k360 k ON k.customer_code = v.customer_code
           {dk}
          GROUP BY v.nhom
         UNION ALL
-        SELECT 'tong', '', count(*), 0, 0 FROM mart.khach_360 k {dk}
+        SELECT 'tong', '', count(*), 0, 0 FROM k360 k {dk}
         UNION ALL
         SELECT 'hang', h.hang, count(*), 0, 0
           FROM mart.hang_doanh_thu h
-          JOIN mart.khach_360 k ON k.customer_code = h.customer_code
+          JOIN k360 k ON k.customer_code = h.customer_code
           {dk}
          GROUP BY h.hang
         UNION ALL
@@ -556,7 +574,7 @@ def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
         -- của câu lệnh này đã do `_vi_tu` quyết định, thêm một cái nữa ở
         -- giữa là một chỗ rất dễ đếm lệch về sau.
         SELECT 'tinh', coalesce(nullif(k.prefecture, ''), '(không rõ)'), count(*), 0, 0
-          FROM mart.khach_360 k {dk}
+          FROM k360 k {dk}
          GROUP BY 2
         UNION ALL
         SELECT 'nv', t.salesperson_code || '|' || t.ten, t.so_khach, t.doanh_thu,
@@ -564,10 +582,10 @@ def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
           FROM mart.tai_nhan_vien t
         UNION ALL
         SELECT 'dem', k.trang_thai, count(*), 0, 0
-          FROM mart.khach_360 k {dk_dem}
+          FROM k360 k {dk_dem}
          GROUP BY k.trang_thai
         UNION ALL
-        SELECT 'tat_ca', '', count(*), 0, 0 FROM mart.khach_360
+        SELECT 'tat_ca', '', count(*), 0, 0 FROM k360
     """, p * 4 + p_dem).fetchall()
 
     lay = lambda khoi: [(r[1], r[2], r[3], r[4]) for r in rows if r[0] == khoi]
