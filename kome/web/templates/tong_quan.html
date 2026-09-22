@@ -63,13 +63,15 @@
 {% include "_nav.html" %}
 {% set MAU_VAR = {"ok": "var(--ok-vien)", "canh": "var(--canh-vien)",
                   "loi": "var(--loi-vien)", "nhat": "var(--ngoai-chu)"} %}
-{% macro so_cung_ky(tn, tang, don_vi) %}
+{% macro so_cung_ky(tn, tang, don_vi, loai="tien") %}
 {% if tn.co_cung_ky %}{% if tang is not none %}<span class="{{ 'manh' if tang >= 0 else 'yeu' }}">{{
-    "%+.1f"|format(tang * 100) }}{{ don_vi }}</span>{% else %}<span
-    title="Mẫu số cùng kỳ ≤ 0 (赤伝 — phiếu đỏ có thể làm doanh thu/lãi gộp cùng
+    "%+.1f"|format(tang * 100) }}{{ don_vi }}</span>{% elif loai == "khach" %}<span
+    title="Không có khách nào cùng kỳ năm trước — không tính được, không phải bằng 0">—</span>
+    {% else %}<span title="Mẫu số cùng kỳ ≤ 0 (赤伝 — phiếu đỏ có thể làm doanh thu/lãi gộp cùng
     kỳ năm trước âm) — không tính được, không phải bằng 0">—</span>{% endif %} so cùng kỳ
 {% else %}chưa có cùng kỳ để so{% endif %}
 {% endmacro %}
+{% macro nhan_tien_do(ten, tien_do) %}Tiến độ {{ ten }}: {% if tien_do is not none %}{{ "%.1f"|format(tien_do * 100) }} phần trăm{% else %}chưa tính được{% endif %}{% endmacro %}
 <h1>Tổng quan</h1>
 
 {# Đặt TRÊN mọi con số: "hôm nay đã nạp chưa" quyết định các con số bên dưới
@@ -82,7 +84,7 @@
 {% set tn = tq.thang_nay %}
 <p class="ghi-chu">{{ tn.tu_ngay.strftime("%d/%m/%Y") }} – {{ tn.den_ngay.strftime("%d/%m/%Y") }}
 {% if tn.co_cung_ky %}so với {{ tn.tu_ngay_ck.strftime("%d/%m/%Y") }} – {{ tn.den_ngay_ck.strftime("%d/%m/%Y") }}
-{% else %}(chưa có cùng kỳ để so — dữ liệu bắt đầu 2025-03-03){% endif %}</p>
+{% else %}(chưa có dữ liệu cùng kỳ năm trước){% endif %}</p>
 
 <div class="so-lon">
   <div class="the"><div class="nhan">Doanh thu thuần</div>
@@ -97,7 +99,7 @@
     <div class="so-cung-ky">{{ so_cung_ky(tn, tn.chenh_ty_suat, " điểm") }}</div></div>
   <div class="the"><div class="nhan">Khách có đơn</div>
     <div class="gia">{{ "{:,}".format(tn.so_khach) }}</div>
-    <div class="so-cung-ky">{{ so_cung_ky(tn, tn.tang_khach, "%") }}</div></div>
+    <div class="so-cung-ky">{{ so_cung_ky(tn, tn.tang_khach, "%", "khach") }}</div></div>
 </div>
 <p class="ghi-chu">Doanh thu thuần đã trừ thuế tiêu dùng. Phiếu đỏ (hàng trả lại)
 được tính vào như số âm — cố ý, vì hàng trả lại là doanh thu âm thật.</p>
@@ -106,7 +108,7 @@
 <h2>Tiến độ ngân sách tháng {{ tq.ngan_sach.thang if tq.ngan_sach else "" }}</h2>
 {% if tq.ngan_sach and tq.ngan_sach.co_ngan_sach %}
 <div class="thanh-tien-do" role="img"
-     aria-label="Tiến độ ngân sách toàn công ty: {{ '%.1f'|format(tq.ngan_sach.tien_do * 100) if tq.ngan_sach.tien_do is not none else 0 }} phần trăm">
+     aria-label="{{ nhan_tien_do('ngân sách toàn công ty', tq.ngan_sach.tien_do) }}">
  <div class="day" style="width:{{ tq.ngan_sach.rong_thanh }}%"></div>
  {% if tq.ngan_sach.rong_moc is not none %}<div class="moc" style="left:{{ tq.ngan_sach.rong_moc }}%"></div>{% endif %}
 </div>
@@ -119,7 +121,7 @@
 <li><span class="ten">{{ n.ten or n.ma }}</span>
  {% if n.rong_thanh is not none %}
  <div class="thanh-tien-do thanh-nho" role="img"
-      aria-label="Tiến độ {{ n.ten or n.ma }}: {{ '%.1f'|format(n.tien_do * 100) if n.tien_do is not none else 0 }} phần trăm">
+      aria-label="{{ nhan_tien_do(n.ten or n.ma, n.tien_do) }}">
   <div class="day" style="width:{{ n.rong_thanh }}%"></div>
   {% if n.rong_moc is not none %}<div class="moc" style="left:{{ n.rong_moc }}%"></div>{% endif %}
  </div>
@@ -140,7 +142,7 @@ theo THỨ TỰ NGÀY (ngày thứ 1 với ngày thứ 1) — không theo "cùng
 {% if xh.co %}
 <div class="khung-bd">
 <svg viewBox="0 0 {{ xh.rong }} {{ xh.cao }}" width="100%" height="{{ xh.cao }}"
-     role="img" aria-label="Doanh thu 30 ngày gần nhất so với 30 ngày liền trước">
+     role="group" aria-label="Doanh thu 30 ngày gần nhất so với 30 ngày liền trước">
  {% for c in xh.cot %}
  <rect x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}" rx="2"
        fill="var(--lien-ket)" opacity=".72">
@@ -167,13 +169,22 @@ theo THỨ TỰ NGÀY (ngày thứ 1 với ngày thứ 1) — không theo "cùng
 
 <h2>Sức khoẻ khách hàng</h2>
 {# Chiều rộng % mỗi đoạn tính SẴN ở Python (kome.tong_quan.doan_suc_khoe) —
-   template chỉ vẽ, không tự chia phần trăm. #}
+   template chỉ vẽ, không tự chia phần trăm.
+
+   [Soát vòng 1] Bộ đếm của thanh này (`tq.dem`) LUÔN không lọc theo sale
+   (toàn công ty — xem docstring `kome.tong_quan.tong_quan`), nên mọi liên
+   kết rời khỏi nó BẮT BUỘC mang `tat_ca=1`: `/khach-hang`/`/can-xu-ly`
+   không có tham số đó sẽ rơi về mặc định lọc theo NGƯỜI ĐANG ĐĂNG NHẬP, và
+   bấm vào một đoạn "1.710 khách" lại ra danh sách 216 khách của riêng mình
+   — đúng lớp lỗi đã ghi ở CLAUDE.md ("chip Tất cả (1.710) bấm vào ra 216
+   khách") và bất biến `/ban-do` (biến `giu` mang `tat_ca`/`nv` qua mọi liên
+   kết rời trang). #}
 <div class="thanh-suc-khoe">
 {% for d in doan_suc_khoe if d.so > 0 %}
   {% set nhan, mau = trang_thai_nhan[d.nhom] %}
-  <a href="{{ '/can-xu-ly' if d.nhom == 'canh_bao' else '/khach-hang?loc=' + d.nhom }}"
+  <a href="{{ '/can-xu-ly?tat_ca=1' if d.nhom == 'canh_bao' else '/khach-hang?loc=' + d.nhom + '&tat_ca=1' }}"
      style="width:{{ d.rong }}%;background:{{ MAU_VAR[mau] }}"
-     title="{{ nhan }}: {{ d.so }} khách"></a>
+     title="{{ nhan }}: {{ d.so }} khách" aria-label="{{ nhan }}: {{ d.so }} khách"></a>
 {% endfor %}
 </div>
 <div class="chu-thich">
@@ -189,6 +200,11 @@ theo THỨ TỰ NGÀY (ngày thứ 1 với ngày thứ 1) — không theo "cùng
     {% if sale %}
     <p class="ghi-chu">Danh sách của <strong>{{ ten_sale }}</strong> ·
       <a href="/?tat_ca=1">Xem của mọi người</a></p>
+    {% elif tat_ca and nguoi_sale %}
+    {# Đang xem "mọi người" (?tat_ca=1) NHƯNG người đăng nhập vẫn có một mã
+       sale riêng — cần đường quay lại, không chỉ đường đi tới. #}
+    <p class="ghi-chu">Đang xem của mọi người ·
+      <a href="/">Xem danh sách của tôi</a></p>
     {% endif %}
     {% if tq.can_goi %}
     <ul class="viec">
@@ -200,7 +216,11 @@ theo THỨ TỰ NGÀY (ngày thứ 1 với ngày thứ 1) — không theo "cùng
     {% else %}
     <div class="trong">Không có khách nào cần gọi{% if sale %} trong danh sách của {{ ten_sale }}{% endif %}.</div>
     {% endif %}
-    <p class="ghi-chu"><a href="/can-xu-ly">Xem tất cả →</a></p>
+    {# Khối này đang hiện của AI (sale hiện tại, hoặc "mọi người" khi
+       `tat_ca`) — "Xem tất cả" phải giữ NGUYÊN trạng thái lọc đó, không thì
+       bấm vào từ chế độ "mọi người" lại rơi về mặc định lọc-theo-mình của
+       /can-xu-ly. #}
+    <p class="ghi-chu"><a href="/can-xu-ly{{ '?tat_ca=1' if tat_ca else '' }}">Xem tất cả →</a></p>
   </section>
   <section>
     <h3>Hàng cận hạn</h3>

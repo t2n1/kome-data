@@ -114,15 +114,22 @@
 </svg>
 {% endif %}
 {% endmacro %}
-{% macro so_ky_truoc(cung_ky, tang, don_vi) %}
+{% macro so_ky_truoc(cung_ky, tang, don_vi, loai="tien", ngay_dau=none) %}
 {% if cung_ky and cung_ky.so_thang > 0 %}
 {% if tang is not none %}<span class="{{ 'manh' if tang >= 0 else 'yeu' }}">{{
-    "%+.1f"|format(tang * 100) }}{{ don_vi }}</span>{% else %}<span
+    "%+.1f"|format(tang * 100) }}{{ don_vi }}</span>{% elif loai == "khach" %}<span
+    title="Không có khách nào cùng kỳ năm trước — không tính được, không phải bằng 0">—</span>
+    {% else %}<span
     title="Mẫu số cùng kỳ ≤ 0 (赤伝 — phiếu đỏ có thể làm doanh thu/lãi gộp
     cùng kỳ năm trước âm) — không tính được %, không phải bằng 0">—</span>{% endif %}
 so cùng kỳ · {{ cung_ky.so_thang }} tháng đối chiếu ({{ cung_ky.tu }} → {{ cung_ky.den }})
 {% else %}
-chưa có cùng kỳ để so — dữ liệu bắt đầu 2025-03-03
+{# [Soát vòng 1] KHÔNG hardcode ngày bắt đầu dữ liệu — `ngay_dau` (đọc từ
+   `bc.moi_ky[0].ngay_dau`, ĐÃ có sẵn trong `bc`, không thêm truy vấn nào)
+   là ngày bán ĐẦU TIÊN thật của kỳ xa nhất còn trong kho; hardcode một ngày
+   cố định là nói sai ngay khi công ty đối soát lại và dữ liệu cũ hơn bị
+   dọn/thêm vào. #}
+chưa có cùng kỳ để so{% if ngay_dau %} — dữ liệu bắt đầu {{ ngay_dau }}{% endif %}
 {% endif %}
 {% endmacro %}
 <h1>Báo cáo bán hàng</h1>
@@ -144,25 +151,30 @@ Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
 <div class="ky">📅 <strong>{{ bc.ky.nhan }}</strong> · dữ liệu từ
   {{ bc.ky.ngay_dau }} đến {{ bc.ky.ngay_cuoi }} ({{ bc.ky.so_thang }}/12 tháng)</div>
 
+{# [Soát vòng 1] Ngày bán ĐẦU TIÊN thật của kỳ xa nhất còn trong kho — dùng
+   cho câu "chưa có cùng kỳ để so" của `so_ky_truoc` thay vì hardcode một
+   ngày cố định. `bc.moi_ky` đã sắp `ORDER BY company_fy` (tinh_bao_cao) nên
+   phần tử đầu là kỳ SỚM NHẤT — không thêm truy vấn nào. #}
+{% set ngay_dau_du_lieu = bc.moi_ky[0].ngay_dau if bc.moi_ky else none %}
 <div class="so-lon">
   <div class="the"><div class="nhan">Doanh thu thuần</div>
     <div class="gia">¥{{ "{:,}".format(bc.ky.doanh_thu) }}</div>
     {{ spark_svg(so_nho.dt, "var(--lien-ket)") }}
-    <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.tang_dt, "%") }}</div></div>
+    <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.tang_dt, "%", ngay_dau=ngay_dau_du_lieu) }}</div></div>
   <div class="the"><div class="nhan">Lãi gộp</div>
     <div class="gia">¥{{ "{:,}".format(bc.ky.lai_gop) }}</div>
     {{ spark_svg(so_nho.lg, "var(--lien-ket)") }}
-    <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.tang_lg, "%") }}</div></div>
+    <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.tang_lg, "%", ngay_dau=ngay_dau_du_lieu) }}</div></div>
   <div class="the"><div class="nhan">Tỷ suất lãi gộp</div>
     <div class="gia">{% if bc.ky.ty_suat is not none %}{{ "%.1f"|format(bc.ky.ty_suat*100) }}%{% else %}—{% endif %}</div>
     {{ spark_svg(so_nho.ts, "var(--ok-vien)") }}
     {# Tỷ suất so bằng ĐIỂM PHẦN TRĂM (hiệu số), không phải %, xem
        kome/bao_cao.py::_SoCungKy.chenh_ty_suat — 0,8 điểm khác 0,8%. #}
-    <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.chenh_ty_suat, " điểm") }}</div></div>
+    <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.chenh_ty_suat, " điểm", ngay_dau=ngay_dau_du_lieu) }}</div></div>
   <div class="the"><div class="nhan">Khách có mua</div>
     <div class="gia">{{ "{:,}".format(bc.ky.so_khach) }}</div>
     {{ spark_svg(so_nho.kh, "var(--lien-ket)") }}
-    <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.tang_khach, "%") }}</div></div>
+    <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.tang_khach, "%", "khach", ngay_dau_du_lieu) }}</div></div>
 </div>
 <p class="ghi-chu">Doanh thu thuần đã trừ thuế tiêu dùng. Phiếu đỏ (hàng trả lại)
 được tính vào như số âm — cố ý, vì hàng trả lại là doanh thu âm thật.</p>
@@ -223,7 +235,7 @@ Ngày làm việc chưa trừ ngày lễ Nhật.</p>
    nên "vượt chỉ tiêu" vẫn đọc ra trên 100% dù thanh dừng ở mép khung. #}
 {% if td.rong_thanh is not none %}
 <div class="thanh-tien-do" role="img"
-     aria-label="Tiến độ ngân sách toàn nhóm: {{ '%.1f'|format(td.tien_do * 100) if td.tien_do is not none else 0 }} phần trăm">
+     aria-label="Tiến độ ngân sách toàn nhóm: {% if td.tien_do is not none %}{{ '%.1f'|format(td.tien_do * 100) }} phần trăm{% else %}chưa tính được{% endif %}">
  <div class="day" style="width:{{ td.rong_thanh }}%"></div>
  {% if td.rong_moc is not none %}<div class="moc" style="left:{{ td.rong_moc }}%"></div>{% endif %}
 </div>

@@ -202,6 +202,14 @@ def ve_xu_huong(ngay: "list[tuple[date, int]]", rong: int = 720, cao: int = 180)
     so) thì KHÔNG có đường — không đủ một chu kỳ trước đó để so sánh, và vẽ
     một đường từ 0 ngày sẽ trông như "sụt về không" trong khi sự thật là
     "chưa có gì để so".
+
+    [Soát vòng 1] 31–59 ngày dữ liệu (đủ cột nhưng CHƯA đủ 30 ngày để so) thì
+    số điểm của đường ÍT HƠN 30 — các điểm đó phải xếp CĂN PHẢI vào lưới 30 ô
+    (dùng chung trục X với cột), không dồn về bên trái: điểm CUỐI của đường
+    (ngày liền kề trước cột) luôn rơi vào Ô CUỐI, cùng vị trí với cột cuối
+    cùng. Dồn trái sẽ đặt một ngày (thứ tự thời gian gần cột nhất) vào ô ĐẦU
+    của lưới — trông như còn 29 ngày nữa mới tới cột, trong khi sự thật là
+    hết dữ liệu ngay sau điểm đó.
     """
     if not ngay:
         return {"co": False}
@@ -227,8 +235,13 @@ def ve_xu_huong(ngay: "list[tuple[date, int]]", rong: int = 720, cao: int = 180)
 
     diem = []
     if co_duong:
+        # Căn phải: ô lưới cuối cùng (idx = len(cot_ngay)-1) LUÔN dành cho
+        # điểm cuối của đường (ngày liền kề trước cột) — offset dịch mọi
+        # điểm sang phải đúng bằng số ô còn thiếu.
+        offset = len(cot_ngay) - len(duong_ngay)
         for i, (ng, v) in enumerate(duong_ngay):
-            x = le_t + i * buoc + buoc / 2
+            idx = offset + i
+            x = le_t + idx * buoc + buoc / 2
             y = le_tren + cao_ve - (cao_ve * (v / dinh) if v > 0 else 0)
             diem.append({"x": round(x, 1), "y": round(y, 1), "ngay": ng, "gia_tri": v})
 

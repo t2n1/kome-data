@@ -4,6 +4,8 @@ hoặc tuple đơn giản) và trả toạ độ để template vẽ.
 """
 from datetime import date, timedelta
 
+import pytest
+
 from kome.bao_cao import NganhKy, NganhThang, O, TapTrung, KhachTapTrung, ve_bieu_do
 from kome.ve_phan_tich import (
     _squarify,
@@ -378,14 +380,33 @@ def test_ve_xu_huong_60_ngay_30_cot_30_diem():
 
 def test_ve_xu_huong_dinh_la_max_ca_hai_day():
     """`dinh` phải tính trên max của CẢ cột lẫn đường — nếu chỉ lấy max(cột),
-    một ngày trong 30 ngày TRƯỚC lớn hơn mọi ngày sau sẽ vẽ đường vọt khung."""
-    gia_tri = [1] * 30 + [1] * 29 + [999]  # ngày cuối cùng (thuộc phần "đường") rất lớn
+    một ngày trong 30 ngày TRƯỚC (phần "đường") lớn hơn mọi ngày sau sẽ vẽ
+    đường vọt khung. `_ngay(60, ...)` xếp CŨ -> MỚI nên chỉ số 0 (đầu dãy)
+    thuộc về phần "đường" (30 ngày trước), KHÔNG phải phần "cột" (30 ngày
+    cuối) — đặt đỉnh ở chỉ số 0 mới thật sự kiểm tra nhánh của đường."""
+    gia_tri = [999] + [1] * 59  # ngày ĐẦU DÃY (thuộc phần "đường") rất lớn
     r = ve_xu_huong(_ngay(60, gia_tri))
     assert r["dinh"] == 999
 
 
-def test_ve_xu_huong_31_ngay_co_dung_1_diem_duong():
+def test_ve_xu_huong_31_ngay_can_phai_trung_o_cuoi():
+    """[Soát vòng 1] 31 ngày -> đúng 1 điểm đường, phải CĂN PHẢI vào ô CUỐI
+    của lưới 30 ô (cùng vị trí X với cột cuối cùng), không dồn về ô đầu."""
     r = ve_xu_huong(_ngay(31))
     assert r["co_duong"] is True
     assert len(r["diem"]) == 1
     assert len(r["cot"]) == 30
+    tam_cot_cuoi = r["cot"][-1]["x"] + r["cot"][-1]["w"] / 2
+    assert r["diem"][0]["x"] == pytest.approx(tam_cot_cuoi, abs=0.1)
+
+
+def test_ve_xu_huong_45_ngay_can_phai_vao_dung_o():
+    """31–59 ngày (đây: 45 -> 15 điểm đường) phải xếp vào 15 Ô CUỐI của lưới
+    30 ô — điểm cuối cùng trùng cột cuối, điểm đầu trùng cột thứ 15 (0-based),
+    KHÔNG dồn về các ô đầu (0..14)."""
+    r = ve_xu_huong(_ngay(45))
+    assert len(r["diem"]) == 15
+    tam_cot_cuoi = r["cot"][-1]["x"] + r["cot"][-1]["w"] / 2
+    assert r["diem"][-1]["x"] == pytest.approx(tam_cot_cuoi, abs=0.1)
+    tam_cot_15 = r["cot"][15]["x"] + r["cot"][15]["w"] / 2
+    assert r["diem"][0]["x"] == pytest.approx(tam_cot_15, abs=0.1)

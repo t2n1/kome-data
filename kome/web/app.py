@@ -450,12 +450,20 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         """
         try:
             sale, ten_sale = _sale_dang_loc(request, tat_ca)
+            # Mã sale CỦA CHÍNH người đăng nhập, bất kể `tat_ca` đang bật hay
+            # không — khác `sale` (bộ lọc HIỆU LỰC của khối "Cần gọi hôm nay",
+            # None khi `?tat_ca=1`). Cần cả hai để vẽ liên kết "Xem danh sách
+            # của tôi" khi đang xem "mọi người" mà người đăng nhập VẪN có một
+            # mã sale riêng để quay về.
+            nguoi = getattr(request.state, "nguoi", None)
+            nguoi_sale = nguoi.salesperson_code if nguoi is not None else None
             with open_app_conn() as conn:
                 tq = TQ.tong_quan(conn, sale)
                 tuoi = tinh_tuoi(conn)
             return _ve(request, "tong_quan.html",
                        {"tq": tq, "tuoi": tuoi, "trang": "tong-quan",
                         "sale": sale, "ten_sale": ten_sale, "tat_ca": bool(tat_ca),
+                        "nguoi_sale": nguoi_sale,
                         "xh": ve_xu_huong(tq.ngay),
                         "doan_suc_khoe": TQ.doan_suc_khoe(tq.dem),
                         "trang_thai_nhan": KH.TRANG_THAI,
