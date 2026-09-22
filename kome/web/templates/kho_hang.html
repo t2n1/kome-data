@@ -184,11 +184,18 @@ là lời thú nhận về dữ liệu — ô đó có chữ mà ta chưa đọc
    theo kho — bấm vào một kho xong phải còn đường quay lại. Nhưng nó CÓ theo
    bộ lọc trạng thái. Phải nói ra cả hai vế: nó đứng ngay dưới một bảng ĐÃ lọc
    theo kho, và hai con số cạnh nhau mà không cái nào nói mình nói về tập nào
-   thì người đọc sẽ tự ghép chúng lại. #}
-<p class="ghi-chu">Bảng này luôn liệt kê <strong>mọi kho</strong> — nó là ô
-điều khiển của chính bộ lọc kho, tự lọc theo mình thì bấm vào một kho xong
-không còn đường quay lại.{% if loc %} Nhưng nó <strong>có</strong> theo bộ
-lọc trạng thái đang bật ({{ trang_thai[loc][0] }}).{% endif %}</p>
+   thì người đọc sẽ tự ghép chúng lại.
+
+   ĐỪNG viết "luôn liệt kê mọi kho": nhánh 'kho' của kome/san_pham.py::
+   kho_hang() có GROUP BY, nên khi lọc trạng thái, kho không còn dòng nào khớp
+   sẽ KHÔNG có dòng ở đây. Đường quay lại nằm ở ô chọn kho phía trên — ô đó
+   đọc core.dim_warehouse nên luôn đủ mọi kho, kể cả kho trống. #}
+<p class="ghi-chu">Bảng này <strong>không tự lọc theo kho</strong>: nó là ô điều
+khiển của chính bộ lọc kho, tự lọc theo mình thì bấm vào một kho xong không còn
+đường quay lại.{% if loc %} Nhưng nó <strong>có</strong> theo bộ lọc trạng thái
+đang bật ({{ trang_thai[loc][0] }}) — kho nào không còn dòng tồn nào ở trạng
+thái đó thì vắng mặt khỏi bảng; ô chọn kho phía trên vẫn liệt kê đủ mọi kho.
+{% endif %}</p>
 {% if k.theo_kho %}
 <div class="bang-cuon">
 <table>

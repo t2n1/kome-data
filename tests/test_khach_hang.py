@@ -271,7 +271,9 @@ def test_mat_hang_da_ngung_mua(conn, batch):
     """Khách vẫn mua, nhưng đã bỏ hẳn một mặt hàng — tín hiệu sớm hơn nhiều so
     với việc khách ngừng mua toàn bộ."""
     _ho_so_khach(conn, batch, "000000009292", "KHACH BO MOT MON")
-    for i in range(4):     # món cũ: mua 4 lần, dừng cách đây hơn 90 ngày
+    # Món cũ: mua 4 lần cách nhau 7 ngày (nhịp riêng = 7), lần cuối 120 ngày
+    # trước — im hơn mười bảy lần nhịp của chính cặp khách–mã này.
+    for i in range(4):
         _mua(conn, batch, "000000009292", HOM_NAY - timedelta(days=120 + i * 7),
              hang="XT08")
     _mua_deu(conn, batch, "000000009292", nhip=7, so_lan=5)   # món mới, vẫn mua
@@ -644,11 +646,17 @@ def test_ho_so_mang_bon_khoi_moi(conn, batch):
     """Bốn khối mới phải có DỮ LIỆU THẬT, không chỉ có mặt dưới dạng danh
     sách rỗng — một khối luôn rỗng thì không ai phát hiện nó hỏng."""
     _ho_so_khach(conn, batch, "B0001", "Quán bốn khối", price_level_code="03")
-    # XT07: mua đều 7 ngày/lần, lần cuối 30 ngày trước -> dự kiến 23 ngày
-    # trước, tức QUÁ HẠN 23 ngày, nhưng chưa quá 90 ngày nên đây KHÔNG phải
-    # "đã ngừng mua" — đúng khoảng trống mà khối "tháng này chưa mua" lấp.
+    # XT07: mua đều 7 ngày/lần, lần cuối 10 ngày trước -> dự kiến 3 ngày
+    # trước, tức QUÁ HẠN 3 ngày, nhưng CHƯA tới hai lần nhịp (14 ngày) nên đây
+    # KHÔNG phải "đã ngừng mua" — đúng khoảng trống mà khối "tháng này chưa
+    # mua" lấp.
+    #
+    # Trước migration 024 khoảng này là "quá hạn nhưng chưa quá 90 ngày" và
+    # test gieo lần cuối 30 ngày trước (trễ 23). Con số 23/30 ĐÓ khoá đúng
+    # công thức 90 ngày mà 024 dẹp: với nhịp 7 ngày, im 30 ngày đã là hơn bốn
+    # lần nhịp — khách đó bỏ mã này từ lâu, không phải "còn gọi kịp".
     for i in range(4):
-        _mua(conn, batch, "B0001", HOM_NAY - timedelta(days=30 + i * 7))
+        _mua(conn, batch, "B0001", HOM_NAY - timedelta(days=10 + i * 7))
     # XT09 bán cho một khách KHÁC -> có tỷ suất để xếp hạng gợi ý, và B0001
     # chưa từng mua nó.
     _mua(conn, batch, "000000000998", HOM_NAY - timedelta(days=5), hang="XT09")
@@ -659,7 +667,10 @@ def test_ho_so_mang_bon_khoi_moi(conn, batch):
 
     h = KH.ho_so(conn, "B0001")
     assert [m["ma"] for m in h.chua_mua_thang] == ["XT07"]
-    assert h.chua_mua_thang[0]["tre"] == 23
+    assert h.chua_mua_thang[0]["tre"] == 3
+    # …và nó KHÔNG được nằm luôn ở khối "đã ngừng mua": hai khối là hai dải
+    # rời nhau của cùng một trục, không phải hai bộ lọc chồng nhau.
+    assert "XT07" not in {m["ma"] for m in h.da_ngung_mua}
     assert "XT09" in {g["ma"] for g in h.goi_y}
     assert [b["ma"] for b in h.bac_gia] == ["XT07"]
     assert [d["ma"] for d in h.diem_giao] == ["SH01"]

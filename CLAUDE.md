@@ -125,6 +125,32 @@ cả ba trả cùng một tập khách.
 trung vị** với nhịp mua của khách (`mart.nhip_mua`). Một khái niệm một công thức;
 hai chỗ tính khác nhau là hai con số cùng tên nói hai điều.
 
+**Bất biến:** "cặp (khách, mã) đã ngừng" có **hai** chỗ hiển thị và chỉ **một**
+định nghĩa, cột `mart.khach_mat_hang.ngung_mua` (migration `024`): im lặng **≥ 2×
+nhịp mua riêng của chính cặp đó** (`tre_ngay >= nhip_ngay`; `nhip_ngay` NULL —
+dưới 3 lần mua — là "chưa đủ dữ liệu", KHÔNG phải "đã ngừng") **và** khách chưa bị
+OBC đánh dấu ※廃業※/※取引停止※. Hai chỗ đó — "Mặt hàng đã ngừng mua" của
+`/khach-hang/{mã}` và "Khách đã ngừng mua mã này" của `/san-pham/{mã}` — **ĐỌC**
+cột này, không chỗ nào viết lại vị từ (cùng nếp `022`). Trước `024` chỗ đầu dùng
+ngưỡng chung 90 ngày còn chỗ sau dùng nhịp riêng, nên cùng một cặp cho hai câu
+trả lời ngược nhau ở **cả hai chiều**, và cả hai đều thiếu cổng ※廃業※. `ngung_mua`
+là một **CỘT, không phải bộ lọc dòng**: view vẫn giữ đủ mọi cặp, vì nó còn phục vụ
+khối "khách đang mua mã này" và bảng top-15 mặt hàng — sự thật lịch sử, không phải
+danh sách gọi lại. Khối "Tháng này chưa mua" là **phần bù**: đã quá ngày dự kiến
+mua lại nhưng chưa tới 2× nhịp. Có test canh:
+`tests/test_san_pham.py::test_hai_man_tra_loi_GIONG_NHAU_ve_mot_cap_khach_ma` và
+`::test_khach_da_dong_cua_khong_lot_vao_khoi_goi_lai_nao`.
+
+**Bất biến:** khi một câu lệnh tham chiếu **cùng một view của `mart` nhiều hơn một
+lần**, view đó phải vào CTE `AS MATERIALIZED` (ghi **tường minh**, đừng dựa vào mặc
+định của Postgres 12+) và mọi nhánh đọc từ CTE. Postgres KHÔNG gộp các truy vấn con
+trùng nhau: mỗi lần tham chiếu là một lần **đánh giá lại** cả view. `kho_hang()`
+từng tham chiếu `mart.san_pham_360` 5 lần ở câu 1 và 3 lần ở câu 2 — mỗi lần kéo
+theo `ty_suat_mat_hang`, `toc_do_ban` (2 lượt quét `fact_sales_line`) và CTE `sl`,
+tức ~32 lượt quét bảng bán hàng cho MỘT lần mở trang. Ngân sách "≤ 2 truy vấn" đo
+**số lượt hỏi**, không đo sức tính, nên nó không bắt được lớp lỗi này và màn hình
+vẫn xanh trên CSDL test vài chục dòng.
+
 **Bất biến:** tỷ suất lãi gộp — ở BẤT KỲ view nào trong `mart` (`ty_suat_mat_hang`,
 `ban_theo_*`, `khach_360.ty_suat`) — luôn là **tỷ số của các TỔNG**
 (`sum(lãi gộp) / sum(doanh thu thuần)`), KHÔNG BAO GIỜ là trung bình của các tỷ số

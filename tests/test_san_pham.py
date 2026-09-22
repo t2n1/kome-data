@@ -13,6 +13,7 @@ Ba thứ được canh kỹ nhất ở đây:
 """
 from datetime import timedelta
 
+from kome import khach_hang as KH
 from kome import san_pham as SP
 from tests.test_khach_hang import _ho_so_khach, _mua, _neo, HOM_NAY
 from tests.test_mart_san_pham import _ban_qty, _san_pham, _ton
@@ -381,7 +382,8 @@ def test_ho_so_co_du_nam_khoi(conn, batch):
     _ho_so_khach(conn, batch, "KP19", "Quán đang mua")
     for i in range(3):
         _mua(conn, batch, "KP19", HOM_NAY - timedelta(days=i * 7), hang="P019")
-    # Khách đã ngừng: mua đều 3 lần rồi im quá 90 ngày.
+    # Khách đã ngừng: mua đều 3 lần (nhịp 7 ngày) rồi im 120 ngày — hơn mười
+    # bảy lần nhịp riêng của chính cặp khách–mã này.
     _ho_so_khach(conn, batch, "KP20", "Quán đã ngừng")
     for i in range(3):
         _mua(conn, batch, "KP20", HOM_NAY - timedelta(days=120 + i * 7), hang="P019")
@@ -441,6 +443,78 @@ def test_khach_ngung_mua_ma_nay_so_voi_NHIP_RIENG_khong_nguong_chung(conn, batch
     h = SP.ho_so(conn, "P023")
     assert [k["ma"] for k in h.khach_ngung] == ["KP23"]
     assert [k["ma"] for k in h.khach_mua] == ["KP24"]
+
+
+def test_hai_man_tra_loi_GIONG_NHAU_ve_mot_cap_khach_ma(conn, batch):
+    """[CRITICAL] "Cặp (khách, mã) đã ngừng" là MỘT khái niệm, nên hai màn phải
+    trả lời GIỐNG NHAU về cùng một cặp.
+
+    Trước migration 024 có hai công thức: /khach-hang/{mã} dùng ngưỡng CHUNG
+    (`hom_nay - lan_cuoi > 90`), /san-pham/{mã} dùng nhịp RIÊNG. Hai ca dưới
+    đây nằm hai phía của ranh giới thật và CÙNG PHÍA của ngưỡng 90 — nên ngưỡng
+    chung trả lời NGƯỢC LẠI nhịp riêng ở CẢ HAI ca, và người bán mở hai màn
+    cạnh nhau không có cách nào biết tin màn nào.
+
+    Nay cả hai ĐỌC mart.khach_mat_hang.ngung_mua."""
+    _san_pham(conn, batch, "P025")
+    # Mua 7 ngày/lần, im 60 ngày = 8,5 lần nhịp -> ĐÃ NGỪNG.
+    # Ngưỡng chung 90 ngày nói ngược: "vẫn đang mua".
+    _ho_so_khach(conn, batch, "KP25", "Quán mua dày")
+    for i in range(4):
+        _mua(conn, batch, "KP25", HOM_NAY - timedelta(days=60 + i * 7), hang="P025")
+    # Mua 120 ngày/lần, im 100 ngày = chưa tới một nhịp -> VẪN ĐANG MUA.
+    # Ngưỡng chung 90 ngày nói ngược: "đã ngừng".
+    _ho_so_khach(conn, batch, "KP26", "Quán mua thưa")
+    for i in range(4):
+        _mua(conn, batch, "KP26", HOM_NAY - timedelta(days=100 + i * 120), hang="P025")
+    _neo(conn, batch)
+
+    sp = SP.ho_so(conn, "P025")
+    assert [k["ma"] for k in sp.khach_ngung] == ["KP25"]
+    assert [k["ma"] for k in sp.khach_mua] == ["KP26"]
+
+    day = KH.ho_so(conn, "KP25")
+    thua = KH.ho_so(conn, "KP26")
+    assert "P025" in {m["ma"] for m in day.da_ngung_mua}, \
+        "/khach-hang/{mã} nói 'vẫn mua' về đúng cặp mà /san-pham/{mã} nói 'đã ngừng'"
+    assert "P025" not in {m["ma"] for m in thua.da_ngung_mua}, \
+        "/khach-hang/{mã} nói 'đã ngừng' về đúng cặp mà /san-pham/{mã} nói 'vẫn mua'"
+    # Hai khối của CÙNG một trang là hai dải RỜI NHAU, không chồng nhau: mã đã
+    # vào "đã ngừng mua" thì không được nằm luôn ở "tháng này chưa mua".
+    assert "P025" not in {m["ma"] for m in day.chua_mua_thang}
+
+
+def test_khach_da_dong_cua_khong_lot_vao_khoi_goi_lai_nao(conn, batch):
+    """[CRITICAL] Bất biến của CLAUDE.md: khách OBC đã đánh dấu ※廃業※ /
+    ※取引停止※ (281/2.077 khách) KHÔNG BAO GIỜ vào danh sách gọi lại. Doanh
+    nghiệp đã phá sản thì im lặng là đúng, không phải bất thường.
+
+    mart.khach_nhom_viec có cổng đó từ migration 016, nhưng mart.khach_mat_hang
+    thì KHÔNG — nên /can-xu-ly đúng trong khi khối "Khách đã ngừng mua mã này"
+    của /san-pham/{mã} vẫn gọi tên một công ty đã đóng cửa. 024 đưa cổng đó vào
+    chính định nghĩa `ngung_mua`.
+
+    Và LỊCH SỬ không được mất theo: hồ sơ của chính khách đó vẫn phải hiện bảng
+    mặt hàng. `ngung_mua` là một CỘT, không phải bộ lọc dòng của view."""
+    _san_pham(conn, batch, "P026")
+    _ho_so_khach(conn, batch, "KD01", "※廃業・精算※ QUAN DA DONG CUA")
+    # Mua 7 ngày/lần rồi im 60 ngày: đúng hình dạng "đã ngừng" của ca trên.
+    for i in range(4):
+        _mua(conn, batch, "KD01", HOM_NAY - timedelta(days=60 + i * 7), hang="P026")
+    _neo(conn, batch)
+
+    # /san-pham/{mã}: không khối nào của trang bán hàng được nhắc tới họ.
+    sp = SP.ho_so(conn, "P026")
+    assert [k["ma"] for k in sp.khach_ngung] == []
+    assert [k["ma"] for k in sp.khach_mua] == [], \
+        "chặn khỏi khối 'đã ngừng' mà lại rơi sang khối 'ĐANG mua' là tệ hơn"
+
+    # /khach-hang/{mã}: hai khối gọi lại rỗng, nhưng lịch sử còn nguyên.
+    kh = KH.ho_so(conn, "KD01")
+    assert [m["ma"] for m in kh.da_ngung_mua] == []
+    assert [m["ma"] for m in kh.chua_mua_thang] == []
+    assert "P026" in {m["ma"] for m in kh.mat_hang}, \
+        "lọc dòng ở view thì hồ sơ khách ※廃業※ trắng trơn — phải là CỘT"
 
 
 def test_ho_so_hien_dung_cot_toc_do_giai_thich_du_ban_ngay(conn, batch):
@@ -669,7 +743,10 @@ def test_kho_hang_noi_ro_con_so_nao_la_cua_MOI_KHO(conn, batch, test_db_url):
     Mỗi khẳng định neo vào ĐÚNG KHỐI mà nó nói về, không đếm chuỗi trên cả
     trang: riêng mục `<option>— mọi kho —</option>` của ô lọc cộng với một câu
     duy nhất đã đủ cho `html.count("mọi kho") >= 2`, nên xoá hẳn lời chú thích
-    của hai ô đếm mà test vẫn xanh."""
+    của hai ô đếm mà test vẫn xanh.
+
+    "Không theo bộ lọc kho" KHÁC "luôn liệt kê mọi kho": bảng vẫn co theo bộ
+    lọc TRẠNG THÁI, và kho không còn dòng nào khớp thì vắng mặt hẳn."""
     _san_pham(conn, batch, "P109")
     _ton(conn, batch, "P109", kho="0001")
     _neo(conn, batch)
@@ -680,9 +757,23 @@ def test_kho_hang_noi_ro_con_so_nao_la_cua_MOI_KHO(conn, batch, test_db_url):
     assert "mọi kho" in o_dem, \
         "hai ô đếm trạng thái không nói ra rằng chúng đếm trên mọi kho"
     # (2) Lời chú thích của bảng giá trị theo kho: giữa tiêu đề và chính bảng.
+    #
+    # "KHÔNG TỰ LỌC THEO KHO", chứ KHÔNG PHẢI "luôn liệt kê mọi kho" — hai câu
+    # khác nhau và câu thứ hai SAI: nhánh 'kho' của kho_hang() có GROUP BY, nên
+    # khi lọc trạng thái thì kho không còn dòng nào khớp biến mất khỏi bảng.
+    # Bản trước của test này khoá đúng câu sai đó (và template còn tự mâu thuẫn
+    # ngay câu sau: "luôn liệt kê mọi kho… Nhưng nó CÓ theo bộ lọc trạng thái").
     theo_kho = _khoi(html, "Giá trị theo kho", "<table")
-    assert "mọi kho" in theo_kho, \
-        "bảng giá trị theo kho không nói ra rằng nó luôn liệt kê mọi kho"
+    assert "không tự lọc theo kho" in theo_kho, \
+        "bảng giá trị theo kho không nói ra rằng nó bỏ qua bộ lọc kho"
+
+    # (3) …và khi CÓ lọc trạng thái thì nó phải nói ra cả vế kia: bảng co lại,
+    # đường quay lại nằm ở ô chọn kho. Im lặng ở đây là để người đọc kết luận
+    # một kho vừa biến mất khỏi bảng là một kho không còn tồn.
+    html_loc = _khach_web(test_db_url).get("/kho-hang?loc=chua_ro_ton").text
+    theo_kho_loc = _khoi(html_loc, "Giá trị theo kho", "<table")
+    assert "bộ lọc trạng thái" in theo_kho_loc and "vắng mặt" in theo_kho_loc, \
+        "lọc trạng thái mà bảng không nói ra rằng kho không khớp sẽ biến mất"
 
 
 def test_bo_loc_la_tren_URL_khong_lam_do_trang(conn, batch, test_db_url):

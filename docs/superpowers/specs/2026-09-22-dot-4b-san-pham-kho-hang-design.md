@@ -261,6 +261,29 @@ Biểu đồ vẽ SVG tự tính toạ độ, đúng nếp `kome/bao_cao.py::ve_
 - [ ] **KIỂM TAY sau khi chạy migration lên production:** mở `/san-pham`, một hồ sơ mã
       hàng, và `/kho-hang` — xem bằng mắt, đối chiếu vài con số với `在庫一覧` gốc
 
+- [ ] **KIỂM TAY thứ hai (chỉ chủ sở hữu, sau khi chạy `python db/migrate.py` lên
+      production — xem `docs/runbook.md`): thời gian đáp ứng THẬT của ba trang mới.**
+      Ngân sách §5.5 đếm **số lượt hỏi** (2 / 5 / 2), không đếm **sức tính** — và
+      vòng soát toàn nhánh đã bắt được đúng lỗ hổng đó: `kho_hang()` tham chiếu
+      `mart.san_pham_360` 5 lần trong câu 1 và 3 lần trong câu 2, mà Postgres không
+      gộp các truy vấn con trùng nhau. Mỗi lần tham chiếu kéo theo
+      `mart.ty_suat_mat_hang`, `mart.toc_do_ban` (2 lượt quét `core.fact_sales_line`)
+      và CTE `sl` — khoảng **32 lượt quét bảng bán hàng cho MỘT lần mở trang**. Vòng
+      sửa đã đưa cả `san_pham_360` lẫn `ton_hien_tai` vào CTE `AS MATERIALIZED` ở cả
+      ba hàm, nhưng **chưa ai đo trên CSDL đầy** (CSDL thử nghiệm chỉ vài chục dòng,
+      nơi cả hai cách đều tức thì).
+
+      Chạy lệnh dưới đây và lấy con số **LẦN CHẠY THỨ HAI** — lần đầu là cache lạnh
+      (tiền lệ đợt 4a: 272 ms lần đầu rồi 7 ms các lần sau trên cùng một view).
+      Ngưỡng: **dưới 1.500 ms** cho mỗi trang. Vượt thì báo lại, đừng tự tối ưu.
+
+      ```bash
+      python -u -c "import os,time;from fastapi.testclient import TestClient;from kome.env import nap_env;nap_env(bat_buoc=False);from kome.web.app import create_app;c=TestClient(create_app());[print(d, [ (lambda t0: (c.get(d), round((time.perf_counter()-t0)*1000))[1])(time.perf_counter()) for _ in range(2) ]) for d in ('/san-pham','/san-pham/000000000001','/kho-hang')]"
+      ```
+
+      Thay `000000000001` bằng một mã hàng có thật (lấy từ `/san-pham`). Kết quả in
+      ra hai con số mỗi trang: **bỏ con số đầu, đọc con số thứ hai.**
+
 ---
 
 ## 10. Bước tiếp theo

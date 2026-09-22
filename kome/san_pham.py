@@ -185,24 +185,35 @@ def _sp(r) -> SanPham:
         lan_dau=r[13], lan_cuoi=r[14])
 
 
+def _dk_tim(tim: str = "") -> tuple[str, list]:
+    """Mảnh điều kiện của ô tìm kiếm. Tìm theo mã, tên hàng hoặc nhóm cùng lúc
+    — người bán không nhớ mình đang cầm mảnh thông tin nào."""
+    if not tim.strip():
+        return "", []
+    return ("""(product_code ILIKE %s OR ten_hang ILIKE %s OR nhom ILIKE %s)""",
+            [f"%{tim.strip()}%"] * 3)
+
+
+def _dk_loc(loc: str = "") -> tuple[str, list]:
+    """Mảnh điều kiện của dải chip trạng thái tồn."""
+    return ("trang_thai = %s", [loc]) if loc in TRANG_THAI_TON else ("", [])
+
+
 def _vi_tu(tim: str = "", loc: str = "") -> tuple[str, list]:
-    """Mệnh đề WHERE lọc `mart.san_pham_360`, viết MỘT LẦN cho cả hai chỗ đọc.
+    """Mệnh đề WHERE lọc `mart.san_pham_360`, viết MỘT LẦN cho mọi chỗ đọc.
 
     Vì sao dùng chung chứ không chép (bài học của đợt 4a): bộ đếm trạng thái và
     chính bảng mà nó mở ra phải lọc GIỐNG HỆT nhau. Hai bản chép tay là hai bộ
     lọc sẽ trôi khỏi nhau, và triệu chứng là một con số nói dối đúng cái danh
     sách nó mở ra.
+
+    Hai mảnh tách riêng ở trên vì `danh_sach()` cần chúng RỜI NHAU (lọc `tim`
+    một lần trong CTE, rồi lọc `loc` trên chính CTE đó) — nhưng vẫn chỉ có
+    MỘT bản của mỗi mảnh, nên không có gì để trôi.
     """
-    dieu_kien, tham_so = [], []
-    if tim.strip():
-        # Tìm theo mã, tên hàng hoặc nhóm cùng lúc — người bán không nhớ mình
-        # đang cầm mảnh thông tin nào.
-        dieu_kien.append("""(product_code ILIKE %s OR ten_hang ILIKE %s
-                             OR nhom ILIKE %s)""")
-        tham_so += [f"%{tim.strip()}%"] * 3
-    if loc in TRANG_THAI_TON:
-        dieu_kien.append("trang_thai = %s")
-        tham_so.append(loc)
+    manh = [_dk_tim(tim), _dk_loc(loc)]
+    dieu_kien = [sql for sql, _ in manh if sql]
+    tham_so = [p for _, ps in manh for p in ps]
     return (("WHERE " + " AND ".join(dieu_kien)) if dieu_kien else ""), tham_so
 
 
@@ -217,7 +228,8 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
     `tong` thì ngược lại, theo CẢ HAI: nó phải là số dòng mà chính bảng bên
     dưới đang hiện.
     """
-    where_dem, p_dem = _vi_tu(tim=tim)              # không có `loc`
+    dk_tim, p_tim = _dk_tim(tim)
+    dk_loc, p_loc = _dk_loc(loc)
     where, tham_so = _vi_tu(tim=tim, loc=loc)
 
     # Lượt hỏi 1: bộ đếm trạng thái + tổng, gộp làm một. ORDER BY nằm ở LỚP
@@ -227,15 +239,33 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
     # `tong` do SQL đếm chứ không phải Python cộng dồn `dem_trang_thai`: hai bộ
     # đếm lọc khác nhau (`loc`), nên cộng dồn là ra một con số thứ ba không
     # thuộc về ai.
+    #
+    # CTE `AS MATERIALIZED`, ghi TƯỜNG MINH: hai nhánh dưới cùng đọc
+    # mart.san_pham_360, và Postgres KHÔNG gộp hai truy vấn con giống nhau —
+    # mỗi lần tham chiếu là một lần ĐÁNH GIÁ LẠI cả view, kéo theo
+    # ty_suat_mat_hang, toc_do_ban (2 lượt quét fact_sales_line) và CTE `sl`.
+    # Ngân sách "<= 2 truy vấn" đếm SỐ LƯỢT HỎI, không đếm sức tính, nên nó
+    # không bắt được lớp lỗi này. 232 dòng thì vật hoá một lần rồi quét lại là
+    # rẻ; cái đắt là dựng lại. Không dựa vào mặc định của Postgres 12+ (CTE chỉ
+    # tham chiếu một lần thì được nội tuyến): chỗ này người sau cần ĐỌC THẤY ý
+    # định, không phải suy ra nó từ số lần tham chiếu.
+    #
+    # `tim` lọc BÊN TRONG CTE (giữ được vị từ đẩy xuống), `loc` lọc TRÊN CTE —
+    # đúng phân vai cũ: bộ đếm không theo `loc`, `tong` thì có.
     rows = conn.execute(f"""
+        WITH sp AS MATERIALIZED (
+            SELECT trang_thai FROM mart.san_pham_360
+            {("WHERE " + dk_tim) if dk_tim else ""}
+        )
         SELECT khoi, khoa, so FROM (
             SELECT 'dem'::text AS khoi, trang_thai AS khoa, count(*) AS so
-              FROM mart.san_pham_360 {where_dem}
+              FROM sp
              GROUP BY trang_thai
             UNION ALL
-            SELECT 'tong', '', count(*) FROM mart.san_pham_360 {where}
+            SELECT 'tong', '', count(*) FROM sp
+            {("WHERE " + dk_loc) if dk_loc else ""}
         ) u ORDER BY khoi, khoa
-    """, p_dem + tham_so).fetchall()
+    """, p_tim + p_loc).fetchall()
     dem = {khoa: int(so) for khoi, khoa, so in rows if khoi == "dem"}
     tong = next((int(so) for khoi, _, so in rows if khoi == "tong"), 0)
 
@@ -276,23 +306,29 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
     # Hai khối khách gộp làm MỘT lượt hỏi: cùng một view, cùng bộ cột, chỉ khác
     # vị từ — đúng ca mà UNION ALL không phải đệm NULL cho nhánh nào.
     #
-    # "ĐÃ NGỪNG MUA MÃ NÀY" SO VỚI NHỊP RIÊNG CỦA TỪNG CẶP (khách, mã), không
-    # với một ngưỡng chung. Đó là bất biến của cả dự án — đo thật: ngưỡng chung
-    # 90 ngày bỏ sót 49 khách đang rời đi và báo động nhầm 34 khách vẫn mua
-    # bình thường. Khách mua 7 ngày/lần im 60 ngày đã rời đi từ lâu; khách mua
-    # 120 ngày/lần im 100 ngày vẫn đang mua bình thường — một con số 90 không
-    # phân biệt được hai người đó.
+    # "ĐÃ NGỪNG MUA MÃ NÀY" ĐỌC `ngung_mua` CỦA mart.khach_mat_hang (migration
+    # 024), không viết lại vị từ ở đây. Đó là định nghĩa DUY NHẤT của khái niệm
+    # "cặp (khách, mã) đã ngừng", dùng chung với khối "Mặt hàng đã ngừng mua"
+    # của /khach-hang/{mã} — trước 024 hai màn có hai công thức và trả lời
+    # ngược nhau về cùng một cặp.
     #
-    # `tre_ngay` = số ngày quá NGÀY DỰ KIẾN MUA LẠI (lan_cuoi + nhip_ngay), do
-    # mart.khach_mat_hang tính sẵn cho đúng cặp này. Nên
-    #     tre_ngay >= nhip_ngay  ⟺  im lặng >= 2 × nhịp riêng
-    # tức ĐÚNG ngưỡng 'canh_bao' mà mart.khach_360 dùng cho quan hệ khách hàng.
-    # Viết bằng hai cột có sẵn của chính view đang đọc, nên không có hằng số
-    # ngày nào của riêng file này để trôi khỏi định nghĩa ở mart.
+    # `ngung_mua` = im lặng >= 2 × NHỊP RIÊNG của chính cặp đó, VÀ khách chưa
+    # bị OBC đánh dấu ※廃業※. Không phải ngưỡng chung: đo thật, ngưỡng 90 ngày
+    # bỏ sót 49 khách đang rời đi và báo động nhầm 34 khách vẫn mua bình
+    # thường. Khách mua 7 ngày/lần im 60 ngày đã rời đi từ lâu; khách mua 120
+    # ngày/lần im 100 ngày vẫn đang mua bình thường.
     #
-    # `tre_ngay` là NULL khi cặp (khách, mã) chưa đủ 3 lần mua để nói về nhịp —
-    # và NULL rơi vào nhánh "đang mua", đúng ý: chưa đủ lịch sử thì chưa được
-    # kết luận là đã mất. Đó cũng là lý do nhánh dưới không cần `so_lan >= 3`.
+    # NHÁNH 'mua' KHÔNG PHẢI PHẦN BÙ THUẦN CỦA 'ngung'. Nó còn phải tự loại
+    # khách ※廃業※: `ngung_mua` đã mang cổng đó bên trong, nên `NOT ngung_mua`
+    # LUÔN đúng với một doanh nghiệp đã đóng cửa — không chặn thì họ trượt
+    # thẳng từ khối "đã ngừng" sang khối "ĐANG mua mã này", tức trang khẳng
+    # định một công ty đã phá sản vẫn đang lấy hàng. Cờ `da_ngung` đọc từ
+    # mart.khach_360 (nhà của nó là migration 016) chứ không so chuỗi ※…※ ở
+    # đây — đọc một cờ có sẵn, không chép một vị từ.
+    #
+    # Hai khối này là DANH SÁCH BÁN HÀNG, nên cả hai đều không chứa khách đã
+    # đóng cửa. Sự thật lịch sử của cặp đó KHÔNG mất: view vẫn giữ đủ dòng, và
+    # hồ sơ của chính khách ※廃業※ vẫn hiện bảng top-15 mặt hàng như cũ.
     #
     # `xep` là hạng TRONG TỪNG NHÁNH, tính bằng row_number() theo đúng khoá mà
     # nhánh đó dùng để cắt top-N. ORDER BY ở lớp NGOÀI đọc `xep` chứ không tin
@@ -300,11 +336,26 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
     # và đợt 4a đã dính đúng lỗi này. (ORDER BY … LIMIT trong nhánh vẫn cần,
     # nhưng để CHỌN đúng top-N, không phải để giữ thứ tự.)
     #
-    # LEFT JOIN mart.khach_360 chứ không JOIN: một khách có dòng bán thì luôn
-    # có dòng ở khach_360 hôm nay, nhưng mất tên khách là mất cả DÒNG nếu dùng
+    # LEFT JOIN khach_360 chứ không JOIN: một khách có dòng bán thì luôn có
+    # dòng ở khach_360 hôm nay, nhưng mất tên khách là mất cả DÒNG nếu dùng
     # INNER — và đây là khối "ai đang mua mã này", nơi thiếu một khách nguy
-    # hiểm hơn nhiều so với hiện mã thay cho tên.
+    # hiểm hơn nhiều so với hiện mã thay cho tên. Cùng lý do,
+    # `NOT coalesce(k.da_ngung, false)`: không có dòng -> không phải đã đóng
+    # cửa -> giữ lại.
+    #
+    # HAI CTE `AS MATERIALIZED`, ghi TƯỜNG MINH: cả hai nhánh đều đọc
+    # khach_mat_hang và khach_360, mà Postgres KHÔNG gộp hai truy vấn con
+    # giống nhau — mỗi lần tham chiếu là một lần dựng lại cả view (khach_360
+    # gộp toàn bộ mart.lan_mua). Vị từ `product_code = %s` nằm BÊN TRONG CTE
+    # nên vẫn đẩy xuống được; vật hoá ở đây chỉ bỏ đi lần dựng THỨ HAI.
     khach = conn.execute(f"""
+        WITH h AS MATERIALIZED (
+            SELECT customer_code, doanh_thu_thuan, so_luong, so_lan, lan_cuoi,
+                   nhip_ngay, tre_ngay, ngung_mua
+              FROM mart.khach_mat_hang WHERE product_code = %s
+        ), k AS MATERIALIZED (
+            SELECT customer_code, ten, da_ngung FROM mart.khach_360
+        )
         SELECT khoi, ma, ten, doanh_thu, so_luong, so_lan, lan_cuoi, nhip, tre
         FROM (
             (SELECT 'mua'::text AS khoi, h.customer_code AS ma,
@@ -313,10 +364,9 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
                     h.lan_cuoi, h.nhip_ngay AS nhip, h.tre_ngay AS tre,
                     row_number() OVER (ORDER BY h.doanh_thu_thuan DESC NULLS LAST)
                       AS xep
-               FROM mart.khach_mat_hang h
-               LEFT JOIN mart.khach_360 k ON k.customer_code = h.customer_code
-              WHERE h.product_code = %s
-                AND (h.tre_ngay IS NULL OR h.tre_ngay < h.nhip_ngay)
+               FROM h
+               LEFT JOIN k ON k.customer_code = h.customer_code
+              WHERE NOT h.ngung_mua AND NOT coalesce(k.da_ngung, false)
               ORDER BY h.doanh_thu_thuan DESC NULLS LAST
               LIMIT 20)
             UNION ALL
@@ -325,13 +375,13 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
                     h.doanh_thu_thuan, h.so_luong, h.so_lan, h.lan_cuoi,
                     h.nhip_ngay, h.tre_ngay,
                     row_number() OVER (ORDER BY h.doanh_thu_thuan DESC NULLS LAST)
-               FROM mart.khach_mat_hang h
-               LEFT JOIN mart.khach_360 k ON k.customer_code = h.customer_code
-              WHERE h.product_code = %s AND h.tre_ngay >= h.nhip_ngay
+               FROM h
+               LEFT JOIN k ON k.customer_code = h.customer_code
+              WHERE h.ngung_mua
               ORDER BY h.doanh_thu_thuan DESC NULLS LAST
               LIMIT 10)
         ) u ORDER BY khoi, xep
-    """, (ma, ma)).fetchall()
+    """, (ma,)).fetchall()
 
     def _khach(r):
         return {"ma": r[1], "ten": r[2], "doanh_thu": int(r[3] or 0),
@@ -426,31 +476,52 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
 
     # THỨ TỰ THAM SỐ = thứ tự VĂN BẢN các mảnh xuất hiện bên dưới: nhánh
     # 'can_han' (CAN_HAN_NGAY, kho, loc), rồi 'gia_tri_ton_chet' (kho, loc),
-    # rồi 'kho' (loc).
+    # rồi 'kho' (loc). Hai CTE ở đầu KHÔNG mang tham số nào.
+    #
+    # HAI CTE `AS MATERIALIZED`, ghi TƯỜNG MINH. Câu này tham chiếu
+    # mart.san_pham_360 **5 lần** và mart.ton_hien_tai **3 lần**, mà Postgres
+    # KHÔNG gộp các truy vấn con trùng nhau: mỗi lần tham chiếu là một lần
+    # ĐÁNH GIÁ LẠI cả view, và san_pham_360 kéo theo ty_suat_mat_hang,
+    # toc_do_ban (2 lượt quét fact_sales_line) cùng CTE `sl` — khoảng 32 lượt
+    # quét bảng bán hàng cho MỘT lần mở trang. Ngân sách "<= 2 truy vấn" đếm
+    # SỐ LƯỢT HỎI, không đếm sức tính, nên nó không bắt được lớp lỗi này; trên
+    # CSDL test vài chục dòng màn hình vẫn xanh.
+    #
+    # Vật hoá là rẻ ở đúng hình dạng dữ liệu này: san_pham_360 là 232 dòng,
+    # ton_hien_tai là một ảnh chụp ~177 dòng (chặn trên bởi số mã × số kho).
+    # Quét lại một bảng tạm bé năm lần rẻ hơn hẳn dựng lại nó năm lần.
+    #
+    # KHÔNG nhét `dk_kho` vào CTE `t`: nhánh 'kho' (giá trị theo kho) CỐ Ý
+    # không lọc theo kho — nó là ô điều khiển của chính bộ lọc đó.
+    #
+    # Tên CTE giữ đúng bí danh cũ (`s`, `t`) để mọi mảnh vị từ dựng sẵn ở trên
+    # chạy nguyên văn.
     tq = conn.execute(f"""
+        WITH s AS MATERIALIZED (SELECT * FROM mart.san_pham_360),
+             t AS MATERIALIZED (SELECT * FROM mart.ton_hien_tai)
         SELECT khoi, khoa, ten, so, so2, ngay FROM (
             SELECT 'o'::text AS khoi, 'het_hang'::text AS khoa, ''::text AS ten,
                    count(*)::numeric AS so, 0::numeric AS so2, NULL::date AS ngay
-              FROM mart.san_pham_360 WHERE trang_thai = 'het_hang'
+              FROM s WHERE trang_thai = 'het_hang'
             UNION ALL
             SELECT 'o', 'sap_thieu', '', count(*), 0, NULL
-              FROM mart.san_pham_360 WHERE trang_thai = 'sap_thieu'
+              FROM s WHERE trang_thai = 'sap_thieu'
             UNION ALL
             SELECT 'o', 'can_han', '', count(*), 0, NULL
-              FROM mart.ton_hien_tai t
-              LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
+              FROM t
+              LEFT JOIN s ON s.product_code = t.product_code
              WHERE t.loai_han = 'ngay' AND t.han_con_lai BETWEEN 0 AND %s
                    {dk_kho} {dk_loc}
             UNION ALL
             SELECT 'o', 'gia_tri_ton_chet', '', coalesce(sum(t.gia_tri), 0), 0, NULL
-              FROM mart.ton_hien_tai t
-              JOIN mart.san_pham_360 s ON s.product_code = t.product_code
+              FROM t
+              JOIN s ON s.product_code = t.product_code
              WHERE s.trang_thai = 'ton_chet' {dk_kho} {dk_loc}
             UNION ALL
             SELECT 'kho', t.warehouse_code, t.ten_kho,
                    coalesce(sum(t.gia_tri), 0), count(*), NULL
-              FROM mart.ton_hien_tai t
-              LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
+              FROM t
+              LEFT JOIN s ON s.product_code = t.product_code
              WHERE true {dk_loc}
              GROUP BY t.warehouse_code, t.ten_kho
             UNION ALL
@@ -483,7 +554,13 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     # LEFT JOIN san_pham_360: một mã có trong bản xuất tồn kho nhưng chưa có
     # trong 商品マスタ vẫn phải hiện ở bảng tồn. INNER JOIN làm nó biến mất khỏi
     # đúng màn hình lẽ ra phải phát hiện ra nó.
+    #
+    # Lại HAI CTE `AS MATERIALIZED` như lượt hỏi 1, và vì đúng lý do đó: ba
+    # nhánh dưới đây tham chiếu mart.ton_hien_tai 3 lần và mart.san_pham_360 3
+    # lần, tức 3 lần dựng lại mỗi view nếu để nguyên.
     rows = conn.execute(f"""
+        WITH s AS MATERIALIZED (SELECT * FROM mart.san_pham_360),
+             t AS MATERIALIZED (SELECT * FROM mart.ton_hien_tai)
         SELECT khoi, ma, ten, kho, ten_kho, so_luong, gia_tri, best_before,
                loai_han, han_con_lai, trang_thai
         FROM (
@@ -492,8 +569,8 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                     t.warehouse_code AS kho, t.ten_kho, t.so_luong, t.gia_tri,
                     t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
                     row_number() OVER (ORDER BY t.gia_tri DESC NULLS LAST) AS xep
-               FROM mart.ton_hien_tai t
-               LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
+               FROM t
+               LEFT JOIN s ON s.product_code = t.product_code
               WHERE true {dk_kho} {dk_loc})
             UNION ALL
             (SELECT 'han', t.product_code,
@@ -501,8 +578,8 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                     t.warehouse_code, t.ten_kho, t.so_luong, t.gia_tri,
                     t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
                     row_number() OVER (ORDER BY t.han_con_lai)
-               FROM mart.ton_hien_tai t
-               LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
+               FROM t
+               LEFT JOIN s ON s.product_code = t.product_code
               WHERE t.loai_han = 'ngay' AND t.han_con_lai BETWEEN 0 AND %s
                     {dk_kho} {dk_loc})
             UNION ALL
@@ -511,8 +588,8 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                     t.warehouse_code, t.ten_kho, t.so_luong, t.gia_tri,
                     t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
                     row_number() OVER (ORDER BY t.han_con_lai)
-               FROM mart.ton_hien_tai t
-               LEFT JOIN mart.san_pham_360 s ON s.product_code = t.product_code
+               FROM t
+               LEFT JOIN s ON s.product_code = t.product_code
               WHERE t.loai_han = 'ngay' AND t.han_con_lai < 0
                     {dk_kho} {dk_loc})
         ) u ORDER BY khoi, xep

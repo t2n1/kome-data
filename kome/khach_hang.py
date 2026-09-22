@@ -282,15 +282,23 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # Mặt hàng khách TỪNG mua đều rồi NGỪNG hẳn. Đây là tín hiệu sớm hơn nhiều
     # so với việc khách ngừng mua toàn bộ: họ đang chuyển dần sang nhà cung cấp
     # khác, từng món một, và không ai để ý cho tới khi mất luôn khách.
+    #
+    # ĐỌC `ngung_mua` của mart.khach_mat_hang (migration 024), KHÔNG viết lại
+    # vị từ. Trước 024 chỗ này dùng ngưỡng CHUNG (`hom_nay - lan_cuoi > 90`
+    # cộng `so_lan >= 3`) còn /san-pham/{mã} dùng nhịp RIÊNG — cùng một cặp
+    # (khách, mã) cho hai câu trả lời ngược nhau ở hai màn. Nay một khái niệm
+    # một công thức, đúng nếp 021/022.
+    #
+    # `so_lan >= 3` đã bỏ vì THỪA, không phải vì nới lỏng: `nhip_ngay` chỉ có
+    # giá trị khi đã có >= 2 khoảng cách, tức >= 3 lần mua (020). Để lại là
+    # dựng thêm một bản sao của cùng điều kiện, ở đúng chỗ vừa dọn xong.
     da_ngung = [dict(zip(("ma", "ten", "so_lan", "lan_cuoi", "doanh_thu",
                           "nhip", "du_kien", "tre"), h))
                 for h in conn.execute(
         """SELECT h.product_code, h.ten_hang, h.so_lan, h.lan_cuoi,
                   h.doanh_thu_thuan, h.nhip_ngay, h.du_kien_lan_toi, h.tre_ngay
-           FROM mart.khach_mat_hang h, mart.moc_thoi_gian m
-           WHERE h.customer_code = %s
-             AND h.so_lan >= 3
-             AND m.hom_nay - h.lan_cuoi > 90
+           FROM mart.khach_mat_hang h
+           WHERE h.customer_code = %s AND h.ngung_mua
            ORDER BY h.doanh_thu_thuan DESC LIMIT 10""", (ma,)).fetchall()]
 
     gan_day = [dict(zip(("ngay", "so_phieu", "doanh_thu", "lai_gop"), l))
@@ -326,15 +334,35 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # thẳng ra cho khách. Báo giá lẻ bằng giá thùng sai hơn chục lần; không
     # có số còn hơn có số sai. Bảng giá đúng (tách 荷姿) nằm ở khối "Bảng giá
     # của bậc" ngay dưới, dựng từ core.fact_price_list.
+    #
+    # NHÁNH 'chua' LÀ PHẦN BÙ CỦA `ngung_mua`, KHÔNG PHẢI MỘT NGƯỠNG NGÀY
+    # RIÊNG. Nó là dải giữa: đã quá ngày dự kiến mua lại (`tre_ngay IS NOT
+    # NULL`, tức im lặng > 1 nhịp) nhưng CHƯA tới 2 nhịp (`NOT ngung_mua`) —
+    # "còn gọi kịp". Trước 024 vế thứ hai là `hom_nay - lan_cuoi <= 90`, ăn
+    # khớp với ngưỡng 90 của khối "đã ngừng mua" ngay dưới nó. Đổi khối kia
+    # sang nhịp riêng mà để nguyên chỗ này thì hai khối CHỒNG NHAU: một mã
+    # nhịp 7 ngày im 60 ngày vừa "đã ngừng" (60 >= 2x7) vừa "chưa mua tháng
+    # này" (60 <= 90) — cùng một mã, hai kết luận, trên cùng một trang.
+    #
+    # `NOT dh.da_ngung` (mart.dau_hieu_khach, migration 016): đây cũng là một
+    # DANH SÁCH GỌI LẠI ("một cuộc điện thoại nhắc là đủ"), nên khách ※廃業※
+    # không được vào. `ngung_mua` đã tự mang cổng đó, nhưng chính vì thế mà
+    # `NOT ngung_mua` LUÔN đúng với khách đã đóng cửa — không chặn ở đây thì
+    # toàn bộ mặt hàng quá hạn của họ dồn hết sang khối này. LEFT JOIN +
+    # coalesce chứ không INNER: khách chưa có dòng 得意先全情報 vẫn phải giữ
+    # được khối của mình.
     them = conn.execute("""
         SELECT khoi, ma, ten, chu, so_a FROM (
             (SELECT 'chua'::text AS khoi, h.product_code AS ma,
                     h.ten_hang AS ten, h.lan_cuoi::text AS chu,
                     h.tre_ngay::numeric AS so_a,
                     h.doanh_thu_thuan::numeric AS xep
-               FROM mart.khach_mat_hang h, mart.moc_thoi_gian m
-              WHERE h.customer_code = %s AND h.so_lan >= 3
-                AND h.tre_ngay IS NOT NULL AND m.hom_nay - h.lan_cuoi <= 90
+               FROM mart.khach_mat_hang h
+               LEFT JOIN mart.dau_hieu_khach dh
+                      ON dh.customer_code = h.customer_code
+              WHERE h.customer_code = %s
+                AND h.tre_ngay IS NOT NULL AND NOT h.ngung_mua
+                AND NOT coalesce(dh.da_ngung, false)
               ORDER BY h.doanh_thu_thuan DESC
               LIMIT 10)
             UNION ALL
