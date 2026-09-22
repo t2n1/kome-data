@@ -276,24 +276,26 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | 
     # màn hình hiện khối "chưa đặt chỉ tiêu", không hiện bộ đếm ngày.
     ngay_kd, ngay_kd_da_qua = (dong[0][7], dong[0][8]) if dong else (0, 0)
 
-    # Luỹ kế 12 tháng của kỳ. Tháng SAU hom_nay trả None cho thực tế: một
-    # đường rơi xuống 0 đọc thành "doanh thu sụp", không phải "chưa có dữ liệu".
-    #
-    # Alias bảng nguồn là `b` (khớp đúng lối viết mà
-    # test_dinh_nghia_chi_so_nam_o_mart_khong_o_python đã chừa sẵn cho phép
-    # cộng dồn có alias): câu này cộng dồn các dòng đã có sẵn công thức từ
-    # mart.tien_do_ngan_sach để ra tổng cả công ty — không định nghĩa lại
-    # "tiến độ" hay bất kỳ chỉ số nào, chỉ gộp dòng để hiển thị.
+    # Luỹ kế 12 tháng của kỳ, VÀ tổng cả công ty của tháng đang xét — cùng một
+    # câu. Alias bảng nguồn là `b`: câu này chỉ CỘNG DỒN các cột mart đã tính
+    # sẵn (thuc_te, muc_tieu, muc_tieu_den_hom_nay) và chia hai tổng đó để ra
+    # tiến độ công ty — không định nghĩa lại công thức nào, hỏi hẳn SQL thay
+    # vì Python để không có phép cộng/chia chỉ số nào lọt vào phía Python.
+    # `nullif(sum(b.muc_tieu), 0)` cho tiến độ NULL khi tổng chỉ tiêu bằng 0,
+    # cùng nếp `nullif` mà mart.tien_do_ngan_sach đã dùng cho từng dòng.
     thang_ky = thang_cua_ky(ky)
-    theo_thang = {x[0]: (int(x[1] or 0), int(x[2]) if x[2] is not None else None)
-                  for x in conn.execute(
-        """SELECT thang, sum(b.thuc_te), sum(b.muc_tieu)
+    theo_thang = {x[0]: x[1:] for x in conn.execute(
+        """SELECT thang, sum(b.thuc_te), sum(b.muc_tieu),
+                  sum(b.muc_tieu_den_hom_nay),
+                  sum(b.thuc_te)::numeric / nullif(sum(b.muc_tieu), 0)
            FROM mart.tien_do_ngan_sach b WHERE company_fy = %s
            GROUP BY thang""", (ky,)).fetchall()}
 
     luy_ke, c_tt, c_ns = [], 0, 0
     for th in thang_ky:
-        tt, ns = theo_thang.get(th, (0, None))
+        row = theo_thang.get(th)
+        tt = int(row[0] or 0) if row else 0
+        ns = int(row[1]) if row and row[1] is not None else None
         c_tt += tt
         c_ns += ns or 0
         luy_ke.append(MocLuyKe(
@@ -301,34 +303,21 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | 
             thuc_te=c_tt if th <= thang_hom_nay else None,
             ngan_sach=c_ns if c_ns else None))
 
-    # Cộng dồn bằng vòng lặp tay thay vì hàm dựng sẵn của Python: cùng lý do
-    # ghi ở trên — có test canh mã nguồn để chặn ai đó lỡ viết lại công thức
-    # chỉ số trong Python, và phép cộng tổng công ty từ các dòng-người đã
-    # tính sẵn này không phải một công thức mới.
-    tong_tt = 0
-    for n in nguoi:
-        tong_tt += n.thuc_te
-    co_mt = [n.muc_tieu for n in nguoi if n.muc_tieu is not None]
-    tong_mt = None
-    if co_mt:
-        tong_mt = 0
-        for v in co_mt:
-            tong_mt += v
-    co_moc = [n.muc_tieu_den_hom_nay for n in nguoi
-              if n.muc_tieu_den_hom_nay is not None]
-    tong_moc = None
-    if co_moc:
-        tong_moc = 0
-        for v in co_moc:
-            tong_moc += v
+    # Tổng công ty của tháng đang xét: dòng CHÍNH LÀ một trong những dòng
+    # `theo_thang` vừa gộp — không hỏi thêm câu nào, không cộng gì ở Python.
+    r_thang = theo_thang.get(thang)
+    tong_tt = int(r_thang[0] or 0) if r_thang else 0
+    tong_mt = int(r_thang[1]) if r_thang and r_thang[1] is not None else None
+    tong_moc = int(r_thang[2]) if r_thang and r_thang[2] is not None else None
+    tien_do_ct = float(r_thang[3]) if r_thang and r_thang[3] is not None else None
 
     return TienDoNganSach(
         company_fy=ky, thang=thang, hom_nay=hom_nay,
         ngay_kd=ngay_kd, ngay_kd_da_qua=ngay_kd_da_qua,
         thuc_te=tong_tt, muc_tieu=tong_mt,
         muc_tieu_den_hom_nay=tong_moc,
-        tien_do=(tong_tt / tong_mt) if tong_mt else None,
-        nguoi=nguoi, luy_ke=luy_ke, co_ngan_sach=bool(co_mt))
+        tien_do=tien_do_ct,
+        nguoi=nguoi, luy_ke=luy_ke, co_ngan_sach=tong_mt is not None)
 
 
 def ve_luy_ke(td: "TienDoNganSach | None") -> dict:

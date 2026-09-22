@@ -47,7 +47,29 @@ Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
 {% endfor %}
 </div>
 
+{% for c in bc.canh_bao %}<div class="ngay-thieu">⚠️ {{ c }}</div>{% endfor %}
+
+<div class="ky">📅 <strong>{{ bc.ky.nhan }}</strong> · dữ liệu từ
+  {{ bc.ky.ngay_dau }} đến {{ bc.ky.ngay_cuoi }} ({{ bc.ky.so_thang }}/12 tháng)</div>
+
+<div class="so-lon">
+  <div class="the"><div class="nhan">Doanh thu thuần</div>
+    <div class="gia">¥{{ "{:,}".format(bc.ky.doanh_thu) }}</div></div>
+  <div class="the"><div class="nhan">Lãi gộp</div>
+    <div class="gia">¥{{ "{:,}".format(bc.ky.lai_gop) }}</div></div>
+  <div class="the"><div class="nhan">Tỷ suất lãi gộp</div>
+    <div class="gia">{% if bc.ky.ty_suat is not none %}{{ "%.1f"|format(bc.ky.ty_suat*100) }}%{% else %}—{% endif %}</div></div>
+  <div class="the"><div class="nhan">Khách có mua</div>
+    <div class="gia">{{ "{:,}".format(bc.ky.so_khach) }}</div></div>
+</div>
+<p class="ghi-chu">Doanh thu thuần đã trừ thuế tiêu dùng. Phiếu đỏ (hàng trả lại)
+được tính vào như số âm — cố ý, vì hàng trả lại là doanh thu âm thật.</p>
+
 {% if td %}
+{# Khối ngân sách đứng SAU cảnh báo chất lượng dữ liệu (bc.canh_bao) và thẻ
+   KPI của cả kỳ ở trên — đó là tiêu đề thật của một trang tên "Báo cáo bán
+   hàng", và cảnh báo phải được đọc TRƯỚC bất kỳ con số nào trên trang. Vẫn
+   đứng TRƯỚC biểu đồ 12 tháng bên dưới, đúng chữ của brief. #}
 <h2>Tiến độ ngân sách — tháng {{ td.thang }}</h2>
 {# Tháng lấy theo mart.moc_thoi_gian.hom_nay, KHÔNG theo đồng hồ thật. In ra
    cả tháng lẫn ngày mốc: dữ liệu bán có thể chậm hàng tuần so với hôm nay, và
@@ -128,24 +150,6 @@ Ngày làm việc chưa trừ ngày lễ Nhật.</p>
 </table>
 </div>
 {% endif %}
-
-{% for c in bc.canh_bao %}<div class="ngay-thieu">⚠️ {{ c }}</div>{% endfor %}
-
-<div class="ky">📅 <strong>{{ bc.ky.nhan }}</strong> · dữ liệu từ
-  {{ bc.ky.ngay_dau }} đến {{ bc.ky.ngay_cuoi }} ({{ bc.ky.so_thang }}/12 tháng)</div>
-
-<div class="so-lon">
-  <div class="the"><div class="nhan">Doanh thu thuần</div>
-    <div class="gia">¥{{ "{:,}".format(bc.ky.doanh_thu) }}</div></div>
-  <div class="the"><div class="nhan">Lãi gộp</div>
-    <div class="gia">¥{{ "{:,}".format(bc.ky.lai_gop) }}</div></div>
-  <div class="the"><div class="nhan">Tỷ suất lãi gộp</div>
-    <div class="gia">{% if bc.ky.ty_suat is not none %}{{ "%.1f"|format(bc.ky.ty_suat*100) }}%{% else %}—{% endif %}</div></div>
-  <div class="the"><div class="nhan">Khách có mua</div>
-    <div class="gia">{{ "{:,}".format(bc.ky.so_khach) }}</div></div>
-</div>
-<p class="ghi-chu">Doanh thu thuần đã trừ thuế tiêu dùng. Phiếu đỏ (hàng trả lại)
-được tính vào như số âm — cố ý, vì hàng trả lại là doanh thu âm thật.</p>
 
 <h2>Diễn biến theo tháng</h2>
 {% if bd.co %}
