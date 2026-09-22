@@ -84,7 +84,7 @@ def test_ty_suat_None_khi_chua_co_doanh_thu(conn):
     bc = tinh_bao_cao(conn)
     assert bc.khong_co_du_lieu is True
     assert bc.ky.ty_suat is None
-    assert bc.thang == [] and bc.khach == []
+    assert bc.thang == [] and bc.tap_trung is None
 
 
 def test_chon_dung_ky_qua_tham_so(conn, batch):

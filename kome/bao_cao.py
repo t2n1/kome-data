@@ -36,6 +36,8 @@ class O:
     tang_truong: float | None
     la_thang_chot: bool
     so_phieu: int
+    so_khach: int
+    dt_cung_ky: int | None
 
 
 @dataclass
@@ -57,16 +59,140 @@ class Ky:
         return self.so_thang >= DU_MOT_KY
 
 
+class _SoCungKy:
+    """Trộn sẵn các phép CHIA của hai bộ cột tổng `dt/lg/so_khach` và
+    `..._ck` (cùng kỳ) — không định nghĩa chỉ số mới, chỉ là tỷ số của các
+    TỔNG đã tính sẵn trong `mart` (`mart.ky_cung_ky`, và đợt 5b Task 5
+    `mart.thang_den_hom_nay` dùng lại đúng lớp này qua `ThangNay`, cùng bộ
+    cột). Một công thức viết MỘT LẦN ở đây, không phải mỗi dataclass tự chia
+    lấy rồi trôi khỏi nhau.
+
+    Tăng trưởng None khi mẫu số None hoặc <= 0: 赤伝 (phiếu đỏ) có thể làm
+    doanh thu/lãi gộp cùng kỳ năm trước ÂM, và chia cho số âm ra phần trăm
+    NGƯỢC DẤU — một con số sai còn tệ hơn không có con số.
+    """
+    dt: int | None
+    lg: int | None
+    so_khach: int | None
+    dt_ck: int | None
+    lg_ck: int | None
+    so_khach_ck: int | None
+
+    @staticmethod
+    def _tang(tu_so, mau_so) -> float | None:
+        if tu_so is None or mau_so is None or mau_so <= 0:
+            return None
+        return tu_so / mau_so - 1
+
+    @property
+    def tang_dt(self) -> float | None:
+        return self._tang(self.dt, self.dt_ck)
+
+    @property
+    def tang_lg(self) -> float | None:
+        return self._tang(self.lg, self.lg_ck)
+
+    @property
+    def tang_khach(self) -> float | None:
+        return self._tang(self.so_khach, self.so_khach_ck)
+
+    @staticmethod
+    def _ty_suat(dt, lg) -> float | None:
+        if dt is None or dt <= 0 or lg is None:
+            return None
+        return lg / dt
+
+    @property
+    def ty_suat(self) -> float | None:
+        return self._ty_suat(self.dt, self.lg)
+
+    @property
+    def ty_suat_ck(self) -> float | None:
+        return self._ty_suat(self.dt_ck, self.lg_ck)
+
+    @property
+    def chenh_ty_suat(self) -> float | None:
+        """Chênh lệch tỷ suất tính bằng ĐIỂM PHẦN TRĂM (hiệu số), không phải
+        tỷ lệ phần trăm — spec §5.2: "▲ 0,8 điểm", khác cách đọc %."""
+        a, b = self.ty_suat, self.ty_suat_ck
+        return None if a is None or b is None else a - b
+
+
+@dataclass
+class CungKy(_SoCungKy):
+    """Một dòng `mart.ky_cung_ky` — kỳ hiện tại so với cùng kỳ năm trước,
+    CHỈ TRÊN CÁC THÁNG ĐỐI CHIẾU (không phải cả kỳ, xem migration 029 §3.4)."""
+    so_thang: int
+    tu: str | None
+    den: str | None
+    dt: int | None
+    lg: int | None
+    so_khach: int | None
+    dt_ck: int | None
+    lg_ck: int | None
+    so_khach_ck: int | None
+
+
+@dataclass
+class NganhThang:
+    """Một dòng `mart.ban_theo_nganh_thang_so_sanh` — cho bản đồ nhiệt."""
+    thang: str
+    nganh: str
+    doanh_thu: int
+    dt_cung_ky: int | None
+    co_cung_ky: bool
+    tang_truong: float | None
+
+
+@dataclass
+class NganhKy:
+    """Một dòng `mart.nganh_ky_cung_ky` — cho khối "ngành kéo lên/xuống"."""
+    nganh: str
+    doanh_thu: int
+    lai_gop: int
+    dt_doi_chieu: int | None
+    dt_cung_ky: int | None
+    chenh_lech: int | None
+    tang_truong: float | None
+
+
+@dataclass
+class KhachTapTrung:
+    """Một dòng `mart.tap_trung_khach` — một khách trên biểu đồ Pareto."""
+    ma: str
+    ten: str
+    doanh_thu: int
+    thu_hang: int
+    ty_trong: float | None
+    luy_ke: float | None
+
+
+@dataclass
+class TapTrung:
+    """20 khách doanh thu cao nhất của kỳ, kèm tổng số khách có doanh thu và
+    luỹ kế tại hạng 10 — con số cho câu tóm tắt "10 khách lớn nhất = X% doanh
+    thu, trên N khách"."""
+    dong: list[KhachTapTrung]
+    so_khach: int
+    luy_ke_top10: float | None
+
+
 @dataclass
 class BaoCao:
     ky: Ky
     moi_ky: list[Ky]
     thang: list[O]
-    khach: list[dict]
     hang: list[dict]
     nhan_vien: list[dict]
     khong_co_du_lieu: bool = False
     canh_bao: list[str] = field(default_factory=list)
+    # Đợt 5b — trường mới, mặc định rỗng/None để nhánh "không có dữ liệu"
+    # vẫn dựng được BaoCao mà không phải viết nhánh riêng cho từng trường.
+    cung_ky: CungKy | None = None
+    nganh_thang: list[NganhThang] = field(default_factory=list)
+    nganh_ky: list[NganhKy] = field(default_factory=list)
+    tap_trung: TapTrung | None = None
+    hang_theo_nganh: list[dict] = field(default_factory=list)
 
 
 def _ky_tu_dong(r) -> Ky:
@@ -76,52 +202,124 @@ def _ky_tu_dong(r) -> Ky:
               so_khach=r[9], so_phieu=r[10])
 
 
+def _cung_ky_tu_dong(r) -> CungKy:
+    # Chỉ số cột: 11=so_thang_doi_chieu, 12=tu, 13=den, 14=dt, 15=lg,
+    # 16=so_khach, 17=dt_ck, 18=lg_ck, 19=so_khach_ck — xem SELECT trong
+    # tinh_bao_cao(). so_thang không bao giờ NULL vì mart.ky_cung_ky đã
+    # coalesce về 0, nhưng `or 0` phòng khi LEFT JOIN không khớp company_fy
+    # nào (không nên xảy ra — ky_cung_ky phủ mọi company_fy trong dải bán).
+    return CungKy(so_thang=r[11] or 0, tu=r[12], den=r[13],
+                  dt=int(r[14]) if r[14] is not None else None,
+                  lg=int(r[15]) if r[15] is not None else None,
+                  so_khach=r[16],
+                  dt_ck=int(r[17]) if r[17] is not None else None,
+                  lg_ck=int(r[18]) if r[18] is not None else None,
+                  so_khach_ck=r[19])
+
+
 def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
     """Số liệu cho một kỳ kế toán. company_fy=None => kỳ GẦN NHẤT có dữ liệu."""
-    moi_ky = [_ky_tu_dong(r) for r in conn.execute(
-        """SELECT company_fy, company_fy_no, nhan, ngay_dau, ngay_cuoi,
-                  so_thang_co_du_lieu, doanh_thu_thuan, lai_gop, ty_suat,
-                  so_khach, so_phieu
-           FROM mart.tong_theo_ky ORDER BY company_fy""").fetchall()]
+    # (1) Một câu lấy MỌI kỳ kèm cùng kỳ: LEFT JOIN mart.ky_cung_ky USING
+    # (company_fy) thay vì hỏi riêng — gộp "kỳ" và "cùng kỳ" của gợi ý brief.
+    dong_ky = conn.execute(
+        """SELECT t.company_fy, t.company_fy_no, t.nhan, t.ngay_dau, t.ngay_cuoi,
+                  t.so_thang_co_du_lieu, t.doanh_thu_thuan, t.lai_gop, t.ty_suat,
+                  t.so_khach, t.so_phieu,
+                  c.so_thang_doi_chieu, c.thang_dau_doi_chieu, c.thang_cuoi_doi_chieu,
+                  c.dt, c.lg, c.so_khach, c.dt_ck, c.lg_ck, c.so_khach_ck
+           FROM mart.tong_theo_ky t
+           LEFT JOIN mart.ky_cung_ky c USING (company_fy)
+           ORDER BY t.company_fy""").fetchall()
+    moi_ky = [_ky_tu_dong(r) for r in dong_ky]
 
     if not moi_ky:
         trong = Ky(0, 0, "(chưa có dữ liệu)", 0, 0, None, 0, 0, 0, None, None)
-        return BaoCao(ky=trong, moi_ky=[], thang=[], khach=[], hang=[],
+        return BaoCao(ky=trong, moi_ky=[], thang=[], hang=[],
                       nhan_vien=[], khong_co_du_lieu=True)
 
     ky = next((k for k in moi_ky if k.company_fy == company_fy), moi_ky[-1])
+    cung_ky = _cung_ky_tu_dong(
+        next(r for r in dong_ky if r[0] == ky.company_fy))
 
+    # (2) Tháng — thêm so_khach, dt_cung_ky vào câu ban_theo_thang_so_sanh
+    # đang có: cả hai cột ĐÃ có sẵn trong view (so_khach qua `t.*`, dt_cung_ky
+    # do chính view định nghĩa), chỉ là trước Task 2 chưa được SELECT ra.
     thang = [
         O(thang=r[0], doanh_thu=int(r[1] or 0), lai_gop=int(r[2] or 0),
           ty_suat=float(r[3]) if r[3] is not None else None,
           co_cung_ky=r[4], tang_truong=float(r[5]) if r[5] is not None else None,
-          la_thang_chot=r[0].endswith("-07"), so_phieu=r[6])
+          la_thang_chot=r[0].endswith("-07"), so_phieu=r[6], so_khach=r[7],
+          dt_cung_ky=int(r[8]) if r[8] is not None else None)
         for r in conn.execute(
             """SELECT thang, doanh_thu_thuan, lai_gop, ty_suat, co_cung_ky,
-                      tang_truong, so_phieu
+                      tang_truong, so_phieu, so_khach, dt_cung_ky
                FROM mart.ban_theo_thang_so_sanh
                WHERE company_fy = %s ORDER BY thang""", (ky.company_fy,)).fetchall()
     ]
 
-    khach = [dict(zip(("ma", "ten", "tinh", "doanh_thu", "lai_gop", "ty_suat",
-                       "so_phieu", "mua_gan_nhat"), r)) for r in conn.execute(
-        """SELECT customer_code, ten_khach, prefecture, doanh_thu_thuan, lai_gop,
-                  ty_suat, so_phieu, mua_gan_nhat
-           FROM mart.ban_theo_khach WHERE company_fy = %s
-           ORDER BY doanh_thu_thuan DESC LIMIT %s""", (ky.company_fy, TOP)).fetchall()]
+    # (3) Pareto 20 khách + tổng số khách có doanh thu trong CÙNG một câu:
+    # count(*) OVER() sẽ đếm SAU LIMIT nếu đặt thẳng trong SELECT ngoài, nên
+    # lấy max(thu_hang) bằng truy vấn con — vẫn một round-trip duy nhất.
+    dong_tt = conn.execute(
+        """SELECT customer_code, ten_khach, doanh_thu_thuan, thu_hang,
+                  ty_trong, luy_ke,
+                  (SELECT max(thu_hang) FROM mart.tap_trung_khach
+                    WHERE company_fy = %s) AS tong_so_khach
+           FROM mart.tap_trung_khach WHERE company_fy = %s
+           ORDER BY thu_hang LIMIT 20""", (ky.company_fy, ky.company_fy)).fetchall()
+    tap_trung = None
+    if dong_tt:
+        khach_tt = [KhachTapTrung(
+            ma=r[0], ten=r[1], doanh_thu=int(r[2]),
+            thu_hang=r[3],
+            ty_trong=float(r[4]) if r[4] is not None else None,
+            luy_ke=float(r[5]) if r[5] is not None else None) for r in dong_tt]
+        hang_10 = next((k for k in khach_tt if k.thu_hang == 10), None)
+        tap_trung = TapTrung(dong=khach_tt, so_khach=dong_tt[0][6] or 0,
+                             luy_ke_top10=hang_10.luy_ke if hang_10 else None)
 
-    hang = [dict(zip(("ma", "ten", "nhom", "doanh_thu", "lai_gop", "ty_suat",
-                      "so_khach"), r)) for r in conn.execute(
+    # (4) Mọi mặt hàng của kỳ, dùng cho cây ô VÀ để suy ra bảng "hang" (top
+    # 10 lãi gộp) bằng cách sắp xếp trong Python — tiết kiệm một lượt hỏi so
+    # với hỏi riêng ORDER BY lai_gop DESC LIMIT 10 như bản cũ.
+    hang_theo_nganh = [dict(zip(("ma", "ten", "nhom", "doanh_thu", "lai_gop",
+                                 "ty_suat", "so_khach"), r)) for r in conn.execute(
         """SELECT product_code, ten_hang, food_category_name, doanh_thu_thuan,
                   lai_gop, ty_suat, so_khach_mua
-           FROM mart.ban_theo_san_pham WHERE company_fy = %s
-           ORDER BY lai_gop DESC LIMIT %s""", (ky.company_fy, TOP)).fetchall()]
+           FROM mart.ban_theo_san_pham WHERE company_fy = %s""",
+        (ky.company_fy,)).fetchall()]
+    hang = sorted(hang_theo_nganh, key=lambda h: h["lai_gop"], reverse=True)[:TOP]
 
+    # (5) Người phụ trách — không đổi.
     nhan_vien = [dict(zip(("ma", "doanh_thu", "lai_gop", "ty_suat", "so_khach",
                            "so_phieu"), r)) for r in conn.execute(
         """SELECT salesperson_code, doanh_thu_thuan, lai_gop, ty_suat, so_khach, so_phieu
            FROM mart.ban_theo_nhan_vien WHERE company_fy = %s
            ORDER BY doanh_thu_thuan DESC""", (ky.company_fy,)).fetchall()]
+
+    # (6) Ngành × tháng — cho bản đồ nhiệt.
+    nganh_thang = [NganhThang(
+        thang=r[0], nganh=r[1], doanh_thu=int(r[2] or 0),
+        dt_cung_ky=int(r[3]) if r[3] is not None else None,
+        co_cung_ky=r[4],
+        tang_truong=float(r[5]) if r[5] is not None else None) for r in conn.execute(
+        """SELECT thang, nganh, doanh_thu_thuan, dt_cung_ky, co_cung_ky, tang_truong
+           FROM mart.ban_theo_nganh_thang_so_sanh
+           WHERE company_fy = %s ORDER BY nganh, thang""", (ky.company_fy,)).fetchall()]
+
+    # (7) Ngành × kỳ — cho khối "ngành kéo doanh thu lên/xuống". KHÔNG gộp
+    # với (6): câu gộp sẽ đánh giá lại mart.ban_theo_nganh_thang_so_sanh một
+    # lần trực tiếp và một lần qua nganh_ky_cung_ky, đúng lớp lỗi CTE-trùng
+    # đã ghi ở CLAUDE.md (xem spec §5 cuối).
+    nganh_ky = [NganhKy(
+        nganh=r[0], doanh_thu=int(r[1] or 0), lai_gop=int(r[2] or 0),
+        dt_doi_chieu=int(r[3]) if r[3] is not None else None,
+        dt_cung_ky=int(r[4]) if r[4] is not None else None,
+        chenh_lech=int(r[5]) if r[5] is not None else None,
+        tang_truong=float(r[6]) if r[6] is not None else None) for r in conn.execute(
+        """SELECT nganh, doanh_thu_thuan, lai_gop, dt_doi_chieu, dt_cung_ky,
+                  chenh_lech, tang_truong
+           FROM mart.nganh_ky_cung_ky
+           WHERE company_fy = %s ORDER BY chenh_lech""", (ky.company_fy,)).fetchall()]
 
     canh_bao = []
     if not ky.du_12_thang:
@@ -134,8 +332,10 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
             f"{len(thieu)} tháng KHÔNG có dữ liệu cùng kỳ năm trước "
             f"({thieu[0]}…{thieu[-1]}) — công ty không còn lưu dữ liệu bán trước "
             f"2025-03-03. Cột 'So cùng kỳ' để trống là đúng, không phải lỗi.")
-    return BaoCao(ky=ky, moi_ky=moi_ky, thang=thang, khach=khach, hang=hang,
-                  nhan_vien=nhan_vien, canh_bao=canh_bao)
+    return BaoCao(ky=ky, moi_ky=moi_ky, thang=thang, hang=hang,
+                  nhan_vien=nhan_vien, canh_bao=canh_bao, cung_ky=cung_ky,
+                  nganh_thang=nganh_thang, nganh_ky=nganh_ky, tap_trung=tap_trung,
+                  hang_theo_nganh=hang_theo_nganh)
 
 
 # ---- Vẽ biểu đồ ---------------------------------------------------------
