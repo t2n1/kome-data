@@ -24,9 +24,18 @@
 -- trên khách rồi vẽ ra bấy nhiêu ô. Gom theo khách thì một tỉnh không có
 -- khách nào sẽ BIẾN MẤT khỏi bản đồ — mà "chúng ta chưa có mặt ở tỉnh này"
 -- đúng là một trong những điều một tấm bản đồ bán hàng phải nói ra, không
--- phải một ô trống cần giấu đi. Hôm nay cả 47 tỉnh đều có khách nên lỗi kiểu
--- này sẽ KHÔNG lộ trên dữ liệu thật; nó chỉ lộ ra khi lọc theo một người phụ
--- trách (?nv=<mã sale>) — và lúc đó lộ ngay ở gần bốn mươi tỉnh cùng lúc.
+-- phải một ô trống cần giấu đi.
+--
+-- [Vòng sửa 1] Câu "hôm nay cả 47 tỉnh đều có khách" từng đứng ở đây là SAI,
+-- chép lại nguyên một câu sai từ đặc tả §5.2/§3.1. Đo lại
+-- (`mart.khach_360`, người soát 2026-09-22): `core.dim_customer` đúng là có
+-- đủ 47 tỉnh, nhưng `mart.khach_360` chỉ 46 — 和歌山県 có 1 khách trong
+-- `dim_customer` nhưng KHÔNG khách nào có doanh số, nên khách đó không có
+-- dòng trong `khach_360` (view đó dựng từ `mart.lan_mua`, tức PHẢI có ít
+-- nhất một lần bán). Nghĩa là ô 0 khách ĐẦU TIÊN đã tồn tại sẵn hôm nay, ở
+-- 和歌山県, không phải đợi lọc theo người phụ trách mới lộ ra. Người làm
+-- Task 2/3 thấy 和歌山県 trống trên bản đồ TỔNG (không lọc gì) là ĐÚNG, không
+-- phải dấu hiệu phép nối hỏng — đừng đi sửa cái không hỏng.
 
 -- `ten` LÀ KHOÁ NỐI VỚI CHUỖI OBC GHI THẬT, không phải một mã tự đặt. Đo thật
 -- trên CSDL 2026-09-22: `SELECT DISTINCT prefecture FROM core.dim_customer
@@ -117,8 +126,14 @@ VALUES
     ('26', '京都府',   'Kyoto',     '京都',     '近畿',        8,  6),
     ('27', '大阪府',   'Osaka',     '大阪',     '近畿',        9,  7),
     ('28', '兵庫県',   'Hyogo',     '兵庫',     '近畿',        9,  6),
-    ('29', '奈良県',   'Nara',      '奈良',     '近畿',       10,  6),
-    ('30', '和歌山県', 'Wakayama',  '和歌山',   '近畿',       10,  7),
+    -- [Vòng sửa 1] 奈良県 (135,83°Đ) nằm ĐÔNG của 和歌山県 (135,17°Đ) trên bản
+    -- đồ thật. Bản đầu đặt ngược (奈良 ở cột 6, 和歌山 ở cột 7) — đã đổi chỗ.
+    -- 和歌山 giờ nằm dưới 兵庫 (cột 6) thay vì dưới 大阪 (cột 7) — một xấp xỉ
+    -- chấp nhận được của lưới ô rời rạc, vì thứ tự đông–tây giữa hai tỉnh
+    -- liền kề mới là thứ mắt người dùng bản đồ dùng để định vị, không phải
+    -- việc mỗi tỉnh nằm thẳng dưới đúng "tỉnh mẹ" nào ở hàng trên.
+    ('29', '奈良県',   'Nara',      '奈良',     '近畿',       10,  7),
+    ('30', '和歌山県', 'Wakayama',  '和歌山',   '近畿',       10,  6),
     ('31', '鳥取県',   'Tottori',   '鳥取',     '中国',        8,  5),
     ('32', '島根県',   'Shimane',   '島根',     '中国',        9,  4),
     ('33', '岡山県',   'Okayama',   '岡山',     '中国',        9,  5),

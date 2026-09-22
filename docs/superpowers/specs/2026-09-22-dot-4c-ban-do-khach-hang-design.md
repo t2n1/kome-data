@@ -50,8 +50,15 @@ trị**, tất cả là tên chuẩn có hậu tố 都/道/府/県 (`東京都`
 …), cộng một giá trị rỗng. **Đúng 1 trên 1.710 khách** không có tỉnh.
 
 Hệ quả: không cần lớp chuẩn hoá tên, không cần bảng bí danh, không cần đoán. Khoá nối
-là chính chuỗi tên tỉnh. Và vì cả 47 tỉnh đều đã có khách, ô "tỉnh chưa có khách" hôm
-nay rỗng — nhưng bảng tra vẫn phải đủ 47 dòng, xem §5.2.
+là chính chuỗi tên tỉnh.
+
+[Vòng sửa 1] Câu tiếp theo ở đây từng khẳng định "cả 47 tỉnh đều đã có khách [nên] ô
+'tỉnh chưa có khách' hôm nay rỗng" — SAI, đo lại 2026-09-22: cả 47 tỉnh đều có khách
+trong `core.dim_customer` (đúng như trên), nhưng `mart.khach_360` (một dòng một khách
+CÓ ÍT NHẤT MỘT LẦN MUA) chỉ có **46** tỉnh — 和歌山県 có 1 khách trong `dim_customer`
+nhưng khách đó chưa có doanh số nào, nên không có dòng ở `khach_360`. Nghĩa là ô 0
+khách ĐẦU TIÊN đã tồn tại sẵn hôm nay, ở 和歌山県, không phải một tình huống giả định
+chỉ lộ ra khi lọc theo người phụ trách. Bảng tra vẫn phải đủ 47 dòng dù vậy — xem §5.2.
 
 ### 3.2 Không có toạ độ của từng khách, và sẽ không bao giờ có từ OBC
 
@@ -151,9 +158,13 @@ chuẩn (mã JIS 1–47).
 **Bất biến:** bản đồ và bảng nối từ `dim_prefecture` **LEFT JOIN** sang số liệu khách,
 chứ không GROUP BY trên khách rồi vẽ. Gom theo khách thì một tỉnh không có khách nào
 **biến mất khỏi bản đồ** — mà "chúng ta chưa có mặt ở tỉnh này" đúng là một trong những
-điều một tấm bản đồ bán hàng phải nói ra. Hôm nay cả 47 tỉnh đều có khách nên lỗi này
-sẽ KHÔNG lộ ra trên dữ liệu thật; nó chỉ lộ khi lọc theo một người phụ trách — và lúc
-đó thì lộ ngay ở gần bốn mươi tỉnh.
+điều một tấm bản đồ bán hàng phải nói ra.
+
+[Vòng sửa 1] Câu tiếp theo ở đây từng nói "hôm nay cả 47 tỉnh đều có khách nên lỗi này
+sẽ KHÔNG lộ ra trên dữ liệu thật" — SAI (xem §3.1 đã sửa): `mart.khach_360` hôm nay chỉ
+có 46 tỉnh, 和歌山県 đã là một ô 0 khách sẵn trên bản đồ TỔNG, không lọc gì. Nghĩa là lỗi
+"GROUP BY làm tỉnh biến mất" ĐÃ có thể lộ ra ngay hôm nay ở đúng một tỉnh (和歌山県), và
+sẽ lộ rộng hơn — ở gần bốn mươi tỉnh — khi lọc theo một người phụ trách.
 
 ### 5.3 Vị trí lưới là dữ liệu, không phải mã lệnh
 

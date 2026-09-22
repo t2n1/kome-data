@@ -1,8 +1,8 @@
 """Đợt 4c — bảng tra 47 tỉnh và view gộp theo tỉnh."""
-from datetime import date, timedelta
+import re
+from datetime import date
 
 import pandas as pd
-import pytest
 
 
 # Ba hàm gieo dữ liệu dưới đây chép NGUYÊN VĂN từ tests/test_khach_hang.py —
@@ -105,17 +105,61 @@ def test_ten_tinh_khop_chuoi_OBC_that(conn, batch):
     assert dem == 1
 
 
-def test_khach_theo_tinh_khong_dem_trung_khi_khach_o_NHIEU_nhom_viec(conn, batch):
-    # mart.khach_nhom_viec cho phép MỘT khách thuộc NHIỀU nhóm ('im' và 'tut'
-    # cùng lúc). LEFT JOIN thẳng vào nó sẽ nhân đôi dòng khách và thổi phồng
-    # `so_khach` của tỉnh. Phải dùng EXISTS — đúng nếp migration 022.
+def test_ten_la_ten_ngan_cong_dung_MOT_hau_to_ca_47_dong(conn):
+    # [Vòng sửa 1, hạng mục 4] test_ten_tinh_khop_chuoi_OBC_that ở trên chỉ
+    # phủ ĐÚNG 1/47 chuỗi (東京都). Một tỉnh khác gõ sai hậu tố (vd 大阪県 thay
+    # vì 大阪府) sẽ lọt qua test đó mà không bị bắt — nó chỉ kiểm Tokyo.
     #
-    # Không gieo một khách "vừa im vừa tụt" (dựng được nhưng mong manh: nó phụ
-    # thuộc hai công thức khác nhau cùng khớp). Khẳng định bất biến TỔNG, thứ
-    # vỡ ngay khi có BẤT KỲ dòng nào bị nhân lên, dù vì nhóm nào.
-    _ho_so_khach(conn, batch, "BD01", "Quan A", prefecture="東京都")
-    _mua(conn, batch, "BD01", HOM_NAY - timedelta(days=5))
-    tong_view = conn.execute(
-        "SELECT coalesce(sum(so_khach), 0) FROM mart.khach_theo_tinh").fetchone()[0]
-    tong_that = conn.execute("SELECT count(*) FROM mart.khach_360").fetchone()[0]
-    assert tong_view == tong_that
+    # Test này quét cả 47 dòng đã gieo: `ten` phải bằng `ten_ngan` nối thêm
+    # ĐÚNG MỘT ký tự hậu tố trong {都, 道, 府, 県} — đúng bất biến đo được
+    # trên CSDL thật (CLAUDE.md: "cả 47 đều có hậu tố 都/道/府/県").
+    #
+    # NGOẠI LỆ DUY NHẤT: 北海道 (ma_jis='01') — hậu tố 道 nằm SẴN TRONG tên
+    # ngắn, nên ten == ten_ngan, không nối thêm gì. Ngoại lệ này viết TƯỜNG
+    # MINH bằng đúng mã JIS '01', KHÔNG bỏ qua bằng một điều kiện chung
+    # chung kiểu "nếu ten == ten_ngan thì cho qua" — làm vậy sẽ vô tình cho
+    # qua CẢ một tỉnh khác lỡ gõ ten_ngan trùng hệt ten (tức bị thiếu mất
+    # hậu tố), đúng loại lỗi gõ sai mà test này được viết ra để bắt.
+    rows = conn.execute(
+        "SELECT ma_jis, ten, ten_ngan FROM core.dim_prefecture ORDER BY ma_jis"
+    ).fetchall()
+    assert len(rows) == 47
+    for ma_jis, ten, ten_ngan in rows:
+        if ma_jis == "01":
+            assert ten == ten_ngan == "北海道", "ngoại lệ 北海道 không còn đúng"
+            continue
+        assert ten[:-1] == ten_ngan, \
+            f"{ma_jis}: '{ten}' không phải '{ten_ngan}' + một hậu tố"
+        assert ten[-1] in "都道府県", \
+            f"{ma_jis}: hậu tố '{ten[-1]}' không nằm trong 都/道/府/県"
+
+
+def test_khach_theo_tinh_dung_EXISTS_khong_JOIN_vao_khach_nhom_viec(conn):
+    # [Vòng sửa 1] Bản đầu của test này gieo MỘT khách rồi so sánh
+    # sum(so_khach) của view với count(*) của khach_360 — trang trí thuần
+    # tuý: người soát dựng song song một bản SAI (LEFT JOIN thẳng vào
+    # mart.khach_nhom_viec) và chạy cùng dữ liệu, cả hai bản cho CÙNG một số.
+    # Lý do: khách BD01 (1 lần mua, khách duy nhất trong CSDL test) thuộc
+    # ĐÚNG 0 nhóm việc — 1 lần mua thì trang_thai='chua_du_lich_su' (chưa đủ
+    # 3 lần mua) chứ không phải 'im'; là khách duy nhất thì cume_dist=1.0 nên
+    # hạng='D' chứ không 'S'/'A' nên không thể là 'tut'; ty_le_im_lang NULL
+    # nên không phải 'moi'. Cả hai bản JOIN/EXISTS đều nhân với 0 dòng.
+    #
+    # Không có cách gieo một khách "vừa im vừa tụt" mà không mong manh: nó
+    # phải khớp ĐỒNG THỜI công thức của cả hai nhóm việc, và vỡ ngay khi MỘT
+    # trong hai công thức đổi — một test hồi quy không được phép phụ thuộc
+    # vào chi tiết nội bộ dễ đổi của một view KHÁC.
+    #
+    # Nên canh ở TẦNG ĐỊNH NGHĨA thay vì tầng dữ liệu: đọc thẳng văn bản SQL
+    # của view bằng pg_get_viewdef và khẳng định nó không nhắc tới
+    # mart.khach_nhom_viec bằng JOIN — bất kể dữ liệu nào được gieo. Bắt
+    # được đúng lớp lỗi migration 022 mô tả (LEFT JOIN nhân dòng), mà không
+    # cần dựng ra được một ca dữ liệu thật sự lộ ra hậu quả đó.
+    dinh_nghia = conn.execute(
+        "SELECT pg_get_viewdef('mart.khach_theo_tinh'::regclass)").fetchone()[0]
+    assert "khach_nhom_viec" in dinh_nghia, \
+        "view không còn nhắc tới khach_nhom_viec — can_goi tính bằng gì?"
+    assert re.search(r"(?i)\bjoin\s+mart\.khach_nhom_viec\b", dinh_nghia) is None, \
+        "view JOIN thẳng vào khach_nhom_viec — phải dùng EXISTS (subquery), " \
+        "nếu không một khách thuộc nhiều nhóm việc sẽ nhân dòng và thổi " \
+        "phồng so_khach/doanh_thu_12t của tỉnh đó"

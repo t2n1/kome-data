@@ -188,8 +188,8 @@ Gieo đúng 47 dòng sau, nguyên văn (cột theo thứ tự
 26 京都府     Kyoto      京都     近畿        8  6
 27 大阪府     Osaka      大阪     近畿        9  7
 28 兵庫県     Hyogo      兵庫     近畿        9  6
-29 奈良県     Nara       奈良     近畿       10  6
-30 和歌山県   Wakayama   和歌山   近畿       10  7
+29 奈良県     Nara       奈良     近畿       10  7
+30 和歌山県   Wakayama   和歌山   近畿       10  6
 31 鳥取県     Tottori    鳥取     中国        8  5
 32 島根県     Shimane    島根     中国        9  4
 33 岡山県     Okayama    岡山     中国        9  5
