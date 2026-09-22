@@ -270,16 +270,25 @@ def test_tap_trung_khach_thu_tu_xac_dinh_khi_bang_tien(conn, batch):
     """[IMPORTANT] Không có khoá phụ thì hai khách bằng tiền có thể đổi chỗ
     giữa hai lần mở trang (thứ tự không xác định của Postgres khi ORDER BY
     chỉ có một cột nhiều dòng trùng giá trị). customer_code làm khoá phụ để
-    thứ tự luôn giống nhau."""
+    thứ tự luôn giống nhau.
+
+    Đồng thời canh cửa sổ `luy_ke` dùng `ROWS BETWEEN UNBOUNDED PRECEDING AND
+    CURRENT ROW`, không phải `RANGE` (mặc định của `ORDER BY` không khai báo
+    khung): hai khách bằng tiền dùng RANGE sẽ gộp cả hai vào CÙNG một khung
+    "ngang hàng", khiến cả hai dòng cùng nhảy thẳng lên luỹ kế 100% thay vì
+    tăng dần 50% rồi 100%. Cũng canh cửa sổ có PARTITION BY company_fy: nếu
+    thiếu, tổng ở mẫu số sẽ cộng cả các kỳ khác."""
     _ban(conn, batch, date(2026, 5, 10), "AA01", amount=110_000, tax=10_000, gp=20_000,
          khach="000000000002")
     _ban(conn, batch, date(2026, 5, 11), "AA01", amount=110_000, tax=10_000, gp=20_000,
          khach="000000000001")
 
     rows = conn.execute(
-        "SELECT customer_code FROM mart.tap_trung_khach "
+        "SELECT customer_code, luy_ke FROM mart.tap_trung_khach "
         "WHERE company_fy = 2026 ORDER BY thu_hang").fetchall()
     assert [r[0] for r in rows] == ["000000000001", "000000000002"]
+    assert rows[0][1] == pytest.approx(0.5), "hạng 1 (ROWS) chỉ luỹ kế chính nó"
+    assert rows[1][1] == pytest.approx(1.0), "hạng 2 luỹ kế cả hai"
 
 
 # ---------------------------------------------------------------------------
@@ -333,6 +342,20 @@ def test_thang_den_hom_nay_29_2_kep_ve_28_2(conn, batch):
 
     r = conn.execute("SELECT den_ngay_ck FROM mart.thang_den_hom_nay").fetchone()
     assert r[0] == date(2027, 2, 28)
+
+
+def test_thang_den_hom_nay_M_tru_12_khong_co_du_lieu_thi_ck_la_NULL(conn, batch):
+    """[CRITICAL] "co_cung_ky = false" (tháng M-12 chưa từng có dòng bán nào)
+    phải cho dt_ck/lg_ck/so_khach_ck NULL — "chưa có cùng kỳ để so", KHÔNG
+    phải 0 ("có cùng kỳ, và cùng kỳ bằng 0"). Nhầm hai trường hợp này là ô
+    chỉ số in ra "▼100% so cùng kỳ" cho một tháng chưa hề có dữ liệu năm
+    trước để so, thay vì câu "chưa có cùng kỳ để so"."""
+    _ban(conn, batch, date(2026, 5, 12), "AA01")  # không có dòng nào ở 2025-05
+
+    r = conn.execute(
+        "SELECT co_cung_ky, dt_ck, lg_ck, so_khach_ck "
+        "FROM mart.thang_den_hom_nay").fetchone()
+    assert r == (False, None, None, None)
 
 
 def test_thang_den_hom_nay_kho_rong_khong_co_dong(conn):

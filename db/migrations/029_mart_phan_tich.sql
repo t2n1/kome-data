@@ -104,7 +104,7 @@ WITH doi AS MATERIALIZED (
     SELECT company_fy, tu, true AS la_nay FROM doi
     UNION ALL
     SELECT company_fy, tu_ck, false FROM doi
-), gop AS (
+), gop AS MATERIALIZED (
     SELECT m.company_fy, m.la_nay,
            count(DISTINCT m.tu)            AS so_thang,
            to_char(min(m.tu), 'YYYY-MM')   AS tu,
@@ -176,7 +176,12 @@ WITH b AS (
     FROM mart.dong_ban
     GROUP BY sales_date
 ), dai AS (
-    SELECT min(sales_date) AS tu, max(sales_date) AS den FROM core.fact_sales_line
+    -- Đầu dải lấy thẳng từ fact (không có view nào giữ "ngày bán đầu tiên"),
+    -- CUỐI dải đọc từ mart.moc_thoi_gian.hom_nay — MỘT định nghĩa "hôm nay"
+    -- duy nhất cho cả dự án, không tính lại max(sales_date) ở đây.
+    SELECT (SELECT min(sales_date) FROM core.fact_sales_line) AS tu,
+           hom_nay AS den
+    FROM mart.moc_thoi_gian
 )
 SELECT d.date_key AS ngay,
        to_char(d.date_key, 'YYYY-MM') AS thang,
@@ -193,10 +198,10 @@ LEFT JOIN b ON b.sales_date = d.date_key;
 -- trước (không phải trọn tháng năm trước: 12 ngày đầu tháng so với cả một
 -- tháng thì giữa tháng nào cũng "sụt 60%"). `hom_nay - interval '1 year'`
 -- của Postgres tự kẹp 29/2 về 28/2.
--- `dai.den` ở 3.6 và `hom_nay` ở đây cùng là max(sales_date) — cùng định
--- nghĩa với mart.moc_thoi_gian.
+-- `dai.den` ở 3.6 và `hom_nay` ở đây cùng ĐỌC từ mart.moc_thoi_gian.hom_nay
+-- (MỘT định nghĩa "hôm nay" duy nhất).
 CREATE VIEW mart.thang_den_hom_nay AS
-WITH r AS (
+WITH r AS MATERIALIZED (
     SELECT hom_nay,
            date_trunc('month', hom_nay)::date                        AS tu,
            (date_trunc('month', hom_nay) - interval '1 year')::date  AS tu_ck,
