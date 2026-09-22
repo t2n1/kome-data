@@ -155,48 +155,97 @@ def test_co_moi_mac_dinh_FALSE(conn):
     assert r[0] is False
 
 
-# ---- 027: vòng soát cuối — mart.ban_theo_nhan_vien_thang_so_sanh ----------
+# ---- 028: vòng soát cuối 2 — cung_ky/co_cung_ky/tang_truong trên chính
+# mart.tien_do_ngan_sach (thay cho mart.ban_theo_nhan_vien_thang_so_sanh
+# của 027, đã bị DROP vì lọc sai trục và gây hồi quy — xem 028) -----------
 
-def test_so_sanh_cung_ky_AM_khong_ra_tang_truong_nguoc_dau(conn, batch):
-    """[CRITICAL, vòng soát cuối việc 2] Kiểm THẲNG ở tầng view — không qua
-    kome/bao_cao.py — rằng gate `> 0` (không phải `<> 0`) chặn đúng mẫu số
-    ÂM do 赤伝. `100.000 / -50.000 - 1 = -3.0`, tức -300%: một con số nói
-    doanh thu SỤT trong khi thật ra nó TĂNG."""
+def test_cung_ky_DUNG_khi_KHONG_ban_thang_nay_nhung_CO_ban_cung_ky(conn, batch):
+    """[CRITICAL, vòng soát cuối 2, việc 1] Đây CHÍNH XÁC là hồi quy do 027
+    gây ra. 027 lọc mart.ban_theo_nhan_vien_thang_so_sanh theo THÁNG ĐANG
+    XÉT — nên một người CÓ muc_tieu mà KHÔNG một dòng bán nào trong tháng đó
+    (đúng người mà FULL JOIN của 026 tồn tại để giữ, chú thích của 026 gọi
+    là "đúng người cần nhìn nhất") không hề có mặt trong view so sánh, bất
+    kể năm ngoái cùng tháng họ có bán được bao nhiêu. Đây CHÍNH XÁC là setup
+    của test_nguoi_co_chi_tieu_ma_KHONG_ban_duoc_dong_nao_van_co_dong (mã
+    0105) cộng thêm một dòng bán ở tháng cùng kỳ — không test nào của vòng
+    sửa trước chạm ca này."""
+    # 0104 bán tháng đang xét (2026-05) để tháng đó TỒN TẠI trong kho.
+    _ban(conn, batch, date(2026, 5, 11), "0104")
+    # 0105 KHÔNG bán gì tháng 2026-05, nhưng CÓ bán ở đúng tháng cùng kỳ
+    # (2025-05) — doanh thu thuần = 88.000 - 8.000 = 80.000.
+    _ban(conn, batch, date(2025, 5, 20), "0105", amount=88_000, tax=8_000,
+         gp=20_000, khach="000000009293")
+    _chi_tieu(conn, "0105", date(2026, 5, 1), 9_000_000)
+
+    r = conn.execute(
+        """SELECT thuc_te, cung_ky, co_cung_ky, tang_truong
+           FROM mart.tien_do_ngan_sach
+           WHERE thang = '2026-05' AND salesperson_code = '0105'""").fetchone()
+    assert r is not None, "0105 phải VẪN có dòng (chỉ tiêu mà 0 doanh thu)"
+    assert r[0] == 0, "0105 không bán gì tháng đang xét"
+    assert r[1] == 80_000, \
+        "cung_ky phải là doanh thu THẬT của 0105 năm ngoái, không phải None"
+    assert r[2] is True
+    assert r[3] == pytest.approx(0 / 80_000 - 1), "0 / 80.000 - 1 = -100%"
+
+
+def test_cung_ky_KHONG_TON_TAI_khi_thang_M12_chua_co_du_lieu_trong_kho(conn, batch):
+    """[CRITICAL, vòng soát cuối 2, việc 1] "co_cung_ky = false" là một sự
+    thật về KHO (tháng M-12 chưa từng có dòng bán nào ở BẤT KỲ ai), không
+    phải một sự thật riêng về người đang xét — đây là ca DUY NHẤT được in
+    "không có dữ liệu"."""
+    _ban(conn, batch, date(2025, 4, 20), "0104")   # M=2025-04, M-12=2024-04
+    r = conn.execute(
+        """SELECT cung_ky, co_cung_ky FROM mart.tien_do_ngan_sach
+           WHERE thang = '2025-04' AND salesperson_code = '0104'""").fetchone()
+    assert r == (None, False)
+
+
+def test_cung_ky_TON_TAI_ban_0_dong_khac_KHONG_TON_TAI(conn, batch):
+    """[IMPORTANT, vòng soát cuối, việc 3] "co_cung_ky = false" CHỈ đúng khi
+    tháng cùng kỳ không có dòng bán nào TRONG CẢ CÔNG TY. Một tháng CÓ dòng
+    (dù ròng bằng 0) phải cho `co_cung_ky = true, cung_ky = 0` — khác hẳn
+    "không tồn tại"."""
+    _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
+    _ban(conn, batch, date(2025, 7, 11), "0104", amount=0, tax=0, gp=0,
+         khach="000000009293")
+    r = conn.execute(
+        """SELECT cung_ky, co_cung_ky, tang_truong
+           FROM mart.tien_do_ngan_sach
+           WHERE thang = '2026-07' AND salesperson_code = '0104'""").fetchone()
+    assert r[0] == 0
+    assert r[1] is True
+    assert r[2] is None, "mẫu số 0 cũng không có tỷ lệ tăng trưởng đọc được"
+
+
+def test_cung_ky_AM_khong_ra_tang_truong_nguoc_dau(conn, batch):
+    """[CRITICAL] Kiểm THẲNG ở tầng view rằng gate `> 0` (không phải `<>
+    0`) chặn đúng mẫu số ÂM do 赤伝. `100.000 / -50.000 - 1 = -3.0`, tức
+    -300%: một con số nói doanh thu SỤT trong khi thật ra nó TĂNG."""
     _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
     _ban(conn, batch, date(2025, 7, 11), "0104", amount=-60_000, tax=-10_000,
          gp=-20_000, khach="000000009293")
     r = conn.execute(
-        """SELECT dt_cung_ky, co_cung_ky, tang_truong
-           FROM mart.ban_theo_nhan_vien_thang_so_sanh
+        """SELECT cung_ky, co_cung_ky, tang_truong
+           FROM mart.tien_do_ngan_sach
            WHERE thang = '2026-07' AND salesperson_code = '0104'""").fetchone()
     assert r[0] == -50_000
     assert r[1] is True, "có dòng cùng kỳ (dù âm) thì co_cung_ky phải TRUE"
     assert r[2] is None, "mẫu số ÂM không có tỷ lệ tăng trưởng đọc được"
 
 
-def test_so_sanh_cung_ky_TON_TAI_ban_0_dong_khac_KHONG_TON_TAI(conn, batch):
-    """[IMPORTANT, vòng soát cuối việc 3] "co_cung_ky = false" CHỈ đúng khi
-    tháng cùng kỳ KHÔNG có dòng nào trong mart.ban_theo_nhan_vien_thang (ví
-    dụ trước 2025-03-03). Một tháng CÓ dòng mà tổng ròng bằng 0 phải cho
-    `co_cung_ky = true, dt_cung_ky = 0` — khác hẳn "không tồn tại"."""
-    _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
-    _ban(conn, batch, date(2025, 7, 11), "0104", amount=0, tax=0, gp=0,
-         khach="000000009293")
+def test_view_so_sanh_027_da_bi_DROP_o_028(conn):
+    """[Vòng soát cuối 2] mart.ban_theo_nhan_vien_thang_so_sanh (027) không
+    còn ai đọc — kome/bao_cao.py giờ đọc thẳng ba cột mới trên
+    mart.tien_do_ngan_sach (028). Khẳng định nó thật sự đã biến mất, để
+    không ai vô tình để lại một view chết mang chú thích sai (027 nói
+    dt_cung_ky "NULL hoặc 0 tuỳ nguồn" — sai, amount/tax_amount NOT NULL từ
+    007 nên sum() trên nhóm không rỗng không bao giờ NULL)."""
     r = conn.execute(
-        """SELECT dt_cung_ky, co_cung_ky, tang_truong
-           FROM mart.ban_theo_nhan_vien_thang_so_sanh
-           WHERE thang = '2026-07' AND salesperson_code = '0104'""").fetchone()
-    assert r[0] == 0
-    assert r[1] is True
-    assert r[2] is None, "mẫu số 0 cũng không có tỷ lệ tăng trưởng đọc được"
-
-    # Không CHÈN gì cho 2024-07 (trước cả 2025-03-03) — không có dòng nào để
-    # có, nên co_cung_ky của tháng ĐÓ (nếu nó xuất hiện) phải là false. Kiểm
-    # gián tiếp: 2024-07 không hề có mặt trong view (không có t.thang ứng).
-    khong_co = conn.execute(
-        """SELECT 1 FROM mart.ban_theo_nhan_vien_thang_so_sanh
-           WHERE thang = '2024-07' AND salesperson_code = '0104'""").fetchone()
-    assert khong_co is None
+        """SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname = 'mart'
+             AND c.relname = 'ban_theo_nhan_vien_thang_so_sanh'""").fetchone()
+    assert r is None, "view thừa của 027 phải đã bị DROP ở 028"
 
 
 # ---- 027: vòng soát cuối — sua_boi ON DELETE SET NULL ----------------------
@@ -238,14 +287,18 @@ def test_xoa_tai_khoan_da_tung_sua_ngan_sach_van_xoa_duoc(conn):
 def test_bon_view_moi_deu_cap_SELECT_cho_ca_ba_vai_tro(conn):
     """[IMPORTANT] ALTER DEFAULT PRIVILEGES của 009 KHÔNG kể tên kome_ingest,
     nên view mới của `mart` không tự có quyền cho vai trò đó. Mọi migration
-    thêm view vào `mart` (014, 020, 021, 023, 024, 025, 027) đều phải kết
-    thúc bằng một dòng GRANT tường minh. Quên dòng đó thì lỗi không nổ ra lúc
+    thêm view vào `mart` (014, 020, 021, 023, 024, 025) đều phải kết thúc
+    bằng một dòng GRANT tường minh. Quên dòng đó thì lỗi không nổ ra lúc
     migration chạy — nó nổ bằng `permission denied` nhiều tháng sau, giữa lúc
     có người đang nạp dữ liệu lúc 13:30.
 
-    [Vòng soát cuối, việc 2/3] Mở rộng canh thêm
-    `ban_theo_nhan_vien_thang_so_sanh` (027) — view mới của vòng soát cuối
-    này, cùng lớp lỗi với bốn view kia."""
+    [Vòng soát cuối 2] `ban_theo_nhan_vien_thang_so_sanh` (027) đã bị DROP ở
+    028 nên rời khỏi danh sách này. `tien_do_ngan_sach` không cần một dòng
+    GRANT mới ở 028: `CREATE OR REPLACE VIEW` giữ nguyên OID và mọi quyền đã
+    cấp trước đó (từ 026), miễn cột cũ không bị đổi tên/kiểu/thứ tự — 028
+    chỉ THÊM ba cột vào cuối, nên quyền cũ vẫn còn nguyên. Test này canh
+    đúng điều đó: nếu giả định trên sai, nó sẽ đỏ dù 028 không viết dòng
+    GRANT nào."""
     thieu = conn.execute(
         """SELECT c.relname, r.rolname
            FROM pg_class c
@@ -254,8 +307,7 @@ def test_bon_view_moi_deu_cap_SELECT_cho_ca_ba_vai_tro(conn):
                       AS r(rolname)
            WHERE n.nspname = 'mart'
              AND c.relname IN ('ngay_kinh_doanh', 'ngan_sach_thang',
-                               'ban_theo_nhan_vien_thang', 'tien_do_ngan_sach',
-                               'ban_theo_nhan_vien_thang_so_sanh')
+                               'ban_theo_nhan_vien_thang', 'tien_do_ngan_sach')
              AND NOT has_table_privilege(r.rolname, c.oid, 'SELECT')
            ORDER BY 1, 2""").fetchall()
     assert thieu == [], f"thiếu SELECT: {thieu}"

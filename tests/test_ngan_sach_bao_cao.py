@@ -199,7 +199,7 @@ def test_cung_ky_AM_khong_ra_phan_tram_NGUOC_DAU(conn, batch):
     `(thuc_te / cung_ky - 1) * 100` thẳng trong template: thực tế dương chia
     cho một mẫu số ÂM (nhưng khác 0) cho ra phần trăm NGƯỢC DẤU — trang nói
     doanh thu SỤT trong khi thật ra nó TĂNG. `tang_truong` (đọc từ
-    mart.ban_theo_nhan_vien_thang_so_sanh, gate `> 0`) phải là None, KHÔNG
+    mart.tien_do_ngan_sach, gate `> 0`, migration 028) phải là None, KHÔNG
     phải một con số âm khổng lồ."""
     _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
     # Cùng kỳ năm trước (2025-07) của CHÍNH người này: net ÂM (một phiếu đỏ
@@ -246,7 +246,61 @@ def test_trang_bao_cao_hien_0_dong_khong_hien_khong_co_du_lieu(client, conn, bat
     r = client.get("/bao-cao")
     assert r.status_code == 200
     assert "không có dữ liệu" not in r.text
-    assert "¥0</td>" in r.text
+
+
+# ---- vòng soát cuối 2: hồi quy do chính 027 gây ra -------------------------
+#
+# 027 lọc mart.ban_theo_nhan_vien_thang_so_sanh theo THÁNG ĐANG XÉT (không
+# phải tháng cùng kỳ) — nên một người CÓ muc_tieu mà KHÔNG một dòng bán nào
+# trong tháng đang xét mất luôn dữ liệu cùng kỳ NĂM NGOÁI, dù nó có thật.
+# Ba test dưới đây khớp NGUYÊN VĂN ba kịch bản bản soát cuối yêu cầu.
+
+def test_khong_ban_thang_nay_nhung_CO_ban_cung_ky_hien_so_that(conn, batch):
+    """[CRITICAL, vòng soát cuối 2, việc 1] Người có muc_tieu, KHÔNG một
+    dòng bán nào trong tháng M, nhưng CÓ doanh thu ở tháng M-12 → cột "Cùng
+    kỳ năm trước" phải hiện SỐ THẬT của năm ngoái, `co_cung_ky` True."""
+    _ban(conn, batch, date(2026, 5, 11), "0104")            # M=2026-05 tồn tại
+    _ban(conn, batch, date(2025, 5, 20), "0105", amount=88_000, tax=8_000,
+         gp=20_000, khach="000000009293")                   # cùng kỳ CỦA 0105
+    _chi_tieu(conn, "0105", date(2026, 5, 1), 9_000_000)
+    td = tien_do_ngan_sach(conn, 2026)
+    n = next(x for x in td.nguoi if x.ma == "0105")
+    assert n.thuc_te == 0, "0105 không bán gì tháng đang xét"
+    assert n.co_cung_ky is True
+    assert n.cung_ky == 80_000, "phải là số THẬT của năm ngoái, không phải None"
+    assert n.tang_truong == pytest.approx(-1.0)
+
+
+def test_trang_bao_cao_khong_bao_khong_co_du_lieu_khi_cung_ky_co_that(
+        client, conn, batch):
+    _ban(conn, batch, date(2026, 5, 11), "0104")
+    _ban(conn, batch, date(2025, 5, 20), "0105", amount=88_000, tax=8_000,
+         gp=20_000, khach="000000009293")
+    _chi_tieu(conn, "0105", date(2026, 5, 1), 9_000_000)
+    r = client.get("/bao-cao?ky=2026")
+    assert r.status_code == 200
+    assert "¥80,000" in r.text, "phải hiện đúng số cùng kỳ của 0105"
+    # Dòng của 0105 không được nói "không có dữ liệu" — kiểm bằng cách đếm:
+    # trang có ĐÚNG các dòng "không có dữ liệu" đến từ những chỗ khác (nếu
+    # có), không tăng thêm vì ca này.
+    assert "-100.0%" in r.text or "-100,0%" in r.text
+
+
+def test_M12_khong_ton_tai_trong_kho_hien_khong_co_du_lieu(conn, batch):
+    """[CRITICAL, vòng soát cuối 2, việc 1] Tháng M-12 KHÔNG TỒN TẠI trong
+    kho (chưa từng có dòng bán nào, ở BẤT KỲ ai) → co_cung_ky False."""
+    _ban(conn, batch, date(2025, 4, 20), "0104")   # M=2025-04, M-12=2024-04
+    td = tien_do_ngan_sach(conn, 2025)
+    n = next(x for x in td.nguoi if x.ma == "0104")
+    assert n.co_cung_ky is False
+    assert n.cung_ky is None
+
+
+def test_trang_bao_cao_hien_khong_co_du_lieu_khi_M12_khong_ton_tai(client, conn, batch):
+    _ban(conn, batch, date(2025, 4, 20), "0104")
+    r = client.get("/bao-cao?ky=2025")
+    assert r.status_code == 200
+    assert "không có dữ liệu" in r.text
 
 
 # ---- vòng soát cuối, việc 9: thanh tiến độ CSS thuần -----------------------

@@ -219,13 +219,18 @@ class TienDoNguoi:
     muc_tieu_den_hom_nay: int | None
     tien_do: float | None
     cung_ky: int | None      # doanh thu cùng tháng năm trước, None nếu không có
-    # [Vòng soát cuối, việc 2/3] Hai cột dưới đọc THẲNG từ
-    # mart.ban_theo_nhan_vien_thang_so_sanh (027) — KHÔNG tính lại ở Python
-    # hay Jinja. `co_cung_ky` phân biệt "tháng cùng kỳ không tồn tại trong
-    # kho" (False) với "tồn tại nhưng người này bán 0 đồng" (True, cung_ky
-    # có thể là 0). `tang_truong` đã qua gate `> 0` ở view — không phải
-    # `n.thuc_te / n.cung_ky - 1` như bản Jinja cũ, thứ ăn cả mẫu số ÂM (赤伝)
-    # và in ra phần trăm NGƯỢC DẤU. Template chỉ nhân 100 và định dạng.
+    # [Vòng soát cuối 2, việc 1] Ba cột này đọc THẲNG từ
+    # mart.tien_do_ngan_sach (028) — KHÔNG tính lại ở Python hay Jinja.
+    # `co_cung_ky` là một sự thật về KHO (tháng M-12 có tồn tại doanh thu ở
+    # BẤT KỲ ai không), KHÔNG phải về riêng người này — phân biệt "tháng
+    # cùng kỳ không tồn tại trong kho" (False) với "tồn tại nhưng người này
+    # bán 0 đồng" (True, `cung_ky` = 0). Vòng soát cuối 1 (027) từng đặt hai
+    # cột này vào một view riêng lọc theo THÁNG ĐANG XÉT — sai: nó làm mất
+    # dữ liệu cùng kỳ của đúng người "có chỉ tiêu mà 0 doanh thu tháng này",
+    # một hồi quy thật so với bản Jinja cũ (xem migration 028). `tang_truong`
+    # đã qua gate `> 0` ở view — không phải `n.thuc_te / n.cung_ky - 1` như
+    # bản Jinja cũ nhất, thứ ăn cả mẫu số ÂM (赤伝) và in ra phần trăm NGƯỢC
+    # DẤU. Template chỉ nhân 100 và định dạng.
     co_cung_ky: bool
     tang_truong: float | None
 
@@ -279,6 +284,22 @@ class TienDoNganSach:
         nhóm, kẹp [0, 100]."""
         return _pct_rong(self.muc_tieu_den_hom_nay, self.muc_tieu)
 
+    @property
+    def pct_moc_chi_tieu(self) -> float | None:
+        """[Vòng soát cuối 2, việc 4] % của mốc đến hôm nay so với chỉ tiêu,
+        KHÔNG KẸP (khác `rong_moc`, thứ chỉ dùng cho chiều rộng CSS) — con
+        số ĐỌC ĐƯỢC in cạnh thẻ KPI "Mốc đến hôm nay" và cạnh thanh tiến độ
+        toàn nhóm. Trước bản sửa, công thức `muc_tieu_den_hom_nay / muc_tieu
+        * 100` bị chép tay HAI LẦN trong bao_cao.html (thẻ KPI và nhãn thanh
+        tiến độ) — hai bản chép của cùng một phép tính sẽ trôi khỏi nhau.
+        `muc_tieu` là mẫu số của CHỈ TIÊU (CHECK >= 0 ở app.ngan_sach),
+        không phải doanh thu — không có bẫy dấu ÂM như 赤伝, nên chỉ cần
+        kiểm "khác 0/None", không cần gate `> 0` phức tạp như tang_truong.
+        """
+        if not self.muc_tieu or self.muc_tieu_den_hom_nay is None:
+            return None
+        return self.muc_tieu_den_hom_nay / self.muc_tieu * 100
+
 
 def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | None":
     """Tiến độ so với chỉ tiêu. None khi kho chưa có dòng bán nào.
@@ -307,40 +328,26 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | 
     # Một lượt hỏi qua pooler Tokyo mất ~260 ms — không đáng cho hai con số
     # đã nằm sẵn trong kết quả.
     #
-    # [Vòng soát cuối, việc 2/3/6] `dt_cung_ky`/`co_cung_ky`/`tang_truong`
-    # đọc THẲNG từ mart.ban_theo_nhan_vien_thang_so_sanh (027) — không còn
-    # phép chia nào ở Python hay Jinja, và `tang_truong` đã qua gate `> 0`
-    # đúng trong view (赤伝 làm doanh thu một tháng có thể ÂM).
-    #
-    # CTE `cung_ky` AS MATERIALIZED (ghi tường minh, không dựa vào mặc định
-    # của Postgres 12+): câu này tham chiếu "họ" ban_theo_nhan_vien_thang
-    # HAI LẦN — một lần ẩn bên trong mart.tien_do_ngan_sach (biến `b` trong
-    # định nghĩa view đó), một lần ở đây qua ban_theo_nhan_vien_thang_so_sanh
-    # (chính nó cũng tham chiếu ban_theo_nhan_vien_thang bên trong). Bất biến
-    # CLAUDE.md (ca kho_hang()): Postgres KHÔNG gộp hai lượt quét trùng nhau,
-    # mỗi lần tham chiếu là một lần gộp lại TOÀN BỘ mart.dong_ban. Lọc
-    # `thang = %s` NGAY TRONG CTE — không dựa vào WHERE của câu ngoài, vì
-    # WHERE đó áp lên `t.thang` (cột `coalesce(b.thang, n.thang)` của một
-    # FULL JOIN bên trong mart.tien_do_ngan_sach) và KHÔNG đẩy xuống được
-    # xuyên qua FULL JOIN — để ở ngoài thì nhánh CTE này vẫn gộp lại toàn bộ
-    # lịch sử bán mà không lọc gì.
+    # [Vòng soát cuối 2, việc 1+2] `cung_ky`/`co_cung_ky`/`tang_truong` đọc
+    # THẲNG từ mart.tien_do_ngan_sach (028) — không qua CTE hay JOIN nào ở
+    # đây nữa. Vòng soát cuối 1 (027) từng bọc chúng vào một view riêng
+    # (`ban_theo_nhan_vien_thang_so_sanh`) rồi lọc theo THÁNG ĐANG XÉT — sai:
+    # view đó chỉ có dòng cho (người, tháng) có DOANH THU THẬT tháng đó, nên
+    # một người có chỉ tiêu mà 0 đồng THÁNG NÀY (đúng người mà FULL JOIN của
+    # 026 tồn tại để giữ) mất luôn cả dữ liệu cùng kỳ NĂM NGOÁI — một hồi quy
+    # thật so với bản Jinja cũ. 028 đặt lại ba cột này NGAY TRONG
+    # mart.tien_do_ngan_sach — view duy nhất đã có sẵn đúng tập dòng (đã qua
+    # FULL JOIN) — nên không cần CTE lọc-theo-tháng ở tầng gọi nữa.
     dong = conn.execute(
-            """WITH cung_ky AS MATERIALIZED (
-                   SELECT salesperson_code, dt_cung_ky, co_cung_ky, tang_truong
-                   FROM mart.ban_theo_nhan_vien_thang_so_sanh
-                   WHERE thang = %s
-               )
-               SELECT t.salesperson_code, s.ten, t.thuc_te, t.muc_tieu,
+            """SELECT t.salesperson_code, s.ten, t.thuc_te, t.muc_tieu,
                       t.muc_tieu_den_hom_nay, t.tien_do,
-                      ck.dt_cung_ky, ck.co_cung_ky, ck.tang_truong,
+                      t.cung_ky, t.co_cung_ky, t.tang_truong,
                       t.ngay_kd, t.ngay_kd_da_qua
                FROM mart.tien_do_ngan_sach t
                LEFT JOIN core.dim_salesperson s
                       ON s.salesperson_code = t.salesperson_code
-               LEFT JOIN cung_ky ck
-                      ON ck.salesperson_code = t.salesperson_code
                WHERE t.thang = %s
-               ORDER BY t.salesperson_code""", (thang, thang)).fetchall()
+               ORDER BY t.salesperson_code""", (thang,)).fetchall()
 
     nguoi = [TienDoNguoi(
         ma=x[0], ten=x[1], thuc_te=int(x[2] or 0),
@@ -348,15 +355,11 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | 
         muc_tieu_den_hom_nay=int(x[4]) if x[4] is not None else None,
         tien_do=float(x[5]) if x[5] is not None else None,
         cung_ky=int(x[6]) if x[6] is not None else None,
-        # `ck.co_cung_ky` là NULL khi không khớp CTE (người này không có
-        # dòng trong ban_theo_nhan_vien_thang cho ĐÚNG tháng đang xét) —
-        # coi như FALSE, cùng nghĩa "không có dữ liệu cùng kỳ để nói".
         co_cung_ky=bool(x[7]),
         tang_truong=float(x[8]) if x[8] is not None else None) for x in dong]
     # Tháng không có dòng nào (chọn một kỳ đã qua mà tháng cuối kỳ không có
     # doanh thu lẫn chỉ tiêu) -> 0/0. Khi đó `co_ngan_sach` cũng FALSE nên
     # màn hình hiện khối "chưa đặt chỉ tiêu", không hiện bộ đếm ngày.
-    # Chỉ số cột 9/10 (không còn 7/8): ba cột cung_ky mới chen vào giữa.
     ngay_kd, ngay_kd_da_qua = (dong[0][9], dong[0][10]) if dong else (0, 0)
 
     # Luỹ kế 12 tháng của kỳ, VÀ tổng cả công ty của tháng đang xét — cùng một
