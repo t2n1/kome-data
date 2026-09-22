@@ -31,6 +31,29 @@
  h2{font-size:1.1rem;margin:1.75rem 0 .5rem;padding-top:.5rem;
       border-top:1px solid var(--vien)}
  .ghi-chu{color:var(--chu-nhat);font-size:.85rem;margin:.25rem 0 .75rem}
+ {# [Vòng soát cuối, việc 9] Thanh tiến độ CSS thuần — không một dòng
+    JavaScript, cùng nguyên tắc với ve_bieu_do/ve_luy_ke (SVG tính sẵn ở
+    Python). Chiều rộng `.day` và vị trí `.moc` đều là % đã KẸP về [0,100]
+    ở Python (kome/bao_cao.py::_pct_rong) — CSS ở đây không tự vẽ tràn hay
+    âm, nó chỉ nhận đúng con số đã an toàn. #}
+ .thanh-tien-do{position:relative;height:1.05rem;background:var(--nen-phu);
+      border:1px solid var(--vien);border-radius:999px;overflow:hidden;
+      margin:.35rem 0}
+ .thanh-tien-do.thanh-nho{height:.6rem;width:8rem;display:inline-block;
+      vertical-align:middle;margin:0 0 0 .5rem}
+ .thanh-tien-do .day{position:absolute;inset:0 auto 0 0;background:var(--do);
+      border-radius:999px}
+ {# [Vòng soát cuối 2, việc 5] `margin-left:-1px` dịch vạch mốc sang trái
+    nửa chiều rộng của chính nó — ở đúng 100% (cuối tháng, đã đạt hết mốc),
+    `left:100%` đặt trọn cả ô 2px NẰM NGOÀI khung (khung rộng đúng 100% của
+    chính nó), và `overflow:hidden` của `.thanh-tien-do` cắt mất toàn bộ:
+    vạch BIẾN MẤT đúng vào ngày cần thấy nó nhất. Dịch nửa chiều rộng ra
+    ngoài (thay vì để cả khối) giữ lại MỘT NỬA vạch trong mọi trường hợp
+    0–100%, thay vì mất trắng ở hai đầu mút. #}
+ .thanh-tien-do .moc{position:absolute;top:-3px;bottom:-3px;width:2px;
+      margin-left:-1px;background:var(--chu-nhat)}
+ .thanh-nhan{display:flex;justify-content:space-between;font-size:.85rem;
+      color:var(--chu-nhat)}
 </style>
 {% include "_nav.html" %}
 <h1>Báo cáo bán hàng</h1>
@@ -64,6 +87,158 @@ Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
 </div>
 <p class="ghi-chu">Doanh thu thuần đã trừ thuế tiêu dùng. Phiếu đỏ (hàng trả lại)
 được tính vào như số âm — cố ý, vì hàng trả lại là doanh thu âm thật.</p>
+
+{% if td %}
+{# Khối ngân sách đứng SAU cảnh báo chất lượng dữ liệu (bc.canh_bao) và thẻ
+   KPI của cả kỳ ở trên — đó là tiêu đề thật của một trang tên "Báo cáo bán
+   hàng", và cảnh báo phải được đọc TRƯỚC bất kỳ con số nào trên trang. Vẫn
+   đứng TRƯỚC biểu đồ 12 tháng bên dưới, đúng chữ của brief. #}
+<h2>Tiến độ ngân sách — tháng {{ td.thang }}</h2>
+{# Tháng lấy theo mart.moc_thoi_gian.hom_nay, KHÔNG theo đồng hồ thật. In ra
+   cả tháng lẫn ngày mốc: dữ liệu bán có thể chậm hàng tuần so với hôm nay, và
+   một khối không nói ngày mốc sẽ bị đọc là "tháng này bán được có thế". #}
+<p class="ghi-chu">Số liệu đến {{ td.hom_nay.strftime("%d/%m/%Y") }} ·
+{{ td.ngay_kd_da_qua }}/{{ td.ngay_kd }} ngày làm việc của tháng.
+Ngày làm việc chưa trừ ngày lễ Nhật.</p>
+
+{% if not td.co_ngan_sach %}
+<div class="ngay-thieu">Chưa đặt chỉ tiêu cho kỳ này.
+<a href="/ngan-sach?ky={{ td.company_fy }}">Đặt chỉ tiêu</a> rồi quay lại đây.</div>
+{% else %}
+<div class="so-lon">
+ <div class="the"><div class="nhan">Thực tế</div>
+  <div class="gia">¥{{ "{:,}".format(td.thuc_te) }}</div></div>
+ <div class="the"><div class="nhan">Chỉ tiêu tháng</div>
+  <div class="gia">¥{{ "{:,}".format(td.muc_tieu) }}</div></div>
+ <div class="the"><div class="nhan">Tiến độ</div>
+  {# Chỉ tiêu tháng ĐẶT BẰNG 0 là một giá trị hợp lệ (khác "chưa đặt" —
+     app.ngan_sach.muc_tieu CHECK >= 0, xem đặc tả 5a). mart.tien_do_ngan_sach
+     đã lường trước bằng nullif(sum(muc_tieu), 0) nên tien_do = NULL, KHÔNG
+     phải chia cho 0 ở đây. In "—", không "0%" (nói dối là đã đạt 0% trong
+     khi không có mẫu số để tính) và không để trang nổ 500 vì None * 100. #}
+  <div class="gia">{% if td.tien_do is not none %}{{ "%.1f"|format(td.tien_do * 100) }}%{% else %}—{% endif %}</div></div>
+ {# [CRITICAL, vòng soát cuối việc 4] Thẻ "Mốc đến hôm nay" phải là MỘT
+    `.the` chứa BA phần tử (nhan tiêu đề · gia số tiền · nhan "% chỉ tiêu"),
+    đóng bằng ĐÚNG MỘT `</div>` cuối cùng cho `.the`. Bản trước đóng `.the`
+    ngay sau `.gia` (`</div></div>` sớm một nhịp), nên dòng "% chỉ tiêu" rơi
+    RA NGOÀI thẻ thành flex-item thứ năm trơ trọi trong `.so-lon`, và
+    `</div>` thừa phía dưới đóng luôn `.so-lon` sớm — con số duy nhất thoả
+    bất biến "màu kèm chữ đọc được" (_chung.html:76-77) của vạch mốc bị bật
+    khỏi thẻ mà HTML không báo lỗi nào. #}
+ <div class="the"><div class="nhan">Mốc đến hôm nay</div>
+  <div class="gia">{% if td.muc_tieu_den_hom_nay is not none %}¥{{ "{:,}".format(td.muc_tieu_den_hom_nay) }}{% else %}—{% endif %}</div>
+  {# Con số in ra ngay cạnh vạch mốc: bất biến "mã hoá bằng màu phải kèm thứ
+     đọc được" (_chung.html:76-77). Cùng lý do ở thẻ Tiến độ: chỉ tiêu = 0
+     không có mẫu số để chia — in "—", không chia cho 0.
+     [Vòng soát cuối 2, việc 4] `td.pct_moc_chi_tieu` tính MỘT LẦN ở Python
+     (kome/bao_cao.py) — công thức này từng chép tay hai lần trong chính
+     file này (đây và nhãn thanh tiến độ toàn nhóm bên dưới). #}
+  <div class="nhan">{% if td.pct_moc_chi_tieu is not none %}{{ "%.1f"|format(td.pct_moc_chi_tieu) }}% chỉ tiêu{% else %}—{% endif %}</div></div>
+</div>
+
+{# [Vòng soát cuối, việc 9] Đặc tả §7.1 đòi "thanh tiến độ toàn nhóm + vạch
+   mốc muc_tieu_den_hom_nay" — bản trước chỉ có bốn thẻ KPI, không có thanh
+   nào. `rong_thanh`/`rong_moc` (kome/bao_cao.py) đã KẸP về [0,100] nên CSS
+   ở đây không cần tự phòng tràn/âm. Con số ĐỌC ĐƯỢC đứng cạnh thanh dùng lại
+   đúng `td.tien_do`/`td.muc_tieu_den_hom_nay` — không phải giá trị đã kẹp —
+   nên "vượt chỉ tiêu" vẫn đọc ra trên 100% dù thanh dừng ở mép khung. #}
+{% if td.rong_thanh is not none %}
+<div class="thanh-tien-do" role="img"
+     aria-label="Tiến độ ngân sách toàn nhóm: {{ '%.1f'|format(td.tien_do * 100) if td.tien_do is not none else 0 }} phần trăm">
+ <div class="day" style="width:{{ td.rong_thanh }}%"></div>
+ {% if td.rong_moc is not none %}<div class="moc" style="left:{{ td.rong_moc }}%"></div>{% endif %}
+</div>
+<div class="thanh-nhan">
+ <span>{% if td.tien_do is not none %}{{ "%.1f"|format(td.tien_do * 100) }}% đạt{% else %}—{% endif %}</span>
+ <span>Vạch mốc — {% if td.pct_moc_chi_tieu is not none %}{{ "%.1f"|format(td.pct_moc_chi_tieu) }}% chỉ tiêu{% else %}—{% endif %}</span>
+</div>
+{% endif %}
+
+<h2>Luỹ kế thực tế so với nhịp ngân sách</h2>
+{% if lk.co %}
+<div class="khung-bd">
+<svg viewBox="0 0 {{ lk.rong }} {{ lk.cao }}" width="100%" height="{{ lk.cao }}"
+     role="img" aria-label="Luỹ kế doanh thu so với nhịp ngân sách">
+ <polyline points="{{ lk.ngan_sach }}" fill="none" stroke="var(--chu-nhat)"
+           stroke-width="2" stroke-dasharray="5 4"></polyline>
+ <polyline points="{{ lk.thuc_te }}" fill="none" stroke="var(--do)"
+           stroke-width="2.5"></polyline>
+ {# [Vòng soát cuối, việc 10] Nhãn trục hoành — `ve_luy_ke()` đã trả `nhan`
+    kèm toạ độ `x` tính sẵn (kome/bao_cao.py) từ lần đầu dựng khối này,
+    nhưng template chưa từng dùng tới nên biểu đồ không nói điểm nào là
+    tháng nào. `hien` lọc bớt còn tháng đầu/cuối + mốc quý, tránh 12 nhãn đè
+    lên nhau trên một trục 720px. #}
+ {% for n in lk.nhan if n.hien %}
+ <text x="{{ n.x }}" y="{{ lk.cao - 8 }}" font-size="9" text-anchor="middle"
+       fill="var(--chu-nhat)">{{ n.thang[5:] }}</text>
+ {% endfor %}
+</svg>
+</div>
+<div class="chu-thich">
+ <span><i class="mau" style="background:var(--do)"></i>Luỹ kế thực tế</span>
+ <span><i class="mau" style="background:var(--chu-nhat)"></i>Nhịp ngân sách</span>
+ <span>Đỉnh trục: ¥{{ "{:,}".format(lk.dinh) }}</span>
+</div>
+{% endif %}
+{% endif %}
+
+{# Bảng này nằm NGOÀI nhánh `co_ngan_sach`: chưa đặt chỉ tiêu thì các cột
+   chỉ tiêu in "—", nhưng cột Thực tế và Tỷ trọng vẫn là số thật và vẫn đáng
+   xem. Tiêu đề cũng ở ngoài — một bảng không tiêu đề là một bảng người đọc
+   không biết nó nói về tháng nào. #}
+<h2>Kết quả theo từng nhân viên — tháng {{ td.thang }}</h2>
+
+<div class="bang-cuon">
+<table>
+ <tr><th>Nhân viên</th><th class="so">Thực tế</th><th class="so">Chỉ tiêu</th>
+  <th class="so">Tiến độ</th><th class="so">Mốc đến hôm nay</th>
+  <th class="so">Cùng kỳ năm trước</th><th class="so">So cùng kỳ</th>
+  <th class="so">Tỷ trọng</th></tr>
+ {% for n in td.nguoi %}
+ <tr>
+  {# Mã ngoài core.dim_salesperson: bỏ dòng này đi là giấu doanh thu thật;
+     gắn cho nó một chỉ tiêu là bịa ra một con số. #}
+  <td>{% if n.ten %}{{ n.ten }}<br><small>{{ n.ma }}</small>
+      {% else %}{{ n.ma }}<br><small>(mã không có trong danh sách phụ trách)</small>
+      {% endif %}</td>
+  <td class="so">¥{{ "{:,}".format(n.thuc_te) }}</td>
+  <td class="so">{% if n.muc_tieu is not none %}¥{{ "{:,}".format(n.muc_tieu) }}{% else %}—{% endif %}</td>
+  <td class="so">{% if n.tien_do is not none %}
+      <span class="{{ 'manh' if n.tien_do >= 1 else 'yeu' }}">{{ "%.1f"|format(n.tien_do * 100) }}%</span>
+      {# [Vòng soát cuối, việc 9] Đặc tả §7.3: "Một thanh mỗi người". Đặt
+         ngay trong ô Tiến độ — con số đã in ở dòng trên, thanh chỉ trang trí
+         thêm, không phải nơi duy nhất mang thông tin. `rong_thanh`/
+         `rong_moc` None khi người này chưa có chỉ tiêu (muc_tieu 0/None) —
+         không thanh nào để vẽ, khớp nhánh "—" bên dưới cùng điều kiện. #}
+      {% if n.rong_thanh is not none %}
+      <div class="thanh-tien-do thanh-nho" role="img"
+           aria-label="Tiến độ {{ n.ten or n.ma }}: {{ '%.1f'|format(n.tien_do * 100) }} phần trăm">
+       <div class="day" style="width:{{ n.rong_thanh }}%"></div>
+       {% if n.rong_moc is not none %}<div class="moc" style="left:{{ n.rong_moc }}%"></div>{% endif %}
+      </div>
+      {% endif %}
+      {% else %}—{% endif %}</td>
+  <td class="so">{% if n.muc_tieu_den_hom_nay is not none %}¥{{ "{:,}".format(n.muc_tieu_den_hom_nay) }}{% else %}—{% endif %}</td>
+  {# [Vòng soát cuối 2, việc 1] `co_cung_ky`/`tang_truong` đọc THẲNG từ
+     mart.tien_do_ngan_sach (028) — không còn phép chia nào ở đây, chỉ nhân
+     100 và định dạng. `co_cung_ky` FALSE = tháng cùng kỳ KHÔNG TỒN TẠI
+     trong kho, tính cho CẢ CÔNG TY (dữ liệu bán bắt đầu 2025-03-03), KHÔNG
+     phải riêng người này — một người có chỉ tiêu mà 0 doanh thu THÁNG NÀY
+     vẫn phải đọc được cùng kỳ NĂM NGOÁI nếu nó có thật. TRUE nhưng
+     `tang_truong` None = tồn tại nhưng doanh thu cùng kỳ ≤ 0 (không có mẫu
+     số dương để chia — KHÔNG in phần trăm ngược dấu như bản Jinja cũ từng
+     làm với mẫu số ÂM do 赤伝). Hai tình huống đó khác "chưa đặt" (None) ở
+     cột bên trái: `n.cung_ky` bằng 0 vẫn hiện ¥0, không hiện "không có dữ
+     liệu" — cùng nếp `co_cung_ky` của mart.ban_theo_thang_so_sanh. #}
+  <td class="so">{% if n.co_cung_ky %}¥{{ "{:,}".format(n.cung_ky) }}{% else %}không có dữ liệu{% endif %}</td>
+  <td class="so">{% if n.tang_truong is not none %}<span class="{{ 'manh' if n.tang_truong >= 0 else 'yeu' }}">{{ "%+.1f"|format(n.tang_truong * 100) }}%</span>
+      {% elif n.co_cung_ky %}—{% else %}không có dữ liệu{% endif %}</td>
+  <td class="so">{% if td.thuc_te %}{{ "%.1f"|format(n.thuc_te / td.thuc_te * 100) }}%{% else %}—{% endif %}</td>
+ </tr>
+ {% endfor %}
+</table>
+</div>
+{% endif %}
 
 <h2>Diễn biến theo tháng</h2>
 {% if bd.co %}

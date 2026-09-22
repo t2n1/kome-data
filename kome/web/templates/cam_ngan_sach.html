@@ -1,0 +1,21 @@
+<!-- kome/web/templates/cam_ngan_sach.html
+     403 cho người không có cờ duoc_sua_ngan_sach. Cùng khuôn
+     cam_kho_du_lieu.html, chữ khác: hai màn bị từ chối vì hai lý do khác
+     nhau, và một trang chung sẽ nói sai một trong hai. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<title>KOME — không có quyền</title>
+{% include "_chung.html" %}
+<style> h1{font-size:1.3rem} </style>
+{% include "_nav.html" %}
+<div class="ngay-thieu">
+<h1>🔐 Bạn không có quyền sửa Ngân sách</h1>
+<p>Màn <strong>Ngân sách</strong> là nơi đặt chỉ tiêu doanh thu cho từng nhân
+viên từng tháng. Con số đó là thước đo mà cả công ty được đánh giá theo, nên
+nó chỉ mở cho chủ doanh nghiệp.</p>
+<p>Cần đặt hoặc sửa chỉ tiêu? Nhờ người quản trị cấp quyền cho tài khoản
+{% if nguoi %}<strong>{{ nguoi.ten_dang_nhap }}</strong>{% endif %}.</p>
+<p>Tiến độ so với chỉ tiêu vẫn xem được bình thường ở
+<a href="/bao-cao">Báo cáo doanh thu</a>.</p>
+</div>
+</html>
+</main>

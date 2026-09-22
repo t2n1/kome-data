@@ -59,6 +59,9 @@ mỗi lần gửi bị Vercel chặn ở 4,5 MB còn một file `売上伝票デ
     python scripts/tao_nguoi_dung.py doi-mat-khau an
     python scripts/tao_nguoi_dung.py quyen an --kho-du-lieu
     python scripts/tao_nguoi_dung.py quyen an --bo-kho-du-lieu
+    python scripts/tao_nguoi_dung.py them chu --ngan-sach
+    python scripts/tao_nguoi_dung.py quyen chu --ngan-sach
+    python scripts/tao_nguoi_dung.py quyen chu --bo-ngan-sach
 
 `--sale <mã>` gắn tài khoản với một trong 5 người phụ trách của OBC
 (`core.dim_salesperson`) — trang khách hàng khi đó mặc định chỉ hiện khách của
@@ -69,10 +72,15 @@ thấy toàn bộ.
 Hoàn tác nhầm lô đối soát tháng sẽ xoá cả một tháng doanh thu khỏi kho. Chỉ
 cấp cho người phụ trách nạp và chủ doanh nghiệp.
 
+`--ngan-sach` mở màn Ngân sách, tức **đặt và sửa chỉ tiêu doanh thu của từng
+nhân viên từng tháng** — con số cả công ty được đánh giá theo. Chỉ cấp cho chủ
+doanh nghiệp.
+
 **Phải đặt `KOME_SESSION_SECRET` trong `.env` của máy trong công ty.** Để
 trống thì trang chạy KHÔNG có đăng nhập và KHÔNG có phân quyền — ai mở được
-trang cũng bấm được nút Hoàn tác. Đây cũng đúng là máy DUY NHẤT nạp và hoàn
-tác được, nên để trống là vô hiệu hoá toàn bộ phần bảo vệ của đợt 3.
+trang cũng bấm được nút Hoàn tác **và** sửa được màn Ngân sách. Đây cũng đúng
+là máy DUY NHẤT nạp và hoàn tác được, nên để trống là vô hiệu hoá toàn bộ
+phần bảo vệ của cả đợt 3 lẫn đợt 5a.
 
 ### Bật đăng nhập trên máy trong công ty — làm ĐÚNG THỨ TỰ NÀY
 
@@ -175,6 +183,17 @@ Lưu ý:
   trò khác thì quyền mặc định cho bảng mới sẽ âm thầm không áp dụng.
 - Muốn đổi mật khẩu sau này: `ALTER USER kome_app_user PASSWORD '<mật khẩu mới>';`
   chạy tay trên SQL Editor, rồi cập nhật biến môi trường tương ứng.
+
+### Danh sách việc sau migration (ví dụ `026` — ngân sách)
+
+Một migration thêm cột quyền mới (như `duoc_sua_ngan_sach` của `026`) không tự
+cấp cờ đó cho ai — hai bước dưới đây **luôn đi cùng nhau**, thiếu bước 2 thì
+màn mới dựng xong không ai vào được:
+
+1. Chạy `python db/migrate.py` **bằng vai trò `postgres`** (xem "Migration
+   luôn chạy bằng `postgres`" ở trên).
+2. Cấp cờ mới cho đúng người, ví dụ `--ngan-sach`:
+   `python scripts/tao_nguoi_dung.py quyen <tên> --ngan-sach`.
 
 ---
 
