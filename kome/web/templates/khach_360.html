@@ -102,8 +102,10 @@ nói về nhịp, và trang hiện &ldquo;—&rdquo; chứ không đoán bừa.<
 
 <h2>Tháng này chưa mua</h2>
 <p class="ghi-chu">Mã khách mua đều (từ 3 lần trở lên) đã <strong>quá ngày dự kiến
-mua lại</strong> nhưng CHƯA quá 90 ngày — tức chưa vào khối &ldquo;đã ngừng
-mua&rdquo; bên dưới. Đây là khoảng còn gọi kịp: một cuộc điện thoại nhắc là đủ.</p>
+mua lại</strong> nhưng chưa im tới <strong>hai lần nhịp mua riêng</strong> của
+chính cặp khách–mã này — tức chưa vào khối &ldquo;đã ngừng mua&rdquo; bên dưới.
+Đây là khoảng còn gọi kịp: một cuộc điện thoại nhắc là đủ. Nhiều nhất 10 mã, xếp
+theo doanh thu.</p>
 {% if h.chua_mua_thang %}
 <div class="bang-cuon">
 <table>
@@ -119,9 +121,17 @@ mua&rdquo; bên dưới. Đây là khoảng còn gọi kịp: một cuộc đi�
 {% endif %}
 
 <h2>Mặt hàng đã ngừng mua</h2>
-<p class="ghi-chu">Từng mua ít nhất 3 lần rồi <strong>ngừng hẳn trên 90 ngày</strong>.
-Đây là tín hiệu sớm hơn nhiều so với việc khách ngừng mua toàn bộ: họ đang chuyển
-dần sang nhà cung cấp khác, từng món một.</p>
+{# CÙNG MỘT định nghĩa với khối "Khách đã ngừng mua mã này" của /san-pham/{mã}:
+   cột mart.khach_mat_hang.trang_thai_cap = 'ngung' (migration 024). Hai màn
+   từng có hai công thức — ngưỡng chung 90 ngày ở đây, nhịp riêng ở kia — và
+   trả lời ngược nhau về cùng một cặp khách–mã. Lời văn hai chỗ phải nói cùng
+   một điều. #}
+<p class="ghi-chu">Từng mua ít nhất 3 lần rồi <strong>im lặng quá hai lần nhịp
+mua riêng</strong> của chính cặp khách–mã này, không phải quá một ngưỡng ngày
+chung: 90 ngày im lặng là thảm hoạ với mã lấy hằng tuần và là bình thường với mã
+lấy bốn tháng một lần. Đây là tín hiệu sớm hơn nhiều so với việc khách ngừng mua
+toàn bộ: họ đang chuyển dần sang nhà cung cấp khác, từng món một. Nhiều nhất 10
+mã, xếp theo doanh thu.</p>
 {% if h.da_ngung_mua %}
 <div class="bang-cuon">
 <table>

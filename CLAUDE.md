@@ -30,6 +30,12 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
    OBC đổi mẫu xuất, hoặc quan sát cũ chỉ đúng cho một cấu hình xuất khác.
    File master và `在庫一覧` thì header ở dòng 1.
 5. `担当者` của OBC (5 người) KHÁC người nhập đơn trên web (7 tài khoản, gồm 2 arubaito).
+6. Tên kho của OBC là **tên nghiệp vụ**, không phải địa điểm: `1002 新・賞味期限用`
+   nghĩa là "ngăn dùng cho hạn sử dụng", không phải một địa chỉ kho. Gói thiết kế đợt
+   4b có viết cứng ba tên `Osaka` / `Nagoya` / `Kho lạnh Osaka` — **không có thật**.
+   Thực tế công ty chỉ có HAI kho: `0001 茨城第１倉庫（出荷専用）` và `1002 新・賞味期限用`.
+   Đặt tên kho cứng ở đâu đó (thay vì đọc từ `core.dim_warehouse`) là thêm một kho ảo
+   vào mọi bộ lọc.
 
 ## Bốn vai trò CSDL (Task 13, `db/migrations/009_roles.sql`)
 Luật số một ("OBC chỉ đọc") không chỉ là quy ước trong code — nó là ràng
@@ -75,6 +81,9 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
+| `/san-pham` | Danh mục mã hàng + tìm kiếm + lọc theo trạng thái tồn | `mart.san_pham_360` |
+| `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
+| `/kho-hang` | Bốn ô tổng quan tồn kho · bảng tồn · cận hạn/quá hạn · giá trị theo kho | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
 
 **Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
@@ -115,6 +124,49 @@ cả ba trả cùng một tập khách.
 **Bất biến:** nhịp mua theo từng mã (`mart.nhip_mat_hang`) dùng **cùng công thức
 trung vị** với nhịp mua của khách (`mart.nhip_mua`). Một khái niệm một công thức;
 hai chỗ tính khác nhau là hai con số cùng tên nói hai điều.
+
+**Bất biến:** trạng thái của một **cặp (khách, mã)** có **bốn** khối hiển thị và
+chỉ **một** định nghĩa: cột `mart.khach_mat_hang.trang_thai_cap` (migration `024`)
+— một **NHÃN ba giá trị**, xét theo đúng thứ tự này:
+`'khong_goi'` (khách bị OBC đánh dấu ※廃業※/※取引停止※ — xét **TRƯỚC**, cùng nếp
+`'ngung_giao_dich'` của `016`) · `'ngung'` (im lặng **≥ 2× nhịp mua riêng của
+chính cặp đó**, `tre_ngay >= nhip_ngay`) · `'mua'` (còn lại, gồm cả cặp chưa đủ 3
+lần mua nên `nhip_ngay` NULL — đó là "chưa đủ dữ liệu", KHÔNG phải "đã ngừng").
+Bốn khối — "Mặt hàng đã ngừng mua" và "Tháng này chưa mua" của `/khach-hang/{mã}`,
+"Khách đang mua mã này" và "Khách đã ngừng mua mã này" của `/san-pham/{mã}` —
+**ĐỌC** cột này và **so bằng** (`= 'ngung'`, `= 'mua'`), không chỗ nào viết lại vị
+từ (cùng nếp `022`) và không chỗ nào tự JOIN lấy `da_ngung` nữa: cờ ※廃業※ được
+đọc **đúng một lần**, trong view, từ `mart.dau_hieu_khach` (nhà của nó theo `016`,
+và rẻ hơn `khach_360`).
+
+**NHÃN chứ không phải boolean, và KHÔNG ĐƯỢC dùng `NOT` trên nó.** Bản đầu của
+`024` là boolean `ngung_mua` gói cổng ※廃業※ vào bên trong; phủ định một boolean
+như thế **luôn đúng** với khách đã phá sản, nên mọi khối viết "phần còn lại" bằng
+`NOT ngung_mua` lặng lẽ mở cửa lại cho trọn 281 khách đó — và ba chỗ Python phải
+tự JOIN `da_ngung` để đắp tay, tức một cờ hai nguồn ba chỗ chép, đúng cái bệnh mà
+`021`/`022` tồn tại để dẹp. So bằng với một nhãn không có lỗ đó, và thêm trạng
+thái thứ tư sau này cũng không âm thầm dồn dòng vào khối nào.
+
+Trước `024`, "đã ngừng" ở `/khach-hang/{mã}` dùng ngưỡng chung 90 ngày còn
+`/san-pham/{mã}` dùng nhịp riêng, nên cùng một cặp cho hai câu trả lời ngược nhau
+ở **cả hai chiều**, và cả hai đều thiếu cổng ※廃業※. `trang_thai_cap` là một
+**CỘT, không phải bộ lọc dòng**: view vẫn giữ đủ mọi cặp, vì nó còn phục vụ khối
+"khách đang mua mã này" và bảng top-15 mặt hàng — sự thật lịch sử, không phải danh
+sách gọi lại. Khối "Tháng này chưa mua" là dải giữa: đã quá ngày dự kiến mua lại
+(`tre_ngay IS NOT NULL`) nhưng nhãn vẫn là `'mua'`. Có test canh:
+`tests/test_san_pham.py::test_hai_man_tra_loi_GIONG_NHAU_ve_mot_cap_khach_ma`,
+`::test_khach_da_dong_cua_khong_lot_vao_khoi_goi_lai_nao` và
+`::test_cap_cua_khach_da_dong_cua_mang_NHAN_RIENG_khong_phai_phu_dinh`.
+
+**Bất biến:** khi một câu lệnh tham chiếu **cùng một view của `mart` nhiều hơn một
+lần**, view đó phải vào CTE `AS MATERIALIZED` (ghi **tường minh**, đừng dựa vào mặc
+định của Postgres 12+) và mọi nhánh đọc từ CTE. Postgres KHÔNG gộp các truy vấn con
+trùng nhau: mỗi lần tham chiếu là một lần **đánh giá lại** cả view. `kho_hang()`
+từng tham chiếu `mart.san_pham_360` 5 lần ở câu 1 và 3 lần ở câu 2 — mỗi lần kéo
+theo `ty_suat_mat_hang`, `toc_do_ban` (2 lượt quét `fact_sales_line`) và CTE `sl`,
+tức ~32 lượt quét bảng bán hàng cho MỘT lần mở trang. Ngân sách "≤ 2 truy vấn" đo
+**số lượt hỏi**, không đo sức tính, nên nó không bắt được lớp lỗi này và màn hình
+vẫn xanh trên CSDL test vài chục dòng.
 
 **Bất biến:** tỷ suất lãi gộp — ở BẤT KỲ view nào trong `mart` (`ty_suat_mat_hang`,
 `ban_theo_*`, `khach_360.ty_suat`) — luôn là **tỷ số của các TỔNG**
@@ -167,6 +219,44 @@ thiếu. Ba ràng buộc của ô đó:
 **Bất biến:** khách OBC đã đánh dấu `※廃業※` / `※取引停止※` trong TÊN (281/2.077
 khách) không bao giờ vào danh sách gọi lại. Doanh nghiệp đã phá sản thì im lặng
 là đúng, không phải bất thường — xem `db/migrations/016_*.sql`.
+
+**Bất biến:** `mart.toc_do_ban` dùng **trung bình 90 ngày**, còn `mart.nhip_mua` dùng
+**trung vị** — KHÁC NHAU CÓ CHỦ Ý. `toc_do_ban` trả lời "bao nhiêu ngày nữa thì hết
+hàng" (một phép chia trên tổng lượng, nên trung bình đúng); `nhip_mua` trả lời "khoảng
+cách điển hình giữa hai lần mua" (nơi một kỳ nghỉ Tết làm trung bình lệch). Đừng "sửa
+cho nhất quán".
+
+**Bất biến:** `mart.toc_do_ban` có **HAI** cột tốc độ và chúng không thay nhau được.
+`toc_do_ngay` chia cho HẰNG 90; `toc_do_ngay_theo_tuoi` chia cho `least(90, hom_nay -
+lan_dau + 1)` — số ngày mã THỰC SỰ có mặt. Mọi con số dùng để RA QUYẾT ĐỊNH đều đi
+theo cột thứ hai: `san_pham_360.du_ban_ngay` và `san_pham_360.trang_thai`. Với mã đã
+bán quá 90 ngày hai cột BẰNG NHAU, nên lỗi không lộ ra ở phần lớn dữ liệu — nó chỉ
+lộ ở mã mới. Một mã ra mắt 20 ngày bán 30 đơn vị mà chia cho 90 cho ra tốc độ thấp
+hơn thật gần 4,5 lần, và "còn đủ bán bao nhiêu ngày" bị thổi phồng đúng bấy nhiêu
+lần, đẩy một mã đang bán chạy vào nhãn tồn chết. Màn hình phải hiện **đúng cột đã
+dùng để phân loại** — hiện `toc_do_ngay` bên cạnh một nhãn tính từ
+`toc_do_ngay_theo_tuoi` thì người giữ kho đọc được "tốc độ 0,33/ngày · còn đủ 140
+ngày" trên cùng một dòng và không có cách nào đối chiếu. Xem chú thích dài trong
+`db/migrations/023_mart_san_pham.sql`.
+
+**Bất biến:** `core.fact_inventory_daily.best_before` là **TEXT** và chứa cả giá trị chữ
+`賞味期限なし` lẫn chuỗi rỗng. **Không bao giờ `to_date()` trần trên cột này** — một giá
+trị chữ làm cả truy vấn nổ và trang trắng, mà nó chỉ nổ khi trong kho có đúng loại hàng
+đó, tức sau khi đã triển khai. `mart.ton_hien_tai` kiểm dạng bằng regex trước và phân
+**BỐN** loại: `ngay` / `khong_han` / `trong` / `khong_ro` (chuỗi không rỗng nhưng không
+khớp regex ngày và không đúng y hệt `賞味期限なし` — "không đọc được", KHÁC "không có
+hạn dùng").
+
+**Bất biến:** `mart.san_pham_360.ton` là **NULL** khi mã không có dòng tồn nào, không
+phải `0`. 90/232 mã chưa từng có dòng trong `在庫一覧`. "Không biết" khác "bằng không" —
+hiện `0` là nói kho đã hết, và người đọc sẽ đi đặt hàng.
+
+**Bất biến:** hai ô đếm trạng thái ở đầu `/kho-hang` KHÔNG co theo bộ lọc kho và
+KHÔNG co theo bộ lọc trạng thái, còn ô "Giá trị tồn chết" thì co theo **cả hai**.
+Khác nhau có chủ ý và trang phải nói ra: ô đếm là để so sánh giữa các kho nên phải
+đứng yên, còn "giá trị tồn chết của kho này" là con số người ta dùng để quyết định
+thanh lý — hiện tổng mọi kho bên cạnh một bảng đã lọc thì sai gần 2× ở công ty hai
+kho.
 
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |

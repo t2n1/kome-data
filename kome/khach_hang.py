@@ -282,15 +282,28 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # Mặt hàng khách TỪNG mua đều rồi NGỪNG hẳn. Đây là tín hiệu sớm hơn nhiều
     # so với việc khách ngừng mua toàn bộ: họ đang chuyển dần sang nhà cung cấp
     # khác, từng món một, và không ai để ý cho tới khi mất luôn khách.
+    #
+    # ĐỌC `trang_thai_cap` của mart.khach_mat_hang (migration 024), KHÔNG viết
+    # lại vị từ. Trước 024 chỗ này dùng ngưỡng CHUNG (`hom_nay - lan_cuoi > 90`
+    # cộng `so_lan >= 3`) còn /san-pham/{mã} dùng nhịp RIÊNG — cùng một cặp
+    # (khách, mã) cho hai câu trả lời ngược nhau ở hai màn. Nay một khái niệm
+    # một công thức, đúng nếp 021/022.
+    #
+    # SO BẰNG với `'ngung'`, và KHÔNG BAO GIỜ dùng `NOT` trên cột này: nhãn có
+    # ba giá trị, nên phủ định nó là gộp bừa hai giá trị còn lại (trong đó có
+    # `'khong_goi'` — khách ※廃業※) vào một khối. Đó đúng là lý do cột này là
+    # nhãn chứ không phải boolean; xem chú thích của migration 024.
+    #
+    # `so_lan >= 3` đã bỏ vì THỪA, không phải vì nới lỏng: `nhip_ngay` chỉ có
+    # giá trị khi đã có >= 2 khoảng cách, tức >= 3 lần mua (020). Để lại là
+    # dựng thêm một bản sao của cùng điều kiện, ở đúng chỗ vừa dọn xong.
     da_ngung = [dict(zip(("ma", "ten", "so_lan", "lan_cuoi", "doanh_thu",
                           "nhip", "du_kien", "tre"), h))
                 for h in conn.execute(
         """SELECT h.product_code, h.ten_hang, h.so_lan, h.lan_cuoi,
                   h.doanh_thu_thuan, h.nhip_ngay, h.du_kien_lan_toi, h.tre_ngay
-           FROM mart.khach_mat_hang h, mart.moc_thoi_gian m
-           WHERE h.customer_code = %s
-             AND h.so_lan >= 3
-             AND m.hom_nay - h.lan_cuoi > 90
+           FROM mart.khach_mat_hang h
+           WHERE h.customer_code = %s AND h.trang_thai_cap = 'ngung'
            ORDER BY h.doanh_thu_thuan DESC LIMIT 10""", (ma,)).fetchall()]
 
     gan_day = [dict(zip(("ngay", "so_phieu", "doanh_thu", "lai_gop"), l))
@@ -326,15 +339,42 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # thẳng ra cho khách. Báo giá lẻ bằng giá thùng sai hơn chục lần; không
     # có số còn hơn có số sai. Bảng giá đúng (tách 荷姿) nằm ở khối "Bảng giá
     # của bậc" ngay dưới, dựng từ core.fact_price_list.
+    #
+    # NHÁNH 'chua' ĐỌC ĐÚNG NHÃN `'mua'`, KHÔNG PHẢI MỘT NGƯỠNG NGÀY RIÊNG và
+    # cũng không phải phủ định của nhãn "đã ngừng". Nó là dải giữa: đã quá ngày
+    # dự kiến mua lại (`tre_ngay IS NOT NULL`, tức im lặng > 1 nhịp) nhưng CHƯA
+    # tới 2 nhịp (`trang_thai_cap = 'mua'`) — "còn gọi kịp". Trước 024 vế thứ
+    # hai là `hom_nay - lan_cuoi <= 90`, ăn khớp với ngưỡng 90 của khối "đã
+    # ngừng mua" ngay dưới nó. Đổi khối kia sang nhịp riêng mà để nguyên chỗ
+    # này thì hai khối CHỒNG NHAU: một mã nhịp 7 ngày im 60 ngày vừa "đã ngừng"
+    # (60 >= 2x7) vừa "chưa mua tháng này" (60 <= 90) — cùng một mã, hai kết
+    # luận, trên cùng một trang.
+    #
+    # KHÔNG CÒN JOIN mart.dau_hieu_khach Ở ĐÂY. Đây cũng là một DANH SÁCH GỌI
+    # LẠI ("một cuộc điện thoại nhắc là đủ"), nên khách ※廃業※ không được vào —
+    # và nhãn đã lo việc đó: họ mang `'khong_goi'`, nên `= 'mua'` tự loại họ.
+    # Bản trước của 024 dùng boolean `NOT ngung_mua`, thứ LUÔN đúng với khách
+    # đã đóng cửa vì cổng ※廃業※ nằm gói bên trong chính boolean đó, nên chỗ này
+    # buộc phải tự JOIN lấy `da_ngung` để đắp lại — một cờ, hai nguồn, ba chỗ
+    # chép. Nhãn dẹp cả ba: cờ ※廃業※ nay chỉ được đọc MỘT lần, trong view.
+    # CTE `AS MATERIALIZED`: hai nhánh dưới đây đều đọc mart.khach_mat_hang,
+    # và không CTE thì Postgres dựng view ĐÓ HAI LẦN cho một lần mở trang.
+    # Vị từ `customer_code` nằm TRONG CTE chứ không ngoài — vật hoá cả view
+    # rồi mới lọc một khách là đổi một trang nhanh lấy một lượt quét toàn
+    # bảng, tức đúng thứ mà tối ưu này định tránh.
     them = conn.execute("""
+        WITH h AS MATERIALIZED (
+            SELECT product_code, ten_hang, lan_cuoi, tre_ngay, doanh_thu_thuan,
+                   trang_thai_cap
+              FROM mart.khach_mat_hang WHERE customer_code = %s
+        )
         SELECT khoi, ma, ten, chu, so_a FROM (
             (SELECT 'chua'::text AS khoi, h.product_code AS ma,
                     h.ten_hang AS ten, h.lan_cuoi::text AS chu,
                     h.tre_ngay::numeric AS so_a,
                     h.doanh_thu_thuan::numeric AS xep
-               FROM mart.khach_mat_hang h, mart.moc_thoi_gian m
-              WHERE h.customer_code = %s AND h.so_lan >= 3
-                AND h.tre_ngay IS NOT NULL AND m.hom_nay - h.lan_cuoi <= 90
+               FROM h
+              WHERE h.tre_ngay IS NOT NULL AND h.trang_thai_cap = 'mua'
               ORDER BY h.doanh_thu_thuan DESC
               LIMIT 10)
             UNION ALL
@@ -343,14 +383,13 @@ def ho_so(conn, ma: str) -> HoSo | None:
                     ''::text, t.ty_suat, t.ty_suat
                FROM core.dim_product p
                JOIN mart.ty_suat_mat_hang t ON t.product_code = p.product_code
-              WHERE NOT EXISTS (SELECT 1 FROM mart.khach_mat_hang h
-                                 WHERE h.customer_code = %s
-                                   AND h.product_code = p.product_code)
+              WHERE NOT EXISTS (SELECT 1 FROM h
+                                 WHERE h.product_code = p.product_code)
                 AND t.ty_suat IS NOT NULL
               ORDER BY t.ty_suat DESC
               LIMIT 8)
         ) u ORDER BY khoi, xep DESC
-    """, (ma, ma)).fetchall()
+    """, (ma,)).fetchall()
 
     chua_mua, goi_y = [], []
     for khoi, ma_hang, ten_hang, chu, so_a in them:
@@ -493,6 +532,15 @@ def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
     `tong_tat_ca` thì ngược lại: không lọc gì hết. Liên kết của nó
     (`?tat_ca=1`) bỏ MỌI bộ lọc, nên con số phải là con số sau khi bấm.
     """
+    # CTE `AS MATERIALIZED`: câu lệnh này đọc mart.khach_360 SÁU lần. Không
+    # CTE thì Postgres dựng lại view đó sáu lượt — mỗi lượt gộp toàn bộ
+    # mart.lan_mua — cho MỘT lần mở trang. Đây là view đắt nhất trong mart,
+    # và ngân sách "3 lượt hỏi" của trang này đếm SỐ LƯỢT HỎI chứ không đếm
+    # sức tính, nên nó không hề chặn được chuyện đó. Vật hoá ~1.710 dòng một
+    # lần rồi quét lại sáu lượt thì rẻ; dựng lại view sáu lượt mới là cái đắt.
+    # Không có vị từ nào đẩy xuống được ở đây (bộ lọc chỉ theo `sale`, và bốn
+    # trong sáu nhánh cố ý lọc khác nhau), nên CTE không làm mất gì.
+    #
     # Hai mệnh đề WHERE, cùng một hàm dựng (`_vi_tu`) nên không bao giờ trôi
     # khỏi nhau. THỨ TỰ THAM SỐ = thứ tự văn bản các mảnh WHERE bên dưới:
     # bốn lần `{dk}` (nhom, tong, hang, tinh) rồi MỘT lần `{dk_dem}`; hai
@@ -504,18 +552,19 @@ def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
     # chuỗi `khoa` như "mã|tên": nhồi chuỗi thêm một quy ước phải nhớ và một
     # chỗ nữa có thể tách sai (vd tên nhân viên lỡ chứa dấu phân cách).
     rows = conn.execute(f"""
+        WITH k360 AS MATERIALIZED (SELECT * FROM mart.khach_360)
         SELECT 'nhom' AS khoi, v.nhom AS khoa, count(*) AS so, 0::bigint AS tien,
                0::bigint AS canh_bao
           FROM mart.khach_nhom_viec v
-          JOIN mart.khach_360 k ON k.customer_code = v.customer_code
+          JOIN k360 k ON k.customer_code = v.customer_code
           {dk}
          GROUP BY v.nhom
         UNION ALL
-        SELECT 'tong', '', count(*), 0, 0 FROM mart.khach_360 k {dk}
+        SELECT 'tong', '', count(*), 0, 0 FROM k360 k {dk}
         UNION ALL
         SELECT 'hang', h.hang, count(*), 0, 0
           FROM mart.hang_doanh_thu h
-          JOIN mart.khach_360 k ON k.customer_code = h.customer_code
+          JOIN k360 k ON k.customer_code = h.customer_code
           {dk}
          GROUP BY h.hang
         UNION ALL
@@ -525,7 +574,7 @@ def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
         -- của câu lệnh này đã do `_vi_tu` quyết định, thêm một cái nữa ở
         -- giữa là một chỗ rất dễ đếm lệch về sau.
         SELECT 'tinh', coalesce(nullif(k.prefecture, ''), '(không rõ)'), count(*), 0, 0
-          FROM mart.khach_360 k {dk}
+          FROM k360 k {dk}
          GROUP BY 2
         UNION ALL
         SELECT 'nv', t.salesperson_code || '|' || t.ten, t.so_khach, t.doanh_thu,
@@ -533,10 +582,10 @@ def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
           FROM mart.tai_nhan_vien t
         UNION ALL
         SELECT 'dem', k.trang_thai, count(*), 0, 0
-          FROM mart.khach_360 k {dk_dem}
+          FROM k360 k {dk_dem}
          GROUP BY k.trang_thai
         UNION ALL
-        SELECT 'tat_ca', '', count(*), 0, 0 FROM mart.khach_360
+        SELECT 'tat_ca', '', count(*), 0, 0 FROM k360
     """, p * 4 + p_dem).fetchall()
 
     lay = lambda khoi: [(r[1], r[2], r[3], r[4]) for r in rows if r[0] == khoi]
