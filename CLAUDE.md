@@ -86,12 +86,12 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 ## Các trang của web app
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
-| `/` | Tổng quan + ô "hôm nay đã có dữ liệu chưa" | `mart.tong_theo_ky`, `mart.khach_360`, `meta.ingest_batch` |
+| `/` | Dashboard chung (đợt 5b): 4 ô chỉ số tháng đến hôm nay · tiến độ ngân sách · xu hướng 30 ngày · sức khoẻ khách · cần gọi hôm nay · hàng cận hạn · ô "hôm nay đã có dữ liệu chưa" | `mart.thang_den_hom_nay`, `mart.ban_theo_ngay`, `mart.khach_360`, `mart.tien_do_ngan_sach` (qua `kome.bao_cao.tien_do_ngan_sach`), `mart.ton_hien_tai` (qua `kome.san_pham.kho_hang`), `meta.ingest_batch` |
 | `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
 | `/ban-do` | Bản đồ khách hàng — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách | `core.dim_prefecture`, `mart.khach_theo_tinh` |
-| `/bao-cao` | Báo cáo bán hàng theo kỳ | `mart.ban_theo_*` |
+| `/bao-cao` | Báo cáo bán hàng theo kỳ + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
 | `/ngan-sach` | Đặt chỉ tiêu doanh thu: 5 người phụ trách × 12 tháng một kỳ. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
 | `/san-pham` | Danh mục mã hàng + tìm kiếm + lọc theo trạng thái tồn | `mart.san_pham_360` |
 | `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
@@ -415,6 +415,96 @@ nguyên nằm thừa trong giới hạn đó. Và bản Vercel là bản chạy 
 buộc** có `KOME_SESSION_SECRET`, tức là nơi cờ quyền LUÔN được thi hành — máy
 trong công ty mới là nơi có thể không có cổng nào. Chặn màn nhập ở Vercel là
 lấy nó đi đúng ở chỗ nó an toàn nhất.
+
+**Bất biến (Đợt 5b):** hai màn có "so cùng kỳ" nhưng đi theo HAI kiểu so khác
+nhau, và mỗi ô phải luôn nói nó so cách nào — im lặng là để người đọc tự suy
+diễn sai kiểu kia:
+- `/bao-cao` so **cùng tháng với cùng tháng** (`mart.ky_cung_ky`): kỳ 6 chỉ có
+  5 tháng dữ liệu, nên đem cả kỳ 6 so với cả kỳ 7 (12 tháng) ra "+140%" — đúng
+  số học, sai hoàn toàn về kinh doanh. Mỗi dòng so cùng kỳ ở đây PHẢI in kèm số
+  tháng đối chiếu ("▲ 4,2% so cùng kỳ · 5 tháng đối chiếu (2026-03 → 2026-07)"),
+  không chỉ in phần trăm trần.
+- `/` so **cùng dải ngày** (`mart.thang_den_hom_nay`, §3.7 migration `029`):
+  1 → ngày hôm nay của tháng đó năm trước, KHÔNG phải trọn tháng năm trước. Đem
+  12 ngày đầu tháng so với cả tháng thì giữa tháng nào cũng "sụt 60%".
+Hai công thức không được gộp làm một: đổi `/` sang so cả tháng (hay ngược lại)
+là âm thầm đổi ý nghĩa của phép so mà không ai để ý cho tới khi có người đối
+chiếu tay. Có test canh:
+`tests/test_phan_tich_mart.py::test_ky_cung_ky_chi_tinh_thang_doi_chieu`,
+`::test_thang_den_hom_nay_so_cung_so_ngay_khong_tron_thang`,
+`::test_thang_den_hom_nay_29_2_kep_ve_28_2`,
+`tests/test_bao_cao_phan_tich_web.py::test_co_doi_chieu_hien_dung_cau`,
+`::test_khong_co_doi_chieu_hien_dung_cau`.
+
+**Bất biến:** "ngành hàng" là `food_category_name`, và biểu thức
+`coalesce(nullif(food_category_name, ''), '(chưa phân loại)')` viết ĐÚNG MỘT
+LẦN, trong `mart.ban_theo_nganh_thang` (LEFT JOIN từ dòng bán sang
+`core.dim_product`, migration `029`). Mọi view ngành khác (`..._so_sanh`,
+`nganh_ky_cung_ky`) đọc lại view đó, không tự viết biểu thức riêng — hai bản
+chép của cùng một `coalesce` trôi khỏi nhau là mã hàng rỗng tách ra hai ô
+"(chưa phân loại)" khác nhau trên cùng một trang. Hằng `kome.bao_cao.NGANH_TRONG`
+là bản chép BẮT BUỘC ở tầng Python (`nhom_theo_nganh` ghép `mart.ban_theo_san_pham`,
+thứ trả `food_category_name` THÔ chưa qua coalesce, vào theo tên ngành của
+`nganh_ky`) — lệch một ký tự ở đây thì mã hàng rỗng của bảng đó rơi vào một
+ô "(chưa phân loại)" riêng, cạnh ô gốc từ mart, mà không lỗi nào nổ ra. Có
+test canh:
+`tests/test_bao_cao_phan_tich_web.py::test_nganh_trong_khop_chu_view_tra_ra`,
+`tests/test_phan_tich_mart.py::test_tong_cac_nganh_bang_tong_thang_ke_ca_dong_ma_hang_rong`.
+
+**Bất biến:** `mart.ban_theo_nganh_thang_so_sanh` nối **FULL JOIN** giữa tháng
+này và tháng M−12 theo ngành (cùng lớp bất biến FULL JOIN của
+`mart.tien_do_ngan_sach` đã ghi ở trên) — ngành bán năm ngoái mà năm nay không
+bán phải có dòng `doanh_thu_thuan = 0`, chính là ngành sụt mạnh nhất. Đổi sang
+`LEFT JOIN` từ tháng này là ngành đó biến mất khỏi khối "kéo doanh thu xuống"
+mà trang vẫn vẽ ra bình thường. View lọc chỉ giữ **tháng có trong kho** (chặn
+bằng CTE `ct`); thiếu vị từ đó thì FULL JOIN đẻ ra 12 tháng tương lai từ dữ
+liệu năm trước. View gốc được tham chiếu hai lần trong chính migration này nên
+nó vào CTE `AS MATERIALIZED` ghi tường minh (bất biến CTE đã ghi ở trên). Có
+test canh:
+`tests/test_phan_tich_mart.py::test_nganh_ban_nam_ngoai_ma_nam_nay_khong_ban_van_co_dong`,
+`::test_khong_sinh_dong_cho_thang_khong_co_trong_kho`,
+`::test_nganh_so_sanh_chi_quet_fact_sales_line_mot_lan`.
+
+**Bất biến:** Pareto tập trung khách (`mart.tap_trung_khach`) gộp theo
+**KHÁCH**, KHÔNG theo `(khách, người phụ trách)` như `mart.ban_theo_khach`.
+Một khách đổi người phụ trách giữa kỳ sẽ chiếm HAI cột trên biểu đồ nếu gộp
+theo view kia — cùng khách, tiền chia đôi, độ tập trung bị tính thấp hơn thật.
+Có test canh:
+`tests/test_phan_tich_mart.py::test_tap_trung_khach_mot_khach_hai_nguoi_phu_trach_chi_mot_dong`.
+
+**Bất biến:** cây ô (`ve_cay_o`, `kome/ve_phan_tich.py`) không vẽ được diện
+tích ÂM — ngành/mã doanh thu ≤ 0 bị bỏ khỏi hình. Phần bị bỏ PHẢI in ra dưới
+khối kèm số tiền thật ("Không vẽ: ¥−26.258.617 của 10 mã doanh thu âm"), không
+được lặng lẽ bỏ: lặng lẽ bỏ là tổng cây ô lệch tổng ô chỉ số của kỳ mà không ai
+biết vì sao. Bất biến đối soát: với MỌI đầu vào,
+`sum(doanh_thu_ve của các ngành được vẽ) + khong_ve == sum(dt_nganh đầu vào)`.
+Có test canh: `tests/test_ve_phan_tich.py::test_ve_cay_o_bo_nganh_am_va_cong_don_khong_ve`,
+`::test_doi_soat_a_nganh_duong_co_mot_ma_am`, `::test_doi_soat_b_hon_5_ma_duong_cong_mot_ma_am`,
+`::test_doi_soat_c_ca_nganh_am`,
+`tests/test_bao_cao_phan_tich_web.py::test_khong_ve_hien_dung_cau_khi_co_doanh_thu_am`.
+
+**Bất biến:** Dashboard (`/`, đợt 5b) là "công ty đang thế nào" — mọi khối SỐ
+TỔNG (4 ô chỉ số tháng, xu hướng 30 ngày, sức khoẻ khách, tiến độ ngân sách,
+hàng cận hạn) KHÔNG lọc theo người đăng nhập. CHỈ khối "Cần gọi hôm nay" lọc
+theo `sale` (mặc định người đăng nhập, `?tat_ca=1` bỏ lọc — cùng nếp
+`/can-xu-ly`). Lọc cả trang theo từng sale là một câu hỏi khác, đã có nhà ở
+`/bao-cao` (bảng theo người phụ trách) và `/khach-hang?nv=`. Khối nào của gói
+thiết kế không có nguồn dữ liệu thật (công nợ, dòng tiền, mua hàng, khiếu nại,
+thời tiết) thì KHÔNG được dựng bằng số bịa — dòng "Tồn kho — chưa có" cũ phải
+bỏ hẳn (`/kho-hang` đã có từ đợt 4b), không phải thay bằng số giả. Có test
+canh: `tests/test_tong_quan.py::test_can_goi_mac_dinh_loc_theo_nguoi_dang_nhap`,
+`::test_o_chi_so_so_cung_so_ngay`, `::test_khong_con_khoi_ton_kho_chua_co_du_lieu`.
+
+**Bất biến:** ngân sách truy vấn: `/bao-cao` ≤ **11** truy vấn, `/` ≤ **11**
+truy vấn (đếm cả các câu ở tầng route như `tinh_tuoi`/`_sale_dang_loc`). Ngân
+sách đo **số lượt hỏi**, không đo sức tính — cùng lý lẽ đã ghi cho `/khach-hang`
+ở trên. Ở `/bao-cao`, ngành × tháng (`mart.ban_theo_nganh_thang_so_sanh`) và
+ngành × kỳ (`mart.nganh_ky_cung_ky`) KHÔNG được gộp vào một câu: câu gộp sẽ
+tham chiếu `ban_theo_nganh_thang_so_sanh` hai lần (một lần trực tiếp, một lần
+qua `nganh_ky_cung_ky` — view sau ĐỌC view trước), tức đánh giá lại view đó hai
+lần, đúng lớp lỗi của bất biến CTE-trùng đã ghi ở trên. Có test đếm:
+`tests/test_bao_cao_phan_tich.py::test_bao_cao_khong_qua_11_truy_van`,
+`tests/test_tong_quan.py::test_trang_chu_khong_qua_11_truy_van`.
 
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |
