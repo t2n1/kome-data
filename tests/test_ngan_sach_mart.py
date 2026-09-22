@@ -153,3 +153,24 @@ def test_co_moi_mac_dinh_FALSE(conn):
         "SELECT duoc_sua_ngan_sach FROM app.nguoi_dung WHERE ten_dang_nhap='an'"
     ).fetchone()
     assert r[0] is False
+
+
+def test_bon_view_moi_deu_cap_SELECT_cho_ca_ba_vai_tro(conn):
+    """[IMPORTANT] ALTER DEFAULT PRIVILEGES của 009 KHÔNG kể tên kome_ingest,
+    nên view mới của `mart` không tự có quyền cho vai trò đó. Mọi migration
+    thêm view vào `mart` (014, 020, 021, 023, 024, 025) đều phải kết thúc
+    bằng một dòng GRANT tường minh. Quên dòng đó thì lỗi không nổ ra lúc
+    migration chạy — nó nổ bằng `permission denied` nhiều tháng sau, giữa lúc
+    có người đang nạp dữ liệu lúc 13:30."""
+    thieu = conn.execute(
+        """SELECT c.relname, r.rolname
+           FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           CROSS JOIN (VALUES ('kome_app'), ('kome_report'), ('kome_ingest'))
+                      AS r(rolname)
+           WHERE n.nspname = 'mart'
+             AND c.relname IN ('ngay_kinh_doanh', 'ngan_sach_thang',
+                               'ban_theo_nhan_vien_thang', 'tien_do_ngan_sach')
+             AND NOT has_table_privilege(r.rolname, c.oid, 'SELECT')
+           ORDER BY 1, 2""").fetchall()
+    assert thieu == [], f"thiếu SELECT: {thieu}"

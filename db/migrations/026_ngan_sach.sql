@@ -155,15 +155,29 @@ COMMENT ON VIEW mart.tien_do_ngan_sach IS
    tests/test_ngan_sach_mart.py.';
 
 -- Quyền: 009/010 đã ALTER DEFAULT PRIVILEGES cho schema app (TABLES và
--- SEQUENCES) và cho mart, nên hai bảng và bốn view trên tự nhận quyền — với
--- điều kiện file này chạy bằng vai trò `postgres`.
---
+-- SEQUENCES) và cho mart, nên hai bảng app.* và bốn view mart.* trên tự nhận
+-- quyền — với điều kiện file này chạy bằng vai trò `postgres`. NHƯNG dòng
+-- ALTER DEFAULT PRIVILEGES của 009 (schema core, mart) chỉ kể tên
+-- `kome_app, kome_report` — KHÔNG kể `kome_ingest`. Vì vậy bốn view mới
+-- không tự có SELECT cho kome_ingest, và mọi migration trước đã thêm view
+-- vào mart (014, 015, 016, 020, 021, 022, 023, 024, 025) đều kết thúc bằng
+-- một dòng GRANT tường minh giống dòng dưới đây — quên dòng này thì lỗi
+-- không nổ ra lúc migration chạy, nó nổ bằng `permission denied` nhiều
+-- tháng sau, giữa lúc có người đang nạp dữ liệu lúc 13:30. Có test canh:
+-- tests/test_ngan_sach_mart.py::test_bon_view_moi_deu_cap_SELECT_cho_ca_ba_vai_tro.
+GRANT SELECT ON ALL TABLES IN SCHEMA mart TO kome_app, kome_report, kome_ingest;
+
 -- kome_report tự nhận SELECT trên hai bảng mới. GIỮ NGUYÊN, không REVOKE như
 -- đã làm với app.nguoi_dung: chỉ tiêu doanh thu là con số nghiệp vụ, không
 -- phải hash mật khẩu.
 --
--- LƯU Ý: mart.ngan_sach_thang đọc app.ngan_sach, mà kome_ingest KHÔNG có
--- USAGE trên schema app. View vẫn chạy được cho nó, vì Postgres kiểm quyền
--- trên bảng nền theo CHỦ SỞ HỮU VIEW (ở đây là postgres). Đúng và mong muốn —
--- nhưng nó có nghĩa: đặt gì vào một view của mart là công bố thứ đó cho MỌI
--- vai trò đọc mart. Không đưa cột nhạy cảm nào vào theo đường này.
+-- LƯU Ý — chuyện KHÁC với đoạn GRANT ở trên: mart.ngan_sach_thang đọc
+-- app.ngan_sach, mà kome_ingest KHÔNG có USAGE trên schema app. Chỗ ĐÓ vẫn
+-- chạy được cho kome_ingest (một khi đã có SELECT trên chính view, như dòng
+-- GRANT ở trên vừa cấp), vì Postgres kiểm quyền trên BẢNG NỀN mà view đọc
+-- theo CHỦ SỞ HỮU VIEW (ở đây là postgres), không theo người đang gọi.
+-- "Chủ sở hữu view" chỉ miễn kiểm tra CHO BẢNG NỀN — người gọi vẫn phải có
+-- SELECT trên CHÍNH CÁI VIEW, và đó là thứ dòng GRANT ở trên cấp. Hai luật
+-- khác nhau, đừng gộp làm một. Hệ quả vẫn giữ: đặt gì vào một view của mart
+-- là công bố thứ đó cho MỌI vai trò đọc mart. Không đưa cột nhạy cảm nào
+-- vào theo đường này.
