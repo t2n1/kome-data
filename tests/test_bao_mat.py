@@ -699,3 +699,21 @@ def test_duong_dan_an_toan_chan_ca_dang_gach_cheo_nguoc():
     # đúng danh sách đó, còn nguyên bộ lọc.
     assert (bao_mat.duong_dan_an_toan("/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD&nv=0102")
             == "/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD&nv=0102")
+
+
+def test_canh_bao_khoi_dong_khong_giet_app_tren_console_cp1252(monkeypatch):
+    """Console Windows mặc định là cp1252, không mã hoá được chữ Việt có dấu.
+    Một `print()` tiếng Việt lúc khởi động nổ UnicodeEncodeError và app không
+    lên được — đúng ở chỗ cảnh báo "mất một lớp phòng thủ" lại thành sự cố
+    chắc chắn. Cảnh báo phải vẫn in ra (không nuốt), chỉ đổi ký tự không mã
+    hoá được thành dạng thoát."""
+    import io
+    import sys
+    ra = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", ra)
+    monkeypatch.delenv("DATABASE_URL_APP", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
+    create_app()
+    ra.flush()
+    chu = ra.buffer.getvalue().decode("cp1252")
+    assert "DATABASE_URL_APP" in chu, "cảnh báo bị nuốt"

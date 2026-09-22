@@ -1,5 +1,5 @@
 # kome/web/app.py
-import os, shutil, tempfile, traceback
+import os, shutil, sys, tempfile, traceback
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
@@ -153,6 +153,21 @@ def _ky_du_lieu(conn) -> dict:
     return {"dau": dau, "cuoi": cuoi, "thieu": thieu, "tu": tu}
 
 
+
+def _in(thong_diep: str) -> None:
+    """In ra nhật ký máy chủ mà không bao giờ nổ vì bảng mã của console.
+
+    Console Windows mặc định là cp1252, không mã hoá được chữ Việt có dấu —
+    `print()` trần nổ UnicodeEncodeError, và ở lúc khởi động thì app không lên
+    được. Ký tự không mã hoá được đổi thành dạng thoát (`\\u1ea2`) chứ không
+    bỏ: cảnh báo vẫn phải đọc được, chỉ xấu đi một chút."""
+    try:
+        print(thong_diep, flush=True)
+    except UnicodeEncodeError:
+        ma = getattr(sys.stdout, "encoding", None) or "ascii"
+        print(thong_diep.encode(ma, "backslashreplace").decode(ma), flush=True)
+
+
 def create_app(db_url: str | None = None, db_url_app: str | None = None) -> FastAPI:
     """db_url=None => lấy DATABASE_URL. Test LUÔN truyền DATABASE_URL_TEST."""
     app = FastAPI(title="KOME — dữ liệu")
@@ -185,7 +200,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         # Cảnh báo chứ không chết: vai trò CSDL là lớp phòng thủ thứ hai, còn
         # cổng đăng nhập mới là thứ chặn người lạ. Giết cả trang vì thiếu một
         # lớp phòng thủ thứ hai là đổi một rủi ro lấy một sự cố chắc chắn.
-        print("[KOME] CẢNH BÁO: chưa đặt DATABASE_URL_APP — các trang chỉ đọc "
+        _in("[KOME] CẢNH BÁO: chưa đặt DATABASE_URL_APP — các trang chỉ đọc "
               "đang chạy bằng vai trò nạp dữ liệu, tức có quyền ghi vào core. "
               "Xem docs/runbook.md, mục 'Hai kết nối CSDL'.")
     open_app_conn = lambda: connect(db_url_app)
@@ -245,7 +260,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         `_ve` KHÔNG chạm CSDL, nên trang này render được cả khi CSDL đang hỏng
         — điều kiện bắt buộc để middleware dùng nó (xem `chan_cua`).
         """
-        print(f"[KOME] lỗi khi {viec}:\n{traceback.format_exc()}")
+        _in(f"[KOME] lỗi khi {viec}:\n{traceback.format_exc()}")
         return _ve(request, "error.html", {"viec": viec, "trang": None},
                    status_code=500)
 
