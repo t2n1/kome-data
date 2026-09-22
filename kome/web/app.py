@@ -96,6 +96,16 @@ def _thuoc_kho_du_lieu(duong: str) -> bool:
     return any(duong == d or duong.startswith(d + "/") for d in DUONG_KHO_DU_LIEU)
 
 
+# Màn Ngân sách: đặt và sửa chỉ tiêu doanh thu của cả công ty. Cùng nếp
+# DUONG_KHO_DU_LIEU — gác cả cửa đọc lẫn cửa ghi. Gác mỗi GET là để nguyên
+# cửa ghi mở toang cho ai biết gõ `curl`.
+DUONG_NGAN_SACH = ("/ngan-sach",)
+
+
+def _thuoc_ngan_sach(duong: str) -> bool:
+    return any(duong == d or duong.startswith(d + "/") for d in DUONG_NGAN_SACH)
+
+
 def _chi_doc() -> bool:
     """Trang có ở chế độ CHỈ ĐỌC không (ẩn hẳn phần nạp dữ liệu)?
 
@@ -198,6 +208,10 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         # `nguoi is None` = không có cổng đăng nhập (máy trong công ty để
         # trống KOME_SESSION_SECRET) -> mọi thứ mở, y như trước đợt 3.
         hien_kho = nguoi is None or nguoi.duoc_vao_kho_du_lieu
+        # Cùng lý lẽ với hien_kho: mời người ta bấm vào một thứ sẽ từ chối họ
+        # thì tệ hơn là không hiện. `nguoi is None` = không có cổng đăng nhập
+        # (máy trong công ty) -> mọi thứ mở, y như trước đợt 3.
+        hien_ngan_sach = nguoi is None or nguoi.duoc_sua_ngan_sach
         # Chế độ giao diện đọc từ cookie MỖI LƯỢT (không chốt lúc dựng app,
         # khác `chung` ở trên): mỗi người một lựa chọn riêng trên cùng một
         # app. `che_do_giao_dien` cho _nav.html biết nút nào đang "đang
@@ -207,6 +221,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         return TEMPLATES.TemplateResponse(
             request, ten,
             {**ctx, **chung, "nguoi": nguoi, "hien_kho": hien_kho,
+             "hien_ngan_sach": hien_ngan_sach,
              "che_do_giao_dien": che_do, "data_theme": _data_theme(che_do)},
             **kw)
 
@@ -349,6 +364,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 # gõ thẳng địa chỉ cần biết vì sao mình không vào được, không
                 # phải tự hỏi trang có hỏng không.
                 return _ve(request, "cam_kho_du_lieu.html",
+                           {"trang": None}, status_code=403)
+            if not nguoi.duoc_sua_ngan_sach and _thuoc_ngan_sach(request.url.path):
+                # Chặn ở middleware nên nó chặn CẢ GET LẪN POST bằng một chỗ
+                # duy nhất — không có đường nào cho một route mới quên gác.
+                return _ve(request, "cam_ngan_sach.html",
                            {"trang": None}, status_code=403)
             return await call_next(request)
 
@@ -708,6 +728,86 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                        {"bc": bc, "bd": ve_bieu_do(bc.thang), "trang": "bao-cao"})
         except Exception as e:
             return _loi(request, "mở trang báo cáo", e)
+
+    def _ngu_canh_ngan_sach(b) -> dict:
+        """Đổi khoá bộ đôi sang khoá chuỗi cho Jinja, và cộng sẵn hai chiều
+        tổng.
+
+        `BangNhap.o` dùng khoá `(mã, tháng)` vì đó là khoá đúng ở tầng Python.
+        Template thì tra bằng chính tên ô của biểu mẫu (`o-0104-2026-05`), nên
+        đổi một lần ở đây thay vì để Jinja dựng lại bộ đôi ở mỗi trong 60 ô.
+
+        Hai bảng tổng cộng từ `b.o` đã nằm sẵn trong bộ nhớ — KHÔNG thêm truy
+        vấn nào. Ô chưa đặt không có mặt trong `b.o` nên nó không cộng vào
+        tổng, đúng như phải thế: "chưa đặt" không phải "bằng không".
+        """
+        return {
+            "b": b,
+            "o_txt": {f"{ma}-{th}": v for (ma, th), v in b.o.items()},
+            "tong_nguoi": {n.ma: sum(v for (m, _), v in b.o.items() if m == n.ma)
+                           for n in b.nguoi},
+            "tong_thang": {th: sum(v for (_, t), v in b.o.items() if t == th)
+                           for th in b.thang},
+        }
+
+    @app.get("/ngan-sach", response_class=HTMLResponse)
+    def ngan_sach(request: Request, ky: int | None = None):
+        """Bảng nhập chỉ tiêu: 5 người phụ trách × 12 tháng của một kỳ.
+
+        Cổng quyền nằm ở middleware (`_thuoc_ngan_sach`), không ở đây — một
+        chỗ gác cho cả GET lẫn POST.
+        """
+        from kome.ngan_sach import bang_nhap
+        try:
+            with open_app_conn() as conn:
+                b = bang_nhap(conn, ky)
+            return _ve(request, "ngan_sach.html",
+                       {**_ngu_canh_ngan_sach(b), "da_go": {}, "loi": [],
+                        "trang": "ngan-sach"})
+        except Exception as e:
+            return _loi(request, "mở trang ngân sách", e)
+
+    @app.post("/ngan-sach")
+    async def luu_ngan_sach(request: Request):
+        """Ghi cả biểu mẫu trong MỘT giao dịch.
+
+        Một ô rác => KHÔNG ghi ô nào và hiện lại đúng những gì người ta vừa
+        gõ. Ghi một nửa rồi báo lỗi là để người ta không biết nửa nào đã vào,
+        và bắt gõ lại 60 ô vì một ô sai là cách chắc chắn để không ai dùng màn
+        này lần thứ hai.
+        """
+        from kome.ngan_sach import LoiSo, bang_nhap, doc_so, luu
+        form = await request.form()
+        ky = int(form.get("ky") or 0) or None
+        da_go = {k[2:]: str(v) for k, v in form.items() if k.startswith("o-")}
+
+        gia_tri, loi = {}, []
+        for khoa, chuoi in da_go.items():
+            ma, thang = khoa.split("-", 1)
+            try:
+                gia_tri[(ma, thang)] = doc_so(chuoi)
+            except LoiSo:
+                loi.append(khoa)
+
+        nguoi = getattr(request.state, "nguoi", None)
+        try:
+            with open_app_conn() as conn:
+                if loi:
+                    b = bang_nhap(conn, ky)
+                    return _ve(request, "ngan_sach.html",
+                               {**_ngu_canh_ngan_sach(b), "da_go": da_go,
+                                "loi": loi, "trang": "ngan-sach"},
+                               status_code=400)
+                luu(conn, gia_tri, nguoi.id if nguoi else None)
+                conn.commit()
+            # `?ky=` (chuỗi rỗng) KHÔNG phải `None` với FastAPI — nó là một
+            # chuỗi không ép được sang `int`, tức 422 chứ không phải "bỏ
+            # trống". Một trang lỗi khó hiểu ngay sau khi vừa lưu THÀNH CÔNG
+            # làm người dùng tưởng mất dữ liệu.
+            return RedirectResponse(
+                f"/ngan-sach?ky={ky}" if ky else "/ngan-sach", status_code=303)
+        except Exception as e:
+            return _loi(request, "lưu ngân sách", e)
 
     @app.post("/undo/{batch_id}")
     def undo(request: Request, batch_id: int):

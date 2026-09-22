@@ -32,7 +32,7 @@ DAI_SALT = 16
 # người không phụ trách khách nào (chủ DN, kế toán) có salesperson_code NULL
 # và vẫn phải đăng nhập được.
 _CHON = f"""SELECT n.id, n.ten_dang_nhap, n.salesperson_code,
-                   n.duoc_vao_kho_du_lieu, s.ten
+                   n.duoc_vao_kho_du_lieu, n.duoc_sua_ngan_sach, s.ten
             FROM app.nguoi_dung n
             LEFT JOIN core.dim_salesperson s
                    ON s.salesperson_code = n.salesperson_code"""
@@ -46,12 +46,14 @@ class NguoiDung:
     ten_dang_nhap: str
     salesperson_code: str | None
     duoc_vao_kho_du_lieu: bool
+    duoc_sua_ngan_sach: bool
     ten_sale: str | None
 
 
 def _nguoi(r) -> NguoiDung:
     return NguoiDung(id=r[0], ten_dang_nhap=r[1], salesperson_code=r[2],
-                     duoc_vao_kho_du_lieu=r[3], ten_sale=r[4])
+                     duoc_vao_kho_du_lieu=r[3], duoc_sua_ngan_sach=r[4],
+                     ten_sale=r[5])
 
 
 def bam(mat_khau: str, salt: bytes) -> bytes:
@@ -60,16 +62,21 @@ def bam(mat_khau: str, salt: bytes) -> bytes:
 
 
 def tao(conn, ten: str, mat_khau: str, salesperson_code: str | None = None,
-        kho_du_lieu: bool = False) -> int:
+        kho_du_lieu: bool = False, ngan_sach: bool = False) -> int:
     """Tạo tài khoản, trả về id. Ném UniqueViolation nếu tên đã có,
-    ForeignKeyViolation nếu mã sale không có trong core.dim_salesperson."""
+    ForeignKeyViolation nếu mã sale không có trong core.dim_salesperson.
+
+    Hai cờ quyền mặc định FALSE: quyền ghi phải được cấp TƯỜNG MINH, không
+    phải thứ ai cũng có vì người tạo tài khoản quên đặt.
+    """
     salt = os.urandom(DAI_SALT)
     return conn.execute(
         """INSERT INTO app.nguoi_dung
              (ten_dang_nhap, mat_khau_hash, mat_khau_salt, salesperson_code,
-              duoc_vao_kho_du_lieu)
-           VALUES (%s, %s, %s, %s, %s) RETURNING id""",
-        (ten, bam(mat_khau, salt), salt, salesperson_code or None, kho_du_lieu),
+              duoc_vao_kho_du_lieu, duoc_sua_ngan_sach)
+           VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
+        (ten, bam(mat_khau, salt), salt, salesperson_code or None,
+         kho_du_lieu, ngan_sach),
     ).fetchone()[0]
 
 
@@ -108,11 +115,20 @@ def doi_mat_khau(conn, ten: str, mat_khau_moi: str) -> bool:
         (bam(mat_khau_moi, salt), salt, ten)).rowcount == 1
 
 
-def dat_quyen(conn, ten: str, kho_du_lieu: bool) -> bool:
-    """False nếu không có tài khoản tên đó."""
+def dat_quyen(conn, ten: str, kho_du_lieu: bool | None = None,
+              ngan_sach: bool | None = None) -> bool:
+    """False nếu không có tài khoản tên đó.
+
+    `None` = KHÔNG đổi cờ đó. Đặt mặc định False thay vì None sẽ làm lệnh
+    "cấp quyền ngân sách" âm thầm thu hồi quyền Kho dữ liệu của cùng người —
+    hai cờ độc lập, mỗi lệnh chỉ đụng cờ mà nó nói tới.
+    """
     return conn.execute(
-        "UPDATE app.nguoi_dung SET duoc_vao_kho_du_lieu = %s WHERE ten_dang_nhap = %s",
-        (kho_du_lieu, ten)).rowcount == 1
+        """UPDATE app.nguoi_dung
+           SET duoc_vao_kho_du_lieu = coalesce(%s, duoc_vao_kho_du_lieu),
+               duoc_sua_ngan_sach   = coalesce(%s, duoc_sua_ngan_sach)
+           WHERE ten_dang_nhap = %s""",
+        (kho_du_lieu, ngan_sach, ten)).rowcount == 1
 
 
 def liet_ke(conn) -> list[NguoiDung]:
