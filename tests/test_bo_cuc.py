@@ -78,12 +78,12 @@ def test_ma_khoi_cua_ban_jinja_van_doc_duoc():
 
 
 def test_danh_muc_bam_goi_thiet_ke():
-    """21 khối, 6 nhóm, 4 vai trò của Dashboard.dc.html; mọi khối của vai trò
+    """21 khối của Dashboard.dc.html + khối tháng (036), 6 nhóm, 4 vai trò; mọi khối của vai trò
     đều có trong danh mục; mọi khối KHÔNG có hàm dữ liệu thì có câu "chưa có"."""
     from kome import khoi_tong_quan as KTQ
     dm = BC.danh_muc()
     ma = {k["id"] for k in dm["khoi"]}
-    assert len(ma) == 21 and len(dm["nhom"]) == 6 and len(dm["vai_tro"]) == 4
+    assert len(ma) == 22 and len(dm["nhom"]) == 6 and len(dm["vai_tro"]) == 4
     assert all(set(v["khoi"]) <= ma for v in dm["vai_tro"])
     assert ma == set(KTQ.KHOI) | set(KTQ.CHUA_CO)
     assert not set(KTQ.KHOI) & set(KTQ.CHUA_CO)

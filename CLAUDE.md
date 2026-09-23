@@ -89,7 +89,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối kéo thả / đổi cỡ / ẩn hiện, xem theo vai trò, chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api` |
 | `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
-| `/lien-he` | **Cần liên hệ** (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc qua `POST /khach-hang/{mã}/tiep-xuc`. **3 truy vấn** | `mart.uu_tien_lien_he`, `app.nhat_ky_tiep_xuc` |
+| `/lien-he` | **Cần liên hệ** (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn · mua đều tháng này chưa — 036) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc qua `POST /khach-hang/{mã}/tiep-xuc`. **3 truy vấn** | `mart.uu_tien_lien_he`, `mart.khach_thang_nay`, `app.nhat_ky_tiep_xuc` |
 | `/ban-do` | Bản đồ khách hàng — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách | `core.dim_prefecture`, `mart.khach_theo_tinh` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
 | `/du-bao` | **Dự báo doanh thu** (đợt 8): chốt tháng (đường luỹ kế + khoảng sai số thật + theo người phụ trách) · 12 tháng tới (3 kịch bản) · đơn kỳ vọng 14 ngày · nguy cơ ngừng mua · dự báo đã chuẩn tới đâu. Toàn công ty, **3 truy vấn** | `mart.lich_kinh_doanh`, `mart.ban_theo_ngay`, `mart.tien_do_ngan_sach`, `mart.khach_360`, `mart.khoang_cach_mua` |
@@ -322,6 +322,17 @@ bất biến mốc thời gian, cùng lý lẽ với ô tuổi dữ liệu. Khá
 lặng lẽ: khối "Đã liên hệ gần đây — đang tạm ẩn" liệt kê họ. `tut`/`moi` của
 `mart.khach_nhom_viec` cố ý KHÔNG vào view (view đó dựng lại `khach_360` ba lần) —
 trang trỏ sang `/khach-hang?nhom=tut|moi`.
+
+**Bất biến (036, nhìn theo tháng):** "khách mua đều mà tháng này chưa mua" có
+**một** định nghĩa — `mart.khach_thang_nay.nhan` (NHÃN, so bằng, không `NOT`:
+`khong_goi` → `da_mua` → `tre` → `chua_toi_ngay` → `khac`) — và ba chỗ đọc: khối
+Tổng quan `thang_nay_chua_mua`, cột thứ tư của `/lien-he` (đi chung câu danh sách,
+vẫn 3 truy vấn; khách đã ở cột nhịp không lặp lại), việc hôm nay. "Tháng này" theo
+mốc dữ liệu; "tháng có mua" = có phiếu doanh thu thuần > 0; "đến cùng ngày" =
+`extract(day) <= ngày mốc`, mốc là ngày cuối tháng thì tính trọn tháng trước. Nhóm
+này KHÁC nhóm `'im'` (nhịp riêng) — không gộp, mỗi khối in `khach_thang.CACH_TINH`.
+Có test canh: `tests/test_khach_thang.py::test_ba_cho_doc_tra_CUNG_MOT_tap_khach`.
+Đặc tả: `docs/superpowers/specs/2026-09-23-nhin-theo-thang-design.md`.
 
 **Bất biến:** khách OBC đã đánh dấu `※廃業※` / `※取引停止※` trong TÊN (281/2.077
 khách) không bao giờ vào danh sách gọi lại. Doanh nghiệp đã phá sản thì im lặng

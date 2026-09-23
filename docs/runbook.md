@@ -219,6 +219,9 @@ Cấp cho chủ doanh nghiệp:
 thiếu bảng đó thì mọi khối Tổng quan báo lỗi. Bảng chỉ là bộ đệm: `TRUNCATE
 app.anh_chup_api` lúc nào cũng an toàn (lượt xem sau tính lại).
 
+`036` (nhìn theo tháng) chỉ thêm view `mart.khach_thang_nay` — không đụng dữ liệu.
+Chạy TRƯỚC khi triển khai: thiếu view thì `/lien-he` và khối "Tháng này chưa mua" lỗi.
+
 **Giao diện React** (`giao_dien/`): máy công ty KHÔNG cần Node — bản build nằm sẵn
 trong git (`kome/web/spa/`). Chỉ người sửa giao diện mới cần Node: `cd giao_dien &&
 npm install` (một lần) rồi `npm run build` sau mỗi lần sửa, và commit cả
