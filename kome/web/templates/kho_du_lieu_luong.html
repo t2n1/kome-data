@@ -1,0 +1,88 @@
+<!-- kome/web/templates/kho_du_lieu_luong.html — Sơ đồ luồng (đợt 2b).
+     KHÔNG có chuỗi dữ liệu viết tay nào ở đây: mọi tên bảng, tên file, ngưỡng,
+     cạm bẫy đến từ kome/tai_lieu.py (files.yml lúc chạy + ảnh chụp sinh bởi
+     scripts/sinh_tai_lieu.py). Thêm một khối thì thêm NGUỒN, không gõ chữ. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<title>KOME — sơ đồ luồng dữ liệu</title>
+{% include "_chung.html" %}
+{% include "_nav.html" %}
+<h1>Kho dữ liệu</h1>
+{% include "_tab_kho_du_lieu.html" %}
+<div class="tai-lieu">
+<p class="ghi-chu">Bảng nào lấy từ file nào, bao lâu một lần, khoá chính là gì, đối chiếu
+thế nào. Một chiều — không bao giờ ghi ngược vào OBC.</p>
+{% set nhac %}<p class="trong">Chưa sinh tài liệu — chạy <code>python scripts/sinh_tai_lieu.py</code>.</p>{% endset %}
+
+<section id="bon-tang">
+<h2>Bốn tầng</h2>
+<div class="tang">
+{% for t in tang %}
+<div class="tang-o">
+  <div><code>{{ t.ma }}</code> <strong>{{ t.ten }}</strong> · {{ t.muc|length }}</div>
+  <p class="ghi-chu">{{ t.mo_ta }}</p>
+  {% if t.muc %}<ul class="tang-ds">{% for m in t.muc %}<li><code>{{ m }}</code></li>{% endfor %}</ul>
+  {% elif t.ma != 'raw' %}{{ nhac }}{% endif %}
+</div>
+{% endfor %}
+</div>
+</section>
+
+<section id="bay-nguon">
+<h2>Các nguồn từ OBC</h2>
+<div class="bang-cuon"><table class="bang-tl">
+<tr><th>File</th><th>Nội dung</th><th>Tần suất</th><th>Mẫu tên file</th><th>Dòng header</th><th>Khoá chính</th><th>Vào bảng</th></tr>
+{% for n in nguon %}
+<tr><td><a href="/kho-du-lieu/cot-noi?file={{ n.ten }}">{{ n.ja }}</a></td><td>{{ n.mo_ta }}</td>
+<td>{{ n.tan_suat }}</td><td><code>{{ n.mau }}</code></td><td class="so">{{ n.header_row }}</td>
+<td>{% for k in n.khoa %}<code>{{ k }}</code>{% if not loop.last %} + {% endif %}{% endfor %}</td>
+<td><code>{{ n.core_table }}</code></td></tr>
+{% endfor %}
+</table></div>
+<h3>OBC có, hệ thống chưa nạp</h3>
+<div class="bang-cuon"><table class="bang-tl">
+<tr><th>File</th><th>Nội dung</th><th>Tình trạng</th></tr>
+{% for c in chua_nap %}<tr><td>{{ c.ten_obc }}</td><td>{{ c.mo_ta }}</td><td>{{ c.ghi_chu }}</td></tr>{% endfor %}
+</table></div>
+</section>
+
+<section id="doi-chieu">
+<h2>Đối chiếu bắt buộc sau mỗi lần nạp</h2>
+<p class="ghi-chu">Cổng chặn thì lô không được lưu; cổng cảnh báo thì lô vẫn lưu nhưng màn nạp báo ra.</p>
+{% if cong %}
+<ol class="cong">
+{% for c in cong %}<li><span class="vien {{ 'loi' if c.chan else 'canh' }}">Cổng {{ c.so }} · {{ c.loai }}</span> {{ c.ten }}</li>{% endfor %}
+</ol>
+{% else %}{{ nhac }}{% endif %}
+<h3>Ngưỡng của từng file</h3>
+<div class="bang-cuon"><table class="bang-tl">
+<tr><th>File</th><th>Tối thiểu (cổng 3)</th><th>Ngày bắt buộc</th><th>Khử trùng khoá</th><th>Cột tiền đại diện</th><th>Cảnh báo số dòng</th><th>Cảnh báo tiền</th><th>Đối chiếu tích (cổng 5)</th></tr>
+{% for g in nguong %}
+<tr><td>{{ g.ja }}</td><td class="so">{{ "{:,}".format(g.min_rows).replace(",", ".") }} dòng</td>
+<td>{% for d in g.required_date %}<code>{{ d }}</code> {% else %}—{% endfor %}</td>
+<td>{{ "có" if g.dedup else "—" }}</td>
+<td>{% if g.total_column %}<code>{{ g.total_column }}</code>{% else %}—{% endif %}</td>
+<td>dưới {{ (g.row_drop * 100)|round|int }}% lần trước</td>
+<td>{% if g.total_column %}&gt; {{ g.spike }}× hoặc &lt; {{ (g.drop * 100)|round|int }}% lần trước{% else %}—{% endif %}</td>
+<td>{% if g.product_check %}<code>{{ g.product_check.result }}</code> = {% for f in g.product_check.factors %}<code>{{ f }}</code>{% if not loop.last %} × {% endif %}{% endfor %}{% else %}—{% endif %}</td></tr>
+{% endfor %}
+</table></div>
+</section>
+
+<section id="cam-bay">
+<h2>Cạm bẫy riêng của OBC</h2>
+<p class="ghi-chu">Sinh từ mục "Bẫy đã biết" của <code>CLAUDE.md</code> — sửa ở đó, không sửa ở đây.</p>
+{% if cam_bay %}<ol class="cam-bay">{% for c in cam_bay %}<li>{{ md(c) }}</li>{% endfor %}</ol>{% else %}{{ nhac }}{% endif %}
+</section>
+
+<section id="lo-trinh">
+<h2>Lộ trình</h2>
+{% if lo_trinh.dong %}
+<div class="bang-cuon"><table class="bang-tl">
+<tr>{% for c in lo_trinh.cot %}<th>{{ c }}</th>{% endfor %}</tr>
+{% for d in lo_trinh.dong %}<tr>{% for o in d %}<td>{{ md(o) }}</td>{% endfor %}</tr>{% endfor %}
+</table></div>
+{% else %}{{ nhac }}{% endif %}
+</section>
+</div>
+</html>
+</main>

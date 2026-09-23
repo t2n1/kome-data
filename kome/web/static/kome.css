@@ -272,6 +272,17 @@
  .the-so .gia{font-size:1.45rem;font-weight:600;line-height:1.25;margin-top:.15rem;
    font-family:var(--font-so);font-variant-numeric:tabular-nums}
  .bang-cuon{overflow-x:auto}
+ /* Tài liệu sống (đợt 2b): lưới bốn tầng + ô ký hiệu của ma trận khoá. */
+ .tang{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:.75rem}
+ .tang-o{background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:.75rem 1rem}
+ .tang-ds{margin:.25rem 0 0;padding-left:1.1rem;font-size:.85rem;max-height:14rem;overflow-y:auto;overflow-x:hidden;overflow-wrap:anywhere}
+ .bang-tl td:first-child{white-space:nowrap}
+ /* `code` toàn cục là KHỐI (dòng lệnh sao lưu); trang tài liệu cần mã NẰM TRONG câu. */
+ .tai-lieu code{display:inline;padding:.05rem .3rem;border-radius:5px;margin:0;white-space:normal}
+ /* Mã trong bảng KHÔNG bẻ giữa chữ (customer_c|ode đọc sai) — bảng tự cuộn ngang. */
+ .tai-lieu .bang-tl code{white-space:nowrap}
+ td.o-khoa{text-align:center;font-weight:600}
+ ol.cong li,ol.cam-bay li{margin:.35rem 0}
  td.so,th.so{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;
    font-family:var(--font-so)}
  .ghi-chu{color:var(--chu-nhat);font-size:.85rem;margin:.25rem 0 .75rem}

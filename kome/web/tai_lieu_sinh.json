@@ -1,0 +1,165 @@
+{
+ "bang": {
+  "app": [
+   "ngan_sach",
+   "ngan_sach_nhat_ky",
+   "nguoi_dung"
+  ],
+  "core": [
+   "dim_customer",
+   "dim_date",
+   "dim_prefecture",
+   "dim_product",
+   "dim_salesperson",
+   "dim_shipto",
+   "dim_supplier",
+   "dim_warehouse",
+   "fact_inventory_daily",
+   "fact_price_list",
+   "fact_sales_line"
+  ],
+  "mart": [
+   "ban_theo_khach",
+   "ban_theo_nganh_thang",
+   "ban_theo_nganh_thang_so_sanh",
+   "ban_theo_ngay",
+   "ban_theo_nhan_vien",
+   "ban_theo_nhan_vien_thang",
+   "ban_theo_san_pham",
+   "ban_theo_thang",
+   "ban_theo_thang_so_sanh",
+   "dau_hieu_khach",
+   "dong_ban",
+   "hang_doanh_thu",
+   "khach_360",
+   "khach_chua_mua",
+   "khach_mat_hang",
+   "khach_nhom_viec",
+   "khach_theo_thang",
+   "khach_theo_tinh",
+   "khoang_cach_mat_hang",
+   "khoang_cach_mua",
+   "ky_cung_ky",
+   "lan_mua",
+   "moc_thoi_gian",
+   "ngan_sach_thang",
+   "nganh_ky_cung_ky",
+   "ngay_kinh_doanh",
+   "nhip_mat_hang",
+   "nhip_mua",
+   "san_pham_360",
+   "san_pham_theo_thang",
+   "tai_nhan_vien",
+   "tap_trung_khach",
+   "thang_den_hom_nay",
+   "tien_do_ngan_sach",
+   "toc_do_ban",
+   "ton_hien_tai",
+   "tong_theo_ky",
+   "ty_suat_mat_hang"
+  ],
+  "meta": [
+   "ingest_batch"
+  ]
+ },
+ "cam_bay": [
+  "Mã (`*コード`) là TEXT. `000000009292` đọc thành số sẽ mất số 0 đầu → hỏng mọi liên kết.",
+  "Số lượng CÓ phần thập phân (`83.75` ケース). Tiền thì luôn là số nguyên yên.",
+  "Có bản xuất `得意先全情報` chỉ 201 dòng (xuất một phần — **cổng 3** chặn vì dưới `min_rows`) và bản chỉ 5 cột (sai mẫu — **cổng 2** chặn trước, `ColumnMismatch`, vì thiếu cột khai báo).",
+  "File `元帳` có 5 dòng rác trước header (CHƯA kiểm chứng lại). `売上明細表` đã đo thật (2026-09-17): header ở dòng 1, KHÔNG có dòng rác — có thể do OBC đổi mẫu xuất, hoặc quan sát cũ chỉ đúng cho một cấu hình xuất khác. File master và `在庫一覧` thì header ở dòng 1.",
+  "`担当者` của OBC (5 người) KHÁC người nhập đơn trên web (7 tài khoản, gồm 2 arubaito).",
+  "Tên kho của OBC là **tên nghiệp vụ**, không phải địa điểm: `1002 新・賞味期限用` nghĩa là \"ngăn dùng cho hạn sử dụng\", không phải một địa chỉ kho. Gói thiết kế đợt 4b có viết cứng ba tên `Osaka` / `Nagoya` / `Kho lạnh Osaka` — **không có thật**. Thực tế công ty chỉ có HAI kho: `0001 茨城第１倉庫（出荷専用）` và `1002 新・賞味期限用`. Đặt tên kho cứng ở đâu đó (thay vì đọc từ `core.dim_warehouse`) là thêm một kho ảo vào mọi bộ lọc.",
+  "`prefecture` của OBC là tên tỉnh chuẩn có hậu tố 都/道/府/県, đủ cả 47 tỉnh, và chỉ **1 trên 1.710 khách** bỏ trống — cột sạch nhất đã gặp, nên khoá nối (`core.dim_prefecture.ten` ↔ `core.dim_customer.prefecture`) là chính chuỗi tên, không cần lớp chuẩn hoá. Đổi một ký tự trong `core.dim_prefecture.ten` là tỉnh đó rỗng vĩnh viễn trên bản đồ khách hàng (`/ban-do`) mà không lỗi nào nổ ra — phép nối chỉ lặng lẽ không khớp dòng nào. Có test canh: `tests/test_ban_do.py::test_ten_tinh_khop_chuoi_OBC_that`, `::test_hau_to_dung_voi_tung_ma_jis_ca_47_dong` (khẳng định hậu tố theo ĐÚNG `ma_jis` — `01`→道, `13`→都, `26`/`27`→府, 43 mã còn lại→県; một điều kiện \"hậu tố nằm trong 都/道/府/県\" cho `大阪県` lọt qua)."
+ ],
+ "cong": [
+  {
+   "chan": true,
+   "so": 1,
+   "ten": "Nhận diện file qua tên (mẫu filename_pattern)"
+  },
+  {
+   "chan": true,
+   "so": 2,
+   "ten": "Khớp cột khai báo — thiếu cột là ColumnMismatch, chặn trước khi đọc"
+  },
+  {
+   "chan": true,
+   "so": 3,
+   "ten": "Hợp lý nghiệp vụ: đủ min_rows, không trùng/rỗng khoá, cột mã không rỗng toàn bộ, ngày bắt buộc đọc được"
+  },
+  {
+   "chan": false,
+   "so": 4,
+   "ten": "So với lần nạp trước: số dòng rơi, tổng tiền đại diện tăng/giảm vọt"
+  },
+  {
+   "chan": false,
+   "so": 5,
+   "ten": "Đối chiếu nội bộ: tích = thừa số × thừa số, khử trùng gặp giá trị khác nhau"
+  }
+ ],
+ "lo_trinh": {
+  "cot": [
+   "Đợt",
+   "Nội dung",
+   "Màn",
+   "Dữ liệu mới"
+  ],
+  "dong": [
+   [
+    "**1**",
+    "Nền giao diện: `static/kome.css`, token §6.2, font tự host, shell sidebar. Áp lên 8 trang đang có",
+    "—",
+    "không"
+   ],
+   [
+    "**2a**",
+    "Kho dữ liệu — phần vận hành: gộp `/nap` + `/health` + `/phu-du-lieu` thành một màn (khối \"Theo ngày\" 90 ngày · \"Theo tháng\" toàn kỳ · luồng nạp 7 ô thả file qua 5 cổng · hoàn tác lô)",
+    "19 (một phần)",
+    "không"
+   ],
+   [
+    "**2b**",
+    "Kho dữ liệu — phần tài liệu sống: 4 tầng · 7 nguồn từ OBC · đối chiếu bắt buộc sau mỗi lần nạp · ai là sự thật về cái gì · cạm bẫy riêng của OBC · lộ trình · ma trận khoá · file này nối đi đâu · cột trong từng file",
+    "19 (phần còn lại)",
+    "không"
+   ],
+   [
+    "**3**",
+    "Danh tính: đăng nhập theo người, `core.dim_salesperson`, `app.nguoi_dung`, lọc theo `salesperson_code`. Kèm Cài đặt + Nhật ký thao tác",
+    "22·21·20",
+    "bảng mới, không từ OBC"
+   ],
+   [
+    "**4**",
+    "Customer 360 · Sản phẩm · Kho hàng · Bản đồ",
+    "5·17·15·24",
+    "bảng tra 47 tỉnh → toạ độ (tĩnh)"
+   ],
+   [
+    "**5**",
+    "Báo cáo + Dashboard bố cục cố định theo vai trò",
+    "2·1",
+    "ngân sách theo người"
+   ],
+   [
+    "**6**",
+    "Công nợ + Dòng tiền. **Đợt duy nhất động vào pipeline nạp**: viết bộ nạp `得意先元帳` / `請求先元帳`",
+    "12·14",
+    "2 nguồn OBC đã có file"
+   ],
+   [
+    "**7**",
+    "CRM: danh sách ưu tiên liên hệ + nhật ký chăm sóc",
+    "6 (phần suy ra)",
+    "nhập tay"
+   ],
+   [
+    "**8**",
+    "Dự báo",
+    "3",
+    "không"
+   ]
+  ]
+ }
+}

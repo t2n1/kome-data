@@ -14,6 +14,19 @@ class Warning_:
     gate: int
     message: str
 
+# Tên từng cổng — nguồn của khối "Đối chiếu bắt buộc" trên màn tài liệu sống
+# (scripts/sinh_tai_lieu.py đọc hằng này; web KHÔNG nhập file này vì nó kéo
+# pandas). Sửa nội dung một cổng thì sửa luôn câu ở đây rồi chạy lại script.
+TEN_CONG = {
+    1: "Nhận diện file qua tên (mẫu filename_pattern)",
+    2: "Khớp cột khai báo — thiếu cột là ColumnMismatch, chặn trước khi đọc",
+    3: "Hợp lý nghiệp vụ: đủ min_rows, không trùng/rỗng khoá, cột mã không rỗng toàn bộ, ngày bắt buộc đọc được",
+    4: "So với lần nạp trước: số dòng rơi, tổng tiền đại diện tăng/giảm vọt",
+    5: "Đối chiếu nội bộ: tích = thừa số × thừa số, khử trùng gặp giá trị khác nhau",
+}
+CHAN = {1, 2, 3}   # cổng CHẶN; còn lại chỉ cảnh báo
+
+
 def check(
     path: Path, spec: FileSpec, df: pd.DataFrame, previous: dict | None
 ) -> tuple[list[Blocker], list[Warning_]]:

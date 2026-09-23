@@ -46,6 +46,14 @@ class FileSpec:
     warn_row_drop_ratio: float = 0.5  # ngưỡng cổng 4: số dòng rơi dưới này
     warn_total_spike: float = 3.0     # ngưỡng cổng 4: tổng tiền tăng quá này lần
     warn_total_drop: float = 0.34     # ngưỡng cổng 4: tổng tiền còn dưới này
+    # Bảng đích chính trong `core`. Trùng với pipeline.UNDO_TABLES[tên][0] (có
+    # test canh) — khai lại ở đây vì màn tài liệu sống chạy cả trên Vercel, nơi
+    # không được nhập kome.pipeline (kéo theo pandas).
+    core_table: str | None = None
+    # Khoá ngoại theo nghĩa nghiệp vụ: {cột của file này: tên spec đích}. Cột
+    # nguồn KHÔNG cần trùng tên khoá đích (billing_customer_code -> tokuisaki
+    # trỏ vào customer_code); spec đích phải có đúng một khoá.
+    references: dict[str, str] = field(default_factory=dict)
 
 def load_specs(path: Path) -> dict[str, FileSpec]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
