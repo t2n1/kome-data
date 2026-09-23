@@ -2,6 +2,8 @@
 # OBC đổi tên cột khi nâng phiên bản → SỬA FILE NÀY, không sửa code.
 zaiko:
   display_name: 在庫一覧
+  core_table: core.fact_inventory_daily
+  references: {product_code: shohin}
   filename_pattern: '^在庫一覧_(?P<date>\d{8})\.xlsx$'
   sheet: 在庫一覧表
   header_row: 1          # header ở dòng 1 (khác file báo cáo)
@@ -38,6 +40,8 @@ zaiko:
 
 tokuisaki:
   display_name: 得意先全情報
+  core_table: core.dim_customer
+  references: {billing_customer_code: tokuisaki}
   filename_pattern: '^得意先全情報_(?P<date>\d{8})\.xlsx$'
   sheet: 得意先データ作成
   header_row: 1
@@ -72,6 +76,8 @@ tokuisaki:
 
 uriage:
   display_name: 売上伝票データ
+  core_table: core.fact_sales_line
+  references: {customer_code: tokuisaki, billing_customer_code: tokuisaki, product_code: shohin, shipto_code: chokusousaki}
   filename_pattern: '^売上伝票データ_(?P<date>\d{8})\.xlsx$'
   sheet: 売上伝票データ作成
   header_row: 1
@@ -134,6 +140,7 @@ uriage:
 
 shohin:
   display_name: 商品データ
+  core_table: core.dim_product
   filename_pattern: '^商品データ_(?P<date>\d{8})\.xlsx$'
   sheet: 商品データ作成
   header_row: 1
@@ -162,6 +169,7 @@ shohin:
 
 shiiresaki:
   display_name: 仕入先
+  core_table: core.dim_supplier
   filename_pattern: '^仕入先_(?P<date>\d{8})\.xlsx$'
   sheet: 仕入先データ作成
   header_row: 1
@@ -177,6 +185,8 @@ shiiresaki:
 
 chokusousaki:
   display_name: 直送先
+  core_table: core.dim_shipto
+  references: {customer_code: tokuisaki}
   filename_pattern: '^直送先_(?P<date>\d{8})\.xlsx$'
   sheet: 直送先データ作成
   header_row: 1
@@ -205,6 +215,8 @@ chokusousaki:
 # ngang -> dọc, nên spec này KHÔNG dùng chung make_loader() với 3 spec trên.
 tanka:
   display_name: 取引単価データ
+  core_table: core.fact_price_list
+  references: {product_code: shohin}
   filename_pattern: '^取引単価データ_(?P<date>\d{8})\.xlsx$'
   sheet: 取引単価データ作成
   header_row: 1
@@ -249,6 +261,8 @@ tanka:
 
 meisai:
   display_name: 売上明細表
+  core_table: core.fact_sales_line
+  references: {customer_code: tokuisaki, product_code: shohin}
   filename_pattern: '^売上明細表_(?P<date>\d{8})\.xlsx$'
   sheet: 売上明細表
   header_row: 1
