@@ -16,7 +16,7 @@ Không tự commit: người gọi quyết định ranh giới giao dịch.
 import hashlib
 import hmac
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # Tham số scrypt. n=2^14, r=8, p=1 tốn ~16 MB bộ nhớ mỗi lần băm — nằm gọn
 # trong giới hạn mặc định của OpenSSL, đã chạy thật trên máy này.
@@ -33,7 +33,7 @@ DAI_SALT = 16
 # và vẫn phải đăng nhập được.
 _CHON = f"""SELECT n.id, n.ten_dang_nhap, n.salesperson_code,
                    n.duoc_vao_kho_du_lieu, n.duoc_sua_ngan_sach, s.ten,
-                   n.duoc_quan_tri
+                   n.duoc_quan_tri, n.bo_cuc_tong_quan
             FROM app.nguoi_dung n
             LEFT JOIN core.dim_salesperson s
                    ON s.salesperson_code = n.salesperson_code"""
@@ -52,6 +52,11 @@ class NguoiDung:
     # Quyền quản trị (033): đổi được cờ quyền của người khác trên /cai-dat.
     # Mặc định để đối tượng dựng tay trong test cũ vẫn chạy.
     duoc_quan_tri: bool = False
+    # Bố cục trang Tổng quan đã lưu (034), JSON thô — CHƯA tin được, luôn đi
+    # qua kome.web.bo_cuc.chuan_hoa trước khi dùng. Đọc cùng lượt hỏi của cổng
+    # đăng nhập nên trang chủ không tốn thêm truy vấn nào. compare/hash=False:
+    # list không băm được, và bố cục không phải một phần danh tính.
+    bo_cuc: object = field(default=None, compare=False, hash=False)
 
 
 # Ba cờ quyền đổi được — thứ tự này là thứ tự cột trên màn Cài đặt, và là
@@ -62,7 +67,7 @@ CO_QUYEN = ("duoc_vao_kho_du_lieu", "duoc_sua_ngan_sach", "duoc_quan_tri")
 def _nguoi(r) -> NguoiDung:
     return NguoiDung(id=r[0], ten_dang_nhap=r[1], salesperson_code=r[2],
                      duoc_vao_kho_du_lieu=r[3], duoc_sua_ngan_sach=r[4],
-                     ten_sale=r[5], duoc_quan_tri=bool(r[6]))
+                     ten_sale=r[5], duoc_quan_tri=bool(r[6]), bo_cuc=r[7])
 
 
 def bam(mat_khau: str, salt: bytes) -> bytes:

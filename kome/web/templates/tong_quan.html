@@ -1,7 +1,11 @@
-<!-- Trang chủ — dashboard CHUNG cho mọi người (đợt 5b Task 5). Một bố cục,
-     không kéo thả, không chọn khối, không cài đặt theo vai trò.
-     Biểu đồ vẽ bằng SVG tính sẵn ở kome/ve_phan_tich.py — không thư viện
-     JavaScript nào (CSP của Vercel chặn script ngoài), cùng nếp bao_cao.html. -->
+<!-- Trang chủ — dashboard CHUNG cho mọi người (đợt 5b Task 5): cùng các khối,
+     cùng con số cho mọi người. Từ 034, MỖI NGƯỜI tự sắp xếp khối (kéo đổi chỗ,
+     kéo góc đổi kích thước, ẩn/hiện — theo Dashboard.dc.html), lưu theo tài
+     khoản (kome/web/bo_cuc.py). Máy chủ vẽ SẴN đúng bố cục đã lưu: thứ tự
+     theo `bo_cuc`, kích thước bằng style grid-column/grid-row — JS
+     (static/tong_quan.js, file JavaScript DUY NHẤT của app, không thư viện
+     ngoài) chỉ lo việc kéo thả và gửi bố cục về. Tắt JS thì trang vẫn đúng.
+     Biểu đồ vẫn là SVG tính sẵn ở kome/ve_phan_tich.py. -->
 <!doctype html><html lang="vi"><meta charset="utf-8">
 <title>KOME — tổng quan</title>
 {% include "_chung.html" %}
@@ -17,6 +21,52 @@
  .manh{color:var(--ok-chu);font-weight:600}
  h2{font-size:1.1rem;margin:1.75rem 0 .5rem;padding-top:.5rem;
       border-top:1px solid var(--vien)}
+ {# Lưới khối theo Dashboard.dc.html: 3 cột, hàng tối thiểu 150px, `dense`
+    tự lấp chỗ trống. Hàng là minmax(150px, auto) nên "cao" là chiều cao TỐI
+    THIỂU — khối không bao giờ cắt mất nội dung của chính nó. Điện thoại: mọi
+    khối rộng hết màn, giữ đúng thứ tự (!important thắng style nội dòng). #}
+ .luoi-tq{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+      grid-auto-flow:dense;grid-auto-rows:minmax(150px,auto);gap:.75rem;margin:1rem 0}
+ @media (max-width:768px){
+   .luoi-tq{grid-template-columns:minmax(0,1fr)}
+   .luoi-tq > .khoi-tq{grid-column:auto !important;grid-row:auto !important}
+   .co-gian{display:none}
+ }
+ .khoi-tq{position:relative;min-width:0;background:var(--nen-the);
+      border:1px solid var(--vien);border-radius:12px;padding:.9rem 1.1rem}
+ .khoi-tq h2{margin:0;padding:0;border:0;font-size:.98rem}
+ .khoi-tq .so-lon{margin:.6rem 0 .3rem}
+ .dau-khoi{display:flex;align-items:center;gap:.4rem;margin-bottom:.5rem}
+ .dau-khoi h2{flex:1;min-width:0}
+ .keo-khoi,.an-khoi{font:inherit;line-height:1;border:1px solid transparent;
+      background:transparent;color:var(--chu-mo);border-radius:6px;
+      padding:.2rem .35rem;cursor:grab}
+ .an-khoi{cursor:pointer;font-size:.8rem}
+ .keo-khoi:hover,.an-khoi:hover{border-color:var(--vien);color:var(--chu)}
+ .keo-khoi:focus-visible,.an-khoi:focus-visible{outline:2px solid var(--do);outline-offset:1px}
+ .co-gian{position:absolute;right:2px;bottom:2px;width:16px;height:16px;
+      cursor:nwse-resize;border-right:2px solid var(--vien-dam);
+      border-bottom:2px solid var(--vien-dam);border-radius:0 0 6px 0;touch-action:none}
+ .khoi-tq.dang-keo{opacity:.45}
+ .khoi-tq.dich-truoc{box-shadow:inset 3px 0 0 var(--do)}
+ .khoi-tq.dich-sau{box-shadow:inset -3px 0 0 var(--do)}
+ .thanh-bo-cuc{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;
+      font-size:.8rem;color:var(--chu-nhat);margin-top:.75rem}
+ .thanh-bo-cuc form{margin:0}
+ .thanh-bo-cuc button{font:inherit;font-size:.78rem;padding:.25rem .65rem;border-radius:7px;
+      border:1px solid var(--vien);background:var(--nen-the);color:var(--chu-thuong);cursor:pointer}
+ {# Hộp thả xuống, không chen vào dòng: mở ra không đẩy lệch thanh công cụ. #}
+ .them-khoi{position:relative}
+ .them-khoi summary{cursor:pointer;color:var(--lien-ket)}
+ .them-khoi .hop{position:absolute;z-index:20;top:calc(100% + .35rem);left:0;
+      min-width:17rem;background:var(--nen-the);border:1px solid var(--vien);
+      border-radius:10px;padding:.5rem .75rem}
+ .them-khoi ul{list-style:none;margin:0;padding:0}
+ .them-khoi li{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.2rem 0}
+ .them-khoi p{margin:0}
+ {# `display` của lớp đè lên thuộc tính `hidden` của trình duyệt — không có
+    dòng này thì mục "đang hiện" vẫn nằm trong danh sách khối ẩn. #}
+ .them-khoi [hidden],.luoi-tq > [hidden]{display:none}
  .khoi-rong{color:var(--chu-nhat);font-size:.9rem;font-style:italic}
  .khung-bd{overflow-x:auto;border:1px solid var(--vien);border-radius:10px;
       padding:.75rem;background:var(--nen-phu)}
@@ -74,10 +124,52 @@
 {% macro nhan_tien_do(ten, tien_do) %}Tiến độ {{ ten }}: {% if tien_do is not none %}{{ "%.1f"|format(tien_do * 100) }} phần trăm{% else %}chưa tính được{% endif %}{% endmacro %}
 <h1>Tổng quan</h1>
 
-{# Đặt TRÊN mọi con số: "hôm nay đã nạp chưa" quyết định các con số bên dưới
-   có đáng tin hay không, nên phải đọc được trước chúng. #}
+{# Đặt TRÊN mọi con số và NGOÀI lưới kéo thả: "hôm nay đã nạp chưa" quyết
+   định các con số bên dưới có đáng tin hay không, nên phải đọc được trước
+   chúng — không ai được kéo nó xuống cuối trang. #}
 {% include "_tuoi_du_lieu.html" %}
 
+{% if sap_xep_duoc %}
+{% set so_an = bo_cuc|selectattr("an")|list|length %}
+<div class="thanh-bo-cuc">
+  <span id="huong-dan-bo-cuc">⠿ kéo để sắp xếp · đổi kích thước ở góc phải dưới ·
+    bàn phím: chọn ⠿ rồi ←/→ đổi chỗ, Shift + mũi tên đổi kích thước</span>
+  <details class="them-khoi">
+    <summary>Thêm chức năng vào dashboard (<span data-dem-an>{{ so_an }}</span> đang ẩn)</summary>
+    <div class="hop"><ul>
+    {% for o in bo_cuc %}
+      <li data-muc-an="{{ o.id }}"{% if not o.an %} hidden{% endif %}>{{ o.nhan }}
+        <button type="button" data-hien="{{ o.id }}">Hiện</button></li>
+    {% endfor %}
+    </ul>
+    <p class="khong-ap-dung" data-het-an{% if so_an %} hidden{% endif %}>Không có khối nào đang ẩn.</p></div>
+  </details>
+  <form method="post" action="/tong-quan/bo-cuc/mac-dinh">
+    <button type="submit">Về bố cục mặc định</button></form>
+  <span class="sr" aria-live="polite" id="bao-bo-cuc"></span>
+</div>
+{% endif %}
+
+{# Vỏ chung của một khối: tiêu đề, nút kéo ⠿ (kéo bằng chuột CHỈ từ nút này —
+   kéo cả khối thì không bôi đen chữ hay bấm liên kết trong khối được), nút ẩn,
+   góc đổi kích thước. Không có người đăng nhập thì không có ba thứ đó. #}
+{% macro vo(o, tieu_de) %}
+<section class="khoi-tq" data-khoi="{{ o.id }}" data-rong="{{ o.rong }}" data-cao="{{ o.cao }}"
+         style="grid-column:span {{ o.rong }};grid-row:span {{ o.cao }}"
+         aria-labelledby="tieu-de-{{ o.id }}"{% if o.an %} hidden{% endif %}>
+ <div class="dau-khoi">
+  {% if sap_xep_duoc %}<button type="button" class="keo-khoi" aria-describedby="huong-dan-bo-cuc"
+     aria-label="Sắp xếp khối {{ o.nhan }}" title="Kéo để sắp xếp">⠿</button>{% endif %}
+  <h2 id="tieu-de-{{ o.id }}">{{ tieu_de }}</h2>
+  {% if sap_xep_duoc %}<button type="button" class="an-khoi" aria-label="Ẩn khối {{ o.nhan }}"
+     title="Ẩn khối">✕</button>{% endif %}
+ </div>
+ {{ caller() }}
+ {% if sap_xep_duoc %}<div class="co-gian" aria-hidden="true" title="Kéo để đổi kích thước"></div>{% endif %}
+</section>
+{% endmacro %}
+
+{% macro khoi_chi_so(o) %}{% call vo(o, "Chỉ số tháng đến hôm nay") %}
 {% if not tq.thang_nay %}
 <div class="ngay-thieu">Chưa có dòng bán hàng nào. Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
 {% else %}
@@ -104,8 +196,9 @@
 <p class="ghi-chu">Doanh thu thuần đã trừ thuế tiêu dùng. Phiếu đỏ (hàng trả lại)
 được tính vào như số âm — cố ý, vì hàng trả lại là doanh thu âm thật.</p>
 {% endif %}
+{% endcall %}{% endmacro %}
 
-<h2>Tiến độ ngân sách tháng {{ tq.ngan_sach.thang if tq.ngan_sach else "" }}</h2>
+{% macro khoi_ngan_sach(o) %}{% call vo(o, "Tiến độ ngân sách tháng " ~ (tq.ngan_sach.thang if tq.ngan_sach else "")) %}
 {% if tq.ngan_sach and tq.ngan_sach.co_ngan_sach %}
 <div class="thanh-tien-do" role="img"
      aria-label="{{ nhan_tien_do('ngân sách toàn công ty', tq.ngan_sach.tien_do) }}">
@@ -135,8 +228,9 @@
 <p class="ngay-thieu">Chưa đặt chỉ tiêu tháng này.
 {% if hien_ngan_sach %} <a href="/ngan-sach">Đặt chỉ tiêu</a>{% endif %}</p>
 {% endif %}
+{% endcall %}{% endmacro %}
 
-<h2>Xu hướng 30 ngày</h2>
+{% macro khoi_xu_huong(o) %}{% call vo(o, "Xu hướng 30 ngày") %}
 <p class="ghi-chu">Cột là 30 ngày gần nhất; đường là 30 ngày liền trước, so
 theo THỨ TỰ NGÀY (ngày thứ 1 với ngày thứ 1) — không theo "cùng thứ trong tuần".</p>
 {% if xh.co %}
@@ -166,8 +260,9 @@ theo THỨ TỰ NGÀY (ngày thứ 1 với ngày thứ 1) — không theo "cùng
 {% else %}
 <p class="khoi-rong">Chưa có dữ liệu để vẽ khối này.</p>
 {% endif %}
+{% endcall %}{% endmacro %}
 
-<h2>Sức khoẻ khách hàng</h2>
+{% macro khoi_suc_khoe(o) %}{% call vo(o, "Sức khoẻ khách hàng") %}
 {# Chiều rộng % mỗi đoạn tính SẴN ở Python (kome.tong_quan.doan_suc_khoe) —
    template chỉ vẽ, không tự chia phần trăm.
 
@@ -199,55 +294,61 @@ theo THỨ TỰ NGÀY (ngày thứ 1 với ngày thứ 1) — không theo "cùng
   <span><i class="mau" style="background:{{ MAU_VAR[mau] }}"></i>{{ nhan }}: {{ "{:,}".format(d.so) }}</span>
 {% endfor %}
 </div>
+{% endcall %}{% endmacro %}
 
-<div class="hai-cot">
-  <section>
-    <h3>Cần gọi hôm nay</h3>
-    {% if sale %}
-    <p class="ghi-chu">Danh sách của <strong>{{ ten_sale }}</strong> ·
-      <a href="/?tat_ca=1">Xem của mọi người</a></p>
-    {% elif tat_ca and nguoi_sale %}
-    {# Đang xem "mọi người" (?tat_ca=1) NHƯNG người đăng nhập vẫn có một mã
-       sale riêng — cần đường quay lại, không chỉ đường đi tới. #}
-    <p class="ghi-chu">Đang xem của mọi người ·
-      <a href="/">Xem danh sách của tôi</a></p>
-    {% endif %}
-    {% if tq.can_goi %}
-    <ul class="viec">
-    {% for k in tq.can_goi %}
-      <li><a href="/khach-hang/{{ k.ma }}">{{ k.ten }}</a>
-        <div class="ghi-chu">im {{ k.so_ngay_im_lang }} ngày · ¥{{ "{:,}".format(k.doanh_thu) }}</div></li>
-    {% endfor %}
-    </ul>
-    {% else %}
-    <div class="trong">Không có khách nào cần gọi{% if sale %} trong danh sách của {{ ten_sale }}{% endif %}.</div>
-    {% endif %}
-    {# Khối này đang hiện của AI (sale hiện tại, hoặc "mọi người" khi
-       `tat_ca`) — "Xem tất cả" phải giữ NGUYÊN trạng thái lọc đó, không thì
-       bấm vào từ chế độ "mọi người" lại rơi về mặc định lọc-theo-mình của
-       /lien-he (trước đợt 7: /can-xu-ly). #}
-    <p class="ghi-chu"><a href="/lien-he{{ '?tat_ca=1' if tat_ca else '' }}">Xem tất cả →</a></p>
-  </section>
-  <section>
-    <h3>Hàng cận hạn</h3>
-    <p class="ghi-chu">Sắp hết hạn trong {{ can_han_ngay }} ngày{% if tq.so_qua_han %}
-      · <strong>{{ tq.so_qua_han }}</strong> lô đã quá hạn{% endif %}.</p>
-    {% if tq.can_han %}
-    <ul class="viec">
-    {% for d in tq.can_han %}
-      <li><a href="/san-pham/{{ d.ma }}">{{ d.ten }}</a>
-        <div class="ghi-chu">{{ d.ten_kho or d.kho }} · còn {{ d.han_con_lai }} ngày</div></li>
-    {% endfor %}
-    </ul>
-    {% else %}
-    <div class="trong">Không lô nào cận hạn.</div>
-    {% endif %}
-    <p class="ghi-chu"><a href="/kho-hang">Xem tất cả →</a></p>
-  </section>
+{% macro khoi_can_goi(o) %}{% call vo(o, "Cần gọi hôm nay") %}
+{% if sale %}
+<p class="ghi-chu">Danh sách của <strong>{{ ten_sale }}</strong> ·
+  <a href="/?tat_ca=1">Xem của mọi người</a></p>
+{% elif tat_ca and nguoi_sale %}
+{# Đang xem "mọi người" (?tat_ca=1) NHƯNG người đăng nhập vẫn có một mã
+   sale riêng — cần đường quay lại, không chỉ đường đi tới. #}
+<p class="ghi-chu">Đang xem của mọi người ·
+  <a href="/">Xem danh sách của tôi</a></p>
+{% endif %}
+{% if tq.can_goi %}
+<ul class="viec">
+{% for k in tq.can_goi %}
+  <li><a href="/khach-hang/{{ k.ma }}">{{ k.ten }}</a>
+    <div class="ghi-chu">im {{ k.so_ngay_im_lang }} ngày · ¥{{ "{:,}".format(k.doanh_thu) }}</div></li>
+{% endfor %}
+</ul>
+{% else %}
+<div class="trong">Không có khách nào cần gọi{% if sale %} trong danh sách của {{ ten_sale }}{% endif %}.</div>
+{% endif %}
+{# Khối này đang hiện của AI (sale hiện tại, hoặc "mọi người" khi
+   `tat_ca`) — "Xem tất cả" phải giữ NGUYÊN trạng thái lọc đó, không thì
+   bấm vào từ chế độ "mọi người" lại rơi về mặc định lọc-theo-mình của
+   /lien-he (trước đợt 7: /can-xu-ly). #}
+<p class="ghi-chu"><a href="/lien-he{{ '?tat_ca=1' if tat_ca else '' }}">Xem tất cả →</a></p>
+{% endcall %}{% endmacro %}
+
+{% macro khoi_can_han(o) %}{% call vo(o, "Hàng cận hạn") %}
+<p class="ghi-chu">Sắp hết hạn trong {{ can_han_ngay }} ngày{% if tq.so_qua_han %}
+  · <strong>{{ tq.so_qua_han }}</strong> lô đã quá hạn{% endif %}.</p>
+{% if tq.can_han %}
+<ul class="viec">
+{% for d in tq.can_han %}
+  <li><a href="/san-pham/{{ d.ma }}">{{ d.ten }}</a>
+    <div class="ghi-chu">{{ d.ten_kho or d.kho }} · còn {{ d.han_con_lai }} ngày</div></li>
+{% endfor %}
+</ul>
+{% else %}
+<div class="trong">Không lô nào cận hạn.</div>
+{% endif %}
+<p class="ghi-chu"><a href="/kho-hang">Xem tất cả →</a></p>
+{% endcall %}{% endmacro %}
+
+{# Mã khối -> macro. Khớp với kome/web/bo_cuc.py::KHOI — có test canh. #}
+{% set VE = {"chi_so": khoi_chi_so, "ngan_sach": khoi_ngan_sach, "xu_huong": khoi_xu_huong,
+             "suc_khoe": khoi_suc_khoe, "can_goi": khoi_can_goi, "can_han": khoi_can_han} %}
+<div class="luoi-tq"{% if sap_xep_duoc %} data-luu="/tong-quan/bo-cuc"{% endif %}>
+{% for o in bo_cuc %}{{ VE[o.id](o) }}{% endfor %}
 </div>
 
 <h2>Chưa có dữ liệu</h2>
 <p class="ghi-chu">Công nợ · Dòng tiền · Mua hàng · Khiếu nại · Thời tiết —
 chưa có nguồn dữ liệu, sẽ thêm khi nạp được.</p>
+{% if sap_xep_duoc %}<script src="/static/tong_quan.js" defer></script>{% endif %}
 </html>
 </main>

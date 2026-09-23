@@ -4,7 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, Form, UploadFile, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from kome.bao_cao import (tinh_bao_cao, ve_bieu_do, tien_do_ngan_sach, ve_luy_ke,
@@ -41,6 +41,7 @@ from kome import tuoi_du_lieu as TDL
 from kome.tuoi_du_lieu import tinh_tuoi
 from kome.web import bao_mat
 from kome.web import nguoi_dung as ND
+from kome.web import bo_cuc as BC
 from ops.backup import backup_status
 
 # Đợt 4d (Task 2) — nút đổi giao diện sáng/tối, KHÔNG JS.
@@ -480,9 +481,57 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         "xh": ve_xu_huong(tq.ngay),
                         "doan_suc_khoe": TQ.doan_suc_khoe(tq.dem),
                         "trang_thai_nhan": KH.TRANG_THAI,
-                        "can_han_ngay": SP.CAN_HAN_NGAY})
+                        "can_han_ngay": SP.CAN_HAN_NGAY,
+                        # Bố cục của NGƯỜI ĐANG XEM (034). Không có người
+                        # (máy trong công ty chưa bật cổng) -> mặc định, và
+                        # không có nút sắp xếp: không biết lưu cho ai.
+                        "bo_cuc": BC.chuan_hoa(nguoi.bo_cuc if nguoi else None),
+                        "sap_xep_duoc": nguoi is not None})
         except Exception as e:
             return _loi(request, "mở trang tổng quan", e)
+
+    @app.post("/tong-quan/bo-cuc")
+    async def luu_bo_cuc(request: Request):
+        """Lưu bố cục trang Tổng quan của người đang đăng nhập — tong_quan.js
+        gửi sau mỗi lần kéo/đổi cỡ/ẩn/hiện. Chỉ nhận JSON; mọi giá trị đi qua
+        `BC.chuan_hoa` (chỉ mã khối đã biết, kích thước kẹp trong dải), nên
+        thứ ghi xuống luôn là một bố cục hợp lệ, dù gửi lên là gì.
+
+        Không bị `_chi_doc` chặn — cùng lý lẽ `POST /ngan-sach` (CLAUDE.md):
+        chế độ chỉ-đọc là giới hạn của luồng NẠP OBC, không phải phân quyền,
+        và một mảng vài trăm byte vào app.nguoi_dung nằm thừa trong giới hạn."""
+        nguoi = getattr(request.state, "nguoi", None)
+        if nguoi is None:
+            return JSONResponse({"loi": "Máy này chưa bật đăng nhập — không biết lưu bố cục cho ai."},
+                                status_code=403)
+        if not request.headers.get("content-type", "").startswith("application/json"):
+            return JSONResponse({"loi": "Cần gửi JSON."}, status_code=415)
+        than = await request.body()
+        if len(than) > BC.DAI_TOI_DA:
+            return JSONResponse({"loi": "Bố cục quá lớn."}, status_code=413)
+        bo_cuc = BC.chuan_hoa(than)
+        try:
+            with open_app_conn() as conn:
+                BC.luu(conn, nguoi.id, bo_cuc)
+                conn.commit()
+        except Exception:
+            traceback.print_exc()
+            return JSONResponse({"loi": "Không lưu được bố cục."}, status_code=500)
+        return JSONResponse({"bo_cuc": [o.dict() for o in bo_cuc]})
+
+    @app.post("/tong-quan/bo-cuc/mac-dinh")
+    def bo_cuc_mac_dinh(request: Request):
+        """Nút "Về bố cục mặc định" — một FORM thường, nên chạy được cả khi
+        trình duyệt không chạy JavaScript."""
+        nguoi = getattr(request.state, "nguoi", None)
+        if nguoi is not None:
+            try:
+                with open_app_conn() as conn:
+                    BC.luu(conn, nguoi.id, None)
+                    conn.commit()
+            except Exception as e:
+                return _loi(request, "đưa bố cục về mặc định", e)
+        return RedirectResponse("/", status_code=303)
 
     def _sale_dang_loc(request: Request, tat_ca: int,
                        nv: str = "") -> tuple[str | None, str | None]:
