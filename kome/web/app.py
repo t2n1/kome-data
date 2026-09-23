@@ -7,9 +7,19 @@ from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from kome.bao_cao import tinh_bao_cao, ve_bieu_do, tien_do_ngan_sach, ve_luy_ke
+from kome.bao_cao import (tinh_bao_cao, ve_bieu_do, tien_do_ngan_sach, ve_luy_ke,
+                          nhom_theo_nganh)
 from kome.coverage import tinh_bang_ngay, tinh_bang_phu
+# kome/ve_phan_tich.py chỉ tính hình học SVG thuần Python (không conn, không
+# pandas) — an toàn nhập ở mức ngoài cùng, cùng lý do với kome/san_pham.py.
+from kome.ve_phan_tich import (ve_duong_nho, ve_dong_gop, ve_cay_o, ve_nhiet,
+                               ve_pareto, ve_xu_huong)
+from kome.ngan_sach import thang_cua_ky
 from kome import khach_hang as KH
+# kome/tong_quan.py (đợt 5b Task 5) — dữ liệu cho `/`. Chỉ dataclasses +
+# gọi lại các hàm mart/khach_hang/san_pham đã có (+ psycopg qua `conn`),
+# cùng lý do an toàn nhập ở mức ngoài cùng như kome/san_pham.py.
+from kome import tong_quan as TQ
 # Nhập ở mức ngoài cùng được: kome/san_pham.py chỉ dùng dataclasses/datetime
 # (+ psycopg qua `conn` truyền vào), KHÔNG kéo pandas hay python-calamine —
 # đúng ràng buộc mà test_trang_chi_doc_khong_phu_thuoc_pandas canh.
@@ -426,27 +436,38 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
 
     # ---- Các trang ------------------------------------------------------
     @app.get("/", response_class=HTMLResponse)
-    def tong_quan(request: Request):
-        """Trang chủ: công ty đang thế nào, và hôm nay cần làm gì.
+    def trang_chu(request: Request, tat_ca: int = 0):
+        """Trang chủ dùng chung: công ty đang thế nào, và hôm nay cần làm gì.
 
-        TRƯỚC ĐÂY `/` là trang nạp dữ liệu. Đổi vì nạp dữ liệu là việc của MỘT
-        người, MỘT lần mỗi ngày, còn `/` là thứ mọi người mở nhiều lần mỗi
-        ngày. Khối nạp giờ nằm trong /kho-du-lieu (Đợt 2a, Task 1-4), và mục
-        đó vẫn còn trong thanh điều hướng.
+        Đợt 5b Task 5: `/` không còn gọi `tinh_bao_cao` (5 lượt hỏi chỉ để
+        lấy ba con số của KỲ KẾ TOÁN) — mọi khối giờ qua
+        `kome.tong_quan.tong_quan()`, đọc `mart.thang_den_hom_nay` (tháng
+        đến hôm nay). `sale` dùng lại đúng `_sale_dang_loc` (mặc định tiện
+        dụng theo người đăng nhập, `?tat_ca=1` bỏ lọc — cùng nếp
+        `/can-xu-ly`), CHỈ áp cho khối "Cần gọi hôm nay"; các khối số tổng
+        (tháng, xu hướng, sức khoẻ, ngân sách, hàng cận hạn) không lọc theo
+        sale — xem docstring `kome.tong_quan.tong_quan`.
         """
         try:
+            sale, ten_sale = _sale_dang_loc(request, tat_ca)
+            # Mã sale CỦA CHÍNH người đăng nhập, bất kể `tat_ca` đang bật hay
+            # không — khác `sale` (bộ lọc HIỆU LỰC của khối "Cần gọi hôm nay",
+            # None khi `?tat_ca=1`). Cần cả hai để vẽ liên kết "Xem danh sách
+            # của tôi" khi đang xem "mọi người" mà người đăng nhập VẪN có một
+            # mã sale riêng để quay về.
+            nguoi = getattr(request.state, "nguoi", None)
+            nguoi_sale = nguoi.salesperson_code if nguoi is not None else None
             with open_app_conn() as conn:
-                bc = tinh_bao_cao(conn)
-                dem = dict(conn.execute(
-                    "SELECT trang_thai, count(*) FROM mart.khach_360 GROUP BY 1"
-                ).fetchall())
-                so_ngay_ton = conn.execute(
-                    "SELECT count(DISTINCT snapshot_date) FROM core.fact_inventory_daily"
-                ).fetchone()[0]
+                tq = TQ.tong_quan(conn, sale)
                 tuoi = tinh_tuoi(conn)
             return _ve(request, "tong_quan.html",
-                       {"bc": bc, "dem": dem, "so_ngay_ton": so_ngay_ton,
-                        "tuoi": tuoi, "trang": "tong-quan"})
+                       {"tq": tq, "tuoi": tuoi, "trang": "tong-quan",
+                        "sale": sale, "ten_sale": ten_sale, "tat_ca": bool(tat_ca),
+                        "nguoi_sale": nguoi_sale,
+                        "xh": ve_xu_huong(tq.ngay),
+                        "doan_suc_khoe": TQ.doan_suc_khoe(tq.dem),
+                        "trang_thai_nhan": KH.TRANG_THAI,
+                        "can_han_ngay": SP.CAN_HAN_NGAY})
         except Exception as e:
             return _loi(request, "mở trang tổng quan", e)
 
@@ -740,9 +761,38 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             with open_app_conn() as conn:
                 bc = tinh_bao_cao(conn, ky)
                 td = tien_do_ngan_sach(conn, ky)
+            # [Đợt 5b Task 4] Bảy khối phân tích mới (spec §5) — mọi hình học
+            # tính sẵn ở kome/ve_phan_tich.py, route chỉ gọi và truyền vào
+            # template, không tính chỉ số nào ở đây.
+            nhom = nhom_theo_nganh(bc.nganh_ky, bc.hang_theo_nganh)
+            thang_ky = thang_cua_ky(bc.ky.company_fy)
+            # [Vòng soát 1, I-1] Ranh giới "tháng chưa tới" của bản đồ nhiệt —
+            # LẤY TỪ `bc.ky.ngay_cuoi` đã có sẵn (ngày bán mới nhất của CHÍNH
+            # kỳ đang xem), không hỏi CSDL thêm câu nào. None khi kho rỗng.
+            thang_cuoi = (bc.ky.ngay_cuoi.strftime("%Y-%m")
+                          if bc.ky.ngay_cuoi else None)
+            # [Vòng soát cuối, I-2] Tháng công ty có dòng bán ĐẦU TIÊN —
+            # `bc.moi_ky[0]` là kỳ SỚM NHẤT (dong_ky đã ORDER BY company_fy ở
+            # tinh_bao_cao()), lấy sẵn từ `bc`, KHÔNG hỏi CSDL thêm câu nào.
+            # Chặn ve_nhiet tô ¥0 cho các tháng TRƯỚC khi có dữ liệu (một
+            # NULL≠0 khác đối tượng nhưng cùng lớp lỗi với `san_pham_360.ton`
+            # đã ghi ở CLAUDE.md).
+            thang_dau = (bc.moi_ky[0].ngay_dau.strftime("%Y-%m")
+                         if bc.moi_ky and bc.moi_ky[0].ngay_dau else None)
+            so_nho = {
+                "dt": ve_duong_nho([o.doanh_thu for o in bc.thang]),
+                "lg": ve_duong_nho([o.lai_gop for o in bc.thang]),
+                "ts": ve_duong_nho([o.ty_suat for o in bc.thang]),
+                "kh": ve_duong_nho([o.so_khach for o in bc.thang]),
+            }
             return _ve(request, "bao_cao.html",
                        {"bc": bc, "bd": ve_bieu_do(bc.thang), "td": td,
-                        "lk": ve_luy_ke(td), "trang": "bao-cao"})
+                        "lk": ve_luy_ke(td), "trang": "bao-cao",
+                        "so_nho": so_nho,
+                        "dg": ve_dong_gop(bc.nganh_ky),
+                        "co": ve_cay_o(nhom),
+                        "nh": ve_nhiet(bc.nganh_thang, thang_ky, thang_cuoi, thang_dau),
+                        "pa": ve_pareto(bc.tap_trung)})
         except Exception as e:
             return _loi(request, "mở trang báo cáo", e)
 

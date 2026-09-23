@@ -447,6 +447,70 @@ def test_can_xu_ly_loc_duoc_theo_sale(conn, batch):
     assert {k.ma for k in KH.can_xu_ly(conn)} == {"R0104", "R0102"}
 
 
+# ---- dem_va_can_xu_ly: đếm + can_xu_ly gộp MỘT lượt hỏi (soát hiệu năng 5b) ----
+
+def test_dem_va_can_xu_ly_dem_TOAN_CONG_TY_danh_sach_theo_sale(conn, batch, monkeypatch):
+    """[IMPORTANT] Bộ đếm trả về phải KHÔNG lọc theo `sale` (dashboard dùng
+    cho thanh sức khoẻ toàn công ty), còn danh sách thì lọc — giống hệt
+    `can_xu_ly(sale=...)`. Và cả hàm chỉ được chạy ĐÚNG MỘT lượt hỏi: đây
+    đúng là lý do hàm này tồn tại, thay cho count(*) riêng + can_xu_ly()
+    riêng — hai câu cùng đánh giá lại mart.khach_360, view đắt nhất của mart
+    (đo thật 2026-09-23: ~1.185 ms một lần)."""
+    for ma, sale in (("R0104", "0104"), ("R0102", "0102")):
+        _ho_so_khach(conn, batch, ma, f"Quán {ma}", salesperson_code=sale)
+        _mua_deu(conn, batch, ma, nhip=7, so_lan=6, ngung_truoc=90)
+    _ho_so_khach(conn, batch, "R_OK", "Quán bình thường", salesperson_code="0104")
+    _mua_deu(conn, batch, "R_OK", nhip=7, so_lan=6, ngung_truoc=0)
+    _neo(conn, batch)
+
+    dem_khac = {"n": 0}
+    that = conn.execute
+
+    def demo(*a, **k):
+        dem_khac["n"] += 1
+        return that(*a, **k)
+
+    monkeypatch.setattr(conn, "execute", demo)
+    dem, ds = KH.dem_va_can_xu_ly(conn, sale="0104")
+    assert dem_khac["n"] == 1, f"chạy {dem_khac['n']} lượt hỏi, phải đúng 1"
+
+    assert {k.ma for k in ds} == {"R0104"}, "danh sách PHẢI lọc theo sale"
+    # Bộ đếm là của TOÀN CÔNG TY: cả hai khách "cần xử lý" (R0104 của 0104 và
+    # R0102 của 0102) phải được đếm, không chỉ khách của 0104. (Nhãn cụ thể
+    # là 'canh_bao' hay 'da_roi_bo' không quan trọng ở đây — cả hai đều thuộc
+    # KH.TRANG_THAI_CAN_XU_LY; test khác đã canh nhãn chính xác.)
+    can_xu_ly_toan_cty = sum(dem.get(t, 0) for t in KH.TRANG_THAI_CAN_XU_LY)
+    assert can_xu_ly_toan_cty >= 2
+    assert dem.get("binh_thuong", 0) >= 1
+
+    dem_tat_ca, ds_tat_ca = KH.dem_va_can_xu_ly(conn)
+    assert {k.ma for k in ds_tat_ca} == {"R0104", "R0102"}
+    assert dem_tat_ca == dem, "bộ đếm không đổi dù không lọc theo sale"
+
+
+def test_dem_va_can_xu_ly_rong_tra_dem_rong_danh_sach_rong(conn, batch):
+    """CSDL trống (hoặc không khách nào khớp) không được làm câu LEFT JOIN ON
+    true nổ ra một dòng "khách ma" toàn NULL trong danh sách."""
+    _neo(conn, batch)
+    dem, ds = KH.dem_va_can_xu_ly(conn, sale="khong-ai-ca")
+    assert ds == []
+    assert isinstance(dem, dict)
+
+
+def test_dem_va_can_xu_ly_giong_HET_can_xu_ly_rieng(conn, batch):
+    """Kết quả gộp phải khớp với can_xu_ly() gọi riêng — cùng thứ tự, cùng
+    tập khách — chỉ khác số lượt hỏi."""
+    for ma, sale in (("RG01", "0104"), ("RG02", "0104")):
+        _ho_so_khach(conn, batch, ma, f"Quán {ma}", salesperson_code=sale)
+    _mua_deu(conn, batch, "RG01", nhip=7, so_lan=6, ngung_truoc=90)
+    _mua_deu(conn, batch, "RG02", nhip=7, so_lan=6, ngung_truoc=95)
+    _neo(conn, batch)
+
+    rieng = [k.ma for k in KH.can_xu_ly(conn, sale="0104")]
+    _, gop = KH.dem_va_can_xu_ly(conn, sale="0104")
+    assert [k.ma for k in gop] == rieng
+
+
 # ---- Tổng quan danh bạ: bốn khối trong một truy vấn (task 3 đợt 4a) ----
 
 def test_tong_quan_danh_ba_chay_dung_MOT_truy_van(conn, batch, monkeypatch):

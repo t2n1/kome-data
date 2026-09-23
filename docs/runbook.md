@@ -195,6 +195,25 @@ màn mới dựng xong không ai vào được:
 2. Cấp cờ mới cho đúng người, ví dụ `--ngan-sach`:
    `python scripts/tao_nguoi_dung.py quyen <tên> --ngan-sach`.
 
+Ngược lại, `029` (các view phân tích cho `/bao-cao` và `/`, đợt 5b) **không
+thêm cột quyền nào** — chỉ thêm view mới trong `mart`, đã có sẵn dòng GRANT
+cho cả ba vai trò ngay trong chính file migration. Không cần bước 2: chạy
+`python db/migrate.py` bằng vai trò `postgres` là đủ.
+
+### Kiểm tay sau khi chạy migration `029` (đợt 5b — báo cáo phân tích + dashboard)
+
+Chủ doanh nghiệp làm năm việc này sau khi migration `029` chạy xong trên CSDL
+thật (spec §8, `docs/superpowers/specs/2026-09-23-dot-5b-bao-cao-dashboard-design.md`):
+
+1. Mở `/bao-cao` kỳ 7, đọc thời gian ở LẦN MỞ THỨ HAI: dưới 1.500 ms.
+2. Mở `/`, lần thứ hai: dưới 1.500 ms.
+3. Đối chiếu doanh thu kỳ 7 trên ô chỉ số với tổng 12 dòng của bảng chi tiết
+   (`<details>` cuối trang `/bao-cao`): phải bằng nhau đến từng yên.
+4. Đối chiếu ô "Doanh thu tháng đến hôm nay" của `/` với OBC 売上明細表 cùng
+   dải ngày (mùng 1 tới hôm nay).
+5. Chuyển máy sang chế độ tối: bản đồ nhiệt và cây ô phải đọc được (màu không
+   biến mất, chữ không chìm vào nền).
+
 ---
 
 ## Trước khi chạy migration trên CSDL THẬT — kiểm một câu

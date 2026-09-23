@@ -1,88 +1,253 @@
-<!-- Trang chủ. Trả lời đúng hai câu hỏi người ta mở app để hỏi:
-     "công ty đang thế nào?" và "hôm nay tôi cần làm gì?" -->
+<!-- Trang chủ — dashboard CHUNG cho mọi người (đợt 5b Task 5). Một bố cục,
+     không kéo thả, không chọn khối, không cài đặt theo vai trò.
+     Biểu đồ vẽ bằng SVG tính sẵn ở kome/ve_phan_tich.py — không thư viện
+     JavaScript nào (CSP của Vercel chặn script ngoài), cùng nếp bao_cao.html. -->
 <!doctype html><html lang="vi"><meta charset="utf-8">
 <title>KOME — tổng quan</title>
 {% include "_chung.html" %}
 <style>
- .khoi{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem;margin:1.25rem 0}
- .khoi > section{border:1px solid var(--vien);border-radius:12px;padding:1rem 1.15rem}
- .khoi h2{margin:0 0 .5rem;font-size:1rem;border:0;padding:0}
- .khoi ul{margin:.25rem 0 0;padding-left:1.1rem}
- .khoi li{margin:.3rem 0}
- .lon{font-size:1.9rem;font-weight:700;line-height:1.2}
- .chua-co{border-style:dashed;opacity:.75}
+ .so-lon{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}
+ .the{flex:1 1 10rem;background:var(--nen-the);border:1px solid var(--vien);
+      border-radius:11px;padding:.75rem 1rem}
+ .the .nhan{color:var(--chu-nhat);font-size:.8rem}
+ .the .gia{font-size:1.45rem;font-weight:600;line-height:1.25;margin-top:.15rem;
+      font-family:var(--font-so);font-variant-numeric:tabular-nums}
+ .so-cung-ky{font-size:.8rem;color:var(--chu-nhat);margin-top:.35rem}
+ .yeu{color:var(--loi-chu);font-weight:600}
+ .manh{color:var(--ok-chu);font-weight:600}
+ h2{font-size:1.1rem;margin:1.75rem 0 .5rem;padding-top:.5rem;
+      border-top:1px solid var(--vien)}
+ .khoi-rong{color:var(--chu-nhat);font-size:.9rem;font-style:italic}
+ .khung-bd{overflow-x:auto;border:1px solid var(--vien);border-radius:10px;
+      padding:.75rem;background:var(--nen-phu)}
+ .chu-thich{display:flex;flex-wrap:wrap;gap:1rem;font-size:.85rem;
+      color:var(--chu-nhat);margin-top:.5rem}
+ .chu-thich span{display:inline-flex;align-items:center;gap:.35rem}
+ .mau{width:.85rem;height:.85rem;border-radius:3px;display:inline-block}
+ {# Thanh tiến độ ngân sách — cùng CSS thuần với bao_cao.html (không một
+    dòng JavaScript). Chiều rộng/vị trí ĐÃ KẸP về [0,100] ở Python
+    (kome/bao_cao.py::_pct_rong) — CSS ở đây không tự vẽ tràn hay âm. #}
+ .thanh-tien-do{position:relative;height:1.05rem;background:var(--nen-phu);
+      border:1px solid var(--vien);border-radius:999px;overflow:hidden;
+      margin:.35rem 0}
+ .thanh-tien-do.thanh-nho{height:.6rem;width:8rem;display:inline-block;
+      vertical-align:middle;margin:0 0 0 .5rem}
+ .thanh-tien-do .day{position:absolute;inset:0 auto 0 0;background:var(--do);
+      border-radius:999px}
+ .thanh-tien-do .moc{position:absolute;top:-3px;bottom:-3px;width:2px;
+      margin-left:-1px;background:var(--chu-nhat)}
+ .thanh-nhan{display:flex;justify-content:space-between;font-size:.85rem;
+      color:var(--chu-nhat)}
+ .ds-nguoi{list-style:none;margin:.5rem 0 0;padding:0}
+ .ds-nguoi li{display:flex;align-items:center;gap:.5rem;padding:.3rem 0;
+      border-top:1px solid var(--vien);font-size:.9rem}
+ .ds-nguoi li:first-child{border-top:0}
+ .ds-nguoi .ten{flex:0 0 9rem}
+ {# Thanh sức khoẻ khách hàng: mỗi đoạn là MỘT LIÊN KẾT (không phải chỉ tô
+    màu) — bấm vào một đoạn đi thẳng tới danh sách khách đúng trạng thái đó,
+    cùng nếp thanh trạng thái của các trang khác. Màu lấy từ token đã có
+    (--ok-vien/--canh-vien/--loi-vien/--ngoai-chu, kome.css) — không hex mới. #}
+ .thanh-suc-khoe{display:flex;height:1.6rem;border-radius:8px;overflow:hidden;
+      border:1px solid var(--vien);margin:.5rem 0}
+ .thanh-suc-khoe a{display:block;height:100%;text-decoration:none}
+ .thanh-suc-khoe a:hover,.thanh-suc-khoe a:focus{opacity:.8}
+ .hai-cot{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));
+      gap:1.25rem;margin:1rem 0}
+ .hai-cot > section{border:1px solid var(--vien);border-radius:12px;padding:1rem 1.15rem}
+ .hai-cot h3{margin:0 0 .5rem;font-size:1rem;border:0;padding:0}
+ .viec{list-style:none;margin:0;padding:0}
+ .viec li{border-top:1px solid var(--vien);padding:.5rem 0}
+ .viec li:first-child{border-top:0}
+ .viec a{text-decoration:none;font-weight:600}
 </style>
 {% include "_nav.html" %}
+{% set MAU_VAR = {"ok": "var(--ok-vien)", "canh": "var(--canh-vien)",
+                  "loi": "var(--loi-vien)", "nhat": "var(--ngoai-chu)"} %}
+{% macro so_cung_ky(tn, tang, don_vi, loai="tien") %}
+{% if tn.co_cung_ky %}{% if tang is not none %}<span class="{{ 'manh' if tang >= 0 else 'yeu' }}">{{
+    "%+.1f"|format(tang * 100) }}{{ don_vi }}</span>{% elif loai == "khach" %}<span
+    title="Không có khách nào cùng kỳ năm trước — không tính được, không phải bằng 0">—</span>
+    {% else %}<span title="Mẫu số cùng kỳ ≤ 0 (赤伝 — phiếu đỏ có thể làm doanh thu/lãi gộp cùng
+    kỳ năm trước âm) — không tính được, không phải bằng 0">—</span>{% endif %} so cùng kỳ
+{% else %}chưa có cùng kỳ để so{% endif %}
+{% endmacro %}
+{% macro nhan_tien_do(ten, tien_do) %}Tiến độ {{ ten }}: {% if tien_do is not none %}{{ "%.1f"|format(tien_do * 100) }} phần trăm{% else %}chưa tính được{% endif %}{% endmacro %}
 <h1>Tổng quan</h1>
 
 {# Đặt TRÊN mọi con số: "hôm nay đã nạp chưa" quyết định các con số bên dưới
    có đáng tin hay không, nên phải đọc được trước chúng. #}
 {% include "_tuoi_du_lieu.html" %}
 
-{% if bc.khong_co_du_lieu %}
+{% if not tq.thang_nay %}
 <div class="ngay-thieu">Chưa có dòng bán hàng nào. Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
 {% else %}
-<p class="ghi-chu">{{ bc.ky.nhan }} · dữ liệu đến {{ bc.ky.ngay_cuoi }}</p>
-<div class="the-so">
-  <div><div class="nhan">Doanh thu thuần</div><div class="gia">¥{{ "{:,}".format(bc.ky.doanh_thu) }}</div></div>
-  <div><div class="nhan">Lãi gộp</div><div class="gia">¥{{ "{:,}".format(bc.ky.lai_gop) }}</div></div>
-  <div><div class="nhan">Tỷ suất</div><div class="gia">{% if bc.ky.ty_suat is not none %}{{ "%.1f"|format(bc.ky.ty_suat*100) }}%{% else %}—{% endif %}</div></div>
-  <div><div class="nhan">Khách có mua</div><div class="gia">{{ "{:,}".format(bc.ky.so_khach) }}</div></div>
-</div>
+{% set tn = tq.thang_nay %}
+<p class="ghi-chu">{{ tn.tu_ngay.strftime("%d/%m/%Y") }} – {{ tn.den_ngay.strftime("%d/%m/%Y") }}
+{% if tn.co_cung_ky %}so với {{ tn.tu_ngay_ck.strftime("%d/%m/%Y") }} – {{ tn.den_ngay_ck.strftime("%d/%m/%Y") }}
+{% else %}(chưa có dữ liệu cùng kỳ năm trước){% endif %}</p>
 
-<div class="khoi">
-  <section>
-    <h2>Cần gọi lại</h2>
-    <div class="lon">{{ "{:,}".format(dem.get('canh_bao', 0)) }}</div>
-    <p class="ghi-chu">khách im lặng lâu hơn nhịp mua riêng của họ</p>
-    <a href="/can-xu-ly">Xem danh sách →</a>
-  </section>
-  <section>
-    <h2>Đã rời bỏ</h2>
-    <div class="lon">{{ "{:,}".format(dem.get('da_roi_bo', 0)) }}</div>
-    <p class="ghi-chu">im lặng trên 4 lần nhịp thường lệ</p>
-    <a href="/khach-hang?loc=da_roi_bo">Xem danh sách →</a>
-  </section>
-  <section>
-    <h2>Đang mua đều</h2>
-    <div class="lon">{{ "{:,}".format(dem.get('binh_thuong', 0)) }}</div>
-    <p class="ghi-chu">quan hệ bình thường</p>
-    <a href="/khach-hang?loc=binh_thuong">Xem danh sách →</a>
-  </section>
-  <section>
-    <h2>Ngừng giao dịch</h2>
-    <div class="lon">{{ "{:,}".format(dem.get('ngung_giao_dich', 0)) }}</div>
-    <p class="ghi-chu">OBC đã đánh dấu ※廃業※ / ※取引停止※ — không đưa vào danh sách gọi</p>
-    <a href="/khach-hang?loc=ngung_giao_dich">Xem danh sách →</a>
-  </section>
+<div class="so-lon">
+  <div class="the"><div class="nhan">Doanh thu thuần</div>
+    <div class="gia">¥{{ "{:,}".format(tn.dt) }}</div>
+    <div class="so-cung-ky">{{ so_cung_ky(tn, tn.tang_dt, "%") }}</div></div>
+  <div class="the"><div class="nhan">Lãi gộp</div>
+    <div class="gia">¥{{ "{:,}".format(tn.lg) }}</div>
+    <div class="so-cung-ky">{{ so_cung_ky(tn, tn.tang_lg, "%") }}</div></div>
+  <div class="the"><div class="nhan">Tỷ suất lãi gộp</div>
+    <div class="gia">{% if tn.ty_suat is not none %}{{ "%.1f"|format(tn.ty_suat*100) }}%{% else %}—{% endif %}</div>
+    {# Tỷ suất so bằng ĐIỂM PHẦN TRĂM, không phải %, xem kome/bao_cao.py::_SoCungKy.chenh_ty_suat. #}
+    <div class="so-cung-ky">{{ so_cung_ky(tn, tn.chenh_ty_suat, " điểm") }}</div></div>
+  <div class="the"><div class="nhan">Khách có đơn</div>
+    <div class="gia">{{ "{:,}".format(tn.so_khach) }}</div>
+    <div class="so-cung-ky">{{ so_cung_ky(tn, tn.tang_khach, "%", "khach") }}</div></div>
 </div>
-
-<h2 style="font-size:1.05rem;margin-top:2rem;padding-top:.5rem;border-top:1px solid var(--vien)">Phần chưa có dữ liệu</h2>
-<p class="ghi-chu">Khung đã dựng sẵn. Mỗi mục dưới đây bật lên ngay khi có dữ liệu tương ứng.</p>
-<div class="khoi">
-  <section class="chua-co">
-    <h2>Tồn kho</h2>
-    <p class="ghi-chu">Mới có <strong>{{ so_ngay_ton }}</strong> ngày ảnh chụp.
-    Cần xuất <code style="display:inline;padding:0 .25rem">在庫一覧</code> hằng ngày thì mới tính được
-    vòng quay hàng, hàng chậm, hàng sắp hết hạn.</p>
-  </section>
-  <section class="chua-co">
-    <h2>Mua hàng</h2>
-    <p class="ghi-chu">Chưa có dữ liệu nhập hàng. Thiếu nó thì không tính được
-    biên lợi nhuận thật theo nhà cung cấp.</p>
-  </section>
-  <section class="chua-co">
-    <h2>Công nợ</h2>
-    <p class="ghi-chu">Mới có 1 quý. Thiếu nó thì không dựng được bảng tuổi nợ
-    dù đã có ngày chốt của 100% khách.</p>
-  </section>
-  <section class="chua-co">
-    <h2>Ghi chú &amp; tương tác</h2>
-    <p class="ghi-chu">OBC ghi giao dịch, không ghi tương tác. Phần này chỉ chạy
-    khi nhân viên gõ vào sau mỗi cuộc gọi — quyết định về cách làm việc, không
-    phải về kỹ thuật.</p>
-  </section>
-</div>
+<p class="ghi-chu">Doanh thu thuần đã trừ thuế tiêu dùng. Phiếu đỏ (hàng trả lại)
+được tính vào như số âm — cố ý, vì hàng trả lại là doanh thu âm thật.</p>
 {% endif %}
+
+<h2>Tiến độ ngân sách tháng {{ tq.ngan_sach.thang if tq.ngan_sach else "" }}</h2>
+{% if tq.ngan_sach and tq.ngan_sach.co_ngan_sach %}
+<div class="thanh-tien-do" role="img"
+     aria-label="{{ nhan_tien_do('ngân sách toàn công ty', tq.ngan_sach.tien_do) }}">
+ <div class="day" style="width:{{ tq.ngan_sach.rong_thanh }}%"></div>
+ {% if tq.ngan_sach.rong_moc is not none %}<div class="moc" style="left:{{ tq.ngan_sach.rong_moc }}%"></div>{% endif %}
+</div>
+<div class="thanh-nhan">
+ <span>{% if tq.ngan_sach.tien_do is not none %}{{ "%.1f"|format(tq.ngan_sach.tien_do * 100) }}% đạt{% else %}—{% endif %}</span>
+ <span>¥{{ "{:,}".format(tq.ngan_sach.thuc_te) }} / ¥{{ "{:,}".format(tq.ngan_sach.muc_tieu) }}</span>
+</div>
+<ul class="ds-nguoi">
+{% for n in tq.ngan_sach.nguoi %}
+<li><span class="ten">{{ n.ten or n.ma }}</span>
+ {% if n.rong_thanh is not none %}
+ <div class="thanh-tien-do thanh-nho" role="img"
+      aria-label="{{ nhan_tien_do(n.ten or n.ma, n.tien_do) }}">
+  <div class="day" style="width:{{ n.rong_thanh }}%"></div>
+  {% if n.rong_moc is not none %}<div class="moc" style="left:{{ n.rong_moc }}%"></div>{% endif %}
+ </div>
+ {% if n.tien_do is not none %}<span class="{{ 'manh' if n.tien_do >= 1 else 'yeu' }}">{{ "%.1f"|format(n.tien_do * 100) }}%</span>{% endif %}
+ {% else %}<span class="khong-ap-dung">chưa có chỉ tiêu</span>{% endif %}
+</li>
+{% endfor %}
+</ul>
+<p class="ghi-chu"><a href="/bao-cao">Xem chi tiết →</a></p>
+{% else %}
+<p class="ngay-thieu">Chưa đặt chỉ tiêu tháng này.
+{% if hien_ngan_sach %} <a href="/ngan-sach">Đặt chỉ tiêu</a>{% endif %}</p>
+{% endif %}
+
+<h2>Xu hướng 30 ngày</h2>
+<p class="ghi-chu">Cột là 30 ngày gần nhất; đường là 30 ngày liền trước, so
+theo THỨ TỰ NGÀY (ngày thứ 1 với ngày thứ 1) — không theo "cùng thứ trong tuần".</p>
+{% if xh.co %}
+<div class="khung-bd">
+<svg viewBox="0 0 {{ xh.rong }} {{ xh.cao }}" width="100%" height="{{ xh.cao }}"
+     role="group" aria-label="Doanh thu 30 ngày gần nhất so với 30 ngày liền trước">
+ {% for c in xh.cot %}
+ <rect x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}" rx="2"
+       fill="var(--lien-ket)" opacity=".72">
+  <title>{{ c.ngay }}: ¥{{ "{:,}".format(c.gia_tri) }}</title></rect>
+ {% endfor %}
+ {% if xh.co_duong %}
+ <polyline points="{{ xh.duong }}" fill="none" stroke="var(--duong-ck)"
+           stroke-width="1.75" stroke-dasharray="5 4"/>
+ {% for p in xh.diem %}
+ <circle cx="{{ p.x }}" cy="{{ p.y }}" r="2.2" fill="var(--duong-ck)">
+  <title>{{ p.ngay }}: ¥{{ "{:,}".format(p.gia_tri) }}</title></circle>
+ {% endfor %}
+ {% endif %}
+</svg>
+</div>
+<div class="chu-thich">
+ <span><i class="mau" style="background:var(--lien-ket);opacity:.72"></i>30 ngày gần nhất (cột)</span>
+ {% if xh.co_duong %}<span><i class="mau" style="background:var(--duong-ck)"></i>30 ngày liền trước (đường nét đứt)</span>
+ {% else %}<span>Chưa đủ 31 ngày dữ liệu để vẽ đường so sánh.</span>{% endif %}
+</div>
+{% else %}
+<p class="khoi-rong">Chưa có dữ liệu để vẽ khối này.</p>
+{% endif %}
+
+<h2>Sức khoẻ khách hàng</h2>
+{# Chiều rộng % mỗi đoạn tính SẴN ở Python (kome.tong_quan.doan_suc_khoe) —
+   template chỉ vẽ, không tự chia phần trăm.
+
+   [Soát vòng 1] Bộ đếm của thanh này (`tq.dem`) LUÔN không lọc theo sale
+   (toàn công ty — xem docstring `kome.tong_quan.tong_quan`), nên mọi liên
+   kết rời khỏi nó BẮT BUỘC mang `tat_ca=1`: `/khach-hang` không có tham số
+   đó sẽ rơi về mặc định lọc theo NGƯỜI ĐANG ĐĂNG NHẬP, và bấm vào một đoạn
+   "1.710 khách" lại ra danh sách 216 khách của riêng mình — đúng lớp lỗi đã
+   ghi ở CLAUDE.md ("chip Tất cả (1.710) bấm vào ra 216 khách") và bất biến
+   `/ban-do` (biến `giu` mang `tat_ca`/`nv` qua mọi liên kết rời trang).
+
+   [Soát cuối, I-3] Mọi đoạn — kể cả "Cần gọi lại" (`d.nhom == 'canh_bao'`)
+   — trỏ về `/khach-hang?loc=<nhom>&tat_ca=1`, KHÔNG về `/can-xu-ly`: đoạn
+   này đếm ĐÚNG `trang_thai = 'canh_bao'` (khớp `loc=canh_bao` của
+   `/khach-hang`), còn `/can-xu-ly` gộp CẢ `canh_bao` LẪN `da_roi_bo` và cắt
+   ở 100 dòng — bấm vào bộ đếm "canh_bao" mà ra một danh sách rộng hơn (và
+   có thể bị cắt bớt) là con số không khớp danh sách nó mở ra. #}
+<div class="thanh-suc-khoe">
+{% for d in doan_suc_khoe if d.so > 0 %}
+  {% set nhan, mau = trang_thai_nhan[d.nhom] %}
+  <a href="{{ '/khach-hang?loc=' + d.nhom + '&tat_ca=1' }}"
+     style="width:{{ d.rong }}%;background:{{ MAU_VAR[mau] }}"
+     title="{{ nhan }}: {{ d.so }} khách" aria-label="{{ nhan }}: {{ d.so }} khách"></a>
+{% endfor %}
+</div>
+<div class="chu-thich">
+{% for d in doan_suc_khoe %}
+  {% set nhan, mau = trang_thai_nhan[d.nhom] %}
+  <span><i class="mau" style="background:{{ MAU_VAR[mau] }}"></i>{{ nhan }}: {{ "{:,}".format(d.so) }}</span>
+{% endfor %}
+</div>
+
+<div class="hai-cot">
+  <section>
+    <h3>Cần gọi hôm nay</h3>
+    {% if sale %}
+    <p class="ghi-chu">Danh sách của <strong>{{ ten_sale }}</strong> ·
+      <a href="/?tat_ca=1">Xem của mọi người</a></p>
+    {% elif tat_ca and nguoi_sale %}
+    {# Đang xem "mọi người" (?tat_ca=1) NHƯNG người đăng nhập vẫn có một mã
+       sale riêng — cần đường quay lại, không chỉ đường đi tới. #}
+    <p class="ghi-chu">Đang xem của mọi người ·
+      <a href="/">Xem danh sách của tôi</a></p>
+    {% endif %}
+    {% if tq.can_goi %}
+    <ul class="viec">
+    {% for k in tq.can_goi %}
+      <li><a href="/khach-hang/{{ k.ma }}">{{ k.ten }}</a>
+        <div class="ghi-chu">im {{ k.so_ngay_im_lang }} ngày · ¥{{ "{:,}".format(k.doanh_thu) }}</div></li>
+    {% endfor %}
+    </ul>
+    {% else %}
+    <div class="trong">Không có khách nào cần gọi{% if sale %} trong danh sách của {{ ten_sale }}{% endif %}.</div>
+    {% endif %}
+    {# Khối này đang hiện của AI (sale hiện tại, hoặc "mọi người" khi
+       `tat_ca`) — "Xem tất cả" phải giữ NGUYÊN trạng thái lọc đó, không thì
+       bấm vào từ chế độ "mọi người" lại rơi về mặc định lọc-theo-mình của
+       /can-xu-ly. #}
+    <p class="ghi-chu"><a href="/can-xu-ly{{ '?tat_ca=1' if tat_ca else '' }}">Xem tất cả →</a></p>
+  </section>
+  <section>
+    <h3>Hàng cận hạn</h3>
+    <p class="ghi-chu">Sắp hết hạn trong {{ can_han_ngay }} ngày{% if tq.so_qua_han %}
+      · <strong>{{ tq.so_qua_han }}</strong> lô đã quá hạn{% endif %}.</p>
+    {% if tq.can_han %}
+    <ul class="viec">
+    {% for d in tq.can_han %}
+      <li><a href="/san-pham/{{ d.ma }}">{{ d.ten }}</a>
+        <div class="ghi-chu">{{ d.ten_kho or d.kho }} · còn {{ d.han_con_lai }} ngày</div></li>
+    {% endfor %}
+    </ul>
+    {% else %}
+    <div class="trong">Không lô nào cận hạn.</div>
+    {% endif %}
+    <p class="ghi-chu"><a href="/kho-hang">Xem tất cả →</a></p>
+  </section>
+</div>
+
+<h2>Chưa có dữ liệu</h2>
+<p class="ghi-chu">Công nợ · Dòng tiền · Mua hàng · Khiếu nại · Thời tiết —
+chưa có nguồn dữ liệu, sẽ thêm khi nạp được.</p>
 </html>
 </main>

@@ -72,6 +72,65 @@
       kome/web/templates/ban_do.html. */
    --map-0:#EFEBE1; --map-1:#F6E7B8; --map-2:#EDCB78; --map-3:#D9A83E;
    --map-4:#B37F1E; --map-5:#7A5510; --map-chu-alt:#FFFFFF;
+   /* [Đợt 5b Task 4] Bậc màu tăng trưởng cho bản đồ nhiệt và cây ô
+      (kome/ve_phan_tich.py::bac_tang_truong) — 5 bậc đối xứng quanh 0, tông
+      đỏ/xanh lấy từ --do/--ok-vien đang có (KHÔNG đơn-tông kiểu --map-*:
+      bản đồ khách hàng cần an toàn cho người mù màu đỏ-xanh vì nó không có
+      trục "tốt/xấu" rõ ràng, còn tăng trưởng CÓ — cả trang đã dùng đỏ/xanh
+      cho .yeu/.manh khắp nơi). Đủ nhạt để chữ --chu (gần đen ở chế độ sáng)
+      đọc được khi đè lên, không cần một --nhiet-chu-alt riêng.
+      --nhiet-khong: trung tính cho "có cùng kỳ nhưng mẫu số ≤ 0" (bac
+      "khong" của bac_tang_truong). --nhiet-soc: [Vòng soát cuối, M4] màu
+      sọc chéo CSS (`repeating-linear-gradient`, lớp `.bac-khong_ck` của
+      bao_cao.html) cho ô "không có cùng kỳ" của bản đồ nhiệt (bac
+      "khong_ck") — bình luận cũ ở đây nói "<pattern>" (một phần tử SVG),
+      stale từ trước khi bản đồ nhiệt chuyển từ SVG sang <table> (I-2, xem
+      chú thích ngay phía trên lớp `.bac-khong_ck` trong bao_cao.html) —
+      khác --nhiet-khong, vì đây là "không có DỮ LIỆU", không phải "có dữ
+      liệu, không so được". --duong-ck: đường doanh thu cùng kỳ nét đứt trên biểu đồ 12
+      tháng (ve_bieu_do::duong_ck) — [Vòng soát cuối, M3] TÔNG RIÊNG (xanh
+      lam trầm), khác hẳn --lien-ket: bản trước đặt CÙNG GIÁ TRỊ với
+      --lien-ket (cột doanh thu dùng chính --lien-ket làm `fill`, xem
+      bao_cao.html), nên đường nét đứt cùng kỳ và cột doanh thu năm nay tô
+      trùng một màu — mắt chỉ tách được nhờ hình dạng (đường vs cột), không
+      nhờ màu, và chú giải "màu X = cùng kỳ năm trước" nói dối vì màu đó
+      cũng chính là màu cột. Cũng khác --ok-vien (đường tỷ suất) và --do
+      (cột tháng chốt) đã có trên cùng biểu đồ.
+      [Vòng soát 1, I-4] Bậc chẵn (g2/t2, cực trị) đậm/bão hoà HƠN HẲN bậc lẻ
+      (g1/t1, nhẹ) và bậc 0 (gần như bằng nền/viền trang) — khoảng cách độ
+      sáng phải đủ RỘNG để mắt phân biệt được 5 bậc liền kề nhau trên một
+      lưới nhỏ (~40px/ô), không chỉ đủ tương phản với CHỮ đè lên. Bản đồ
+      nhiệt (kome/web/templates/bao_cao.html) LUÔN vẽ viền `var(--vien)`
+      quanh mỗi ô (`.nhiet-bang td`) — hai bậc gần màu nền/viền nhất
+      (--nhiet-0, --nhiet-khong) không có viền sẽ lẫn hẳn vào khoảng trống
+      giữa các ô.
+      [Vòng soát 1 vòng 2, N-2] --nhiet-khong-ban RIÊNG cho "không bán
+      tháng này" (bac "khong_ban") — trước bản sửa ô này tái dùng
+      --vien-phu (qua lớp `.bac-khong_ban` cũ), TRÙNG HỆT --nhiet-khong
+      (bac "khong") ở cả hai giá trị, nên hai Ý NGHĨA KHÁC NHAU ("ngành
+      thật sự không bán gì tháng đó" và "có bán, nhưng mẫu số cùng kỳ ≤ 0
+      không tính được %") lại tô CÙNG MỘT MÀU — mắt không tách được hai
+      trạng thái mà `title` nói khác hẳn nhau. Tông xanh dương nhạt, tách
+      hẳn khỏi trục đỏ/xanh lá của 5 bậc tăng trưởng (để không ai đọc nhầm
+      thành "bậc thứ sáu" của thang đó). */
+   --nhiet-g2:#E8938C; --nhiet-g1:#F5D2CD; --nhiet-0:#E6E2D9;
+   --nhiet-t1:#CFEBDC; --nhiet-t2:#8FCDA9;
+   --nhiet-khong:#F0EDE6; --nhiet-khong-ban:#DCE4EC; --nhiet-soc:#D8D3C8;
+   --duong-ck:#5C7A99;
+   /* [Vòng soát cuối, M4] Chữ nhãn số tiền khi bị ĐẨY VÀO TRONG thân thanh
+      (khối "Ngành hàng kéo doanh thu lên/xuống", `ve_dong_gop::nhan_trong`,
+      bao_cao.html) — trước bản sửa dùng CHUNG `var(--nen-the)` cho cả thanh
+      dương (`--ok-vien`, xanh) lẫn thanh âm (`--loi-vien`, ĐỎ CÔNG TY
+      #D62C27, KHÔNG đổi theo chế độ sáng/tối). Ở chế độ TỐI, `--nen-the` là
+      màu gần đen (#211D17) — chữ gần đen trên nền đỏ đó chỉ đạt tỷ lệ tương
+      phản ~3,4:1, dưới ngưỡng 4,5:1 (WCAG AA cho chữ cỡ nhỏ). Vì nền đỏ
+      không đổi theo chế độ, chữ đặt lên nó cũng không nên đổi theo chế độ —
+      `--dg-chu-am` cố định TRẮNG ở CẢ HAI bảng màu (đạt ~4,9:1 với đỏ, còn
+      `var(--chu)` bản tối dù đã sáng hơn `--nen-the` vẫn chỉ ~4,3:1, chưa
+      đủ ngưỡng). Thanh DƯƠNG (xanh `--ok-vien`) vẫn giữ nguyên
+      `var(--nen-the)` — tổ hợp đó đã đạt >5:1 ở cả hai chế độ, không cần
+      đổi. */
+   --dg-chu-am:#FFFFFF;
    /* Nền bọc logo sidebar (đợt 4d, Task 1) — README gói thiết kế: "logo
       tròn, hiển thị 28px trong sidebar (nền tối thì bọc nền sáng, bo
       tròn)". Ở chế độ sáng giá trị này trùng --nen-the nên không thấy gì
@@ -122,6 +181,13 @@
    --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
    --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
    --logo-nen:#FBF9F5;
+   /* [Đợt 5b Task 4] Bậc màu tăng trưởng — bản tối, cùng công thức đảo
+      đậm/nhạt như --map-* ở trên (bậc cực trị phải NỔI trên nền sẫm). */
+   --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
+   --nhiet-t1:#20452F; --nhiet-t2:#1E6E45;
+   --nhiet-khong:#2B251D; --nhiet-khong-ban:#26313B; --nhiet-soc:#4A4239;
+   --duong-ck:#8FA3C9;
+   --dg-chu-am:#FFFFFF;
    /* HET-BANG-TOI */
    }
  }
@@ -157,6 +223,13 @@
    --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
    --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
    --logo-nen:#FBF9F5;
+   /* [Đợt 5b Task 4] Bậc màu tăng trưởng — bản tối, cùng công thức đảo
+      đậm/nhạt như --map-* ở trên (bậc cực trị phải NỔI trên nền sẫm). */
+   --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
+   --nhiet-t1:#20452F; --nhiet-t2:#1E6E45;
+   --nhiet-khong:#2B251D; --nhiet-khong-ban:#26313B; --nhiet-soc:#4A4239;
+   --duong-ck:#8FA3C9;
+   --dg-chu-am:#FFFFFF;
    /* HET-BANG-TOI */
  }
  /* Chọn "Sáng" bằng tay: đối xứng với color-scheme:dark ở trên — không cần

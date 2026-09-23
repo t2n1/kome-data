@@ -86,6 +86,13 @@ SAP_XEP = {
 # sách cái cần theo dõi. Lô quá hạn có khối riêng: `Kho.qua_han`.
 CAN_HAN_NGAY = 90
 
+# Vị từ "lô cận hạn"/"lô đã quá hạn" trên mart.ton_hien_tai (bí danh BẮT BUỘC
+# `t`), viết MỘT LẦN cho cả `kho_hang()` (hai lượt hỏi) và `lo_can_han()`
+# (dùng riêng cho dashboard `/`) — hai bản chép tay là hai ngưỡng "cận hạn"
+# sẽ trôi khỏi nhau, đúng bài học của `_vi_tu` ở kome/khach_hang.py.
+VI_TU_CAN_HAN = "t.loai_han = 'ngay' AND t.han_con_lai BETWEEN 0 AND %s"
+VI_TU_QUA_HAN = "t.loai_han = 'ngay' AND t.han_con_lai < 0"
+
 
 @dataclass
 class SanPham:
@@ -512,7 +519,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
             SELECT 'o', 'can_han', '', count(*), 0, NULL
               FROM t
               LEFT JOIN s ON s.product_code = t.product_code
-             WHERE t.loai_han = 'ngay' AND t.han_con_lai BETWEEN 0 AND %s
+             WHERE {VI_TU_CAN_HAN}
                    {dk_kho} {dk_loc}
             UNION ALL
             SELECT 'o', 'gia_tri_ton_chet', '', coalesce(sum(t.gia_tri), 0), 0, NULL
@@ -582,7 +589,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                     row_number() OVER (ORDER BY t.han_con_lai)
                FROM t
                LEFT JOIN s ON s.product_code = t.product_code
-              WHERE t.loai_han = 'ngay' AND t.han_con_lai BETWEEN 0 AND %s
+              WHERE {VI_TU_CAN_HAN}
                     {dk_kho} {dk_loc})
             UNION ALL
             (SELECT 'qua', t.product_code,
@@ -592,7 +599,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                     row_number() OVER (ORDER BY t.han_con_lai)
                FROM t
                LEFT JOIN s ON s.product_code = t.product_code
-              WHERE t.loai_han = 'ngay' AND t.han_con_lai < 0
+              WHERE {VI_TU_QUA_HAN}
                     {dk_kho} {dk_loc})
         ) u ORDER BY khoi, xep
     """, p_kho + p_loc + [CAN_HAN_NGAY] + p_kho + p_loc
@@ -618,3 +625,59 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                can_han=[_dong(r) for r in rows if r[0] == "han"],
                qua_han=[_dong(r) for r in rows if r[0] == "qua"],
                ds_kho=ds_kho, kho=kho, loc=loc)
+
+
+def lo_can_han(conn, gioi_han: int = 5) -> tuple[list[dict], int]:
+    """`gioi_han` lô cận hạn KHÔNG lọc theo kho/trạng thái + số lô ĐÃ quá hạn,
+    ĐÚNG MỘT lượt hỏi trên `mart.ton_hien_tai` — KHÔNG đụng `mart.san_pham_360`.
+
+    Vì sao có hàm riêng: dashboard `/` (kome.tong_quan.tong_quan()) trước đây
+    gọi nguyên `kho_hang()` — HAI lượt hỏi, mỗi lượt vật hoá san_pham_360, VIEW
+    NẶNG NHẤT của mart (kéo theo mart.ty_suat_mat_hang và hai lượt quét
+    fact_sales_line, xem chú thích ở đầu kho_hang()) — chỉ để lấy 5 dòng cận
+    hạn và một con số đếm. `lo_can_han()` chỉ cần TÊN HÀNG và HẠN SỬ DỤNG, cả
+    hai đều có sẵn ở nguồn rẻ hơn nhiều: `mart.ton_hien_tai` + `core.dim_product`.
+
+    TÊN HÀNG tái tạo ĐÚNG công thức của `san_pham_360.ten_hang`
+    (`coalesce(nullif(product_name, ''), product_code)`, migration 023) bằng
+    cách LEFT JOIN thẳng `core.dim_product` — không phải chép một biểu thức
+    tương tự rồi hy vọng nó khớp. `san_pham_360` dựng TỪ `core.dim_product`
+    (`FROM core.dim_product p`), nên với MỌI mã có trong `dim_product`, biểu
+    thức ở đây cho ra đúng con số mà `kho_hang()::_dong` hiện
+    (`coalesce(s.ten_hang, t.product_code)`). Ca hiếm mã tồn kho không có
+    trong `dim_product` (dữ liệu bất thường) cũng khớp: `p` là NULL qua LEFT
+    JOIN ở CẢ HAI nơi, `nullif(NULL, '')` vẫn NULL, `coalesce` rơi về
+    `product_code` ở cả hai — cùng một kết quả, không phải trùng hợp.
+
+    Thứ tự VÀ ngưỡng dùng chung `VI_TU_CAN_HAN`/`VI_TU_QUA_HAN` với
+    `kho_hang()` — một hằng, không phải hai bản chép của cùng một ngưỡng 90
+    ngày (xem chú thích ở CAN_HAN_NGAY).
+
+    CTE `t` vào `AS MATERIALIZED`: câu này tham chiếu `mart.ton_hien_tai` HAI
+    lần (khối 'han' và khối đếm 'qua'), đúng bất biến CTE-trùng của CLAUDE.md.
+    """
+    rows = conn.execute(f"""
+        WITH t AS MATERIALIZED (SELECT * FROM mart.ton_hien_tai),
+             han AS (
+                 SELECT t.product_code AS ma,
+                        coalesce(nullif(p.product_name, ''), t.product_code) AS ten,
+                        t.warehouse_code AS kho, t.ten_kho, t.han_con_lai,
+                        row_number() OVER (ORDER BY t.han_con_lai) AS xep
+                   FROM t
+                   LEFT JOIN core.dim_product p ON p.product_code = t.product_code
+                  WHERE {VI_TU_CAN_HAN}
+             ),
+             qua AS (SELECT count(*) AS n FROM t WHERE {VI_TU_QUA_HAN})
+        SELECT 'han'::text AS khoi, ma, ten, kho, ten_kho, han_con_lai, xep,
+               NULL::bigint AS n
+          FROM han WHERE xep <= %s
+        UNION ALL
+        SELECT 'qua', NULL, NULL, NULL, NULL, NULL, NULL, n FROM qua
+    """, [CAN_HAN_NGAY, gioi_han]).fetchall()
+
+    can_han = sorted(
+        ({"ma": r[1], "ten": r[2], "kho": r[3], "ten_kho": r[4],
+          "han_con_lai": r[5]} for r in rows if r[0] == "han"),
+        key=lambda d: d["han_con_lai"])
+    so_qua_han = next((int(r[7] or 0) for r in rows if r[0] == "qua"), 0)
+    return can_han, so_qua_han

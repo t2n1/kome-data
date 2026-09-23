@@ -93,6 +93,28 @@ def test_muc_ngan_sach_an_khoi_thanh_dieu_huong_khi_khong_co_co(khach, conn, bat
     assert 'href="/ngan-sach"' in khach(ngan_sach=True).get("/bao-cao").text
 
 
+def test_dat_chi_tieu_trong_khoi_bao_cao_gac_boi_hien_ngan_sach(khach, conn, batch):
+    """[Vòng soát cuối, M7] Khối ngân sách của `/bao-cao` — khi kỳ CHƯA có chỉ
+    tiêu — có RIÊNG một liên kết "Đặt chỉ tiêu" mang query (`/ngan-sach?ky=
+    ...`), phải gác bởi CÙNG cờ `hien_ngan_sach` như mọi liên kết `/ngan-sach`
+    khác (`/` — tests/test_tong_quan.py, và mục sidebar).
+
+    [Vì sao test cũ không bắt được lỗi] `test_muc_ngan_sach_an_khoi_thanh_
+    dieu_huong_khi_khong_co_co` ở trên chỉ kiểm chuỗi CHÍNH XÁC
+    `href="/ngan-sach"` (dấu ngoặc kép đóng NGAY sau đường dẫn) — liên kết
+    "Đặt chỉ tiêu" viết `href="/ngan-sach?ky=2026"`, có dấu `?` chen giữa
+    đường dẫn và dấu ngoặc kép, nên KHÔNG khớp chuỗi đó dù liên kết có mặt
+    hay không — bug lọt qua ngay cả khi có test canh mục sidebar."""
+    _ban(conn, batch, ngay=date(2026, 5, 11))
+    html_khong_quyen = khach(ngan_sach=False).get("/bao-cao?ky=2026").text
+    assert "Chưa đặt chỉ tiêu cho kỳ này." in html_khong_quyen
+    assert "/ngan-sach?ky=" not in html_khong_quyen
+
+    html_co_quyen = khach(ngan_sach=True).get("/bao-cao?ky=2026").text
+    assert "Chưa đặt chỉ tiêu cho kỳ này." in html_co_quyen
+    assert 'href="/ngan-sach?ky=2026">Đặt chỉ tiêu</a>' in html_co_quyen
+
+
 def test_khong_co_cong_dang_nhap_thi_vao_duoc(conn, batch, test_db_url):
     """Máy trong công ty để trống KOME_SESSION_SECRET => không có cổng và
     không có phân quyền. Đây là CẠM BẪY đã ghi trong CLAUDE.md, không phải lỗ
