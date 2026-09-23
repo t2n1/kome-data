@@ -199,6 +199,14 @@ def lam_nong(open_conn) -> None:
                 lay(c, "kho-hang", du_lieu_kho_hang, chi_nap=True)
         except Exception as e:         # noqa: BLE001
             print(f"[anh-chup] không làm nóng được sản phẩm / kho: {e!r}")
+        # Sổ công nợ (đợt 6) — khoá khớp kome/web/api.py::KHOA_CONG_NO.
+        try:
+            from kome import cong_no as CN
+            from kome.web.api import KHOA_CONG_NO, thanh_json
+            with open_conn() as c:
+                lay(c, KHOA_CONG_NO, lambda cc: thanh_json(CN.man_hinh(cc)), chi_nap=True)
+        except Exception as e:         # noqa: BLE001
+            print(f"[anh-chup] không làm nóng được công nợ: {e!r}")
 
     if bat():
         threading.Thread(target=chay, name="lam-nong-anh-chup", daemon=True).start()

@@ -10,7 +10,9 @@ import type { BoLoc } from "./loc";
 import { nhoDanhSach, thamSoDs } from "./loc";
 import type { DsApi, KhachDong } from "./kieu";
 
-const CHUA_CO_NO = "Cần sổ công nợ (請求先元帳 / 入金伝票) — chưa có bộ nạp.";
+// Công nợ ghi theo BÊN NHẬN HOÁ ĐƠN (請求先), không theo từng khách — nên danh sách
+// khách không lọc / đếm được theo nợ; số nằm ở màn Công nợ (đợt 6).
+const CHUA_CO_NO = "Công nợ ghi theo bên nhận hoá đơn (請求先), không theo từng khách — xem màn Công nợ.";
 export const MAU_TT: Record<string, string> = {
   binh_thuong: "ok", canh_bao: "canh", da_roi_bo: "do", chua_du_lich_su: "nhat", ngung_giao_dich: "nhat",
 };
@@ -102,8 +104,9 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
             {tang == null ? "tháng trước cùng ngày chưa có đơn" : `${thay_doi(tang)} so tháng trước cùng ngày`}</div></div>
         <div className="o-kpi"><div className="nhan">Im lặng ≥ 2× nhịp</div><div className="gia">{so(t.so_can_xu_ly)}</div>
           <div className="dong-phu nhat-chu">đã quá chu kỳ mua thường lệ</div></div>
-        <div className="o-kpi chua" title={CHUA_CO_NO}><div className="nhan">Công nợ quá hạn</div><div className="gia">chưa có dữ liệu</div>
-          <div className="dong-phu nhat-chu">cần sổ công nợ</div></div>
+        <a className="o-kpi" href="/cong-no?tab=qua_han" title={CHUA_CO_NO}><div className="nhan">Công nợ quá hạn</div>
+          <div className="gia" style={{ fontSize: "1rem" }}>xem màn Công nợ →</div>
+          <div className="dong-phu nhat-chu">ghi theo bên nhận hoá đơn</div></a>
       </div>
 
       <div className="kh-muc"><h2>Danh sách làm việc</h2><span className="phu">chọn một nhóm để lọc danh bạ · số đếm theo người phụ trách đang xem</span></div>
@@ -112,7 +115,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
           <button key={p.ma} type="button" className="kh-pk" aria-pressed={p.bat} disabled={!p.ap}
             title={p.ap ? undefined : CHUA_CO_NO} onClick={() => p.ap && dat(p.ap, true)}>
             <span className="kh-pk-dau"><b>{p.ten}</b><span className={"kh-pk-so" + (p.so ? " co" : "")}>{p.so == null ? "chưa có" : so(p.so)}</span></span>
-            <span className="kh-pk-mo">{p.ma === "no" ? "chưa có dữ liệu công nợ" : p.mo}</span>
+            <span className="kh-pk-mo">{p.ma === "no" ? "theo bên nhận hoá đơn — màn Công nợ" : p.mo}</span>
           </button>))}
       </div>
 

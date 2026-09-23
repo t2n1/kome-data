@@ -25,6 +25,8 @@ const DuBao = lazy(() => import("./du_bao/DuBao"));
 // Giai đoạn 4.
 const ManSanPham = lazy(() => import("./san_pham/ManSanPham"));
 const KhoHang = lazy(() => import("./san_pham/KhoHang"));
+// Đợt 6.
+const ManCongNo = lazy(() => import("./cong_no/ManCongNo"));
 // Giai đoạn 5 — nhóm HỆ THỐNG. Máy chủ tính sẵn dữ liệu vào window.__KOME__.man.
 const KhoDuLieu = lazy(() => import("./he_thong/KhoDuLieu"));
 const TaiLieuLuong = lazy(() => import("./he_thong/TaiLieu").then(m => ({ default: m.TaiLieuLuong })));
@@ -45,6 +47,7 @@ function man(duong: string): (() => React.ReactElement) | null {
   if (duong === "/du-bao") return () => <DuBao />;
   if (duong === "/san-pham" || /^\/san-pham\/[^/]+$/.test(duong)) return () => <ManSanPham />;
   if (duong === "/kho-hang") return () => <KhoHang />;
+  if (duong === "/cong-no") return () => <ManCongNo />;
   if (KD.man != null) {
     if (duong === "/kho-du-lieu" || duong === "/upload") return () => <KhoDuLieu />;
     if (duong === "/kho-du-lieu/luong") return () => <TaiLieuLuong />;

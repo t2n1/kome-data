@@ -155,6 +155,7 @@ def du_lieu_kho_hang(c, kho: str = "", loc: str = "") -> dict:
 
 # Khoá ảnh chụp danh mục sản phẩm — `anh_chup.lam_nong` làm nóng đúng khoá này.
 KHOA_DANH_MUC = "san-pham/danh-muc"
+KHOA_CONG_NO = "cong-no"
 
 
 def _loi(thong_diep: str, ma: int = 500) -> JSONResponse:
@@ -421,5 +422,22 @@ def tao_api(open_app_conn) -> APIRouter:
         return _chup(request, _khoa("kho-hang", kho=kho, loc=loc),
                      lambda c: du_lieu_kho_hang(c, kho, loc),
                      "Không đọc được tồn kho.", chi_nap=True)
+
+    # ---- Đợt 6: Công nợ ------------------------------------------------
+    # Chỉ đọc core/mart -> phiên bản theo dữ liệu NẠP.
+
+    @r.get("/cong-no")
+    def cong_no(request: Request):
+        """Màn Công nợ: MỘT ảnh chụp (`CN.man_hinh`, 2 lượt hỏi) — lọc ở trình duyệt."""
+        from kome import cong_no as CN
+        return _chup(request, KHOA_CONG_NO, lambda c: thanh_json(CN.man_hinh(c)),
+                     "Không đọc được sổ công nợ.", chi_nap=True)
+
+    @r.get("/cong-no/khach/{ma}")
+    def cong_no_khach(request: Request, ma: str):
+        """Tab Công nợ của hồ sơ khách (`CN.cua_khach`, ≤ 3 lượt hỏi)."""
+        from kome import cong_no as CN
+        return _chup(request, _khoa("cong-no/khach", ma=ma), lambda c: thanh_json(CN.cua_khach(c, ma)),
+                     "Không đọc được công nợ của khách.", chi_nap=True)
 
     return r

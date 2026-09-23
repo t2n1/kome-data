@@ -11,7 +11,7 @@ lại hàm đã có (`kome.tong_quan`, `kome.bao_cao.tien_do_ngan_sach`,
 (CLAUDE.md). Khối số tổng KHÔNG lọc theo người đăng nhập; chỉ các khối "việc
 của tôi" (`viec_hom_nay`, danh sách cần gọi) nhận `sale`.
 
-Khối của gói thiết kế KHÔNG có nguồn (tuổi nợ, dòng tiền, mua hàng, khiếu nại,
+Khối của gói thiết kế KHÔNG có nguồn (dòng tiền, mua hàng, khiếu nại,
 hàng sắp về, thời tiết, tỷ lệ im lặng theo tuần) không có hàm ở đây — giao diện
 vẽ khung "chưa có dữ liệu" và nói rõ thiếu nguồn nào (`CHUA_CO`).
 """
@@ -27,7 +27,6 @@ from kome.tuoi_du_lieu import hom_nay_o_nhat, tinh_tuoi
 
 # Khối không có nguồn dữ liệu thật -> câu giải thích hiện trong khung khối.
 CHUA_CO = {
-    "cong_no": "Cần sổ công nợ 請求先元帳 / 入金伝票 nạp đều đặn — chưa có bộ nạp (đợt 6 hoãn).",
     "dong_tien": "Cần số dư ngân hàng, chi phí và phải trả — chưa có nguồn nào.",
     "mua_hang": "Cần dữ liệu đơn đặt nhà cung cấp (発注) — OBC chưa xuất đều đặn.",
     "khieu_nai": "Cần sổ trả hàng & khiếu nại — chưa có nơi ghi.",
@@ -328,6 +327,14 @@ def thong_bao(conn, sale=None) -> dict:
     return {"tb": tb}
 
 
+# ---- Tuổi nợ phải thu (đợt 6) -----------------------------------------------
+
+def cong_no(conn, sale=None) -> dict | None:
+    """Sổ 請求先元帳 mới nhất (mart.cong_no_*, migration 038). None = chưa nạp sổ."""
+    from kome import cong_no as CN
+    return CN.khoi_tong_quan(conn)
+
+
 # Mã khối -> (hàm, theo_ngay, theo_sale). Mã trùng `kome/web/bo_cuc.py::KHOI`.
 KHOI = {
     "kpi": (kpi, False, False),
@@ -339,6 +346,7 @@ KHOI = {
     "han_su_dung": (han_su_dung, False, False),
     "viec_hom_nay": (viec_hom_nay, True, True),
     "thang_nay_chua_mua": (thang_nay_chua_mua, False, True),
+    "cong_no": (cong_no, False, False),
     "don_hang": (nap_gan_nhat, False, False),
     "danh_sach_khach": (danh_sach_khach, False, False),
     "hieu_suat_nganh": (hieu_suat_nganh, False, False),

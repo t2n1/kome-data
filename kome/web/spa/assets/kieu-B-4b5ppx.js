@@ -1,0 +1,1 @@
+function e(e){return e.qua_han==null?[e.tuoi==null?`trước kỳ`:`${e.tuoi} ngày · không suy được hạn`,`nhat`]:e.qua_han>0?[`quá hạn ${e.qua_han} ngày`,`do`]:e.qua_han===0?[`đến hạn hôm mốc`,`canh`]:[`còn ${-e.qua_han} ngày tới hạn`,`ok`]}export{e as t};

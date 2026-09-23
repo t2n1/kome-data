@@ -311,3 +311,51 @@ meisai:
   qty_columns: [case_qty, qty]
   rate_columns: [gross_margin, tax_rate]
   required_date_columns: [sales_date]
+
+# 請求先元帳 — sổ công nợ theo BÊN NHẬN HOÁ ĐƠN (đợt 6, migration 038). Đo thật
+# 2026-09-24: 5 dòng thông tin (帳票名 / 法人名 / 集計期間 / 集計軸項目 /
+# 売上伝票の表示) rồi header ở dòng 6 — bẫy #4 ĐÚNG với 元帳. Sheet tên
+# `得意先元帳` CẢ Ở file 請求先元帳 (OBC đặt vậy) — nên phân biệt hai loại sổ bằng
+# dòng 集計軸項目 (`so_cai_truc`), không bằng tên sheet. Chuẩn bị riêng ở
+# kome/so_cai.py: đọc kỳ từ 集計期間, đối chiếu 【合計】 (cổng 5), bỏ dòng tổng phụ.
+# Nhận CẢ tên gốc của OBC (`請求先元帳_2026年 5月 1日　～　2026年 7月31日.xlsx`)
+# lẫn dạng `_YYYYMMDD`; ngày dữ liệu = ngày CUỐI kỳ.
+seikyu_motocho:
+  display_name: 請求先元帳
+  core_table: core.fact_ar_ledger
+  references: {billing_customer_code: tokuisaki}
+  filename_pattern: '^請求先元帳_(?:(?P<date>\d{8})|\d{4}年\s*\d{1,2}月\s*\d{1,2}日\s*～\s*(?P<y>\d{4})年\s*(?P<m>\d{1,2})月\s*(?P<d>\d{1,2})日)\.xlsx$'
+  sheet: 得意先元帳
+  header_row: 6
+  so_cai_truc: 請求先
+  min_rows: 100
+  keys: [billing_customer_code, row_seq]
+  warn_row_drop_ratio: 0.3
+  warn_total_spike: 5.0
+  warn_total_drop: 0.2
+  columns:
+    請求先コード: billing_customer_code
+    請求先名: billing_customer_name
+    請求締日コード: closing_day_code
+    請求締日名: closing_day_name
+    行タイトル: row_title
+    日付: entry_date
+    伝票No.: slip_no
+    法人口座名: bank_name
+    債権額: receivable_amount
+    債権調整額: receivable_adj
+    売上額: sales_amount
+    消費税額: tax_amount
+    入金額: payment_amount
+    入金調整額: payment_adj
+    残高: balance
+    摘要: memo
+  code_columns: [billing_customer_code, closing_day_code, slip_no]
+  money_columns: [receivable_amount, receivable_adj, sales_amount, tax_amount,
+                  payment_amount, payment_adj, balance]
+  # 債権額 = bán chịu trong kỳ. KHÔNG dùng 残高: cộng số dư CHẠY của mọi dòng là
+  # con số vô nghĩa.
+  total_column: receivable_amount
+  qty_columns: []
+  rate_columns: []
+  date_columns: [entry_date]

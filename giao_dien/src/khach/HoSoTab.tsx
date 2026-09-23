@@ -9,6 +9,7 @@ import { ChuaCoDuLieu } from "../chung/Khoi";
 import { gon, ngay, pc, so, thay_doi, yen } from "../dinh_dang";
 import type { DongBan, HoSoApi, LichMa, MatHang } from "./kieu";
 import { GhiTiepXuc } from "./GhiTiepXuc";
+import { OCongNo } from "../cong_no/CongNoKhach";
 
 /** Khung "chưa có dữ liệu" trong một thẻ (ChuaCoDuLieu trả fragment — không bọc là vỡ lưới). */
 function ChuaCo(p: { tieu_de: string; ly_do: string }) {
@@ -58,8 +59,7 @@ export function TabTongQuan({ h }: { h: HoSoApi }) {
         <div className={"dong-phu " + (o.so_ma_ngung ? "giam" : "nhat-chu")}>{o.so_ma_ngung ? `${o.so_ma_ngung} mã đã ngừng` : "không mã nào ngừng"}</div></div>
       <div className="o-kpi"><div className="nhan">Biên lãi gộp giỏ hàng</div><div className="gia">{pc(k.ty_suat)}</div>
         <div className="dong-phu nhat-chu">lãi gộp ÷ doanh thu thuần, luỹ kế</div></div>
-      <div className="o-kpi chua" title="Cần sổ công nợ — chưa có bộ nạp."><div className="nhan">Công nợ quá hạn</div>
-        <div className="gia">chưa có dữ liệu</div><div className="dong-phu nhat-chu">cần sổ công nợ</div></div>
+      <OCongNo ma={k.ma} />
     </div>
 
     <div className="hs-hang hai-mot">
@@ -390,14 +390,8 @@ function DongNgay({ ma, ngay_ }: { ma: string; ngay_: string }) {
 }
 
 // ============================================================ Công nợ
-export function TabCongNo() {
-  const ly = "Cần sổ công nợ 請求先元帳 / 入金伝票 nạp đều đặn — chưa có bộ nạp (đợt 6 hoãn).";
-  return (
-    <div className="hs-hang hai">
-      <ChuaCo tieu_de="Hạn mức & dư nợ" ly_do={ly} />
-      <ChuaCo tieu_de="Hoá đơn chưa thanh toán" ly_do={ly} />
-    </div>);
-}
+// Đợt 6: cong_no/CongNoKhach.tsx (/api/cong-no/khach/{mã}).
+export { TabCongNo } from "../cong_no/CongNoKhach";
 
 // ============================================================ Hồ sơ & liên hệ
 const NHAN_HO_SO: [string, string][] = [["chi_nhanh", "Chi nhánh"], ["buu_chinh", "Bưu chính"], ["dia_chi", "Địa chỉ"],

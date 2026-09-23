@@ -71,6 +71,7 @@ BANG_THEO_LOAI = {
     "shiiresaki": ["core.dim_supplier"],
     "chokusousaki": ["core.dim_shipto"],
     "tanka": ["core.fact_price_list"],
+    "seikyu_motocho": ["core.fact_ar_ledger"],
 }
 
 # Tên bảng bằng tiếng Việt cho người vận hành. Không in tên bảng SQL lên màn
@@ -87,6 +88,7 @@ TEN_BANG_VI = {
     "shiiresaki": "bảng nhà cung cấp",
     "chokusousaki": "bảng điểm giao thẳng",
     "tanka": "bảng giá",
+    "seikyu_motocho": "sổ công nợ",
 }
 
 
