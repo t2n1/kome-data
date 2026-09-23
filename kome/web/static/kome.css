@@ -397,6 +397,49 @@
    border:1px solid var(--vien);background:var(--nen-phu);color:var(--chu);
    cursor:pointer}
  .chon-file{color:var(--chu)}
+ /* ---- Đợt 7: nhật ký tiếp xúc + màn Cần liên hệ (CRM.dc.html, Customer 360.dc.html) */
+ .nut-chinh{font:inherit;font-size:.82rem;font-weight:600;padding:.42rem .9rem;border-radius:7px;
+   border:1px solid var(--do);background:var(--do);color:var(--nen-the);cursor:pointer;white-space:nowrap}
+ .chip-chon{border:0;margin:0 0 .4rem;padding:0;display:flex;flex-wrap:wrap;gap:.3rem}
+ .chip-chon legend{font-size:.72rem;color:var(--chu-nhat);padding:0;margin-bottom:.2rem;width:100%}
+ .chip-chon label{font-size:.78rem;padding:.3rem .7rem;border-radius:7px;cursor:pointer;
+   border:1px solid var(--vien);background:var(--nen-the);color:var(--chu-thuong)}
+ .chip-chon input{position:absolute;opacity:0;width:1px;height:1px}
+ .chip-chon label:has(input:checked){border-color:var(--do);background:var(--do-nen);color:var(--do-chu);font-weight:600}
+ .chip-chon label.ok:has(input:checked){border-color:var(--ok-vien);background:var(--ok-nen);color:var(--ok-chu)}
+ .chip-chon label.loi:has(input:checked){border-color:var(--loi-vien);background:var(--loi-nen);color:var(--loi-chu)}
+ .chip-chon label.nhat:has(input:checked){border-color:var(--vien-dam);background:var(--nen-phu);color:var(--chu)}
+ .chip-chon label:has(input:focus-visible){outline:2px solid var(--do);outline-offset:1px}
+ .ghi-tx-dong{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+ .ghi-tx-dong input[type=text]{flex:1 1 14rem;min-width:0;font:inherit;font-size:.83rem;padding:.4rem .6rem;
+   border:1px solid var(--vien);border-radius:7px;background:var(--nen);color:var(--chu)}
+ .ghi-tx-dong .hen-lai{font-size:.76rem;color:var(--chu-nhat);display:flex;gap:.3rem;align-items:center}
+ .ghi-tx-dong input[type=date]{font:inherit;font-size:.78rem;padding:.3rem .4rem;border:1px solid var(--vien);
+   border-radius:7px;background:var(--nen);color:var(--chu)}
+ .the-nk{border:1px solid var(--vien);border-radius:11px;background:var(--nen-the);overflow:hidden}
+ .the-nk-dau{padding:.7rem .85rem;border-bottom:1px solid var(--vien-phu)}
+ .dong-nk{padding:.65rem .85rem;border-bottom:1px solid var(--vien-phu);font-size:.83rem;line-height:1.45}
+ .dong-nk:last-child{border-bottom:0}
+ .dong-nk-dau{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem;margin-bottom:.2rem;font-size:.78rem}
+ .dong-nk .khong-ap-dung{font-size:.72rem}
+ .cot-lh{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,1fr);gap:.75rem;
+   overflow-x:auto;padding-bottom:.5rem;margin:0 0 1.8rem}
+ .cot-lh > section{background:var(--nen-phu);border-radius:12px;padding:.65rem;min-width:0}
+ .cot-lh-dau{display:flex;align-items:baseline;gap:.4rem;padding:.15rem .3rem .2rem}
+ .cot-lh-dau h2{margin:0;font-size:.88rem}
+ .cot-lh-dau .tong{margin-left:auto;font-size:.75rem;color:var(--chu-nhat);font-variant-numeric:tabular-nums}
+ .cot-lh-mo{font-size:.72rem;color:var(--chu-nhat);padding:0 .3rem .55rem}
+ .the-lh{background:var(--nen-the);border:1px solid var(--vien);border-radius:9px;padding:.6rem .7rem;margin-bottom:.5rem}
+ .the-lh .ten{font-weight:600;font-size:.83rem;margin-bottom:.15rem}
+ .the-lh .phu{font-size:.74rem;color:var(--chu-nhat);margin-bottom:.35rem}
+ .the-lh .so-dong{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem;gap:.4rem}
+ .the-lh .so-dong strong{font-variant-numeric:tabular-nums}
+ .the-lh .cuoi{font-size:.72rem;color:var(--chu-nhat);margin-bottom:.35rem}
+ .the-lh details summary{font-size:.76rem;cursor:pointer;color:var(--lien-ket)}
+ .the-lh details[open] summary{margin-bottom:.45rem}
+ .the-lh .ghi-tx-dong input[type=text]{flex-basis:100%}
+ .hai-cot-lh{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:1.1rem;align-items:start}
+ .hai-cot-lh h2{margin:0 0 .6rem;font-size:1.06rem}
  .kq-ok{color:var(--ok-chu)} .kq-canh{color:var(--canh-chu)} .kq-loi{color:var(--loi-chu)}
 
  /* ---- Hai bảng phủ dữ liệu (màn Kho dữ liệu) --------------------

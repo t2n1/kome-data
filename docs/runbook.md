@@ -164,7 +164,7 @@ Lưu ý:
   — chính là `DATABASE_URL` ở trên. Màn đó cần ghi và xoá trong `core`, nên
   không dùng `kome_app_user` được.
 - **Từ Đợt 3, `kome_app_user` chạy đăng nhập và mọi trang chỉ đọc** (Tổng
-  quan, Khách hàng, Cần xử lý, Báo cáo) — biến `DATABASE_URL_APP` trong
+  quan, Khách hàng, Cần liên hệ, Báo cáo) — biến `DATABASE_URL_APP` trong
   `.env` (cách ghép chuỗi kết nối: xem `docs/trien-khai-vercel.md` mục 2c).
   Đọc `core`/`mart`, đọc-ghi `app` — **không ghi được vào `core`**, kể cả khi
   có bug trong code. Có SELECT trên `meta.ingest_batch` (cấp từ
@@ -207,6 +207,11 @@ màn mới dựng xong không ai vào được:
    luôn chạy bằng `postgres`" ở trên).
 2. Cấp cờ mới cho đúng người, ví dụ `--ngan-sach`:
    `python scripts/tao_nguoi_dung.py quyen <tên> --ngan-sach`.
+
+`030` (đợt 7 — nhật ký tiếp xúc) **không thêm cột quyền nào**: mọi người đã
+đăng nhập đều ghi được lần tiếp xúc cho mọi khách (lọc theo người phụ trách là
+mặc định tiện dụng, không phải hàng rào). Chạy `python db/migrate.py` bằng
+`postgres` là đủ; sau đó `python scripts/sinh_tai_lieu.py` nếu chưa chạy.
 
 Ngược lại, `029` (các view phân tích cho `/bao-cao` và `/`, đợt 5b) **không
 thêm cột quyền nào** — chỉ thêm view mới trong `mart`, đã có sẵn dòng GRANT

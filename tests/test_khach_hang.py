@@ -331,7 +331,7 @@ def test_cac_trang_moi_mo_duoc(conn, batch, test_db_url):
     _mua_deu(conn, batch, "000000009292", nhip=7, so_lan=5)
     c = TestClient(create_app(db_url=test_db_url))
 
-    for duong in ("/", "/khach-hang", "/can-xu-ly", "/khach-hang/000000009292"):
+    for duong in ("/", "/khach-hang", "/lien-he", "/khach-hang/000000009292"):
         r = c.get(duong)
         assert r.status_code == 200, duong
         assert "<script" not in r.text, f"{duong}: không dùng JavaScript"
@@ -348,10 +348,10 @@ def test_moi_trang_deu_co_khung_dieu_huong(conn, test_db_url):
     from kome.web.app import create_app
 
     c = TestClient(create_app(db_url=test_db_url))
-    for duong in ("/", "/khach-hang", "/can-xu-ly", "/bao-cao", "/health",
+    for duong in ("/", "/khach-hang", "/lien-he", "/bao-cao", "/health",
                   "/phu-du-lieu", "/nap"):
         t = c.get(duong).text
-        for muc in ('href="/khach-hang"', 'href="/bao-cao"', 'href="/can-xu-ly"'):
+        for muc in ('href="/khach-hang"', 'href="/bao-cao"', 'href="/lien-he"'):
             assert muc in t, f"{duong} thiếu {muc}"
 
 

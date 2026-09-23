@@ -36,7 +36,7 @@ TEN_FONT = [
 # (/san-pham và /kho-hang của đợt 4b thì ĐÃ có sẵn — bản soát ghi chúng cũng
 # thiếu, nhưng đo lại trên nhánh này thì không.) Thêm một trang mới thì THÊM
 # VÀO ĐÂY — đây là chỗ duy nhất canh khung chung của mọi trang.
-TRANG = ["/", "/khach-hang", "/bao-cao", "/can-xu-ly", "/kho-du-lieu",
+TRANG = ["/", "/khach-hang", "/bao-cao", "/lien-he", "/kho-du-lieu",
          "/san-pham", "/kho-hang", "/ban-do"]
 
 
@@ -198,7 +198,7 @@ def test_sidebar_hien_du_nam_muc_va_ba_nhom(conn, test_db_url):
     nhóm."""
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/").text
-    for duong_dan in ["/", "/bao-cao", "/khach-hang", "/can-xu-ly",
+    for duong_dan in ["/", "/bao-cao", "/khach-hang", "/lien-he",
                       "/kho-du-lieu"]:
         assert f'href="{duong_dan}"' in html, f"sidebar thiếu {duong_dan}"
     for nhom in ["TỔNG QUAN", "KHÁCH HÀNG", "HỆ THỐNG"]:
@@ -249,7 +249,7 @@ def test_ten_badge_khong_duoc_dung_lam_lop_tran_trong_css():
     khối 196px x 100vh dính trên đầu màn hình. 207 test vẫn xanh lúc đó vì
     không test nào soi việc MỘT TÊN LỚP bị TÁI SỬ DỤNG cho hai thứ khác
     nhau -- nó chỉ lộ ra khi có người mở đúng trang có đúng loại khách
-    (`/can-xu-ly`, nhóm "Cần gọi lại").
+    (`/can-xu-ly` lúc đó, nay `/lien-he`).
 
     `ok`/`canh`/`loi`/`nhat` là bốn tên RẤT CHUNG (kome/khach_hang.py) --
     người viết CSS sau này rất dễ đặt lại một trong bốn tên đó cho một

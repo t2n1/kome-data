@@ -3,7 +3,8 @@
   "app": [
    "ngan_sach",
    "ngan_sach_nhat_ky",
-   "nguoi_dung"
+   "nguoi_dung",
+   "nhat_ky_tiep_xuc"
   ],
   "core": [
    "dim_customer",
@@ -56,7 +57,8 @@
    "toc_do_ban",
    "ton_hien_tai",
    "tong_theo_ky",
-   "ty_suat_mat_hang"
+   "ty_suat_mat_hang",
+   "uu_tien_lien_he"
   ],
   "meta": [
    "ingest_batch"
