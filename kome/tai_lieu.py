@@ -81,7 +81,7 @@ def _tan_suat(s: FileSpec) -> str:
 def nguon_obc(specs: dict[str, FileSpec]) -> list[dict]:
     return [{"ten": s.name, "ja": s.display_name, "mo_ta": _mo_ta(s),
              "mau": s.filename_pattern, "header_row": s.header_row,
-             "keys": list(s.keys), "core_table": s.core_table,
+             "khoa": list(s.keys), "core_table": s.core_table,
              "tan_suat": _tan_suat(s)}
             for s in specs.values()]
 

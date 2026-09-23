@@ -691,7 +691,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 ctx = _du_lieu_kho(conn)
             ctx["backup"] = None if chi_doc else backup_status(backup_dir)
             return _ve(request, "kho_du_lieu.html",
-                       {**ctx, "results": results, "trang": "kho-du-lieu"})
+                       {**ctx, "results": results, "trang": "kho-du-lieu", "tab": "van-hanh"})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e)
 
@@ -722,9 +722,37 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             # đọc bỏ qua dải đỏ.
             ctx["backup"] = None if chi_doc else backup_status(backup_dir)
             return _ve(request, "kho_du_lieu.html",
-                       {**ctx, "trang": "kho-du-lieu"})
+                       {**ctx, "trang": "kho-du-lieu", "tab": "van-hanh"})
         except Exception as e:
             return _loi(request, "mở màn kho dữ liệu", e)
+
+    # ---- Tài liệu sống (đợt 2b) -------------------------------------
+    # 0 truy vấn: KHÔNG open_conn(). Nguồn là files.yml (lúc chạy) và ảnh
+    # chụp kome/web/tai_lieu_sinh.json (sinh bởi scripts/sinh_tai_lieu.py) —
+    # xem kome/tai_lieu.py. Nằm dưới tiền tố /kho-du-lieu/ nên middleware đã
+    # gác bằng duoc_vao_kho_du_lieu, không cần ngoại lệ nào.
+    @app.get("/kho-du-lieu/luong", response_class=HTMLResponse)
+    def kho_du_lieu_luong(request: Request):
+        from kome import tai_lieu as TL
+        from kome.config import SPECS
+        anh = TL.doc_anh_chup()
+        return _ve(request, "kho_du_lieu_luong.html", {
+            "trang": "kho-du-lieu", "tab": "luong", "md": TL.md_dong,
+            "tang": TL.bon_tang(anh, SPECS), "nguon": TL.nguon_obc(SPECS),
+            "chua_nap": TL.chua_nap(), "cong": TL.cong(anh),
+            "nguong": TL.nguong(SPECS), "cam_bay": TL.cam_bay(anh),
+            "lo_trinh": TL.lo_trinh(anh)})
+
+    @app.get("/kho-du-lieu/cot-noi", response_class=HTMLResponse)
+    def kho_du_lieu_cot_noi(request: Request, file: str | None = None):
+        from kome import tai_lieu as TL
+        from kome.config import SPECS
+        ten = TL.chon_file(SPECS, file)
+        return _ve(request, "kho_du_lieu_cot_noi.html", {
+            "trang": "kho-du-lieu", "tab": "cot-noi", "file": ten,
+            "file_ja": SPECS[ten].display_name, "core_table": SPECS[ten].core_table,
+            "nguon": TL.nguon_obc(SPECS), "ma_tran": TL.ma_tran(SPECS),
+            "noi": TL.noi_di_dau(SPECS, ten), "cot": TL.cot_cua(SPECS, ten)})
 
     # Ba địa chỉ cũ -> màn gộp. 301 chứ không 302: chúng biến mất vĩnh viễn,
     # và 301 cho trình duyệt cập nhật dấu trang. Neo để người bấm dấu trang cũ

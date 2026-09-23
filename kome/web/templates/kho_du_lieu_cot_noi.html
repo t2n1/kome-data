@@ -1,0 +1,54 @@
+<!-- kome/web/templates/kho_du_lieu_cot_noi.html — Cột nối (đợt 2b).
+     Mọi tên cột/khoá sinh từ config/files.yml qua kome/tai_lieu.py; chọn file
+     bằng ?file=<tên spec> (máy chủ vẽ, không JS). Test canh: mọi tên cột OBC
+     trong bảng "Cột trong …" đúng bằng `columns` của spec. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<title>KOME — cột nối giữa các file OBC</title>
+{% include "_chung.html" %}
+{% include "_nav.html" %}
+<h1>Kho dữ liệu</h1>
+{% include "_tab_kho_du_lieu.html" %}
+<div class="tai-lieu">
+<p class="ghi-chu">Mỗi file OBC chỉ ghép được với file khác qua mấy cột mã dưới đây. Mọi cột
+mã là TEXT — đọc thành số là mất số 0 đầu và không ghép được với gì nữa.</p>
+
+<section id="ma-tran">
+<h2>Ma trận khoá</h2>
+<p class="ghi-chu"><strong>◆</strong> khoá chính · <strong>●</strong> khoá ngoại · <strong>○</strong> có cột nhưng không phải khoá · trống = không có cột.</p>
+<div class="bang-cuon"><table class="bang-tl ma-tran">
+<tr><th>File</th>{% for c in ma_tran.cot %}<th>{{ c.ja }}<br><code>{{ c.vi }}</code></th>{% endfor %}</tr>
+{% for h in ma_tran.hang %}
+<tr><td><a href="/kho-du-lieu/cot-noi?file={{ h.ten }}"{% if h.ten == file %} aria-current="true"{% endif %}>{{ h.ja }}</a></td>
+{% for o in h.o %}<td class="o-khoa">{{ o }}</td>{% endfor %}</tr>
+{% endfor %}
+</table></div>
+</section>
+
+<section id="noi-di-dau">
+<h2>File này nối đi đâu</h2>
+<nav class="loc" aria-label="Chọn file">
+{% for n in nguon %}<a href="/kho-du-lieu/cot-noi?file={{ n.ten }}#noi-di-dau"{% if n.ten == file %} class="dang-xem" aria-current="true"{% endif %}>{{ n.ja }}</a>{% endfor %}
+</nav>
+<h3>{{ file_ja }} trỏ ra</h3>
+{% if noi.tro_ra %}<ul>{% for x in noi.tro_ra %}
+<li>{{ x.ja }} <code>{{ x.cot }}</code> → <a href="/kho-du-lieu/cot-noi?file={{ x.dich }}#noi-di-dau">{{ x.dich_ja }}</a> <code>{{ x.khoa_dich }}</code></li>
+{% endfor %}</ul>{% else %}<p class="ghi-chu">Không trỏ sang file nào — đây là file gốc (master).</p>{% endif %}
+<h3>Được trỏ vào từ</h3>
+{% if noi.tro_vao %}<ul>{% for x in noi.tro_vao %}
+<li><a href="/kho-du-lieu/cot-noi?file={{ x.nguon }}#noi-di-dau">{{ x.nguon_ja }}</a> <code>{{ x.cot }}</code></li>
+{% endfor %}</ul>{% else %}<p class="ghi-chu">Không file nào trỏ vào.</p>{% endif %}
+</section>
+
+<section id="cot">
+<h2>Cột trong {{ file_ja }}</h2>
+<p class="ghi-chu">{{ cot|length }} cột khai trong <code>config/files.yml</code> · vào bảng <code>{{ core_table }}</code></p>
+<div class="bang-cuon"><table class="bang-tl bang-cot">
+<tr><th>Cột OBC</th><th>Tên hệ thống</th><th>Kiểu</th><th>Vai</th><th>Nối tới</th></tr>
+{% for c in cot %}
+<tr><td class="cot-obc">{{ c.ja }}</td><td><code>{{ c.vi }}</code></td><td>{{ c.kieu }}</td><td class="o-khoa">{{ c.vai }}</td><td>{{ c.noi }}</td></tr>
+{% endfor %}
+</table></div>
+</section>
+</div>
+</html>
+</main>

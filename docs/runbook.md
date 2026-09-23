@@ -184,6 +184,19 @@ Lưu ý:
 - Muốn đổi mật khẩu sau này: `ALTER USER kome_app_user PASSWORD '<mật khẩu mới>';`
   chạy tay trên SQL Editor, rồi cập nhật biến môi trường tương ứng.
 
+### Viết migration mới / sửa mục "Bẫy đã biết" → sinh lại tài liệu sống
+
+Màn `/kho-du-lieu/luong` đọc danh sách bảng, tên cổng, cạm bẫy và lộ trình từ
+một ảnh chụp đã commit (`kome/web/tai_lieu_sinh.json`), vì bản Vercel không có
+`db/` và `docs/`. Sau khi thêm một file trong `db/migrations/`, sửa mục "Bẫy đã
+biết" của `CLAUDE.md`, sửa `TEN_CONG` trong `kome/gates.py` hay bảng §7 của đặc
+tả lộ trình, chạy **một lần** rồi commit file JSON cùng thay đổi đó:
+
+    python scripts/sinh_tai_lieu.py
+
+Quên thì `pytest` đỏ ở `test_anh_chup_tai_lieu_khong_cu` — không có gì hỏng trên
+trang, chỉ là trang tài liệu nói về trạng thái cũ.
+
 ### Danh sách việc sau migration (ví dụ `026` — ngân sách)
 
 Một migration thêm cột quyền mới (như `duoc_sua_ngan_sach` của `026`) không tự

@@ -97,6 +97,8 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
 | `/kho-hang` | Bốn ô tổng quan tồn kho · bảng tồn · cận hạn/quá hạn · giá trị theo kho | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
+| `/kho-du-lieu/luong` | Tài liệu sống (đợt 2b): bốn tầng · các nguồn OBC · 5 cổng + ngưỡng từng file · cạm bẫy OBC · lộ trình. **0 truy vấn** | `config/files.yml`, `kome/web/tai_lieu_sinh.json` |
+| `/kho-du-lieu/cot-noi` | Tài liệu sống: ma trận khoá · file nối đi đâu · cột trong từng file (`?file=<spec>`). **0 truy vấn** | `config/files.yml` |
 | `/giao-dien` | Đổi chế độ sáng/tối/theo hệ thống/theo giờ, ghi cookie, chuyển hướng về trang đã gọi | không đọc CSDL — chỉ đọc/ghi cookie |
 
 **Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
@@ -201,6 +203,19 @@ tiện dụng, không phải hàng rào, không kiểm quyền, và luôn còn l
 một GIÁ TRỊ QUY ƯỚC, không phải chuỗi rỗng, vì rỗng nghĩa là "không chọn gì" và
 trang rơi về mặc định lọc theo người đăng nhập — tức ô chọn khoe "mọi người" trong
 khi danh sách vẫn bị lọc. Cùng lý lẽ với `KH.TINH_TRONG` của ô Tỉnh.
+
+**Bất biến (Đợt 2b):** tài liệu sống ở `/kho-du-lieu/luong` và `/cot-noi` được
+**SINH RA, không chép tay** (lộ trình §7). Nguồn lúc chạy là `config/files.yml`
+(kể cả hai trường `core_table` và `references` thêm ở đợt này) và
+`kome.coverage`; bốn nguồn còn lại — `db/migrations/*.sql`, mục "Bẫy đã biết"
+của file NÀY, `kome.gates.TEN_CONG`, bảng §7 của đặc tả lộ trình — KHÔNG có trên
+Vercel (`.vercelignore` loại `docs/`/`db/`; `gates.py` nhập pandas), nên
+`scripts/sinh_tai_lieu.py` chụp chúng vào `kome/web/tai_lieu_sinh.json` (commit
+vào git). **Sửa một migration, mục "Bẫy đã biết", `TEN_CONG` hay bảng lộ trình
+thì chạy lại `python scripts/sinh_tai_lieu.py`** — không chạy là
+`tests/test_tai_lieu.py::test_anh_chup_tai_lieu_khong_cu` đỏ. `files.yml.core_table`
+khai lại bảng đích của `pipeline.UNDO_TABLES` vì web không được nhập pipeline —
+có test canh hai bản khớp (`::test_core_table_khop_undo_tables`).
 
 Ba trang cũ — nạp (`nap`), sức khoẻ (`health`), độ phủ dữ liệu (`phu-du-lieu`)
 — nay chỉ còn 301 về `/kho-du-lieu`, không render nội dung gì nữa.
