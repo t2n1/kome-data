@@ -13,7 +13,9 @@
 <h1>Cần liên hệ</h1>
 <p class="ghi-chu">Khách đang im lặng lâu hơn <strong>nhịp mua riêng của chính họ</strong>, chia theo lý do,
 trong từng cột xếp theo doanh thu luỹ kế. Ghi lại mỗi lần gọi — khách vừa liên hệ tạm ẩn
-tới ngày hẹn (hoặc {{ an_ngay }} ngày nếu không hẹn). Khách OBC đánh dấu ※廃業※ / ※取引停止※ không có ở đây.</p>
+tới ngày hẹn (hoặc {{ an_ngay }} ngày nếu không hẹn). Khách OBC đánh dấu ※廃業※ / ※取引停止※ không có ở đây.
+Cột cuối nhìn theo <strong>tháng</strong> thay vì theo nhịp: khách mua đều mà tháng này chưa có đơn — số tiền trên thẻ là
+trung bình mỗi tháng của 3 tháng trước.</p>
 {% if sale %}
 <p class="ghi-chu">Đang xem khách của <strong>{{ ten_sale or sale }}</strong>. <a href="/lien-he?tat_ca=1{{ '&ly_do=' ~ ds.ly_do if ds.ly_do else '' }}">Xem tất cả →</a></p>
 {% endif %}
@@ -21,7 +23,7 @@ tới ngày hẹn (hoặc {{ an_ngay }} ngày nếu không hẹn). Khách OBC đ
 
 <div class="the-so">
   <div><div class="nhan">Cần liên hệ</div><div class="gia">{{ "{:,}".format(ds.tong) }}</div>
-       <div class="nhan">khách · ¥{{ "{:,}".format(ds.cot|sum(attribute='doanh_thu')) }} doanh thu luỹ kế</div></div>
+       <div class="nhan">khách · ¥{{ "{:,}".format(ds.cot|rejectattr('ly_do', 'equalto', cot_thang)|sum(attribute='doanh_thu')) }} doanh thu luỹ kế{% if ds.dem[cot_thang] %} (chưa gồm cột tháng){% endif %}</div></div>
   {% for c in ds.cot %}
   <div><div class="nhan">{{ c.nhan }}</div><div class="gia">{{ ds.dem[c.ly_do] }}</div><div class="nhan">{{ c.mo_ta }}</div></div>
   {% endfor %}
@@ -39,14 +41,19 @@ tới ngày hẹn (hoặc {{ an_ngay }} ngày nếu không hẹn). Khách OBC đ
 <section aria-labelledby="cot-{{ c.ly_do }}">
   <div class="cot-lh-dau"><h2 id="cot-{{ c.ly_do }}"><span class="vien {{ c.mau }}">{{ c.nhan }}</span></h2>
     <span class="khong-ap-dung">{{ c.tong }} khách</span>
-    <span class="tong">¥{{ "{:,}".format(c.doanh_thu) }}</span></div>
+    <span class="tong">¥{{ "{:,}".format(c.doanh_thu) }}{% if c.ly_do == cot_thang %}/tháng{% endif %}</span></div>
   <div class="cot-lh-mo">{{ c.mo_ta }}</div>
   {% for t in c.the %}
   <div class="the-lh">
     <div class="ten"><a href="/khach-hang/{{ t.ma }}">{{ t.ten }}</a></div>
     <div class="phu">{{ t.ma }}{% if t.tinh %} · {{ t.tinh }}{% endif %}{% if t.phu_trach %} · phụ trách {{ t.phu_trach }}{% endif %}</div>
+    {% if t.ly_do == cot_thang %}
+    <div class="so-dong"><strong>¥{{ "{:,}".format(t.doanh_thu) }}/tháng</strong>
+      <span class="khong-ap-dung">mua {{ t.so_thang }}/3 tháng trước · tháng trước ¥{{ "{:,}".format(t.dt_thang_truoc or 0) }}</span></div>
+    {% else %}
     <div class="so-dong"><strong>¥{{ "{:,}".format(t.doanh_thu) }}</strong>
       <span class="khong-ap-dung">im {{ t.so_ngay_im_lang }} ngày{% if t.ty_le %} · {{ "%.1f"|format(t.ty_le) }}× nhịp {{ t.nhip_ngay|int }} ngày{% endif %}</span></div>
+    {% endif %}
     {% if t.dien_thoai %}<div class="phu">☎ <a href="tel:{{ t.dien_thoai }}">{{ t.dien_thoai }}</a></div>{% endif %}
     {% if t.cuoi %}<div class="cuoi">Lần trước: {{ t.cuoi.icon }} {{ t.cuoi.ngay }} · <span class="vien {{ t.cuoi.mau_ket_qua }}">{{ t.cuoi.nhan_ket_qua }}</span> {{ t.cuoi.noi_dung|truncate(60) }}</div>{% endif %}
     <details><summary>✏️ Ghi liên hệ</summary>
@@ -56,6 +63,7 @@ tới ngày hẹn (hoặc {{ an_ngay }} ngày nếu không hẹn). Khách OBC đ
   {% else %}
   <p class="cot-lh-mo">Không còn khách nào ở cột này.</p>
   {% endfor %}
+  {% if c.trung %}<p class="cot-lh-mo">+{{ c.trung }} khách cũng thuộc nhóm này nhưng đã nằm ở cột khác hoặc đang tạm ẩn.</p>{% endif %}
   {% if c.tong > c.the|length %}
   <p class="cot-lh-mo"><a href="/lien-he?ly_do={{ c.ly_do }}{{ '&' ~ giu if giu else '' }}">Xem cả {{ c.tong }} khách →</a></p>
   {% endif %}

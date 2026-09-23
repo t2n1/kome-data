@@ -812,7 +812,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 "trang": "lien-he", "ds": ds, "hoat_dong": hoat_dong, "hen": hen,
                 "hom_nay": hom_nay, "sale": sale, "ten_sale": ten_sale,
                 "tat_ca": bool(tat_ca), "nv": nv if nv != KH.NV_MOI_NGUOI else "",
-                "an_ngay": LH.AN_KHI_KHONG_HEN, "kieu_tx": LH.KIEU,
+                "an_ngay": LH.AN_KHI_KHONG_HEN, "cot_thang": LH.COT_THANG, "kieu_tx": LH.KIEU,
                 "ket_qua_tx": LH.KET_QUA, "loi_tx": loi_tx[:200],
                 # Ghi xong quay về ĐÚNG trang này, kể cả bộ lọc đang xem.
                 "tiep": request.url.path + (f"?{request.url.query}" if request.url.query else "")})

@@ -453,6 +453,47 @@ export function KhoiViec() {
   );
 }
 
+// ---- Tháng này chưa mua (036) -----------------------------------------------
+// Nguồn DUY NHẤT: mart.khach_thang_nay.nhan (kome/khach_thang.py). Nhìn theo
+// THÁNG — khác "im lặng quá nhịp" của khối Sức khoẻ; câu cách tính in dưới khối.
+type KhachThang = { ma: string; ten: string; sale: string | null; so_thang: number; tb_thang: number; thang_truoc: number };
+type ThangNay = { thang: string | null; ngay_moc: string | null; dem: Record<string, number>; nhan: Record<string, string>;
+  cach_tinh: string; thang_truoc_den_ngay: number; khach: KhachThang[] };
+
+export function KhoiThangNay() {
+  const [tatCa, datTatCa] = useState(false);
+  const { data: d, isLoading, error } = useKhoi<ThangNay>("thang_nay_chua_mua", true, tatCa ? "tat_ca=1" : "");
+  const giu = KD.nguoi?.sale && !tatCa ? "" : "&tat_ca=1";
+  const da = d?.dem.da_mua ?? 0, truoc = d?.thang_truoc_den_ngay ?? 0;
+  return (
+    <Khoi tieu_de="Tháng này chưa mua" dang_tai={isLoading} loi={error?.message}
+      phu={d?.thang ? <>tháng {thang_nhan(d.thang)} · tính đến {ngay(d.ngay_moc)}
+        {KD.nguoi?.sale && <button type="button" className="chip" aria-pressed={!tatCa} onClick={() => datTatCa(t => !t)}
+          style={{ marginLeft: ".4rem" }}>{tatCa ? "Khách của mọi người" : "Chỉ khách của tôi"}</button>}</> : undefined}
+      lien_ket={{ href: `/lien-he?ly_do=thang_nay_chua_mua${giu}` }}>
+      {d && <>
+        <div className="tn-dau">
+          <div><b>{so(d.dem.tre ?? 0)}</b><span>khách mua đều, tháng này chưa có đơn</span></div>
+          <div className="phu">Đã mua tháng này: <b>{so(da)}</b> khách
+            {truoc > 0 && <> · tháng trước đến cùng ngày: {so(truoc)} <span className={da >= truoc ? "tang" : "giam"}>({thay_doi(da / truoc - 1, 0)})</span></>}</div>
+          {(d.dem.chua_toi_ngay ?? 0) > 0 &&
+            <div className="phu nhat-chu">+ {so(d.dem.chua_toi_ngay)} khách mua đều nhưng thường mua muộn hơn trong tháng — chưa tới ngày.</div>}
+        </div>
+        <div className="bang-cuon"><table className="bang">
+          <thead><tr><th>Khách hàng</th><th className="so">TB/tháng</th><th className="so">Tháng trước</th></tr></thead>
+          <tbody>{d.khach.map(k => (
+            <tr key={k.ma}>
+              <td className="ten-jp"><a href={`/khach-hang/${k.ma}`}>{k.ten}</a><div className="ma-nho">mua {k.so_thang}/3 tháng trước</div></td>
+              <td className="so">{gon(k.tb_thang)}</td><td className="so">{gon(k.thang_truoc)}</td>
+            </tr>))}</tbody></table>
+          {!d.khach.length && <div className="trong">Không có khách mua đều nào đang trễ tháng này.</div>}
+        </div>
+        <div className="phu" style={{ marginTop: ".4rem" }}>{d.cach_tinh} Bộ đếm là của cả công ty; danh sách xếp theo trung bình mỗi tháng.</div>
+      </>}
+    </Khoi>
+  );
+}
+
 // ---- Nạp dữ liệu / phiếu gần nhất -------------------------------------------
 export function KhoiNap() {
   const { data: d, isLoading, error } = useKhoi<{ lo: { loai: string; ten_file: string; ngay_du_lieu: string; nap_luc: string; so_dong: number }[];
@@ -480,6 +521,7 @@ export const VE: Record<string, () => React.ReactElement> = {
   danh_sach_khach: () => <KhoiDanhSachKhach />, han_su_dung: () => <KhoiHanSuDung />, hieu_suat_nganh: () => <KhoiNganh />,
   so_sanh_sale: () => <KhoiSale />, tuong_quan: () => <KhoiTuongQuan />, tang_truong: () => <KhoiTangTruong />,
   bien_loi_nhuan: () => <KhoiBien />, don_hang: () => <KhoiNap />,
+  thang_nay_chua_mua: () => <KhoiThangNay />,
 };
 
 export function veKhoi(id: string, nhan: string) {

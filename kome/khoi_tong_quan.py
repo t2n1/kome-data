@@ -176,7 +176,8 @@ def viec_hom_nay(conn, sale=None) -> dict:
     for cot in ds.cot:
         for k in cot.the[:3]:
             viec.append({"muc": "canh" if cot.ly_do != "sap_den_han" else "thuong", "tag": cot.nhan,
-                         "chu": f"Gọi {k.ten} — im {k.so_ngay_im_lang} ngày",
+                         "chu": (f"Gọi {k.ten} — mua đều {k.so_thang}/3 tháng, tháng này chưa có đơn"
+                                 if cot.ly_do == LH.COT_THANG else f"Gọi {k.ten} — im {k.so_ngay_im_lang} ngày"),
                          "lien_ket": f"/khach-hang/{k.ma}", "han": None})
     if so_qua_han:
         viec.append({"muc": "gap", "tag": "Kho", "chu": f"{so_qua_han} lô đã quá hạn sử dụng",
@@ -185,6 +186,13 @@ def viec_hom_nay(conn, sale=None) -> dict:
         viec.append({"muc": "canh", "tag": "Kho", "chu": f"{d['ten']} còn {d['han_con_lai']} ngày",
                      "lien_ket": f"/san-pham/{d['ma']}", "han": None})
     return {"viec": viec, "thieu_nguon": ["công nợ", "mua hàng", "khiếu nại"]}
+
+
+# ---- Tháng này chưa mua (036) -----------------------------------------------
+
+def thang_nay_chua_mua(conn, sale=None) -> dict:
+    from kome.khach_thang import chua_mua
+    return chua_mua(conn, sale=sale)
 
 
 # ---- Nạp dữ liệu / phiếu gần nhất ------------------------------------------
@@ -329,6 +337,7 @@ KHOI = {
     "suc_khoe_khach": (suc_khoe, False, False),
     "han_su_dung": (han_su_dung, False, False),
     "viec_hom_nay": (viec_hom_nay, True, True),
+    "thang_nay_chua_mua": (thang_nay_chua_mua, False, True),
     "don_hang": (nap_gan_nhat, False, False),
     "danh_sach_khach": (danh_sach_khach, False, False),
     "hieu_suat_nganh": (hieu_suat_nganh, False, False),

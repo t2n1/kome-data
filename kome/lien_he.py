@@ -8,6 +8,9 @@ Hai nguồn, hai loại "hôm nay" — KHÔNG gộp:
   thứ Năm là thứ Năm ngoài đời, không phải "ngày bán mới nhất + n". Cùng ngoại
   lệ với ô tuổi dữ liệu (CLAUDE.md).
 
+Cột thứ tư (036) nhìn theo THÁNG: khách mua đều mà tháng này chưa có đơn
+(`kome.khach_thang`) — đi chung câu danh sách, không thêm lượt hỏi.
+
 Ngân sách truy vấn của `/lien-he`: đúng 3 lượt hỏi (danh sách, hoạt động gần
 đây, hẹn gọi lại) — có test đếm.
 """
@@ -30,7 +33,15 @@ LY_DO = {
     "lau_khong_mua": ("Lâu không mua", "Im lặng ≥ 4 lần nhịp mua riêng — đang mất khách", "loi"),
     "qua_han": ("Quá hạn mua lại", "Im lặng 2–4 lần nhịp mua riêng", "canh"),
     "sap_den_han": ("Sắp đến hạn", "Im lặng 1–2 lần nhịp — gọi trước khi khách trễ hẳn", "ok"),
+    # Cột thứ tư (036) — nhìn theo THÁNG, không theo nhịp. Nguồn DUY NHẤT:
+    # mart.khach_thang_nay.nhan = 'tre' (kome.khach_thang). Khách đã ở ba
+    # cột trên thì không lặp lại ở đây (đếm vào Cot.trung).
+    "thang_nay_chua_mua": ("Mua đều, tháng này chưa",
+                           "Mua ≥ 2/3 tháng trước, mọi khi đến ngày này đã có đơn — tháng này chưa", "canh"),
 }
+# Cột theo tháng: số tiền trên thẻ là TB/tháng của 3 tháng trước, không phải
+# doanh thu luỹ kế — ô tổng đầu trang không được cộng lẫn hai loại số.
+COT_THANG = "thang_nay_chua_mua"
 
 # Không đặt ngày hẹn thì khách vừa liên hệ ẩn khỏi danh sách bấy nhiêu ngày.
 # Ẩn mãi là mất khách khỏi tầm mắt; không ẩn là khách hiện lại y nguyên hôm
@@ -94,6 +105,8 @@ class The:
     ty_le: float | None
     ly_do: str
     cuoi: LanTiepXuc | None = None
+    so_thang: int | None = None          # cột tháng: số tháng có mua trong 3 tháng trước
+    dt_thang_truoc: int | None = None    # cột tháng: doanh thu tháng trước
 
     @property
     def nhan_ly_do(self) -> str:
@@ -113,6 +126,7 @@ class Cot:
     the: list[The]
     tong: int
     doanh_thu: int
+    trung: int = 0      # cột tháng: số khách bỏ vì đã ở cột khác / đang tạm ẩn
 
 
 @dataclass
@@ -145,44 +159,69 @@ def _loc_sale(sale: str | None, cot: str) -> tuple[str, list]:
 
 def danh_sach(conn, hom_nay: date, sale: str | None = None,
               ly_do: str | None = None) -> DanhSach:
-    """MỘT lượt hỏi: mọi khách của `mart.uu_tien_lien_he` (lọc theo sale)
-    kèm lần tiếp xúc MỚI NHẤT. Chia cột, ẩn, đếm làm bằng Python trên vài
+    """MỘT lượt hỏi: mọi khách của `mart.uu_tien_lien_he` + khách 'tre' của
+    `mart.khach_thang_nay` (cột tháng, 036), lọc theo sale, kèm lần tiếp xúc
+    MỚI NHẤT. Chia cột, ẩn, đếm làm bằng Python trên vài
     trăm dòng — rẻ hơn ba câu đếm riêng (mỗi câu dựng lại khach_360)."""
     if ly_do not in LY_DO:
         ly_do = None
-    dk, ts = _loc_sale(sale, "u.salesperson_code")
+    dk, ts = _loc_sale(sale, "salesperson_code")
+    dk2, ts2 = _loc_sale(sale, "k.salesperson_code")
     rows = conn.execute(
-        f"""SELECT u.customer_code, u.ten, u.prefecture, u.phone,
+        f"""WITH u AS (
+                SELECT customer_code, ten, prefecture, phone, salesperson_code,
+                       doanh_thu_thuan, so_ngay_im_lang, nhip_ngay, ty_le_im_lang,
+                       ly_do, thu_tu, NULL::int AS so_thang, NULL::numeric AS dt_truoc
+                  FROM mart.uu_tien_lien_he WHERE true {dk}
+                UNION ALL
+                SELECT k.customer_code, k.ten, d.prefecture, d.phone, k.salesperson_code,
+                       k.dt_tb_3_thang, NULL, NULL, NULL,
+                       '{COT_THANG}', 4, k.so_thang_mua_3, k.dt_thang_truoc
+                  FROM mart.khach_thang_nay k
+                  LEFT JOIN core.dim_customer d
+                         ON d.customer_code = k.customer_code AND d.is_current
+                 WHERE k.nhan = 'tre' {dk2})
+            SELECT u.customer_code, u.ten, u.prefecture, u.phone,
                    coalesce(sp.ten, u.salesperson_code),
                    u.doanh_thu_thuan, u.so_ngay_im_lang, u.nhip_ngay, u.ty_le_im_lang,
-                   u.ly_do, n.kieu, n.ket_qua, n.noi_dung, n.thoi_diem, n.hen_lai
-            FROM mart.uu_tien_lien_he u
+                   u.ly_do, n.kieu, n.ket_qua, n.noi_dung, n.thoi_diem, n.hen_lai,
+                   u.so_thang, u.dt_truoc
+            FROM u
             LEFT JOIN core.dim_salesperson sp ON sp.salesperson_code = u.salesperson_code
             LEFT JOIN LATERAL (
                 SELECT kieu, ket_qua, noi_dung, thoi_diem, hen_lai
                 FROM app.nhat_ky_tiep_xuc x
                 WHERE x.customer_code = u.customer_code
                 ORDER BY x.thoi_diem DESC, x.id DESC LIMIT 1) n ON true
-            WHERE true {dk}
             ORDER BY u.thu_tu, u.doanh_thu_thuan DESC NULLS LAST, u.customer_code""",
-        ts).fetchall()
+        ts + ts2).fetchall()
     theo: dict[str, list[The]] = {k: [] for k in LY_DO}
     an: list[The] = []
+    da_co: set[str] = set()   # khách đã ở ba cột nhịp (kể cả đang ẩn)
+    trung = 0
     for r in rows:
+        if r[9] == COT_THANG:
+            if r[0] in da_co:
+                trung += 1
+                continue
+        else:
+            da_co.add(r[0])
         cuoi = (LanTiepXuc(kieu=r[10], ket_qua=r[11], noi_dung=r[12],
                            thoi_diem=r[13], hen_lai=r[14]) if r[13] else None)
         t = The(ma=r[0], ten=r[1], tinh=r[2], dien_thoai=r[3], phu_trach=r[4],
                 doanh_thu=int(r[5] or 0), so_ngay_im_lang=r[6],
                 nhip_ngay=float(r[7]) if r[7] is not None else None,
                 ty_le=float(r[8]) if r[8] is not None else None,
-                ly_do=r[9], cuoi=cuoi)
+                ly_do=r[9], cuoi=cuoi, so_thang=r[15],
+                dt_thang_truoc=int(r[16]) if r[16] is not None else None)
         (an if dang_an(cuoi, hom_nay) else theo[t.ly_do]).append(t)
     cot = []
     for k, (nhan, mo_ta, mau) in LY_DO.items():
         ds = theo[k]
         cot.append(Cot(ly_do=k, nhan=nhan, mo_ta=mo_ta, mau=mau,
                        the=ds if ly_do == k else ds[:THE_MOI_COT], tong=len(ds),
-                       doanh_thu=sum(t.doanh_thu for t in ds)))
+                       doanh_thu=sum(t.doanh_thu for t in ds),
+                       trung=trung if k == COT_THANG else 0))
     if ly_do:
         cot = [c for c in cot if c.ly_do == ly_do]
     return DanhSach(cot=cot, da_lien_he=an, hom_nay=hom_nay, ly_do=ly_do,

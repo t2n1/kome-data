@@ -24,7 +24,7 @@ RONG_TOI_DA = 3   # số cột của lưới — đổi là đổi cả giao_die
 CAO_TOI_DA = 4
 
 # (mã, nhãn, rộng, cao, nhóm, mô tả) — ĐÚNG danh mục `MODULES` và thứ tự /
-# kích thước `BO_CUC_MAC_DINH` của Dashboard.dc.html (21 khối). Khối không có
+# kích thước `BO_CUC_MAC_DINH` của Dashboard.dc.html (21 khối) + khối tháng (036). Khối không có
 # nguồn dữ liệu vẫn có mặt (khung "chưa có dữ liệu", kome/khoi_tong_quan.py
 # ::CHUA_CO) — lựa chọn của chủ doanh nghiệp, đặc tả giao diện React §2.
 KHOI = (
@@ -32,6 +32,9 @@ KHOI = (
     ("ns_thang", "Tiến độ ngân sách tháng", 3, 1, "tong_quan", "Từng sale so với mốc đáng lẽ đạt tới hôm nay"),
     ("theo_thang", "Kết quả theo từng tháng", 3, 3, "tong_quan", "12 tháng của kỳ kế toán so ngân sách và cùng kỳ"),
     ("viec_hom_nay", "Việc cần làm hôm nay", 2, 3, "tong_quan", "Gom việc từ khách cần gọi, hẹn gọi lại, kho và dữ liệu"),
+    # Ngoài 21 khối của gói thiết kế — thêm 2026-09-23 theo yêu cầu chủ DN
+    # ("công ty chạy doanh thu theo tháng"), nguồn: mart.khach_thang_nay (036).
+    ("thang_nay_chua_mua", "Tháng này chưa mua", 1, 3, "khach_hang", "Khách mua đều hằng tháng mà tháng này chưa có đơn"),
     ("cong_no", "Tuổi nợ phải thu", 1, 2, "tien", "Chia 0–30 / 30–60 / trên 60 ngày và ai nợ lâu nhất"),
     ("xu_huong", "Xu hướng doanh thu", 2, 2, "tien", "Doanh thu ngày, có đường so sánh kỳ trước"),
     ("dong_tien", "Dòng tiền 8 tuần", 1, 2, "tien", "Tiền vào trừ tiền ra theo tuần và số dư dự kiến"),
@@ -57,7 +60,7 @@ NHOM = (("tat_ca", "Tất cả"), ("tong_quan", "Tổng quan"), ("tien", "Tiền
 VAI_TRO = (
     ("giamdoc", "Giám đốc", ("kpi", "ns_thang", "theo_thang", "cong_no", "dong_tien", "xu_huong",
                              "bien_loi_nhuan", "hieu_suat_nganh", "so_sanh_sale", "mua_hang", "tang_truong")),
-    ("kinhdoanh", "Trưởng phòng KD", ("kpi", "viec_hom_nay", "ns_thang", "theo_thang", "danh_sach_khach",
+    ("kinhdoanh", "Trưởng phòng KD", ("kpi", "viec_hom_nay", "thang_nay_chua_mua", "ns_thang", "theo_thang", "danh_sach_khach",
                                       "suc_khoe_khach", "nhip_mua", "tuong_quan", "so_sanh_sale",
                                       "xu_huong", "thoi_tiet")),
     ("ketoan", "Kế toán", ("kpi", "cong_no", "dong_tien", "theo_thang", "bien_loi_nhuan", "khieu_nai",
