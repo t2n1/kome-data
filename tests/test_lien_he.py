@@ -240,5 +240,4 @@ def test_sidebar_tro_toi_lien_he(client, conn):
     assert '{ ma: "crm", nhan: "Cần liên hệ", url: "/lien-he", icon: "crm" }' in muc
     assert "/can-xu-ly" not in muc
     assert 'aria-current={m.ma === dangMo ? "page" : undefined}' in         (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")
-    t = client.get("/san-pham").text
-    assert 'href="/lien-he"' in t and 'href="/can-xu-ly"' not in t
+    assert "/can-xu-ly" not in (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")

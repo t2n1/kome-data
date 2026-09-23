@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from kome import khach_hang as KH
 from kome.web import bao_mat
 from kome.web.app import create_app
+from tests.spa_kd import kd, man, nguon
 
 MK = "mat-khau-cua-an-2026"
 BI_MAT = "bi-mat-phien-du-dai-2026"
@@ -406,7 +407,8 @@ def test_tren_vercel_khong_nap_va_khong_hoan_tac_duoc(khach):
 
     r = c.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", b"x")})
     assert r.status_code == 403
-    assert "chỉ để xem" in r.text
+    assert kd(r.text)["thong_bao"]["loai"] == "chi_doc"
+    assert "chỉ để xem" in nguon("he_thong", "ThongBao.tsx")
 
     assert c.post("/undo/1").status_code == 403
 
@@ -431,9 +433,9 @@ def test_ban_chi_doc_an_han_muc_nap_du_lieu(khach):
     c = khach(vercel=True)
     _vao(c)
     t = c.get("/kho-du-lieu").text
-    assert "Nạp từ OBC" not in t and 'href="/nap"' not in t
-    assert 'id="nap"' not in t
-    assert "在庫一覧" in t and 'href="/khach-hang"' in t
+    assert kd(t)["chi_doc"] is True
+    assert "{!KD.chi_doc && <Nap" in nguon("he_thong", "KhoDuLieu.tsx")
+    assert any(x["name"] == "在庫一覧" for x in man(t)["status"])
 
 
 def test_ban_chi_doc_khong_bao_dong_sao_luu_gia(khach):
@@ -444,8 +446,9 @@ def test_ban_chi_doc_khong_bao_dong_sao_luu_gia(khach):
     _vao(c)
     # /health chỉ 301 sang /kho-du-lieu (Task 4) — khối sức khoẻ giờ nằm ở đó.
     t = c.get("/kho-du-lieu").text
-    assert "Chưa sao lưu" not in t
-    assert "máy trong công ty" in t
+    assert man(t)["backup"] is None
+    assert "b == null ? <div className=\"ky\">💾 Tình trạng sao lưu chỉ xem được trên bản chạy ở máy trong công ty" \
+        in nguon("he_thong", "KhoDuLieu.tsx")
 
 
 def test_ban_o_may_ca_nhan_van_nap_duoc(khach):
@@ -456,7 +459,8 @@ def test_ban_o_may_ca_nhan_van_nap_duoc(khach):
     assert r.status_code == 301
     assert r.headers["location"] == "/kho-du-lieu#nap"
     t = c.get("/kho-du-lieu").text
-    assert 'id="nap"' in t and "Nạp dữ liệu OBC" in t
+    assert kd(t)["chi_doc"] is False
+    assert "Nạp dữ liệu OBC" in nguon("he_thong", "KhoDuLieu.tsx")
 
 
 def test_trang_chi_doc_khong_phu_thuoc_pandas():
@@ -516,9 +520,12 @@ def test_trang_403_noi_ro_vi_sao_chu_khong_chuyen_huong_im_lang(khach):
     tự hỏi trang có hỏng không."""
     c = khach(kho_du_lieu=False)
     _vao(c)
-    t = c.get("/kho-du-lieu").text
-    assert "không có quyền" in t
-    assert 'href="/"' in t          # còn đường quay ra
+    r = c.get("/kho-du-lieu")
+    assert r.status_code == 403
+    assert kd(r.text)["thong_bao"]["loai"] == "cam_kho_du_lieu"
+    tb = nguon("he_thong", "ThongBao.tsx")
+    assert "không có quyền vào Kho dữ liệu" in tb
+    assert '<a href="/">Tổng quan</a>' in tb          # còn đường quay ra
 
 
 def test_co_quyen_thi_van_vao_binh_thuong(khach):
@@ -544,22 +551,22 @@ def test_khong_co_quyen_thi_sidebar_khong_moi_bam_vao_kho_du_lieu(khach):
     """Một liên kết luôn dẫn tới trang từ chối thì tệ hơn là không có."""
     # Giai đoạn 2/3: /khach-hang, /lien-he… là React (thanh bên dựng từ
     # window.__KOME__.hien_kho — tests/test_api.py canh); thanh bên Jinja kiểm
-    # trên một trang Jinja còn lại (/san-pham).
+    # trên một trang Jinja còn lại (/nhat-ky).
     c = khach(kho_du_lieu=False)
     _vao(c)
-    t = c.get("/san-pham").text
-    assert 'href="/kho-du-lieu"' not in t
-    assert 'href="/khach-hang"' in t        # các mục khác vẫn còn
+    assert kd(c.get("/nhat-ky").text)["hien_kho"] is False
     assert '"hien_kho": false' in c.get("/khach-hang").text
+    muc = nguon("khung", "muc.ts")
+    assert '...(KD.hien_kho ? [{ ma: "khodl"' in muc and 'url: "/khach-hang"' in muc
 
 
 def test_co_quyen_thi_sidebar_van_co_muc_kho_du_lieu(khach):
     # Giai đoạn 2/3: /khach-hang, /lien-he… là React (thanh bên dựng từ
     # window.__KOME__.hien_kho — tests/test_api.py canh); thanh bên Jinja kiểm
-    # trên một trang Jinja còn lại (/san-pham).
+    # trên một trang Jinja còn lại (/nhat-ky).
     c = khach(kho_du_lieu=True)
     _vao(c)
-    assert 'href="/kho-du-lieu"' in c.get("/san-pham").text
+    assert kd(c.get("/nhat-ky").text)["hien_kho"] is True
     assert '"hien_kho": true' in c.get("/khach-hang").text
 
 
@@ -576,28 +583,30 @@ def test_trang_loi_van_con_duong_ve_kho_du_lieu(khach, monkeypatch):
     là falsy, mục biến mất khỏi CHÍNH trang lỗi, kể cả với người CÓ quyền.
     Nghĩa là nạp file gặp lỗi lúc 13:30 thì người phụ trách đứng lại trên một
     trang không có cách nào quay về /kho-du-lieu ngoài gõ tay địa chỉ."""
-    from kome import san_pham as SP
+    from kome import nhat_ky as NK
     c = khach(kho_du_lieu=True)
     _vao(c)
-    monkeypatch.setattr(SP, "danh_sach", _no)
+    monkeypatch.setattr(NK, "dong_thoi_gian", _no)
     # Trang Jinja còn lại có lưới `_loi` (/khach-hang, /lien-he là React từ
     # giai đoạn 2/3 — lỗi của chúng là JSON của /api, không qua error.html).
-    r = c.get("/san-pham")
+    r = c.get("/nhat-ky")
     assert r.status_code == 500
-    assert "Hệ thống gặp lỗi" in r.text
-    assert 'href="/kho-du-lieu"' in r.text, "trang lỗi mất đường về Kho dữ liệu"
+    k = kd(r.text)
+    assert k["thong_bao"]["loai"] == "loi"
+    # Trang lỗi vẽ trong khung chung: thanh bên đọc CÙNG cờ hien_kho như mọi màn.
+    assert k["hien_kho"] is True, "trang lỗi mất đường về Kho dữ liệu"
 
 
 def test_trang_loi_van_khong_moi_nguoi_khong_co_quyen(khach, monkeypatch):
     """Chiều ngược lại của test trên: gộp ngữ cảnh về một chỗ không được biến
     trang lỗi thành kẽ hở mời người không có quyền bấm vào màn bị cấm."""
-    from kome import san_pham as SP
+    from kome import nhat_ky as NK
     c = khach(kho_du_lieu=False)
     _vao(c)
-    monkeypatch.setattr(SP, "danh_sach", _no)
-    r = c.get("/san-pham")   # trang Jinja còn lại (xem test trên)
+    monkeypatch.setattr(NK, "dong_thoi_gian", _no)
+    r = c.get("/nhat-ky")
     assert r.status_code == 500
-    assert 'href="/kho-du-lieu"' not in r.text
+    assert kd(r.text)["hien_kho"] is False
 
 
 def test_csdl_hong_o_cong_dang_nhap_van_ra_trang_loi_tieng_viet(
@@ -617,7 +626,7 @@ def test_csdl_hong_o_cong_dang_nhap_van_ra_trang_loi_tieng_viet(
     monkeypatch.setattr(ND, "theo_id", _no)
     r = c.get("/khach-hang")
     assert r.status_code == 500, "lỗi CSDL trong middleware không ra trang lỗi"
-    assert "Hệ thống gặp lỗi" in r.text
+    assert kd(r.text)["thong_bao"]["loai"] == "loi"
     assert "RuntimeError" not in r.text, "chuỗi ngoại lệ gốc lọt lên trang"
     assert "CSDL rung giua chung" in capsys.readouterr().out, "lỗi bị nuốt"
 
@@ -627,7 +636,7 @@ def test_khong_co_cong_dang_nhap_thi_khong_chan_ai(khach):
     cũng không có khái niệm quyền — mọi thứ mở như trước đợt 3."""
     c = khach(bi_mat=None, tai_khoan=False)
     assert c.get("/kho-du-lieu").status_code == 200
-    assert 'href="/kho-du-lieu"' in c.get("/san-pham").text
+    assert kd(c.get("/nhat-ky").text)["hien_kho"] is True
     assert '"hien_kho": true' in c.get("/khach-hang").text
 
 
@@ -698,25 +707,19 @@ def test_nguoi_khong_phu_trach_khach_nao_thay_toan_bo_ngay_tu_dau(khach):
 
 
 def test_nut_dang_xuat_co_icon_VA_van_con_chu(khach):
-    """Đợt 4d: nút Đăng xuất nằm NGOÀI <nav> và chỉ render khi có cổng đăng
-    nhập, nên test icon ở tests/test_giao_dien.py không với tới được nó.
-
-    Cùng bất biến với các mục điều hướng: icon là trang trí, chữ mới là nhãn.
-    Đây là nút DUY NHẤT trong sidebar kết thúc một phiên làm việc — một cái
-    nút chỉ có hình thì người mới sẽ phải đoán, và đoán sai ở đây nghĩa là
-    bấm nhầm rồi mất chỗ đang làm dở.
-    """
+    """Nút Đăng xuất (thanh bên React, giao_dien/src/khung/Nav.tsx) chỉ có khi có
+    cổng đăng nhập, là biểu mẫu POST thật, và icon là TRANG TRÍ — chữ "Đăng
+    xuất" mới là nhãn (Icon luôn aria-hidden + focusable=false, icon.tsx).
+    Đây là nút DUY NHẤT kết thúc một phiên làm việc: chỉ có hình thì người mới
+    phải đoán, và đoán sai là mất chỗ đang làm dở."""
     c = khach()
     _vao(c)
-    html = c.get("/nhat-ky").text
-    thoat = re.search(r'<div class="thoat">(.*?)</div>', html, re.S).group(1)
-    the_svg = re.findall(r"<svg[^>]*>", thoat)
-    assert the_svg, "nút Đăng xuất thiếu icon"
-    for the in the_svg:
-        assert 'aria-hidden="true"' in the, the
-        assert 'focusable="false"' in the, the
-    chu = re.sub(r"<svg.*?</svg>", "", thoat, flags=re.S)
-    assert "Đăng xuất" in chu
+    assert kd(c.get("/nhat-ky").text)["co_dang_nhap"] is True
+    nav = nguon("khung", "Nav.tsx")
+    assert '{KD.co_dang_nhap && <form method="post" action="/dang-xuat">' in nav
+    assert '<Icon ten="out" /><span>Đăng xuất</span>' in nav
+    icon = nguon("khung", "icon.tsx")
+    assert 'aria-hidden="true" focusable="false"' in icon
 
 
 def test_duong_dan_an_toan_chan_ca_dang_gach_cheo_nguoc():

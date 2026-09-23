@@ -3,6 +3,7 @@ import re
 import time
 from fastapi.testclient import TestClient
 from kome.web.app import create_app
+from tests.spa_kd import kd, man, nguon
 
 def test_trang_suc_khoe_mo_duoc(conn, test_db_url):
     client = TestClient(create_app(db_url=test_db_url))   # KHÔNG bao giờ để nó tự lấy DATABASE_URL
@@ -23,14 +24,15 @@ def test_health_canh_bao_khi_sao_luu_qua_han(conn, test_db_url, tmp_path, monkey
 
     r = client.get("/health")
     assert r.status_code == 200
-    assert "Chưa sao lưu" in r.text
+    assert man(r.text)["backup"]["stale"] is True
 
     new = time.time() - 1 * 3600           # 1 giờ trước -> còn mới
     os.utime(z, (new, new))
 
     r = client.get("/health")
-    assert "Chưa sao lưu" not in r.text
-    assert "Sao lưu gần nhất" in r.text
+    assert man(r.text)["backup"]["stale"] is False
+    src = nguon("he_thong", "KhoDuLieu.tsx")
+    assert "Chưa sao lưu" in src and "Sao lưu gần nhất" in src
 
 def test_upload_file_hong_tra_ve_loi_de_hieu(conn, test_db_url):
     client = TestClient(create_app(db_url=test_db_url))
@@ -92,11 +94,9 @@ def test_health_hien_lan_nap_GAN_NHAT_khong_phai_lon_nhat(conn, test_db_url):
     # của loại này là gì"). Cô lập đúng khối bằng neo `id="suc-khoe"`
     # (_suc_khoe.html), KHÔNG bằng chuỗi tiêu đề: cắt theo chuỗi vỡ âm thầm
     # nếu đảo thứ tự khối, hoặc nếu "Lô nạp gần nhất" bị ẩn ở bản chỉ-đọc.
-    m = re.search(r'<section id="suc-khoe">(.*?)</section>', r.text, re.S)
-    assert m, "thiếu khối id=\"suc-khoe\""
-    khoi = m.group(1)
-    assert "60" in khoi and "900,000" in khoi
-    assert "18,000" not in khoi and "400,000,000" not in khoi
+    # Bảng trạng thái (khối Sức khoẻ) đọc `man.status` — phải là lần nạp GẦN NHẤT.
+    u = next(x for x in man(r.text)["status"] if x["name"] == "売上伝票データ")
+    assert u["rows"] == 60 and u["total"] == 900_000
 
 
 def test_health_liet_ke_ngay_lam_viec_bi_thieu(conn, test_db_url, batch):
@@ -127,9 +127,10 @@ def test_health_liet_ke_ngay_lam_viec_bi_thieu(conn, test_db_url, batch):
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/health")
     assert r.status_code == 200
-    assert "2026-05-11" in r.text and "2026-05-13" in r.text   # kỳ dữ liệu
-    assert "Thiếu 1 ngày làm việc" in r.text
-    assert "2026-05-12" in r.text
+    ky = man(r.text)["ky"]
+    assert ky["dau"] == "2026-05-11" and ky["cuoi"] == "2026-05-13"   # kỳ dữ liệu
+    assert ky["thieu"] == ["2026-05-12"]
+    assert "ngày làm việc</strong>" in nguon("he_thong", "KhoDuLieu.tsx")
     # cuối tuần 2026-05-09 (Bảy) / 2026-05-10 (CN) nằm ngoài kỳ, không được kể
 
 
@@ -152,8 +153,9 @@ def test_loi_ngoai_du_kien_hien_tieng_viet_khong_lo_chuoi_ngoai_le(
         r = client.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", f)})
 
     assert r.status_code == 500
-    assert "Hệ thống gặp lỗi" in r.text
-    assert "Dữ liệu chưa được nạp" in r.text
+    assert kd(r.text)["thong_bao"] == {"loai": "loi", "viec": "nạp file dữ liệu"}
+    tb = nguon("he_thong", "ThongBao.tsx")
+    assert "Hệ thống gặp lỗi khi" in tb and "Dữ liệu chưa được nạp" in tb
     assert "connection reset by peer" not in r.text
     assert "RuntimeError" not in r.text
     assert "Traceback" not in r.text
@@ -173,19 +175,21 @@ def test_trang_phu_du_lieu_mo_duoc_va_nhom_theo_ky_cong_ty(conn, test_db_url):
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/phu-du-lieu")
     assert r.status_code == 200
-    assert 'id="theo-thang"' in r.text
+    b = man(r.text)["bang"]
+    src = nguon("he_thong", "KhoDuLieu.tsx")
+    assert 'id="theo-thang"' in src
     # Trang phải gọi kỳ theo SỐ mà công ty tự dùng (Kỳ 7), không phải năm kết thúc
-    assert "Kỳ 7 (2025-08 → 2026-07)" in r.text
-    assert "1/8 → 31/7" in r.text
-    assert "在庫一覧" in r.text and "売上伝票データ" in r.text
+    assert "Kỳ 7 (2025-08 → 2026-07)" in [k["nhan"] for k in b["ky"]]
+    assert "1/8 → 31/7" in src
+    assert {"在庫一覧", "売上伝票データ"} <= {c["ten_obc"] for c in b["cot"]}
     # Tổng kết kỳ
-    assert "Doanh thu thuần" in r.text and "Lãi gộp" in r.text
+    assert "Doanh thu thuần" in src and "Lãi gộp" in src
     # Tháng chốt kỳ phải được đánh dấu
-    assert "chốt kỳ" in r.text
+    assert any(t["la_thang_chot_ky"] for k in b["ky"] for t in k["thang"]) and "chốt kỳ" in src
     # Ràng buộc §2.2.1 và hạn chế của dấu "không có" phải viết ra rõ ràng
-    assert "2025-03-03" in r.text
-    assert "ngoài phạm vi" in r.text
-    assert "cổng kiểm tra chặn" in r.text
+    assert b["dau_du_lieu"] == "2025-03-03"
+    assert "ngoài phạm vi" in src
+    assert "cổng kiểm tra" in src and "chặn <strong>trước khi</strong>" in src
 
 
 def test_phu_du_lieu_phan_biet_bang_MAU_NEN_khong_chi_bang_ky_tu(conn, test_db_url):
@@ -203,7 +207,9 @@ def test_phu_du_lieu_phan_biet_bang_MAU_NEN_khong_chi_bang_ky_tu(conn, test_db_u
     for lop in ("o-co", "o-khong", "o-ngoai"):
         assert f"{lop}{{background:" in css, f"thiếu màu nền cho .{lop}"
     html = client.get("/phu-du-lieu").text
-    assert 'class="o o-ngoai"' in html     # tháng trước 2025-03 phải là "ngoài phạm vi"
+    # tháng trước 2025-03 phải là "ngoài phạm vi"; giao diện gắn lớp "o o-" + trạng thái
+    assert any(o["trang_thai"] == "ngoai" for k in man(html)["bang"]["ky"] for t in k["thang"] for o in t["o"])
+    assert '"o o-" + o.trang_thai' in nguon("he_thong", "KhoDuLieu.tsx")
 
 
 def test_phu_du_lieu_ton_trong_db_url_va_khong_lo_thong_tin_ket_noi(
@@ -228,8 +234,7 @@ def test_ba_trang_deu_co_thanh_dieu_huong_di_qua_lai(conn, test_db_url):
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/kho-du-lieu")
     assert r.status_code == 200
-    for link in ('href="/"', 'href="/kho-du-lieu"'):
-        assert link in r.text, f"/kho-du-lieu thiếu {link}"
+    assert 'id="goc"' in r.text and kd(r.text)["hien_kho"] is True
     assert client.get("/").status_code == 200
     from pathlib import Path
     muc = (Path(__file__).resolve().parents[1] / "giao_dien/src/khung/muc.ts").read_text(encoding="utf-8")
@@ -289,18 +294,13 @@ def test_health_hien_gach_ngang_thay_vi_yen_0_cho_file_khong_mang_tien(
     r = client.get("/health")
     assert r.status_code == 200
 
-    # Ô cuối mỗi dòng của bảng = cột "Tổng tiền".
-    o_cuoi = {}
-    for dong in re.findall(r"<tr>\s*(<td>.*?)</tr>", r.text, re.S):
-        o = re.findall(r"<td>(.*?)</td>", dong, re.S)
-        if len(o) >= 4:
-            o_cuoi[o[0].strip()] = o[-1].strip()
-
+    # Cột "Tổng tiền" in "—" khi `co_tien` sai (giao diện), số tiền khi đúng.
+    st = {x["name"]: x for x in man(r.text)["status"]}
     for ten in khong_tien:
-        assert "—" in o_cuoi[ten] and "¥" not in o_cuoi[ten], \
-            f"{ten}: phải hiện — chứ không phải ¥0, đã hiện {o_cuoi[ten]!r}"
+        assert st[ten]["co_tien"] is False, ten
     for ten in co_tien:
-        assert o_cuoi[ten].startswith("¥"), f"{ten}: vẫn phải hiện số tiền"
+        assert st[ten]["co_tien"] is True, ten
+    assert 's.co_tien ? yen(s.total) : <span className="khong-ap-dung"' in nguon("he_thong", "KhoDuLieu.tsx")
 
 def _tuoi_khoi_dau(html):
     import json
@@ -353,6 +353,7 @@ def test_trang_phu_du_lieu_co_bang_theo_tung_ngay(conn, test_db_url, monkeypatch
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/phu-du-lieu")
     assert r.status_code == 200
-    assert "90 ngày gần nhất" in r.text
-    assert "2026-09-17" in r.text          # dòng đầu là hôm nay
-    assert "2026-06-20" in r.text          # dòng cuối, đủ 90 ngày
+    assert "90 ngày gần nhất" in nguon("he_thong", "KhoDuLieu.tsx")
+    ngay = [n["ngay"] for n in man(r.text)["bang_ngay"]["ngay"]]
+    assert ngay[0] == "2026-09-17"          # dòng đầu là hôm nay
+    assert ngay[-1] == "2026-06-20"         # dòng cuối, đủ 90 ngày

@@ -725,24 +725,6 @@ def dem_va_can_xu_ly(conn, gioi_han: int = 100,
     return dem, khach
 
 
-def ve_duong(thang: list[dict], rong: int = 640, cao: int = 120) -> dict:
-    """Đường doanh thu theo tháng cho hồ sơ 360°. Tự tính toạ độ — không dùng
-    thư viện JavaScript nào (xem ghi chú ở kome/bao_cao.py)."""
-    if not thang:
-        return {"co": False}
-    le = 6
-    dinh = max((t["doanh_thu"] or 0) for t in thang) or 1
-    n = len(thang)
-    buoc = (rong - 2 * le) / max(n - 1, 1)
-    diem = [(round(le + i * buoc, 1),
-             round(cao - le - (cao - 2 * le) * ((t["doanh_thu"] or 0) / dinh), 1), t)
-            for i, t in enumerate(thang)]
-    return {"co": True, "rong": rong, "cao": cao, "diem": diem,
-            "duong": " ".join(f"{x},{y}" for x, y, _ in diem),
-            "vung": f"{le},{cao-le} " + " ".join(f"{x},{y}" for x, y, _ in diem)
-                    + f" {round(le + (n-1)*buoc, 1)},{cao-le}",
-            "dinh": dinh}
-
 
 @dataclass
 class TongQuan:

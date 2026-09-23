@@ -129,12 +129,16 @@ def test_csv_co_bom_va_tieu_de(conn, batch):
 def test_hai_trang_mo_duoc_khi_khong_co_cong(conn, batch, test_db_url):
     _nam_loai(conn, batch)
     c = TestClient(create_app(db_url=test_db_url), follow_redirects=False)
+    from tests.spa_kd import man, nguon
     t = c.get("/nhat-ky").text
-    assert "Dòng thời gian" in t and "Hoàn tác lô" in t
+    m = man(t)
+    assert {d["loai"] for d in m["ds"]} >= {"nap", "huy"} and m["loai_ds"]["huy"][1] == "Hoàn tác lô"
+    assert "Dòng thời gian" in nguon("he_thong", "NhatKy.tsx")
     assert c.get("/nhat-ky.csv").headers["content-type"].startswith("text/csv")
-    t = c.get("/cai-dat").text
-    assert "chưa bật đăng nhập" in t and "an" in t
-    assert 'href="/cai-dat" class="dang-xem" aria-current="page"' in t
+    m = man(c.get("/cai-dat").text)
+    assert m["co_cong"] is False and m["duoc_sua"] is False
+    assert "an" in {n["ten_dang_nhap"] for n in m["nguoi_dung"]}
+    assert "chưa bật đăng nhập" in nguon("he_thong", "CaiDat.tsx")
     # không có cổng → không đổi được quyền, và KHÔNG ghi gì
     r = c.post("/cai-dat/quyen/1", data={"duoc_quan_tri": "1"})
     assert r.status_code == 303 and "loi=" in r.headers["location"]

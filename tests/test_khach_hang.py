@@ -333,19 +333,18 @@ def test_cac_trang_moi_mo_duoc(conn, batch, test_db_url):
 
     # Giai đoạn 2: /khach-hang, /khach-hang/{mã}, /ban-do là ứng dụng React
     # (vỏ index.html, dữ liệu qua /api). Giai đoạn 3 thêm /lien-he, /bao-cao,
-    # /du-bao. /san-pham vẫn là Jinja không JavaScript.
+    # /du-bao; giai đoạn 4 thêm /san-pham, /kho-hang.
     for duong in ("/khach-hang", "/khach-hang/000000009292", "/ban-do",
-                  "/lien-he", "/bao-cao", "/du-bao"):
+                  "/lien-he", "/bao-cao", "/du-bao", "/san-pham", "/kho-hang"):
         r = c.get(duong)
         assert r.status_code == 200 and 'id="goc"' in r.text, duong
     assert c.get("/api/lien-he").status_code == 200
-    r = c.get("/san-pham")
-    assert r.status_code == 200 and "<script" not in r.text
 
     assert c.get("/api/khach-hang/000000009292").json()["khach"]["ten"] == "QUAN AN TEST"
     assert c.get("/api/khach-hang/MA-KHONG-CO").status_code == 404
     assert 'id="goc"' in c.get("/").text          # trang React Tổng quan
-    assert "Nạp dữ liệu OBC" in c.get("/nap").text
+    from tests.spa_kd import kd
+    assert "man" in kd(c.get("/nap").text)   # 301 -> /kho-du-lieu (React, máy chủ tính sẵn)
 
 
 def test_moi_trang_deu_co_khung_dieu_huong(conn, test_db_url):
@@ -358,10 +357,9 @@ def test_moi_trang_deu_co_khung_dieu_huong(conn, test_db_url):
     # /khach-hang (giai đoạn 2), /lien-he, /bao-cao (giai đoạn 3) là React —
     # thanh bên của chúng ở giao_dien/src/khung/muc.ts; các trang Jinja còn lại
     # vẫn phải có đủ ba mục.
-    for duong in ("/san-pham", "/health", "/phu-du-lieu", "/nap"):
-        t = c.get(duong).text
-        for muc in ('href="/khach-hang"', 'href="/bao-cao"', 'href="/lien-he"'):
-            assert muc in t, f"{duong} thiếu {muc}"
+    # Giai đoạn 5: MỌI trang là React — thanh bên dựng từ muc.ts cho mọi trang.
+    for duong in ("/nhat-ky", "/health", "/phu-du-lieu", "/nap"):
+        assert 'id="goc"' in c.get(duong).text, duong
     muc_ts = Path("giao_dien/src/khung/muc.ts").read_text(encoding="utf-8")
     for url in ("/khach-hang", "/bao-cao", "/lien-he"):
         assert f'url: "{url}"' in muc_ts, f"thanh bên React thiếu {url}"

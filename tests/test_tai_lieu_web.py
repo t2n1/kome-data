@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 import kome.web.app as A
 from kome import tai_lieu as TL
 from kome.config import SPECS
+from tests.spa_kd import kd, man, nguon
 
 
 @pytest.fixture
@@ -28,7 +29,10 @@ def test_hai_trang_200_khong_truy_van(client):
     for d in ("/kho-du-lieu/luong", "/kho-du-lieu/cot-noi"):
         r = client.get(d)
         assert r.status_code == 200, d
-        assert "Chưa sinh tài liệu" not in r.text, "ảnh chụp không được nạp"
+    m = man(client.get("/kho-du-lieu/luong").text)
+    for khoa in ("cong", "cam_bay", "lo_trinh"):
+        assert m[khoa], f"ảnh chụp không được nạp ({khoa} rỗng)"
+    assert all(t["muc"] for t in m["tang"]), "ảnh chụp không được nạp (bốn tầng)"
 
 
 def test_moi_cot_tren_trang_co_trong_files_yml(client):
@@ -36,31 +40,34 @@ def test_moi_cot_tren_trang_co_trong_files_yml(client):
     đúng câu lộ trình §7: tài liệu sống sinh ra, không chép tay."""
     for ten, s in SPECS.items():
         r = client.get(f"/kho-du-lieu/cot-noi?file={ten}")
-        khoi = r.text.split('id="cot"', 1)[1]
-        tren_trang = [H.unescape(x) for x in re.findall(r'<td class="cot-obc">(.*?)</td>', khoi)]
+        tren_trang = [c["ja"] for c in man(r.text)["cot"]]
         assert tren_trang == list(s.columns), ten
+    assert '<td className="cot-obc">{c.ja}</td>' in nguon("he_thong", "TaiLieu.tsx")
 
 
 def test_file_la_ve_mac_dinh(client):
     r = client.get("/kho-du-lieu/cot-noi?file=khong-co")
     assert r.status_code == 200
-    assert "Cột trong 売上伝票データ" in r.text
+    m = man(r.text)
+    assert m["file"] == "uriage" and m["file_ja"] == "売上伝票データ"
 
 
 def test_tab_danh_dau_trang_dang_xem(client):
-    r = client.get("/kho-du-lieu/luong")
-    assert re.search(r'href="/kho-du-lieu/luong" class="dang-xem" aria-current="page"', r.text)
-    assert not re.search(r'href="/kho-du-lieu/cot-noi" class="dang-xem"', r.text)
+    src = nguon("he_thong", "TaiLieu.tsx")
+    assert '<TabKho dang="luong" />' in src and '<TabKho dang="cot-noi" />' in src
+    tab = nguon("he_thong", "TabKho.tsx")
+    assert 'aria-current={dang === ma ? "page" : undefined}' in tab
 
 
 def test_trang_luong_hien_cam_bay_cong_va_bang_moi(client):
     t = client.get("/kho-du-lieu/luong").text
+    m = man(t)
     anh = TL.doc_anh_chup()
-    assert t.count('class="the-tl"', t.index('id="cam-bay"'), t.index('id="lo-trinh"')) == len(anh["cam_bay"])
+    assert len(m["cam_bay"]) == len(anh["cam_bay"])
     # "Ai là sự thật": mọi bảng app của migration hiện ở thẻ của app
-    khoi = t[t.index('id="ai-la-su-that"'):t.index('id="nguong"')]
+    ten_ranh = {x["ten"] for r in m["ranh_gioi"] for x in r["muc"]}
     for b in anh["bang"]["app"]:
-        assert f"app.{b}" in khoi
+        assert f"app.{b}" in ten_ranh
     for c in anh["cong"]:
         assert H.escape(c["ten"]) in t or c["ten"] in t
     assert "mart.thang_den_hom_nay" in t
@@ -69,15 +76,22 @@ def test_trang_luong_hien_cam_bay_cong_va_bang_moi(client):
 
 
 def test_cam_bay_khong_de_html_lot_qua(client):
+    """[CRITICAL] Nguồn là CLAUDE.md / đặc tả — ai cũng sửa được. Thẻ HTML lọt
+    qua là một chỗ chèn script vào màn có nút xoá dữ liệu. Giao diện dựng
+    `**đậm**` / `` `mã` `` thành PHẦN TỬ React (md()), không bao giờ innerHTML;
+    JSON trong <script> thoát `<`."""
     t = client.get("/kho-du-lieu/luong").text
-    khoi = t[t.index('id="cam-bay"'):t.index('id="lo-trinh"')]
-    assert "<code>" in khoi, "md_dong không được áp"
-    assert "**" not in khoi
+    assert any("`" in c["cach"] for c in man(t)["cam_bay"]), "cạm bẫy phải còn đánh dấu mã để md() dựng"
+    src = nguon("he_thong", "TaiLieu.tsx")
+    assert "dangerouslySetInnerHTML" not in src
+    assert "export function md(" in src and "<code key={k++}>" in src
+    assert "</script>" not in t.split("window.__KOME__=", 1)[1].split("</script>", 1)[0]
 
 
 def test_man_van_hanh_co_tab(conn, test_db_url):
     r = TestClient(A.create_app(db_url=test_db_url)).get("/kho-du-lieu")
-    assert 'href="/kho-du-lieu" class="dang-xem" aria-current="page"' in r.text
+    assert r.status_code == 200 and "man" in kd(r.text)
+    assert '<TabKho dang="van-hanh" />' in nguon("he_thong", "KhoDuLieu.tsx")
 
 
 def test_khong_co_quyen_kho_du_lieu_thi_tai_lieu_cung_403():

@@ -29,6 +29,12 @@ export type KhoiDau = {
     vai_tro: { id: string; nhan: string; khoi: string[] }[];
   };
   chua_co: Record<string, string>;
+  // Giai đoạn 5 — màn do máy chủ tính sẵn (route cũ giữ nguyên truy vấn, chỉ đổi
+  // cách vẽ): dữ liệu của màn đang mở, trang thông báo (lỗi / không có quyền /
+  // bản chỉ-đọc), và cờ "vừa đăng nhập sai".
+  man?: unknown;
+  thong_bao?: { loai: "loi" | "chi_doc" | "cam_kho_du_lieu" | "cam_ngan_sach" | "cam_cai_dat"; viec?: string };
+  dang_nhap_sai?: boolean;
 };
 
 declare global {

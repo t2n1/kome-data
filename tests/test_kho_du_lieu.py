@@ -5,6 +5,9 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from kome.web.app import create_app
+from tests.spa_kd import kd, man, nguon
+
+KDL = ("he_thong", "KhoDuLieu.tsx")
 
 
 def _lo(conn, spec_name, ten_file, ngay, row_count, digest, tong_tien=0):
@@ -41,15 +44,23 @@ def _nha_cung_cap(conn, batch_id, so_dong):
         (batch_id, so_dong))
 
 
-def _khoi_hoan_tac(html: str) -> dict[int, str]:
-    """Tách từng khối <details> hoàn tác, khoá theo số lô trong form action.
+def _khoi_hoan_tac(html: str) -> dict[int, dict]:
+    """Dữ liệu khối hoàn tác của TỪNG lô (giai đoạn 5: màn React đọc
+    `window.__KOME__.man.lo`), khoá theo số lô. Kiểm theo từng lô là cần khi có
+    NHIỀU lô: một câu đúng cho lô này không được làm test xanh cho lô kia."""
+    return {l["batch_id"]: l for l in man(html)["lo"]}
 
-    Kiểm cả trang bằng `in html` là không đủ khi có NHIỀU lô: một câu đúng
-    cho lô này vẫn làm test xanh trong khi lô kia nói sai."""
-    khoi = {}
-    for m in re.finditer(r'<details class="hoan-tac">(.*?)</details>', html, re.S):
-        khoi[int(re.search(r"/undo/(\d+)", m.group(1)).group(1))] = m.group(1)
-    return khoi
+
+def test_cau_chu_khoi_hoan_tac_du_ba_dieu_bat_buoc():
+    """Ba điều BẮT BUỘC có trong câu xác nhận: số dòng thật sẽ bị xoá, bảng có
+    trống hẳn không, và không hoàn lại được — cùng ca "lô không còn giữ dòng
+    nào". Chữ nằm ở giao diện; số (so_dong_xoa, lam_trong_bang) ở máy chủ."""
+    src = nguon(*KDL)
+    for cau in ("so(l.so_dong_xoa)} dòng", "sẽ trống hoàn toàn", "không lùi",
+                "về lần nạp trước", "lô TRƯỚC nạp vào", "không còn giữ dòng nào",
+                "Không thể hoàn lại", '<details className="hoan-tac">', "Xoá lô {l.batch_id}"):
+        assert cau in src, cau
+
 
 # Mỗi khối một dấu hiệu nhận biết ổn định (không phải chuỗi trang trí dễ đổi).
 DAU_HIEU_KHOI = {
@@ -69,18 +80,22 @@ def test_man_kho_du_lieu_co_du_cac_khoi(conn, test_db_url):
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/kho-du-lieu")
     assert r.status_code == 200
+    src = nguon(*KDL)
     for ten, dau_hieu in DAU_HIEU_KHOI.items():
-        assert dau_hieu in r.text, f"thiếu khối: {ten}"
+        assert dau_hieu in src or dau_hieu in r.text, f"thiếu khối: {ten}"
+    m = man(r.text)
+    for khoa in ("status", "ky", "bang", "bang_ngay", "lo", "backup"):
+        assert khoa in m, f"thiếu dữ liệu khối {khoa}"
+    assert kd(r.text)["tuoi"]["nguon"], "thiếu ô tuổi dữ liệu"
 
 
 def test_man_co_hai_neo_cho_dau_trang_cu(conn, test_db_url):
     """Dấu trang cũ /nap và /phu-du-lieu sẽ được chuyển hướng kèm neo
     #nap / #theo-thang. Neo không tồn tại thì người bấm rơi lên đầu trang
     và phải cuộn đi tìm — đúng thứ chuyển hướng sinh ra để tránh."""
-    client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/kho-du-lieu").text
-    assert 'id="nap"' in html
-    assert 'id="theo-thang"' in html
+    src = nguon(*KDL)
+    assert '<section id="nap">' in src
+    assert '<section id="theo-thang">' in src
 
 
 def test_ban_chi_doc_an_o_tha_file(conn, test_db_url, monkeypatch):
@@ -89,8 +104,9 @@ def test_ban_chi_doc_an_o_tha_file(conn, test_db_url, monkeypatch):
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/kho-du-lieu").text
-    assert 'id="nap"' not in html
-    assert "在庫一覧" in html, "khối chỉ-đọc khác vẫn phải hiện"
+    assert kd(html)["chi_doc"] is True
+    assert "{!KD.chi_doc && <Nap" in nguon(*KDL)
+    assert any(x["name"] == "在庫一覧" for x in man(html)["status"]), "khối chỉ-đọc khác vẫn phải hiện"
 
 
 def test_khoi_hoan_tac_hien_lo_va_giau_nut_sau_mot_buoc(conn, test_db_url):
@@ -104,10 +120,11 @@ def test_khoi_hoan_tac_hien_lo_va_giau_nut_sau_mot_buoc(conn, test_db_url):
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/kho-du-lieu").text
 
-    assert "仕入先_20260908.xlsx" in html
-    assert "<details" in html and "Hoàn tác" in html
-    assert "3 dòng" in _khoi_hoan_tac(html)[b], "phải nói rõ sẽ xoá bao nhiêu dòng"
-    assert "Không thể hoàn lại" in html
+    l = _khoi_hoan_tac(html)[b]
+    assert l["ten_file"] == "仕入先_20260908.xlsx"
+    assert l["so_dong_xoa"] == 3, "phải nói rõ sẽ xoá bao nhiêu dòng"
+    src = nguon(*KDL)
+    assert "<details" in src and "<summary>Hoàn tác</summary>" in src and "Không thể hoàn lại" in src
 
 
 def test_ban_chi_doc_an_khoi_hoan_tac(conn, test_db_url, monkeypatch):
@@ -116,7 +133,8 @@ def test_ban_chi_doc_an_khoi_hoan_tac(conn, test_db_url, monkeypatch):
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/kho-du-lieu").text
-    assert "/undo/" not in html
+    assert kd(html)["chi_doc"] is True
+    assert "{!KD.chi_doc && <LoNap" in nguon(*KDL)
 
 
 def test_hoan_tac_master_upsert_hien_canh_bao_se_trong(conn, test_db_url):
@@ -134,9 +152,8 @@ def test_hoan_tac_master_upsert_hien_canh_bao_se_trong(conn, test_db_url):
     conn.commit()
     client = TestClient(create_app(db_url=test_db_url))
     khoi = _khoi_hoan_tac(client.get("/kho-du-lieu").text)[b]
-    assert "49 dòng" in khoi
-    assert "sẽ trống hoàn toàn" in khoi
-    assert "không lùi về lần nạp trước" in khoi
+    assert khoi["so_dong_xoa"] == 49
+    assert khoi["lam_trong_bang"] is True
 
 
 def test_hoan_tac_uriage_doi_soat_thang_noi_dung_so_dong_se_mat(conn, test_db_url):
@@ -166,16 +183,14 @@ def test_hoan_tac_uriage_doi_soat_thang_noi_dung_so_dong_se_mat(conn, test_db_ur
     client = TestClient(create_app(db_url=test_db_url))
     khoi = _khoi_hoan_tac(client.get("/kho-du-lieu").text)
 
-    assert "3 dòng" in khoi[b2], "lô đối soát đang giữ 3 dòng, phải nói đúng 3"
-    assert "doanh thu" in khoi[b2], "phải nói rõ mất dòng của BẢNG NÀO"
-    assert "lô TRƯỚC nạp vào" in khoi[b2], \
-        "phải nói rõ số này gồm cả dòng của lô trước bị đè lên"
-    assert "sẽ trống hoàn toàn" in khoi[b2]
-    assert "Không thể hoàn lại" in khoi[b2]
+    assert khoi[b2]["so_dong_xoa"] == 3, "lô đối soát đang giữ 3 dòng, phải nói đúng 3"
+    assert "doanh thu" in khoi[b2]["ten_bang"], "phải nói rõ mất dòng của BẢNG NÀO"
+    assert khoi[b2]["lam_trong_bang"] is True
 
-    assert "không còn giữ dòng nào" in khoi[b1]
-    assert "2 dòng" not in khoi[b1], \
-        "row_count cũ (2) là con số GÂY HIỂU NHẦM — hoàn tác lô 1 xoá 0 dòng"
+    assert khoi[b1]["so_dong_xoa"] == 0, (
+        "row_count cũ (2) là con số GÂY HIỂU NHẦM — hoàn tác lô 1 xoá 0 dòng")
+    # 0 dòng -> nhánh "không còn giữ dòng nào" của giao diện (không in số của file).
+    assert "l.so_dong_xoa === 0 ? <p>Lô này <strong>không còn giữ dòng nào" in nguon(*KDL)
 
 
 def test_khong_doa_se_trong_khi_bang_con_dong_cua_lo_khac(conn, test_db_url):
@@ -191,9 +206,9 @@ def test_khong_doa_se_trong_khi_bang_con_dong_cua_lo_khac(conn, test_db_url):
     conn.commit()
     client = TestClient(create_app(db_url=test_db_url))
     khoi = _khoi_hoan_tac(client.get("/kho-du-lieu").text)
-    assert "1 dòng" in khoi[b2]
-    assert "sẽ trống hoàn toàn" not in khoi[b2]
-    assert "sẽ trống hoàn toàn" not in khoi[b1]
+    assert khoi[b2]["so_dong_xoa"] == 1
+    assert khoi[b2]["lam_trong_bang"] is False
+    assert khoi[b1]["lam_trong_bang"] is False
 
 
 def test_ba_dia_chi_cu_chuyen_huong_301(conn, test_db_url):
@@ -230,8 +245,10 @@ def test_upload_render_man_gop(conn, test_db_url):
     with open("tests/fixtures/zaiko_cat_cut.xlsx", "rb") as f:
         r = client.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", f)})
     assert r.status_code == 200
-    assert 'id="theo-thang"' in r.text, "phải là màn gộp, không phải trang nạp cũ"
-    assert "nghi file xuất một phần" in r.text, "kết quả nạp vẫn phải hiện"
+    m = man(r.text)
+    assert "bang" in m and "lo" in m, "phải là màn gộp, không phải trang nạp cũ"
+    assert any("nghi file xuất một phần" in b["message"] for k in m["results"] for b in k["blockers"]),         "kết quả nạp vẫn phải hiện"
+    assert '"/upload") return () => <KhoDuLieu />' in (nguon("main.tsx"))
 
 
 def test_tai_lieu_khong_con_tro_toi_ba_dia_chi_cu():
@@ -330,9 +347,9 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
     import ast
 
     canh = [
-        Path("kome/web/templates/chi_doc.html"),
+        Path("giao_dien/src/he_thong/ThongBao.tsx"),
         Path("kome/web/bao_mat.py"),
-        Path("kome/web/templates/kho_du_lieu.html"),
+        Path("giao_dien/src/he_thong/KhoDuLieu.tsx"),
         Path("kome/web/app.py"),
     ]
     cu = ("/phu-du-lieu", "/health", "/nap")

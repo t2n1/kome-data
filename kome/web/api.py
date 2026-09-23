@@ -34,7 +34,7 @@ def _json(request: Request, du_lieu: str, phien_ban: str) -> Response:
 
 def _sale(request: Request, tat_ca: int) -> str | None:
     """Mặc định tiện dụng theo người đăng nhập (không phải hàng rào) — cùng nếp
-    `_sale_dang_loc` của app.py; `?tat_ca=1` bỏ lọc."""
+    `sale_dang_loc` bên dưới; `?tat_ca=1` bỏ lọc."""
     nguoi = getattr(request.state, "nguoi", None)
     if tat_ca or nguoi is None:
         return None
@@ -42,12 +42,21 @@ def _sale(request: Request, tat_ca: int) -> str | None:
 
 
 def sale_dang_loc(request: Request, tat_ca: int, nv: str = "") -> tuple[str | None, str | None]:
-    """(mã sale, tên) đang lọc cho màn Khách hàng — MỘT định nghĩa, app.py
-    (`_sale_dang_loc` của các trang Jinja còn lại) gọi lại hàm này. Xem
-    docstring gốc ở app.py: `nv` tường minh thắng mọi mặc định;
-    `KH.NV_MOI_NGUOI` = mọi người; `KH.PT_TRONG` = chưa ai phụ trách; không ai
-    đăng nhập / người không phụ trách khách nào => không lọc. KHÔNG phải hàng
-    rào bảo mật (đặc tả đợt 3 §5)."""
+    """(mã sale, tên người) đang lọc, hoặc (None, None) nếu xem tất cả — MỘT
+    định nghĩa cho mọi màn (Khách hàng, Bản đồ, Cần liên hệ).
+
+    Không có người đăng nhập (máy trong công ty không bật cổng) hoặc người đó
+    không phụ trách khách nào (chủ DN, kế toán, kho) => KHÔNG lọc gì. Lọc theo
+    NULL thì họ mở lên thấy danh sách rỗng và tưởng mất dữ liệu.
+
+    `nv` là lựa chọn TƯỜNG MINH từ ô lọc "Người phụ trách": nó thắng cả mặc
+    định theo người đăng nhập lẫn `tat_ca`. `nv == KH.NV_MOI_NGUOI` ("mọi người
+    phụ trách") cũng là lựa chọn tường minh — không có giá trị quy ước này thì
+    mục đó gửi `nv=""`, rơi về mặc định và ô chọn khoe "mọi người" trong khi
+    danh sách vẫn bị lọc. `KH.PT_TRONG` = chưa ai phụ trách.
+
+    Vẫn KHÔNG phải hàng rào bảo mật: năm sale ai cũng biết khách của ai (đặc tả
+    đợt 3 §5), nên chọn mã của người khác là hợp lệ."""
     if nv == KH.NV_MOI_NGUOI:
         return None, None
     if nv:
@@ -132,6 +141,20 @@ def du_lieu_du_bao(c) -> dict:
         "ve_chot": VDB.ve_chot_thang(db.chot) if db.chot else {"co": False},
         "ve_nam": {kb: VDB.ve_muoi_hai_thang(m, kb) for kb in DB.KICH_BAN} if m.du_bao else None,
     }, bo=("ngay",))
+
+
+def du_lieu_kho_hang(c, kho: str = "", loc: str = "") -> dict:
+    """Dữ liệu màn /kho-hang (`SP.kho_hang`, 2 lượt hỏi) + nhãn để giao diện
+    không tự chép. Cũng là thứ `anh_chup.lam_nong` tính sẵn (không lọc)."""
+    from kome import san_pham as SP
+    return thanh_json({"k": SP.kho_hang(c, kho=kho, loc=loc),
+                       "trang_thai": {a: list(b) for a, b in SP.TRANG_THAI_TON.items()},
+                       "loai_han": {a: list(b) for a, b in SP.LOAI_HAN.items()},
+                       "can_han_ngay": SP.CAN_HAN_NGAY})
+
+
+# Khoá ảnh chụp danh mục sản phẩm — `anh_chup.lam_nong` làm nóng đúng khoá này.
+KHOA_DANH_MUC = "san-pham/danh-muc"
 
 
 def _loi(thong_diep: str, ma: int = 500) -> JSONResponse:
@@ -346,5 +369,57 @@ def tao_api(open_app_conn) -> APIRouter:
         # Bản đồ chỉ đọc core/mart (không bảng `app` nào) -> phiên bản theo dữ liệu nạp.
         return _chup(request, _khoa("ban-do", sale=sale or "*", chi_so=chi_so), tinh_,
                      "Không đọc được bản đồ khách hàng.", chi_nap=True)
+
+    # ---- Giai đoạn 4: Sản phẩm · Kho hàng -----------------------------
+    # Cả bốn chỉ đọc core/mart (không bảng `app` nào) -> phiên bản theo dữ
+    # liệu NẠP (`chi_nap`): ghi một lần tiếp xúc không làm chúng cũ.
+
+    @r.get("/san-pham")
+    def sp_danh_muc(request: Request):
+        """Cả danh mục một lượt (232 mã) — lọc / sắp / tìm ở trình duyệt."""
+        from kome import san_pham as SP
+        return _chup(request, KHOA_DANH_MUC, SP.danh_muc,
+                     "Không đọc được danh mục sản phẩm.", chi_nap=True)
+
+    @r.get("/san-pham/{ma}")
+    def sp_ho_so(request: Request, ma: str):
+        """Hồ sơ một mã: `SP.ho_so` (trần 5 lượt hỏi, bất biến đặc tả 4b §5.5)."""
+        from kome import san_pham as SP
+
+        def tinh_(c):
+            h = SP.ho_so(c, ma)
+            return None if h is None else thanh_json({"h": h, "quy_cach": SP.QUY_CACH})
+        try:
+            with open_app_conn() as conn:
+                du_lieu, pb = anh_chup.lay(conn, _khoa("san-pham/ho-so", ma=ma), tinh_, chi_nap=True)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được hồ sơ mã hàng.")
+        if du_lieu == "null":
+            return _loi(f"Không có mã hàng {ma}.", 404)
+        return _json(request, du_lieu, pb)
+
+    @r.get("/san-pham/{ma}/ngay")
+    def sp_ngay(request: Request, ma: str, thang: str):
+        """Bán theo ngày của một mã trong một tháng + tháng trước. 1 lượt hỏi."""
+        from kome import san_pham as SP
+        import re
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", thang):
+            return _loi("Tháng phải có dạng YYYY-MM.", 400)
+        return _chup(request, _khoa("san-pham/ngay", ma=ma, thang=thang),
+                     lambda c: SP.ban_theo_ngay(c, ma, thang),
+                     "Không đọc được lượng bán theo ngày.", chi_nap=True)
+
+    @r.get("/kho-hang")
+    def kho_hang(request: Request, kho: str = "", loc: str = ""):
+        """Màn Kho hàng: `SP.kho_hang` (ĐÚNG 2 lượt hỏi, bất biến đặc tả 4b).
+        Mỗi khối theo đúng những bộ lọc nó không điều khiển — xem docstring
+        của kho_hang(); giao diện chỉ hiện, không lọc lại."""
+        from kome import san_pham as SP
+        loc = loc if loc in SP.TRANG_THAI_TON else ""
+
+        return _chup(request, _khoa("kho-hang", kho=kho, loc=loc),
+                     lambda c: du_lieu_kho_hang(c, kho, loc),
+                     "Không đọc được tồn kho.", chi_nap=True)
 
     return r

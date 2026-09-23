@@ -19,8 +19,6 @@ import json
 import re
 from pathlib import Path
 
-from markupsafe import Markup, escape
-
 from kome import coverage
 from kome.config import FileSpec
 
@@ -66,16 +64,6 @@ def kieu_nap(core_table: str | None, chu_thich: dict) -> tuple[str, str]:
     if "SCD2" in chu_thich.get(core_table or "", ""):
         return ("full + lịch sử", "ok")
     return ("full", "nhat")
-
-
-def md_dong(s: str) -> Markup:
-    """Markdown một dòng → HTML an toàn. ESCAPE TRƯỚC, rồi mới thay hai mẫu
-    `**đậm**` và `` `mã` ``: thay trước rồi escape là mở cửa cho mọi thẻ HTML
-    lọt trong nguồn; đánh `|safe` lên chuỗi thô cũng vậy."""
-    t = str(escape(s))
-    t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
-    t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
-    return Markup(t)
 
 
 # ---- Lúc chạy: files.yml + coverage -------------------------------------

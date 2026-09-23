@@ -16,6 +16,8 @@ HAI LUẬT RIÊNG CỦA FILE NÀY, cả hai đều đến từ dữ liệu thậ
 from dataclasses import dataclass, field
 from datetime import date
 
+from kome.bao_cao import NGANH_TRONG
+
 MOI_TRANG = 50
 
 # Nhãn tiếng Việt + màu cho `mart.san_pham_360.trang_thai`. SÁU nhãn, không
@@ -163,6 +165,9 @@ class Kho:
     # Lô ĐÃ quá hạn, tách hẳn khỏi `can_han` (lô sắp hết hạn). Trộn hai thứ là
     # trộn "xử lý ngay" với "theo dõi" — xem ghi chú ở CAN_HAN_NGAY.
     qua_han: list[dict] = field(default_factory=list)
+    # Tổng giá trị của ĐÚNG các dòng bảng tồn đang hiện (theo CẢ HAI bộ lọc) —
+    # cộng lại từ `dong`, nên ô "Giá trị tồn" không thể lệch tổng của bảng.
+    gia_tri_ton: int = 0
 
 
 _COT = """product_code, ten_hang, nhom, doanh_thu_thuan, lai_gop, ty_suat,
@@ -571,12 +576,13 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
         WITH s AS MATERIALIZED (SELECT * FROM mart.san_pham_360),
              t AS MATERIALIZED (SELECT * FROM mart.ton_hien_tai)
         SELECT khoi, ma, ten, kho, ten_kho, so_luong, gia_tri, best_before,
-               loai_han, han_con_lai, trang_thai
+               loai_han, han_con_lai, trang_thai, nhom, du_ban_ngay, toc_do
         FROM (
             (SELECT 'dong'::text AS khoi, t.product_code AS ma,
                     coalesce(s.ten_hang, t.product_code) AS ten,
                     t.warehouse_code AS kho, t.ten_kho, t.so_luong, t.gia_tri,
                     t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
+                    s.nhom, s.du_ban_ngay, s.toc_do_ngay_theo_tuoi AS toc_do,
                     row_number() OVER (ORDER BY t.gia_tri DESC NULLS LAST) AS xep
                FROM t
                LEFT JOIN s ON s.product_code = t.product_code
@@ -586,6 +592,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                     coalesce(s.ten_hang, t.product_code),
                     t.warehouse_code, t.ten_kho, t.so_luong, t.gia_tri,
                     t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
+                    s.nhom, s.du_ban_ngay, s.toc_do_ngay_theo_tuoi,
                     row_number() OVER (ORDER BY t.han_con_lai)
                FROM t
                LEFT JOIN s ON s.product_code = t.product_code
@@ -596,6 +603,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                     coalesce(s.ten_hang, t.product_code),
                     t.warehouse_code, t.ten_kho, t.so_luong, t.gia_tri,
                     t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
+                    s.nhom, s.du_ban_ngay, s.toc_do_ngay_theo_tuoi,
                     row_number() OVER (ORDER BY t.han_con_lai)
                FROM t
                LEFT JOIN s ON s.product_code = t.product_code
@@ -617,10 +625,14 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                 "best_before": r[7], "loai_han": r[8],
                 "nhan_han": nhan_han, "mau_han": mau_han,
                 "han_con_lai": r[9], "trang_thai": r[10],
-                "nhan_trang_thai": nhan_tt, "mau": mau_tt}
+                "nhan_trang_thai": nhan_tt, "mau": mau_tt,
+                # Ba cột của CẢ MÃ (mọi kho, san_pham_360) — giao diện React ghi
+                # rõ "của cả mã": không có "đủ bán" riêng từng kho ở mart.
+                "nhom": r[11], "du_ban_ngay": _so(r[12]), "toc_do": _so(r[13])}
 
+    dong = [_dong(r) for r in rows if r[0] == "dong"]
     return Kho(ngay_chup=ngay_chup, o_tong_quan=o_tong_quan,
-               dong=[_dong(r) for r in rows if r[0] == "dong"],
+               dong=dong, gia_tri_ton=sum(d["gia_tri"] for d in dong),
                theo_kho=theo_kho,
                can_han=[_dong(r) for r in rows if r[0] == "han"],
                qua_han=[_dong(r) for r in rows if r[0] == "qua"],
@@ -681,3 +693,127 @@ def lo_can_han(conn, gioi_han: int = 5) -> tuple[list[dict], int]:
         key=lambda d: d["han_con_lai"])
     so_qua_han = next((int(r[7] or 0) for r in rows if r[0] == "qua"), 0)
     return can_han, so_qua_han
+
+
+# ---- Giao diện React (giai đoạn 4) ------------------------------------------
+
+def danh_muc(conn) -> dict:
+    """TOÀN BỘ danh mục (232 mã) cho màn Sản phẩm React — ĐÚNG MỘT lượt hỏi.
+
+    Vì sao cả danh mục chứ không phân trang như `danh_sach()`: 232 dòng là
+    ~60 KB JSON, còn mỗi cú bấm lọc / sắp / tìm mà phải hỏi lại máy chủ thì
+    mỗi lần mất một vòng `mart.san_pham_360` (view nặng nhất của mart). Đi qua
+    ảnh chụp theo phiên bản NẠP (không đọc bảng `app` nào), nên sau lần đầu
+    màn này là 1 lượt hỏi (phiên bản) — cùng nếp danh bạ khách (giai đoạn 2).
+
+    Hai thứ `san_pham_360` KHÔNG có, cùng câu lệnh:
+      * `dt_12t`/`lg_12t` — doanh thu / lãi gộp **12 tháng**, đúng cửa sổ của
+        `mart.hang_doanh_thu` (`sales_date > hom_nay - 365`, mốc dữ liệu) —
+        một định nghĩa "12 tháng" cho cả dự án. `san_pham_360.doanh_thu_thuan`
+        là LUỸ KẾ, hai cột cùng tồn tại và trang ghi rõ cột nào là cột nào.
+      * `thang` — 12 THÁNG LỊCH gần nhất (tới tháng mốc) cho đường xu hướng.
+      * `nganh` — ngành hàng (`core.dim_product.food_category_name`).
+    Cả hai đọc MỘT CTE trên `mart.dong_ban` (không đi qua
+    `mart.san_pham_theo_thang`, thứ đọc lại `dong_ban` một lần nữa) — cùng lý lẽ
+    bất biến CTE-trùng.
+    """
+    rows = conn.execute(f"""
+        WITH m AS (SELECT hom_nay FROM mart.moc_thoi_gian),
+        s AS MATERIALIZED (SELECT {_COT} FROM mart.san_pham_360),
+        b AS MATERIALIZED (
+            SELECT d.product_code, d.thang, d.sales_date, d.qty,
+                   d.doanh_thu_thuan, d.gross_profit
+              FROM mart.dong_ban d, m
+             WHERE d.sales_date > least(m.hom_nay - 365,
+                                        (date_trunc('month', m.hom_nay)
+                                         - interval '11 months')::date - 1)
+        ),
+        d12 AS (
+            SELECT b.product_code, sum(b.doanh_thu_thuan) AS dt, sum(b.gross_profit) AS lg
+              FROM b, m WHERE b.sales_date > m.hom_nay - 365
+             GROUP BY 1
+        ),
+        th AS (
+            SELECT product_code,
+                   json_agg(json_build_array(thang, dt, sl) ORDER BY thang) AS j
+              FROM (SELECT b.product_code, b.thang, sum(b.doanh_thu_thuan) AS dt,
+                           sum(b.qty) AS sl
+                      FROM b, m
+                     WHERE b.sales_date >= (date_trunc('month', m.hom_nay)
+                                            - interval '11 months')::date
+                     GROUP BY 1, 2) x
+             GROUP BY product_code
+        )
+        SELECT s.*, d12.dt, d12.lg, th.j, p.food_category_name, m.hom_nay
+          FROM s CROSS JOIN m
+          LEFT JOIN d12 ON d12.product_code = s.product_code
+          LEFT JOIN th ON th.product_code = s.product_code
+          LEFT JOIN core.dim_product p ON p.product_code = s.product_code
+         ORDER BY s.doanh_thu_thuan DESC NULLS LAST, s.product_code
+    """).fetchall()
+    hom_nay = rows[0][-1] if rows else None
+    thang: list[str] = []
+    if hom_nay:
+        y, mo = hom_nay.year, hom_nay.month
+        for k in range(11, -1, -1):
+            yy, mm = divmod(mo - 1 - k, 12)
+            thang.append(f"{y + yy:04d}-{mm + 1:02d}")
+    ma = []
+    for r in rows:
+        sp = _sp(r[:15])
+        chuoi = {t[0]: t for t in (r[17] or [])}
+        ma.append({**sp.__dict__, "nhan_trang_thai": sp.nhan_trang_thai, "mau": sp.mau,
+                   # NGÀNH hàng — cùng khái niệm "ngành" của /bao-cao. Rỗng -> ĐÚNG
+                   # hằng NGANH_TRONG (bản chép bắt buộc ở tầng Python của biểu thức
+                   # coalesce trong mart.ban_theo_nganh_thang — CLAUDE.md). `nhom`
+                   # (kind_name) của san_pham_360 chỉ có 有形/無形, không lọc được.
+                   "nganh": r[18] or NGANH_TRONG,
+                   "dt_12t": int(r[15] or 0), "lg_12t": int(r[16] or 0),
+                   # Tỷ số của các TỔNG (bất biến tỷ suất), NULL khi mẫu số 0 —
+                   # cùng `nullif(sum(...), 0)` của mart.
+                   "ts_12t": (float(r[16] or 0) / float(r[15])) if r[15] else None,
+                   # Tháng không có dòng bán = 0 yên ĐÃ BIẾT (không có phiếu), cùng
+                   # ngoại lệ tiền của `_sp`.
+                   "thang_dt": [int(chuoi[t][1] or 0) if t in chuoi else 0 for t in thang],
+                   "thang_sl": [_so(chuoi[t][2]) if t in chuoi else 0.0 for t in thang]})
+    return {"hom_nay": hom_nay, "thang": thang, "ma": ma,
+            "trang_thai": {k: list(v) for k, v in TRANG_THAI_TON.items()}}
+
+
+def ban_theo_ngay(conn, ma: str, thang: str) -> dict:
+    """Bán theo NGÀY của một mã trong `thang` ('YYYY-MM') và tháng liền trước
+    (cột nhạt "cùng kỳ tháng trước" của gói thiết kế) — MỘT lượt hỏi trên
+    `mart.dong_ban`. Ngày không có dòng bán không có dòng ở đây; giao diện vẽ ô
+    trống cho ngày đó (không phải 0 bịa: "không có phiếu" CHÍNH LÀ 0 yên, nhưng
+    ngày nghỉ thì giao diện tô khác — xem `la_ngay_kd`).
+
+    `la_ngay_kd` đọc `mart.lich_kinh_doanh` — định nghĩa "ngày làm việc" DUY
+    NHẤT của dự án (migration 031)."""
+    y, m = int(thang[:4]), int(thang[5:7])
+    dau = date(y, m, 1)
+    truoc = date(y - 1, 12, 1) if m == 1 else date(y, m - 1, 1)
+    sau = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
+    rows = conn.execute("""
+        WITH n AS (
+            SELECT l.ngay, l.la_ngay_kd FROM mart.lich_kinh_doanh l
+             WHERE l.ngay >= %s AND l.ngay < %s
+        ), b AS (
+            SELECT sales_date, sum(qty) AS sl, sum(doanh_thu_thuan) AS dt,
+                   sum(gross_profit) AS lg, count(DISTINCT customer_code) AS kh
+              FROM mart.dong_ban
+             WHERE product_code = %s AND sales_date >= %s AND sales_date < %s
+             GROUP BY 1
+        )
+        SELECT n.ngay, n.la_ngay_kd, b.sl, b.dt, b.lg, b.kh,
+               (SELECT hom_nay FROM mart.moc_thoi_gian)
+          FROM n LEFT JOIN b ON b.sales_date = n.ngay
+         ORDER BY n.ngay
+    """, (truoc, sau, ma, truoc, sau)).fetchall()
+    hom_nay = rows[0][6] if rows else None
+
+    def _ngay(r):
+        return {"ngay": r[0], "la_ngay_kd": bool(r[1]), "so_luong": _so(r[2]) or 0.0,
+                "doanh_thu": int(r[3] or 0), "lai_gop": int(r[4] or 0), "so_khach": int(r[5] or 0)}
+    return {"thang": thang, "hom_nay": hom_nay,
+            "nay": [_ngay(r) for r in rows if r[0] >= dau],
+            "truoc": [_ngay(r) for r in rows if r[0] < dau]}

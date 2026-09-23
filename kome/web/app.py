@@ -6,20 +6,8 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from kome.coverage import tinh_bang_ngay, tinh_bang_phu
 from kome import khach_hang as KH
-# kome/tong_quan.py (đợt 5b Task 5) — dữ liệu cho `/`. Chỉ dataclasses +
-# gọi lại các hàm mart/khach_hang/san_pham đã có (+ psycopg qua `conn`),
-# cùng lý do an toàn nhập ở mức ngoài cùng như kome/san_pham.py.
-from kome import tong_quan as TQ
-# Nhập ở mức ngoài cùng được: kome/san_pham.py chỉ dùng dataclasses/datetime
-# (+ psycopg qua `conn` truyền vào), KHÔNG kéo pandas hay python-calamine —
-# đúng ràng buộc mà test_trang_chi_doc_khong_phu_thuoc_pandas canh.
-from kome import san_pham as SP
-# kome/ban_do.py cũng chỉ dùng dataclasses, cùng lý do trên — an toàn nhập ở
-# mức ngoài cùng.
-from kome import ban_do as BD
 from kome.db import connect
 from kome.env import nap_env
 from kome.nhat_ky_nap import lo_nap_gan_nhat, trang_thai_nap
@@ -72,6 +60,28 @@ def _data_theme(che_do: str) -> str | None:
         return "toi" if (gio >= GIO_BAT_DAU_TOI or gio < GIO_KET_THUC_TOI) else "sang"
     return None
 
+def _json_man(o):
+    """Dữ liệu một màn -> đối tượng chỉ gồm kiểu JSON (dataclass KÈM @property qua
+    `api.thanh_json`; ngày -> ISO; Decimal -> số; kiểu lạ như Path -> chuỗi)."""
+    import json
+    from dataclasses import asdict, is_dataclass
+    from datetime import date, datetime
+    from decimal import Decimal
+    from kome.web.api import thanh_json
+
+    def mac_dinh(x):
+        if isinstance(x, (date, datetime)):
+            return x.isoformat()
+        if isinstance(x, Decimal):
+            return int(x) if x == x.to_integral_value() else float(x)
+        if is_dataclass(x):
+            return asdict(x)
+        if isinstance(x, (set, frozenset, tuple)):
+            return list(x)
+        return str(x)
+    return json.loads(json.dumps(thanh_json(o), default=mac_dinh, ensure_ascii=False))
+
+
 # Tự đọc .env khi chạy ở máy trong công ty. `uvicorn kome.web.app:app` khởi
 # động trong môi trường trống, nên không có dòng này thì trang chạy lên bình
 # thường rồi báo lỗi đỏ ở /kho-du-lieu — người dùng đọc thành "hỏng CSDL" chứ
@@ -85,7 +95,11 @@ nap_env(bat_buoc=False)
 # Vercel không bao giờ làm. Hai hàm ingest/undo_batch được nhập bên trong thân
 # route, nên chúng chỉ nạp khi thật sự có người nạp hoặc hoàn tác dữ liệu.
 
-TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+# Giai đoạn 5 (2026-09-23): KHÔNG còn template Jinja nào. Mọi màn trả vỏ React
+# (kome/web/spa/index.html); màn nào máy chủ tính sẵn dữ liệu (Kho dữ liệu, Nhật
+# ký, Cài đặt, Ngân sách) chèn nó vào window.__KOME__.man — CÙNG câu truy vấn
+# như bản Jinja trước, nên ngân sách lượt hỏi và cổng quyền không đổi. Biểu mẫu
+# (nạp, hoàn tác, ngân sách, quyền, đăng nhập) vẫn là <form method="post"> thật.
 
 # Cửa sổ soát ngày thiếu trên /kho-du-lieu (tính lùi từ ngày bán gần nhất).
 SO_NGAY_SOAT = 30
@@ -224,37 +238,6 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     # Ném CauHinhSai ngay lúc dựng app, trước khi phục vụ dòng nào.
     bao_mat.kiem_cau_hinh_phien(bi_mat, cong_khai=bao_mat.tren_mang())
 
-    # Biến mà MỌI trang đều cần để vẽ đúng thanh điều hướng. Gom vào một chỗ
-    # để không trang nào bị sót: sót `chi_doc` thì trang đó vẫn mời người ta
-    # bấm "Nạp dữ liệu" — một liên kết dẫn thẳng tới 403 trên bản công khai.
-    chung = {"chi_doc": chi_doc, "co_dang_nhap": bool(bi_mat)}
-
-    def _ve(request: Request, ten: str, ctx: dict, **kw) -> HTMLResponse:
-        # `nguoi` gắn bởi middleware chan_cua. getattr có mặc định vì KHÔNG
-        # PHẢI lúc nào cũng có middleware: máy trong công ty để trống
-        # KOME_SESSION_SECRET thì không có cổng, và /dang-nhap thì chạy
-        # TRƯỚC khi ai kịp là ai.
-        nguoi = getattr(request.state, "nguoi", None)
-        # `nguoi is None` = không có cổng đăng nhập (máy trong công ty để
-        # trống KOME_SESSION_SECRET) -> mọi thứ mở, y như trước đợt 3.
-        hien_kho = nguoi is None or nguoi.duoc_vao_kho_du_lieu
-        # Cùng lý lẽ với hien_kho: mời người ta bấm vào một thứ sẽ từ chối họ
-        # thì tệ hơn là không hiện. `nguoi is None` = không có cổng đăng nhập
-        # (máy trong công ty) -> mọi thứ mở, y như trước đợt 3.
-        hien_ngan_sach = nguoi is None or nguoi.duoc_sua_ngan_sach
-        # Chế độ giao diện đọc từ cookie MỖI LƯỢT (không chốt lúc dựng app,
-        # khác `chung` ở trên): mỗi người một lựa chọn riêng trên cùng một
-        # app. `che_do_giao_dien` cho _nav.html biết nút nào đang "đang
-        # chọn"; `data_theme` cho _chung.html biết có đặt thuộc tính gì lên
-        # <html> không (xem kome/web/app.py::_data_theme).
-        che_do = _che_do_giao_dien(request)
-        return TEMPLATES.TemplateResponse(
-            request, ten,
-            {**ctx, **chung, "nguoi": nguoi, "hien_kho": hien_kho,
-             "hien_ngan_sach": hien_ngan_sach,
-             "che_do_giao_dien": che_do, "data_theme": _data_theme(che_do)},
-            **kw)
-
     def _loi(request: Request, viec: str, exc: Exception) -> HTMLResponse:
         """Trang lỗi tiếng Việt cho mọi lỗi NGOÀI DỰ KIẾN.
 
@@ -264,20 +247,31 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         màu xanh. Chuỗi ngoại lệ gốc CHỈ ghi ra nhật ký máy chủ, KHÔNG hiện
         lên trang.
 
-        Dựng ngữ cảnh QUA `_ve`, không dựng riêng một đường thứ hai: error.html
-        include _nav.html, mà thanh điều hướng chỉ hiện mục Kho dữ liệu khi có
-        biến `hien_kho`. Đường dựng riêng trước đây thiếu đúng biến đó, nên
-        người CÓ quyền gặp lỗi lúc nạp file thì đứng lại trên một trang không
-        còn đường nào về /kho-du-lieu — error.html không có liên kết của riêng
-        nó, sidebar là lối ra duy nhất. Cùng lý lẽ với `_du_lieu_kho`: một chỗ
-        dựng thì không bao giờ có hai chỗ trôi khỏi nhau.
+        Vẽ trong khung React CHUNG (`_thong_bao`), nên thanh bên — lối ra duy
+        nhất của trang lỗi — có mục Kho dữ liệu đúng theo cờ quyền của người
+        đang xem (window.__KOME__.hien_kho), y như mọi màn khác: một chỗ dựng
+        thì không bao giờ có hai chỗ trôi khỏi nhau.
 
-        `_ve` KHÔNG chạm CSDL, nên trang này render được cả khi CSDL đang hỏng
-        — điều kiện bắt buộc để middleware dùng nó (xem `chan_cua`).
+        KHÔNG chạm CSDL, nên trang này render được cả khi CSDL đang hỏng —
+        điều kiện bắt buộc để middleware dùng nó (xem `chan_cua`).
         """
         _in(f"[KOME] lỗi khi {viec}:\n{traceback.format_exc()}")
-        return _ve(request, "error.html", {"viec": viec, "trang": None},
-                   status_code=500)
+        return _thong_bao(request, {"loai": "loi", "viec": viec}, 500)
+
+    def _thong_bao(request: Request, tb: dict, ma: int) -> HTMLResponse:
+        """Trang thông báo (lỗi 500 / không có quyền 403 / bản chỉ-đọc 403) vẽ
+        trong khung React (giao_dien/src/he_thong/ThongBao.tsx). Thiếu bản build
+        thì một trang HTML trần tối thiểu — vẫn tiếng Việt, vẫn không có vết
+        ngăn xếp."""
+        if not SPA.co_ban_build():
+            import html
+            chu = {"loi": f"Hệ thống gặp lỗi khi {tb.get('viec', '')}",
+                   "chi_doc": "Bản này chỉ để xem"}.get(tb["loai"], "Bạn không có quyền vào màn này")
+            return HTMLResponse(
+                '<!doctype html><html lang="vi"><meta charset="utf-8"><title>KOME</title>'
+                f"<h1>{html.escape(chu)}</h1><p>Thiếu bản build giao diện — chạy "
+                "<code>cd giao_dien &amp;&amp; npm run build</code>.</p></html>", status_code=ma)
+        return _spa(request, thong_bao=tb, status_code=ma)
 
     def _chi_gui_qua_https(request: Request) -> bool:
         """Có gắn cờ Secure lên cookie không (cấm trình duyệt gửi qua HTTP)?
@@ -294,7 +288,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         return bao_mat.tren_mang() or request.url.scheme == "https"
 
     def _cam(request: Request) -> HTMLResponse:
-        return _ve(request, "chi_doc.html", {"trang": None}, status_code=403)
+        return _thong_bao(request, {"loai": "chi_doc"}, 403)
 
     @app.get("/giao-dien")
     def doi_giao_dien(request: Request, che_do: str = "he-thong"):
@@ -409,18 +403,22 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 # 403 kèm trang giải thích, KHÔNG chuyển hướng im lặng: người
                 # gõ thẳng địa chỉ cần biết vì sao mình không vào được, không
                 # phải tự hỏi trang có hỏng không.
-                return _ve(request, "cam_kho_du_lieu.html",
-                           {"trang": None}, status_code=403)
+                return _cam_quyen(request, "cam_kho_du_lieu")
             if not nguoi.duoc_sua_ngan_sach and _thuoc_ngan_sach(request.url.path):
                 # Chặn ở middleware nên nó chặn CẢ GET LẪN POST bằng một chỗ
                 # duy nhất — không có đường nào cho một route mới quên gác.
-                return _ve(request, "cam_ngan_sach.html",
-                           {"trang": None}, status_code=403)
+                return _cam_quyen(request, "cam_ngan_sach")
             return await call_next(request)
+
+        def _cam_quyen(request: Request, loai: str):
+            # /api/* nhận JSON (giao diện React đọc được), trang nhận khung React.
+            if request.url.path.startswith("/api/"):
+                return JSONResponse({"loi": "Bạn không có quyền xem mục này."}, status_code=403)
+            return _thong_bao(request, {"loai": loai}, 403)
 
         @app.get("/dang-nhap", response_class=HTMLResponse)
         def form_dang_nhap(request: Request):
-            return _ve(request, "dang_nhap.html", {"trang": None, "sai": False})
+            return _spa(request)
 
         @app.post("/dang-nhap")
         def nhan_dang_nhap(request: Request, ten: str = Form(""),
@@ -437,8 +435,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 # MỘT thông báo duy nhất cho cả "sai tên" lẫn "sai mật khẩu":
                 # nói rõ cái nào sai là xác nhận giúp người ngoài rằng tên đó
                 # CÓ TỒN TẠI trong công ty.
-                return _ve(request, "dang_nhap.html",
-                           {"trang": None, "sai": True}, status_code=401)
+                return _spa(request, dang_nhap_sai=True, status_code=401)
             resp = RedirectResponse(
                 bao_mat.duong_dan_an_toan(request.cookies.get("kome_tiep")),
                 status_code=303)
@@ -478,8 +475,17 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "chua_co": KTQ_CHUA_CO,
         }
 
-    def _spa(request: Request, tuoi: bool = False) -> HTMLResponse:
+    def _spa(request: Request, tuoi: bool = False, man=None, thong_bao: dict | None = None,
+             dang_nhap_sai: bool = False, status_code: int = 200) -> HTMLResponse:
+        """Vỏ index.html + window.__KOME__. `man` = dữ liệu màn tính sẵn (giai
+        đoạn 5), `thong_bao` = trang lỗi / không có quyền."""
         kd = _khoi_dau(request)
+        if man is not None:
+            kd["man"] = _json_man(man)
+        if thong_bao is not None:
+            kd["thong_bao"] = thong_bao
+        if dang_nhap_sai:
+            kd["dang_nhap_sai"] = True
         if tuoi:
             # Ô "hôm nay đã có dữ liệu chưa" (kome/tuoi_du_lieu.py) — ĐỒNG HỒ
             # THẬT (ngoại lệ của bất biến mốc thời gian), nên KHÔNG qua ảnh
@@ -493,7 +499,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             except Exception:
                 traceback.print_exc()
                 kd["tuoi"] = None
-        return HTMLResponse(SPA.trang(_data_theme(_che_do_giao_dien(request)), kd))
+        return HTMLResponse(SPA.trang(_data_theme(_che_do_giao_dien(request)), kd),
+                            status_code=status_code)
 
     # ---- Các trang ------------------------------------------------------
     @app.get("/", response_class=HTMLResponse)
@@ -503,7 +510,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         Đợt 5b Task 5: `/` không còn gọi `tinh_bao_cao` (5 lượt hỏi chỉ để
         lấy ba con số của KỲ KẾ TOÁN) — mọi khối giờ qua
         `kome.tong_quan.tong_quan()`, đọc `mart.thang_den_hom_nay` (tháng
-        đến hôm nay). `sale` dùng lại đúng `_sale_dang_loc` (mặc định tiện
+        đến hôm nay). `sale` dùng lại đúng `api.sale_dang_loc` (mặc định tiện
         dụng theo người đăng nhập, `?tat_ca=1` bỏ lọc — cùng nếp
         `/can-xu-ly`), CHỈ áp cho khối "Cần gọi hôm nay"; các khối số tổng
         (tháng, xu hướng, sức khoẻ, ngân sách, hàng cận hạn) không lọc theo
@@ -558,32 +565,6 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 return _loi(request, "đưa bố cục về mặc định", e)
         return RedirectResponse("/", status_code=303)
 
-    def _sale_dang_loc(request: Request, tat_ca: int,
-                       nv: str = "") -> tuple[str | None, str | None]:
-        """(mã sale, tên người) đang lọc, hoặc (None, None) nếu xem tất cả.
-
-        Không có người đăng nhập (máy trong công ty không bật cổng) hoặc người
-        đó không phụ trách khách nào (chủ DN, kế toán, kho) => KHÔNG lọc gì.
-        Lọc theo NULL thì họ mở lên thấy danh sách rỗng và tưởng mất dữ liệu.
-
-        `nv` là lựa chọn TƯỜNG MINH từ ô lọc "Người phụ trách" trên trang danh
-        sách. Nó thắng cả mặc định theo người đăng nhập lẫn `tat_ca`: người ta
-        vừa chọn một cái tên thì không có cách đọc nào khác. Tên đi kèm trả
-        None vì ở đây chưa có CSDL trong tay — route tra tên từ
-        `mart.tai_nhan_vien` (đã nằm sẵn trong `tong_quan_danh_ba`), không tốn
-        thêm một vòng hỏi nào.
-
-        `nv == KH.NV_MOI_NGUOI` là mục đầu của ô chọn — "mọi người phụ
-        trách". Nó cũng là một lựa chọn TƯỜNG MINH, nên nó cũng thắng mặc
-        định theo người đăng nhập. Không có giá trị quy ước này thì mục đó
-        gửi `nv=""`, hàm rơi xuống nhánh mặc định và trả về đúng người đang
-        đăng nhập — ô chọn khoe "mọi người" trong khi danh sách vẫn bị lọc.
-
-        Vẫn KHÔNG phải hàng rào bảo mật: năm sale ai cũng biết khách của ai
-        (đặc tả đợt 3 §5), nên chọn mã của người khác là hợp lệ.
-        """
-        from kome.web.api import sale_dang_loc
-        return sale_dang_loc(request, tat_ca, nv)
 
     # Giai đoạn 2 (đặc tả 2026-09-23-giai-doan-2-khach-hang-design.md): màn
     # Khách hàng là ứng dụng React — danh sách, hồ sơ 360° và bản đồ (tab của
@@ -626,8 +607,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             with open_app_conn() as conn:
                 ds = NK.dong_thoi_gian(conn, loai or None, tim)
                 th = NK.tong_hop_30_ngay(conn)
-            return _ve(request, "nhat_ky.html", {
-                "trang": "nhat-ky", "ds": ds, "th": th, "loai": loai, "tim": tim,
+            return _spa(request, man={
+                "ds": ds, "th": th, "loai": loai, "tim": tim,
                 "loai_ds": NK.LOAI, "gioi_han": 200})
         except Exception as e:
             return _loi(request, "mở nhật ký thao tác", e)
@@ -665,8 +646,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                     """SELECT ngay, ngay_le FROM mart.lich_kinh_doanh
                        WHERE ngay_le IS NOT NULL AND ngay >= %s ORDER BY ngay LIMIT 12""",
                     (TDL.hom_nay_o_nhat(),)).fetchall()
-            return _ve(request, "cai_dat.html", {
-                "trang": "cai-dat", "nguoi_dung": ds, "nguoi": nguoi, "ngay_le": ngay_le,
+            return _spa(request, man={
+                "nguoi_dung": ds, "ngay_le": ngay_le,
                 "co_cong": bool(bi_mat), "duoc_sua": bool(bi_mat and nguoi and nguoi.duoc_quan_tri),
                 "co_quyen": [(c, _NHAN_CO[c]) for c in ND.CO_QUYEN], "muc": _MUC_CAI_DAT,
                 "loi": loi[:200], "xong": xong[:200]})
@@ -688,7 +669,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             return RedirectResponse("/cai-dat?loi=" + quote(
                 "Máy này chưa bật đăng nhập — không đổi quyền được ở đây."), status_code=303)
         if not nguoi.duoc_quan_tri:
-            return _ve(request, "cam_cai_dat.html", {"trang": "cai-dat"}, status_code=403)
+            return _thong_bao(request, {"loai": "cam_cai_dat"}, 403)
         form = await request.form()
         moi = {c: form.get(c) == "1" for c in ND.CO_QUYEN}
         try:
@@ -756,59 +737,23 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         đồ (2) giờ nằm ở /api/ban-do — tests/test_ban_do.py đếm ở đó."""
         return _man_khach(request)
 
-    # ---- Hàng hoá: sản phẩm và kho hàng (đợt 4b) ------------------------
-    # Cả ba route đều `open_app_conn` — chúng chỉ đọc. Có test duyệt AST canh
-    # (tests/test_bao_mat.py::test_trang_chi_doc_khong_duoc_dung_ket_noi_nap_du_lieu).
-    #
-    # Mọi chỉ số nằm ở schema `mart` (migration 023) và mọi nhãn ở
-    # kome/san_pham.py — ba route này chỉ lấy dữ liệu rồi giao cho template,
-    # y hệt cặp route khách hàng ngay trên.
+    # ---- Hàng hoá: sản phẩm và kho hàng (giai đoạn 4 — React) -------------
+    # Ba địa chỉ trả vỏ React; dữ liệu qua /api/san-pham, /api/san-pham/{mã}
+    # (+ /ngay) và /api/kho-hang (kome/web/api.py -> kome/san_pham.py — mọi chỉ
+    # số vẫn ở mart, migration 023). Mã hàng lạ: vỏ 200, API trả 404 và giao
+    # diện nói "không có mã hàng …".
 
     @app.get("/san-pham", response_class=HTMLResponse)
-    def ds_san_pham(request: Request, tim: str = "", loc: str = "",
-                    sap: str = "doanh_thu", trang: int = 1):
-        try:
-            with open_app_conn() as conn:
-                t = SP.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang)
-            return _ve(request, "san_pham.html",
-                       {"t": t, "trang_thai": SP.TRANG_THAI_TON,
-                        "trang": "san-pham"})
-        except Exception as e:
-            return _loi(request, "mở danh sách sản phẩm", e)
+    def ds_san_pham(request: Request):
+        return _man_khach(request)
 
     @app.get("/san-pham/{ma}", response_class=HTMLResponse)
     def ho_so_san_pham(request: Request, ma: str):
-        try:
-            with open_app_conn() as conn:
-                h = SP.ho_so(conn, ma)
-            if h is None:
-                return _ve(request, "khong_thay.html",
-                           {"thu": f"mã hàng {ma}", "trang": "san-pham",
-                            "ve": "/san-pham", "ve_ten": "danh sách sản phẩm"},
-                           status_code=404)
-            # Mượn KH.ve_duong: nó chỉ TÍNH TOẠ ĐỘ từ cột `doanh_thu` của một
-            # danh sách theo tháng — hình học thuần tuý, không một định nghĩa
-            # chỉ số nào. Chép sang kome/san_pham.py là hai bản cùng công thức
-            # sẽ trôi khỏi nhau, đúng lớp lỗi mà `_vi_tu` né ở tầng SQL.
-            return _ve(request, "san_pham_360.html",
-                       {"h": h, "d": KH.ve_duong(h.thang), "trang": "san-pham"})
-        except Exception as e:
-            return _loi(request, "mở hồ sơ sản phẩm", e)
+        return _man_khach(request)
 
     @app.get("/kho-hang", response_class=HTMLResponse)
-    def man_kho_hang(request: Request, kho: str = "", loc: str = ""):
-        try:
-            with open_app_conn() as conn:
-                k = SP.kho_hang(conn, kho=kho, loc=loc)
-            # `can_han_ngay` đi ra template để tiêu đề khối và nhãn ô đếm đọc
-            # CÙNG một hằng với truy vấn đã lọc (kome/san_pham.py::
-            # CAN_HAN_NGAY). Viết cứng "90 ngày" vào HTML là để sẵn một ngày
-            # ô đếm nói 60 còn tiêu đề vẫn nói 90.
-            return _ve(request, "kho_hang.html",
-                       {"k": k, "trang_thai": SP.TRANG_THAI_TON,
-                        "can_han_ngay": SP.CAN_HAN_NGAY, "trang": "kho-hang"})
-        except Exception as e:
-            return _loi(request, "mở màn kho hàng", e)
+    def man_kho_hang(request: Request):
+        return _man_khach(request)
 
     @app.post("/upload", response_class=HTMLResponse)
     def upload(request: Request, files: list[UploadFile]):
@@ -832,8 +777,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             with open_conn() as conn:
                 ctx = _du_lieu_kho(conn)
             ctx["backup"] = None if chi_doc else backup_status(backup_dir)
-            return _ve(request, "kho_du_lieu.html",
-                       {**ctx, "results": results, "trang": "kho-du-lieu", "tab": "van-hanh"})
+            return _man_kho(request, {**ctx, "results": results})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e)
 
@@ -867,6 +811,27 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 "bang_ngay": tinh_bang_ngay(conn),
                 "lo": lo_nap_gan_nhat(conn)}
 
+    def _man_kho(request: Request, ctx: dict) -> HTMLResponse:
+        """Màn Kho dữ liệu React. Ô tuổi dữ liệu đi qua `window.__KOME__.tuoi`
+        (cùng chỗ trang `/` đọc — một component DaiTuoi cho hai màn), lấy từ
+        ĐÚNG lượt tính của `_du_lieu_kho` (không hỏi CSDL thêm). Ô bảng phủ bỏ
+        bản chép `cot` trong từng ô — giao diện tra cột theo vị trí."""
+        t = ctx.pop("tuoi")
+        man = _json_man(ctx)
+        # `BangPhu.database` (tên CSDL) CHỈ dành cho terminal — không bao giờ ra
+        # trình duyệt (có test: không lộ thông tin kết nối).
+        man["bang"].pop("database", None)
+        for bang in (man["bang_ngay"]["ngay"], *[k["thang"] for k in man["bang"]["ky"]]):
+            for dong in bang:
+                for o in dong["o"]:
+                    o.pop("cot", None)
+        kd = _khoi_dau(request)
+        kd["man"] = man
+        kd["tuoi"] = {"hom_nay": t.hom_nay, "co_thieu": t.co_thieu,
+                      "nguon": [{"spec": n.spec, "ten": n.ten, "ngay": n.ngay,
+                                 "trang_thai": n.trang_thai, "tre": n.tre} for n in t.nguon]}
+        return HTMLResponse(SPA.trang(_data_theme(_che_do_giao_dien(request)), kd))
+
     @app.get("/kho-du-lieu", response_class=HTMLResponse)
     def kho_du_lieu(request: Request):
         try:
@@ -880,8 +845,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             # luôn kết luận "chưa sao lưu" — một dải đỏ vĩnh viễn dạy người
             # đọc bỏ qua dải đỏ.
             ctx["backup"] = None if chi_doc else backup_status(backup_dir)
-            return _ve(request, "kho_du_lieu.html",
-                       {**ctx, "trang": "kho-du-lieu", "tab": "van-hanh"})
+            return _man_kho(request, ctx)
         except Exception as e:
             return _loi(request, "mở màn kho dữ liệu", e)
 
@@ -895,8 +859,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         from kome import tai_lieu as TL
         from kome.config import SPECS
         anh = TL.doc_anh_chup()
-        return _ve(request, "kho_du_lieu_luong.html", {
-            "trang": "kho-du-lieu", "tab": "luong", "md": TL.md_dong,
+        return _spa(request, man={
             "tang": TL.bon_tang(anh, SPECS), "nguon": TL.nguon_obc(SPECS, anh),
             "ranh_gioi": TL.ranh_gioi(anh),
             "chua_nap": TL.chua_nap(), "cong": TL.cong(anh),
@@ -908,8 +871,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         from kome import tai_lieu as TL
         from kome.config import SPECS
         ten = TL.chon_file(SPECS, file)
-        return _ve(request, "kho_du_lieu_cot_noi.html", {
-            "trang": "kho-du-lieu", "tab": "cot-noi", "file": ten,
+        return _spa(request, man={
+            "file": ten,
             "file_ja": SPECS[ten].display_name, "core_table": SPECS[ten].core_table,
             "nguon": TL.nguon_obc(SPECS), "ma_tran": TL.ma_tran(SPECS),
             "noi": TL.noi_di_dau(SPECS, ten), "so_do": TL.so_do_noi(SPECS, ten),
@@ -943,35 +906,18 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         return _man_khach(request)
 
     def _ngu_canh_ngan_sach(b) -> dict:
-        """Đổi khoá bộ đôi sang khoá chuỗi cho Jinja, và cộng sẵn hai chiều
-        tổng.
+        """Dữ liệu màn Ngân sách cho giao diện React.
 
-        `BangNhap.o` dùng khoá `(mã, tháng)` vì đó là khoá đúng ở tầng Python.
-        Template thì tra bằng chính tên ô của biểu mẫu (`o-0104-2026-05`), nên
-        đổi một lần ở đây thay vì để Jinja dựng lại bộ đôi ở mỗi trong 60 ô.
-
-        Hai bảng tổng cộng từ `b.o` đã nằm sẵn trong bộ nhớ — KHÔNG thêm truy
-        vấn nào. Ô chưa đặt không có mặt trong `b.o` nên nó không cộng vào
-        tổng, đúng như phải thế: "chưa đặt" không phải "bằng không".
-
-        `co_nguoi`/`co_thang`/`co_bat_ky` (vòng sửa 1): CÓ ít nhất một ô đã
-        đặt cho hàng/cột/toàn bảng đó không. `sum()` trên một dải TRỐNG trả
-        `0`, và một dải TỔNG in thẳng `¥0` cho "chưa đặt gì" là trang tự mâu
-        thuẫn với chính dòng ghi chú "ô trống nghĩa là chưa đặt chỉ tiêu,
-        khác với đặt bằng không" ngay phía trên nó. Ba cờ này để template
-        chọn in `—` thay vì `¥0` khi không có ô nào đứng sau con số đó.
+        `BangNhap.o` dùng khoá `(mã, tháng)` vì đó là khoá đúng ở tầng Python;
+        JSON không có khoá bộ đôi nên đổi sang khoá chuỗi bằng CHÍNH tên ô của
+        biểu mẫu (`0104-2026-05`, ô gửi lên là `o-0104-2026-05`). Ô chưa đặt
+        KHÔNG có mặt — "chưa đặt" khác "bằng không", nên dải TỔNG (giao diện
+        cộng từ `o_txt`) in "—" khi không ô nào đứng sau nó, chứ không in ¥0.
+        KHÔNG thêm truy vấn nào.
         """
-        return {
-            "b": b,
-            "o_txt": {f"{ma}-{th}": v for (ma, th), v in b.o.items()},
-            "tong_nguoi": {n.ma: sum(v for (m, _), v in b.o.items() if m == n.ma)
-                           for n in b.nguoi},
-            "tong_thang": {th: sum(v for (_, t), v in b.o.items() if t == th)
-                           for th in b.thang},
-            "co_nguoi": {n.ma: any(m == n.ma for m, _ in b.o) for n in b.nguoi},
-            "co_thang": {th: any(t == th for _, t in b.o) for th in b.thang},
-            "co_bat_ky": bool(b.o),
-        }
+        return {"ky": b.company_fy, "moi_ky": b.moi_ky, "thang": b.thang,
+                "nguoi": [{"ma": n.ma, "ten": n.ten} for n in b.nguoi],
+                "o_txt": {f"{ma}-{th}": v for (ma, th), v in b.o.items()}}
 
     @app.get("/ngan-sach", response_class=HTMLResponse)
     def ngan_sach(request: Request, ky: int | None = None):
@@ -984,9 +930,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         try:
             with open_app_conn() as conn:
                 b = bang_nhap(conn, ky)
-            return _ve(request, "ngan_sach.html",
-                       {**_ngu_canh_ngan_sach(b), "da_go": {}, "loi": [],
-                        "trang": "ngan-sach"})
+            return _spa(request, man={**_ngu_canh_ngan_sach(b), "da_go": {}, "loi": []})
         except Exception as e:
             return _loi(request, "mở trang ngân sách", e)
 
@@ -1037,10 +981,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             with open_app_conn() as conn:
                 if loi:
                     b = bang_nhap(conn, ky)
-                    return _ve(request, "ngan_sach.html",
-                               {**_ngu_canh_ngan_sach(b), "da_go": da_go,
-                                "loi": loi, "trang": "ngan-sach"},
-                               status_code=400)
+                    return _spa(request, man={**_ngu_canh_ngan_sach(b), "da_go": da_go,
+                                              "loi": loi}, status_code=400)
                 luu(conn, gia_tri, nguoi.id if nguoi else None)
                 conn.commit()
             # `?ky=` (chuỗi rỗng) KHÔNG phải `None` với FastAPI — nó là một
