@@ -29,6 +29,10 @@ def apply_all(conn: psycopg.Connection, migrations_dir: Path) -> list[str]:
 
 
 if __name__ == "__main__":
+    # Đọc .env như mọi script khác (kome/env.py): thiếu dòng này thì lệnh
+    # trong sổ tay nổ KeyError DATABASE_URL trên máy không nạp sẵn biến môi trường.
+    from kome.env import nap_env
+    nap_env()
     from kome.db import connect
     with connect() as c:
         for name in apply_all(c, Path(__file__).parent / "migrations"):
