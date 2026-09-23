@@ -86,7 +86,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 ## Các trang của web app
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
-| `/` | Dashboard chung (đợt 5b): 4 ô chỉ số tháng đến hôm nay · tiến độ ngân sách · xu hướng 30 ngày · sức khoẻ khách · cần gọi hôm nay · hàng cận hạn · ô "hôm nay đã có dữ liệu chưa" | `mart.thang_den_hom_nay`, `mart.ban_theo_ngay`, `mart.khach_360` (qua `kome.khach_hang.dem_va_can_xu_ly`, MỘT lượt hỏi), `mart.tien_do_ngan_sach` (qua `kome.bao_cao.tien_do_ngan_sach`), `mart.ton_hien_tai` (qua `kome.san_pham.lo_can_han`, KHÔNG qua `kho_hang()`), `meta.ingest_batch` |
+| `/` | Dashboard chung (đợt 5b): 4 ô chỉ số tháng đến hôm nay · tiến độ ngân sách · xu hướng 30 ngày · sức khoẻ khách · cần gọi hôm nay · hàng cận hạn · ô "hôm nay đã có dữ liệu chưa". Từ `034` mỗi người tự kéo thả / đổi cỡ / ẩn hiện khối, lưu theo tài khoản (`POST /tong-quan/bo-cuc`) | `mart.thang_den_hom_nay`, `mart.ban_theo_ngay`, `mart.khach_360` (qua `kome.khach_hang.dem_va_can_xu_ly`, MỘT lượt hỏi), `mart.tien_do_ngan_sach` (qua `kome.bao_cao.tien_do_ngan_sach`), `mart.ton_hien_tai` (qua `kome.san_pham.lo_can_han`, KHÔNG qua `kho_hang()`), `meta.ingest_batch` |
 | `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
 | `/lien-he` | **Cần liên hệ** (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc qua `POST /khach-hang/{mã}/tiep-xuc`. **3 truy vấn** | `mart.uu_tien_lien_he`, `app.nhat_ky_tiep_xuc` |
@@ -544,6 +544,21 @@ Có test canh: `tests/test_ve_phan_tich.py::test_ve_cay_o_bo_nganh_am_va_cong_do
 `::test_doi_soat_a_nganh_duong_co_mot_ma_am`, `::test_doi_soat_b_hon_5_ma_duong_cong_mot_ma_am`,
 `::test_doi_soat_c_ca_nganh_am`,
 `tests/test_bao_cao_phan_tich_web.py::test_khong_ve_hien_dung_cau_khi_co_doanh_thu_am`.
+
+**Bất biến (034, bố cục Tổng quan):** chủ doanh nghiệp đổi quyết định P8 của đặc
+tả 5b ("không kéo thả") ngày 2026-09-23: mỗi người tự sắp khối như gói thiết kế,
+nhưng **cùng các khối và cùng con số** cho mọi người — bố cục là cách XẾP, không
+phải bộ lọc dữ liệu. Lưu ở `app.nguoi_dung.bo_cuc_tong_quan` (KHÔNG localStorage,
+cùng lý lẽ cookie giao diện: máy chủ vẽ sẵn đúng bố cục, không có khung hình giật)
+và đọc cùng lượt hỏi của cổng đăng nhập — **0 truy vấn thêm** cho `/`. Mọi bố cục
+đi qua `kome/web/bo_cuc.py::chuan_hoa` cả lúc ghi lẫn lúc đọc; thêm khối là thêm
+MỘT dòng `KHOI` + MỘT macro `khoi_<mã>` trong `tong_quan.html` (có test canh hai
+bên khớp). `static/tong_quan.js` là file JavaScript **DUY NHẤT** của app: tự host,
+không thư viện, không gọi ra ngoài, chỉ nạp khi có người đăng nhập; mọi trang
+khác vẫn không có `<script>`. Tắt JS thì trang vẫn đúng bố cục đã lưu và nút "Về
+bố cục mặc định" vẫn chạy (form thường). Dải "hôm nay đã có dữ liệu chưa" nằm
+NGOÀI lưới — không kéo xuống được. **Migration 034 phải chạy TRƯỚC khi triển khai**
+(cổng đăng nhập đọc cột đó ở mọi lượt gọi). Có test canh: `tests/test_bo_cuc.py`.
 
 **Bất biến:** Dashboard (`/`, đợt 5b) là "công ty đang thế nào" — mọi khối SỐ
 TỔNG (4 ô chỉ số tháng, xu hướng 30 ngày, sức khoẻ khách, tiến độ ngân sách,

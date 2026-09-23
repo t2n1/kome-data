@@ -214,6 +214,13 @@ Cấp cho chủ doanh nghiệp:
 `python scripts/tao_nguoi_dung.py quyen <tên> --quan-tri`. Từ đó các cờ khác đổi
 được trên web (và được ghi vào Nhật ký thao tác). Mật khẩu vẫn chỉ đổi bằng script.
 
+`034` (bố cục trang Tổng quan theo tài khoản) thêm cột
+`app.nguoi_dung.bo_cuc_tong_quan` và **phải chạy TRƯỚC khi triển khai code
+mới**: cổng đăng nhập đọc cột đó ở MỌI lượt gọi, nên code mới trên CSDL chưa có
+cột là mọi trang (kể cả đăng nhập) báo lỗi. Thứ tự: `python db/migrate.py` bằng
+`postgres` → rồi mới push/Redeploy. Không có cờ quyền nào: ai đăng nhập cũng tự
+sắp được bố cục của mình.
+
 `030` (đợt 7 — nhật ký tiếp xúc) **không thêm cột quyền nào**: mọi người đã
 đăng nhập đều ghi được lần tiếp xúc cho mọi khách (lọc theo người phụ trách là
 mặc định tiện dụng, không phải hàng rào). Chạy `python db/migrate.py` bằng
