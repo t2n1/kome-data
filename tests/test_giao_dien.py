@@ -381,40 +381,40 @@ def test_nut_nap_va_o_chon_file_co_kieu_dang():
 
 def test_trang_danh_sach_co_du_bon_khoi_va_ba_bo_loc(conn, test_db_url):
     """[IMPORTANT] Bốn khối là bốn câu hỏi khác nhau; thiếu một khối thì
-    không test nào khác đỏ, vì trang vẫn trả 200 và vẫn có danh sách."""
+    không test nào khác đỏ, vì trang vẫn trả 200 và vẫn có danh sách.
+    Giai đoạn 2: màn là React — kiểm dữ liệu API có đủ cho từng khối, và mã
+    giao diện có đủ khối / bộ lọc."""
     c = TestClient(create_app(db_url=test_db_url))
-    html = c.get("/khach-hang").text
-    # Khối 1: danh sách làm việc — bốn nút
-    for ten in ("Toàn bộ danh bạ", "Im lặng", "đang tụt", "Khách mới"):
-        assert ten in html, f"thiếu nút nhóm việc: {ten}"
-    # Ba khối phân tích
-    assert "luoi-3" in html, "ba khối phân tích không nằm trong .luoi-3"
-    for tieu_de in ("hạng doanh thu 12 tháng", "Tập trung ở đâu",
-                    "Tải của từng nhân viên"):
-        assert tieu_de in html, f"thiếu khối: {tieu_de}"
-    # Ba bộ lọc: chip hạng, select người phụ trách, select tỉnh. Phải khớp
-    # CHÍNH thẻ <select> — `name="nv"` khớp cả ô ẩn của form tìm kiếm, nên
-    # xoá hẳn hai ô chọn mà test vẫn xanh.
-    assert '<select name="nv"' in html and '<select name="tinh"' in html
-    assert "hang=S" in html and "hang=D" in html
+    tq = c.get("/api/khach-hang/ds").json()["tq"]
+    assert set(tq["nhom"]) == {"im", "tut", "moi"}
+    assert [h for h, _ in tq["hang"]] == ["S", "A", "B", "C", "D"]
+    assert "tinh" in tq and "nhan_vien" in tq and "thang" in tq
+    nguon = Path("giao_dien/src/khach/DanhSach.tsx").read_text(encoding="utf-8")
+    for ten in ("Toàn bộ danh bạ", "Im lặng ≥ 2× nhịp", "đang tụt", "Khách mới", "Mua đều, tháng này chưa"):
+        assert ten in nguon, f"thiếu nút nhóm việc: {ten}"
+    for tieu_de in ("Phân bố theo hạng doanh thu 12 tháng", "Tập trung ở đâu", "Tải của từng nhân viên"):
+        assert tieu_de in nguon, f"thiếu khối: {tieu_de}"
+    # Bộ lọc: chip hạng S..D, ô chọn người phụ trách, ô chọn tỉnh.
+    assert '["S", "A", "B", "C", "D"].map(h =>' in nguon
+    assert "<span>Phụ trách</span>" in nguon and "<span>Tỉnh</span>" in nguon
 
 
-def test_nhan_hang_khong_bao_gio_tro_troi(conn, test_db_url):
+def test_nhan_hang_khong_bao_gio_tro_troi():
     """[IMPORTANT] core.dim_customer.rank_code (得意先ランク của OBC, 10 nhóm
     không có tên ở đâu) cũng tồn tại. Gọi tắt chỉ số của ta là "hạng" thì sáu
     tháng nữa sẽ có người đối chiếu với OBC, thấy lệch, và không biết tin cái
-    nào. Cả hai đều đúng — chúng trả lời hai câu khác nhau."""
-    c = TestClient(create_app(db_url=test_db_url))
-    html = c.get("/khach-hang").text.lower()
-    assert "hạng doanh thu 12 tháng" in html
-    # Ngoại lệ DUY NHẤT: tên nút nhóm việc "Hạng S·A đang tụt" — câu mô tả
-    # ngay dưới nó đã viết đủ chữ "theo doanh thu 12 tháng".
-    # Nhận CẢ HAI cách viết: đặc tả nói "hạng theo doanh thu 12 tháng", còn
-    # tiêu đề khối trong bản mô tả là "Phân bố theo hạng doanh thu 12 tháng".
-    # Cấm một trong hai là bắt người viết sau chọn giữa đặc tả và test.
-    tro_troi = re.findall(r"hạng(?! (?:theo )?doanh thu 12 tháng)(?! s·a)", html)
-    assert not tro_troi, \
-        f"{len(tro_troi)} chỗ ghi 'hạng' trơ trọi — sẽ bị đối chiếu nhầm với 得意先ランク"
+    nào. Giai đoạn 2: màn Khách hàng là React — MỌI dòng mã giao diện nhắc
+    "hạng" phải mang theo "doanh thu 12 tháng" trên CHÍNH phần tử đó (chữ hiện
+    ra hoặc `title`). Ngoại lệ: "Hạng S·A đang tụt" (mô tả ngay dưới đã nói đủ)
+    và "xếp hạng" (động từ, không phải chỉ số)."""
+    tro_troi = []
+    for p in sorted(Path("giao_dien/src/khach").glob("*.tsx")):
+        for i, dong in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            d = dong.lower()
+            if "hạng" in d and not dong.lstrip().startswith("//") and not re.search(
+                    r"doanh thu 12 tháng|s·a|xếp hạng", d):
+                tro_troi.append(f"{p.name}:{i}: {dong.strip()[:90]}")
+    assert not tro_troi, "'hạng' trơ trọi — sẽ bị đối chiếu nhầm với 得意先ランク: " + " | ".join(tro_troi)
 
 
 # ---- Icon và logo sidebar (đợt 4d, Task 1) ------------------------------

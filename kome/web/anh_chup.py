@@ -58,6 +58,22 @@ _PHIEN_BAN = """concat_ws('|',
     (SELECT max(id) FROM app.nhat_ky_tiep_xuc),
     (SELECT max(filename) FROM meta.schema_migration))"""
 
+# Phiên bản CHỈ theo dữ liệu nạp (lô nạp, hoàn tác, migration) — cho ảnh chụp
+# mà dữ liệu KHÔNG đọc bảng nào web ghi được (danh bạ khách: mart.* dựng từ
+# core, không đọc app.ngan_sach hay app.nhat_ky_tiep_xuc). Dùng bản đầy đủ ở
+# trên cho những ảnh chụp đó thì mỗi lần ai đó ghi một cuộc gọi, danh bạ 1.710
+# khách (~6 s để dựng) lại phải tính lại — vì một thứ nó không hề đọc.
+# BẤT BIẾN: chọn `chi_nap=True` NGHĨA LÀ cam đoan dữ liệu không đọc bảng `app`
+# nào — sai là ảnh chụp đứng yên sau khi người ta sửa.
+_PHIEN_BAN_NAP = """concat_ws('|',
+    (SELECT max(batch_id) FROM meta.ingest_batch),
+    (SELECT max(undone_at) FROM meta.ingest_batch),
+    (SELECT max(filename) FROM meta.schema_migration))"""
+
+
+# Khoá ảnh chụp danh bạ khách — api.py đọc, lam_nong làm nóng.
+KHOA_DANH_BA = "khach-hang/danh-ba"
+
 
 def bat() -> bool:
     return os.environ.get("KOME_ANH_CHUP", "1") != "0"
@@ -79,7 +95,8 @@ def sang_json(du_lieu) -> str:
     return json.dumps(du_lieu, default=_mac_dinh, ensure_ascii=False, separators=(",", ":"))
 
 
-def lay(conn, khoa: str, tinh, theo_ngay: bool = False) -> tuple[str, str]:
+def lay(conn, khoa: str, tinh, theo_ngay: bool = False,
+        chi_nap: bool = False) -> tuple[str, str]:
     """(JSON, phiên bản) của khoá `khoa`. Trúng ảnh chụp: MỘT lượt hỏi. Trượt:
     gọi `tinh(conn)` (trả về dữ liệu chuyển được sang JSON), ghi đè ảnh chụp,
     commit. `theo_ngay`: khối phụ thuộc đồng hồ thật giờ Tokyo (hẹn gọi lại,
@@ -89,7 +106,7 @@ def lay(conn, khoa: str, tinh, theo_ngay: bool = False) -> tuple[str, str]:
         return sang_json(tinh(conn)), ""
     r = conn.execute(
         f"""SELECT v.pb, a.du_lieu::text
-            FROM (SELECT {_PHIEN_BAN} || '|' || %s AS pb) v
+            FROM (SELECT {_PHIEN_BAN_NAP if chi_nap else _PHIEN_BAN} || '|' || %s AS pb) v
             LEFT JOIN app.anh_chup_api a ON a.khoa = %s AND a.phien_ban = v.pb""",
         (duoi, khoa)).fetchone()
     phien_ban, co_san = r[0], r[1]
@@ -107,6 +124,30 @@ def lay(conn, khoa: str, tinh, theo_ngay: bool = False) -> tuple[str, str]:
         (khoa, phien_ban, ra, ms))
     conn.commit()
     return ra, phien_ban
+
+
+# Bản ĐÃ GIẢI MÃ của các ảnh chụp lớn (danh bạ ~940 KB) trong tiến trình này,
+# theo khoá — một phần tử mỗi khoá, thay khi phiên bản đổi. Mỗi lượt lọc danh
+# sách vẫn hỏi CSDL phiên bản hiện tại (không bao giờ trả bản cũ), chỉ bỏ được
+# bước đọc + giải mã lại cả ảnh chụp.
+_DA_GIAI_MA: dict[str, tuple[str, object]] = {}
+
+
+def lay_du_lieu(conn, khoa: str, tinh, chi_nap: bool = False) -> tuple[object, str]:
+    """Như `lay` nhưng trả về đối tượng Python (đã `json.loads`). Trúng ảnh
+    chụp của đúng phiên bản đang nhớ thì không đọc lại thân ảnh chụp."""
+    if not bat():
+        return json.loads(sang_json(tinh(conn))), ""
+    pb = conn.execute(
+        f"SELECT {_PHIEN_BAN_NAP if chi_nap else _PHIEN_BAN} || '|' || %s",
+        (VAN_TAY_MA,)).fetchone()[0]
+    nho = _DA_GIAI_MA.get(khoa)
+    if nho and nho[0] == pb:
+        return nho[1], pb
+    du_lieu, pb = lay(conn, khoa, tinh, chi_nap=chi_nap)
+    obj = json.loads(du_lieu)
+    _DA_GIAI_MA[khoa] = (pb, obj)
+    return obj, pb
 
 
 def lam_nong(open_conn) -> None:
@@ -131,6 +172,13 @@ def lam_nong(open_conn) -> None:
                 lay(c, "thong-bao", KTQ.thong_bao, theo_ngay=True)
         except Exception as e:         # noqa: BLE001
             print(f"[anh-chup] không làm nóng được thong-bao: {e!r}")
+        # Danh bạ khách (giai đoạn 2) — câu nặng nhất của màn Khách hàng.
+        try:
+            from kome import khach_hang as KH
+            with open_conn() as c:
+                lay(c, KHOA_DANH_BA, KH.danh_ba, chi_nap=True)
+        except Exception as e:         # noqa: BLE001
+            print(f"[anh-chup] không làm nóng được danh bạ: {e!r}")
 
     if bat():
         threading.Thread(target=chay, name="lam-nong-anh-chup", daemon=True).start()

@@ -87,10 +87,10 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
 | `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối kéo thả / đổi cỡ / ẩn hiện, xem theo vai trò, chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api` |
-| `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
-| `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
+| `/khach-hang` | **React** (giai đoạn 2, bám Customer 360.dc.html) tab **Danh sách**: KPI · 7 phân khúc (gồm "mua đều, tháng này chưa") · lọc tìm/hạng (nhiều)/phụ trách/tỉnh/trạng thái/nhãn tháng · bảng sắp xếp máy chủ 50/100/200 dòng · xuất CSV dòng đã chọn · 3 khối phân tích. `/api/khach-hang/ds` — một ảnh chụp danh bạ (`KH.danh_ba`) lọc bằng Python | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `khach_thang_nay`, `tai_nhan_vien` |
+| `/khach-hang/{mã}` | **Hồ sơ 360° React**: 5 tab (Tổng quan · Sản phẩm · Đơn hàng · Công nợ [chưa có] · Hồ sơ & liên hệ), biểu đồ 12 tháng bấm tháng xem mặt hàng, lưới 26 tuần, giỏ theo ngành, lịch mua dự kiến, ghi tiếp xúc (`POST /api/khach-hang/{mã}/tiep-xuc`, chỉ JSON). `/api/khach-hang/{mã}` (+ `/dong?tu=&den=`) | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `khach_thang_nay`, `lan_mua`, `dong_ban`, `ty_suat_mat_hang` |
 | `/lien-he` | **Cần liên hệ** (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn · mua đều tháng này chưa — 036) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc qua `POST /khach-hang/{mã}/tiep-xuc`. **3 truy vấn** | `mart.uu_tien_lien_he`, `mart.khach_thang_nay`, `app.nhat_ky_tiep_xuc` |
-| `/ban-do` | Bản đồ khách hàng — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách | `core.dim_prefecture`, `mart.khach_theo_tinh` |
+| `/ban-do` | Tab **Bản đồ** của màn Khách hàng (React) — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách; bấm ô → tab Danh sách lọc tỉnh đó. `/api/ban-do` | `core.dim_prefecture`, `mart.khach_theo_tinh` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
 | `/du-bao` | **Dự báo doanh thu** (đợt 8): chốt tháng (đường luỹ kế + khoảng sai số thật + theo người phụ trách) · 12 tháng tới (3 kịch bản) · đơn kỳ vọng 14 ngày · nguy cơ ngừng mua · dự báo đã chuẩn tới đâu. Toàn công ty, **3 truy vấn** | `mart.lich_kinh_doanh`, `mart.ban_theo_ngay`, `mart.tien_do_ngan_sach`, `mart.khach_360`, `mart.khoang_cach_mua` |
 | `/ngan-sach` | Đặt chỉ tiêu doanh thu: 5 người phụ trách × 12 tháng một kỳ. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
@@ -111,10 +111,15 @@ tháng**, KHÔNG phải `得意先ランク` của OBC. `core.dim_customer.rank_
 gọi tắt là "hạng" thì sẽ có người đối chiếu với OBC rồi thấy lệch và không biết tin
 cái nào.
 
-**Bất biến:** `kome/khach_hang.py::ho_so()` chạy **không quá 8 truy vấn** (nay là
-7 — chỗ trống là cố ý, để khối tiếp theo thêm được mà không phải nới trần), và cả
-trang `/khach-hang` chạy **3**: `tong_quan_danh_ba` 1 (bốn khối phân tích + bộ đếm
-trạng thái + tổng toàn công ty) và `danh_sach` 2 (đếm + lấy dòng). Đo thật
+**Bất biến:** `kome/khach_hang.py::ho_so()` chạy **không quá 8 truy vấn** (giai
+đoạn 2 gộp "đã ngừng mua" vào câu mặt hàng nên nay là 7 — chỗ trống là cố ý), và
+màn danh sách chạy **≤ 3**: từ giai đoạn 2 cả bảng lẫn khối tổng quan tính trên MỘT
+ảnh chụp danh bạ (`KH.danh_ba`, 1 lượt hỏi, phiên bản CHỈ theo dữ liệu nạp —
+`anh_chup.lay(..., chi_nap=True)`), lọc / sắp / đếm bằng MỘT bộ lọc Python
+(`KH._khop`) — đo thật: lọc bằng SQL thì mỗi tổ hợp bộ lọc dựng lại `khach_360`,
+3–10 s mỗi cú bấm. `danh_ba` đọc nhánh `'im'` từ `trang_thai IN
+TRANG_THAI_CAN_XU_LY` (đúng định nghĩa nhánh đó của `mart.khach_nhom_viec`, có test
+canh `tests/test_khach_hang_api.py::test_nhom_im_cua_danh_ba_DUNG_BANG_view_nhom_viec`). Đo thật
 2026-09-22: một round-trip tới pooler Tokyo mất 47 ms và một lượt hỏi thật ~260 ms.
 Nút thắt là **số lượt hỏi**, không phải sức tính — nên tối ưu đúng là gộp truy vấn,
 không phải materialized view. Có test đếm.
@@ -398,7 +403,9 @@ hơn số khách nó thật sự có. Có test canh:
 `tests/test_ban_do.py::test_khach_theo_tinh_dung_EXISTS_khong_JOIN_vao_khach_nhom_viec`.
 
 **Bất biến:** mọi liên kết rời `/ban-do` sang `/khach-hang` — ô SVG **và** dòng
-bảng xếp hạng — phải mang theo `tat_ca`/`nv` (biến `giu` của `ban_do.html`).
+bảng xếp hạng — phải mang theo `tat_ca`/`nv`. Từ giai đoạn 2 hai màn là hai TAB
+trên CÙNG một trạng thái lọc (`giao_dien/src/khach/loc.ts`); bấm ô / dòng chỉ đổi
+`tinh` + tab (`BanDo.tsx::moTinh`), nên bộ lọc người phụ trách không có đường rơi.
 `/khach-hang` thiếu hai tham số đó rơi về mặc định lọc theo NGƯỜI ĐANG ĐĂNG
 NHẬP, nên bản đồ vẽ số của "tất cả" (hay của một đồng nghiệp) mà bấm vào lại ra
 danh sách của chính mình — cùng lớp lỗi `kome/khach_hang.py::_vi_tu` đã ghi
@@ -589,6 +596,14 @@ kế, có ô nổi / bật tắt chú giải / bấm để lọc). Đặc tả:
   (`KOME_ANH_CHUP=0`, conftest). **Migration 035 phải chạy TRƯỚC khi triển khai.**
 - `window.__KOME__` (người đăng nhập, cờ quyền, bố cục, danh mục) chèn vào
   `index.html` qua `kome/web/spa.py::trang` — `<`, `>`, `&` được thoát (có test).
+- **Giai đoạn 2 (màn Khách hàng)** — đặc tả `2026-09-23-giai-doan-2-khach-hang-design.md`:
+  `/khach-hang`, `/ban-do`, `/khach-hang/{mã}` là React (template Jinja đã xoá). Ảnh
+  chụp nào dữ liệu KHÔNG đọc bảng `app` (danh bạ, bản đồ, dòng bán) dùng
+  `chi_nap=True` — ghi tiếp xúc không làm chúng cũ; hồ sơ (đọc nhật ký) dùng phiên
+  bản đầy đủ. `lam_nong` làm nóng cả danh bạ (`anh_chup.KHOA_DANH_BA`, ~6 s trên CSDL
+  thật). Bản đồ vẫn là LƯỚI 47 tỉnh, không Leaflet. Khối gói thiết kế không có nguồn
+  (công nợ, giá riêng, tạo đơn, ảnh, chat, gợi ý tiếp khách, "độ tin cậy %") là khung
+  "chưa có" hoặc nút vô hiệu kèm lý do.
 - Thanh bên: sáu nhóm của gói thiết kế; màn chưa có hiện MỜ kèm "chưa có" (không giả
   vờ có); bốn màn bị cắt (lộ trình §4.2) không hiện; Kho dữ liệu / Ngân sách ẩn theo
   cờ quyền. Chuông chỉ báo thứ có nguồn thật (`khoi_tong_quan.thong_bao`).

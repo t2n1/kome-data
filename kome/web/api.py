@@ -8,11 +8,16 @@ JSON thay vì chuyển hướng). Kết quả đi qua ảnh chụp theo phiên b
 """
 from __future__ import annotations
 
+import hashlib
 import traceback
+from datetime import date
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
+from kome import khach_hang as KH
+from kome import khach_thang as KT
 from kome import khoi_tong_quan as KTQ
 from kome.web import anh_chup
 
@@ -34,6 +39,34 @@ def _sale(request: Request, tat_ca: int) -> str | None:
     if tat_ca or nguoi is None:
         return None
     return nguoi.salesperson_code
+
+
+def sale_dang_loc(request: Request, tat_ca: int, nv: str = "") -> tuple[str | None, str | None]:
+    """(mã sale, tên) đang lọc cho màn Khách hàng — MỘT định nghĩa, app.py
+    (`_sale_dang_loc` của các trang Jinja còn lại) gọi lại hàm này. Xem
+    docstring gốc ở app.py: `nv` tường minh thắng mọi mặc định;
+    `KH.NV_MOI_NGUOI` = mọi người; `KH.PT_TRONG` = chưa ai phụ trách; không ai
+    đăng nhập / người không phụ trách khách nào => không lọc. KHÔNG phải hàng
+    rào bảo mật (đặc tả đợt 3 §5)."""
+    if nv == KH.NV_MOI_NGUOI:
+        return None, None
+    if nv:
+        return nv, None
+    nguoi = getattr(request.state, "nguoi", None)
+    if tat_ca or nguoi is None or not nguoi.salesperson_code:
+        return None, None
+    return nguoi.salesperson_code, nguoi.ten_sale or nguoi.ten_dang_nhap
+
+
+def _khoa(goc: str, **ts) -> str:
+    """Khoá ảnh chụp: đường dẫn + tham số ĐÃ CHUẨN HOÁ (sắp theo tên, bỏ giá
+    trị rỗng) — hai URL cùng nghĩa dùng chung một ảnh chụp."""
+    q = urlencode(sorted((k, str(v)) for k, v in ts.items() if v not in (None, "")))
+    return goc + ("?" + q if q else "")
+
+
+def _loi(thong_diep: str, ma: int = 500) -> JSONResponse:
+    return JSONResponse({"loi": thong_diep}, status_code=ma)
 
 
 def tao_api(open_app_conn) -> APIRouter:
@@ -64,5 +97,140 @@ def tao_api(open_app_conn) -> APIRouter:
             traceback.print_exc()
             return JSONResponse({"loi": "Không đọc được thông báo."}, status_code=500)
         return _json(request, du_lieu, pb)
+
+    # ---- Khách hàng (giai đoạn 2) --------------------------------------
+    # Ngân sách lượt hỏi của màn danh sách = 3 (bất biến /khach-hang): tong-quan
+    # 1 + ds 2. Hồ sơ <= 8 (bất biến ho_so). Bản đồ 2 (bất biến /ban-do).
+
+    def _chup(request, khoa, tinh, loi, chi_nap=False):
+        try:
+            with open_app_conn() as conn:
+                du_lieu, pb = anh_chup.lay(conn, khoa, tinh, chi_nap=chi_nap)
+        except Exception:
+            traceback.print_exc()
+            return _loi(loi)
+        return _json(request, du_lieu, pb)
+
+    @r.get("/khach-hang/ds")
+    def kh_ds(request: Request, tim: str = "", loc: str = "", sap: str = "doanh_thu",
+              giam: str = "", trang: int = 1, co: int = KH.MOI_TRANG, tat_ca: int = 0,
+              nv: str = "", nhom: str = "", hang: str = "", tinh: str = "", thang: str = ""):
+        """Màn danh sách: MỘT lượt gọi trả cả trang bảng lẫn khối tổng quan.
+        Danh bạ (1 lượt hỏi nặng) đi qua ảnh chụp theo phiên bản NẠP; lọc /
+        sắp / đếm làm bằng Python (kome.khach_hang._khop). Trúng ảnh chụp: 1
+        lượt hỏi (phiên bản). Trượt: 2. Ngân sách màn danh sách <= 3 (bất biến)."""
+        sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
+        hang = ",".join(KH._ds_hang(hang))
+        g = None if giam == "" else giam in ("1", "true")
+        tim = tim.strip()[:100]
+        bo_loc = dict(nhom=nhom or None, hang=hang or None, tinh=tinh or None)
+        try:
+            with open_app_conn() as conn:
+                db, pb = anh_chup.lay_du_lieu(conn, anh_chup.KHOA_DANH_BA, KH.danh_ba,
+                                              chi_nap=True)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được danh bạ khách hàng.")
+        tq = KH.tong_quan(db, sale, tim=tim, thang=thang or None, **bo_loc)
+        t = KH.trang_danh_sach(db, tim=tim, loc=loc, sap=sap, trang=trang, sale=sale,
+                               thang=thang or None, giam=g, co=co, **bo_loc)
+        ten = ten_sale or next((n["ten"] for n in tq.nhan_vien if n["ma"] == sale), None)
+        ra = {"trang": t, "tq": tq, "sale": sale, "ten_sale": ten, "hom_nay": db.get("hom_nay"),
+              "nhan_trang_thai": {a: b[0] for a, b in KH.TRANG_THAI.items()},
+              "can_xu_ly": list(KH.TRANG_THAI_CAN_XU_LY),
+              "khong_ro": KH.KHONG_RO, "tinh_trong": KH.TINH_TRONG,
+              "nv_moi_nguoi": KH.NV_MOI_NGUOI, "pt_trong": KH.PT_TRONG,
+              "nhan_thang": KT.NHAN}
+        # ETag = phiên bản danh bạ + chính URL: cùng URL, cùng dữ liệu -> 304.
+        return _json(request, anh_chup.sang_json(ra),
+                     hashlib.sha1(f"{pb}|{request.url.query}|{sale}".encode()).hexdigest()[:16] if pb else "")
+
+    @r.get("/khach-hang/{ma}")
+    def kh_ho_so(request: Request, ma: str):
+        from kome import ho_so_khach as HSK
+        # Nhật ký tiếp xúc thuộc phiên bản dữ liệu (app.nhat_ky_tiep_xuc có
+        # trong _PHIEN_BAN), nên ghi xong một lần tiếp xúc là ảnh chụp tự mới.
+        try:
+            with open_app_conn() as conn:
+                du_lieu, pb = anh_chup.lay(
+                    conn, _khoa("khach-hang/ho-so", ma=ma),
+                    lambda c: (lambda h: None if h is None else HSK.cho_giao_dien(h))(KH.ho_so(c, ma)))
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được hồ sơ khách hàng.")
+        if du_lieu == "null":
+            return _loi(f"Không có khách hàng mã {ma}.", 404)
+        return _json(request, du_lieu, pb)
+
+    @r.get("/khach-hang/{ma}/dong")
+    def kh_dong(request: Request, ma: str, tu: str, den: str):
+        """Dòng bán của MỘT khách trong [tu, den], gộp theo ngày × mã × quy cách
+        — khi bấm một tháng trên biểu đồ 12 tháng / một mốc trên dòng thời gian.
+        Tối đa 62 ngày một lần hỏi. 1 lượt hỏi."""
+        try:
+            a, b = date.fromisoformat(tu), date.fromisoformat(den)
+        except ValueError:
+            return _loi("Ngày không đọc được.", 400)
+        if b < a or (b - a).days > 62:
+            return _loi("Khoảng ngày phải từ 0 tới 62 ngày.", 400)
+
+        def tinh_(c):
+            rows = c.execute(
+                """SELECT d.sales_date, d.product_code,
+                          coalesce(nullif(p.product_name, ''), d.product_code),
+                          d.pack_code, sum(d.qty), sum(d.doanh_thu_thuan),
+                          sum(d.gross_profit), count(DISTINCT d.slip_no)
+                     FROM mart.dong_ban d
+                     LEFT JOIN core.dim_product p ON p.product_code = d.product_code
+                    WHERE d.customer_code = %s AND d.sales_date BETWEEN %s AND %s
+                    GROUP BY 1, 2, 3, 4
+                    ORDER BY 1 DESC, 6 DESC""", (ma, a, b)).fetchall()
+            return {"tu": a, "den": b, "dong": [
+                {"ngay": x[0], "ma": x[1], "ten": x[2],
+                 "quy_cach": KH.QUY_CACH.get(x[3], x[3]), "so_luong": x[4],
+                 "doanh_thu": int(x[5] or 0), "lai_gop": int(x[6] or 0), "so_phieu": x[7]}
+                for x in rows]}
+        # Dòng bán chỉ đọc core -> phiên bản theo dữ liệu nạp.
+        return _chup(request, _khoa("khach-hang/dong", ma=ma, tu=a, den=b), tinh_,
+                     "Không đọc được dòng bán.", chi_nap=True)
+
+    @r.post("/khach-hang/{ma}/tiep-xuc")
+    async def kh_tiep_xuc(request: Request, ma: str):
+        """Thêm MỘT dòng app.nhat_ky_tiep_xuc (chỉ thêm — 030). Chỉ nhận
+        `application/json`: một form của trang lạ không gửi được kiểu đó mà
+        không qua preflight CORS — lớp chặn CSRF cộng thêm SameSite=Lax."""
+        from kome import lien_he as LH
+        if not request.headers.get("content-type", "").startswith("application/json"):
+            return _loi("Chỉ nhận JSON.", 415)
+        try:
+            b = await request.json()
+        except Exception:
+            return _loi("Thân yêu cầu không phải JSON.", 400)
+        nguoi = getattr(request.state, "nguoi", None)
+        try:
+            with open_app_conn() as conn:
+                LH.ghi(conn, ma, nguoi.id if nguoi else None, str(b.get("kieu", "")),
+                       str(b.get("ket_qua", "")), str(b.get("noi_dung", "")),
+                       str(b.get("hen_lai", "") or ""))
+                conn.commit()
+        except LH.LoiNhap as e:
+            return _loi(str(e), 400)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không ghi được lần tiếp xúc.")
+        return JSONResponse({"ok": True})
+
+    @r.get("/ban-do")
+    def ban_do(request: Request, tat_ca: int = 0, nv: str = "", chi_so: str = "khach"):
+        from kome import ban_do as BD
+        sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
+
+        def tinh_(c):
+            t = BD.ban_do(c, sale=sale, chi_so=chi_so)
+            return {"t": t, "sale": sale, "ten_sale": ten_sale, "chi_so_ds": BD.CHI_SO,
+                    "o_rong": BD.O_RONG, "o_cao": BD.O_CAO}
+        # Bản đồ chỉ đọc core/mart (không bảng `app` nào) -> phiên bản theo dữ liệu nạp.
+        return _chup(request, _khoa("ban-do", sale=sale or "*", chi_so=chi_so), tinh_,
+                     "Không đọc được bản đồ khách hàng.", chi_nap=True)
 
     return r

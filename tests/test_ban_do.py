@@ -5,6 +5,8 @@ from html import unescape
 
 import pandas as pd
 import pytest
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from kome.ban_do import ban_do
@@ -365,32 +367,37 @@ def test_ban_do_khong_qua_2_truy_van(conn, batch, monkeypatch):
 # Task 3 — trang /ban-do
 # ---------------------------------------------------------------------------
 
-def _o_svg(html: str) -> list[str]:
-    """Nội dung từng ô của bản đồ, cắt theo <g class="o">…</g>.
+def _o(client, q: str = "") -> dict[str, dict]:
+    """Ô bản đồ theo tên tỉnh, từ /api/ban-do (giai đoạn 2: bản đồ là tab React
+    của màn Khách hàng, dữ liệu + hình học vẫn dựng ở kome/ban_do.py)."""
+    r = client.get("/api/ban-do" + (f"?{q}" if q else ""))
+    assert r.status_code == 200, r.text
+    return {o["ten"]: o for o in r.json()["t"]["o"]}
 
-    Cắt theo Ô chứ không quét cả TRANG: đoạn văn giải thích phía trên bản đồ
-    có nhắc tên tỉnh và có cả con số, nên một khẳng định quét cả trang sẽ xanh
-    kể cả khi trong SVG không còn chữ nào — đúng lỗi đã bắt ở đợt 4b.
-    """
-    return re.findall(r'<g class="o"[^>]*>(.*?)</g>', html, re.S)
+
+BAN_DO_TSX = Path("giao_dien/src/khach/BanDo.tsx")
 
 
 def test_moi_o_co_con_so_doc_duoc_chu_khong_chi_co_mau(conn, client, batch):
-    # Bất biến _chung.html:76-77: mã hoá bằng màu phải kèm thứ đọc được.
+    # Bất biến: mã hoá bằng màu phải kèm thứ đọc được. API trả đủ 47 ô, mỗi ô
+    # một con số; ô SVG in chính con số đó (không chỉ tô màu).
     _hai_tinh(conn, batch)
-    html = client.get("/ban-do").text
-    o = _o_svg(html)
+    o = _o(client)
     assert len(o) == 47
-    for noi_dung in o:
-        assert re.search(r">\s*\d[\d.,]*\s*<", noi_dung), noi_dung
+    assert all(isinstance(x["gia_tri"], int) for x in o.values())
+    nguon = BAN_DO_TSX.read_text(encoding="utf-8")
+    assert "{tien ? gon(o.gia_tri) : so(o.gia_tri)}" in nguon, "ô SVG không còn in con số"
 
 
 def test_bam_o_dan_toi_danh_ba_da_loc_dung_tinh(conn, client, batch):
-    # Tên tỉnh là tiếng Nhật -> href phải được mã hoá URL. Quên `|urlencode`
-    # thì liên kết vẫn trông đúng trên trang mà bấm vào ra danh sách rỗng.
+    # Bấm ô -> tab Danh sách lọc ĐÚNG tên tỉnh (tiếng Nhật, đi qua URL được mã
+    # hoá bởi URLSearchParams trong loc.ts). Danh sách lọc theo tên đó phải ra
+    # đúng số khách mà ô ghi.
     _hai_tinh(conn, batch)
-    html = client.get("/ban-do").text
-    assert "/khach-hang?tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD" in html
+    o = _o(client, "tat_ca=1")
+    d = client.get("/api/khach-hang/ds?tat_ca=1&tinh=%E6%9D%B1%E4%BA%AC%E9%83%BD").json()
+    assert d["trang"]["tong"] == o["東京都"]["so_khach"] >= 1
+    assert 'moTinh = (ten: string) => dat({ tab: "danh_sach", tinh: ten }, true)' in BAN_DO_TSX.read_text(encoding="utf-8")
 
 
 def _href(html: str, mau: str, ten_tinh: str) -> str:
@@ -420,21 +427,19 @@ def _href_dong_bang(html: str, ten_tinh: str) -> str:
 
 
 def test_bam_o_hay_dong_bang_GIU_NGUYEN_bo_loc_nguoi_phu_trach(conn, client, batch):
-    # [Vòng soát toàn nhánh, mục 1] Liên kết sang /khach-hang phải MANG THEO
-    # `tat_ca`/`nv`. /khach-hang thiếu hai tham số đó rơi về mặc định lọc theo
-    # NGƯỜI ĐANG ĐĂNG NHẬP, nên: sale bấm "Xem tất cả", thấy ô 東京都 ghi 290
-    # khách, bấm vào ô đó và danh sách mở ra 42 khách của riêng anh ta. Với
-    # `?nv=<đồng nghiệp>` còn tệ hơn — bản đồ vẽ số của người kia, bấm vào ra
-    # khách của chính mình. Cùng lớp lỗi mà kome/khach_hang.py::_vi_tu đã ghi
-    # ("chip 'Tất cả (1.710)' bấm vào ra 216 khách"), chỉ khác là nó nằm giữa
-    # HAI trang thay vì trong một trang.
+    # [Vòng soát toàn nhánh, mục 1] Bấm một tỉnh trên bản đồ phải mở danh sách
+    # ĐÚNG phạm vi bản đồ đang vẽ: bản đồ lọc theo đồng nghiệp (`nv`) mà danh
+    # sách rơi về "khách của tôi" là lỗi "chip Tất cả (1.710) bấm vào ra 216
+    # khách", chỉ khác là nó bắc qua HAI màn.
     #
-    # Kiểm CẢ HAI lối bấm: ô SVG và dòng bảng. Chúng là hai chỗ viết href
-    # riêng biệt trong template, nên sửa một chỗ quên chỗ kia là chuyện thường.
+    # Giai đoạn 2: bản đồ và danh sách là hai TAB trên CÙNG một trạng thái lọc
+    # (giao_dien/src/khach/loc.ts). Bấm ô / dòng bảng CHỈ đổi `tinh` + tab —
+    # `nv`/`tat_ca` không có đường nào rơi mất. Kiểm cả hai tầng: (1) mã giao
+    # diện — cả ô SVG lẫn dòng bảng đi qua đúng `moTinh`; (2) dữ liệu — cùng
+    # `nv`, ô ghi 1 khách thì danh sách lọc tỉnh đó ra đúng 1 khách đó.
     #
-    # HAI khách CÙNG MỘT TỈNH, khác người phụ trách — cố ý: nếu hai khách ở
-    # hai tỉnh khác nhau thì riêng `?tinh=` đã đủ lọc ra đúng một người, và
-    # phép bấm thử bên dưới sẽ XANH kể cả khi `nv` rơi mất.
+    # HAI khách CÙNG MỘT TỈNH, khác người phụ trách — cố ý: hai tỉnh khác nhau
+    # thì riêng `tinh` đã lọc ra một người và test xanh cả khi `nv` rơi mất.
     _ho_so_khach(conn, batch, "BD01", "Cua A", prefecture="東京都",
                  salesperson_code="0102")
     _ho_so_khach(conn, batch, "BD02", "Cua B", prefecture="東京都",
@@ -442,45 +447,31 @@ def test_bam_o_hay_dong_bang_GIU_NGUYEN_bo_loc_nguoi_phu_trach(conn, client, bat
     _mua(conn, batch, "BD01", HOM_NAY - timedelta(days=5))
     _mua(conn, batch, "BD02", HOM_NAY - timedelta(days=5))
 
-    html = client.get("/ban-do?tat_ca=1").text
-    for href in (_href_o_svg(html, "東京都"), _href_dong_bang(html, "東京都")):
-        assert "tat_ca=1" in href, \
-            f"bản đồ đang xem TẤT CẢ nhưng liên kết bỏ mất tat_ca: {href}"
+    nguon = BAN_DO_TSX.read_text(encoding="utf-8")
+    assert nguon.count("moTinh(o.ten)") == 3, "ô SVG (bấm + phím) và dòng bảng phải cùng đi qua moTinh"
+    assert 'dat({ tab: "danh_sach", tinh: ten }, true)' in nguon
 
-    html = client.get("/ban-do?nv=0104").text
-    for href in (_href_o_svg(html, "東京都"), _href_dong_bang(html, "東京都")):
-        assert "nv=0104" in href, \
-            f"bản đồ đang xem khách của 0104 nhưng liên kết bỏ mất nv: {href}"
-    # Và BẤM THẬT vào đó phải ra đúng phạm vi bản đồ đang vẽ: ô 東京都 ghi 1
-    # khách (của 0104), nên danh bạ mở ra phải là đúng khách đó — không phải
-    # cả hai khách của tỉnh.
-    o = dict(re.findall(
-        r'<g class="o" data-tinh="([^"]+)"[^>]*>.*?class="so">([\d.,]+)<',
-        html, re.S))
-    assert o["東京都"] == "1", "fixture hỏng: bản đồ không hề bị lọc theo nv"
-    r = client.get(_href_o_svg(html, "東京都"))
-    assert r.status_code == 200
-    assert "Cua B" in r.text
-    assert "Cua A" not in r.text, \
-        "ô ghi 1 khách nhưng bấm vào ra cả hai — liên kết bỏ rơi bộ lọc nv"
+    assert _o(client, "tat_ca=1")["東京都"]["so_khach"] == 2
+    o = _o(client, "nv=0104")
+    assert o["東京都"]["so_khach"] == 1, "fixture hỏng: bản đồ không hề bị lọc theo nv"
+    t = client.get("/api/khach-hang/ds?nv=0104&tinh=東京都").json()["trang"]
+    assert [k["ten"] for k in t["khach"]] == ["Cua B"], \
+        "ô ghi 1 khách nhưng danh sách cùng bộ lọc ra khác"
 
 
 def test_cuoi_trang_hien_TONG_de_doi_chieu(conn, client, batch):
-    # [Vòng soát toàn nhánh, mục 4] Dòng "(không rõ tỉnh)" mời người đọc cộng
-    # "47 ô + (không rõ tỉnh)" — phải cho họ chính con số đó để đối chiếu,
-    # nếu không họ tự cộng 47 dòng bằng tay hoặc tin rằng bảng đã là toàn bộ
-    # công ty. TrangBanDo.tong đã được tính sẵn ở tầng Python.
+    # [Vòng soát toàn nhánh, mục 4] "47 ô + (không rõ tỉnh)" mời người đọc cộng
+    # lại — phải cho họ chính con số đó để đối chiếu.
     _hai_tinh(conn, batch)
     _ho_so_khach(conn, batch, "BD03", "Khong ro tinh", prefecture=None)
     _mua(conn, batch, "BD03", HOM_NAY - timedelta(days=5))
 
-    html = client.get("/ban-do").text
-    m = re.search(r'<b data-tong="so_khach">([\d.,]+)</b>', html)
-    assert m, "cuối trang không hiện tổng số khách"
-    # 2 khách trên lưới + 1 khách "(không rõ tỉnh)".
-    assert m.group(1) == "3"
-    assert re.search(r'<b data-tong="doanh_thu">', html), "thiếu tổng doanh thu"
-    assert re.search(r'<b data-tong="can_goi">', html), "thiếu tổng cần gọi"
+    t = client.get("/api/ban-do").json()["t"]
+    assert t["tong"]["so_khach"] == 3          # 2 khách trên lưới + 1 "(không rõ tỉnh)"
+    assert t["khong_ro_tinh"] == 1
+    assert {"doanh_thu", "can_goi"} <= set(t["tong"])
+    nguon = BAN_DO_TSX.read_text(encoding="utf-8")
+    assert "t.tong.so_khach" in nguon and "t.tong.doanh_thu" in nguon and "t.tong.can_goi" in nguon
 
 
 def test_loc_nv_co_ca_ban_do_lan_bang_lan_dai_vung(conn, client, batch):
@@ -492,28 +483,20 @@ def test_loc_nv_co_ca_ban_do_lan_bang_lan_dai_vung(conn, client, batch):
                  salesperson_code="0104")
     _mua(conn, batch, "BD01", HOM_NAY - timedelta(days=5))
     _mua(conn, batch, "BD02", HOM_NAY - timedelta(days=5))
-    html = client.get("/ban-do?nv=0102").text
-    o = {t: n for t, n in re.findall(
-        r'<g class="o" data-tinh="([^"]+)"[^>]*>.*?class="so">([\d.,]+)<', html, re.S)}
-    assert o["東京都"] == "1" and o["大阪府"] == "0"
-    # 大阪府 vẫn phải còn trên bản đồ (ô số 0), không được biến mất khi lọc —
-    # `len(o) == 47` là khẳng định thật, còn `"大阪府" in html` thì không: tên
-    # tỉnh nằm sẵn trong bảng 47 dòng nên chuỗi đó luôn có mặt.
-    assert len(o) == 47
-    # Dải vùng cũng phải co: 関東 còn 1 khách, 近畿 còn 0.
-    vung = dict(re.findall(r'<li class="vung" data-vung="([^"]+)">[^<]*<b>(\d+)</b>', html))
-    assert vung["関東"] == "1" and vung["近畿"] == "0"
+    t = client.get("/api/ban-do?nv=0102").json()["t"]
+    o = {x["ten"]: x["gia_tri"] for x in t["o"]}
+    # 大阪府 vẫn phải còn trên bản đồ (ô số 0) — `len(o) == 47` là khẳng định thật.
+    assert o["東京都"] == 1 and o["大阪府"] == 0 and len(o) == 47
+    bang = {x["ten"]: x["so_khach"] for x in t["bang"]}
+    assert bang["東京都"] == 1 and bang["大阪府"] == 0 and len(bang) == 47
+    vung = {v["vung"]: v["gia_tri"] for v in t["vung"]}
+    assert vung["関東"] == 1 and vung["近畿"] == 0
 
 
 def test_trang_ban_do_khong_qua_2_truy_van(conn, client, batch, monkeypatch):
-    # Cùng cơ chế đếm với test của tầng Python, nhưng đo TRANG: route có thể
-    # lỡ thêm một lượt hỏi ngoài hàm `ban_do` (vd danh sách người phụ trách).
-    # Đúng cơ chế tests/test_san_pham.py dùng cho /kho-hang (bọc conn.execute
-    # qua monkeypatch), không dựng cơ chế thứ ba. Đo trên MỘT kết nối cụ thể:
-    # route mở kết nối riêng của chính nó qua open_app_conn(), nên phải bọc
-    # NGAY TRƯỚC lượt gọi — không bọc được `conn` của fixture (route không hề
-    # dùng nó) mà phải theo dõi tại tầng psycopg qua kome.db.connect có sẵn
-    # kết nối test, tức bọc lớp Connection.execute của chính module psycopg.
+    # Đo ENDPOINT (không chỉ hàm `ban_do`): route có thể lỡ thêm một lượt hỏi
+    # ngoài hàm đó (vd danh sách người phụ trách). Bọc psycopg.Connection.execute
+    # vì endpoint mở kết nối riêng. Ảnh chụp tắt trong test (conftest).
     _hai_tinh(conn, batch)
     import psycopg
     dem = {"n": 0}
@@ -524,19 +507,15 @@ def test_trang_ban_do_khong_qua_2_truy_van(conn, client, batch, monkeypatch):
         return that(self, *a, **k)
 
     monkeypatch.setattr(psycopg.Connection, "execute", demo)
-    r = client.get("/ban-do")
+    r = client.get("/api/ban-do")
     assert r.status_code == 200
     assert dem["n"] <= 2, f"{dem['n']} lượt hỏi, trần là 2"
 
 
 def test_chu_giai_bo_qua_bac_rong_nhung_luon_hien_bac_0(conn, client, batch):
     # [Bất biến task-3-brief §1] Luật "giá trị bằng nhau phải cùng bậc" khiến
-    # một bậc GIỮA có thể trống (vd [1, 1, 2] cho bậc [1, 1, 3] -> bậc 2
-    # trống). Gieo đúng hình đó: 2 tỉnh 1-khách, 5 tỉnh 2-khách — dồn cụm
-    # khiến bậc 3/4/5 trống hẳn (xem test_ban_do.py::
-    # test_gia_tri_bang_nhau_cung_mot_bac_khong_chong_khoang_chu_giai của
-    # Task 2, cùng dữ liệu). Bậc 0 (40 tỉnh còn lại, 0 khách) PHẢI luôn hiện
-    # vì nó là màu riêng trên bản đồ — người đọc cần biết màu đó nghĩa là gì.
+    # một bậc GIỮA có thể trống. Bậc trống không có khoảng giá trị thật nào để
+    # nói nên KHÔNG in; bậc 0 là màu riêng trên bản đồ nên LUÔN in.
     mot_khach = ["北海道", "沖縄県"]
     hai_khach = ["東京都", "大阪府", "愛知県", "福岡県", "宮城県"]
     for i, tinh in enumerate(mot_khach):
@@ -553,12 +532,8 @@ def test_chu_giai_bo_qua_bac_rong_nhung_luon_hien_bac_0(conn, client, batch):
     bac_rong = [c["bac"] for c in t.chu_giai
                 if c["bac"] != 0 and c["so_tinh"] == 0]
     assert bac_rong, "ca gieo phải tạo ra ít nhất một bậc giữa trống (fixture hỏng?)"
+    assert any(c["bac"] == 0 for c in client.get("/api/ban-do").json()["t"]["chu_giai"])
+    assert "t.chu_giai.filter(c => c.bac === 0 || c.so_tinh > 0)" in BAN_DO_TSX.read_text(encoding="utf-8"), \
+        "chú giải phải bỏ bậc trống nhưng luôn giữ bậc 0"
 
-    html = client.get("/ban-do").text
-    for b in bac_rong:
-        assert f'data-bac="{b}"' not in html, \
-            f"bậc {b} trống (so_tinh=0) nhưng vẫn bị in ra chú giải"
-    # Bậc 0 luôn hiện, kể cả khi không có tỉnh nào giá trị 0 (không phải ca ở
-    # đây — 40/47 tỉnh còn lại đều 0 khách — nhưng bất biến vẫn phải đúng ở
-    # đây: cứ có mặt trong chu_giai là phải in ra).
-    assert 'data-bac="0"' in html
+

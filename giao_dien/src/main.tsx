@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Nav } from "./khung/Nav";
@@ -14,16 +14,27 @@ const qc = new QueryClient({
 
 // Mỗi màn đã chuyển một mục. Màn chưa chuyển vẫn là trang Jinja — thanh điều
 // hướng trỏ thẳng địa chỉ, nên đi qua lại là một lượt tải trang bình thường.
-const MAN: Record<string, () => React.ReactElement> = {
-  "/": () => <TongQuan />,
-};
+// Màn Khách hàng (giai đoạn 2) tải trễ: người chỉ mở Tổng quan không tải mã của nó.
+const ManKhach = lazy(() => import("./khach/ManKhach"));
+const HoSo = lazy(() => import("./khach/HoSo"));
+
+function man(duong: string): (() => React.ReactElement) | null {
+  if (duong === "/") return () => <TongQuan />;
+  if (duong === "/khach-hang" || duong === "/ban-do") return () => <ManKhach />;
+  const m = duong.match(/^\/khach-hang\/([^/]+)$/);
+  if (m) return () => <HoSo ma={decodeURIComponent(m[1])} />;
+  return null;
+}
 
 function Ung() {
-  const Man = MAN[location.pathname];
+  const Man = man(location.pathname);
   return (
     <div className="khung">
       <Nav />
-      <main className="khung-than">{Man ? <Man /> : <p>Không có màn này.</p>}</main>
+      <main className="khung-than">
+        <Suspense fallback={<div className="khoi-cho" aria-busy="true"><span /><span /><span /></div>}>
+          {Man ? <Man /> : <p>Không có màn này.</p>}
+        </Suspense></main>
     </div>
   );
 }

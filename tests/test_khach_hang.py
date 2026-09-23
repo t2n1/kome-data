@@ -331,16 +331,16 @@ def test_cac_trang_moi_mo_duoc(conn, batch, test_db_url):
     _mua_deu(conn, batch, "000000009292", nhip=7, so_lan=5)
     c = TestClient(create_app(db_url=test_db_url))
 
-    # "/" đã là trang React (đặc tả giao diện React) — các màn còn lại vẫn
-    # là Jinja không JavaScript cho tới khi được chuyển.
-    for duong in ("/khach-hang", "/lien-he", "/khach-hang/000000009292"):
+    # Giai đoạn 2: /khach-hang, /khach-hang/{mã}, /ban-do là ứng dụng React
+    # (vỏ index.html, dữ liệu qua /api). /lien-he vẫn là Jinja không JavaScript.
+    for duong in ("/khach-hang", "/khach-hang/000000009292", "/ban-do"):
         r = c.get(duong)
-        assert r.status_code == 200, duong
-        assert "<script" not in r.text, f"{duong}: không dùng JavaScript"
+        assert r.status_code == 200 and 'id="goc"' in r.text, duong
+    r = c.get("/lien-he")
+    assert r.status_code == 200 and "<script" not in r.text
 
-    assert "QUAN AN TEST" in c.get("/khach-hang/000000009292").text
-    assert c.get("/khach-hang/MA-KHONG-CO").status_code == 404
-    # Trang nạp chuyển từ "/" sang "/nap"; "/" giờ là Tổng quan.
+    assert c.get("/api/khach-hang/000000009292").json()["khach"]["ten"] == "QUAN AN TEST"
+    assert c.get("/api/khach-hang/MA-KHONG-CO").status_code == 404
     assert 'id="goc"' in c.get("/").text          # trang React Tổng quan
     assert "Nạp dữ liệu OBC" in c.get("/nap").text
 
@@ -350,8 +350,8 @@ def test_moi_trang_deu_co_khung_dieu_huong(conn, test_db_url):
     from kome.web.app import create_app
 
     c = TestClient(create_app(db_url=test_db_url))
-    for duong in ("/khach-hang", "/lien-he", "/bao-cao", "/health",
-                  "/phu-du-lieu", "/nap"):
+    # /khach-hang là React từ giai đoạn 2 — thanh bên của nó ở giao_dien/src/khung/muc.ts.
+    for duong in ("/lien-he", "/bao-cao", "/health", "/phu-du-lieu", "/nap"):
         t = c.get(duong).text
         for muc in ('href="/khach-hang"', 'href="/bao-cao"', 'href="/lien-he"'):
             assert muc in t, f"{duong} thiếu {muc}"
@@ -566,14 +566,10 @@ def test_tong_quan_danh_ba_loc_theo_sale(conn, batch):
 
 
 def test_trang_danh_sach_chay_dung_BA_luot_hoi(conn, batch, monkeypatch):
-    """[IMPORTANT] `/khach-hang` = `tong_quan_danh_ba` (1) + `danh_sach` (2).
-
-    Trước vòng sửa cuối đợt 4a là 5: `danh_sach` chạy thêm một câu đếm theo
-    trạng thái và một câu đếm tổng công ty — hai câu mà `tong_quan_danh_ba`
-    vốn đã quét đúng bảng đó rồi. Ở đây mỗi lượt hỏi là ~47 ms mạng tới
-    Tokyo trước khi CSDL làm gì (§3.1), nên hai con số đó là ~94 ms mỗi lần
-    mở trang, trả cho thứ đã nằm sẵn trong một câu lệnh khác.
-    """
+    """[IMPORTANT] Ngân sách màn danh sách <= 3 lượt hỏi. Từ giai đoạn 2 cả
+    danh sách lẫn khối tổng quan tính trên MỘT ảnh chụp danh bạ
+    (`KH.danh_ba`, 1 lượt hỏi) — gọi riêng hai hàm vẫn chỉ 2, và endpoint
+    /api/khach-hang/ds dùng đúng 1 (tests/test_api.py đếm)."""
     _ho_so_khach(conn, batch, "BA01", "Quán ba lượt")
     _mua(conn, batch, "BA01", HOM_NAY)
 
@@ -587,7 +583,7 @@ def test_trang_danh_sach_chay_dung_BA_luot_hoi(conn, batch, monkeypatch):
     monkeypatch.setattr(conn, "execute", demo)
     KH.tong_quan_danh_ba(conn)
     KH.danh_sach(conn)
-    assert dem["n"] == 3, f"trang danh sách chạy {dem['n']} lượt hỏi, phải đúng 3"
+    assert dem["n"] <= 3, f"trang danh sách chạy {dem['n']} lượt hỏi, trần là 3"
 
 
 def test_bo_dem_trang_thai_co_theo_ba_bo_loc_moi(conn, batch):
@@ -759,9 +755,8 @@ def test_goi_y_khong_bao_gio_chua_ma_da_mua(conn, batch):
 
 
 def test_khach_khong_co_diem_giao_thi_khoi_tu_an(conn, batch, test_db_url):
-    """Chỉ 532/1.710 khách có 直送先. Hiện một bảng rỗng cho 1.178 khách còn
-    lại là dạy người ta cuộn nhanh — và ô THẬT nằm giữa những ô trống sẽ bị
-    cuộn qua theo."""
+    """Chỉ 532/1.710 khách có 直送先: khách không có điểm giao nhận danh sách
+    RỖNG (giao diện in một câu thay vì một bảng trống), khách có thì nhận đủ."""
     from fastapi.testclient import TestClient
     from kome.web.app import create_app
 
@@ -773,30 +768,31 @@ def test_khach_khong_co_diem_giao_thi_khoi_tu_an(conn, batch, test_db_url):
     _neo(conn, batch)
 
     c = TestClient(create_app(db_url=test_db_url))
-    html = c.get("/khach-hang/D0001").text
-    assert "直送先" not in html
-    assert "直送先" in c.get("/khach-hang/D0002").text, \
-        "khối tự ẩn cả khi khách CÓ điểm giao — ẩn nhầm còn tệ hơn hiện rỗng"
+    assert c.get("/api/khach-hang/D0001").json()["diem_giao"] == []
+    assert [g["ten"] for g in c.get("/api/khach-hang/D0002").json()["diem_giao"]] == ["Kho Nagoya"], \
+        "khách CÓ điểm giao mà API trả rỗng — ẩn nhầm còn tệ hơn hiện rỗng"
 
 
 def test_hai_bang_mat_hang_co_cot_nhip_va_tre(conn, batch, test_db_url):
     """Ba cột nhịp đã nằm sẵn trong mart.khach_mat_hang từ task 1-2; không
-    đưa lên trang thì chúng chỉ là chi phí tính toán không ai đọc."""
+    đưa lên màn hình thì chúng chỉ là chi phí tính toán không ai đọc. Hồ sơ
+    React đọc chúng từ /api/khach-hang/{mã}: mọi mặt hàng và khối "đã ngừng
+    mua" đều mang nhịp / ngày dự kiến / số ngày trễ."""
     from fastapi.testclient import TestClient
     from kome.web.app import create_app
 
     _ho_so_khach(conn, batch, "N0001", "Quán nhịp")
     _mua_deu(conn, batch, "N0001", nhip=7, so_lan=5)
-    for i in range(4):          # món đã bỏ hẳn -> bảng "đã ngừng mua"
+    for i in range(4):          # món đã bỏ hẳn -> khối "đã ngừng mua"
         _mua(conn, batch, "N0001", HOM_NAY - timedelta(days=120 + i * 7),
              hang="XT08")
     _neo(conn, batch)
 
-    html = TestClient(create_app(db_url=test_db_url)).get("/khach-hang/N0001").text
-    # Khớp CHÍNH ô tiêu đề `<th>`: ba chữ này đều có mặt trong đoạn văn giải
-    # thích ngay trên bảng, nên khớp chuỗi trần thì cột biến mất test vẫn xanh.
-    for cot in ("Nhịp", "Dự kiến lần tới", "Trễ"):
-        assert f'<th class="so">{cot}</th>' in html, f"bảng mặt hàng thiếu cột {cot}"
+    h = TestClient(create_app(db_url=test_db_url)).get("/api/khach-hang/N0001").json()
+    xt07 = next(m for m in h["mat_hang"] if m["ma"] == "XT07")
+    assert xt07["nhip"] == 7 and xt07["du_kien"] and "tre" in xt07
+    ngung = next(m for m in h["da_ngung_mua"] if m["ma"] == "XT08")
+    assert ngung["nhip"] == 7 and ngung["tre"] and ngung["tre"] > 0
 
 
 # ---- Vòng sửa sau review đợt 4a ---------------------------------------
@@ -881,30 +877,20 @@ def test_bang_gia_chi_hien_gia_MOI_NHAT_cua_TUNG_QUY_CACH(conn, batch):
     assert all(b["tu_ngay"] == "2026-06-01" for b in bg)
 
 
-def test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket(conn, batch, test_db_url,
-                                                     monkeypatch):
-    """[IMPORTANT] Sót một liên kết là người đang lọc bấm một cái bị ném về
-    danh sách đầy mà không hiểu vì sao.
+def test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket(conn, batch, test_db_url):
+    """[IMPORTANT] Sắp xếp / phân trang KHÔNG được làm rơi bộ lọc đang bật.
+    Giai đoạn 2: bộ lọc là MỘT trạng thái trên URL (giao_dien/src/khach/loc.ts)
+    và đổi cột sắp xếp chỉ đổi `sap`; phía máy chủ, mọi khoá sắp xếp phải trả
+    CÙNG tập khách với cùng bộ lọc.
 
-    Test này PHẢI gieo dữ liệu. Bản đầu chạy trên CSDL vừa bị TRUNCATE nên
-    `t.khach` rỗng, nhánh `{% if t.khach %}` không render, và BỐN liên kết
-    sắp xếp cùng HAI liên kết phân trang — đúng những cái nó nói mình bảo vệ
-    — không hề có mặt trong HTML được kiểm. Ngưỡng 8 vẫn đạt nhờ các chip,
-    nên xoá `giu` khỏi chính nút "Sau →" mà test vẫn xanh.
-    """
-    import re as _re
-
+    Test này PHẢI gieo dữ liệu (bản Jinja đầu tiên chạy trên CSDL rỗng nên
+    không kiểm gì): 40 khách nền để có hạng 'S', hai khách mục tiêu."""
     from fastapi.testclient import TestClient
     from kome.web.app import create_app
 
-    # 40 khách nền doanh thu nhỏ. Hạng 'S' là 5% trên cùng theo cume_dist,
-    # nên với ít hơn ~20 khách thì KHÔNG AI là 'S' và bộ lọc hang=S trả về
-    # danh sách rỗng — tức cái lỗ cũ quay lại.
     _mua_nhieu(conn, batch,
                [(f"F{i:03d}", HOM_NAY - timedelta(days=3), 1_100, "XT07")
                 for i in range(40)], ma_lo="F")
-    # Hai khách mục tiêu: 愛知県, doanh thu lớn nhất kho (-> 'S'), im 40 ngày
-    # trên nhịp 7 ngày (-> nhóm việc 'im').
     for ma in ("A0001", "A0002"):
         _ho_so_khach(conn, batch, ma, f"Quán {ma}", prefecture="愛知県")
     _mua_nhieu(conn, batch,
@@ -912,33 +898,26 @@ def test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket(conn, batch, test_db_url,
                 for ma in ("A0001", "A0002") for i in range(6)], ma_lo="A")
     _neo(conn, batch)
 
-    monkeypatch.setattr(KH, "MOI_TRANG", 1)      # 2 khách khớp -> 2 trang
     c = TestClient(create_app(db_url=test_db_url))
-    html = c.get("/khach-hang?nhom=im&hang=S&tinh=愛知県").text
-    assert "Quán A0001" in html, \
+    loc = "nhom=im&hang=S&tinh=愛知県"
+    goc = c.get(f"/api/khach-hang/ds?{loc}").json()["trang"]
+    assert {k["ma"] for k in goc["khach"]} == {"A0001", "A0002"}, \
         "không khách nào khớp cả ba bộ lọc — test lại không đi qua thứ nó bảo vệ"
-
-    def _lien_ket(mau, ten):
-        m = _re.search(r'href="(/khach-hang\?' + mau + r'[^"]*)"', html)
-        assert m, f"không thấy liên kết {ten} trong HTML"
-        for ky in ("nhom=im", "hang=S", "tinh="):
-            assert ky in m.group(1), f"liên kết {ten} rơi mất {ky}"
-
-    for sap in ("doanh_thu", "ty_suat", "im_lang", "gan_nhat"):
-        _lien_ket("sap=" + sap, f"sắp xếp {sap}")
-    _lien_ket("trang=2", "phân trang 'Sau →'")
-
-    assert html.count("nhom=im") >= 8, "bộ lọc nhóm rơi khỏi một số liên kết"
-    assert "hang=S" in html and "tinh=" in html
+    for sap in KH.COT_SAP:
+        for giam in ("", "0", "1"):
+            t = c.get(f"/api/khach-hang/ds?{loc}&sap={sap}&giam={giam}").json()["trang"]
+            assert t["tong"] == 2 and {k["ma"] for k in t["khach"]} == {"A0001", "A0002"}, \
+                f"sắp xếp {sap}/{giam} làm đổi tập khách"
 
 
 def test_o_chon_tinh_khong_am_tham_xoa_bo_loc_dang_bat(conn, batch, test_db_url):
-    """[IMPORTANT] Danh sách `<option>` chỉ có 8 tỉnh đông nhất CỦA PHẠM VI
-    ĐANG XEM, mà phạm vi co theo sale/nv. Tỉnh đang lọc không nằm trong đó
-    thì `<select>` hiện "— mọi tỉnh —" trong khi danh sách vẫn đang bị lọc và
-    mọi liên kết vẫn mang `tinh=…`: ô điều khiển nói một đằng, dữ liệu một
-    nẻo. Bấm "Lọc" lần nữa là bộ lọc biến mất mà không ai nhấn nút nào để
-    xoá nó."""
+    """[IMPORTANT] Ô chọn tỉnh liệt kê các tỉnh CÓ KHÁCH trong phạm vi đang xem
+    (co theo sale/nv). Tỉnh đang lọc không nằm trong đó thì `<select>` phải
+    vẫn có option của CHÍNH nó — không thì ô hiện "Mọi tỉnh" trong khi danh
+    sách vẫn bị lọc: ô điều khiển nói một đằng, dữ liệu một nẻo.
+    Giai đoạn 2: API trả danh sách tỉnh; option dự phòng nằm ở giao diện."""
+    from pathlib import Path
+
     from fastapi.testclient import TestClient
     from kome.web.app import create_app
 
@@ -946,7 +925,11 @@ def test_o_chon_tinh_khong_am_tham_xoa_bo_loc_dang_bat(conn, batch, test_db_url)
     _mua(conn, batch, "O0001", HOM_NAY - timedelta(days=3))
     _neo(conn, batch)
 
-    c = TestClient(create_app(db_url=test_db_url))
-    html = c.get("/khach-hang?tinh=沖縄県").text
-    assert '<option value="沖縄県" selected>' in html, \
-        "tỉnh đang lọc không có option của chính nó — ô chọn sẽ âm thầm xoá bộ lọc"
+    d = TestClient(create_app(db_url=test_db_url)).get("/api/khach-hang/ds?tinh=沖縄県").json()
+    assert d["trang"]["tong"] == 0
+    assert "沖縄県" not in [t for t, _ in d["tq"]["tinh_day_du"]]   # đúng ca cần option dự phòng
+    nguon = Path("giao_dien/src/khach/DanhSach.tsx").read_text(encoding="utf-8")
+    assert "b.tinh && !tq.tinh_day_du.some(" in nguon, \
+        "ô chọn tỉnh mất option dự phòng cho tỉnh đang lọc"
+
+
