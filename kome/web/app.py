@@ -374,15 +374,26 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                     # dùng chỉ thấy một vòng lặp không lời giải thích.
                     return _loi(request, "kiểm tra phiên đăng nhập", e)
             if nguoi is None:
-                tiep = request.url.path
-                if request.url.query:
-                    tiep += "?" + request.url.query
                 resp = RedirectResponse("/dang-nhap", status_code=303)
                 # Nhớ nơi người ta định đến để đăng nhập xong quay lại đúng
                 # chỗ, nhưng chỉ nhớ trong cookie tạm — không đưa vào địa chỉ,
                 # vì địa chỉ thì lộ ra lịch sử duyệt web và nhật ký máy chủ.
-                resp.set_cookie("kome_tiep", tiep, max_age=600, httponly=True,
-                                samesite="lax", secure=_chi_gui_qua_https(request))
+                #
+                # CHỈ nhớ một lượt MỞ TRANG. Trình duyệt tự xin /favicon.ico
+                # ngay khi hiện trang đăng nhập; nhớ cả nó là ghi đè nơi người
+                # ta định đến, và đăng nhập xong bị đẩy tới {"detail":"Not
+                # Found"} (lỗi thật trên Vercel, 2026-09-23). POST cũng không
+                # nhớ: quay về một đường dẫn POST bằng GET là 405.
+                la_mo_trang = (request.method == "GET"
+                               and request.url.path != "/favicon.ico"
+                               and request.headers.get("sec-fetch-dest",
+                                                       "document") == "document")
+                if la_mo_trang:
+                    tiep = request.url.path
+                    if request.url.query:
+                        tiep += "?" + request.url.query
+                    resp.set_cookie("kome_tiep", tiep, max_age=600, httponly=True,
+                                    samesite="lax", secure=_chi_gui_qua_https(request))
                 return resp
 
             request.state.nguoi = nguoi

@@ -209,6 +209,29 @@ def test_dang_nhap_xong_quay_lai_dung_trang_dinh_xem(khach):
     assert _vao(c).headers["location"] == "/khach-hang"
 
 
+@pytest.mark.parametrize("duong_dan,dau", [
+    ("/favicon.ico", {}),                                   # trình duyệt tự xin
+    ("/static-khac.png", {"sec-fetch-dest": "image"}),       # ảnh, không phải trang
+    ("/khach-hang", {"sec-fetch-dest": "empty"}),            # fetch nền
+])
+def test_yeu_cau_phu_khong_ghi_de_trang_dinh_xem(khach, duong_dan, dau):
+    """Lỗi thật trên Vercel (2026-09-23): mở trang đăng nhập, trình duyệt tự
+    xin /favicon.ico, cổng ghi đè cookie `kome_tiep` thành /favicon.ico, đăng
+    nhập xong bị đẩy tới {"detail":"Not Found"}. Chỉ một lượt MỞ TRANG (điều
+    hướng, GET) mới được nhớ làm nơi quay về."""
+    c = khach()
+    c.get("/lien-he")                           # trang người ta định xem
+    c.get(duong_dan, headers=dau)               # yêu cầu phụ ngay sau đó
+    assert _vao(c).headers["location"] == "/lien-he"
+
+
+def test_post_khi_chua_dang_nhap_khong_thanh_noi_quay_ve(khach):
+    """Quay về một đường dẫn POST bằng GET là 405 — cùng loại màn trắng."""
+    c = khach()
+    c.post("/khach-hang/000000000001/tiep-xuc")
+    assert _vao(c).headers["location"] == "/"
+
+
 def test_doi_mat_khau_mot_nguoi_khong_lam_nguoi_khac_bi_dang_xuat(khach, conn):
     """[CRITICAL] Đây ĐÚNG LÀ cái lỗi của cơ chế cũ mà đợt 3 sinh ra để sửa:
     khoá ký suy từ chính mật khẩu chung, nên đổi mật khẩu là cả công ty bị
