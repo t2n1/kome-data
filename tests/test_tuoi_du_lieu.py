@@ -66,8 +66,8 @@ def test_dung_13h30_da_tinh_la_qua_gio(conn):
 def test_cuoi_tuan_thi_im_lang(conn):
     """Thứ Bảy không ai xuất file. Báo đỏ ngày nghỉ là báo động giả.
 
-    Cuối tuần lấy từ core.dim_date.is_weekend. Ngày lễ Nhật KHÔNG có trong
-    dim_date nên vẫn đỏ — giống hệt cách /health đang xử lý ngày thiếu.
+    Ngày nghỉ lấy từ mart.lich_kinh_doanh (cuối tuần + ngày lễ Nhật, 032) —
+    xem tests/test_ngay_le.py cho ca ngày lễ.
     """
     t = tinh_tuoi(conn, _luc(2026, 9, 19, 15, 0))   # thứ Bảy
     assert [n.trang_thai for n in t.nguon] == ["nghi", "nghi", "nghi"]
@@ -89,9 +89,11 @@ def test_lo_da_hoan_tac_khong_duoc_tinh(conn):
 
 
 def test_tre_dem_theo_ngay_lam_viec_bo_cuoi_tuan(conn):
-    """Dữ liệu từ thứ Sáu, hôm nay thứ Hai => trễ 1 ngày làm việc, không phải 3."""
-    _lo(conn, "zaiko", date(2026, 9, 18))           # thứ Sáu
-    t = tinh_tuoi(conn, _luc(2026, 9, 21, 14, 0))   # thứ Hai
+    """Dữ liệu từ thứ Sáu, hôm nay thứ Hai => trễ 1 ngày làm việc, không phải 3.
+    (Bản trước dùng 18/9 → 21/9/2026 — nhưng 21/9/2026 là 敬老の日; từ 032 ngày
+    đó là ngày nghỉ, nên đổi sang một tuần không có lễ.)"""
+    _lo(conn, "zaiko", date(2026, 9, 11))           # thứ Sáu
+    t = tinh_tuoi(conn, _luc(2026, 9, 14, 14, 0))   # thứ Hai
     assert t.nguon[0].tre == 1
 
 

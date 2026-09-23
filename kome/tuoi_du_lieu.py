@@ -62,15 +62,17 @@ def hom_nay_o_nhat() -> date:
 
 
 def _la_ngay_nghi(conn, ngay: date) -> bool:
-    """Cuối tuần theo core.dim_date. Ngày lễ Nhật KHÔNG có trong dim_date nên
-    vẫn bị coi là ngày làm việc — giống hệt cách /health xử lý ngày thiếu.
+    """Ngày nghỉ = KHÔNG phải ngày làm việc theo `mart.lich_kinh_doanh` (cuối
+    tuần và ngày lễ Nhật, từ 032) — định nghĩa duy nhất, dùng chung với bảng
+    phủ theo ngày và danh sách ngày thiếu của /kho-du-lieu. Ngày lễ mà đỏ thì
+    dải đỏ dạy người đọc bỏ qua dải đỏ.
 
     dim_date chỉ trải 2024-2035. Ngoài khoảng đó thì lùi về thứ trong tuần của
     Python: thà tính đúng cuối tuần bằng cách khác còn hơn coi mọi ngày năm
     2036 là ngày làm việc và đỏ suốt.
     """
     row = conn.execute(
-        "SELECT is_weekend FROM core.dim_date WHERE date_key = %s", (ngay,)
+        "SELECT NOT la_ngay_kd FROM mart.lich_kinh_doanh WHERE ngay = %s", (ngay,)
     ).fetchone()
     return row[0] if row else ngay.weekday() >= 5
 
@@ -93,9 +95,9 @@ def tinh_tuoi(conn, bay_gio: datetime | None = None) -> Tuoi:
                  WHERE undone_at IS NULL AND spec_name = ANY(%s)
                  GROUP BY spec_name)
                SELECT m.spec_name, m.ngay,
-                      (SELECT count(*) FROM core.dim_date d
-                        WHERE d.is_weekend = false
-                          AND d.date_key > m.ngay AND d.date_key <= %s)
+                      (SELECT count(*) FROM mart.lich_kinh_doanh d
+                        WHERE d.la_ngay_kd
+                          AND d.ngay > m.ngay AND d.ngay <= %s)
                FROM m""",
             (list(NGUON_HANG_NGAY), hom_nay),
         ).fetchall()

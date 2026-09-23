@@ -434,17 +434,23 @@ là nói một điều sai bằng con số. Và `kome.ngan_sach.luu()` **chỉ �
 đã đổi**: `sua_luc`/`sua_boi` phải trả lời "ai đổi con số NÀY lần cuối", không
 phải "ai bấm Lưu lần cuối".
 
-**Bất biến:** `core.dim_date` **không có cột ngày lễ Nhật**, nên
-`mart.ngay_kinh_doanh` chỉ loại thứ Bảy và Chủ nhật. Từ đợt 8 (migration `031`),
-"ngày làm việc" có ĐÚNG MỘT định nghĩa: `mart.lich_kinh_doanh.la_ngay_kd` (từng
-ngày); `mart.ngay_kinh_doanh` (đếm theo tháng, dùng cho ngân sách) và màn `/du-bao`
-(nhịp mỗi ngày làm việc) đều ĐỌC view đó — thêm ngày lễ là sửa đúng một chỗ. Tháng có Tuần lễ Vàng
-(5月) hay Obon (8月) bị đếm thừa 2–4 ngày làm việc và vạch mốc "đáng lẽ đạt
-tới hôm nay" **khắt khe hơn thực tế** ở đúng những tháng đó. Đây là hạn chế
-CÓ TÊN, không phải thiếu sót chưa ai để ý: đừng "sửa" bằng cách bịa một định
-nghĩa thứ hai (ví dụ "ngày có phiếu bán") — hai định nghĩa cùng tên là hai con
-số nói hai điều. Cách sửa đúng là thêm cột ngày lễ vào `core.dim_date`, và đó
-là một việc riêng.
+**Bất biến:** "ngày làm việc" có ĐÚNG MỘT định nghĩa:
+`mart.lich_kinh_doanh.la_ngay_kd` (migration `031`) = không phải thứ Bảy/Chủ nhật
+**và** không phải ngày lễ quốc gia Nhật (`core.dim_date.ngay_le`, migration `032`,
+2024–2035). Bốn chỗ ĐỌC view đó, không chỗ nào tự viết lại vị từ:
+`mart.ngay_kinh_doanh` (mẫu số "đến hôm nay" của ngân sách), màn `/du-bao`, bảng
+phủ theo ngày (`kome/coverage.py::tinh_bang_ngay`), ô "hôm nay đã có dữ liệu chưa"
+(`kome/tuoi_du_lieu.py`) và danh sách ngày thiếu của `/kho-du-lieu`
+(`kome/web/app.py::_ky_du_lieu`). Ngày lễ SINH bởi `scripts/sinh_ngay_le.py` (luật
+祝日法) và viết thành chữ trong 032; `tests/test_ngay_le.py` so khối đó với bộ sinh
+và với lịch chính thức 2024–2026. Xuân/thu phân của năm xa là GẦN ĐÚNG (国立天文台
+chỉ công bố trước một năm) — lệch thì sửa bằng migration MỚI.
+HẠN CHẾ CÒN LẠI (có tên): ngày nghỉ RIÊNG của công ty (Obon, 年末年始 29/12–3/1)
+KHÔNG có — đó là lịch của KOME, không có nguồn nào để đọc; đừng đoán. Tháng 8 và
+tháng 12/1 vì vậy vẫn đếm thừa vài ngày làm việc, và `/kho-du-lieu` vẫn liệt kê
+các ngày đó là "thiếu" (câu nhắc trên màn đã nói rõ). Đừng "sửa" bằng một định
+nghĩa thứ hai (ví dụ "ngày có phiếu bán") — hai định nghĩa cùng tên là hai con số
+nói hai điều.
 
 **Bất biến:** `POST /ngan-sach` KHÔNG bị chế độ chỉ-đọc (`_chi_doc`) chặn, nên
 bản Vercel công khai SỬA ĐƯỢC ngân sách — và đó là chủ ý, không phải sót. Lý
