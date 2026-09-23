@@ -57,7 +57,7 @@ thế nào. Một chiều — không bao giờ ghi ngược vào OBC.</p>
 <div class="bang-cuon"><table class="bang-tl">
 <tr><th>File</th><th>Tối thiểu (cổng 3)</th><th>Ngày bắt buộc</th><th>Khử trùng khoá</th><th>Cột tiền đại diện</th><th>Cảnh báo số dòng</th><th>Cảnh báo tiền</th><th>Đối chiếu tích (cổng 5)</th></tr>
 {% for g in nguong %}
-<tr><td>{{ g.ja }}</td><td class="so">{{ "{:,}".format(g.min_rows).replace(",", ".") }} dòng</td>
+<tr><td>{{ g.ja }}</td><td class="so">{{ "{:,}".format(g.min_rows) }} dòng</td>
 <td>{% for d in g.required_date %}<code>{{ d }}</code> {% else %}—{% endfor %}</td>
 <td>{{ "có" if g.dedup else "—" }}</td>
 <td>{% if g.total_column %}<code>{{ g.total_column }}</code>{% else %}—{% endif %}</td>

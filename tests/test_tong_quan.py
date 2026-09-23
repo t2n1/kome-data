@@ -269,10 +269,10 @@ def test_xem_tat_ca_can_goi_giu_nguyen_trang_thai_loc(conn, batch, monkeypatch, 
     c = _dang_nhap_lan(conn, batch, monkeypatch, test_db_url)
 
     html = c.get("/").text
-    assert 'href="/can-xu-ly">Xem tất cả' in html
+    assert 'href="/lien-he">Xem tất cả' in html
 
     html_tat_ca = c.get("/?tat_ca=1").text
-    assert 'href="/can-xu-ly?tat_ca=1">Xem tất cả' in html_tat_ca
+    assert 'href="/lien-he?tat_ca=1">Xem tất cả' in html_tat_ca
 
 
 def test_dang_xem_moi_nguoi_co_lien_ket_quay_ve_danh_sach_cua_toi(

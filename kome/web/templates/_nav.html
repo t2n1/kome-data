@@ -35,9 +35,9 @@
 
    Sáu icon (dashboard/chart/user/cube/box/db) chép NGUYÊN VĂN từ object `I`
    trong kome-nav.js của gói thiết kế, theo đúng ánh xạ NHOM của gói đó.
-   Hai icon còn lại (bell cho "Cần xử lý", pin cho "Bản đồ") do TA CHỌN
+   Hai icon còn lại (bell cho "Cần liên hệ", pin cho "Bản đồ") do TA CHỌN
    trong chính bộ 24 icon của gói thiết kế — gói thiết kế không có mục
-   "Cần xử lý" (chỉ có ở app này), và gộp bản đồ chung vào "Khách hàng &
+   "Cần liên hệ" (chỉ có ở app này; trước đợt 7 tên là "Cần xử lý"), và gộp bản đồ chung vào "Khách hàng &
    bản đồ" thay vì tách riêng. Xem task-1-brief.md, đợt 4d. #}
 <aside class="thanh-ben">
   <a class="hieu" href="/"><img class="logo" src="/static/kome-logo.png" alt="" width="28" height="28">KOME</a>
@@ -59,8 +59,8 @@
 
     <p class="nhom">KHÁCH HÀNG</p>
     <a href="/khach-hang"{% if trang == 'khach' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><circle cx="9" cy="6" r="2.6"></circle><path d="M3.5 15c0-2.8 2.5-4.5 5.5-4.5s5.5 1.7 5.5 4.5"></path></svg>Khách hàng</a>
-    {# bell: TA CHỌN — gói thiết kế không có mục "Cần xử lý". #}
-    <a href="/can-xu-ly"{% if trang == 'can-xu-ly' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M9 2.6a4.2 4.2 0 0 0-4.2 4.2c0 3.4-1.4 4.6-1.4 4.6h11.2s-1.4-1.2-1.4-4.6A4.2 4.2 0 0 0 9 2.6z"></path><path d="M7.6 14a1.6 1.6 0 0 0 2.8 0"></path></svg>Cần xử lý</a>
+    {# bell: TA CHỌN — gói thiết kế không có mục "Cần liên hệ". #}
+    <a href="/lien-he"{% if trang == 'lien-he' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M9 2.6a4.2 4.2 0 0 0-4.2 4.2c0 3.4-1.4 4.6-1.4 4.6h11.2s-1.4-1.2-1.4-4.6A4.2 4.2 0 0 0 9 2.6z"></path><path d="M7.6 14a1.6 1.6 0 0 0 2.8 0"></path></svg>Cần liên hệ</a>
     {# pin: TA CHỌN — gói thiết kế gộp bản đồ vào "Khách hàng & bản đồ". #}
     <a href="/ban-do"{% if trang == 'ban-do' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M9 16s5.2-5 5.2-8.6A5.2 5.2 0 0 0 9 2.2a5.2 5.2 0 0 0-5.2 5.2C3.8 11 9 16 9 16z"></path><circle cx="9" cy="7.3" r="1.8"></circle></svg>Bản đồ</a>
 

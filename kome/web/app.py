@@ -561,7 +561,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             return _loi(request, "mở danh sách khách hàng", e)
 
     @app.get("/khach-hang/{ma}", response_class=HTMLResponse)
-    def ho_so_khach(request: Request, ma: str):
+    def ho_so_khach(request: Request, ma: str, loi_tx: str = ""):
         try:
             with open_app_conn() as conn:
                 h = KH.ho_so(conn, ma)
@@ -569,22 +569,75 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 return _ve(request, "khong_thay.html",
                            {"thu": f"khách hàng mã {ma}", "trang": "khach"},
                            status_code=404)
+            from kome import lien_he as LH
             return _ve(request, "khach_360.html",
-                       {"h": h, "d": KH.ve_duong(h.thang), "trang": "khach"})
+                       {"h": h, "d": KH.ve_duong(h.thang), "trang": "khach",
+                        "kieu_tx": LH.KIEU, "ket_qua_tx": LH.KET_QUA,
+                        "hom_nay": TDL.hom_nay_o_nhat(), "loi_tx": loi_tx[:200]})
         except Exception as e:
             return _loi(request, "mở hồ sơ khách hàng", e)
 
-    @app.get("/can-xu-ly", response_class=HTMLResponse)
-    def can_xu_ly(request: Request, tat_ca: int = 0):
+    # /can-xu-ly (Giai đoạn 1) nay chỉ còn 301 về /lien-he (đợt 7): hai cột
+    # "Lâu không mua" + "Quá hạn mua lại" của màn mới ĐÚNG là tập khách của
+    # trang cũ (nhóm việc 'im'), cộng thêm dải "Sắp đến hạn" và nhật ký. Giữ
+    # `tat_ca` để dấu trang "xem tất cả" cũ vẫn mở đúng phạm vi.
+    @app.get("/can-xu-ly")
+    def can_xu_ly(tat_ca: int = 0):
+        return RedirectResponse("/lien-he?tat_ca=1" if tat_ca else "/lien-he",
+                                status_code=301)
+
+    @app.get("/lien-he", response_class=HTMLResponse)
+    def lien_he(request: Request, tat_ca: int = 0, nv: str = "",
+                ly_do: str = "", loi_tx: str = ""):
+        """Danh sách ưu tiên liên hệ (đợt 7). ĐÚNG 3 lượt hỏi — có test đếm.
+        Lọc theo người đăng nhập là mặc định tiện dụng, KHÔNG phải hàng rào
+        (cùng nếp /khach-hang)."""
+        from kome import lien_he as LH
         try:
-            sale, ten_sale = _sale_dang_loc(request, tat_ca)
+            sale, ten_sale = _sale_dang_loc(request, tat_ca, nv)
+            hom_nay = TDL.hom_nay_o_nhat()
             with open_app_conn() as conn:
-                ds = KH.can_xu_ly(conn, sale=sale)
-            return _ve(request, "can_xu_ly.html",
-                       {"ds": ds, "trang": "can-xu-ly", "sale": sale,
-                        "ten_sale": ten_sale})
+                ds = LH.danh_sach(conn, hom_nay, sale=sale, ly_do=ly_do or None)
+                hoat_dong = LH.hoat_dong_gan_day(conn, sale=sale)
+                hen = LH.hen_goi_lai(conn, hom_nay, sale=sale)
+            return _ve(request, "lien_he.html", {
+                "trang": "lien-he", "ds": ds, "hoat_dong": hoat_dong, "hen": hen,
+                "hom_nay": hom_nay, "sale": sale, "ten_sale": ten_sale,
+                "tat_ca": bool(tat_ca), "nv": nv if nv != KH.NV_MOI_NGUOI else "",
+                "an_ngay": LH.AN_KHI_KHONG_HEN, "kieu_tx": LH.KIEU,
+                "ket_qua_tx": LH.KET_QUA, "loi_tx": loi_tx[:200],
+                # Ghi xong quay về ĐÚNG trang này, kể cả bộ lọc đang xem.
+                "tiep": request.url.path + (f"?{request.url.query}" if request.url.query else "")})
         except Exception as e:
-            return _loi(request, "mở danh sách cần xử lý", e)
+            return _loi(request, "mở danh sách cần liên hệ", e)
+
+    @app.post("/khach-hang/{ma}/tiep-xuc")
+    def ghi_tiep_xuc(request: Request, ma: str, kieu: str = Form(""),
+                     ket_qua: str = Form(""), noi_dung: str = Form(""),
+                     hen_lai: str = Form(""), tiep: str = Form("")):
+        """Thêm MỘT dòng app.nhat_ky_tiep_xuc bằng kết nối kome_app. KHÔNG bị
+        chế độ chỉ-đọc chặn — cùng lý lẽ với POST /ngan-sach: `_chi_doc` tồn
+        tại vì giới hạn của luồng NẠP OBC, còn một dòng chữ nằm thừa trong
+        giới hạn đó, và bản Vercel là nơi cổng đăng nhập LUÔN bật.
+
+        `tiep` lọc qua bao_mat.duong_dan_an_toan (bộ lọc DUY NHẤT của app) —
+        một form lạ gửi `tiep=https://…` không biến nút Thêm thành bàn đạp."""
+        from urllib.parse import quote
+        from kome import lien_he as LH
+        dich = bao_mat.duong_dan_an_toan(tiep or f"/khach-hang/{ma}#nhat-ky")
+        nguoi = getattr(request.state, "nguoi", None)
+        try:
+            with open_app_conn() as conn:
+                LH.ghi(conn, ma, nguoi.id if nguoi else None, kieu, ket_qua,
+                       noi_dung, hen_lai)
+                conn.commit()
+        except LH.LoiNhap as e:
+            duong, _, neo = dich.partition("#")
+            noi = "&" if "?" in duong else "?"
+            dich = f"{duong}{noi}loi_tx={quote(str(e))}" + (f"#{neo}" if neo else "")
+        except Exception as e:
+            return _loi(request, "ghi lần tiếp xúc", e)
+        return RedirectResponse(dich, status_code=303)
 
     @app.get("/ban-do", response_class=HTMLResponse)
     def ban_do_khach_hang(request: Request, tat_ca: int = 0, nv: str = "",

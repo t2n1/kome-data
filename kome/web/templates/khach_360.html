@@ -234,12 +234,30 @@ còn nữa thì tra trong OBC.</p>
 </div>
 {% endif %}
 
-<h2>Ghi chú &amp; tương tác</h2>
-<div class="trong">
-<strong>Chưa có.</strong> OBC ghi <em>giao dịch</em>, không ghi <em>tương tác</em> —
-không phần mềm nào suy ra được hôm qua ai gọi cho khách này và khách trả lời gì.<br>
-Phần này chỉ chạy được khi nhân viên gõ vào sau mỗi cuộc gọi, và đó là quyết định
-về cách làm việc chứ không phải về kỹ thuật.
+<section id="nhat-ky">
+<h2>Nhật ký tiếp xúc</h2>
+<p class="ghi-chu">Gọi, ghé thăm và chat đã ghi nhận — OBC ghi <em>giao dịch</em>, không ghi <em>tương tác</em>,
+nên phần này chỉ có khi người gọi gõ vào. Chỉ thêm, không sửa: ghi sai thì thêm một dòng đính chính.</p>
+<div class="the-nk">
+  <div class="the-nk-dau">
+  {% if loi_tx %}<p class="ngay-thieu" role="alert">{{ loi_tx }}</p>{% endif %}
+  {% set ma = h.khach.ma %}{% set tiep = "/khach-hang/" ~ h.khach.ma ~ "#nhat-ky" %}
+  {% include "_ghi_tiep_xuc.html" %}
+  </div>
+  {% for n in h.nhat_ky %}
+  <div class="dong-nk">
+    <div class="dong-nk-dau"><span aria-hidden="true">{{ n.icon }}</span>
+      <strong>{{ n.nhan_kieu }}</strong>
+      <span class="khong-ap-dung so">{{ n.ngay }}</span>
+      <span class="vien {{ n.mau_ket_qua }}">{{ n.nhan_ket_qua }}</span>
+      {% if n.hen_lai %}<span class="khong-ap-dung">· hẹn lại {{ n.hen_lai }}</span>{% endif %}</div>
+    <div>{{ n.noi_dung }}</div>
+    <div class="khong-ap-dung">{{ n.nguoi or "(máy trong công ty — chưa bật đăng nhập)" }}</div>
+  </div>
+  {% else %}
+  <div class="dong-nk khong-ap-dung">Chưa có lần tiếp xúc nào được ghi.</div>
+  {% endfor %}
 </div>
+</section>
 </html>
 </main>

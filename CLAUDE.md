@@ -89,7 +89,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/` | Dashboard chung (đợt 5b): 4 ô chỉ số tháng đến hôm nay · tiến độ ngân sách · xu hướng 30 ngày · sức khoẻ khách · cần gọi hôm nay · hàng cận hạn · ô "hôm nay đã có dữ liệu chưa" | `mart.thang_den_hom_nay`, `mart.ban_theo_ngay`, `mart.khach_360` (qua `kome.khach_hang.dem_va_can_xu_ly`, MỘT lượt hỏi), `mart.tien_do_ngan_sach` (qua `kome.bao_cao.tien_do_ngan_sach`), `mart.ton_hien_tai` (qua `kome.san_pham.lo_can_han`, KHÔNG qua `kho_hang()`), `meta.ingest_batch` |
 | `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
-| `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
+| `/lien-he` | **Cần liên hệ** (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc qua `POST /khach-hang/{mã}/tiep-xuc`. **3 truy vấn** | `mart.uu_tien_lien_he`, `app.nhat_ky_tiep_xuc` |
 | `/ban-do` | Bản đồ khách hàng — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách | `core.dim_prefecture`, `mart.khach_theo_tinh` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
 | `/ngan-sach` | Đặt chỉ tiêu doanh thu: 5 người phụ trách × 12 tháng một kỳ. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
@@ -133,8 +133,11 @@ mọi bộ lọc.
 **Bất biến:** "khách đang rời đi" có **ba** chỗ hiển thị và chỉ **một** định nghĩa,
 `mart.khach_nhom_viec` nhóm `'im'`: nút "Im lặng ≥ 2× nhịp", cột "Cần gọi" của bảng
 tải nhân viên (`mart.tai_nhan_vien.so_khach_canh_bao`, migration `022` cho nó ĐỌC
-nhóm việc chứ không chép lại vị từ), và `can_xu_ly()` của `/can-xu-ly`. Có test canh
-cả ba trả cùng một tập khách.
+nhóm việc chứ không chép lại vị từ), và `can_xu_ly()` (khối "Cần gọi hôm nay" của `/`
+qua `dem_va_can_xu_ly`). Từ đợt 7, hai cột "Lâu không mua" + "Quá hạn mua lại" của
+`/lien-he` (`mart.uu_tien_lien_he`, `lau_khong_mua`/`qua_han`) cũng phải là ĐÚNG tập
+đó. Có test canh cả bốn trả cùng một tập khách
+(`tests/test_lien_he.py::test_hai_cot_dau_DUNG_BANG_nhom_viec_im`).
 
 **Bất biến:** nhịp mua theo từng mã (`mart.nhip_mat_hang`) dùng **cùng công thức
 trung vị** với nhịp mua của khách (`mart.nhip_mua`). Một khái niệm một công thức;
@@ -194,7 +197,7 @@ rác đó chiếm trọn tám dòng gợi ý của MỌI khách**. Sửa ở `ma
 (migration `021`). Có test canh:
 `tests/test_khach_hang.py::test_ty_suat_goi_y_la_TY_SO_CUA_CAC_TONG`.
 
-Trang `/khach-hang` và `/can-xu-ly` mặc định chỉ hiện khách của người đang
+Trang `/khach-hang` và `/lien-he` mặc định chỉ hiện khách của người đang
 đăng nhập; `?tat_ca=1` bỏ lọc. Người có `salesperson_code` NULL (chủ DN, kế
 toán) thấy toàn bộ ngay từ đầu. Riêng `/khach-hang` còn nhận `?nv=<mã sale>` để
 chủ động xem danh bạ của MỘT người phụ trách khác — cùng nếp đợt 3: mặc định
@@ -226,7 +229,7 @@ hai thuộc tính đó là trình đọc màn hình đọc icon rồi đọc l�
 dừng ở một phần tử không có gì để bấm. Sáu icon (Tổng quan/Báo cáo/Khách
 hàng/Sản phẩm/Kho hàng/Kho dữ liệu) chép NGUYÊN VĂN từ object `I` trong
 `kome-nav.js` của gói thiết kế, đúng ánh xạ NHÓM của chính gói đó. Hai icon
-còn lại — `bell` cho "Cần xử lý" và `pin` cho "Bản đồ" — là **TA CHỌN**
+còn lại — `bell` cho "Cần liên hệ" (trước đợt 7: "Cần xử lý") và `pin` cho "Bản đồ" — là **TA CHỌN**
 trong bộ 24 icon của gói thiết kế, vì gói đó không có mục "Cần xử lý" và gộp
 bản đồ chung vào "Khách hàng & bản đồ" thay vì tách trang riêng như app này.
 Ai chọn cái gì phải ghi rõ ra (xem chú thích đầu `_nav.html`) — không ghi thì
@@ -298,6 +301,24 @@ thiếu. Ba ràng buộc của ô đó:
   FILE, migration `018_*.sql`), KHÔNG đọc `loaded_at` và KHÔNG đếm dòng trong
   bảng fact: `core.dim_customer` là SCD2 nên ngày khách không đổi gì thì nạp
   `得意先全情報` xong không sinh dòng nào mang ngày hôm nay.
+
+**Bất biến (Đợt 7):** `app.nhat_ky_tiep_xuc` **CHỈ THÊM** — và đó là ràng buộc
+của CSDL: migration `030` `REVOKE UPDATE, DELETE` khỏi `kome_app` trên ĐÚNG bảng này
+(009 cấp mặc định cả bốn quyền trên mọi bảng `app`). Ghi sai thì ghi thêm một dòng
+đính chính. Từ vựng kiểu/kết quả là của gói thiết kế (`KIEU_TX`/`KQ_TX` trong
+`Customer 360.dc.html`): `goi`/`ghe`/`chat` · `tot`/`binh`/`xau` — CHECK của bảng và
+hằng `kome.lien_he.KIEU`/`KET_QUA` phải đổi CÙNG nhau. Có test canh:
+`tests/test_lien_he.py::test_nhat_ky_chi_them_kome_app_khong_sua_khong_xoa_duoc`.
+
+**Bất biến (Đợt 7):** `/lien-he` có HAI loại "hôm nay" và không được gộp. AI cần
+gọi (`mart.uu_tien_lien_he`) theo mốc dữ liệu `mart.moc_thoi_gian` như mọi chỉ số;
+còn việc TẠM ẨN khách vừa liên hệ (tới `hen_lai`, hoặc `AN_KHI_KHONG_HEN` = 7 ngày
+nếu không hẹn) và ô "Hẹn gọi lại hôm nay" theo **đồng hồ thật giờ Tokyo**
+(`hom_nay_o_nhat`) — hẹn thứ Năm là thứ Năm ngoài đời. Đây là ngoại lệ THỨ HAI của
+bất biến mốc thời gian, cùng lý lẽ với ô tuổi dữ liệu. Khách đang ẩn KHÔNG biến mất
+lặng lẽ: khối "Đã liên hệ gần đây — đang tạm ẩn" liệt kê họ. `tut`/`moi` của
+`mart.khach_nhom_viec` cố ý KHÔNG vào view (view đó dựng lại `khach_360` ba lần) —
+trang trỏ sang `/khach-hang?nhom=tut|moi`.
 
 **Bất biến:** khách OBC đã đánh dấu `※廃業※` / `※取引停止※` trong TÊN (281/2.077
 khách) không bao giờ vào danh sách gọi lại. Doanh nghiệp đã phá sản thì im lặng
@@ -537,7 +558,8 @@ một người gọi khác hẳn về hình dạng):
 Cả hai dùng chung HẰNG với hàm gốc (`kome.khach_hang.TRANG_THAI_CAN_XU_LY`,
 `kome.san_pham.VI_TU_CAN_HAN`/`VI_TU_QUA_HAN`) — MỘT định nghĩa "cần xử lý"/
 "cận hạn", không phải hai bản chép sẽ trôi khỏi nhau. `kho_hang()`/
-`can_xu_ly()` vẫn còn nguyên cho `/kho-hang` và `/can-xu-ly` — mỗi màn đó
+`can_xu_ly()` vẫn còn nguyên (`kho_hang()` cho `/kho-hang`; `can_xu_ly()` là đối
+chứng của test và định nghĩa gốc, dù `/can-xu-ly` từ đợt 7 chỉ còn 301) — mỗi màn đó
 CẦN đủ mọi cột/bộ lọc mà hàm gốc tương ứng cung cấp, và không đánh giá view
 đắt hai lần cho MỘT lần mở CHÍNH MÀN CỦA NÓ. Có test canh:
 `tests/test_khach_hang.py::test_dem_va_can_xu_ly_dem_TOAN_CONG_TY_danh_sach_theo_sale`,
@@ -606,7 +628,7 @@ nút xoá thì phải ăn ngay hôm nay.
 **Bất biến:** lọc theo `salesperson_code` là **mặc định tiện dụng, KHÔNG phải
 hàng rào bảo mật**. Công ty năm người, ai cũng biết khách của ai; đăng nhập
 riêng là để cá nhân hoá, không phải để chặn. Không được thêm kiểm quyền vào
-`/khach-hang` hay `/can-xu-ly`.
+`/khach-hang` hay `/lien-he`.
 
 **CẠM BẪY — cổng chỉ tồn tại khi có khoá ký.** Để trống `KOME_SESSION_SECRET`
 ở máy trong công ty là **không có đăng nhập và không có phân quyền**: ai mở

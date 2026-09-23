@@ -1,0 +1,119 @@
+<!-- kome/web/templates/lien_he.html — Cần liên hệ (đợt 7).
+     Bố cục bám màn CRM.dc.html của gói thiết kế: hàng ô chỉ số → các CỘT
+     (ở thiết kế là giai đoạn deal, ở đây là LÝ DO liên hệ — đơn vị công việc
+     là một CUỘC GỌI, không phải một hợp đồng, xem lộ trình §8.2) → hai khối
+     "Hoạt động gần đây" và "Việc cần làm hôm nay" (ở đây: hẹn gọi lại).
+     Không kéo–thả: thẻ rời cột khi DỮ LIỆU đổi (khách mua lại) hoặc khi có
+     người ghi một lần tiếp xúc, không phải khi ai đó kéo nó. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<title>KOME — cần liên hệ</title>
+{% include "_chung.html" %}
+{% include "_nav.html" %}
+{% set giu = ("tat_ca=1" if tat_ca else "") ~ ("&nv=" ~ nv if nv else "") %}
+<h1>Cần liên hệ</h1>
+<p class="ghi-chu">Khách đang im lặng lâu hơn <strong>nhịp mua riêng của chính họ</strong>, chia theo lý do,
+trong từng cột xếp theo doanh thu luỹ kế. Ghi lại mỗi lần gọi — khách vừa liên hệ tạm ẩn
+tới ngày hẹn (hoặc {{ an_ngay }} ngày nếu không hẹn). Khách OBC đánh dấu ※廃業※ / ※取引停止※ không có ở đây.</p>
+{% if sale %}
+<p class="ghi-chu">Đang xem khách của <strong>{{ ten_sale or sale }}</strong>. <a href="/lien-he?tat_ca=1{{ '&ly_do=' ~ ds.ly_do if ds.ly_do else '' }}">Xem tất cả →</a></p>
+{% endif %}
+{% if loi_tx %}<p class="ngay-thieu" role="alert">{{ loi_tx }}</p>{% endif %}
+
+<div class="the-so">
+  <div><div class="nhan">Cần liên hệ</div><div class="gia">{{ "{:,}".format(ds.tong) }}</div>
+       <div class="nhan">khách · ¥{{ "{:,}".format(ds.cot|sum(attribute='doanh_thu')) }} doanh thu luỹ kế</div></div>
+  {% for c in ds.cot %}
+  <div><div class="nhan">{{ c.nhan }}</div><div class="gia">{{ ds.dem[c.ly_do] }}</div><div class="nhan">{{ c.mo_ta }}</div></div>
+  {% endfor %}
+  <div><div class="nhan">Hẹn gọi lại hôm nay</div><div class="gia">{{ hen|length }}</div><div class="nhan">{{ hom_nay }} (giờ Nhật)</div></div>
+  <div><div class="nhan">Đã liên hệ, đang tạm ẩn</div><div class="gia">{{ ds.da_lien_he|length }}</div><div class="nhan"><a href="#da-lien-he">xem danh sách</a></div></div>
+</div>
+
+<p class="ghi-chu">Hai nhóm khác của danh sách làm việc:
+<a href="/khach-hang?nhom=tut{{ '&' ~ giu if giu else '' }}">khách lớn đang giảm tốc</a> ·
+<a href="/khach-hang?nhom=moi{{ '&' ~ giu if giu else '' }}">khách mới đã im lặng</a>.
+{% if ds.ly_do %} <a href="/lien-he{{ '?' ~ giu if giu else '' }}">← Mọi lý do</a>{% endif %}</p>
+
+<div class="cot-lh">
+{% for c in ds.cot %}
+<section aria-labelledby="cot-{{ c.ly_do }}">
+  <div class="cot-lh-dau"><h2 id="cot-{{ c.ly_do }}"><span class="vien {{ c.mau }}">{{ c.nhan }}</span></h2>
+    <span class="khong-ap-dung">{{ c.tong }} khách</span>
+    <span class="tong">¥{{ "{:,}".format(c.doanh_thu) }}</span></div>
+  <div class="cot-lh-mo">{{ c.mo_ta }}</div>
+  {% for t in c.the %}
+  <div class="the-lh">
+    <div class="ten"><a href="/khach-hang/{{ t.ma }}">{{ t.ten }}</a></div>
+    <div class="phu">{{ t.ma }}{% if t.tinh %} · {{ t.tinh }}{% endif %}{% if t.phu_trach %} · phụ trách {{ t.phu_trach }}{% endif %}</div>
+    <div class="so-dong"><strong>¥{{ "{:,}".format(t.doanh_thu) }}</strong>
+      <span class="khong-ap-dung">im {{ t.so_ngay_im_lang }} ngày{% if t.ty_le %} · {{ "%.1f"|format(t.ty_le) }}× nhịp {{ t.nhip_ngay|int }} ngày{% endif %}</span></div>
+    {% if t.dien_thoai %}<div class="phu">☎ <a href="tel:{{ t.dien_thoai }}">{{ t.dien_thoai }}</a></div>{% endif %}
+    {% if t.cuoi %}<div class="cuoi">Lần trước: {{ t.cuoi.icon }} {{ t.cuoi.ngay }} · <span class="vien {{ t.cuoi.mau_ket_qua }}">{{ t.cuoi.nhan_ket_qua }}</span> {{ t.cuoi.noi_dung|truncate(60) }}</div>{% endif %}
+    <details><summary>✏️ Ghi liên hệ</summary>
+      {% set ma = t.ma %}{% include "_ghi_tiep_xuc.html" %}
+    </details>
+  </div>
+  {% else %}
+  <p class="cot-lh-mo">Không còn khách nào ở cột này.</p>
+  {% endfor %}
+  {% if c.tong > c.the|length %}
+  <p class="cot-lh-mo"><a href="/lien-he?ly_do={{ c.ly_do }}{{ '&' ~ giu if giu else '' }}">Xem cả {{ c.tong }} khách →</a></p>
+  {% endif %}
+</section>
+{% endfor %}
+</div>
+
+<div class="hai-cot-lh">
+<section>
+  <h2>Hoạt động gần đây</h2>
+  <div class="the-nk">
+  {% for n in hoat_dong %}
+    <div class="dong-nk">
+      <div class="dong-nk-dau"><span aria-hidden="true">{{ n.icon }}</span>
+        <a href="/khach-hang/{{ n.ma_khach }}#nhat-ky">{{ n.ten_khach or n.ma_khach }}</a>
+        <span class="vien {{ n.mau_ket_qua }}">{{ n.nhan_ket_qua }}</span></div>
+      <div>{{ n.noi_dung }}</div>
+      <div class="khong-ap-dung">{{ n.nhan_kieu }} · {{ n.ngay }} · {{ n.nguoi or "(không rõ người ghi)" }}</div>
+    </div>
+  {% else %}
+    <div class="dong-nk khong-ap-dung">Chưa có lần tiếp xúc nào được ghi.</div>
+  {% endfor %}
+  </div>
+</section>
+<section>
+  <h2>Hẹn gọi lại hôm nay</h2>
+  <div class="the-nk">
+  {% for n in hen %}
+    <div class="dong-nk">
+      <div class="dong-nk-dau"><a href="/khach-hang/{{ n.ma_khach }}#nhat-ky">{{ n.ten_khach or n.ma_khach }}</a>
+        {% if n.hen_lai < hom_nay %}<span class="vien loi">trễ hẹn · {{ n.hen_lai }}</span>{% else %}<span class="vien canh">hôm nay</span>{% endif %}</div>
+      <div>{{ n.noi_dung }}</div>
+      <div class="khong-ap-dung">{{ n.icon }} {{ n.nhan_kieu }} ngày {{ n.ngay }} · {{ n.nguoi or "(không rõ người ghi)" }}</div>
+    </div>
+  {% else %}
+    <div class="dong-nk khong-ap-dung">Không có lời hẹn nào tới hạn.</div>
+  {% endfor %}
+  </div>
+</section>
+</div>
+
+<section id="da-lien-he">
+<h2>Đã liên hệ gần đây — đang tạm ẩn ({{ ds.da_lien_he|length }})</h2>
+{% if ds.da_lien_he %}
+<div class="bang-cuon"><table>
+<tr><th>Khách hàng</th><th>Lý do</th><th>Lần tiếp xúc cuối</th><th>Kết quả</th><th>Hiện lại</th><th class="so">Doanh thu luỹ kế</th></tr>
+{% for t in ds.da_lien_he %}
+<tr><td><a href="/khach-hang/{{ t.ma }}#nhat-ky">{{ t.ten }}</a></td>
+<td><span class="vien {{ t.mau }}">{{ t.nhan_ly_do }}</span></td>
+<td>{{ t.cuoi.icon }} {{ t.cuoi.ngay }} — {{ t.cuoi.noi_dung|truncate(50) }}</td>
+<td><span class="vien {{ t.cuoi.mau_ket_qua }}">{{ t.cuoi.nhan_ket_qua }}</span></td>
+<td>{{ t.cuoi.hen_lai or "sau " ~ an_ngay ~ " ngày" }}</td>
+<td class="so">¥{{ "{:,}".format(t.doanh_thu) }}</td></tr>
+{% endfor %}
+</table></div>
+{% else %}
+<div class="trong">Chưa có khách nào đang tạm ẩn.</div>
+{% endif %}
+</section>
+</html>
+</main>

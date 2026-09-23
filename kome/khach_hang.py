@@ -126,6 +126,10 @@ class HoSo:
     goi_y: list[dict] = field(default_factory=list)
     bac_gia: list[dict] = field(default_factory=list)
     diem_giao: list[dict] = field(default_factory=list)
+    # Đợt 7: khối "Nhật ký tiếp xúc" — lượt hỏi thứ 8, tức ĐÚNG chỗ trống đã
+    # chừa sẵn ở vòng sửa cuối đợt 4a. Trần 8 giờ đã chạm; khối tiếp theo
+    # phải GỘP truy vấn chứ không được nới trần.
+    nhat_ky: list = field(default_factory=list)
 
 
 _COT = """customer_code, ten, prefecture, city, phone, salesperson_code,
@@ -313,13 +317,13 @@ def ho_so(conn, ma: str) -> HoSo | None:
            GROUP BY sales_date ORDER BY sales_date DESC LIMIT 12""", (ma,)).fetchall()]
 
     # ---- Bốn khối mới của đợt 4a, gộp thành ĐÚNG HAI truy vấn -----------
-    # NGÂN SÁCH TRUY VẤN: hàm này chạy 7 lượt hỏi, và 8 là TRẦN. Đo thật
+    # NGÂN SÁCH TRUY VẤN: hàm này chạy 8 lượt hỏi (từ đợt 7), và 8 là TRẦN. Đo thật
     # 2026-09-22: một round-trip rỗng tới pooler Tokyo mất 47 ms, một lượt
     # hỏi thật ~260 ms. Trang hồ sơ chậm dần từng đợt là cách nó chết mà
     # không ai thấy ngày nào nó chết. Có test canh —
     # tests/test_khach_hang.py::test_ho_so_khong_qua_8_truy_van.
-    # Một chỗ trống còn lại là CỐ Ý: khối tiếp theo (đợt 4b/6) phải thêm được
-    # mà không cần nới trần.
+    # Chỗ trống thứ 8 đã dùng cho nhật ký tiếp xúc (đợt 7): khối tiếp theo phải
+    # GỘP vào một truy vấn có sẵn, không được nới trần.
     #
     # HAI truy vấn chứ không MỘT: gộp cả bốn khối vào một UNION ALL bốn tầng
     # thì mỗi nhánh phải đệm NULL cho khớp kiểu của ba nhánh kia, và câu lệnh
@@ -436,10 +440,11 @@ def ho_so(conn, ma: str) -> HoSo | None:
     diem_giao = [{"ma": r[1], "ten": r[2], "dia_chi": r[3]}
                  for r in hai if r[0] == "giao"]
 
+    from kome.lien_he import nhat_ky_khach
     return HoSo(khach=k, ho_so=ho, thang=thang, mat_hang=mat_hang,
                 da_ngung_mua=da_ngung, lan_mua_gan_day=gan_day,
                 chua_mua_thang=chua_mua, goi_y=goi_y, bac_gia=bac_gia,
-                diem_giao=diem_giao)
+                diem_giao=diem_giao, nhat_ky=nhat_ky_khach(conn, ma))
 
 
 # Trạng thái nào được coi là "cần xử lý" — khách đang rời đi. MỘT hằng dùng ở
