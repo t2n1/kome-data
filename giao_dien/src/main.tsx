@@ -17,10 +17,17 @@ const qc = new QueryClient({
 // Màn Khách hàng (giai đoạn 2) tải trễ: người chỉ mở Tổng quan không tải mã của nó.
 const ManKhach = lazy(() => import("./khach/ManKhach"));
 const HoSo = lazy(() => import("./khach/HoSo"));
+// Giai đoạn 3.
+const LienHe = lazy(() => import("./lien_he/LienHe"));
+const BaoCao = lazy(() => import("./bao_cao/BaoCao"));
+const DuBao = lazy(() => import("./du_bao/DuBao"));
 
 function man(duong: string): (() => React.ReactElement) | null {
   if (duong === "/") return () => <TongQuan />;
   if (duong === "/khach-hang" || duong === "/ban-do") return () => <ManKhach />;
+  if (duong === "/lien-he") return () => <LienHe />;
+  if (duong === "/bao-cao") return () => <BaoCao />;
+  if (duong === "/du-bao") return () => <DuBao />;
   const m = duong.match(/^\/khach-hang\/([^/]+)$/);
   if (m) return () => <HoSo ma={decodeURIComponent(m[1])} />;
   return null;

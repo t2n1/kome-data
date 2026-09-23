@@ -172,6 +172,15 @@ def lam_nong(open_conn) -> None:
                 lay(c, "thong-bao", KTQ.thong_bao, theo_ngay=True)
         except Exception as e:         # noqa: BLE001
             print(f"[anh-chup] không làm nóng được thong-bao: {e!r}")
+        # Báo cáo (kỳ gần nhất) và Dự báo (giai đoạn 3) — khoá khớp kome/web/api.py.
+        try:
+            from kome.web.api import du_lieu_bao_cao, du_lieu_du_bao
+            with open_conn() as c:
+                lay(c, "bao-cao", lambda cc: du_lieu_bao_cao(cc, None))
+            with open_conn() as c:
+                lay(c, "du-bao", du_lieu_du_bao)
+        except Exception as e:         # noqa: BLE001
+            print(f"[anh-chup] không làm nóng được báo cáo / dự báo: {e!r}")
         # Danh bạ khách (giai đoạn 2) — câu nặng nhất của màn Khách hàng.
         try:
             from kome import khach_hang as KH

@@ -3,7 +3,14 @@ token màu CSS mới.
 
 Không kiểm lại công thức (đã có `tests/test_phan_tich_mart.py` và
 `tests/test_bao_cao_phan_tich.py`) — chỉ kiểm trang RENDER đúng, chữ bắt
-buộc hiện đúng điều kiện, và không có mã màu hex nào lọt vào template.
+buộc hiện đúng điều kiện, và không có mã màu hex nào lọt vào giao diện.
+
+Giai đoạn 3: màn là React (giao_dien/src/bao_cao/BaoCao.tsx) — template
+bao_cao.html đã xoá. Mỗi test giữ NGUYÊN bất biến cũ nhưng kiểm theo hai
+nửa: (a) dữ liệu `/api/bao-cao` sinh ra câu chữ/khối đó ĐÚNG điều kiện, và
+(b) khi bất biến thuần hiển thị (một câu bắt buộc, một mục chú giải, "không
+mã hex", "mọi rect dữ liệu có <title>", "bảng nhiệt là <table> có scope")
+thì kiểm thẳng mã nguồn React — thứ duy nhất còn quyết định chữ trên màn.
 """
 import re
 from datetime import date
@@ -17,8 +24,20 @@ from kome.bao_cao import NganhKy, tinh_bao_cao, NGANH_TRONG, nhom_theo_nganh
 from kome.ve_phan_tich import ve_cay_o, ve_dong_gop, ve_nhiet
 from kome.web.app import create_app
 
-TEMPLATE = (Path(__file__).resolve().parent.parent
-            / "kome" / "web" / "templates" / "bao_cao.html")
+THU_MUC_GD = (Path(__file__).resolve().parent.parent
+              / "giao_dien" / "src" / "bao_cao")
+NGUON = THU_MUC_GD / "BaoCao.tsx"
+
+
+def _src() -> str:
+    return NGUON.read_text(encoding="utf-8")
+
+
+def _api(client, ky=2026) -> dict:
+    """Trang /bao-cao là vỏ React; dữ liệu nằm ở /api/bao-cao."""
+    r = client.get(f"/api/bao-cao?ky={ky}")
+    assert r.status_code == 200, r.text
+    return r.json()
 
 
 @pytest.fixture
@@ -69,59 +88,82 @@ def _hai_nam(conn, batch, ma="AA01", ngành="Đồ khô"):
 
 def test_kho_rong_tra_200(client, conn):
     r = client.get("/bao-cao")
-    assert r.status_code == 200
+    assert r.status_code == 200 and 'id="goc"' in r.text
+    d = client.get("/api/bao-cao").json()
+    assert d["bc"]["khong_co_du_lieu"] is True
 
 
 def test_kho_hai_nam_tra_200_va_hien_khoi_moi(client, conn, batch):
+    """Giai đoạn 3: bốn khối có DỮ LIỆU để vẽ (API) và có tiêu đề trên màn (React)."""
     _hai_nam(conn, batch)
-    r = client.get("/bao-cao?ky=2026")
-    assert r.status_code == 200
+    assert client.get("/bao-cao?ky=2026").status_code == 200
+    d = _api(client)
+    for khoi in ("dg", "co", "nh", "pa"):
+        assert d[khoi]["co"] is True, f"khối {khoi} không có gì để vẽ"
+    src = _src()
     for tieu_de in ("Ngành hàng kéo doanh thu lên/xuống",
                     "Doanh thu đến từ danh mục nào",
                     "Tăng trưởng theo tháng và ngành",
                     "Doanh thu tập trung ở khách nào"):
-        assert tieu_de in r.text
+        assert f"<h2>{tieu_de}</h2>" in src, tieu_de
 
 
 def test_co_doi_chieu_hien_dung_cau(client, conn, batch):
     """[Chữ bắt buộc, M-7 soát chặt] Ô chỉ số khi có đối chiếu: đúng NGUYÊN
     VĂN 'so cùng kỳ · {n} tháng đối chiếu ({tu} → {den})' — không đoán bừa
-    bằng `or`, lấy thẳng {n}/{tu}/{den} thật từ `tinh_bao_cao`."""
+    bằng `or`, lấy thẳng {n}/{tu}/{den} thật từ `tinh_bao_cao`.
+
+    Giai đoạn 3: API phải trả ĐÚNG {n}/{tu}/{den} của `tinh_bao_cao`, và
+    React ghép câu từ đúng ba trường đó."""
     _hai_nam(conn, batch)
-    bc = tinh_bao_cao(conn, 2026)
-    ck = bc.cung_ky
+    ck = tinh_bao_cao(conn, 2026).cung_ky
     assert ck.so_thang > 0
-    cau = (f"so cùng kỳ · {ck.so_thang} tháng đối chiếu "
-           f"({ck.tu} → {ck.den})")
-    r = client.get("/bao-cao?ky=2026")
-    assert cau in r.text, f"thiếu đúng câu: {cau!r}"
+    api = _api(client)["bc"]["cung_ky"]
+    assert (api["so_thang"], api["tu"], api["den"]) == (ck.so_thang, ck.tu, ck.den)
+    cau = "so cùng kỳ · {ck.so_thang} tháng đối chiếu ({ck.tu} → {ck.den})"
+    assert cau in _src(), f"thiếu đúng câu: {cau!r}"
 
 
 def test_khong_co_doi_chieu_hien_dung_cau(client, conn, batch):
-    """[Chữ bắt buộc] Không có tháng đối chiếu: 'chưa có cùng kỳ để so'."""
+    """[Chữ bắt buộc] Không có tháng đối chiếu: 'chưa có cùng kỳ để so'.
+
+    Giai đoạn 3: API nói "không có đối chiếu" (so_thang 0 hoặc không có dòng
+    cùng kỳ) — đúng điều kiện mà React in hai câu bắt buộc."""
     _nganh(conn, batch, "AA01", "Đồ khô")
     _ban(conn, batch, date(2026, 5, 11), "AA01")
-    r = client.get("/bao-cao?ky=2026")
-    assert r.status_code == 200
-    assert "chưa có cùng kỳ để so" in r.text
+    assert client.get("/bao-cao?ky=2026").status_code == 200
+    ck = _api(client)["bc"]["cung_ky"]
+    assert ck is None or ck["so_thang"] <= 0
+    src = _src()
+    # Ô chỉ số: nhánh `!ck || ck.so_thang <= 0` in đúng câu.
+    assert re.search(r"if \(!ck \|\| ck\.so_thang <= 0\) return <>chưa có cùng kỳ để so", src)
     # Khối "Ngành hàng kéo doanh thu lên/xuống" cũng phải nói ra, KHÔNG ẩn
-    # tiêu đề.
-    assert "Ngành hàng kéo doanh thu lên/xuống" in r.text
-    assert "không có tháng nào để so cùng kỳ" in r.text
+    # tiêu đề: tiêu đề đứng TRƯỚC (ngoài) nhánh điều kiện, câu nằm ở nhánh
+    # "không có".
+    m = re.search(r"<h2>Ngành hàng kéo doanh thu lên/xuống</h2></div>\s*"
+                  r"\{ck && ck\.so_thang > 0 \? <>.*?</> : "
+                  r'<p className="phu">Kỳ này không có tháng nào để so cùng kỳ\.</p>\}', src, re.S)
+    assert m, "tiêu đề khối đóng góp phải ở ngoài điều kiện, và nhánh rỗng phải nói ra"
 
 
 def test_ty_suat_so_bang_diem_khong_bang_phan_tram(client, conn, batch):
     """[M-7 soát chặt] Tỷ suất so cùng kỳ dùng chữ 'điểm' — kiểm NGAY TRONG
     ô chỉ số 'Tỷ suất lãi gộp', không phải bất kỳ đâu trên trang (một chữ
-    'điểm' lạc ở khối khác vẫn làm test cũ xanh giả)."""
+    'điểm' lạc ở khối khác vẫn làm test cũ xanh giả).
+
+    Giai đoạn 3: số API đưa cho ô đó là HIỆU (`chenh_ty_suat` = tỷ suất −
+    tỷ suất cùng kỳ), không phải tỷ lệ tăng; và React truyền đúng trường đó
+    với đơn vị " điểm" trong CHÍNH ô 'Tỷ suất lãi gộp'."""
     _hai_nam(conn, batch)
-    r = client.get("/bao-cao?ky=2026")
-    m = re.search(r'<div class="nhan">Tỷ suất lãi gộp</div>.*?</div>\s*</div>',
-                  r.text, re.S)
+    ck = _api(client)["bc"]["cung_ky"]
+    assert ck["chenh_ty_suat"] is not None
+    assert ck["chenh_ty_suat"] == pytest.approx(ck["ty_suat"] - ck["ty_suat_ck"])
+    m = re.search(r'<div className="nhan">Tỷ suất lãi gộp</div>(.*?)<div className="o-kpi">',
+                  _src(), re.S)
     assert m, "không tìm thấy ô chỉ số Tỷ suất lãi gộp"
-    khoi = m.group(0)
-    assert "điểm" in khoi
-    assert "% điểm" not in khoi, "tỷ suất phải so bằng ĐIỂM, không phải %"
+    khoi = m.group(1)
+    assert 'tang={ck?.chenh_ty_suat ?? null} don_vi=" điểm"' in khoi
+    assert 'don_vi="%"' not in khoi, "tỷ suất phải so bằng ĐIỂM, không phải %"
 
 
 def test_nganh_trong_khop_chu_view_tra_ra(conn, batch):
@@ -155,24 +197,27 @@ def test_khong_ve_hien_dung_cau_khi_co_doanh_thu_am(client, conn, batch):
     """[Chữ bắt buộc, phán quyết controller] Ngành có TỔNG ÂM (không chỉ mã
     lẻ âm) cũng phải rơi vào 'Không vẽ' — chữ chính xác đã chốt:
     'Không vẽ: ¥{khong_ve:,} của {so_ma_khong_ve} mã (doanh thu âm hoặc
-    bằng 0, hoặc thuộc ngành có tổng âm)'."""
+    bằng 0, hoặc thuộc ngành có tổng âm)'.
+
+    Giai đoạn 3: API trả số tiền bị bỏ THẬT (ngành Phí −¥4.500) và số mã;
+    React in đúng câu đã chốt từ hai trường đó."""
     _nganh(conn, batch, "AA01", "Đồ khô")
     _ban(conn, batch, date(2026, 5, 11), "AA01")
     _nganh(conn, batch, "PH01", "Phí")
     _ban(conn, batch, date(2026, 5, 11), "PH01", khach="000000009294",
          amount=-5_000, tax=-500, gp=-1_000, n=77)
-
-    r = client.get("/bao-cao?ky=2026")
-    assert r.status_code == 200
-    assert ("mã (doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)"
-            in r.text)
-    assert "Không vẽ: ¥" in r.text
+    co = _api(client)["co"]
+    assert co["khong_ve"] == -4_500 and co["so_ma_khong_ve"] == 1
+    assert ("Không vẽ: {yen(d.co.khong_ve)} của {d.co.so_ma_khong_ve} mã "
+            "(doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)") in _src()
 
 
 def test_khong_hien_khong_ve_khi_khong_co_am(client, conn, batch):
+    """Giai đoạn 3: không có doanh thu âm -> `khong_ve` = 0, và React chỉ in
+    dòng "Không vẽ" khi `khong_ve !== 0`."""
     _hai_nam(conn, batch)
-    r = client.get("/bao-cao?ky=2026")
-    assert "Không vẽ:" not in r.text
+    assert _api(client)["co"]["khong_ve"] == 0
+    assert '{d.co.khong_ve !== 0 && <p className="phu">Không vẽ:' in _src()
 
 
 def test_pareto_cau_tom_tat(client, conn, batch):
@@ -180,40 +225,60 @@ def test_pareto_cau_tom_tat(client, conn, batch):
     doanh thu kỳ này, trên {so_khach} khách có phát sinh trong kỳ' — KHÔNG
     phải 'khách có doanh thu': `so_khach` đếm mọi khách có dòng trong
     `mart.dong_ban`, kể cả khách net <= 0 (赤伝 có thể làm net âm/bằng
-    không), nên gọi họ "có doanh thu" là sai."""
+    không), nên gọi họ "có doanh thu" là sai.
+
+    Giai đoạn 3: API trả `luy_ke_top10` và `so_khach` = 12; React ghép câu."""
     for i in range(12):
         khach = f"00000000{9300 + i}"
         _ban(conn, batch, date(2026, 5, 11), "AA01", khach=khach,
              amount=(110_000 + i * 1_000), tax=10_000, gp=30_000, n=i)
-    r = client.get("/bao-cao?ky=2026")
-    assert r.status_code == 200
-    assert "10 khách lớn nhất = " in r.text
-    assert "% doanh thu kỳ này, trên 12 khách có phát sinh trong kỳ" in r.text
+    tt = _api(client)["bc"]["tap_trung"]
+    assert tt["so_khach"] == 12 and 0 < tt["luy_ke_top10"] < 1
+    src = _src()
+    assert "10 khách lớn nhất = <b>{p1(bc.tap_trung.luy_ke_top10)}</b>" in src
+    assert "doanh thu kỳ này, trên {so(bc.tap_trung.so_khach)} khách có phát sinh trong kỳ" in src
+    assert "khách có doanh thu" not in src
 
 
 def test_nhiet_chu_giai_co_khong_co_cung_ky(client, conn, batch):
-    """[Chữ bắt buộc] Chú giải bản đồ nhiệt có 'không có cùng kỳ'."""
+    """[Chữ bắt buộc] Chú giải bản đồ nhiệt có 'không có cùng kỳ'.
+
+    Giai đoạn 3: chú giải là mã React — kiểm nó nằm trong khối chú giải NGAY
+    SAU bảng nhiệt (không phải một chữ lạc ở khối khác), cạnh đúng ô màu
+    `bac-khong_ck` mà ô nhiệt bậc đó dùng."""
     _hai_nam(conn, batch)
-    r = client.get("/bao-cao?ky=2026")
-    assert "không có cùng kỳ" in r.text
+    assert _api(client)["nh"]["co"] is True
+    m = re.search(r'<table className="nhiet-bang">.*?</table>.*?<div className="chu-giai bc-cg">(.*?)</div>',
+                  _src(), re.S)
+    assert m, "không tìm thấy chú giải của bảng nhiệt"
+    assert '<i className="mau bac-khong_ck" /> không có cùng kỳ' in m.group(1)
 
 
 def test_khong_co_ma_mau_hex_trong_template():
-    html = TEMPLATE.read_text(encoding="utf-8")
-    # Loại trừ &#... (thực thể HTML) và href="#..." (neo trong trang).
-    loc = re.sub(r"&#\w+;", "", html)
-    loc = re.sub(r'href="#[^"]*"', "", loc)
-    xau = re.findall(r"#[0-9a-fA-F]{3,8}\b", loc)
-    assert xau == [], f"mã màu hex lọt vào template: {xau}"
+    """Giai đoạn 3: "template" nay là mã React + CSS của màn Báo cáo — màu
+    chỉ đi qua biến CSS (hai khối màu tối của kome.css), không mã hex nào."""
+    tep = sorted(THU_MUC_GD.glob("*.tsx")) + sorted(THU_MUC_GD.glob("*.css"))
+    assert NGUON in tep and (THU_MUC_GD / "bao_cao.css") in tep
+    for f in tep:
+        chu = f.read_text(encoding="utf-8")
+        # Loại trừ &#... (thực thể HTML) và href="#..." (neo trong trang).
+        loc = re.sub(r"&#\w+;", "", chu)
+        loc = re.sub(r'href="#[^"]*"', "", loc)
+        xau = re.findall(r"#[0-9a-fA-F]{3,8}\b", loc)
+        assert xau == [], f"mã màu hex lọt vào {f.name}: {xau}"
 
 
 def test_moi_rect_circle_du_lieu_co_title(client, conn, batch):
-    """[M-7 soát chặt] Mọi <rect>/<circle> DỮ LIỆU trong ba SVG còn lại
-    (đóng góp, cây ô, Pareto — bản đồ nhiệt nay là <table>, xem I-2/test
-    riêng bên dưới) phải có <title> ghi số thật. Bắt CẢ dạng tự đóng
-    (`<rect .../>`, không thể mang <title> con) lẫn cặp mở/đóng thiếu
-    <title> — bản trước chỉ bắt cặp mở/đóng, một phần tử tự đóng lọt qua
-    hoàn toàn không bị phát hiện."""
+    """[M-7 soát chặt] Mọi <rect>/<circle> DỮ LIỆU trong các SVG (đóng góp,
+    cây ô, Pareto — bản đồ nhiệt nay là <table>, xem I-2/test riêng bên
+    dưới) phải có <title> ghi số thật. Bắt CẢ dạng tự đóng (`<rect .../>`,
+    không thể mang <title> con) lẫn cặp mở/đóng thiếu <title> — bản trước
+    chỉ bắt cặp mở/đóng, một phần tử tự đóng lọt qua hoàn toàn không bị
+    phát hiện.
+
+    Giai đoạn 3: SVG vẽ bằng React — kiểm mã nguồn của từng SVG (thêm cả
+    biểu đồ 12 tháng, cũng có cột/điểm dữ liệu), và kiểm API có dữ liệu để
+    các SVG đó THẬT SỰ được vẽ với bộ dữ liệu này."""
     _nganh(conn, batch, "AA01", "Đồ khô")
     _hai_nam(conn, batch)
     _nganh(conn, batch, "PH01", "Phí")
@@ -224,16 +289,18 @@ def test_moi_rect_circle_du_lieu_co_title(client, conn, batch):
         _ban(conn, batch, date(2026, 5, 20), "AA01", khach=khach,
              amount=(50_000 + i * 1_000), tax=5_000, gp=15_000, n=200 + i)
 
-    r = client.get("/bao-cao?ky=2026")
-    assert r.status_code == 200
-    html = r.text
-    nhan = ("Chênh lệch doanh thu theo ngành so cùng kỳ",
+    d = _api(client)
+    assert d["bd"]["cot"] and d["dg"]["thanh"] and d["co"]["nganh"] and d["pa"]["cot"]
+    src = _src()
+    nhan = ("Doanh thu và tỷ suất lãi gộp theo tháng, kèm cùng kỳ năm trước",
+            "Chênh lệch doanh thu theo ngành so cùng kỳ",
             "Doanh thu theo ngành hàng và mặt hàng",
             "Doanh thu và luỹ kế của 20 khách hàng lớn nhất")
     for n in nhan:
-        m_svg = re.search(rf'aria-label="{re.escape(n)}">(.*?)</svg>', html, re.S)
+        m_svg = re.search(rf'aria-label="{re.escape(n)}">(.*?)</svg>', src, re.S)
         assert m_svg, f"không tìm thấy SVG '{n}'"
         khoi = m_svg.group(1)
+        dem = 0
         for tag in ("rect", "circle"):
             # Dạng tự đóng — không thể chứa <title> con, nên CHÍNH việc tự
             # đóng đã là lỗi cho một phần tử dữ liệu.
@@ -241,8 +308,10 @@ def test_moi_rect_circle_du_lieu_co_title(client, conn, batch):
                 pytest.fail(f"<{tag}> tự đóng trong '{n}', không thể có "
                             f"<title>: {m.group(0)[:120]!r}")
             for m in re.finditer(rf"<{tag}\b[^>]*>((?:(?!</{tag}>).)*)</{tag}>", khoi, re.S):
+                dem += 1
                 assert "<title>" in m.group(1), \
                     f"<{tag}> trong '{n}' không có <title>: {m.group(0)[:120]!r}"
+        assert dem, f"SVG '{n}' không có <rect>/<circle> dữ liệu nào — regex hỏng?"
 
 
 def _hai_nam_do_dang(conn, batch, ma="AA01", ngành="Đồ khô"):
@@ -264,28 +333,42 @@ def _hai_nam_do_dang(conn, batch, ma="AA01", ngành="Đồ khô"):
 
 def test_ban_do_nhiet_la_bang_html_co_scope(client, conn, batch):
     """[I-1, I-2, M-7/N-4 soát chặt] Bản đồ nhiệt là <table>, không phải
-    SVG — có <th scope> cho cả hàng lẫn cột. Mọi khẳng định về CHỮ TRONG Ô
-    kiểm NGAY TRONG khối `<table class="nhiet-bang">…</table>`, không phải
-    `r.text` toàn trang — chú giải (`.chu-thich`) cũng có các cụm chữ
-    "không bán tháng này"/"chưa tới tháng" nên `in r.text` trần sẽ xanh giả
-    kể cả khi bảng chính vẽ sai. Dữ liệu dựng đủ CẢ BA trạng thái thật (tăng
-    trưởng có %, không bán 2026-03, chưa tới 2026-06/07) trong MỘT lần mở
-    trang — không suy luận qua chú giải hay qua lời gọi `ve_nhiet` rời."""
+    SVG — có <th scope> cho cả hàng lẫn cột. Dữ liệu dựng đủ CẢ BA trạng
+    thái thật (tăng trưởng có %, không bán 2026-03, chưa tới 2026-06/07)
+    trong MỘT lần mở trang — không suy luận qua chú giải hay qua lời gọi
+    `ve_nhiet` rời.
+
+    Giai đoạn 3: (a) API trả đủ ba trạng thái đó cho CÙNG một ngành; (b) mã
+    React vẽ `<table className="nhiet-bang">` có `scope`, và các cụm chữ
+    "không bán tháng này"/"chưa tới tháng" nằm trong hàm vẽ Ô (`ONhiet`),
+    không chỉ ở chú giải (chú giải cũng có các cụm đó — kiểm cả trang là
+    xanh giả). [N-4] % trong Ô và trong title đi qua CÙNG một hàm `dau`
+    (một chữ số thập phân) — hai độ làm tròn khác nhau là ô và ô nổi nói
+    hai con số."""
     _hai_nam_do_dang(conn, batch)
-    r = client.get("/bao-cao?ky=2026")
-    assert r.status_code == 200
-    assert '<table class="nhiet-bang">' in r.text
-    m = re.search(r'<table class="nhiet-bang">(.*?)</table>', r.text, re.S)
+    assert client.get("/bao-cao?ky=2026").status_code == 200
+    nh = _api(client)["nh"]
+    o = {c["thang"]: c for h in nh["hang"] if h["nganh"] == "Đồ khô" for c in h["o"]}
+    assert o["2026-03"]["bac"] == "khong_ban"
+    assert o["2026-06"]["bac"] == o["2026-07"]["bac"] == "chua_toi"
+    assert any(c["bac"] in ("g2", "g1", "0", "t1", "t2") and c["tang_truong"] is not None
+               for c in o.values()), "cần ít nhất một ô có tăng trưởng thật"
+
+    src = _src()
+    m = re.search(r'<table className="nhiet-bang">(.*?)</table>', src, re.S)
     assert m, "không tìm thấy bảng nhiệt"
     bang = m.group(0)
     assert 'scope="col"' in bang and 'scope="row"' in bang
-    assert "không bán tháng này" in bang
-    assert "chưa tới tháng" in bang
-    # [N-4] % trong Ô và trong title cùng một độ làm tròn (1 chữ số thập
-    # phân, dấu chấm) — một ô có tăng trưởng thật (cùng doanh thu mỗi
-    # tháng ở cả hai năm) phải in đúng "+0.0%" cả hai chỗ, không phải "+0%".
-    assert re.search(r'class="bac-(?:g2|g1|0|t1|t2)"[^>]*>[+-]\d+\.\d%<', bang), \
-        "ô nhiệt phải in % với đúng MỘT chữ số thập phân, khớp title"
+    assert "<ONhiet " in bang
+    o_ham = re.search(r"function ONhiet\(.*?\n}\n", src, re.S)
+    assert o_ham, "không tìm thấy hàm vẽ ô nhiệt"
+    ham = o_ham.group(0)
+    assert "không bán tháng này" in ham
+    assert "chưa tới tháng" in ham
+    assert re.search(r"title=\{`\$\{nhan\}: \$\{dau\(o\.tang_truong\)\}% so cùng kỳ[^`]*`\}>"
+                     r"\{dau\(o\.tang_truong\)\}%</td>", ham), \
+        "ô nhiệt và title phải in % bằng CÙNG một hàm làm tròn"
+    assert re.search(r"const dau = .*toFixed\(1\)", src), "% phải có đúng MỘT chữ số thập phân"
 
 
 def test_nhiet_khong_gan_nhan_sai_thang_chua_toi_hay_khong_ban(conn, batch):
@@ -359,25 +442,38 @@ def test_hai_khoi_mau_toi_trong_css_van_xanh():
 
 def test_ba_khoi_ngan_sach_5a_va_bang_nhan_vien_con_nguyen(client, conn, batch):
     """Bộ test 5a hiện có phải xanh nguyên — kiểm nhanh các khối đó vẫn còn
-    mặt trên trang."""
+    mặt trên trang.
+
+    Giai đoạn 3: API có đủ dữ liệu cho ba khối ngân sách + bảng người phụ
+    trách, và mã React có đủ tiêu đề. (Bảng "Kết quả theo từng nhân viên"
+    của bản Jinja nay là "Tiến độ theo nhân viên" + bảng chi tiết trong
+    <details> — cùng dữ liệu `td.nguoi`.)"""
     _ban(conn, batch, date(2026, 7, 31), "XT07", sale="0104")
     conn.execute(
         "INSERT INTO app.ngan_sach (salesperson_code, thang, muc_tieu) "
         "VALUES (%s, %s, %s)", ("0104", date(2026, 7, 1), 6_000_000))
     conn.commit()
-    r = client.get("/bao-cao?ky=2026")
-    assert r.status_code == 200
-    assert "Tiến độ ngân sách" in r.text
-    assert "Luỹ kế thực tế so với nhịp ngân sách" in r.text
-    assert "Kết quả theo từng nhân viên" in r.text
-    assert "Theo người phụ trách khách" in r.text
+    assert client.get("/bao-cao?ky=2026").status_code == 200
+    d = _api(client)
+    assert d["td"]["co_ngan_sach"] is True
+    assert any(n["ma"] == "0104" and n["muc_tieu"] == 6_000_000 for n in d["td"]["nguoi"])
+    assert d["lk"]["co"] is True
+    assert any(n["ma"] == "0104" for n in d["bc"]["nhan_vien"])
+    src = _src()
+    for chu in ("Tiến độ ngân sách tháng", "Luỹ kế thực tế so với nhịp ngân sách",
+                "Tiến độ theo nhân viên", "Bảng số chi tiết theo nhân viên",
+                "Theo người phụ trách khách"):
+        assert chu in src, chu
 
 
 def test_bang_chi_tiet_theo_thang_dong_trong_details(client, conn, batch):
+    """Giai đoạn 3: bảng chi tiết theo tháng vẫn nằm trong <details> (đóng
+    sẵn), dòng lấy từ `bc.thang` của API."""
     _hai_nam(conn, batch)
-    r = client.get("/bao-cao?ky=2026")
-    assert "<details>" in r.text
-    assert "Bảng số chi tiết theo tháng" in r.text
+    assert len(_api(client)["bc"]["thang"]) == 12
+    src = _src()
+    assert re.search(r"<details[^>]*>\s*<summary>Bảng số chi tiết theo tháng", src)
+    assert "<details open" not in src
 
 
 # ---- Vòng soát 1 vòng 2 -----------------------------------------------------
@@ -437,13 +533,20 @@ def test_pareto_truc_pct_tra_toa_do_khong_con_hang_so_cung_trong_template(conn, 
 
 
 def test_khong_ve_hien_du_khi_khong_co_gi_de_ve(client, conn, batch):
-    """[M-3] Dòng 'Không vẽ' đứng NGOÀI `{% if co.co %}` — cả kỳ chỉ có
+    """[M-3] Dòng 'Không vẽ' đứng NGOÀI điều kiện `co.co` — cả kỳ chỉ có
     ĐÚNG MỘT ngành và ngành đó ÂM (cây ô rỗng hoàn toàn, co.co=False) vẫn
     phải in ra số tiền bị bỏ, không được im lặng chỉ vì không có gì để
-    VẼ."""
+    VẼ.
+
+    Giai đoạn 3: API trả co.co=False KÈM khong_ve thật; trong React dòng
+    "Không vẽ" đứng SAU khi nhánh `d.co.co ? … : …` đã đóng."""
     _nganh(conn, batch, "PH01", "Phí")
     _ban(conn, batch, date(2026, 5, 11), "PH01", amount=-5_000, tax=-500, gp=-1_000)
-    r = client.get("/bao-cao?ky=2026")
-    assert r.status_code == 200
-    assert "Không vẽ: ¥" in r.text
-    assert "mã (doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)" in r.text
+    co = _api(client)["co"]
+    assert co["co"] is False
+    assert co["khong_ve"] == -4_500 and co["so_ma_khong_ve"] == 1
+    assert re.search(r'\{d\.co\.co \? <svg.*?</svg> : <p className="phu">Chưa có dữ liệu để vẽ khối này\.</p>\}'
+                     r'\s*\{d\.co\.khong_ve !== 0 && <p className="phu">Không vẽ:', _src(), re.S), \
+        "dòng 'Không vẽ' phải nằm NGOÀI nhánh co.co"
+
+

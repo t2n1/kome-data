@@ -1,0 +1,38 @@
+/* Cần liên hệ — bố cục CRM.dc.html: KPI → cột (min 230px, cuộn ngang) → hai khối. */
+.lh{max-width:1400px}
+.lh-loc{font-size:.8rem;color:var(--chu-thuong);align-self:center}
+.lh-kpi{grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));margin-bottom:.4rem}
+button.o-kpi{font:inherit;text-align:left;cursor:pointer}
+.lh-o[aria-pressed="true"]{border-color:var(--do);background:var(--do-nen)}
+.lh-ghi{font-size:.78rem;margin:.4rem 0 .8rem}
+.lh-cot{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:.75rem;overflow-x:auto;padding-bottom:.5rem;margin-bottom:1.2rem}
+.lh-cot > section{background:var(--nen-phu);border-radius:12px;padding:.65rem;min-width:0}
+.lh-cot-dau{display:flex;align-items:baseline;gap:.4rem;padding:.15rem .3rem .2rem}
+.lh-cot-dau h2{margin:0;font-size:.85rem;border:0;padding:0}
+.lh-cot-dau .phu{font-size:.74rem}
+.lh-tong{margin-left:auto;font-size:.75rem;color:var(--chu-nhat);font-variant-numeric:tabular-nums}
+.lh-cot-mo{font-size:.72rem;color:var(--chu-nhat);padding:0 .3rem .55rem;margin:0}
+.lh-the{background:var(--nen-the);border:1px solid var(--vien);border-radius:9px;padding:.6rem .7rem;margin-bottom:.5rem;font-size:.8rem}
+.lh-ten{font-weight:600;font-size:.83rem;margin-bottom:.15rem}
+.lh-ten a{color:var(--chu);text-decoration:none}.lh-ten a:hover{color:var(--lien-ket);text-decoration:underline}
+.lh-the > .phu{font-size:.74rem;margin-bottom:.35rem}
+.lh-so{display:flex;justify-content:space-between;align-items:baseline;gap:.4rem;margin-bottom:.35rem;flex-wrap:wrap}
+.lh-so b{font-variant-numeric:tabular-nums}
+.lh-so span{font-size:.72rem;font-weight:600}
+.lh-cuoi{font-size:.72rem;color:var(--chu-nhat);margin:.3rem 0;line-height:1.4}
+.lh-ghi-nut{margin-top:.35rem;width:100%}
+.hs-form.gon{margin:.5rem 0 0;gap:.35rem}
+.hs-form.gon textarea{font-size:.8rem}
+.hs-form-vach{width:1px;align-self:stretch;background:var(--vien);margin:0 .15rem}
+.lh-hai{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:.75rem;margin-bottom:.75rem}
+@media (max-width:900px){.lh-hai{grid-template-columns:minmax(0,1fr)}}
+.lh-ds{list-style:none;margin:0;padding:0}
+.lh-ds li{display:flex;gap:.6rem;padding:.55rem .1rem;border-bottom:1px solid var(--vien-phu);font-size:.83rem}
+.lh-ds li:last-child{border-bottom:0}
+.lh-icon{font-size:1rem;line-height:1.2}
+.lh-nd{margin:.15rem 0}
+.lh-ds .phu{font-size:.73rem}
+.lh-an{margin-bottom:1rem}
+/* Đang xem trọn MỘT lý do (?ly_do=): thẻ xếp lưới thay vì một cột dài giãn hết bề ngang. */
+.lh-cot.mot .lh-the-ds{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.5rem}
+.lh-cot.mot .lh-the{margin-bottom:0}

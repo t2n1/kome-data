@@ -82,15 +82,16 @@ def ngan_sach(conn, sale=None) -> dict | None:
     ns = tien_do_ngan_sach(conn)
     if ns is None:
         return None
-    con_lai = max(ns.ngay_kd - ns.ngay_kd_da_qua, 0)
+    from kome.bao_cao import chi_so_phu
+    phu = chi_so_phu(ns)
     return {
         "thang": ns.thang, "co_ngan_sach": ns.co_ngan_sach,
         "thuc_te": ns.thuc_te, "muc_tieu": ns.muc_tieu,
         "muc_tieu_den_hom_nay": ns.muc_tieu_den_hom_nay, "tien_do": ns.tien_do,
         "moc": _ty_so(ns.muc_tieu_den_hom_nay, ns.muc_tieu),
-        "ngay_kd": ns.ngay_kd, "ngay_kd_da_qua": ns.ngay_kd_da_qua, "ngay_kd_con_lai": con_lai,
-        "can_ban_moi_ngay": (ns.muc_tieu - ns.thuc_te) / con_lai if ns.muc_tieu and con_lai else None,
-        "nhip_chuan": _ty_so(ns.muc_tieu, ns.ngay_kd),
+        "ngay_kd": ns.ngay_kd, "ngay_kd_da_qua": ns.ngay_kd_da_qua,
+        "ngay_kd_con_lai": phu["ngay_kd_con_lai"], "can_ban_moi_ngay": phu["can_ban_moi_ngay"],
+        "nhip_chuan": phu["nhip_chuan"],
         "nguoi": [asdict(n) for n in ns.nguoi],
         "luy_ke": [asdict(m) for m in ns.luy_ke],
     }

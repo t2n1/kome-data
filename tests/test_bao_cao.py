@@ -5,6 +5,7 @@ hiện ra bình thường, chỉ là nói sai. Đó là loại lỗi tệ nhất
 này: không ai thấy nó, và người ta ra quyết định dựa trên nó.
 """
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -156,24 +157,43 @@ def test_dinh_nghia_chi_so_nam_o_mart_khong_o_python():
         "không tự cộng dồn trong Python — hỏi mart"
 
 
+NGUON_BAO_CAO = (Path(__file__).resolve().parent.parent
+                 / "giao_dien" / "src" / "bao_cao" / "BaoCao.tsx")
+
+
 def test_trang_bao_cao_mo_duoc_va_hien_so(conn, batch, test_db_url):
+    """Giai đoạn 3: màn là React — kiểm dữ liệu API (doanh thu THUẦN, nhãn kỳ,
+    hình học biểu đồ tính sẵn ở máy chủ) và mã giao diện (SVG tự vẽ, không
+    thư viện biểu đồ nào — bất biến giao diện React của CLAUDE.md)."""
+    import re
+
     from fastapi.testclient import TestClient
     from kome.web.app import create_app
 
     _ban(conn, batch, date(2026, 5, 11), amount=110_000, tax=10_000, gp=30_000)
-    r = TestClient(create_app(db_url=test_db_url)).get("/bao-cao")
-    assert r.status_code == 200
-    assert "¥100,000" in r.text            # doanh thu THUẦN, không phải 110.000
-    assert "¥110,000" not in r.text
-    assert "Kỳ 7" in r.text
-    assert "<svg" in r.text                # biểu đồ vẽ tại chỗ, không cần mạng
-    assert "<script" not in r.text         # không thư viện JS nào
+    c = TestClient(create_app(db_url=test_db_url))
+    r = c.get("/bao-cao")
+    assert r.status_code == 200 and 'id="goc"' in r.text
+    d = c.get("/api/bao-cao").json()
+    assert d["bc"]["ky"]["doanh_thu"] == 100_000     # doanh thu THUẦN, không phải 110.000
+    assert d["bc"]["thang"][0]["doanh_thu"] == 100_000
+    assert "Kỳ 7" in d["bc"]["ky"]["nhan"]
+    assert d["bd"]["co"] is True and len(d["bd"]["cot"]) == 1   # biểu đồ vẽ được, không cần mạng
+    src = NGUON_BAO_CAO.read_text(encoding="utf-8")
+    assert "<svg" in src
+    nguon_nhap = re.findall(r'^import .*?from "([^"]+)"', src, re.M)
+    la = [n for n in nguon_nhap if not (n.startswith(".") or n in ("react", "@tanstack/react-query"))]
+    assert la == [], f"màn Báo cáo nhập thư viện ngoài (biểu đồ phải tự vẽ SVG): {la}"
 
 
 def test_trang_bao_cao_co_trong_thanh_dieu_huong(conn, test_db_url):
+    """Mục Báo cáo có mặt trên thanh bên của trang Jinja còn lại VÀ của thanh
+    bên React (giao_dien/src/khung/muc.ts) — Giai đoạn 3: /bao-cao là React."""
     from fastapi.testclient import TestClient
     from kome.web.app import create_app
 
     c = TestClient(create_app(db_url=test_db_url))
-    for duong in ("/health", "/phu-du-lieu", "/bao-cao"):
+    for duong in ("/health", "/phu-du-lieu", "/san-pham"):
         assert 'href="/bao-cao"' in c.get(duong).text, duong
+    muc = (NGUON_BAO_CAO.parent.parent / "khung" / "muc.ts").read_text(encoding="utf-8")
+    assert 'url: "/bao-cao"' in muc

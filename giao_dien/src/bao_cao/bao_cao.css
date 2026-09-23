@@ -1,0 +1,55 @@
+/* Báo cáo doanh thu — số đo theo Báo cáo.dc.html; màu chỉ qua biến của kome.css
+   (bậc nhiệt --nhiet-*, --duong-ck, --dg-chu-am đã có ở cả ba khối sáng/tối). */
+.bc{max-width:1320px}
+.bc-dk{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-left:auto}
+.bc-dk select{font:inherit;font-size:.82rem;padding:.35rem .5rem;border:1px solid var(--vien-dam);border-radius:8px;background:var(--nen-the);color:var(--chu)}
+.bc-kpi{grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));margin:.4rem 0 .3rem}
+.bc-spark{display:block;width:100%;height:30px;margin:.3rem 0 .2rem}
+.bc-ck{font-size:.73rem;color:var(--chu-nhat);line-height:1.35}
+.bc-ck .tang,.bc-ck .giam{font-weight:700}
+.bc-khoi{margin-bottom:.8rem}
+.bc-khoi > .phu{font-size:.76rem;margin:.25rem 0 .6rem}
+.bc-svg{display:block;height:auto;margin-top:.4rem}
+.bc-cg{font-size:.74rem;margin-top:.45rem}
+.chu-giai.bc-cg .mau{width:.8rem;height:.8rem;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:.3rem}
+.bc-hai{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(460px,100%),1fr));gap:.75rem;margin-bottom:.8rem}
+.bc-hai > .bc-khoi{margin-bottom:0}
+.bc-cot rect,.bc-thanh rect,.bc-cot-kh{transition:opacity .12s}
+.bc-cot:hover rect,.bc-thanh:hover rect{opacity:1 !important;stroke:var(--chu);stroke-width:1}
+.bc-cot-kh:hover{opacity:1 !important}
+.bc-diem{cursor:help}
+.bc-o-ma:hover rect{opacity:.45 !important}
+.cay-o-nganh{stroke:var(--nen-the);stroke-width:1.5}
+.cay-o-ma{stroke:var(--nen-the);stroke-width:1}
+.bac-g2{fill:var(--nhiet-g2);background:var(--nhiet-g2)}
+.bac-g1{fill:var(--nhiet-g1);background:var(--nhiet-g1)}
+.bac-0{fill:var(--nhiet-0);background:var(--nhiet-0)}
+.bac-t1{fill:var(--nhiet-t1);background:var(--nhiet-t1)}
+.bac-t2{fill:var(--nhiet-t2);background:var(--nhiet-t2)}
+.bac-khong{fill:var(--nhiet-khong);background:var(--nhiet-khong)}
+.bac-khong_ck{background:repeating-linear-gradient(45deg,var(--nhiet-khong),var(--nhiet-khong) 3px,var(--nhiet-soc) 3px,var(--nhiet-soc) 6px)}
+.bac-chua_toi{background:var(--nen-phu);color:var(--chu-mo)}
+.bac-khong_ban{background:var(--nhiet-khong-ban);color:var(--chu-nhat)}
+.nhiet-bang{border-collapse:collapse;font-size:.8rem}
+.nhiet-bang th,.nhiet-bang td{border:1px solid var(--vien);padding:.28rem .45rem;text-align:center;white-space:nowrap}
+.nhiet-bang th[scope="row"]{text-align:right;font-weight:400;max-width:10rem;white-space:normal;background:var(--nen-the)}
+.nhiet-bang thead th{background:var(--nen-phu);color:var(--chu-nhat);font-weight:600;font-size:.72rem}
+.nhiet-bang td{font-variant-numeric:tabular-nums;cursor:help}
+.nhiet-bang td:hover{outline:2px solid var(--chu);outline-offset:-2px}
+.bc-pareto{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:.9rem;align-items:start}
+@media (max-width:900px){.bc-pareto{grid-template-columns:minmax(0,1fr)}}
+.bc-bang-kh{max-height:340px}
+.bc-ns .kh-the-dau .tab-pill{margin-left:.5rem}
+.bc-ns-o{grid-template-columns:repeat(auto-fit,minmax(min(175px,100%),1fr));margin:.3rem 0 .8rem}
+.bc-ns-hai{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));gap:1rem;margin-top:.6rem}
+.bc-ns-hai h3{font-size:.84rem;margin:0 0 .4rem}
+.bc-bullet{margin-bottom:.6rem;font-size:.8rem}
+.bc-bullet.tong{padding-bottom:.55rem;border-bottom:1px solid var(--vien-phu)}
+.bc-bl-dau{display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin-bottom:.25rem}
+.bc-bl-dau > span:last-child{font-variant-numeric:tabular-nums;color:var(--chu-nhat)}
+.thanh-tien-do{position:relative;height:18px;background:var(--nen-phu);border:1px solid var(--vien);border-radius:5px;overflow:hidden}
+.thanh-tien-do.vua{height:13px}
+.thanh-tien-do .day{position:absolute;inset:0 auto 0 0;background:var(--do)}
+.thanh-tien-do .moc{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--chu)}
+.bc-chi-tiet summary{cursor:pointer;font-weight:600;font-size:.84rem;margin:.3rem 0 .5rem}
+details.bc-khoi > summary{cursor:pointer;font-weight:600;font-size:.88rem}

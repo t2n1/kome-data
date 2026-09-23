@@ -332,11 +332,14 @@ def test_cac_trang_moi_mo_duoc(conn, batch, test_db_url):
     c = TestClient(create_app(db_url=test_db_url))
 
     # Giai đoạn 2: /khach-hang, /khach-hang/{mã}, /ban-do là ứng dụng React
-    # (vỏ index.html, dữ liệu qua /api). /lien-he vẫn là Jinja không JavaScript.
-    for duong in ("/khach-hang", "/khach-hang/000000009292", "/ban-do"):
+    # (vỏ index.html, dữ liệu qua /api). Giai đoạn 3 thêm /lien-he, /bao-cao,
+    # /du-bao. /san-pham vẫn là Jinja không JavaScript.
+    for duong in ("/khach-hang", "/khach-hang/000000009292", "/ban-do",
+                  "/lien-he", "/bao-cao", "/du-bao"):
         r = c.get(duong)
         assert r.status_code == 200 and 'id="goc"' in r.text, duong
-    r = c.get("/lien-he")
+    assert c.get("/api/lien-he").status_code == 200
+    r = c.get("/san-pham")
     assert r.status_code == 200 and "<script" not in r.text
 
     assert c.get("/api/khach-hang/000000009292").json()["khach"]["ten"] == "QUAN AN TEST"
@@ -349,12 +352,19 @@ def test_moi_trang_deu_co_khung_dieu_huong(conn, test_db_url):
     from fastapi.testclient import TestClient
     from kome.web.app import create_app
 
+    from pathlib import Path
+
     c = TestClient(create_app(db_url=test_db_url))
-    # /khach-hang là React từ giai đoạn 2 — thanh bên của nó ở giao_dien/src/khung/muc.ts.
-    for duong in ("/lien-he", "/bao-cao", "/health", "/phu-du-lieu", "/nap"):
+    # /khach-hang (giai đoạn 2), /lien-he, /bao-cao (giai đoạn 3) là React —
+    # thanh bên của chúng ở giao_dien/src/khung/muc.ts; các trang Jinja còn lại
+    # vẫn phải có đủ ba mục.
+    for duong in ("/san-pham", "/health", "/phu-du-lieu", "/nap"):
         t = c.get(duong).text
         for muc in ('href="/khach-hang"', 'href="/bao-cao"', 'href="/lien-he"'):
             assert muc in t, f"{duong} thiếu {muc}"
+    muc_ts = Path("giao_dien/src/khung/muc.ts").read_text(encoding="utf-8")
+    for url in ("/khach-hang", "/bao-cao", "/lien-he"):
+        assert f'url: "{url}"' in muc_ts, f"thanh bên React thiếu {url}"
 
 
 # ---- Mặc định "khách của tôi" (đợt 3) ----------------------------------

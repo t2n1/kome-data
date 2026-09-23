@@ -1,5 +1,11 @@
-"""Đợt 5a Task 4 — bốn khối ngân sách trên màn Báo cáo."""
+"""Đợt 5a Task 4 — bốn khối ngân sách trên màn Báo cáo.
+
+Giai đoạn 3: /bao-cao là React (giao_dien/src/bao_cao/BaoCao.tsx) — các
+test "trang" kiểm dữ liệu /api/bao-cao (con số mà màn in ra) và, khi bất biến
+là cách IN (ô trống, "không có dữ liệu", không tự tính phần trăm), kiểm thẳng
+mã nguồn React."""
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -7,6 +13,24 @@ from fastapi.testclient import TestClient
 
 from kome.bao_cao import tien_do_ngan_sach, ve_luy_ke
 from kome.web.app import create_app
+
+NGUON = (Path(__file__).resolve().parents[1] / "giao_dien" / "src" / "bao_cao" / "BaoCao.tsx")
+
+
+def _src() -> str:
+    return NGUON.read_text(encoding="utf-8")
+
+
+def _td(client, ky=None) -> dict:
+    """Vỏ React trả 200, và khối ngân sách (`td`) của /api/bao-cao."""
+    assert client.get("/bao-cao" + (f"?ky={ky}" if ky else "")).status_code == 200
+    r = client.get("/api/bao-cao" + (f"?ky={ky}" if ky else ""))
+    assert r.status_code == 200, r.text
+    return r.json()["td"]
+
+
+def _nguoi(td, ma) -> dict:
+    return next(n for n in td["nguoi"] if n["ma"] == ma)
 
 
 @pytest.fixture
@@ -131,19 +155,28 @@ def test_luy_ke_chi_tieu_DUNG_BANG_0_giu_nguyen_la_0_khong_thanh_None(conn, batc
 
 
 def test_trang_bao_cao_in_ro_thang_va_ngay_moc(client, conn, batch):
-    """Khối phải nói nó đang nói về tháng nào và số liệu tới ngày nào."""
+    """Khối phải nói nó đang nói về tháng nào và số liệu tới ngày nào.
+
+    Giai đoạn 3: API trả tháng + ngày mốc; React in cả hai trong khối."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
     _chi_tieu(conn, "0104", date(2026, 7, 1), 6_000_000)
-    html = client.get("/bao-cao").text
-    assert "2026-07" in html
-    assert "31/07/2026" in html
+    td = _td(client)
+    assert td["thang"] == "2026-07"
+    assert td["hom_nay"] == "2026-07-31"
+    src = _src()
+    assert "<h2>Tiến độ ngân sách tháng {tNhan}</h2>" in src
+    assert "Số liệu đến {ngay(td.hom_nay)}" in src
 
 
 def test_trang_bao_cao_khong_co_chi_tieu_thi_moi_sang_man_ngan_sach(client, conn, batch):
+    """Giai đoạn 3: API nói kỳ chưa có chỉ tiêu; React in "Chưa đặt chỉ tiêu"
+    kèm liên kết sang /ngan-sach (gác bởi cờ — xem test_ngan_sach_web.py)."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
-    html = client.get("/bao-cao").text
-    assert "Chưa đặt chỉ tiêu" in html
-    assert '/ngan-sach' in html
+    td = _td(client)
+    assert td["co_ngan_sach"] is False
+    src = _src()
+    assert "{!td.co_ngan_sach ? <div className=\"khoi-loi\">Chưa đặt chỉ tiêu cho kỳ này." in src
+    assert "href={`/ngan-sach?ky=${td.company_fy}`}" in src
 
 
 def test_tien_do_ngan_sach_khong_qua_3_truy_van(conn, batch, monkeypatch):
@@ -177,18 +210,21 @@ def test_chi_tieu_bang_0_la_HOP_LE_tien_do_None_khong_no(conn, batch):
 def test_trang_bao_cao_khong_no_khi_chi_tieu_bang_0(client, conn, batch):
     """[CRITICAL, vòng sửa 2] Không có test này thì bản sửa chỉ là lời hứa:
     24 test cũ không ca nào đặt chỉ tiêu bằng 0, nên lỗi 500 (None * 100 và
-    chia cho 0 ở thẻ "Mốc đến hôm nay") lọt qua hết."""
+    chia cho 0 ở thẻ "Mốc đến hôm nay") lọt qua hết.
+
+    Giai đoạn 3: API không nổ (200) và trả `tien_do`/`rong_thanh` = None —
+    không phải 0 ("0% nói dối là đã đạt tiến độ, không phải KHÔNG có mẫu
+    số"); React in "—" cho `tien_do` None và "chưa có chỉ tiêu" thay vì một
+    thanh 0%."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
     _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
-    r = client.get("/bao-cao")
-    assert r.status_code == 200
-    assert "—" in r.text
-    # So khớp đúng giá trị được RENDER trong ô .gia — không so "0.0%" trần,
-    # vì "30.0%" (Tỷ suất lãi gộp của khối cũ, không liên quan) chứa sẵn
-    # chuỗi con "0.0%" và sẽ làm test đỏ giả (dương tính giả) nếu so trần.
-    assert 'class="gia">0.0%' not in r.text, \
-        "0% nói dối là đã đạt tiến độ, không phải KHÔNG có mẫu số"
-    assert "0.0% chỉ tiêu" not in r.text
+    td = _td(client)
+    assert td["co_ngan_sach"] is True and td["muc_tieu"] == 0
+    assert td["tien_do"] is None and td["rong_thanh"] is None
+    assert _nguoi(td, "0104")["tien_do"] is None
+    src = _src()
+    assert '{td.tien_do != null ? p1(td.tien_do) : "—"}' in src
+    assert 'if (rong == null) return <div className="phu">chưa có chỉ tiêu</div>;' in src
 
 
 # ---- vòng soát cuối, việc 2/3: "So cùng kỳ" đọc từ mart, không tính lại ---
@@ -215,13 +251,18 @@ def test_cung_ky_AM_khong_ra_phan_tram_NGUOC_DAU(conn, batch):
 
 
 def test_trang_bao_cao_khong_hien_phan_tram_nguoc_dau_khi_cung_ky_am(client, conn, batch):
+    """Giai đoạn 3: API trả `tang_truong` None (mẫu số âm), và React CHỈ in
+    `tang_truong` của API — không tự chia `thuc_te / cung_ky` (công thức cũ
+    cho ra -300.0% ngược dấu)."""
     _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
     _ban(conn, batch, date(2025, 7, 11), "0104", amount=-60_000, tax=-10_000,
          gp=-20_000, khach="000000009293")
-    r = client.get("/bao-cao")
-    assert r.status_code == 200
-    # Công thức cũ (100.000 / -50.000 - 1) * 100 = -300.0%.
-    assert "-300.0%" not in r.text and "+-300.0%" not in r.text
+    n = _nguoi(_td(client), "0104")
+    assert n["co_cung_ky"] is True and n["cung_ky"] == -50_000
+    assert n["tang_truong"] is None
+    src = _src()
+    assert "n.thuc_te / n.cung_ky" not in src and "/ n.cung_ky" not in src
+    assert "{n.tang_truong != null ? <span" in src
 
 
 def test_cung_ky_TON_TAI_nhung_BAN_0_DONG_hien_0_khong_hien_khong_co_du_lieu(
@@ -240,17 +281,18 @@ def test_cung_ky_TON_TAI_nhung_BAN_0_DONG_hien_0_khong_hien_khong_co_du_lieu(
 
 
 def test_trang_bao_cao_hien_0_dong_khong_hien_khong_co_du_lieu(client, conn, batch):
+    """Giai đoạn 3: API trả `co_cung_ky` True + `cung_ky` 0 — và React chọn
+    "không có dữ liệu" THEO `co_cung_ky`, không theo giá trị số (0 là falsy
+    trong JS: `n.cung_ky ? … : "không có dữ liệu"` sẽ nói sai đúng ca này)."""
     _ban(conn, batch, date(2026, 7, 31), "0104", amount=100_000, tax=0, gp=30_000)
     _ban(conn, batch, date(2025, 7, 11), "0104", amount=0, tax=0, gp=0,
          khach="000000009293")
-    r = client.get("/bao-cao")
-    assert r.status_code == 200
-    assert "không có dữ liệu" not in r.text
-    # [Vòng soát cuối 3, việc 2] Dòng này bị bỏ sót ở vòng soát cuối 2 khi
-    # thêm các test kế bên — không vì lý do kỹ thuật nào, chỉ là sơ ý lúc
-    # chỉnh sửa. Không có nó, cái tên "hiện 0 đồng" của test không còn được
-    # kiểm chứng: ô đó đổi thành "—" hay rỗng thì test vẫn xanh.
-    assert "¥0</td>" in r.text
+    n = _nguoi(_td(client), "0104")
+    assert n["co_cung_ky"] is True
+    # [Vòng soát cuối 3, việc 2] Không có dòng này, cái tên "hiện 0 đồng"
+    # của test không còn được kiểm chứng.
+    assert n["cung_ky"] == 0
+    assert '{n.co_cung_ky ? yen(n.cung_ky ?? 0) : "không có dữ liệu"}' in _src()
 
 
 # ---- vòng soát cuối 2: hồi quy do chính 027 gây ra -------------------------
@@ -278,19 +320,16 @@ def test_khong_ban_thang_nay_nhung_CO_ban_cung_ky_hien_so_that(conn, batch):
 
 def test_trang_bao_cao_khong_bao_khong_co_du_lieu_khi_cung_ky_co_that(
         client, conn, batch):
+    """Giai đoạn 3: khẳng định TRỰC TIẾP hai giá trị màn in ra — cùng kỳ
+    ¥80.000 và -100% — từ API."""
     _ban(conn, batch, date(2026, 5, 11), "0104")
     _ban(conn, batch, date(2025, 5, 20), "0105", amount=88_000, tax=8_000,
          gp=20_000, khach="000000009293")
     _chi_tieu(conn, "0105", date(2026, 5, 1), 9_000_000)
-    r = client.get("/bao-cao?ky=2026")
-    assert r.status_code == 200
-    assert "¥80,000" in r.text, "phải hiện đúng số cùng kỳ của 0105"
-    # [Vòng soát cuối 3, việc 2] Chú thích cũ ở đây nói "kiểm bằng cách
-    # đếm" nhưng không có phép đếm nào trong test — sửa cho khớp thứ test
-    # thật sự làm: khẳng định TRỰC TIẾP hai giá trị đọc được (¥80.000 ở
-    # dòng trên, -100.0% ở dòng dưới) thay vì suy luận gián tiếp qua việc
-    # đếm số lần xuất hiện của "không có dữ liệu".
-    assert "-100.0%" in r.text or "-100,0%" in r.text
+    n = _nguoi(_td(client, 2026), "0105")
+    assert n["co_cung_ky"] is True
+    assert n["cung_ky"] == 80_000, "phải hiện đúng số cùng kỳ của 0105"
+    assert n["tang_truong"] == pytest.approx(-1.0)
 
 
 def test_M12_khong_ton_tai_trong_kho_hien_khong_co_du_lieu(conn, batch):
@@ -304,10 +343,14 @@ def test_M12_khong_ton_tai_trong_kho_hien_khong_co_du_lieu(conn, batch):
 
 
 def test_trang_bao_cao_hien_khong_co_du_lieu_khi_M12_khong_ton_tai(client, conn, batch):
+    """Giai đoạn 3: API trả `co_cung_ky` False + `cung_ky` None, và React in
+    "không có dữ liệu" ở cả hai cột cùng kỳ cho đúng trường hợp đó."""
     _ban(conn, batch, date(2025, 4, 20), "0104")
-    r = client.get("/bao-cao?ky=2025")
-    assert r.status_code == 200
-    assert "không có dữ liệu" in r.text
+    n = _nguoi(_td(client, 2025), "0104")
+    assert n["co_cung_ky"] is False and n["cung_ky"] is None
+    src = _src()
+    assert '{n.co_cung_ky ? yen(n.cung_ky ?? 0) : "không có dữ liệu"}' in src
+    assert ': n.co_cung_ky ? "—" : "không có dữ liệu"}' in src
 
 
 # ---- vòng soát cuối, việc 9: thanh tiến độ CSS thuần -----------------------
@@ -333,19 +376,27 @@ def test_pct_rong_mau_so_0_hoac_None_tra_None(conn, batch):
 
 def test_trang_bao_cao_khong_ve_thanh_am_khi_thuc_te_am(client, conn, batch):
     """[CRITICAL] Toàn nhóm có thực tế ÂM (nhiều 赤伝 hơn doanh số) vẫn phải
-    ra trang 200, không có chiều rộng CSS âm nào lọt ra HTML."""
+    ra trang 200, không có chiều rộng CSS âm nào.
+
+    Giai đoạn 3: chiều rộng thanh là `rong_thanh` của API (React chỉ đặt
+    `width: ${rong}%`) — nên kiểm nó đã kẹp về 0 ở cả dòng toàn nhóm lẫn
+    từng người."""
     _ban(conn, batch, date(2026, 7, 31), "0104", amount=-60_000, tax=-10_000,
          gp=-20_000)
     _chi_tieu(conn, "0104", date(2026, 7, 1), 1_000_000)
-    r = client.get("/bao-cao")
-    assert r.status_code == 200
-    assert "width:-" not in r.text, "không được vẽ chiều rộng thanh ÂM"
+    td = _td(client)
+    assert td["thuc_te"] < 0
+    assert td["rong_thanh"] == 0.0, "không được vẽ chiều rộng thanh ÂM"
+    assert _nguoi(td, "0104")["rong_thanh"] == 0.0
+    assert 'style={{ width: `${rong}%` }}' in _src()
 
 
 def test_trang_bao_cao_khong_ve_thanh_khi_chi_tieu_bang_0(client, conn, batch):
     """Chỉ tiêu bằng 0: không có mẫu số để vẽ thanh nào — không được chia
-    cho 0 làm trang 500."""
+    cho 0 làm trang 500. Giai đoạn 3: API 200, `rong_thanh` None."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
     _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
-    r = client.get("/bao-cao")
-    assert r.status_code == 200
+    td = _td(client)
+    assert td["rong_thanh"] is None and _nguoi(td, "0104")["rong_thanh"] is None
+
+

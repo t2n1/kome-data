@@ -1,5 +1,6 @@
 """Đợt 7 — danh sách ưu tiên liên hệ (`mart.uu_tien_lien_he`) + nhật ký tiếp xúc."""
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -146,13 +147,29 @@ def client(conn, test_db_url):
     return TestClient(create_app(db_url=test_db_url), follow_redirects=False)
 
 
+NGUON = Path(__file__).resolve().parents[1] / "giao_dien" / "src"
+
+
 def test_trang_lien_he_ve_ba_cot(client, conn, batch):
+    """Giai đoạn 3: màn là React — ba cột lý do (nhãn từ LH.LY_DO) và các thẻ
+    đến từ /api/lien-he; khách bình thường (B) và khách ※廃業※ (X) không nằm
+    trong cột nào; hai khối "Hoạt động gần đây" / "Hẹn gọi lại hôm nay" có
+    trong mã giao diện."""
     _nen(conn, batch)
-    t = client.get("/lien-he").text
-    for nhan in ("Lâu không mua", "Quá hạn mua lại", "Sắp đến hạn",
-                 "Hoạt động gần đây", "Hẹn gọi lại hôm nay"):
-        assert nhan in t
-    assert "Sap" in t and "Binh" not in t.split('id="da-lien-he"')[0].split("cot-lh")[1]
+    r = client.get("/lien-he")
+    assert r.status_code == 200 and 'id="goc"' in r.text
+    d = client.get("/api/lien-he").json()
+    nhan = [c["nhan"] for c in d["ds"]["cot"]]
+    for n in ("Lâu không mua", "Quá hạn mua lại", "Sắp đến hạn"):
+        assert n in nhan, n
+    the = {t["ten"] for c in d["ds"]["cot"] for t in c["the"]}
+    assert "Sap" in the and "Binh" not in the and "※廃業※Dong" not in the
+    assert "hoat_dong" in d and "hen" in d
+    src = (NGUON / "lien_he" / "LienHe.tsx").read_text(encoding="utf-8")
+    assert "<h2>Hoạt động gần đây</h2>" in src
+    assert '<div className="nhan">Hẹn gọi lại hôm nay</div>' in src
+    # Nhãn cột đọc từ API (một định nghĩa ở kome/lien_he.py), không chép tay.
+    assert "{c.nhan}" in src and "Lâu không mua" not in src
 
 
 def test_ghi_qua_web_roi_quay_ve_dung_trang(client, conn, batch):
@@ -214,6 +231,14 @@ def test_can_xu_ly_chuyen_ve_lien_he(client):
 
 
 def test_sidebar_tro_toi_lien_he(client, conn):
-    t = client.get("/lien-he").text
-    assert 'href="/lien-he" class="dang-xem" aria-current="page"' in t
-    assert 'href="/can-xu-ly"' not in t
+    """Giai đoạn 3: /lien-he là React — thanh bên React có mục "Cần liên hệ"
+    trỏ /lien-he (được đánh dấu khi đang mở: Nav.tsx đặt aria-current theo
+    mucDangMo), và không nơi nào còn trỏ /can-xu-ly — cả thanh bên Jinja của
+    các trang còn lại."""
+    assert client.get("/lien-he").status_code == 200
+    muc = (NGUON / "khung" / "muc.ts").read_text(encoding="utf-8")
+    assert '{ ma: "crm", nhan: "Cần liên hệ", url: "/lien-he", icon: "crm" }' in muc
+    assert "/can-xu-ly" not in muc
+    assert 'aria-current={m.ma === dangMo ? "page" : undefined}' in         (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")
+    t = client.get("/san-pham").text
+    assert 'href="/lien-he"' in t and 'href="/can-xu-ly"' not in t

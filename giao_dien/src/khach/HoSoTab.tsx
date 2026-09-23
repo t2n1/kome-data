@@ -1,13 +1,14 @@
 // Nội dung 5 tab của hồ sơ 360° — bố cục Customer 360.dc.html. Biểu đồ SVG tự
 // vẽ như gói thiết kế (không thư viện). Mọi số từ /api/khach-hang/{mã}.
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { gui, lay } from "../api";
+import { lay } from "../api";
 import { BieuDo } from "../chung/BieuDo";
 import { ChuaCoDuLieu } from "../chung/Khoi";
 
 import { gon, ngay, pc, so, thay_doi, yen } from "../dinh_dang";
 import type { DongBan, HoSoApi, LichMa, MatHang } from "./kieu";
+import { GhiTiepXuc } from "./GhiTiepXuc";
 
 /** Khung "chưa có dữ liệu" trong một thẻ (ChuaCoDuLieu trả fragment — không bọc là vỡ lưới). */
 function ChuaCo(p: { tieu_de: string; ly_do: string }) {
@@ -432,36 +433,9 @@ export function TabHoSo({ h }: { h: HoSoApi }) {
 }
 
 function NhatKy({ h }: { h: HoSoApi }) {
-  const qc = useQueryClient();
-  const [kieu, datKieu] = useState("goi"), [kq, datKq] = useState("binh");
-  const [noi, datNoi] = useState(""), [hen, datHen] = useState("");
-  const [loi, datLoi] = useState(""), [dang, datDang] = useState(false);
-  const them = async (e: React.FormEvent) => {
-    e.preventDefault(); datLoi(""); datDang(true);
-    try {
-      await gui(`/api/khach-hang/${encodeURIComponent(h.khach.ma)}/tiep-xuc`, { kieu, ket_qua: kq, noi_dung: noi, hen_lai: hen });
-      datNoi(""); datHen("");
-      await qc.invalidateQueries({ queryKey: ["kh-ho-so", h.khach.ma] });
-    } catch (x) { datLoi((x as Error).message); } finally { datDang(false); }
-  };
   return (
     <The tieu_de="Nhật ký tiếp xúc" phu="gọi, ghé thăm và chat đã ghi nhận · chỉ thêm, không sửa / xoá — ghi sai thì ghi thêm một dòng đính chính">
-      <form className="hs-form" onSubmit={them}>
-        <div className="hs-form-chip" role="radiogroup" aria-label="Kiểu tiếp xúc">
-          {Object.entries(h.kieu_tx).map(([m, [ic, nhan]]) => (
-            <button key={m} type="button" className="chip" role="radio" aria-checked={kieu === m} aria-pressed={kieu === m} onClick={() => datKieu(m)}>{ic} {nhan}</button>))}
-        </div>
-        <div className="hs-form-chip" role="radiogroup" aria-label="Kết quả">
-          {Object.entries(h.ket_qua_tx).map(([m, [nhan]]) => (
-            <button key={m} type="button" className="chip" role="radio" aria-checked={kq === m} aria-pressed={kq === m} onClick={() => datKq(m)}>{nhan}</button>))}
-        </div>
-        <textarea id="ghi-tx" rows={2} placeholder="Nội dung trao đổi…" value={noi} onChange={e => datNoi(e.target.value)} maxLength={2000} aria-label="Nội dung" />
-        <div className="hs-form-cuoi">
-          <label className="phu">Hẹn gọi lại <input type="date" value={hen} onChange={e => datHen(e.target.value)} /></label>
-          <button type="submit" className="nut-chinh" disabled={!noi.trim() || dang}>{dang ? "Đang ghi…" : "Thêm"}</button>
-        </div>
-        {loi && <p className="khoi-loi" role="alert">{loi}</p>}
-      </form>
+      <GhiTiepXuc ma={h.khach.ma} kieu_tx={h.kieu_tx} ket_qua_tx={h.ket_qua_tx} id="ghi-tx" lam_moi={[["kh-ho-so", h.khach.ma]]} />
       <ul className="hs-nk">{h.nhat_ky.map((n, i) => (
         <li key={n.thoi_diem + i}><div className="hs-nk-dau">{n.icon} <b>{n.nhan_kieu}</b> · {ngay(n.ngay)}
           <span className={"nhan-vien " + n.mau_ket_qua}>{n.nhan_ket_qua}</span>{n.hen_lai && <span className="phu"> · hẹn {ngay(n.hen_lai)}</span>}</div>

@@ -1,0 +1,8 @@
+/* Dự báo — phần lớn kiểu đã có sẵn trong kome.css (dùng chung với bản Jinja cũ). */
+.db{max-width:1400px}
+.db section{margin-bottom:1.9rem}
+.db .tieu-de-khoi{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem .9rem;margin-bottom:.6rem}
+.db .tieu-de-khoi h2{margin:0;font-size:1.08rem;border:0;padding:0}
+.db .tieu-de-khoi .tab-pill{margin-left:auto}
+.db .the-bieu-do svg{display:block;height:auto}
+.db .hai-thanh{cursor:help}
