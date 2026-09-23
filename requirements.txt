@@ -11,7 +11,6 @@
 # Máy trong công ty KHÔNG dùng file này; ở đó cài bằng `pip install -e .`
 # (pyproject.toml) để có đủ cả bộ nạp dữ liệu.
 fastapi>=0.115
-jinja2>=3.1
 psycopg[binary]>=3.2
 PyYAML>=6.0
 python-multipart>=0.0.9

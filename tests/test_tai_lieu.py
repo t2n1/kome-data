@@ -33,12 +33,12 @@ def test_references_hop_le():
 
 # ---- Hàm lúc chạy ---------------------------------------------------------
 
-def test_md_dong_escape_truoc():
-    """[CRITICAL] Nguồn là CLAUDE.md / đặc tả — ai cũng sửa được. Thẻ HTML lọt
-    qua là một chỗ chèn script vào màn có nút xoá dữ liệu."""
-    ra = str(T.md_dong("<script>x</script> **đậm** `mã`"))
-    assert "<script>" not in ra and "&lt;script&gt;" in ra
-    assert "<strong>đậm</strong>" in ra and "<code>mã</code>" in ra
+def test_web_khong_con_dung_markupsafe():
+    """Giai đoạn 5: markdown một dòng dựng ở giao diện (TaiLieu.tsx::md, phần tử
+    React — test ở tests/test_tai_lieu_web.py). Bản Vercel không còn jinja2 /
+    markupsafe, nên kome/tai_lieu.py không được nhập chúng."""
+    import inspect
+    assert "markupsafe" not in inspect.getsource(T) and not hasattr(T, "md_dong")
 
 
 def test_ma_tran_ky_hieu():

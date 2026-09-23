@@ -49,3 +49,8 @@ export function thang_nhan(t: string): string {
   const [y, m] = t.split("-");
   return `T${+m}/${y.slice(2)}`;
 }
+
+/** Số lượng (CÓ phần thập phân: 83,75 ケース) — không làm tròn về số nguyên. */
+export function so_luong(n: number | null | undefined, chu_so = 2): string {
+  return n == null ? "—" : n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: chu_so });
+}

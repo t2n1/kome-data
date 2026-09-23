@@ -193,7 +193,7 @@ def test_trang_bao_cao_co_trong_thanh_dieu_huong(conn, test_db_url):
     from kome.web.app import create_app
 
     c = TestClient(create_app(db_url=test_db_url))
-    for duong in ("/health", "/phu-du-lieu", "/san-pham"):
-        assert 'href="/bao-cao"' in c.get(duong).text, duong
+    for duong in ("/health", "/phu-du-lieu", "/nhat-ky"):
+        assert 'id="goc"' in c.get(duong).text, duong   # mọi trang là vỏ React
     muc = (NGUON_BAO_CAO.parent.parent / "khung" / "muc.ts").read_text(encoding="utf-8")
     assert 'url: "/bao-cao"' in muc

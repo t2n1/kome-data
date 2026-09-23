@@ -11,9 +11,12 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from kome.web.app import create_app
+from tests.spa_kd import kd, nguon
 
 CSS = Path("kome/web/static/kome.css")
-TEMPLATES = Path("kome/web/templates")
+# Giai đoạn 5: không còn template Jinja — mọi chỗ trước đây quét *.html của
+# templates nay quét mã giao diện React (tsx + css cạnh nó).
+GIAO_DIEN = sorted([*Path("giao_dien/src").rglob("*.tsx"), *Path("giao_dien/src").rglob("*.css")])
 FONTS = Path("kome/web/static/fonts")
 
 TEN_FONT = [
@@ -71,7 +74,7 @@ def test_khong_ma_mau_nao_ngoai_kome_css():
     """Mọi màu chỉ có MỘT nhà. Chặn thảm hoạ: ai đó gõ thẳng #fff vào một
     template -> trang đó trắng toát ở chế độ tối, trong khi test màu vẫn
     xanh vì nó chỉ soi kome.css."""
-    for f in sorted(TEMPLATES.glob("*.html")):
+    for f in GIAO_DIEN:
         text = f.read_text(encoding="utf-8")
         assert not re.search(r"#[0-9A-Fa-f]{6}\b", text), f"{f.name} chứa mã màu"
 
@@ -132,7 +135,7 @@ def test_moi_bien_dung_deu_duoc_dinh_nghia():
     # Tìm trong CSS
     bien_dung.update(re.findall(r"var\(\s*(--[a-z0-9-]+)", css))
     # Tìm trong tất cả template
-    for f in sorted(TEMPLATES.glob("*.html")):
+    for f in GIAO_DIEN:
         text = f.read_text(encoding="utf-8")
         bien_dung.update(re.findall(r"var\(\s*(--[a-z0-9-]+)", text))
 
@@ -185,7 +188,7 @@ def test_khong_goi_ra_ngoai_mang():
     mất mạng là chữ Nhật rơi về font mặc định, và đó là lúc khó nhận ra
     nhất. Spec §5 đã chốt tự host."""
     ngoai = ("fonts.googleapis.com", "fonts.gstatic.com", "cdnjs", "unpkg.com", "jsdelivr")
-    canh = [CSS] + sorted(TEMPLATES.glob("*.html"))
+    canh = [CSS] + GIAO_DIEN
     for f in canh:
         text = f.read_text(encoding="utf-8")
         for x in ngoai:
@@ -193,51 +196,37 @@ def test_khong_goi_ra_ngoai_mang():
 
 
 def test_sidebar_hien_du_nam_muc_va_ba_nhom(conn, test_db_url):
-    """Chặn thảm hoạ: đổi khung điều hướng làm rơi mất một trang khỏi
-    sidebar -> trang đó vẫn chạy nhưng không ai vào được nữa.
-
-    Đợt 2a gộp /nap + /health + /phu-du-lieu thành một mục "Kho dữ liệu"
-    (Task 4, db/… không liên quan) -> còn 5 mục thay vì 7, nhưng vẫn đúng ba
-    nhóm."""
+    """Chặn thảm hoạ: đổi khung điều hướng làm rơi mất một trang khỏi sidebar
+    -> trang đó vẫn chạy nhưng không ai vào được nữa. Giai đoạn 5: MỌI trang là
+    React, thanh bên dựng từ giao_dien/src/khung/muc.ts (sáu nhóm của gói thiết kế)."""
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/nhat-ky").text
-    for duong_dan in ["/", "/bao-cao", "/khach-hang", "/lien-he",
-                      "/kho-du-lieu"]:
-        assert f'href="{duong_dan}"' in html, f"sidebar thiếu {duong_dan}"
-    for nhom in ["TỔNG QUAN", "KHÁCH HÀNG", "HỆ THỐNG"]:
-        assert nhom in html, f"sidebar thiếu nhóm {nhom}"
+    assert 'id="goc"' in client.get("/nhat-ky").text
+    muc = nguon("khung", "muc.ts")
+    for duong_dan in ["/", "/bao-cao", "/khach-hang", "/lien-he", "/kho-du-lieu",
+                      "/san-pham", "/kho-hang", "/nhat-ky", "/cai-dat"]:
+        assert f'url: "{duong_dan}"' in muc, f"sidebar thiếu {duong_dan}"
+    for nhom in ["TỔNG QUAN", "KHÁCH HÀNG", "HÀNG HÓA & KHO", "HỆ THỐNG"]:
+        assert f'ten: "{nhom}"' in muc, f"sidebar thiếu nhóm {nhom}"
 
 
-def test_muc_dang_mo_duoc_danh_dau(conn, test_db_url):
-    """Đánh dấu mục đang mở bằng CẢ class lẫn aria-current: người dùng
-    trình đọc màn hình không thấy màu nền.
-
-    Giai đoạn 3: /bao-cao là React (thanh bên React đánh dấu bằng
-    aria-current trong giao_dien/src/khung/Nav.tsx) — thanh bên Jinja kiểm
-    trên một trang Jinja còn lại."""
-    client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/san-pham").text
-    assert 'href="/san-pham" class="dang-xem" aria-current="page"' in html
+def test_muc_dang_mo_duoc_danh_dau():
+    """Đánh dấu mục đang mở bằng CẢ lớp lẫn aria-current: người dùng trình đọc
+    màn hình không thấy màu nền (giao_dien/src/khung/Nav.tsx)."""
+    nav = nguon("khung", "Nav.tsx")
+    assert 'className={"knav-muc" + (m.ma === dangMo ? " on" : "")}' in nav
+    assert 'aria-current={m.ma === dangMo ? "page" : undefined}' in nav
 
 
 def test_ban_chi_doc_van_hien_muc_kho_du_lieu(conn, test_db_url, monkeypatch):
-    """Đợt 2a (Task 4): mục Nạp/Sức khoẻ/Bảng phủ gộp thành một mục "Kho dữ
-    liệu" duy nhất, KHÔNG còn bọc `{% if not chi_doc %}` ở tầng sidebar —
-    màn /kho-du-lieu hiện được ở cả hai bản, chỉ tự ẩn khối nạp và khối hoàn
-    tác BÊN TRONG chính nó. Bất biến "bản chỉ-đọc không mời bấm vào việc
-    không làm được" giờ được canh ở tests/test_kho_du_lieu.py::
-    test_ban_chi_doc_an_o_tha_file và ::test_ban_chi_doc_an_khoi_hoan_tac,
-    không còn ở tầng sidebar này.
-
-    Dùng KOME_CHI_DOC chứ KHÔNG dùng VERCEL: đặt VERCEL=1 làm
-    `bao_mat.kiem_cau_hinh_phien` ném CauHinhSai ngay lúc dựng app nếu chưa
-    có KOME_SESSION_SECRET, và nếu đặt khoá ký cho qua thì mọi trang lại
-    chuyển hướng sang /dang-nhap — test sẽ đỏ vì hai lý do chẳng liên quan gì
-    tới sidebar. `_chi_doc()` trong app.py chỉ sẵn đường này."""
+    """Mục "Kho dữ liệu" KHÔNG bị ẩn ở bản chỉ-đọc — màn /kho-du-lieu hiện được ở
+    cả hai bản, chỉ tự ẩn khối nạp và khối hoàn tác BÊN TRONG nó (canh ở
+    tests/test_kho_du_lieu.py). Mục chỉ theo cờ quyền `hien_kho`, không theo `chi_doc`."""
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/nhat-ky").text
-    assert 'href="/kho-du-lieu"' in html
+    k = kd(client.get("/nhat-ky").text)
+    assert k["chi_doc"] is True and k["hien_kho"] is True
+    muc = nguon("khung", "muc.ts")
+    assert "chi_doc" not in muc
 
 
 # Bốn tên lớp badge trạng thái khách hàng, GHÉP Ở TẦNG PYTHON
@@ -277,7 +266,7 @@ def test_ten_badge_khong_duoc_dung_lam_lop_tran_trong_css():
     tái diễn tiếp theo, đúng như nó đã không bắt được lần đầu."""
     tran = re.compile(r'(?:^|[\s,{}])\.(' + "|".join(TEN_BADGE) + r')(?![\w-])')
     vi_pham = []
-    for f in [CSS] + sorted(TEMPLATES.glob("*.html")):
+    for f in [CSS] + GIAO_DIEN:
         text = f.read_text(encoding="utf-8")
         for m in tran.finditer(text):
             vi_pham.append(f"{f.name}: .{m.group(1)}")
@@ -288,31 +277,14 @@ def test_ten_badge_khong_duoc_dung_lam_lop_tran_trong_css():
     )
 
 
-def test_moi_template_dung_nav_deu_dong_main():
-    """`_nav.html` MỞ `<main class="noi-dung">` và KHÔNG đóng (xem chú
-    thích Jinja đầu file) -- mỗi template include nó phải tự thêm `</main>`
-    ở cuối. Ghi chú giải thích chuyện này nằm trong bản mô tả nhiệm vụ,
-    tức NGOÀI repo -- người mở `_nav.html` sáu tháng nữa không có nó trong
-    tay nếu chỉ đọc code. Không viết cứng số lượng file: tự tìm mọi
-    template include `_nav.html`, để thêm trang mới cũng được canh.
-
-    Tìm bằng REGEX, không khớp chuỗi y hệt `{% include "_nav.html" %}`:
-    một template dùng `{%- include -%}` (cắt khoảng trắng) hoặc nháy đơn
-    `'_nav.html'` sẽ bị chuỗi y hệt BỎ QUA LẶNG LẼ -- một test canh một
-    bất biến giòn (chỉ đúng cho đúng một cách viết cú pháp Jinja) thì
-    không canh gì cả."""
-    mau_include = re.compile(r'\{%-?\s*include\s*["\']_nav\.html["\']')
-    dung_nav = [
-        f for f in sorted(TEMPLATES.glob("*.html"))
-        if mau_include.search(f.read_text(encoding="utf-8"))
-    ]
-    assert dung_nav, "không tìm thấy template nào include _nav.html"
-    for f in dung_nav:
-        text = f.read_text(encoding="utf-8")
-        assert text.count("</main>") == 1, (
-            f"{f.name} include _nav.html (mở <main> không đóng) nhưng có "
-            f"{text.count('</main>')} thẻ </main>, cần đúng 1"
-        )
+def test_khong_con_template_jinja():
+    """Giai đoạn 5: mọi màn là React — không còn thư mục template, không còn
+    Jinja2Templates trong app, không còn jinja2 trong requirements của Vercel."""
+    from pathlib import Path
+    goc = Path(__file__).resolve().parents[1]
+    assert not (goc / "kome" / "web" / "templates").exists()
+    assert "Jinja2Templates" not in (goc / "kome" / "web" / "app.py").read_text(encoding="utf-8")
+    assert "jinja2" not in (goc / "requirements.txt").read_text(encoding="utf-8")
 
 
 def test_moi_trang_that_co_dung_mot_the_viewport(conn, test_db_url):
@@ -367,18 +339,13 @@ def test_khong_co_selector_tran_de_ro_kieu_dang():
 
 
 def test_nut_nap_va_o_chon_file_co_kieu_dang():
-    """[IMPORTANT] "Nạp" là nút hành động chính của màn DUY NHẤT có người
-    dùng hằng ngày (13:30, ba file OBC). `upload.html` cũ tạo kiểu cho nó
-    bằng `button{…}` + `input[type=file]{…}`; Task 4 xoá template đó mà không
-    chép hai quy tắc sang kome.css, nên nút thành nút trần mặc định của
-    trình duyệt — nút duy nhất trong app không có kiểu dáng, và không test
-    nào đỏ vì trang vẫn trả 200."""
-    nap = (TEMPLATES / "_nap.html").read_text(encoding="utf-8")
+    """[IMPORTANT] "Nạp" là nút hành động chính của màn DUY NHẤT có người dùng
+    hằng ngày (13:30, ba file OBC) — không được thành nút trần của trình duyệt."""
+    nap = nguon("he_thong", "KhoDuLieu.tsx")
     css = CSS.read_text(encoding="utf-8")
     for lop, o in (("nut-nap", 'nút submit "Nạp"'), ("chon-file", "ô chọn file")):
-        assert f'class="{lop}"' in nap, f"_nap.html: {o} chưa mang lớp .{lop}"
-        assert f".{lop}{{" in css.replace(" ", ""), \
-            f"kome.css chưa khai .{lop} — {o} sẽ trần trụi"
+        assert f'className="{lop}"' in nap, f"KhoDuLieu.tsx: {o} chưa mang lớp .{lop}"
+        assert f".{lop}{{" in css.replace(" ", ""), f"kome.css chưa khai .{lop} — {o} sẽ trần trụi"
 
 
 # ---- Trang danh sách khách: 4 khối + 3 bộ lọc (task 5 đợt 4a) ----------
@@ -426,45 +393,23 @@ def test_nhan_hang_khong_bao_gio_tro_troi():
 # đợt 4c thêm một fixture riêng cho Task 3 của nó) — mọi test ở đây tự dựng
 # TestClient(create_app(...)) tại chỗ, nên ba test dưới theo đúng cách đó.
 
-def test_moi_muc_dieu_huong_co_icon_VA_van_con_chu(conn, test_db_url):
-    # Icon là trang trí, chữ mới là nhãn. Bất biến "màu/hình phải kèm thứ đọc
-    # được" (_chung.html:76-77) áp cả ở đây: bỏ chữ đi thì sidebar thành tám ô
-    # vuông không ai đoán được.
-    client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/nhat-ky").text
-    nav = re.search(r'<nav class="dieu-huong">(.*?)</nav>', html, re.S).group(1)
-    muc = re.findall(r"<a [^>]*href=\"(/[^\"]*)\"[^>]*>(.*?)</a>", nav, re.S)
-    assert len(muc) >= 8
-    for duong_dan, ben_trong in muc:
-        assert "<svg" in ben_trong, f"{duong_dan} thiếu icon"
-        chu = re.sub(r"<svg.*?</svg>", "", ben_trong, flags=re.S).strip()
-        assert len(chu) >= 3, f"{duong_dan} mất chữ, chỉ còn icon"
+def test_moi_muc_dieu_huong_co_icon_VA_van_con_chu():
+    # Icon là trang trí, chữ mới là nhãn: mỗi mục vẽ <Icon/> KÈM <span>{nhãn}</span>,
+    # kể cả mục "chưa có" (mờ). Bỏ chữ đi thì thanh bên thành các ô vuông không ai đoán được.
+    nav = nguon("khung", "Nav.tsx")
+    assert nav.count("<Icon ten={m.icon} /><span>{m.nhan}</span>") == 2
+    muc = nguon("khung", "muc.ts")
+    for m in re.findall(r"\{ ma: \"[^\"]+\", nhan: \"([^\"]*)\", url: [^}]*icon: \"([^\"]+)\"", muc):
+        assert len(m[0]) >= 3 and m[1], m
 
 
-def test_icon_dieu_huong_an_voi_trinh_doc_man_hinh(conn, test_db_url):
-    # Đọc hai lần cùng một mục còn tệ hơn không có icon.
-    #
-    # Quét CẢ sidebar (`<aside class="thanh-ben">`), không chỉ `<nav>`: nút
-    # Đăng xuất nằm NGOÀI <nav>, ở khối `.thoat`, và nó cũng có icon. Bản đầu
-    # của test này chỉ soi trong <nav> nên nút đó không được canh — ai lỡ bỏ
-    # `aria-hidden` của riêng nó thì người dùng trình đọc màn hình nghe icon
-    # đọc thành một mục thứ hai, và không test nào đỏ.
-    #
-    # Nút Đăng xuất chỉ render khi CÓ cổng đăng nhập, mà fixture autouse
-    # `_khong_cong_dang_nhap` tắt cổng cho mọi test ở đây — nên ca đó được
-    # canh riêng ở tests/test_bao_mat.py, nơi đã có sẵn một phiên đăng nhập.
-    client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/nhat-ky").text
-    ben = re.search(r'<aside class="thanh-ben">(.*?)</aside>', html, re.S).group(1)
-    the_svg = re.findall(r"<svg[^>]*>", ben)
-    # 7 chứ không phải 9: nhóm HỆ THỐNG bị `hien_kho` bọc (đợt 3 — chỉ người
-    # có quyền mới thấy "Kho dữ liệu"), và nút Đăng xuất chỉ render khi có
-    # cổng đăng nhập. Con số này canh "mọi mục đang hiện đều có icon", còn
-    # việc đủ mục hay không là việc của test khác.
-    assert len(the_svg) >= 7, "thiếu icon ở sidebar"
-    for the in the_svg:
-        assert 'aria-hidden="true"' in the, the
-        assert 'focusable="false"' in the, the
+def test_icon_dieu_huong_an_voi_trinh_doc_man_hinh():
+    # Đọc hai lần cùng một mục còn tệ hơn không có icon: MỌI icon (kể cả của nút
+    # Đăng xuất) đi qua MỘT component, luôn aria-hidden + focusable=false.
+    icon = nguon("khung", "icon.tsx")
+    assert 'aria-hidden="true" focusable="false"' in icon
+    nav = nguon("khung", "Nav.tsx")
+    assert "<svg" not in nav, "icon vẽ tay trong Nav.tsx sẽ không qua component có aria-hidden"
 
 
 def test_logo_hien_trong_sidebar(conn, test_db_url):
@@ -505,17 +450,18 @@ def test_chon_toi_dat_data_theme_toi(conn, test_db_url):
 
 
 def test_che_do_la_bay_khong_lam_no_trang(conn, test_db_url):
-    # Tham số URL gõ sai không được làm trang chết, và giá trị đó không bao
-    # giờ được PHẢN CHIẾU nguyên văn vào cookie hay HTML -- data-theme render
-    # ra chỉ có thể là "sang"/"toi", do chính route tính, không bao giờ chép
-    # thẳng từ tham số hay cookie.
+    # Tham số URL gõ sai không được làm trang chết, và giá trị đó không bao giờ
+    # được PHẢN CHIẾU nguyên văn vào cookie hay HTML -- data-theme render ra chỉ
+    # có thể là "sang"/"toi", do chính route tính.
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/giao-dien?che_do=<script>", follow_redirects=False)
     assert r.status_code in (302, 303)
     assert "<script>" not in r.headers["set-cookie"]
-    html = client.get("/nhat-ky", cookies={"kome_giao_dien": "<script>"}).text
-    assert "<script>" not in html
+    client.cookies.set("kome_giao_dien", "<script>")
+    html = client.get("/nhat-ky").text
+    assert "<script>alert" not in html and '"<script>"' not in html
     assert "data-theme=" not in html
+    assert kd(html)["che_do_giao_dien"] == "he-thong"
 
 
 def test_theo_gio_doi_theo_gio_NHAT_khong_theo_gio_may_chu(conn, test_db_url, monkeypatch):
@@ -589,15 +535,17 @@ def test_ban_sang_chon_tay_thang_he_thong_dang_toi():
     assert ':root:not([data-theme="sang"])' in css.replace(" ", "")
 
 
-def test_nut_doi_giao_dien_hien_KE_CA_khong_co_cong_dang_nhap(conn, test_db_url):
-    # Máy trong công ty để trống KOME_SESSION_SECRET vẫn phải thấy bốn nút
-    # này -- không được đặt trong khối {% if co_dang_nhap %}.
-    client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/nhat-ky").text
-    for nhan in ("Sáng", "Tối", "Theo hệ thống", "Theo giờ"):
-        assert nhan in html, f"thiếu nút đổi giao diện: {nhan}"
+def test_nut_doi_giao_dien_hien_KE_CA_khong_co_cong_dang_nhap():
+    # Máy trong công ty để trống KOME_SESSION_SECRET vẫn phải thấy bốn nút này --
+    # khối giao diện của Nav.tsx KHÔNG nằm trong `KD.co_dang_nhap && …`.
+    nav = nguon("khung", "Nav.tsx")
+    for nhan in ("Sáng", "Tối", "Hệ thống", "Theo giờ"):
+        assert f'"{nhan}"' in nav, f"thiếu nút đổi giao diện: {nhan}"
     for che_do in ("sang", "toi", "he-thong", "theo-gio"):
-        assert f"/giao-dien?che_do={che_do}" in html
+        assert f'"{che_do}"' in nav
+    assert "href={`/giao-dien?che_do=${ma}`}" in nav
+    khoi = nav.split('<div className="knav-che-do"', 1)[0]
+    assert "KD.co_dang_nhap &&" not in khoi.split('<div className="knav-cuoi">', 1)[1]
 
 
 def test_giao_dien_chuyen_huong_chi_ve_duong_dan_noi_bo(conn, test_db_url):
@@ -654,12 +602,9 @@ def test_color_scheme_nam_trong_khoi_bang_toi():
     assert ':root[data-theme="sang"]{color-scheme:light}' in css.replace(" ", "").replace("\n", "")
 
 
-def test_giao_dien_co_nhan_nhom_cho_trinh_doc_man_hinh(conn, test_db_url):
-    # Vòng soát 1, mục 3: bốn liên kết không có nhãn nhóm thì người dùng
-    # trình đọc màn hình nghe "Sáng, Tối, Theo hệ thống, Theo giờ" trôi nổi
-    # ở cuối sidebar, không biết đó là nhóm gì -- trong khi bốn nhóm khác
-    # của <nav> đều có <p class="nhom">.
-    client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/nhat-ky").text
-    khoi = re.search(r'<div class="giao-dien">(.*?)</div>', html, re.S).group(1)
-    assert '<p class="nhom">' in khoi and "GIAO DIỆN" in khoi
+def test_giao_dien_co_nhan_nhom_cho_trinh_doc_man_hinh():
+    # Bốn liên kết không có nhãn nhóm thì trình đọc màn hình nghe "Sáng, Tối, …"
+    # trôi nổi ở cuối thanh bên, không biết đó là nhóm gì.
+    assert '<div className="knav-che-do" role="group" aria-label="Giao diện">' in nguon("khung", "Nav.tsx")
+
+

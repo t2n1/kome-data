@@ -94,10 +94,10 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/bao-cao` | **React** (giai đoạn 3, `/api/bao-cao?ky=` — hình học biểu đồ vẫn tính ở Python) Báo cáo bán hàng theo kỳ + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
 | `/du-bao` | **Dự báo doanh thu — React** (giai đoạn 3, `/api/du-bao`, đổi kịch bản ở trình duyệt) (đợt 8): chốt tháng (đường luỹ kế + khoảng sai số thật + theo người phụ trách) · 12 tháng tới (3 kịch bản) · đơn kỳ vọng 14 ngày · nguy cơ ngừng mua · dự báo đã chuẩn tới đâu. Toàn công ty, **3 truy vấn** | `mart.lich_kinh_doanh`, `mart.ban_theo_ngay`, `mart.tien_do_ngan_sach`, `mart.khach_360`, `mart.khoang_cach_mua` |
 | `/ngan-sach` | Đặt chỉ tiêu doanh thu: 5 người phụ trách × 12 tháng một kỳ. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
-| `/san-pham` | Danh mục mã hàng + tìm kiếm + lọc theo trạng thái tồn | `mart.san_pham_360` |
-| `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
-| `/kho-hang` | Bốn ô tổng quan tồn kho · bảng tồn · cận hạn/quá hạn · giá trị theo kho | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
-| `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
+| `/san-pham` | **React** (giai đoạn 4, bám Sản phẩm.dc.html): MỘT trang — ô tổng quan · danh mục cả 232 mã (chip ngành / trạng thái, tìm, sắp — lọc ở trình duyệt trên MỘT ảnh chụp `/api/san-pham`, 1 lượt hỏi) · hồ sơ mã đang chọn ngay bên dưới | `mart.san_pham_360`, `mart.dong_ban`, `mart.moc_thoi_gian`, `core.dim_product` |
+| `/san-pham/{mã}` | Cùng màn Sản phẩm với một mã được chọn (`pushState`): hồ sơ (`/api/san-pham/{mã}`, ≤ 5 lượt) · bán theo ngày + cùng ngày tháng trước (`/ngay?thang=`, 1 lượt) · khách đang mua / đã bỏ · tồn theo kho · giá theo bậc · xu hướng theo tháng | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list`, `mart.dong_ban`, `mart.lich_kinh_doanh` |
+| `/kho-hang` | **React** (giai đoạn 4, bám Kho hàng.dc.html; `/api/kho-hang?kho=&loc=`, 2 lượt): tab Tồn hiện tại (5 ô · bảng tồn theo dòng + tìm + CSV · quá hạn / cận hạn / giá trị theo kho) · Hàng đang về (chưa có dữ liệu) · Cần đặt (hết + sắp thiếu, KHÔNG đề xuất số lượng) | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
+| `/kho-du-lieu` | **React** (giai đoạn 5; máy chủ tính sẵn vào `window.__KOME__.man`, vai trò NẠP): nạp file OBC (`POST /upload`, biểu mẫu thật) · sức khoẻ · lô gần nhất + hoàn tác (`POST /undo/{lô}`) · độ phủ ngày / tháng | `meta.ingest_batch`, `core.*` |
 | `/kho-du-lieu/luong` | Tài liệu sống (đợt 2b): bốn tầng · các nguồn OBC · 5 cổng + ngưỡng từng file · cạm bẫy OBC · lộ trình. **0 truy vấn** | `config/files.yml`, `kome/web/tai_lieu_sinh.json` |
 | `/kho-du-lieu/cot-noi` | Tài liệu sống: ma trận khoá · file nối đi đâu · cột trong từng file (`?file=<spec>`). **0 truy vấn** | `config/files.yml` |
 | `/nhat-ky` | **Nhật ký thao tác** (màn 20): ĐỌC GỘP năm sổ đã có — nạp + hoàn tác (`meta.ingest_batch`, `nap_boi`/`huy_boi` từ 033), sửa ngân sách (`app.ngan_sach_nhat_ky`), đổi quyền (`app.nhat_ky_quyen`), ghi tiếp xúc (`app.nhat_ky_tiep_xuc`). Lọc `?loai=`/`?tim=`, `/nhat-ky.csv`. **2 truy vấn** | năm sổ trên |
@@ -231,7 +231,7 @@ có test canh hai bản khớp (`::test_core_table_khop_undo_tables`).
 Ba trang cũ — nạp (`nap`), sức khoẻ (`health`), độ phủ dữ liệu (`phu-du-lieu`)
 — nay chỉ còn 301 về `/kho-du-lieu`, không render nội dung gì nữa.
 
-**Bất biến (Đợt 4d):** icon trong `_nav.html` là TRANG TRÍ, chữ nhãn mới là
+**Bất biến (Đợt 4d; từ giai đoạn 5 là `giao_dien/src/khung/icon.tsx` + `muc.ts`):** icon thanh bên là TRANG TRÍ, chữ nhãn mới là
 thứ đọc được (`aria-hidden="true" focusable="false"` trên mỗi `<svg>`) — bỏ
 hai thuộc tính đó là trình đọc màn hình đọc icon rồi đọc lại nhãn, và Tab
 dừng ở một phần tử không có gì để bấm. Sáu icon (Tổng quan/Báo cáo/Khách
@@ -240,7 +240,7 @@ hàng/Sản phẩm/Kho hàng/Kho dữ liệu) chép NGUYÊN VĂN từ object `I`
 còn lại — `bell` cho "Cần liên hệ" (trước đợt 7: "Cần xử lý") và `pin` cho "Bản đồ" — là **TA CHỌN**
 trong bộ 24 icon của gói thiết kế, vì gói đó không có mục "Cần xử lý" và gộp
 bản đồ chung vào "Khách hàng & bản đồ" thay vì tách trang riêng như app này.
-Ai chọn cái gì phải ghi rõ ra (xem chú thích đầu `_nav.html`) — không ghi thì
+Ai chọn cái gì phải ghi rõ ra (xem chú thích đầu `icon.tsx` / `muc.ts`) — không ghi thì
 người sau tưởng cả tám icon đều theo một ánh xạ có sẵn của gói thiết kế, rồi
 đi tìm một ánh xạ không tồn tại khi thêm trang mới.
 
@@ -611,6 +611,22 @@ kế, có ô nổi / bật tắt chú giải / bấm để lọc). Đặc tả:
   KÈM `@property`). Bốn số phụ của khối ngân sách tính ở MỘT chỗ,
   `kome.bao_cao.chi_so_phu` (dùng cho cả `/` và `/bao-cao`). Màn Cần liên hệ giữ bố cục
   CRM nhưng cột là LÝ DO gọi — không có "deal" / "% khả năng chốt" nào.
+- **Giai đoạn 4 (Sản phẩm · Kho hàng)** — đặc tả
+  `2026-09-23-giai-doan-4-san-pham-kho-hang-design.md`: template Jinja đã xoá. Danh mục là MỘT
+  ảnh chụp cả 232 mã (`SP.danh_muc`, 1 lượt hỏi) — lọc/sắp/đếm ở trình duyệt
+  (`giao_dien/src/san_pham/loc.ts`), cùng luật bộ đếm "mọi bộ lọc trừ của chính nó".
+  "Doanh thu 12 tháng" của mã dùng ĐÚNG cửa sổ `mart.hang_doanh_thu`
+  (`sales_date > hom_nay - 365`). Chip nhóm là NGÀNH (`food_category_name`, rỗng →
+  `bao_cao.NGANH_TRONG`) — `san_pham_360.nhom` (`kind_name`) chỉ có 有形/無形 trên dữ liệu thật.
+- **Giai đoạn 5 (Kho dữ liệu · Nhật ký · Cài đặt · Ngân sách · Đăng nhập · trang thông
+  báo)** — đặc tả `2026-09-23-giai-doan-5-he-thong-design.md`: **KHÔNG còn template Jinja
+  nào** (`kome/web/templates/` đã xoá, `jinja2` khỏi requirements). Route các màn này GIỮ
+  NGUYÊN truy vấn cũ và chèn kết quả vào `window.__KOME__.man` (`app.py::_spa(man=…)`, qua
+  `_json_man`) — ngân sách lượt hỏi và cổng quyền không đổi. Biểu mẫu (nạp, hoàn tác,
+  ngân sách, quyền, đăng nhập) vẫn là `<form method="post">` THẬT. Lỗi 500 / 403 / bản
+  chỉ-đọc là `window.__KOME__.thong_bao` vẽ trong khung chung (`he_thong/ThongBao.tsx`), thanh
+  bên vẫn là lối ra; `/api/*` bị cấm nhận 403 JSON. Đăng nhập sai: vỏ React + `dang_nhap_sai`,
+  mã 401.
 - Thanh bên: sáu nhóm của gói thiết kế; màn chưa có hiện MỜ kèm "chưa có" (không giả
   vờ có); bốn màn bị cắt (lộ trình §4.2) không hiện; Kho dữ liệu / Ngân sách ẩn theo
   cờ quyền. Chuông chỉ báo thứ có nguồn thật (`khoi_tong_quan.thong_bao`).

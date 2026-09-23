@@ -188,6 +188,17 @@ def lam_nong(open_conn) -> None:
                 lay(c, KHOA_DANH_BA, KH.danh_ba, chi_nap=True)
         except Exception as e:         # noqa: BLE001
             print(f"[anh-chup] không làm nóng được danh bạ: {e!r}")
+        # Danh mục sản phẩm + màn Kho hàng không lọc (giai đoạn 4) — khoá khớp
+        # kome/web/api.py (`KHOA_DANH_MUC`, `_khoa("kho-hang")` = "kho-hang").
+        try:
+            from kome import san_pham as SP
+            from kome.web.api import KHOA_DANH_MUC, du_lieu_kho_hang
+            with open_conn() as c:
+                lay(c, KHOA_DANH_MUC, SP.danh_muc, chi_nap=True)
+            with open_conn() as c:
+                lay(c, "kho-hang", du_lieu_kho_hang, chi_nap=True)
+        except Exception as e:         # noqa: BLE001
+            print(f"[anh-chup] không làm nóng được sản phẩm / kho: {e!r}")
 
     if bat():
         threading.Thread(target=chay, name="lam-nong-anh-chup", daemon=True).start()
