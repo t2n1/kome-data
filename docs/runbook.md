@@ -222,6 +222,11 @@ app.anh_chup_api` lúc nào cũng an toàn (lượt xem sau tính lại).
 `036` (nhìn theo tháng) chỉ thêm view `mart.khach_thang_nay` — không đụng dữ liệu.
 Chạy TRƯỚC khi triển khai: thiếu view thì `/lien-he` và khối "Tháng này chưa mua" lỗi.
 
+`037` thêm cột `dt_thang_truoc_den_ngay` vào cuối `mart.khach_thang_nay` (giai đoạn 2,
+màn Khách hàng React). Chạy TRƯỚC khi triển khai — thiếu cột thì danh sách khách lỗi.
+Sau khi triển khai mã mới (dấu vân tay mã đổi), lượt mở danh sách khách ĐẦU TIÊN phải
+dựng ảnh chụp danh bạ (~6 s trên CSDL thật); nạp dữ liệu ở máy công ty tự làm nóng nó.
+
 **Giao diện React** (`giao_dien/`): máy công ty KHÔNG cần Node — bản build nằm sẵn
 trong git (`kome/web/spa/`). Chỉ người sửa giao diện mới cần Node: `cd giao_dien &&
 npm install` (một lần) rồi `npm run build` sau mỗi lần sửa, và commit cả

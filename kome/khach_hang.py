@@ -43,6 +43,18 @@ TINH_TRONG = "__trong"
 # đường nào từ ô đó ra xem toàn công ty.
 NV_MOI_NGUOI = "__moi_nguoi"
 
+# GIÁ TRỊ QUY ƯỚC cho "Chưa ai phụ trách" (phân khúc của gói thiết kế): mã
+# phụ trách rỗng HOẶC không có trong core.dim_salesperson (đo thật: 1 khách,
+# mã ''). Đi qua đúng tham số `sale` như một mã sale, nên mọi bộ đếm co theo
+# `sale` co theo nó luôn.
+PT_TRONG = "__trong"
+
+# Nhãn tháng (mart.khach_thang_nay.nhan, 036) lọc được trên danh sách.
+NHAN_THANG = ("da_mua", "tre", "chua_toi_ngay", "khac")
+
+# Cỡ trang được phép (gói thiết kế: 50 / 100 / 200 dòng).
+CO_TRANG = (50, 100, 200)
+
 # 荷姿区分 — hai mã thật sự có trong dữ liệu (xem CLAUDE.md). Mã lạ thì hiện
 # nguyên mã chứ không đoán: một nhãn đoán sai còn tệ hơn một mã khó đọc.
 QUY_CACH = {"00": "バラ (lẻ)", "02": "ケース (thùng)"}
@@ -56,6 +68,27 @@ SAP_XEP = {
     "im_lang":   "ty_le_im_lang DESC NULLS LAST",
     "gan_nhat":  "lan_cuoi DESC NULLS LAST",
     "ten":       "ten ASC",
+}
+
+# Giai đoạn 2: cột sắp xếp của bảng React -> (khoá trên dòng `danh_ba`, mặc
+# định giảm dần). Danh sách TRẮNG như SAP_XEP — khoá lạ rơi về doanh thu.
+_THU_HANG = {"S": 1, "A": 2, "B": 3, "C": 4, "D": 5}
+COT_SAP = {
+    "doanh_thu": (lambda k: k["doanh_thu"], True),
+    "lai_gop": (lambda k: k["lai_gop"], True),
+    "ty_suat": (lambda k: k["ty_suat"], True),
+    "im_lang": (lambda k: k["ty_le_im_lang"], True),
+    "gan_nhat": (lambda k: k["lan_cuoi"], True),
+    "don_cuoi": (lambda k: k["lan_cuoi"], True),
+    "ten": (lambda k: k["ten"], False),
+    "pt": (lambda k: k["nguoi_phu_trach"], False),
+    "trang_thai": (lambda k: list(TRANG_THAI).index(k["trang_thai"])
+                   if k["trang_thai"] in TRANG_THAI else None, False),
+    "hang": (lambda k: _THU_HANG.get(k["hang"]), False),
+    "thang_nay": (lambda k: k["thang_nay"], True),
+    "so_thang_truoc": (lambda k: (k["thang_nay"] / k["thang_truoc_cung_ngay"])
+                       if k["thang_truoc_cung_ngay"] and k["thang_nay"] is not None else None, True),
+    "tb3": (lambda k: k["tb_3_thang"], True),
 }
 
 
@@ -76,6 +109,12 @@ class Khach:
     ty_le_im_lang: float | None
     trang_thai: str
     dau_hieu_obc: str | None
+    # Giai đoạn 2 — chỉ danh_sach() điền (LEFT JOIN khach_thang_nay/hang_doanh_thu).
+    hang: str | None = None
+    thang_nay: int | None = None
+    thang_truoc_cung_ngay: int | None = None
+    tb_3_thang: int | None = None
+    nhan_thang: str | None = None
 
     @property
     def nhan_trang_thai(self) -> str:
@@ -109,6 +148,18 @@ class TrangKhach:
     nhom: str | None = None
     hang: str | None = None
     tinh: str | None = None
+    # Giai đoạn 2: tổng của CẢ nhóm đang lọc (không chỉ trang này), lấy trong
+    # chính câu đếm — ô KPI đầu trang.
+    thang: str | None = None
+    co: int = MOI_TRANG
+    tong_dt_thang_nay: int = 0
+    tong_dt_thang_truoc_cung_ngay: int = 0
+    tong_doanh_thu: int = 0
+    # = số khách nhóm 'im' của mart.khach_nhom_viec: nhánh đó của view ĐÚNG là
+    # `trang_thai IN TRANG_THAI_CAN_XU_LY` (020), nên đếm thẳng bằng hằng này
+    # thay vì EXISTS trên view (dựng lại khach_360 ba lần). Ô KPI "Im lặng >=
+    # 2x nhịp" đọc con số này. Có test canh hai con số bằng nhau.
+    so_can_xu_ly: int = 0
 
 
 @dataclass
@@ -130,6 +181,15 @@ class HoSo:
     # chừa sẵn ở vòng sửa cuối đợt 4a. Trần 8 giờ đã chạm; khối tiếp theo
     # phải GỘP truy vấn chứ không được nới trần.
     nhat_ky: list = field(default_factory=list)
+    # Giai đoạn 2 (React): lấy trong CÙNG các lượt hỏi đã có, không thêm lượt.
+    # `tat_ca_mat_hang` = MỌI mã của khách (mat_hang ở trên chỉ là 15 mã đầu),
+    # kèm ngành + 3 tháng gần nhất; `ngay_mua` = mọi ngày mua trong 400 ngày
+    # (dòng thời gian, lưới 26 tuần); `thang_nay` = dòng mart.khach_thang_nay
+    # của khách (036/037) hoặc None nếu 4 tháng qua không mua.
+    tat_ca_mat_hang: list[dict] = field(default_factory=list)
+    ngay_mua: list[dict] = field(default_factory=list)
+    thang_nay: dict | None = None
+    hom_nay: date | None = None
 
 
 _COT = """customer_code, ten, prefecture, city, phone, salesperson_code,
@@ -141,7 +201,7 @@ _COT = """customer_code, ten, prefecture, city, phone, salesperson_code,
 # trong câu lệnh đó.
 _COT_CHI_TIET = ("chi_nhanh", "buu_chinh", "dia_chi", "hang", "phan_loai",
                  "ngay_chot", "bac_gia", "vang_lai", "lan_dau", "so_lan_mua",
-                 "so_phieu", "gia_tri_tb")
+                 "so_phieu", "gia_tri_tb", "hang_dt", "ten_phu_trach")
 
 
 def _khach(r) -> Khach:
@@ -155,90 +215,182 @@ def _khach(r) -> Khach:
                  trang_thai=r[13], dau_hieu_obc=r[14])
 
 
-def _vi_tu(q: str, *, tim: str = "", loc: str = "", sale: str | None = None,
-           nhom: str | None = None, hang: str | None = None,
-           tinh: str | None = None) -> tuple[str, list]:
-    """Mệnh đề WHERE lọc `mart.khach_360`, viết MỘT LẦN cho cả hai chỗ đọc.
+def _ds_hang(hang) -> list[str]:
+    """`hang` nhận 'S', 'S,A' hoặc list — gói thiết kế bật/tắt NHIỀU hạng."""
+    if not hang:
+        return []
+    ds = hang if isinstance(hang, (list, tuple)) else str(hang).split(",")
+    return [h for h in (x.strip() for x in ds) if h in ("S", "A", "B", "C", "D")]
 
-    `q` là cách câu lệnh gọi đang gọi tên bảng: `mart.khach_360` ở
-    `danh_sach()` (không bí danh), `k` ở `tong_quan_danh_ba()`.
 
-    Vì sao dùng chung chứ không chép: bộ đếm trạng thái và chính danh sách mà
-    nó mở ra phải lọc GIỐNG HỆT nhau. Hai bản chép tay là hai bộ lọc sẽ trôi
-    khỏi nhau, và triệu chứng đúng bằng cái lỗi vòng review này sửa — chip
-    "Tất cả (1.710)" bấm vào ra 216 khách.
+# ---- Danh bạ: MỘT ảnh chụp, lọc bằng Python --------------------------------
+# Giai đoạn 2 (đo thật 2026-09-23, CSDL thật): lọc bằng SQL thì MỖI tổ hợp bộ
+# lọc dựng lại mart.khach_360 (~1,2 s một lần) — danh sách 3–6 s, khối tổng
+# quan 4–10 s cho mỗi cú bấm. Công ty có ~1.710 khách, dữ liệu chỉ đổi khi nạp,
+# nên đúng cách là: MỘT câu lấy cả danh bạ kèm mọi trường cần lọc (hạng, nhóm
+# việc, nhãn tháng), đi qua ảnh chụp theo phiên bản dữ liệu nạp
+# (kome/web/anh_chup.py), rồi lọc / sắp / đếm trên bộ nhớ — vài mili giây.
+#
+# `_khop` là bộ lọc DUY NHẤT: danh sách, bộ đếm chip trạng thái và mọi khối
+# phân tích đều gọi nó, nên chúng KHÔNG thể trôi khỏi nhau (bài học của
+# `_vi_tu` SQL cũ: "chip Tất cả (1.710) bấm vào ra 216 khách"). Lọc không phải
+# định nghĩa chỉ số: mọi trường so sánh ở đây là cột của `mart`, đọc nguyên.
 
-    Trả về (mệnh đề WHERE đã sẵn sàng nối, danh sách tham số). Thứ tự tham số
-    = thứ tự vị từ trong chính hàm này, nên chỗ gọi chỉ cần nối các danh sách
-    theo đúng thứ tự VĂN BẢN mà các mảnh WHERE xuất hiện trong câu lệnh.
-    """
-    dieu_kien, tham_so = [], []
-    if tim.strip():
-        # Tìm theo tên, mã, điện thoại hoặc địa chỉ cùng lúc — nhân viên không
-        # nhớ mình đang có mảnh thông tin nào trong tay.
-        dieu_kien.append(f"""({q}.ten ILIKE %s OR {q}.customer_code ILIKE %s
-                             OR {q}.phone ILIKE %s OR {q}.address ILIKE %s
-                             OR {q}.city ILIKE %s)""")
-        tham_so += [f"%{tim.strip()}%"] * 5
-    if loc in TRANG_THAI:
-        dieu_kien.append(f"{q}.trang_thai = %s")
-        tham_so.append(loc)
-    if sale:
-        dieu_kien.append(f"{q}.salesperson_code = %s")
-        tham_so.append(sale)
-    if nhom:
-        # EXISTS chứ không JOIN: một khách có thể ở nhiều nhóm, JOIN sẽ nhân
-        # đôi dòng và làm `tong` đếm sai.
-        dieu_kien.append(f"""EXISTS (SELECT 1 FROM mart.khach_nhom_viec v
-                                     WHERE v.customer_code = {q}.customer_code
-                                       AND v.nhom = %s)""")
-        tham_so.append(nhom)
-    if hang:
-        # EXISTS định danh đầy đủ, nhất quán với nhánh `nhom` ngay trên — cùng
-        # một bẫy phân giải tên (customer_code không đủ rõ nó thuộc bảng nào
-        # khi có nhiều bảng cùng cột) nên dùng chung một cách viết.
-        dieu_kien.append(f"""EXISTS (SELECT 1 FROM mart.hang_doanh_thu hd
-                                     WHERE hd.customer_code = {q}.customer_code
-                                       AND hd.hang = %s)""")
-        tham_so.append(hang)
+def danh_ba(conn) -> dict:
+    """{"khach": [...], "nhan_vien": [...]} — ĐÚNG MỘT lượt hỏi (hai mảng JSON
+    trong một dòng). `nhom`: nhóm việc của khách. Nhánh 'im' của
+    mart.khach_nhom_viec ĐÚNG là `trang_thai IN TRANG_THAI_CAN_XU_LY` (020),
+    nên nó đọc thẳng hằng đó; view chỉ được hỏi cho 'tut'/'moi' (điều kiện
+    trên cột hằng của UNION ALL cắt hẳn nhánh 'im' — bớt một lần dựng
+    khach_360). Có test canh hai định nghĩa trả cùng tập."""
+    r = conn.execute("""
+        WITH k AS MATERIALIZED (SELECT * FROM mart.khach_360),
+        v AS (SELECT customer_code, array_agg(nhom ORDER BY nhom) AS nhom
+                FROM mart.khach_nhom_viec WHERE nhom IN ('tut', 'moi') GROUP BY 1),
+        d AS (
+            SELECT k.customer_code AS ma, k.ten, k.prefecture AS tinh, k.city AS thanh_pho,
+                   k.phone AS dien_thoai, k.salesperson_code AS nguoi_phu_trach,
+                   coalesce(k.doanh_thu_thuan, 0)::bigint AS doanh_thu,
+                   coalesce(k.lai_gop, 0)::bigint AS lai_gop, k.ty_suat::float8 AS ty_suat,
+                   k.lan_cuoi, k.so_ngay_im_lang, k.nhip_ngay::float8 AS nhip_ngay,
+                   k.ty_le_im_lang::float8 AS ty_le_im_lang, k.trang_thai, k.dau_hieu_obc,
+                   k.address AS dia_chi, h.hang,
+                   (CASE WHEN k.trang_thai = ANY(%s) THEN ARRAY['im'] ELSE ARRAY[]::text[] END)
+                     || coalesce(v.nhom, ARRAY[]::text[]) AS nhom,
+                   t.nhan AS nhan_thang, t.dt_thang_nay::bigint AS thang_nay,
+                   t.dt_thang_truoc_den_ngay::bigint AS thang_truoc_cung_ngay,
+                   t.dt_tb_3_thang AS tb_3_thang,
+                   EXISTS (SELECT 1 FROM core.dim_salesperson ps
+                            WHERE ps.salesperson_code = k.salesperson_code) AS co_pt
+              FROM k
+              LEFT JOIN mart.hang_doanh_thu h ON h.customer_code = k.customer_code
+              LEFT JOIN v ON v.customer_code = k.customer_code
+              LEFT JOIN mart.khach_thang_nay t ON t.customer_code = k.customer_code)
+        SELECT (SELECT coalesce(json_agg(d ORDER BY d.doanh_thu DESC, d.ma), '[]') FROM d),
+               (SELECT coalesce(json_agg(n ORDER BY n.doanh_thu DESC, n.ma), '[]') FROM (
+                    SELECT salesperson_code AS ma, ten, so_khach,
+                           coalesce(doanh_thu, 0)::bigint AS doanh_thu,
+                           so_khach_canh_bao AS canh_bao
+                      FROM mart.tai_nhan_vien) n),
+               (SELECT hom_nay FROM mart.moc_thoi_gian)
+    """, [list(TRANG_THAI_CAN_XU_LY)]).fetchone()
+    return {"khach": r[0], "nhan_vien": r[1], "hom_nay": r[2]}
+
+
+def _khop(k: dict, *, tim: str = "", loc: str = "", sale: str | None = None,
+          nhom: str | None = None, hang=None, tinh: str | None = None,
+          thang: str | None = None) -> bool:
+    """Một khách (dòng của `danh_ba`) có khớp bộ lọc không. Ngữ nghĩa từng bộ
+    lọc giữ ĐÚNG như bản SQL cũ:
+      * tim — chứa (không phân biệt hoa thường) trong tên, mã, điện thoại,
+        địa chỉ hoặc thành phố: nhân viên không nhớ mình đang cầm mảnh nào.
+      * sale — `PT_TRONG` = mã phụ trách không có trong core.dim_salesperson.
+      * tinh — `TINH_TRONG` = tỉnh NULL/rỗng (nhãn "(không rõ)" chỉ là nhãn
+        hiển thị, không nằm trong CSDL).
+      * hang — nhiều hạng (bật/tắt), hạng theo doanh thu 12 tháng.
+      * thang — nhãn của mart.khach_thang_nay, SO BẰNG (không NOT)."""
+    if tim:
+        t = tim.strip().casefold()
+        if t and not any(t in (k.get(c) or "").casefold()
+                         for c in ("ten", "ma", "dien_thoai", "dia_chi", "thanh_pho")):
+            return False
+    if loc in TRANG_THAI and k["trang_thai"] != loc:
+        return False
+    if sale == PT_TRONG:
+        if k["co_pt"]:
+            return False
+    elif sale and k["nguoi_phu_trach"] != sale:
+        return False
+    if nhom and nhom not in (k["nhom"] or []):
+        return False
+    ds = _ds_hang(hang)
+    if ds and k["hang"] not in ds:
+        return False
     if tinh == TINH_TRONG:
-        # Nhóm "(không rõ)": khách có dòng bán nhưng chưa có hồ sơ
-        # 得意先全情報. `prefecture = '(không rõ)'` không bao giờ khớp gì —
-        # nhãn đó do coalesce() sinh ra lúc HIỂN THỊ, không nằm trong CSDL.
-        dieu_kien.append(f"({q}.prefecture IS NULL OR {q}.prefecture = '')")
-    elif tinh:
-        dieu_kien.append(f"{q}.prefecture = %s")
-        tham_so.append(tinh)
-    return (("WHERE " + " AND ".join(dieu_kien)) if dieu_kien else ""), tham_so
+        if k["tinh"]:
+            return False
+    elif tinh and k["tinh"] != tinh:
+        return False
+    if thang in NHAN_THANG and k["nhan_thang"] != thang:
+        return False
+    return True
+
+
+def _loc(ds: list[dict], **bo_loc) -> list[dict]:
+    return [k for k in ds if _khop(k, **bo_loc)]
+
+
+def _sap(ds: list[dict], sap: str, giam: bool | None) -> tuple[list[dict], str]:
+    """Sắp xếp theo DANH SÁCH TRẮNG `COT_SAP` (khoá lạ rơi về doanh thu).
+    NULL luôn xuống cuối, hoà thì theo mã — thứ tự ổn định giữa các trang."""
+    if sap not in COT_SAP:
+        sap = "doanh_thu"
+    khoa, mac_dinh = COT_SAP[sap]
+    chieu = mac_dinh if giam is None else giam
+    co = [k for k in ds if khoa(k) is not None]
+    khong = [k for k in ds if khoa(k) is None]
+    co.sort(key=lambda k: k["ma"])
+    co.sort(key=khoa, reverse=chieu)
+    khong.sort(key=lambda k: k["ma"])
+    return co + khong, sap
+
+
+def _thanh_khach(k: dict) -> "Khach":
+    lc = k["lan_cuoi"]
+    return Khach(ma=k["ma"], ten=k["ten"], tinh=k["tinh"], thanh_pho=k["thanh_pho"],
+                 dien_thoai=k["dien_thoai"], nguoi_phu_trach=k["nguoi_phu_trach"],
+                 doanh_thu=int(k["doanh_thu"] or 0), lai_gop=int(k["lai_gop"] or 0),
+                 ty_suat=k["ty_suat"],
+                 lan_cuoi=date.fromisoformat(lc) if isinstance(lc, str) else lc,
+                 so_ngay_im_lang=k["so_ngay_im_lang"], nhip_ngay=k["nhip_ngay"],
+                 ty_le_im_lang=k["ty_le_im_lang"], trang_thai=k["trang_thai"],
+                 dau_hieu_obc=k["dau_hieu_obc"], hang=k["hang"],
+                 thang_nay=k["thang_nay"], thang_truoc_cung_ngay=k["thang_truoc_cung_ngay"],
+                 tb_3_thang=k["tb_3_thang"], nhan_thang=k["nhan_thang"])
+
+
+def trang_danh_sach(db: dict, tim: str = "", loc: str = "", sap: str = "doanh_thu",
+                    trang: int = 1, sale: str | None = None,
+                    ten_sale: str | None = None, nhom: str | None = None,
+                    hang=None, tinh: str | None = None, thang: str | None = None,
+                    giam: bool | None = None, co: int = MOI_TRANG) -> TrangKhach:
+    """Một trang của danh sách, tính trên danh bạ `db` (không SQL).
+
+    Ô KPI đầu trang là TỔNG của CẢ nhóm đang lọc (không chỉ trang này), cùng
+    bộ lọc với bảng — ô KPI không bao giờ nói về một nhóm khác cái bảng đang
+    hiện. `so_can_xu_ly` = số khách nhóm 'im' (xem `danh_ba`).
+
+    `sale` là MẶC ĐỊNH TIỆN DỤNG, không phải hàng rào bảo mật: công ty năm
+    người, ai cũng biết khách của ai, và trang luôn có một liên kết bỏ lọc.
+    Không có kiểm quyền nào ở đây, và đó là cố ý — xem đặc tả đợt 3 §5."""
+    ds = _loc(db["khach"], tim=tim, loc=loc, sale=sale, nhom=nhom, hang=hang,
+              tinh=tinh, thang=thang)
+    ds, sap = _sap(ds, sap, giam)
+    co = co if co in CO_TRANG else MOI_TRANG
+    tong = len(ds)
+    so_trang = max(1, -(-tong // co))
+    trang = max(1, trang)
+    return TrangKhach(
+        khach=[_thanh_khach(k) for k in ds[(trang - 1) * co: trang * co]],
+        tong=tong, trang=trang, so_trang=so_trang, tim=tim, loc=loc, sap=sap,
+        sale=sale, ten_sale=ten_sale, nhom=nhom,
+        hang=",".join(_ds_hang(hang)) or None, tinh=tinh,
+        thang=thang if thang in NHAN_THANG else None, co=co,
+        tong_dt_thang_nay=sum(k["thang_nay"] or 0 for k in ds),
+        tong_dt_thang_truoc_cung_ngay=sum(k["thang_truoc_cung_ngay"] or 0 for k in ds),
+        tong_doanh_thu=sum(k["doanh_thu"] or 0 for k in ds),
+        so_can_xu_ly=sum(1 for k in ds if k["trang_thai"] in TRANG_THAI_CAN_XU_LY))
 
 
 def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
               trang: int = 1, sale: str | None = None,
               ten_sale: str | None = None, nhom: str | None = None,
-              hang: str | None = None, tinh: str | None = None) -> TrangKhach:
-    """Danh sách khách, có tìm kiếm và lọc theo trạng thái. HAI lượt hỏi.
-
-    `sale` là MẶC ĐỊNH TIỆN DỤNG, không phải hàng rào bảo mật: công ty năm
-    người, ai cũng biết khách của ai, và trang luôn có một liên kết bỏ lọc.
-    Không có kiểm quyền nào ở đây, và đó là cố ý — xem đặc tả đợt 3 §5.
-    """
-    where, tham_so = _vi_tu("mart.khach_360", tim=tim, loc=loc, sale=sale,
-                            nhom=nhom, hang=hang, tinh=tinh)
-
-    tong = conn.execute(
-        f"SELECT count(*) FROM mart.khach_360 {where}", tham_so).fetchone()[0]
-
-    thu_tu = SAP_XEP.get(sap, SAP_XEP["doanh_thu"])
-    trang = max(1, trang)
-    rows = conn.execute(
-        f"""SELECT {_COT} FROM mart.khach_360 {where}
-            ORDER BY {thu_tu} LIMIT %s OFFSET %s""",
-        tham_so + [MOI_TRANG, (trang - 1) * MOI_TRANG]).fetchall()
-
-    return TrangKhach(
-        khach=[_khach(r) for r in rows], tong=tong, trang=trang,
-        so_trang=max(1, -(-tong // MOI_TRANG)), tim=tim, loc=loc, sap=sap,
-        sale=sale, ten_sale=ten_sale, nhom=nhom, hang=hang, tinh=tinh)
+              hang=None, tinh: str | None = None, thang: str | None = None,
+              giam: bool | None = None, co: int = MOI_TRANG) -> TrangKhach:
+    """`trang_danh_sach` trên danh bạ vừa đọc — MỘT lượt hỏi."""
+    return trang_danh_sach(danh_ba(conn), tim=tim, loc=loc, sap=sap, trang=trang,
+                           sale=sale, ten_sale=ten_sale, nhom=nhom, hang=hang,
+                           tinh=tinh, thang=thang, giam=giam, co=co)
 
 
 def ho_so(conn, ma: str) -> HoSo | None:
@@ -253,8 +405,13 @@ def ho_so(conn, ma: str) -> HoSo | None:
         f"""SELECT {_COT},
                    branch_name, postcode, address, rank_code, category_code,
                    closing_day_code, price_level_code, spot_flag, lan_dau,
-                   so_lan_mua, so_phieu, gia_tri_tb_moi_lan
-            FROM mart.khach_360 WHERE customer_code = %s""", (ma,)).fetchone()
+                   so_lan_mua, so_phieu, gia_tri_tb_moi_lan,
+                   -- Hạng theo doanh thu 12 tháng (KHÔNG phải rank_code OBC ở
+                   -- trên) — cột cuối, cùng lượt hỏi (giai đoạn 2).
+                   (SELECT hang FROM mart.hang_doanh_thu WHERE customer_code = %s),
+                   (SELECT ps.ten FROM core.dim_salesperson ps
+                     WHERE ps.salesperson_code = mart.khach_360.salesperson_code)
+            FROM mart.khach_360 WHERE customer_code = %s""", (ma, ma)).fetchone()
     if r is None:
         return None
     # `_khach` đọc 15 cột ĐẦU theo vị trí, phần đuôi cắt từ CUỐI lên theo số
@@ -263,11 +420,22 @@ def ho_so(conn, ma: str) -> HoSo | None:
     k = _khach(r)
     ho = dict(zip(_COT_CHI_TIET, r[-len(_COT_CHI_TIET):]))
 
-    thang = [dict(zip(("thang", "doanh_thu", "lai_gop", "so_lan"), t))
-             for t in conn.execute(
-        """SELECT thang, doanh_thu_thuan, lai_gop, so_lan_mua
-           FROM mart.khach_theo_thang WHERE customer_code = %s
-           ORDER BY thang""", (ma,)).fetchall()]
+    # Nhãn tháng (036/037) đi CHUNG câu này (LEFT JOIN một dòng) — trần 8
+    # lượt hỏi đã chạm, khối mới phải gộp vào câu có sẵn.
+    rows_thang = conn.execute(
+        """SELECT t.thang, t.doanh_thu_thuan, t.lai_gop, t.so_lan_mua,
+                  x.nhan, x.thang, x.dt_thang_nay, x.dt_thang_truoc_den_ngay,
+                  x.dt_thang_truoc, x.dt_tb_3_thang, x.so_thang_mua_3
+           FROM mart.khach_theo_thang t
+           LEFT JOIN (SELECT * FROM mart.khach_thang_nay WHERE customer_code = %s) x ON true
+           WHERE t.customer_code = %s
+           ORDER BY t.thang""", (ma, ma)).fetchall()
+    thang = [dict(zip(("thang", "doanh_thu", "lai_gop", "so_lan"), t[:4])) for t in rows_thang]
+    x = rows_thang[0] if rows_thang else None
+    thang_nay = None if x is None or x[4] is None else {
+        "nhan": x[4], "thang": x[5], "dt_thang_nay": int(x[6] or 0),
+        "dt_thang_truoc_den_ngay": int(x[7] or 0), "dt_thang_truoc": int(x[8] or 0),
+        "dt_tb_3_thang": int(x[9] or 0), "so_thang_mua_3": x[10]}
 
     # `nhip` là numeric từ Postgres — ép sang int khi HIỂN THỊ ở template
     # (`|int`), không ép ở đây: None phải đi qua nguyên vẹn để template hiện
@@ -275,13 +443,44 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # Cả ba cột nhịp (`nhip`, `du_kien`, `tre`) nằm sẵn trong CÙNG một view
     # mart.khach_mat_hang — lấy đủ ba ở cả hai khối bên dưới, không chỉ khối
     # đưa ra trong đặc tả gốc, vì bổ sung không tốn thêm truy vấn nào.
-    mat_hang = [dict(zip(("ma", "ten", "doanh_thu", "lai_gop", "so_luong",
-                          "so_lan", "lan_cuoi", "nhip", "du_kien", "tre"), h))
-                for h in conn.execute(
-        """SELECT product_code, ten_hang, doanh_thu_thuan, lai_gop, so_luong,
-                  so_lan, lan_cuoi, nhip_ngay, du_kien_lan_toi, tre_ngay
-           FROM mart.khach_mat_hang WHERE customer_code = %s
-           ORDER BY doanh_thu_thuan DESC LIMIT 15""", (ma,)).fetchall()]
+    # MỌI mã của khách trong MỘT lượt hỏi (giai đoạn 2): tab Sản phẩm cần cả
+    # danh sách, giỏ theo ngành và 3 tháng gần nhất của từng mã; khối "đã ngừng
+    # mua" nay LỌC từ chính các dòng này thay vì một câu riêng — trả lại một
+    # chỗ trong trần 8 lượt hỏi. Ba tháng lấy từ mart.dong_ban (doanh thu thuần
+    # định nghĩa ở đó), lọc đúng khách này + từ mùng 1 của hai tháng trước.
+    # Ngành để THÔ (NULL/rỗng) — Python đổi sang kome.bao_cao.NGANH_TRONG, bản
+    # chép bắt buộc của coalesce trong mart.ban_theo_nganh_thang (CLAUDE.md).
+    tat_ca = [dict(zip(("ma", "ten", "doanh_thu", "lai_gop", "so_luong",
+                        "so_lan", "lan_cuoi", "nhip", "du_kien", "tre",
+                        "trang_thai_cap", "nganh", "t2", "t1", "t0"), h))
+              for h in conn.execute(
+        """WITH m AS MATERIALIZED (
+               SELECT date_trunc('month', hom_nay)::date AS dau FROM mart.moc_thoi_gian),
+           b AS (
+               SELECT d.product_code,
+                      sum(d.doanh_thu_thuan) FILTER (WHERE d.sales_date < m.dau - interval '1 month') AS t2,
+                      sum(d.doanh_thu_thuan) FILTER (WHERE d.sales_date >= m.dau - interval '1 month'
+                                                       AND d.sales_date < m.dau) AS t1,
+                      sum(d.doanh_thu_thuan) FILTER (WHERE d.sales_date >= m.dau) AS t0
+                 FROM mart.dong_ban d, m
+                WHERE d.customer_code = %s AND d.sales_date >= m.dau - interval '2 month'
+                GROUP BY d.product_code)
+           SELECT h.product_code, h.ten_hang, h.doanh_thu_thuan, h.lai_gop, h.so_luong,
+                  h.so_lan, h.lan_cuoi, h.nhip_ngay, h.du_kien_lan_toi, h.tre_ngay,
+                  h.trang_thai_cap, p.food_category_name, b.t2, b.t1, b.t0
+             FROM mart.khach_mat_hang h
+             LEFT JOIN core.dim_product p ON p.product_code = h.product_code
+             LEFT JOIN b ON b.product_code = h.product_code
+            WHERE h.customer_code = %s
+            ORDER BY h.doanh_thu_thuan DESC NULLS LAST, h.product_code""", (ma, ma)).fetchall()]
+    from kome.bao_cao import NGANH_TRONG
+    for m_ in tat_ca:
+        m_["nganh"] = m_["nganh"] or NGANH_TRONG
+        for c in ("t2", "t1", "t0"):
+            m_[c] = int(m_[c]) if m_[c] is not None else 0
+    mat_hang = [{k: m_[k] for k in ("ma", "ten", "doanh_thu", "lai_gop", "so_luong",
+                                    "so_lan", "lan_cuoi", "nhip", "du_kien", "tre")}
+                for m_ in tat_ca[:15]]
 
     # Mặt hàng khách TỪNG mua đều rồi NGỪNG hẳn. Đây là tín hiệu sớm hơn nhiều
     # so với việc khách ngừng mua toàn bộ: họ đang chuyển dần sang nhà cung cấp
@@ -301,23 +500,30 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # `so_lan >= 3` đã bỏ vì THỪA, không phải vì nới lỏng: `nhip_ngay` chỉ có
     # giá trị khi đã có >= 2 khoảng cách, tức >= 3 lần mua (020). Để lại là
     # dựng thêm một bản sao của cùng điều kiện, ở đúng chỗ vừa dọn xong.
-    da_ngung = [dict(zip(("ma", "ten", "so_lan", "lan_cuoi", "doanh_thu",
-                          "nhip", "du_kien", "tre"), h))
-                for h in conn.execute(
-        """SELECT h.product_code, h.ten_hang, h.so_lan, h.lan_cuoi,
-                  h.doanh_thu_thuan, h.nhip_ngay, h.du_kien_lan_toi, h.tre_ngay
-           FROM mart.khach_mat_hang h
-           WHERE h.customer_code = %s AND h.trang_thai_cap = 'ngung'
-           ORDER BY h.doanh_thu_thuan DESC LIMIT 10""", (ma,)).fetchall()]
+    da_ngung = [{k: m_[k] for k in ("ma", "ten", "so_lan", "lan_cuoi", "doanh_thu",
+                                    "nhip", "du_kien", "tre")}
+                for m_ in tat_ca if m_["trang_thai_cap"] == "ngung"][:10]
 
-    gan_day = [dict(zip(("ngay", "so_phieu", "doanh_thu", "lai_gop"), l))
-               for l in conn.execute(
-        """SELECT sales_date, count(*), sum(doanh_thu_thuan), sum(lai_gop)
-           FROM mart.lan_mua WHERE customer_code = %s
-           GROUP BY sales_date ORDER BY sales_date DESC LIMIT 12""", (ma,)).fetchall()]
+    # Mọi ngày mua trong 400 ngày tới mốc (lưới 26 tuần, DT 30 ngày, dòng thời
+    # gian) CỘNG 12 ngày mua gần nhất dù cũ hơn (khối "12 lần mua gần nhất" của
+    # khách đã im lâu). Tối đa ~260 dòng (đo thật: 256 ngày/400 ngày).
+    rows_ngay = conn.execute(
+        """SELECT l.sales_date, count(*), sum(l.doanh_thu_thuan), sum(l.lai_gop), m.hom_nay
+           FROM mart.lan_mua l CROSS JOIN mart.moc_thoi_gian m
+           WHERE l.customer_code = %s
+             AND (l.sales_date > m.hom_nay - 400
+                  OR l.sales_date >= (SELECT min(z.d) FROM (
+                         SELECT DISTINCT sales_date AS d FROM mart.lan_mua
+                          WHERE customer_code = %s ORDER BY 1 DESC LIMIT 12) z))
+           GROUP BY l.sales_date, m.hom_nay
+           ORDER BY l.sales_date DESC""", (ma, ma)).fetchall()
+    ngay_mua = [dict(zip(("ngay", "so_phieu", "doanh_thu", "lai_gop"), l[:4])) for l in rows_ngay]
+    gan_day = ngay_mua[:12]
+    moc = rows_ngay[0][4] if rows_ngay else None
 
     # ---- Bốn khối mới của đợt 4a, gộp thành ĐÚNG HAI truy vấn -----------
-    # NGÂN SÁCH TRUY VẤN: hàm này chạy 8 lượt hỏi (từ đợt 7), và 8 là TRẦN. Đo thật
+    # NGÂN SÁCH TRUY VẤN: 8 là TRẦN. Từ giai đoạn 2 hàm chạy 7 (khối "đã ngừng
+    # mua" gộp vào câu mặt hàng) — chỗ trống là cố ý. Đo thật
     # 2026-09-22: một round-trip rỗng tới pooler Tokyo mất 47 ms, một lượt
     # hỏi thật ~260 ms. Trang hồ sơ chậm dần từng đợt là cách nó chết mà
     # không ai thấy ngày nào nó chết. Có test canh —
@@ -444,7 +650,9 @@ def ho_so(conn, ma: str) -> HoSo | None:
     return HoSo(khach=k, ho_so=ho, thang=thang, mat_hang=mat_hang,
                 da_ngung_mua=da_ngung, lan_mua_gan_day=gan_day,
                 chua_mua_thang=chua_mua, goi_y=goi_y, bac_gia=bac_gia,
-                diem_giao=diem_giao, nhat_ky=nhat_ky_khach(conn, ma))
+                diem_giao=diem_giao, nhat_ky=nhat_ky_khach(conn, ma),
+                tat_ca_mat_hang=tat_ca, ngay_mua=ngay_mua, thang_nay=thang_nay,
+                hom_nay=moc)
 
 
 # Trạng thái nào được coi là "cần xử lý" — khách đang rời đi. MỘT hằng dùng ở
@@ -552,6 +760,18 @@ class TongQuan:
     # gì hết, kể cả sale: chính liên kết đó bỏ mọi bộ lọc, nên con số phải là
     # con số người ta sẽ thấy sau khi bấm.
     tong_tat_ca: int = 0
+    # Giai đoạn 2 (cùng lượt hỏi): doanh thu luỹ kế theo hạng / tỉnh (khối
+    # phân tích của gói thiết kế ghi "N khách · ¥…"), số khách theo nhãn tháng
+    # (036 — phân khúc "Mua đều, tháng này chưa", theo `sale` như nhóm việc),
+    # và số khách chưa ai phụ trách (TOÀN CÔNG TY: liên kết của nó thay bộ lọc
+    # người phụ trách, nên con số là con số sau khi bấm).
+    hang_tien: dict[str, int] = field(default_factory=dict)
+    tinh_tien: dict[str, int] = field(default_factory=dict)
+    thang: dict[str, int] = field(default_factory=dict)
+    chua_pt: int = 0
+    # Mọi tỉnh có khách (theo `sale`), đông -> ít — cho Ô CHỌN tỉnh; khối
+    # "Tập trung ở đâu" vẫn là `tinh` (top 8 + "(không rõ)").
+    tinh_day_du: list[tuple[str, int]] = field(default_factory=list)
 
 
 # Thứ tự hiển thị của hạng. S trước D, không phải thứ tự bảng chữ cái ngẫu
@@ -559,117 +779,63 @@ class TongQuan:
 THU_TU_HANG = ("S", "A", "B", "C", "D")
 
 
-def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
-                      hang: str | None = None, tinh: str | None = None) -> TongQuan:
-    """Bốn khối phân tích + hai bộ đếm của trang danh sách, ĐÚNG MỘT truy vấn.
+def tong_quan(db: dict, sale: str | None = None, nhom: str | None = None,
+              hang=None, tinh: str | None = None, *, tim: str = "",
+              thang: str | None = None) -> TongQuan:
+    """Bốn khối phân tích + các bộ đếm của trang danh sách, trên danh bạ `db`.
 
-    Vì sao gộp: đo thật (2026-09-22) một round-trip rỗng tới pooler Tokyo mất
-    47 ms, và một lượt hỏi thật ~260 ms. Sáu khối rời nhau là sáu vòng chờ
-    mạng cho một thứ người ta nhìn một lần. Con số "~10 ms" từng ghi ở đây là
-    phép đo của `mart.khach_mat_hang` LỌC MỘT KHÁCH — ca có vị từ đẩy xuống
-    được — nên nó KHÔNG mô tả khối này: `mart.khach_360` bị tham chiếu nhiều
-    lần và không lần nào có `customer_code` để đẩy xuống. Chi phí thật chưa
-    đo trên CSDL đầy; có mục KIỂM TAY riêng ở đặc tả §9, ngưỡng 500 ms.
-
-    BỐN BỘ LỌC, HAI PHẠM VI:
-      * `sale` — bốn khối phân tích và cả hai bộ đếm đều theo.
-      * `nhom`/`hang`/`tinh` — CHỈ `dem_trang_thai` theo. Bốn khối phân tích
-        thì KHÔNG: mỗi khối đó là ô ĐIỀU KHIỂN của chính bộ lọc mang tên nó,
-        và một ô điều khiển tự lọc theo mình thì bấm vào một mục xong các con
-        số khác về 0 hết, không ai quay lại được.
-      * `loc` (trạng thái) — KHÔNG bộ đếm nào theo, cùng lý do ngay trên:
-        `dem_trang_thai` chính là nhãn của dải chip trạng thái.
-
-    Vì sao `dem_trang_thai` PHẢI theo ba bộ lọc mới: liên kết của từng chip
-    mang theo `nhom`/`hang`/`tinh`/`nv` đang bật. Lý lẽ cũ ("bộ đếm chỉ theo
-    sale") viết khi trang có MỘT bộ lọc; giờ có năm, nên chip "Tất cả
-    (1.710)" bấm vào ra 216 khách — con số nói dối đúng cái danh sách mà
-    chính nó mở ra.
-
-    `tong_tat_ca` thì ngược lại: không lọc gì hết. Liên kết của nó
-    (`?tat_ca=1`) bỏ MỌI bộ lọc, nên con số phải là con số sau khi bấm.
-    """
-    # CTE `AS MATERIALIZED`: câu lệnh này đọc mart.khach_360 SÁU lần. Không
-    # CTE thì Postgres dựng lại view đó sáu lượt — mỗi lượt gộp toàn bộ
-    # mart.lan_mua — cho MỘT lần mở trang. Đây là view đắt nhất trong mart,
-    # và ngân sách "3 lượt hỏi" của trang này đếm SỐ LƯỢT HỎI chứ không đếm
-    # sức tính, nên nó không hề chặn được chuyện đó. Vật hoá ~1.710 dòng một
-    # lần rồi quét lại sáu lượt thì rẻ; dựng lại view sáu lượt mới là cái đắt.
-    # Không có vị từ nào đẩy xuống được ở đây (bộ lọc chỉ theo `sale`, và bốn
-    # trong sáu nhánh cố ý lọc khác nhau), nên CTE không làm mất gì.
-    #
-    # Hai mệnh đề WHERE, cùng một hàm dựng (`_vi_tu`) nên không bao giờ trôi
-    # khỏi nhau. THỨ TỰ THAM SỐ = thứ tự văn bản các mảnh WHERE bên dưới:
-    # bốn lần `{dk}` (nhom, tong, hang, tinh) rồi MỘT lần `{dk_dem}`; hai
-    # khối cuối ('nv', 'tat_ca') không có mảnh nào.
-    dk, p = _vi_tu("k", sale=sale)
-    dk_dem, p_dem = _vi_tu("k", sale=sale, nhom=nhom, hang=hang, tinh=tinh)
-    # Cột thứ năm `canh_bao` (số khách cần gọi lại) chỉ có giá trị thật ở
-    # khối 'nv' — các khối kia trả 0. Đây LÀ một cột riêng, không nhồi vào
-    # chuỗi `khoa` như "mã|tên": nhồi chuỗi thêm một quy ước phải nhớ và một
-    # chỗ nữa có thể tách sai (vd tên nhân viên lỡ chứa dấu phân cách).
-    rows = conn.execute(f"""
-        WITH k360 AS MATERIALIZED (SELECT * FROM mart.khach_360)
-        SELECT 'nhom' AS khoi, v.nhom AS khoa, count(*) AS so, 0::bigint AS tien,
-               0::bigint AS canh_bao
-          FROM mart.khach_nhom_viec v
-          JOIN k360 k ON k.customer_code = v.customer_code
-          {dk}
-         GROUP BY v.nhom
-        UNION ALL
-        SELECT 'tong', '', count(*), 0, 0 FROM k360 k {dk}
-        UNION ALL
-        SELECT 'hang', h.hang, count(*), 0, 0
-          FROM mart.hang_doanh_thu h
-          JOIN k360 k ON k.customer_code = h.customer_code
-          {dk}
-         GROUP BY h.hang
-        UNION ALL
-        -- Chuỗi '(không rõ)' dưới đây PHẢI khớp hằng KHONG_RO ở đầu module
-        -- (trang so nhãn này để biết mục nào cần giá trị URL quy ước
-        -- TINH_TRONG). Để literal chứ không truyền tham số: số placeholder
-        -- của câu lệnh này đã do `_vi_tu` quyết định, thêm một cái nữa ở
-        -- giữa là một chỗ rất dễ đếm lệch về sau.
-        SELECT 'tinh', coalesce(nullif(k.prefecture, ''), '(không rõ)'), count(*), 0, 0
-          FROM k360 k {dk}
-         GROUP BY 2
-        UNION ALL
-        SELECT 'nv', t.salesperson_code || '|' || t.ten, t.so_khach, t.doanh_thu,
-               t.so_khach_canh_bao
-          FROM mart.tai_nhan_vien t
-        UNION ALL
-        SELECT 'dem', k.trang_thai, count(*), 0, 0
-          FROM k360 k {dk_dem}
-         GROUP BY k.trang_thai
-        UNION ALL
-        SELECT 'tat_ca', '', count(*), 0, 0 FROM k360
-    """, p * 4 + p_dem).fetchall()
-
-    lay = lambda khoi: [(r[1], r[2], r[3], r[4]) for r in rows if r[0] == khoi]
-    nhom = {k: n for k, n, _, _ in lay("nhom")}
-    hang = dict((k, n) for k, n, _, _ in lay("hang"))
+    BỐN BỘ LỌC, HAI PHẠM VI (giữ nguyên từ bản SQL):
+      * `sale` — mọi khối và mọi bộ đếm đều theo (trừ `tong_tat_ca`, `chua_pt`).
+      * `nhom`/`hang`/`tinh` (và từ giai đoạn 2: `tim`, `thang` — ô chọn trạng
+        thái của giao diện React GIỮ mọi bộ lọc khác khi đổi) — CHỈ
+        `dem_trang_thai` theo. Khối phân tích thì KHÔNG: mỗi khối là ô ĐIỀU
+        KHIỂN của chính bộ lọc mang tên nó; tự lọc theo mình thì bấm một mục
+        xong các con số khác về 0 hết.
+      * `loc` (trạng thái) — KHÔNG bộ đếm nào theo: `dem_trang_thai` chính là
+        nhãn của ô chọn trạng thái.
+    `tong_tat_ca` không lọc gì (liên kết của nó bỏ MỌI bộ lọc). `chua_pt` là
+    toàn công ty (liên kết của nó THAY bộ lọc người phụ trách)."""
+    theo_sale = _loc(db["khach"], sale=sale)
+    dem_ds = _loc(theo_sale, nhom=nhom, hang=hang, tinh=tinh, tim=tim, thang=thang)
+    nhom_dem = {n: sum(1 for k in theo_sale if n in (k["nhom"] or [])) for n in ("im", "tut", "moi")}
+    hang_dem, hang_tien = {}, {}
+    tinh_dem, tinh_tien = {}, {}
+    thang_dem, dem = {}, {}
+    for k in theo_sale:
+        if k["hang"]:
+            hang_dem[k["hang"]] = hang_dem.get(k["hang"], 0) + 1
+            hang_tien[k["hang"]] = hang_tien.get(k["hang"], 0) + (k["doanh_thu"] or 0)
+        t = k["tinh"] or KHONG_RO
+        tinh_dem[t] = tinh_dem.get(t, 0) + 1
+        tinh_tien[t] = tinh_tien.get(t, 0) + (k["doanh_thu"] or 0)
+        if k["nhan_thang"]:
+            thang_dem[k["nhan_thang"]] = thang_dem.get(k["nhan_thang"], 0) + 1
+    for k in dem_ds:
+        dem[k["trang_thai"]] = dem.get(k["trang_thai"], 0) + 1
     # "(không rõ)" phải được tách ra KHỎI phép xếp hạng trước khi cắt top 8,
-    # không phải trộn chung rồi cắt: công ty thật có 48 tỉnh, "(không rõ)"
-    # thường chỉ vài khách nên đứng NGOÀI top 8/9 nếu xếp chung — trộn rồi
-    # cắt sẽ âm thầm đánh rơi nhóm này khỏi khối "Tập trung ở đâu" đúng vào
-    # lúc dữ liệu đủ lớn để thấy sự khác biệt, còn CSDL thử nghiệm nhỏ (1-2
-    # tỉnh) không bao giờ lộ ra lỗi này.
-    tinh_rows = lay("tinh")
-    tinh_that = sorted(((t, n) for t, n, _, _ in tinh_rows if t != KHONG_RO),
-                        key=lambda x: -x[1])[:8]
-    khong_ro = next(((t, n) for t, n, _, _ in tinh_rows if t == KHONG_RO), None)
-    tinh = tinh_that + ([khong_ro] if khong_ro else [])
+    # không phải trộn chung rồi cắt: nhóm này thường chỉ vài khách nên đứng
+    # NGOÀI top 8 nếu xếp chung — trộn rồi cắt sẽ âm thầm đánh rơi nó khỏi khối
+    # "Tập trung ở đâu", đúng nhóm khách CẦN dọn lại.
+    tinh_that = sorted(((t, n) for t, n in tinh_dem.items() if t != KHONG_RO),
+                       key=lambda x: (-x[1], x[0]))[:8]
+    tinh_ds = tinh_that + ([(KHONG_RO, tinh_dem[KHONG_RO])] if KHONG_RO in tinh_dem else [])
     return TongQuan(
-        nhom={k: nhom.get(k, 0) for k in ("im", "tut", "moi")},
-        tong=next((n for _, n, _, _ in lay("tong")), 0),
-        hang=[(h, hang.get(h, 0)) for h in THU_TU_HANG],
-        tinh=tinh,
+        nhom=nhom_dem, tong=len(theo_sale),
+        hang=[(h, hang_dem.get(h, 0)) for h in THU_TU_HANG], tinh=tinh_ds,
         # Xếp theo DOANH THU chứ không theo số khách: khối này trả lời "ai
-        # đang gánh bao nhiêu tiền", không phải "ai có nhiều khách nhất" — một
-        # người ít khách nhưng khách lớn vẫn đáng chú ý hơn trên bảng tải.
-        nhan_vien=[{"ma": k.split("|")[0], "ten": k.split("|", 1)[1],
-                    "so_khach": n, "doanh_thu": int(d), "canh_bao": int(cb)}
-                   for k, n, d, cb in sorted(lay("nv"), key=lambda x: -x[2])],
-        dem_trang_thai={t: n for t, n, _, _ in lay("dem")},
-        tong_tat_ca=next((n for _, n, _, _ in lay("tat_ca")), 0),
+        # đang gánh bao nhiêu tiền". Đọc mart.tai_nhan_vien (so_khach_canh_bao
+        # ĐỌC nhóm việc — migration 022), không đếm lại ở đây.
+        nhan_vien=[{"ma": n["ma"], "ten": n["ten"], "so_khach": n["so_khach"],
+                    "doanh_thu": int(n["doanh_thu"] or 0), "canh_bao": int(n["canh_bao"] or 0)}
+                   for n in db["nhan_vien"]],
+        dem_trang_thai=dem, tong_tat_ca=len(db["khach"]),
+        hang_tien=hang_tien, tinh_tien={t: tinh_tien[t] for t, _ in tinh_ds},
+        thang=thang_dem, chua_pt=sum(1 for k in db["khach"] if not k["co_pt"]),
+        tinh_day_du=sorted(tinh_dem.items(), key=lambda x: (x[0] == KHONG_RO, -x[1], x[0])),
     )
+
+
+def tong_quan_danh_ba(conn, sale: str | None = None, nhom: str | None = None,
+                      hang=None, tinh: str | None = None) -> TongQuan:
+    """`tong_quan` trên danh bạ vừa đọc — ĐÚNG MỘT lượt hỏi."""
+    return tong_quan(danh_ba(conn), sale, nhom=nhom, hang=hang, tinh=tinh)

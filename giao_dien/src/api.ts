@@ -27,7 +27,11 @@ export async function gui<T>(url: string, du_lieu: unknown): Promise<T> {
     body: JSON.stringify(du_lieu),
   });
   if (r.status === 401) { location.href = "/dang-nhap"; throw new LoiApi(401, "Chưa đăng nhập"); }
-  if (!r.ok) throw new LoiApi(r.status, `Lỗi ${r.status}`);
+  if (!r.ok) {
+    let thong_diep = `Lỗi ${r.status}`;
+    try { thong_diep = (await r.json()).loi ?? thong_diep; } catch { /* không phải JSON */ }
+    throw new LoiApi(r.status, thong_diep);
+  }
   return r.json() as Promise<T>;
 }
 

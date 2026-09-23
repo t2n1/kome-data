@@ -589,87 +589,28 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         Vẫn KHÔNG phải hàng rào bảo mật: năm sale ai cũng biết khách của ai
         (đặc tả đợt 3 §5), nên chọn mã của người khác là hợp lệ.
         """
-        if nv == KH.NV_MOI_NGUOI:
-            return None, None
-        if nv:
-            return nv, None
-        nguoi = getattr(request.state, "nguoi", None)
-        if tat_ca or nguoi is None or not nguoi.salesperson_code:
-            return None, None
-        return nguoi.salesperson_code, nguoi.ten_sale or nguoi.ten_dang_nhap
+        from kome.web.api import sale_dang_loc
+        return sale_dang_loc(request, tat_ca, nv)
+
+    # Giai đoạn 2 (đặc tả 2026-09-23-giai-doan-2-khach-hang-design.md): màn
+    # Khách hàng là ứng dụng React — danh sách, hồ sơ 360° và bản đồ (tab của
+    # cùng màn). Dữ liệu qua /api/khach-hang/* và /api/ban-do (kome/web/api.py).
+    # Mã khách lạ: trang vẫn 200 (vỏ React), API trả 404 và giao diện nói
+    # "không có khách mã …".
+    def _man_khach(request: Request) -> HTMLResponse:
+        if not SPA.co_ban_build():
+            return _loi(request, "mở màn khách hàng",
+                        RuntimeError("Thiếu bản build giao diện (kome/web/spa/index.html). "
+                                     "Chạy: cd giao_dien && npm run build"))
+        return _spa(request)
 
     @app.get("/khach-hang", response_class=HTMLResponse)
-    def ds_khach(request: Request, tim: str = "", loc: str = "",
-                 sap: str = "doanh_thu", trang: int = 1, tat_ca: int = 0,
-                 nhom: str = "", hang: str = "", tinh: str = "", nv: str = ""):
-        try:
-            sale, ten_sale = _sale_dang_loc(request, tat_ca, nv)
-            with open_app_conn() as conn:
-                # CÙNG một khối `with`, và tổng quan chạy TRƯỚC danh sách:
-                # bảng "Tải của từng nhân viên" trong `tq` là chỗ duy nhất
-                # biết mã sale nào ứng với tên nào, mà dải bộ lọc cần cái tên
-                # đó để nói rõ đang xem khách của ai.
-                tq = KH.tong_quan_danh_ba(conn, sale, nhom=nhom, hang=hang,
-                                          tinh=tinh)
-                # `sale and ten_sale is None` chứ không `nv and …`: chỉ có
-                # nhánh `nv` là một mã sale (`KH.NV_MOI_NGUOI` không phải —
-                # nó BỎ lọc, nên `sale` là None và không có tên nào để tra).
-                if sale and ten_sale is None:
-                    ten_sale = next((n["ten"] for n in tq.nhan_vien
-                                     if n["ma"] == sale), sale)
-                t = KH.danh_sach(conn, tim=tim, loc=loc, sap=sap, trang=trang,
-                                 sale=sale, ten_sale=ten_sale, nhom=nhom,
-                                 hang=hang, tinh=tinh)
-            # Ô chọn Tỉnh: (giá trị trên URL, nhãn, số khách). Nhãn "(không
-            # rõ)" do coalesce() sinh ra lúc hiển thị và KHÔNG nằm trong CSDL,
-            # nên nó đi trên URL bằng giá trị quy ước KH.TINH_TRONG — đổ thẳng
-            # nhãn ra `value` thì bấm vào nó luôn trả danh sách rỗng.
-            tinh_chon = [(KH.TINH_TRONG if ten == KH.KHONG_RO else ten, ten, so)
-                         for ten, so in tq.tinh]
-            # Danh sách chỉ có 8 tỉnh đông nhất CỦA PHẠM VI ĐANG XEM, mà phạm
-            # vi co theo sale/nv. Tỉnh đang lọc không nằm trong đó thì ô chọn
-            # hiện "— mọi tỉnh —" trong khi danh sách vẫn đang bị lọc và mọi
-            # liên kết vẫn mang `tinh=…`: ô điều khiển nói một đằng, dữ liệu
-            # một nẻo, và bấm "Lọc" lần nữa là bộ lọc biến mất mà không ai
-            # nhấn nút nào để xoá nó.
-            if tinh and tinh not in [g for g, _, _ in tinh_chon]:
-                tinh_chon.append(
-                    (tinh, KH.KHONG_RO if tinh == KH.TINH_TRONG else tinh, None))
-            # Ba bộ lọc mới đọc lại từ `t` (t.nhom/t.hang/t.tinh) chứ không
-            # truyền thêm bản sao vào ctx: hai nguồn cho cùng một giá trị là
-            # hai chỗ có thể trôi khỏi nhau. `nv` thì KHÔNG có trong `t` vì
-            # nó không phải tham số của danh_sach() — nó đi qua `sale`.
-            # Giá trị ĐANG được chọn của ô 担当者. Lấy từ `t.sale` (bộ lọc
-            # THỰC SỰ đang áp dụng) chứ không từ `nv` (thứ người ta gõ trên
-            # URL): mặc định của đợt 3 lọc theo người đăng nhập mà `nv` rỗng,
-            # nên đọc `nv` thì ô chọn hiện "— mọi người phụ trách —" trong
-            # khi danh sách chỉ có khách của một người. Không lọc ai thì rơi
-            # về mục quy ước NV_MOI_NGUOI — chính là mục đầu.
-            return _ve(request, "khach_hang.html",
-                       {"t": t, "tq": tq, "trang_thai": KH.TRANG_THAI,
-                        "trang": "khach", "tat_ca": bool(tat_ca), "nv": nv,
-                        "nv_chon": t.sale or KH.NV_MOI_NGUOI,
-                        "nv_moi_nguoi": KH.NV_MOI_NGUOI,
-                        "tinh_chon": tinh_chon})
-        except Exception as e:
-            return _loi(request, "mở danh sách khách hàng", e)
+    def ds_khach(request: Request):
+        return _man_khach(request)
 
     @app.get("/khach-hang/{ma}", response_class=HTMLResponse)
-    def ho_so_khach(request: Request, ma: str, loi_tx: str = ""):
-        try:
-            with open_app_conn() as conn:
-                h = KH.ho_so(conn, ma)
-            if h is None:
-                return _ve(request, "khong_thay.html",
-                           {"thu": f"khách hàng mã {ma}", "trang": "khach"},
-                           status_code=404)
-            from kome import lien_he as LH
-            return _ve(request, "khach_360.html",
-                       {"h": h, "d": KH.ve_duong(h.thang), "trang": "khach",
-                        "kieu_tx": LH.KIEU, "ket_qua_tx": LH.KET_QUA,
-                        "hom_nay": TDL.hom_nay_o_nhat(), "loi_tx": loi_tx[:200]})
-        except Exception as e:
-            return _loi(request, "mở hồ sơ khách hàng", e)
+    def ho_so_khach(request: Request, ma: str):
+        return _man_khach(request)
 
     # /can-xu-ly (Giai đoạn 1) nay chỉ còn 301 về /lien-he (đợt 7): hai cột
     # "Lâu không mua" + "Quá hạn mua lại" của màn mới ĐÚNG là tập khách của
@@ -848,36 +789,10 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         return RedirectResponse(dich, status_code=303)
 
     @app.get("/ban-do", response_class=HTMLResponse)
-    def ban_do_khach_hang(request: Request, tat_ca: int = 0, nv: str = "",
-                          chi_so: str = "khach"):
-        """Bản đồ 47 tỉnh (đợt 4c). Ngân sách CẢ TRANG (không chỉ hàm
-        BD.ban_do()) là 2 lượt hỏi — có test đếm lúc chạy
-        (tests/test_ban_do.py::test_trang_ban_do_khong_qua_2_truy_van), nên
-        route này KHÔNG được tự mở thêm một truy vấn nào (vd một danh sách
-        tên đầy đủ của người phụ trách để đổ vào ô chọn — thứ /khach-hang có
-        nhưng phải trả giá bằng một lượt hỏi riêng của tong_quan_danh_ba()).
-        Vì vậy ô lọc bên dưới chỉ biết TÊN của người đang lọc khi đó là mặc
-        định theo người đăng nhập (miễn phí, lấy từ session) — lọc sang một
-        mã khác qua `?nv=` thì trang chỉ hiện lại đúng mã đó, không tra ra
-        tên, giống hệt cách /can-xu-ly xử lý cùng ràng buộc.
-
-        `sale`/`nv` cùng một nếp với /khach-hang: mặc định tiện dụng theo
-        người đăng nhập, KHÔNG phải hàng rào bảo mật.
-        """
-        try:
-            sale, ten_sale = _sale_dang_loc(request, tat_ca, nv)
-            with open_app_conn() as conn:
-                t = BD.ban_do(conn, sale=sale, chi_so=chi_so)
-            return _ve(request, "ban_do.html",
-                       {"t": t, "trang": "ban-do", "tat_ca": bool(tat_ca),
-                        "nv": nv, "sale": sale, "ten_sale": ten_sale,
-                        "nv_moi_nguoi": KH.NV_MOI_NGUOI, "chi_so_ds": BD.CHI_SO,
-                        # Kích thước một ô lưới là HẰNG của kome/ban_do.py, không
-                        # phải của template — truyền qua context để không viết
-                        # cứng "60" lần thứ hai trong ban_do.html.
-                        "o_rong": BD.O_RONG, "o_cao": BD.O_CAO})
-        except Exception as e:
-            return _loi(request, "mở bản đồ khách hàng", e)
+    def ban_do_khach_hang(request: Request):
+        """Tab "Bản đồ" của màn Khách hàng (React). Ngân sách lượt hỏi của bản
+        đồ (2) giờ nằm ở /api/ban-do — tests/test_ban_do.py đếm ở đó."""
+        return _man_khach(request)
 
     # ---- Hàng hoá: sản phẩm và kho hàng (đợt 4b) ------------------------
     # Cả ba route đều `open_app_conn` — chúng chỉ đọc. Có test duyệt AST canh

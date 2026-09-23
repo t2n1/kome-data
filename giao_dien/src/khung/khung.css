@@ -92,6 +92,9 @@ a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
 
 @media (max-width:720px){
   #goc,.khung{flex-direction:column}
+  /* Không để gốc giãn theo nội dung rộng (bảng min-width, ô tìm): bảng tự cuộn trong .bang-cuon. */
+  #goc{width:100%;min-width:0}
+  .khung,.khung-than{width:100%;box-sizing:border-box}
   .knav{width:auto;height:auto;position:sticky;top:0;z-index:30;border-right:0;border-bottom:1px solid var(--vien);
     padding:.6rem .8rem;gap:.6rem}
   .knav-menu{display:flex;align-items:center;justify-content:center}

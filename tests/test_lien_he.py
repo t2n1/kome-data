@@ -161,7 +161,9 @@ def test_ghi_qua_web_roi_quay_ve_dung_trang(client, conn, batch):
                     data={"kieu": "goi", "ket_qua": "tot", "noi_dung": "Đặt 3 thùng",
                           "hen_lai": "", "tiep": "/lien-he?tat_ca=1"})
     assert r.status_code == 303 and r.headers["location"] == "/lien-he?tat_ca=1"
-    assert "Đặt 3 thùng" in client.get("/khach-hang/L0011").text
+    # Hồ sơ 360° là React (giai đoạn 2) — đọc nhật ký qua API của nó.
+    nk = client.get("/api/khach-hang/L0011").json()["nhat_ky"]
+    assert "Đặt 3 thùng" in [n["noi_dung"] for n in nk]
 
 
 def test_tiep_ngoai_he_thong_bi_loc(client, conn, batch):
@@ -175,14 +177,34 @@ def test_tiep_ngoai_he_thong_bi_loc(client, conn, batch):
 
 
 def test_bieu_mau_sai_quay_ve_kem_loi_doc_duoc(client, conn, batch):
+    from pathlib import Path
     _nen(conn, batch)
     r = client.post("/khach-hang/L0011/tiep-xuc",
                     data={"kieu": "goi", "ket_qua": "tot", "noi_dung": " ",
                           "tiep": "/khach-hang/L0011#nhat-ky"})
     loc = r.headers["location"]
     assert loc.startswith("/khach-hang/L0011?loi_tx=") and loc.endswith("#nhat-ky")
-    assert "Ghi lại nội dung" in client.get(loc.split("#")[0]).text
+    assert "Ghi%20l%E1%BA%A1i%20n%E1%BB%99i%20dung" in loc or "Ghi lại nội dung" in loc
+    assert client.get(loc.split("#")[0]).status_code == 200
+    # Hồ sơ React đọc ?loi_tx= và hiện câu lỗi (giai đoạn 2).
+    assert 'get("loi_tx")' in Path("giao_dien/src/khach/HoSo.tsx").read_text(encoding="utf-8")
     assert conn.execute("SELECT count(*) FROM app.nhat_ky_tiep_xuc").fetchone()[0] == 0
+
+
+def test_api_ghi_tiep_xuc_chi_nhan_json_va_bao_loi_doc_duoc(client, conn, batch):
+    """POST /api/khach-hang/{mã}/tiep-xuc (form của hồ sơ React): chỉ nhận
+    application/json (một form trang lạ không gửi được kiểu đó nếu không qua
+    preflight CORS), lỗi nhập trả 400 kèm câu tiếng Việt, không ghi dòng nào."""
+    _nen(conn, batch)
+    r = client.post("/api/khach-hang/L0011/tiep-xuc",
+                    data={"kieu": "goi", "ket_qua": "tot", "noi_dung": "x"})
+    assert r.status_code == 415
+    r = client.post("/api/khach-hang/L0011/tiep-xuc", json={"kieu": "goi", "ket_qua": "tot", "noi_dung": " "})
+    assert r.status_code == 400 and "Ghi lại nội dung" in r.json()["loi"]
+    assert conn.execute("SELECT count(*) FROM app.nhat_ky_tiep_xuc").fetchone()[0] == 0
+    r = client.post("/api/khach-hang/L0011/tiep-xuc", json={"kieu": "ghe", "ket_qua": "binh", "noi_dung": "Ghé cửa hàng"})
+    assert r.status_code == 200
+    assert client.get("/api/khach-hang/L0011").json()["nhat_ky"][0]["noi_dung"] == "Ghé cửa hàng"
 
 
 def test_can_xu_ly_chuyen_ve_lien_he(client):

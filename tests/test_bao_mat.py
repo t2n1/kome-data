@@ -542,17 +542,23 @@ def test_bo_co_quyen_thi_luot_goi_KE_TIEP_da_bi_chan(khach, conn):
 
 def test_khong_co_quyen_thi_sidebar_khong_moi_bam_vao_kho_du_lieu(khach):
     """Một liên kết luôn dẫn tới trang từ chối thì tệ hơn là không có."""
+    # Giai đoạn 2: /khach-hang là React (thanh bên dựng từ window.__KOME__.hien_kho —
+    # tests/test_api.py canh); thanh bên Jinja kiểm trên một trang Jinja còn lại.
     c = khach(kho_du_lieu=False)
     _vao(c)
-    t = c.get("/khach-hang").text
+    t = c.get("/lien-he").text
     assert 'href="/kho-du-lieu"' not in t
     assert 'href="/khach-hang"' in t        # các mục khác vẫn còn
+    assert '"hien_kho": false' in c.get("/khach-hang").text
 
 
 def test_co_quyen_thi_sidebar_van_co_muc_kho_du_lieu(khach):
+    # Giai đoạn 2: /khach-hang là React (thanh bên dựng từ window.__KOME__.hien_kho —
+    # tests/test_api.py canh); thanh bên Jinja kiểm trên một trang Jinja còn lại.
     c = khach(kho_du_lieu=True)
     _vao(c)
-    assert 'href="/kho-du-lieu"' in c.get("/khach-hang").text
+    assert 'href="/kho-du-lieu"' in c.get("/lien-he").text
+    assert '"hien_kho": true' in c.get("/khach-hang").text
 
 
 def _no(*a, **k):
@@ -568,11 +574,11 @@ def test_trang_loi_van_con_duong_ve_kho_du_lieu(khach, monkeypatch):
     là falsy, mục biến mất khỏi CHÍNH trang lỗi, kể cả với người CÓ quyền.
     Nghĩa là nạp file gặp lỗi lúc 13:30 thì người phụ trách đứng lại trên một
     trang không có cách nào quay về /kho-du-lieu ngoài gõ tay địa chỉ."""
-    from kome import khach_hang as KH
+    from kome import lien_he as LH
     c = khach(kho_du_lieu=True)
     _vao(c)
-    monkeypatch.setattr(KH, "danh_sach", _no)
-    r = c.get("/khach-hang")
+    monkeypatch.setattr(LH, "danh_sach", _no)
+    r = c.get("/lien-he")   # trang Jinja (/khach-hang là React từ giai đoạn 2)
     assert r.status_code == 500
     assert "Hệ thống gặp lỗi" in r.text
     assert 'href="/kho-du-lieu"' in r.text, "trang lỗi mất đường về Kho dữ liệu"
@@ -581,11 +587,11 @@ def test_trang_loi_van_con_duong_ve_kho_du_lieu(khach, monkeypatch):
 def test_trang_loi_van_khong_moi_nguoi_khong_co_quyen(khach, monkeypatch):
     """Chiều ngược lại của test trên: gộp ngữ cảnh về một chỗ không được biến
     trang lỗi thành kẽ hở mời người không có quyền bấm vào màn bị cấm."""
-    from kome import khach_hang as KH
+    from kome import lien_he as LH
     c = khach(kho_du_lieu=False)
     _vao(c)
-    monkeypatch.setattr(KH, "danh_sach", _no)
-    r = c.get("/khach-hang")
+    monkeypatch.setattr(LH, "danh_sach", _no)
+    r = c.get("/lien-he")   # trang Jinja (/khach-hang là React từ giai đoạn 2)
     assert r.status_code == 500
     assert 'href="/kho-du-lieu"' not in r.text
 
@@ -617,19 +623,24 @@ def test_khong_co_cong_dang_nhap_thi_khong_chan_ai(khach):
     cũng không có khái niệm quyền — mọi thứ mở như trước đợt 3."""
     c = khach(bi_mat=None, tai_khoan=False)
     assert c.get("/kho-du-lieu").status_code == 200
-    assert 'href="/kho-du-lieu"' in c.get("/khach-hang").text
+    assert 'href="/kho-du-lieu"' in c.get("/lien-he").text
+    assert '"hien_kho": true' in c.get("/khach-hang").text
 
 
 # ---- Mặc định "khách của tôi" (đợt 3) ----------------------------------
 
 def test_dang_nhap_co_ma_sale_thi_trang_khach_mac_dinh_loc_theo_minh(khach):
-    """Mặc định TIỆN DỤNG, không phải hàng rào: trang nói rõ đang lọc theo ai
-    và có một liên kết hiện rõ để xem tất cả."""
+    """Mặc định TIỆN DỤNG, không phải hàng rào: màn nói rõ đang lọc theo ai
+    và có một đường hiện rõ để xem tất cả (nút "Xem tất cả →" gửi `nv` =
+    giá trị quy ước "mọi người" mà API trả về)."""
     c = khach(sale="0104")
     _vao(c)
-    t = c.get("/khach-hang").text
-    assert "TRAN THI LAN THANH" in t
-    assert "tat_ca=1" in t, "không có đường thoát khỏi bộ lọc"
+    d = c.get("/api/khach-hang/ds").json()
+    assert d["sale"] == "0104" and d["ten_sale"] == "TRAN THI LAN THANH"
+    assert d["nv_moi_nguoi"] == KH.NV_MOI_NGUOI
+    from pathlib import Path
+    assert "dat({ nv: d.nv_moi_nguoi })" in Path("giao_dien/src/khach/DanhSach.tsx").read_text(encoding="utf-8"), \
+        "không có đường thoát khỏi bộ lọc"
 
 
 def test_bam_xem_tat_ca_thi_bo_loc(khach):
@@ -641,16 +652,15 @@ def test_bam_xem_tat_ca_thi_bo_loc(khach):
 
 
 def test_chon_moi_nguoi_phu_trach_thi_that_su_bo_loc(khach, conn, batch):
-    """[IMPORTANT] Mục đầu của ô lọc 担当者 phải THẬT SỰ bỏ lọc.
+    """[IMPORTANT] Mục "Mọi nhân viên" của ô lọc 担当者 phải THẬT SỰ bỏ lọc.
 
-    Trước vòng sửa này mục đó mang giá trị RỖNG, mà rỗng nghĩa là "không chọn
-    gì" -> trang rơi về mặc định của đợt 3 và lọc theo người ĐANG ĐĂNG NHẬP.
-    Kết quả: ô chọn khoe "— mọi người phụ trách —" trong khi danh sách vẫn
-    chỉ có khách của một người — đúng cái "ô điều khiển nói một đằng, dữ liệu
-    một nẻo" mà test của ô Tỉnh được viết ra để chặn. Và vì form lọc chỉ mang
-    `tat_ca` khi nó ĐÃ bật, trên bản Vercel nhân viên không có đường nào từ ô
-    đó ra xem toàn công ty.
-    """
+    Mục đó mang giá trị quy ước `KH.NV_MOI_NGUOI`, KHÔNG phải chuỗi rỗng: rỗng
+    nghĩa là "không chọn gì" -> rơi về mặc định lọc theo người ĐANG ĐĂNG NHẬP,
+    tức ô chọn khoe "mọi người" mà danh sách vẫn là của một người. Và ô chọn
+    phải hiện ĐÚNG người đang lọc khi đang ở mặc định (giao diện đọc `sale`
+    mà API trả về, không đọc `nv` rỗng trên URL)."""
+    from pathlib import Path
+
     from tests.test_khach_hang import HOM_NAY, _ho_so_khach, _mua
 
     _ho_so_khach(conn, batch, "S0104", "Quan CUA MINH", salesperson_code="0104")
@@ -661,18 +671,18 @@ def test_chon_moi_nguoi_phu_trach_thi_that_su_bo_loc(khach, conn, batch):
     c = khach(sale="0104")
     _vao(c)
 
-    mac_dinh = c.get("/khach-hang").text
-    assert "Quan NGUOI KHAC" not in mac_dinh, "mặc định đợt 3 đã hỏng"
-    # Ô chọn phải nói đúng cái đang xảy ra: đang lọc theo 0104 thì nó hiện
-    # tên 0104, KHÔNG hiện "— mọi người phụ trách —".
-    assert '<option value="__moi_nguoi" selected>' not in mac_dinh, \
-        "ô chọn khoe 'mọi người' trong khi danh sách đang bị lọc theo một người"
+    ten = lambda d: {k["ten"] for k in d["trang"]["khach"]}
+    mac_dinh = c.get("/api/khach-hang/ds").json()
+    assert "Quan NGUOI KHAC" not in ten(mac_dinh), "mặc định đợt 3 đã hỏng"
+    assert mac_dinh["sale"] == "0104"
+    assert "const nvDang = b.nv || d.sale || d.nv_moi_nguoi;" in \
+        Path("giao_dien/src/khach/DanhSach.tsx").read_text(encoding="utf-8"), \
+        "ô chọn phải hiện người ĐANG lọc, không khoe 'mọi người' khi đang ở mặc định"
 
-    moi_nguoi = c.get(f"/khach-hang?nv={KH.NV_MOI_NGUOI}").text
-    assert "Quan NGUOI KHAC" in moi_nguoi and "Quan CUA MINH" in moi_nguoi, \
-        "chọn '— mọi người phụ trách —' mà danh sách vẫn bị lọc theo người đăng nhập"
-    assert "Đang xem khách của" not in moi_nguoi
-    assert '<option value="__moi_nguoi" selected>' in moi_nguoi
+    moi_nguoi = c.get(f"/api/khach-hang/ds?nv={KH.NV_MOI_NGUOI}").json()
+    assert {"Quan NGUOI KHAC", "Quan CUA MINH"} <= ten(moi_nguoi), \
+        "chọn 'mọi người' mà danh sách vẫn bị lọc theo người đăng nhập"
+    assert moi_nguoi["sale"] is None
 
 
 def test_nguoi_khong_phu_trach_khach_nao_thay_toan_bo_ngay_tu_dau(khach):
