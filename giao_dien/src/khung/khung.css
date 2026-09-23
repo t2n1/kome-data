@@ -1,0 +1,101 @@
+/* Khung chung — kích thước và màu theo kome-nav.js + README "Design Tokens".
+   Chỉ dùng biến màu của kome.css (bất biến: không mã màu nào ngoài kome.css,
+   hai khối tối giống hệt nhau — biến tự đổi theo chế độ). */
+#goc{flex:1;min-width:0;display:flex;min-height:100vh}
+.khung{flex:1;min-width:0;display:flex;font-family:var(--font-ui)}
+.khung-than{flex:1;min-width:0;padding:1.2rem 1.25rem 3rem;max-width:1500px}
+
+.knav{width:196px;flex-shrink:0;background:var(--nen-the);border-right:1px solid var(--vien);
+  padding:1rem .7rem;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;
+  flex-direction:column;gap:1.05rem;font-size:.85rem}
+.knav a{text-decoration:none}
+.knav-dau{display:flex;align-items:center;gap:.4rem}
+.knav-than{display:flex;flex-direction:column;gap:1.05rem;flex:1}
+.knav-menu{display:none;flex-shrink:0;width:32px;height:32px;border-radius:9px;cursor:pointer;font:inherit;
+  border:1px solid var(--vien);background:var(--nen-the);color:var(--chu-thuong)}
+.knav-logo{flex:1;min-width:0;display:flex;align-items:center;gap:.5rem;font-weight:700;
+  letter-spacing:.08em;font-size:.84rem;color:var(--chu);padding:0 .3rem}
+.knav-logo img{width:26px;height:26px;border-radius:50%;object-fit:cover}
+.knav-chuong{position:relative;flex-shrink:0;width:32px;height:32px;border-radius:9px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;border:1px solid var(--vien);
+  background:var(--nen-the);color:var(--chu-thuong)}
+.knav-chuong:hover{background:var(--nen-phu)}
+.knav-dem{position:absolute;top:-5px;right:-5px;font-size:.62rem;font-weight:700;min-width:16px;height:16px;
+  border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 .2rem;
+  background:var(--do);color:var(--nen-the)}
+.knav-tim{display:flex;align-items:center;gap:.45rem;width:100%;font:inherit;font-size:.78rem;cursor:pointer;
+  padding:.38rem .55rem;border-radius:9px;border:1px solid var(--vien);background:var(--nen-phu);color:var(--chu-nhat)}
+.knav-tim kbd{margin-left:auto;font:inherit;font-size:.68rem;opacity:.75}
+.knav-nhom-ten{width:100%;font:inherit;cursor:pointer;background:transparent;border:0;display:flex;
+  align-items:center;gap:.35rem;padding:.1rem .5rem;margin-bottom:.35rem;font-size:.68rem;font-weight:600;
+  letter-spacing:.1em;color:var(--chu-nhat);text-align:left}
+.knav-mui{display:inline-block;width:8px;flex-shrink:0;transition:transform .12s}
+.knav-mui.dong{transform:rotate(-90deg)}
+.knav-ds{display:flex;flex-direction:column;gap:.12rem}
+.knav-muc{padding:.42rem .55rem;border-radius:8px;font-size:.85rem;display:flex;align-items:center;
+  gap:.55rem;color:var(--chu-thuong);font:inherit;border:0;background:transparent;width:100%;cursor:pointer;text-align:left}
+a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
+.knav-muc.on{background:var(--do-nen);color:var(--do-chu);font-weight:600}
+.knav-muc > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.knav-muc.chua{color:var(--chu-mo);cursor:default}
+.knav-muc.chua em{margin-left:auto;flex-shrink:0;font-style:normal;font-size:.58rem;border:1px solid var(--vien);
+  border-radius:99px;padding:0 .28rem;white-space:nowrap}
+.knav-cuoi{margin-top:auto;border-top:1px solid var(--vien-phu);padding-top:.7rem;display:flex;flex-direction:column;gap:.35rem}
+.knav-cuoi form{margin:0}
+.knav-toi{display:flex;align-items:center;gap:.55rem;padding:.2rem .55rem;font-size:.8rem;color:var(--chu-thuong);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.knav-thoat{font-size:.8rem;color:var(--chu-nhat)}
+.knav-che-do{display:grid;grid-template-columns:repeat(2,1fr);gap:.2rem;background:var(--nen-phu);
+  border-radius:9px;padding:.2rem}
+.knav-che-do a{font-size:.7rem;text-align:center;padding:.22rem 0;border-radius:7px;color:var(--chu-nhat)}
+.knav-che-do a.on{background:var(--nen-the);color:var(--do-chu);font-weight:600;box-shadow:0 0 0 1px var(--vien)}
+
+/* Lớp phủ + bảng tìm nhanh + bảng thông báo */
+.lop-phu{position:fixed;inset:0;z-index:60;background:color-mix(in srgb, var(--chu) 30%, transparent);
+  display:flex;align-items:flex-start;justify-content:center;padding-top:12vh}
+.tim-hop{width:min(560px,92vw);background:var(--nen-the);border:1px solid var(--vien);border-radius:14px;overflow:hidden}
+.tim-o{display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;border-bottom:1px solid var(--vien);color:var(--chu-nhat)}
+.tim-o input{flex:1;font:inherit;font-size:.95rem;border:0;outline:0;background:transparent;color:var(--chu)}
+.tim-o kbd{font:inherit;font-size:.7rem;border:1px solid var(--vien);border-radius:5px;padding:0 .3rem}
+.tim-ds{list-style:none;margin:0;padding:.35rem;max-height:52vh;overflow-y:auto}
+.tim-ds li{display:flex;align-items:center;gap:.6rem;padding:.5rem .6rem;border-radius:8px;cursor:pointer;
+  color:var(--chu-thuong);font-size:.88rem}
+.tim-ds li.chon{background:var(--nen-phu);color:var(--chu)}
+.tim-ds li em{margin-left:auto;font-style:normal;font-size:.68rem;letter-spacing:.06em;color:var(--chu-mo)}
+.tim-ds li.trong{cursor:default;color:var(--chu-mo)}
+
+.tb-bang{position:fixed;top:0;right:0;bottom:0;width:min(400px,92vw);z-index:61;background:var(--nen-the);
+  border-left:1px solid var(--vien);display:flex;flex-direction:column}
+.tb-dau{display:flex;align-items:center;gap:.5rem;padding:1rem 1.1rem .8rem;border-bottom:1px solid var(--vien)}
+.tb-dau > div{flex:1}
+.tb-dau strong{font-size:1.02rem}
+.tb-ds{list-style:none;margin:0;padding:.5rem;overflow-y:auto;flex:1}
+.tb-muc a{display:flex;gap:.6rem;padding:.6rem .6rem;border-radius:10px;color:var(--chu);text-decoration:none}
+.tb-muc a:hover{background:var(--nen-phu)}
+.tb-muc.da-doc{opacity:.6}
+.tb-ky{flex-shrink:0;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;font-weight:700}
+.tb-muc.gap .tb-ky{background:var(--loi-nen);color:var(--loi-chu)}
+.tb-muc.canh .tb-ky{background:var(--canh-nen);color:var(--canh-chu)}
+.tb-muc.thuong .tb-ky{background:var(--lam-nen);color:var(--lam-chu)}
+.tb-muc.ok .tb-ky{background:var(--ok-nen);color:var(--ok-chu)}
+.tb-than{display:flex;flex-direction:column;gap:.1rem;font-size:.82rem;min-width:0}
+.tb-loai{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--chu-nhat)}
+.tb-chu-thich{margin:0;padding:.7rem 1.1rem;border-top:1px solid var(--vien);font-size:.72rem;color:var(--chu-mo)}
+
+.phu{font-size:.76rem;color:var(--chu-nhat)}
+.nut-nho{font:inherit;font-size:.74rem;padding:.26rem .6rem;border-radius:7px;cursor:pointer;
+  border:1px solid var(--vien);background:var(--nen-the);color:var(--chu-thuong);white-space:nowrap}
+.nut-nho:hover{background:var(--nen-phu)}
+.nut-dong{font:inherit;border:0;background:transparent;cursor:pointer;color:var(--chu-nhat);font-size:.9rem;padding:.2rem .35rem}
+.trong{color:var(--chu-mo);font-size:.82rem;padding:.6rem}
+
+@media (max-width:720px){
+  #goc,.khung{flex-direction:column}
+  .knav{width:auto;height:auto;position:sticky;top:0;z-index:30;border-right:0;border-bottom:1px solid var(--vien);
+    padding:.6rem .8rem;gap:.6rem}
+  .knav-menu{display:flex;align-items:center;justify-content:center}
+  .knav-than{display:none}
+  .knav-than.mo{display:flex;max-height:calc(100vh - 60px);overflow-y:auto;padding-bottom:.6rem}
+  .khung-than{padding:1rem 1rem 2.5rem}
+}

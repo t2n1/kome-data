@@ -32,18 +32,18 @@ def test_rac_thi_ve_mac_dinh_khong_nem_loi(tho):
 def test_giu_thu_tu_va_noi_khoi_thieu_vao_cuoi():
     """Bố cục lưu từ trước khi code thêm một khối vẫn đọc được — khối mới
     nối vào CUỐI, không vứt cả bố cục về mặc định như gói thiết kế."""
-    ra = BC.chuan_hoa([{"id": "can_han", "rong": 3, "cao": 1}, {"id": "chi_so", "rong": 1, "cao": 4}])
-    assert [o.id for o in ra[:2]] == ["can_han", "chi_so"]
+    ra = BC.chuan_hoa([{"id": "han_su_dung", "rong": 3, "cao": 1}, {"id": "kpi", "rong": 1, "cao": 4}])
+    assert [o.id for o in ra[:2]] == ["han_su_dung", "kpi"]
     assert (ra[0].rong, ra[0].cao, ra[1].rong, ra[1].cao) == (3, 1, 1, 4)
     assert sorted(o.id for o in ra) == sorted(MA)
     assert all(not o.an for o in ra)
 
 
 def test_bo_ma_la_va_ma_trung():
-    ra = BC.chuan_hoa([{"id": "xoa_du_lieu"}, {"id": "chi_so", "rong": 2},
-                       {"id": "chi_so", "rong": 3}, {"id": "__proto__"}])
-    assert [o.id for o in ra].count("chi_so") == 1
-    assert ra[0].id == "chi_so" and ra[0].rong == 2
+    ra = BC.chuan_hoa([{"id": "xoa_du_lieu"}, {"id": "kpi", "rong": 2},
+                       {"id": "kpi", "rong": 3}, {"id": "__proto__"}])
+    assert [o.id for o in ra].count("kpi") == 1
+    assert ra[0].id == "kpi" and ra[0].rong == 2
     assert len(ra) == len(MA)
 
 
@@ -59,25 +59,35 @@ def test_kich_thuoc_kep_trong_dai_kieu_sai_lay_mac_dinh(rong, cao, mong):
 
 
 def test_an_chi_nhan_dung_true():
-    ra = {o.id: o.an for o in BC.chuan_hoa([{"id": "chi_so", "an": True}, {"id": "xu_huong", "an": "true"},
-                                            {"id": "can_goi", "an": 1}])}
-    assert ra["chi_so"] is True and ra["xu_huong"] is False and ra["can_goi"] is False
+    ra = {o.id: o.an for o in BC.chuan_hoa([{"id": "kpi", "an": True}, {"id": "xu_huong", "an": "true"},
+                                            {"id": "tuong_quan", "an": 1}])}
+    assert ra["kpi"] is True and ra["xu_huong"] is False and ra["tuong_quan"] is False
 
 
 def test_doc_duoc_chuoi_json():
-    ra = BC.chuan_hoa(json.dumps([{"id": "suc_khoe", "rong": 3, "cao": 1, "an": True}]))
-    assert ra[0] == BC.O("suc_khoe", 3, 1, True)
+    ra = BC.chuan_hoa(json.dumps([{"id": "suc_khoe_khach", "rong": 3, "cao": 1, "an": True}]))
+    assert ra[0] == BC.O("suc_khoe_khach", 3, 1, True)
 
 
-def test_moi_khoi_trong_KHOI_co_macro_trong_template_va_nguoc_lai():
-    """Thêm khối là thêm MỘT dòng vào KHOI và MỘT macro cùng tên — lệch là
-    trang chủ nổ KeyError (khối chỉ có ở Python) hoặc khối vẽ được mà không
-    bao giờ hiện (chỉ có ở template)."""
-    html = (GOC / "kome/web/templates/tong_quan.html").read_text(encoding="utf-8")
-    ve = re.search(r"\{% set VE = \{(.*?)\} %\}", html, re.S).group(1)
-    assert set(re.findall(r'"(\w+)":\s*khoi_\1\b', ve)) == set(MA)
-    for ma in MA:
-        assert f"{{% macro khoi_{ma}(o) %}}" in html
+def test_ma_khoi_cua_ban_jinja_van_doc_duoc():
+    """Bố cục lưu bằng bản Jinja (034, mã chi_so/can_han…) không bị vứt khi đổi
+    sang giao diện React — đổi sang mã mới, giữ nguyên thứ tự và kích thước."""
+    ra = BC.chuan_hoa([{"id": "can_han", "rong": 1, "cao": 3}, {"id": "chi_so", "an": True}])
+    assert (ra[0].id, ra[0].rong, ra[0].cao) == ("han_su_dung", 1, 3)
+    assert ra[1].id == "kpi" and ra[1].an is True
+
+
+def test_danh_muc_bam_goi_thiet_ke():
+    """21 khối, 6 nhóm, 4 vai trò của Dashboard.dc.html; mọi khối của vai trò
+    đều có trong danh mục; mọi khối KHÔNG có hàm dữ liệu thì có câu "chưa có"."""
+    from kome import khoi_tong_quan as KTQ
+    dm = BC.danh_muc()
+    ma = {k["id"] for k in dm["khoi"]}
+    assert len(ma) == 21 and len(dm["nhom"]) == 6 and len(dm["vai_tro"]) == 4
+    assert all(set(v["khoi"]) <= ma for v in dm["vai_tro"])
+    assert ma == set(KTQ.KHOI) | set(KTQ.CHUA_CO)
+    assert not set(KTQ.KHOI) & set(KTQ.CHUA_CO)
+
 
 
 # ---- Trang web ----------------------------------------------------------
@@ -115,50 +125,54 @@ def _luu(c, bo_cuc):
                   headers={"Content-Type": "application/json"})
 
 
+def _khoi_dau(html):
+    """window.__KOME__ máy chủ chèn vào index.html (kome/web/spa.py)."""
+    m = re.search(r"<script>window.__KOME__=(.*?)</script>", html, re.S)
+    assert m, "trang không có dữ liệu khởi đầu"
+    return json.loads(m.group(1))
+
+
 def _thu_tu(html):
-    return re.findall(r'<section class="khoi-tq" data-khoi="(\w+)"', html)
+    return [o["id"] for o in _khoi_dau(html)["bo_cuc"]]
 
 
 def test_luu_roi_trang_ve_SAN_dung_thu_tu_va_kich_thuoc(web, conn):
-    """Máy chủ vẽ đúng bố cục đã lưu trong HTML đầu tiên — không có khung
-    hình mặc định rồi giật sang bố cục của mình (cùng lý lẽ cookie giao diện)."""
+    """Bố cục đã lưu nằm SẴN trong HTML đầu tiên (window.__KOME__) — giao diện
+    vẽ đúng ngay, không có khung hình mặc định rồi giật sang bố cục của mình."""
     c = web.vao(web())
-    r = _luu(c, [{"id": "can_han", "rong": 3, "cao": 1}, {"id": "chi_so", "rong": 1, "cao": 3}])
+    r = _luu(c, [{"id": "han_su_dung", "rong": 3, "cao": 1}, {"id": "kpi", "rong": 1, "cao": 3}])
     assert r.status_code == 200
-    assert r.json()["bo_cuc"][0] == {"id": "can_han", "rong": 3, "cao": 1, "an": False}
-
-    html = c.get("/").text
-    assert _thu_tu(html)[:2] == ["can_han", "chi_so"]
-    assert re.search(r'data-khoi="can_han"[^>]*style="grid-column:span 3;grid-row:span 1"', html)
-    assert re.search(r'data-khoi="chi_so"[^>]*style="grid-column:span 1;grid-row:span 3"', html)
+    assert r.json()["bo_cuc"][0] == {"id": "han_su_dung", "rong": 3, "cao": 1, "an": False}
+    kd = _khoi_dau(c.get("/").text)
+    assert [o["id"] for o in kd["bo_cuc"]][:2] == ["han_su_dung", "kpi"]
+    assert kd["bo_cuc"][1] == {"id": "kpi", "rong": 1, "cao": 3, "an": False}
+    assert kd["sap_xep_duoc"] is True
     luu = conn.execute("SELECT bo_cuc_tong_quan FROM app.nguoi_dung WHERE ten_dang_nhap='an'").fetchone()[0]
-    assert [x["id"] for x in luu][:2] == ["can_han", "chi_so"] and len(luu) == len(MA)
+    assert [x["id"] for x in luu][:2] == ["han_su_dung", "kpi"] and len(luu) == len(MA)
 
 
-def test_khoi_an_van_co_trong_trang_nhung_hidden_va_nam_trong_o_them(web):
-    """Khối ẩn vẫn được vẽ (thuộc tính `hidden`) để bấm "Hiện" là thấy ngay,
-    không phải tải lại trang; và nó nằm trong ô "Thêm chức năng"."""
+def test_khoi_an_van_nam_trong_bo_cuc_voi_co_an(web):
+    """Khối ẩn không biến khỏi bố cục — nó mang `an`, và ô "Thêm chức năng"
+    hiện lại được."""
     c = web.vao(web())
     _luu(c, [{"id": "xu_huong", "an": True}])
-    html = c.get("/").text
-    assert re.search(r'data-khoi="xu_huong"[^>]*\bhidden\b', html)
-    assert re.search(r'data-muc-an="xu_huong">', html)             # mục hiện lại KHÔNG hidden
-    assert re.search(r'data-muc-an="chi_so" hidden', html)
-    assert "(<span data-dem-an>1</span> đang ẩn)" in html
+    kd = _khoi_dau(c.get("/").text)
+    an = {o["id"]: o["an"] for o in kd["bo_cuc"]}
+    assert an["xu_huong"] is True and an["kpi"] is False and len(an) == len(MA)
 
 
 def test_hai_nguoi_hai_bo_cuc(web):
     a = web.vao(web(), "an")
-    _luu(a, [{"id": "can_goi"}])
+    _luu(a, [{"id": "tuong_quan"}])
     b = web.vao(web(), "binh")
-    _luu(b, [{"id": "suc_khoe"}])
-    assert _thu_tu(a.get("/").text)[0] == "can_goi"
-    assert _thu_tu(b.get("/").text)[0] == "suc_khoe"
+    _luu(b, [{"id": "suc_khoe_khach"}])
+    assert _thu_tu(a.get("/").text)[0] == "tuong_quan"
+    assert _thu_tu(b.get("/").text)[0] == "suc_khoe_khach"
 
 
 def test_ve_mac_dinh_bang_form_thuong(web, conn):
     c = web.vao(web())
-    _luu(c, [{"id": "can_han"}])
+    _luu(c, [{"id": "han_su_dung"}])
     r = c.post("/tong-quan/bo-cuc/mac-dinh")
     assert r.status_code == 303 and r.headers["location"] == "/"
     assert _thu_tu(c.get("/").text) == MA
@@ -186,16 +200,14 @@ def test_chua_dang_nhap_thi_bi_cong_chan(web):
     assert r.status_code == 303 and r.headers["location"] == "/dang-nhap"
 
 
-def test_khong_co_cong_dang_nhap_thi_khong_co_nut_va_khong_luu(web):
-    """Máy trong công ty để trống KOME_SESSION_SECRET: không biết ai là ai,
-    nên không có nút nào hứa "lưu bố cục của bạn" — và POST bị từ chối."""
+def test_khong_co_cong_dang_nhap_thi_khong_luu_duoc(web):
+    """Máy trong công ty để trống KOME_SESSION_SECRET: không biết ai là ai —
+    giao diện được báo `sap_xep_duoc: false` (xếp tạm, không lưu) và POST bị
+    từ chối."""
     c = web(bi_mat=None)
-    html = c.get("/").text
-    assert _thu_tu(html) == MA
-    for dau in ('class="keo-khoi"', 'class="an-khoi"', 'class="co-gian"', 'src="/static/tong_quan.js"',
-                "Về bố cục mặc định", "data-luu="):
-        assert dau not in html, dau
-    assert _luu(c, [{"id": "can_han"}]).status_code == 403
+    kd = _khoi_dau(c.get("/").text)
+    assert kd["nguoi"] is None and kd["sap_xep_duoc"] is False and _thu_tu(c.get("/").text) == MA
+    assert _luu(c, [{"id": "han_su_dung"}]).status_code == 403
 
 
 def test_ban_vercel_chi_doc_van_luu_duoc_bo_cuc(web):
@@ -204,14 +216,12 @@ def test_ban_vercel_chi_doc_van_luu_duoc_bo_cuc(web):
     assert _luu(c, [{"id": "can_han"}]).status_code == 200
 
 
-def test_script_duy_nhat_la_file_tu_host_va_khong_goi_ra_ngoai(web):
-    """File JS duy nhất của app: tự host (không CDN — R1) và chỉ gọi về chính
-    máy chủ. Mọi trang khác vẫn không có <script> (test riêng từng trang)."""
+def test_trang_react_chi_nap_file_tu_host(web):
+    """R1: không CDN, không font ngoài — mọi <script src>/<link href> của trang
+    trỏ về chính máy chủ (/assets, /static)."""
     html = web.vao(web()).get("/").text
-    assert re.findall(r"<script[^>]*>", html) == ['<script src="/static/tong_quan.js" defer>']
-    js = (GOC / "kome/web/static/tong_quan.js").read_text(encoding="utf-8")
-    assert "http://" not in js and "https://" not in js
-    assert "localStorage" not in js
+    for src in re.findall(r'(?:src|href)="([^"]+)"', html):
+        assert src.startswith(("/assets/", "/static/")), src
 
 
 def test_ghi_bo_cuc_khong_them_truy_van_cho_trang_chu(web, monkeypatch, conn):

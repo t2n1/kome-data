@@ -70,6 +70,10 @@ def _khong_cong_dang_nhap(monkeypatch):
     """
     monkeypatch.delenv("KOME_SESSION_SECRET", raising=False)
     monkeypatch.delenv("DATABASE_URL_APP", raising=False)
+    # Ảnh chụp API (kome/web/anh_chup.py) TẮT mặc định: nhiều test chèn thẳng
+    # vào core mà không tạo lô nạp mới, tức phiên bản dữ liệu không đổi — bật
+    # ảnh chụp là test sau đọc số của test trước. tests/test_anh_chup.py tự bật.
+    monkeypatch.setenv("KOME_ANH_CHUP", "0")
 
 
 @pytest.fixture(scope="session")

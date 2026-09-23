@@ -42,6 +42,10 @@ from kome.tuoi_du_lieu import tinh_tuoi
 from kome.web import bao_mat
 from kome.web import nguoi_dung as ND
 from kome.web import bo_cuc as BC
+from kome.web import spa as SPA
+from kome.web import anh_chup
+from kome.web.api import tao_api
+from kome.khoi_tong_quan import CHUA_CO as KTQ_CHUA_CO
 from ops.backup import backup_status
 
 # Đợt 4d (Task 2) — nút đổi giao diện sáng/tối, KHÔNG JS.
@@ -191,6 +195,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         StaticFiles(directory=str(Path(__file__).parent / "static")),
         name="static",
     )
+    # File build của giao diện React (kome/web/spa/, commit vào git — đặc tả
+    # 2026-09-23-giao-dien-react-design.md). Tên file có mã băm nội dung nên
+    # trình duyệt giữ lâu được; không chứa một byte dữ liệu kinh doanh nào.
+    app.mount("/assets", StaticFiles(directory=str(SPA.THU_MUC / "assets"), check_dir=False),
+              name="assets")
     archive_dir = Path(os.environ.get("ARCHIVE_DIR", "./raw_archive"))
     open_conn = lambda: connect(db_url)
     chi_doc = _chi_doc()
@@ -351,7 +360,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             # canh: tests/test_bao_mat.py::
             # test_static_khong_bi_chan_boi_cong_dang_nhap.
             if (request.url.path == "/dang-nhap"
-                    or request.url.path.startswith("/static/")):
+                    or request.url.path.startswith("/static/")
+                    or request.url.path.startswith("/assets/")):
                 return await call_next(request)
 
             # Vé chỉ mang ID. Mọi thứ khác (còn tài khoản không, quyền gì) tra
@@ -374,6 +384,10 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                     # thì trang đăng nhập cũng tra CSDL và cũng hỏng, người
                     # dùng chỉ thấy một vòng lặp không lời giải thích.
                     return _loi(request, "kiểm tra phiên đăng nhập", e)
+            if nguoi is None and request.url.path.startswith("/api/"):
+                # Giao diện React tự chuyển về /dang-nhap khi thấy 401 — một
+                # 303 ở đây thì fetch() lặng lẽ đi theo và nhận về HTML.
+                return JSONResponse({"loi": "Chưa đăng nhập."}, status_code=401)
             if nguoi is None:
                 resp = RedirectResponse("/dang-nhap", status_code=303)
                 # Nhớ nơi người ta định đến để đăng nhập xong quay lại đúng
@@ -448,6 +462,46 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             resp.delete_cookie(bao_mat.TEN_COOKIE)
             return resp
 
+    app.include_router(tao_api(open_app_conn))
+
+    def _khoi_dau(request: Request) -> dict:
+        """Những gì giao diện React cần để vẽ khung NGAY, không chờ /api."""
+        nguoi = getattr(request.state, "nguoi", None)
+        che_do = _che_do_giao_dien(request)
+        return {
+            "nguoi": None if nguoi is None else {
+                "id": nguoi.id, "ten_dang_nhap": nguoi.ten_dang_nhap,
+                "sale": nguoi.salesperson_code, "ten_sale": nguoi.ten_sale,
+                "duoc_vao_kho_du_lieu": nguoi.duoc_vao_kho_du_lieu,
+                "duoc_sua_ngan_sach": nguoi.duoc_sua_ngan_sach,
+                "duoc_quan_tri": nguoi.duoc_quan_tri},
+            "co_dang_nhap": bool(bi_mat), "chi_doc": chi_doc,
+            "hien_kho": nguoi is None or nguoi.duoc_vao_kho_du_lieu,
+            "hien_ngan_sach": nguoi is None or nguoi.duoc_sua_ngan_sach,
+            "che_do_giao_dien": che_do,
+            "bo_cuc": [o.dict() for o in BC.chuan_hoa(nguoi.bo_cuc if nguoi else None)],
+            "sap_xep_duoc": nguoi is not None,
+            "danh_muc": BC.danh_muc(),
+            "chua_co": KTQ_CHUA_CO,
+        }
+
+    def _spa(request: Request, tuoi: bool = False) -> HTMLResponse:
+        kd = _khoi_dau(request)
+        if tuoi:
+            # Ô "hôm nay đã có dữ liệu chưa" (kome/tuoi_du_lieu.py) — ĐỒNG HỒ
+            # THẬT (ngoại lệ của bất biến mốc thời gian), nên KHÔNG qua ảnh
+            # chụp. Chèn sẵn để nó hiện NGAY, TRÊN mọi con số, như bản Jinja.
+            try:
+                with open_app_conn() as conn:
+                    t = tinh_tuoi(conn)
+                kd["tuoi"] = {"hom_nay": t.hom_nay, "co_thieu": t.co_thieu,
+                              "nguon": [{"spec": n.spec, "ten": n.ten, "ngay": n.ngay,
+                                         "trang_thai": n.trang_thai, "tre": n.tre} for n in t.nguon]}
+            except Exception:
+                traceback.print_exc()
+                kd["tuoi"] = None
+        return HTMLResponse(SPA.trang(_data_theme(_che_do_giao_dien(request)), kd))
+
     # ---- Các trang ------------------------------------------------------
     @app.get("/", response_class=HTMLResponse)
     def trang_chu(request: Request, tat_ca: int = 0):
@@ -462,33 +516,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         (tháng, xu hướng, sức khoẻ, ngân sách, hàng cận hạn) không lọc theo
         sale — xem docstring `kome.tong_quan.tong_quan`.
         """
-        try:
-            sale, ten_sale = _sale_dang_loc(request, tat_ca)
-            # Mã sale CỦA CHÍNH người đăng nhập, bất kể `tat_ca` đang bật hay
-            # không — khác `sale` (bộ lọc HIỆU LỰC của khối "Cần gọi hôm nay",
-            # None khi `?tat_ca=1`). Cần cả hai để vẽ liên kết "Xem danh sách
-            # của tôi" khi đang xem "mọi người" mà người đăng nhập VẪN có một
-            # mã sale riêng để quay về.
-            nguoi = getattr(request.state, "nguoi", None)
-            nguoi_sale = nguoi.salesperson_code if nguoi is not None else None
-            with open_app_conn() as conn:
-                tq = TQ.tong_quan(conn, sale)
-                tuoi = tinh_tuoi(conn)
-            return _ve(request, "tong_quan.html",
-                       {"tq": tq, "tuoi": tuoi, "trang": "tong-quan",
-                        "sale": sale, "ten_sale": ten_sale, "tat_ca": bool(tat_ca),
-                        "nguoi_sale": nguoi_sale,
-                        "xh": ve_xu_huong(tq.ngay),
-                        "doan_suc_khoe": TQ.doan_suc_khoe(tq.dem),
-                        "trang_thai_nhan": KH.TRANG_THAI,
-                        "can_han_ngay": SP.CAN_HAN_NGAY,
-                        # Bố cục của NGƯỜI ĐANG XEM (034). Không có người
-                        # (máy trong công ty chưa bật cổng) -> mặc định, và
-                        # không có nút sắp xếp: không biết lưu cho ai.
-                        "bo_cuc": BC.chuan_hoa(nguoi.bo_cuc if nguoi else None),
-                        "sap_xep_duoc": nguoi is not None})
-        except Exception as e:
-            return _loi(request, "mở trang tổng quan", e)
+        if not SPA.co_ban_build():
+            return _loi(request, "mở trang tổng quan",
+                        RuntimeError("Thiếu bản build giao diện (kome/web/spa/index.html). "
+                                     "Chạy: cd giao_dien && npm run build"))
+        return _spa(request, tuoi=True)
 
     @app.post("/tong-quan/bo-cuc")
     async def luu_bo_cuc(request: Request):
@@ -917,6 +949,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         results.append(ingest(conn, staged, archive_dir))
                 _ghi_ai(conn, "nap_boi", [r.batch_id for r in results if r.batch_id],
                         getattr(request.state, "nguoi", None))
+            if any(r.batch_id for r in results):
+                anh_chup.lam_nong(open_app_conn)
             backup_dir = Path(os.environ.get("BACKUP_DIR", "./backups"))
             with open_conn() as conn:
                 ctx = _du_lieu_kho(conn)
@@ -1193,6 +1227,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             with open_conn() as conn:
                 undo_batch(conn, batch_id)
                 _ghi_ai(conn, "huy_boi", [batch_id], getattr(request.state, "nguoi", None))
+            anh_chup.lam_nong(open_app_conn)
             return RedirectResponse("/kho-du-lieu", status_code=303)
         except Exception as e:
             return _loi(request, "hoàn tác lần nạp dữ liệu", e)

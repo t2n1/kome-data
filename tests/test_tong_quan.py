@@ -167,37 +167,28 @@ def test_o_chi_so_so_cung_so_ngay(conn, batch):
     assert tn.tang_dt == pytest.approx(1.0)
 
 
+def _khoi_dau(html):
+    import json, re as _re
+    return json.loads(_re.search(r"<script>window.__KOME__=(.*?)</script>", html, _re.S).group(1))
+
+
 def test_lien_ket_ngan_sach_chi_hien_khi_co_quyen(khach, conn, batch):
-    """Liên kết `/ngan-sach` chỉ hiện khi người xem CÓ cờ `duoc_sua_ngan_sach`
-    — mời bấm vào một thứ sẽ từ chối họ tệ hơn không hiện, cùng bất biến đã
-    canh cho `/bao-cao` (tests/test_ngan_sach_web.py).
-
-    [Soát vòng 1] `_nav.html` CŨNG có một liên kết `/ngan-sach` riêng (mục
-    sidebar), gác bởi ĐÚNG cùng cờ `hien_ngan_sach` — `in`/`not in` trên
-    chuỗi `href="/ngan-sach"` không phân biệt được "khối ngân sách của
-    dashboard thiếu liên kết" với "chỉ có mỗi liên kết sidebar", vì cả hai
-    trường hợp đều cho kết quả `in html` giống nhau khi sidebar đã đúng.
-    Đếm SỐ LẦN xuất hiện: không quyền -> 0 (cả sidebar lẫn dashboard đều ẩn);
-    có quyền, CHƯA đặt chỉ tiêu tháng này -> 2 (sidebar + liên kết "Đặt chỉ
-    tiêu" của khối ngân sách trên dashboard)."""
+    """Mời bấm vào một thứ sẽ từ chối họ tệ hơn không hiện: giao diện React
+    đọc `hien_ngan_sach` từ dữ liệu khởi đầu để quyết định có mục "Ngân sách"
+    (thanh bên) và liên kết "Đặt chỉ tiêu" (khối ngân sách) hay không."""
     _ban(conn, batch, date(2026, 7, 10))
-    html_khong_quyen = khach(ngan_sach=False).get("/").text
-    assert html_khong_quyen.count('href="/ngan-sach"') == 0
-
-    html_co_quyen = khach(ngan_sach=True).get("/").text
-    assert html_co_quyen.count('href="/ngan-sach"') == 2
-    assert "Đặt chỉ tiêu" in html_co_quyen
+    assert _khoi_dau(khach(ngan_sach=False).get("/").text)["hien_ngan_sach"] is False
+    assert _khoi_dau(khach(ngan_sach=True).get("/").text)["hien_ngan_sach"] is True
 
 
-def test_khong_con_khoi_ton_kho_chua_co_du_lieu(conn, batch, test_db_url):
-    """`/kho-hang` đã có từ đợt 4b — dòng "Tồn kho — chưa có" của bản `/` cũ
-    phải bỏ. Năm nguồn còn thiếu phải liệt kê đủ, đúng chữ."""
-    _ban(conn, batch, date(2026, 7, 10))
-    html = _web(test_db_url).get("/").text
-    assert "Tồn kho" not in html
-    assert "chưa có nguồn dữ liệu" in html
-    for ten in ("Công nợ", "Dòng tiền", "Mua hàng", "Khiếu nại", "Thời tiết"):
-        assert ten in html, f"thiếu nguồn {ten}"
+def test_khoi_chua_co_nguon_noi_ro_thieu_gi():
+    """Khối của gói thiết kế không có nguồn thật được DỰNG KHUNG nhưng nói rõ
+    thiếu nguồn nào — không số mẫu. Tồn kho KHÔNG nằm trong đó (đã có
+    /kho-hang từ đợt 4b)."""
+    from kome import khoi_tong_quan as KTQ
+    for ma in ("cong_no", "dong_tien", "mua_hang", "khieu_nai", "thoi_tiet"):
+        assert KTQ.CHUA_CO[ma], ma
+    assert "han_su_dung" in KTQ.KHOI and "han_su_dung" not in KTQ.CHUA_CO
 
 
 def _dang_nhap_lan(conn, batch, monkeypatch, test_db_url):
@@ -216,81 +207,37 @@ def _dang_nhap_lan(conn, batch, monkeypatch, test_db_url):
 
 
 def test_can_goi_mac_dinh_loc_theo_nguoi_dang_nhap(conn, batch, monkeypatch, test_db_url):
-    """Khối "Cần gọi hôm nay" mặc định chỉ hiện khách của người đăng nhập,
-    `?tat_ca=1` bỏ lọc — cùng nếp `/can-xu-ly`."""
+    """Khối "Việc cần làm hôm nay" mặc định chỉ có khách của người đăng nhập,
+    `?tat_ca=1` bỏ lọc — cùng nếp /lien-he. Ảnh chụp tách theo sale, nên hai
+    chế độ không bao giờ trả nhầm của nhau."""
     for ma, sale in (("R0104", "0104"), ("R0102", "0102")):
         _ho_so_khach(conn, batch, ma, f"Quán {ma}", salesperson_code=sale)
         _mua_deu(conn, batch, ma, nhip=7, so_lan=6, ngung_truoc=90)
     _neo(conn, batch)
 
     c = _dang_nhap_lan(conn, batch, monkeypatch, test_db_url)
-
-    html = c.get("/").text
-    assert "R0104" in html and "R0102" not in html
-
-    html_tat_ca = c.get("/?tat_ca=1").text
-    assert "R0104" in html_tat_ca and "R0102" in html_tat_ca
+    cua_toi = c.get("/api/tong-quan/viec_hom_nay").text
+    assert "R0104" in cua_toi and "R0102" not in cua_toi
+    moi_nguoi = c.get("/api/tong-quan/viec_hom_nay?tat_ca=1").text
+    assert "R0104" in moi_nguoi and "R0102" in moi_nguoi
 
 
-def test_thanh_suc_khoe_lien_ket_mang_tat_ca_1(conn, batch, test_db_url):
-    """[Soát vòng 1, IMPORTANT] Bộ đếm của thanh sức khoẻ (`tq.dem`) LUÔN
-    KHÔNG lọc theo sale (toàn công ty), nên mọi liên kết rời khỏi nó phải
-    mang `tat_ca=1` — thiếu nó, `/khach-hang`/`/can-xu-ly` rơi về mặc định
-    lọc theo người đăng nhập và bấm vào "216 khách bình thường" (đếm của cả
-    công ty) lại ra danh sách rỗng/khác của riêng một người — đúng lớp lỗi
-    "chip Tất cả (1.710) bấm vào ra 216 khách" đã ghi trong CLAUDE.md.
-
-    Cần gieo đủ ba nhóm (canh_bao/binh_thuong/ngung_giao_dich) để cả ba đoạn
-    thanh thật sự có mặt (đoạn `so == 0` không render, xem tong_quan.html)."""
+def test_thanh_suc_khoe_dem_toan_cong_ty_va_lien_ket_mang_tat_ca_1(conn, batch, test_db_url):
+    """[Soát vòng 1] Bộ đếm sức khoẻ LUÔN toàn công ty, nên mọi liên kết rời
+    khỏi nó phải mang `tat_ca=1` — thiếu nó /khach-hang rơi về lọc theo người
+    đăng nhập ("chip Tất cả (1.710) bấm vào ra 216 khách", CLAUDE.md)."""
     _ho_so_khach(conn, batch, "R_CANH", "Quán R_CANH")
     _mua_deu(conn, batch, "R_CANH", nhip=7, so_lan=6, ngung_truoc=20)
     _ho_so_khach(conn, batch, "R_BINH", "Quán R_BINH")
     _mua_deu(conn, batch, "R_BINH", nhip=7, so_lan=6, ngung_truoc=0)
-    _ho_so_khach(conn, batch, "R_NGUNG", "Quán R_NGUNG ※廃業※")
-    _mua_deu(conn, batch, "R_NGUNG", nhip=7, so_lan=1, ngung_truoc=0)
     _neo(conn, batch)
-
-    html = _web(test_db_url).get("/").text
-    assert 'href="/khach-hang?loc=canh_bao&amp;tat_ca=1"' in html
-    assert 'href="/khach-hang?loc=binh_thuong&amp;tat_ca=1"' in html
-    assert 'href="/khach-hang?loc=ngung_giao_dich&amp;tat_ca=1"' in html
-
-
-def test_xem_tat_ca_can_goi_giu_nguyen_trang_thai_loc(conn, batch, monkeypatch, test_db_url):
-    """[Soát vòng 1] Khối "Cần gọi hôm nay" đang hiện của AI quyết định liên
-    kết "Xem tất cả" phải mang theo trạng thái đó: đang xem của riêng mình
-    (mặc định) -> `/can-xu-ly` (không tham số, /can-xu-ly cũng mặc định lọc
-    theo mình — nhất quán); đang xem của MỌI NGƯỜI (`?tat_ca=1`) -> phải giữ
-    `tat_ca=1`, không thì bấm vào lại rơi về lọc-theo-mình."""
-    for ma, sale in (("R0104", "0104"), ("R0102", "0102")):
-        _ho_so_khach(conn, batch, ma, f"Quán {ma}", salesperson_code=sale)
-        _mua_deu(conn, batch, ma, nhip=7, so_lan=6, ngung_truoc=90)
-    _neo(conn, batch)
-    c = _dang_nhap_lan(conn, batch, monkeypatch, test_db_url)
-
-    html = c.get("/").text
-    assert 'href="/lien-he">Xem tất cả' in html
-
-    html_tat_ca = c.get("/?tat_ca=1").text
-    assert 'href="/lien-he?tat_ca=1">Xem tất cả' in html_tat_ca
+    d = _web(test_db_url).get("/api/tong-quan/suc_khoe_khach").json()
+    assert d["dem"].get("canh_bao") == 1 and d["dem"].get("binh_thuong", 0) >= 1
+    from pathlib import Path
+    ma = (Path(__file__).resolve().parents[1] / "giao_dien/src/tong_quan/khoi.tsx").read_text(encoding="utf-8")
+    assert "/khach-hang?loc=${n}&tat_ca=1" in ma
 
 
-def test_dang_xem_moi_nguoi_co_lien_ket_quay_ve_danh_sach_cua_toi(
-        conn, batch, monkeypatch, test_db_url):
-    """[Soát vòng 1] `?tat_ca=1` chỉ có đường ĐI (`/?tat_ca=1`) mà không có
-    đường VỀ thì người đăng nhập có mã sale riêng bị kẹt ở chế độ "mọi
-    người" — phải có liên kết quay lại `/` (không tham số) để xem danh sách
-    của chính mình."""
-    _ban(conn, batch, date(2026, 7, 10))
-    c = _dang_nhap_lan(conn, batch, monkeypatch, test_db_url)
-
-    html_tat_ca = c.get("/?tat_ca=1").text
-    assert "Xem danh sách của tôi" in html_tat_ca
-    assert 'href="/">Xem danh sách của tôi' in html_tat_ca
-
-    # Đang xem CỦA MÌNH (mặc định) thì KHÔNG cần liên kết quay về chính nó.
-    html_cua_toi = c.get("/").text
-    assert "Xem danh sách của tôi" not in html_cua_toi
 
 
 def test_trang_chu_kho_rong_van_200(test_db_url):

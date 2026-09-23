@@ -200,7 +200,7 @@ def test_sidebar_hien_du_nam_muc_va_ba_nhom(conn, test_db_url):
     (Task 4, db/… không liên quan) -> còn 5 mục thay vì 7, nhưng vẫn đúng ba
     nhóm."""
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/").text
+    html = client.get("/nhat-ky").text
     for duong_dan in ["/", "/bao-cao", "/khach-hang", "/lien-he",
                       "/kho-du-lieu"]:
         assert f'href="{duong_dan}"' in html, f"sidebar thiếu {duong_dan}"
@@ -232,7 +232,7 @@ def test_ban_chi_doc_van_hien_muc_kho_du_lieu(conn, test_db_url, monkeypatch):
     tới sidebar. `_chi_doc()` trong app.py chỉ sẵn đường này."""
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/").text
+    html = client.get("/nhat-ky").text
     assert 'href="/kho-du-lieu"' in html
 
 
@@ -427,7 +427,7 @@ def test_moi_muc_dieu_huong_co_icon_VA_van_con_chu(conn, test_db_url):
     # được" (_chung.html:76-77) áp cả ở đây: bỏ chữ đi thì sidebar thành tám ô
     # vuông không ai đoán được.
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/").text
+    html = client.get("/nhat-ky").text
     nav = re.search(r'<nav class="dieu-huong">(.*?)</nav>', html, re.S).group(1)
     muc = re.findall(r"<a [^>]*href=\"(/[^\"]*)\"[^>]*>(.*?)</a>", nav, re.S)
     assert len(muc) >= 8
@@ -450,7 +450,7 @@ def test_icon_dieu_huong_an_voi_trinh_doc_man_hinh(conn, test_db_url):
     # `_khong_cong_dang_nhap` tắt cổng cho mọi test ở đây — nên ca đó được
     # canh riêng ở tests/test_bao_mat.py, nơi đã có sẵn một phiên đăng nhập.
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/").text
+    html = client.get("/nhat-ky").text
     ben = re.search(r'<aside class="thanh-ben">(.*?)</aside>', html, re.S).group(1)
     the_svg = re.findall(r"<svg[^>]*>", ben)
     # 7 chứ không phải 9: nhóm HỆ THỐNG bị `hien_kho` bọc (đợt 3 — chỉ người
@@ -509,7 +509,7 @@ def test_che_do_la_bay_khong_lam_no_trang(conn, test_db_url):
     r = client.get("/giao-dien?che_do=<script>", follow_redirects=False)
     assert r.status_code in (302, 303)
     assert "<script>" not in r.headers["set-cookie"]
-    html = client.get("/", cookies={"kome_giao_dien": "<script>"}).text
+    html = client.get("/nhat-ky", cookies={"kome_giao_dien": "<script>"}).text
     assert "<script>" not in html
     assert "data-theme=" not in html
 
@@ -589,7 +589,7 @@ def test_nut_doi_giao_dien_hien_KE_CA_khong_co_cong_dang_nhap(conn, test_db_url)
     # Máy trong công ty để trống KOME_SESSION_SECRET vẫn phải thấy bốn nút
     # này -- không được đặt trong khối {% if co_dang_nhap %}.
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/").text
+    html = client.get("/nhat-ky").text
     for nhan in ("Sáng", "Tối", "Theo hệ thống", "Theo giờ"):
         assert nhan in html, f"thiếu nút đổi giao diện: {nhan}"
     for che_do in ("sang", "toi", "he-thong", "theo-gio"):
@@ -656,6 +656,6 @@ def test_giao_dien_co_nhan_nhom_cho_trinh_doc_man_hinh(conn, test_db_url):
     # ở cuối sidebar, không biết đó là nhóm gì -- trong khi bốn nhóm khác
     # của <nav> đều có <p class="nhom">.
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/").text
+    html = client.get("/nhat-ky").text
     khoi = re.search(r'<div class="giao-dien">(.*?)</div>', html, re.S).group(1)
     assert '<p class="nhom">' in khoi and "GIAO DIỆN" in khoi

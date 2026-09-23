@@ -214,6 +214,17 @@ Cấp cho chủ doanh nghiệp:
 `python scripts/tao_nguoi_dung.py quyen <tên> --quan-tri`. Từ đó các cờ khác đổi
 được trên web (và được ghi vào Nhật ký thao tác). Mật khẩu vẫn chỉ đổi bằng script.
 
+`035` (ảnh chụp API cho giao diện React) thêm bảng `app.anh_chup_api` và cấp
+`SELECT ON meta.schema_migration` cho `kome_app`. **Chạy TRƯỚC khi triển khai** —
+thiếu bảng đó thì mọi khối Tổng quan báo lỗi. Bảng chỉ là bộ đệm: `TRUNCATE
+app.anh_chup_api` lúc nào cũng an toàn (lượt xem sau tính lại).
+
+**Giao diện React** (`giao_dien/`): máy công ty KHÔNG cần Node — bản build nằm sẵn
+trong git (`kome/web/spa/`). Chỉ người sửa giao diện mới cần Node: `cd giao_dien &&
+npm install` (một lần) rồi `npm run build` sau mỗi lần sửa, và commit cả
+`kome/web/spa/`. Xem thử khi đang sửa: `npm run dev` (cổng 5173, tự chuyển /api sang
+uvicorn cổng 8000).
+
 `034` (bố cục trang Tổng quan theo tài khoản) thêm cột
 `app.nguoi_dung.bo_cuc_tong_quan` và **phải chạy TRƯỚC khi triển khai code
 mới**: cổng đăng nhập đọc cột đó ở MỌI lượt gọi, nên code mới trên CSDL chưa có
