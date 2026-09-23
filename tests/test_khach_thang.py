@@ -135,8 +135,21 @@ def test_cot_thang_khong_lap_khach_da_o_cot_nhip(conn, batch):
 
 
 def test_trang_lien_he_hien_cot_thang(conn, batch, test_db_url):
+    """Giai đoạn 3: /lien-he là React — cột tháng có trong /api/lien-he (nhãn
+    "Mua đều, tháng này chưa…"), thẻ của nó có doanh thu THÁNG; và React vẽ
+    thẻ cột tháng bằng nhánh riêng ("/tháng"), KHÔNG qua nhánh "im {số ngày}"
+    — thẻ cột tháng có thể không có số ngày im lặng, in ra là "im None"/
+    "im null"."""
+    import re
+    from pathlib import Path
+    c = TestClient(create_app(db_url=test_db_url))
     _nen_giua_thang(conn, batch)
-    r = TestClient(create_app(db_url=test_db_url)).get("/lien-he?tat_ca=1")
-    assert r.status_code == 200
-    assert "Mua đều, tháng này chưa" in r.text and "/tháng" in r.text
-    assert "im None" not in r.text
+    assert c.get("/lien-he?tat_ca=1").status_code == 200
+    d = c.get("/api/lien-he?tat_ca=1").json()
+    cot = next(x for x in d["ds"]["cot"] if x["ly_do"] == d["cot_thang"] == LH.COT_THANG)
+    assert cot["nhan"].startswith("Mua đều, tháng này chưa") and cot["the"]
+    src = Path("giao_dien/src/lien_he/LienHe.tsx").read_text(encoding="utf-8")
+    m = re.search(r"\{laThang \? <>(.*?)</> : <>(.*?)</>\}", src, re.S)
+    assert m, "thẻ phải tách nhánh cột tháng / cột nhịp"
+    assert "/tháng" in m.group(1) and "so_ngay_im_lang" not in m.group(1)
+    assert "im {t.so_ngay_im_lang} ngày" in m.group(2)

@@ -542,22 +542,24 @@ def test_bo_co_quyen_thi_luot_goi_KE_TIEP_da_bi_chan(khach, conn):
 
 def test_khong_co_quyen_thi_sidebar_khong_moi_bam_vao_kho_du_lieu(khach):
     """Một liên kết luôn dẫn tới trang từ chối thì tệ hơn là không có."""
-    # Giai đoạn 2: /khach-hang là React (thanh bên dựng từ window.__KOME__.hien_kho —
-    # tests/test_api.py canh); thanh bên Jinja kiểm trên một trang Jinja còn lại.
+    # Giai đoạn 2/3: /khach-hang, /lien-he… là React (thanh bên dựng từ
+    # window.__KOME__.hien_kho — tests/test_api.py canh); thanh bên Jinja kiểm
+    # trên một trang Jinja còn lại (/san-pham).
     c = khach(kho_du_lieu=False)
     _vao(c)
-    t = c.get("/lien-he").text
+    t = c.get("/san-pham").text
     assert 'href="/kho-du-lieu"' not in t
     assert 'href="/khach-hang"' in t        # các mục khác vẫn còn
     assert '"hien_kho": false' in c.get("/khach-hang").text
 
 
 def test_co_quyen_thi_sidebar_van_co_muc_kho_du_lieu(khach):
-    # Giai đoạn 2: /khach-hang là React (thanh bên dựng từ window.__KOME__.hien_kho —
-    # tests/test_api.py canh); thanh bên Jinja kiểm trên một trang Jinja còn lại.
+    # Giai đoạn 2/3: /khach-hang, /lien-he… là React (thanh bên dựng từ
+    # window.__KOME__.hien_kho — tests/test_api.py canh); thanh bên Jinja kiểm
+    # trên một trang Jinja còn lại (/san-pham).
     c = khach(kho_du_lieu=True)
     _vao(c)
-    assert 'href="/kho-du-lieu"' in c.get("/lien-he").text
+    assert 'href="/kho-du-lieu"' in c.get("/san-pham").text
     assert '"hien_kho": true' in c.get("/khach-hang").text
 
 
@@ -574,11 +576,13 @@ def test_trang_loi_van_con_duong_ve_kho_du_lieu(khach, monkeypatch):
     là falsy, mục biến mất khỏi CHÍNH trang lỗi, kể cả với người CÓ quyền.
     Nghĩa là nạp file gặp lỗi lúc 13:30 thì người phụ trách đứng lại trên một
     trang không có cách nào quay về /kho-du-lieu ngoài gõ tay địa chỉ."""
-    from kome import lien_he as LH
+    from kome import san_pham as SP
     c = khach(kho_du_lieu=True)
     _vao(c)
-    monkeypatch.setattr(LH, "danh_sach", _no)
-    r = c.get("/lien-he")   # trang Jinja (/khach-hang là React từ giai đoạn 2)
+    monkeypatch.setattr(SP, "danh_sach", _no)
+    # Trang Jinja còn lại có lưới `_loi` (/khach-hang, /lien-he là React từ
+    # giai đoạn 2/3 — lỗi của chúng là JSON của /api, không qua error.html).
+    r = c.get("/san-pham")
     assert r.status_code == 500
     assert "Hệ thống gặp lỗi" in r.text
     assert 'href="/kho-du-lieu"' in r.text, "trang lỗi mất đường về Kho dữ liệu"
@@ -587,11 +591,11 @@ def test_trang_loi_van_con_duong_ve_kho_du_lieu(khach, monkeypatch):
 def test_trang_loi_van_khong_moi_nguoi_khong_co_quyen(khach, monkeypatch):
     """Chiều ngược lại của test trên: gộp ngữ cảnh về một chỗ không được biến
     trang lỗi thành kẽ hở mời người không có quyền bấm vào màn bị cấm."""
-    from kome import lien_he as LH
+    from kome import san_pham as SP
     c = khach(kho_du_lieu=False)
     _vao(c)
-    monkeypatch.setattr(LH, "danh_sach", _no)
-    r = c.get("/lien-he")   # trang Jinja (/khach-hang là React từ giai đoạn 2)
+    monkeypatch.setattr(SP, "danh_sach", _no)
+    r = c.get("/san-pham")   # trang Jinja còn lại (xem test trên)
     assert r.status_code == 500
     assert 'href="/kho-du-lieu"' not in r.text
 
@@ -623,7 +627,7 @@ def test_khong_co_cong_dang_nhap_thi_khong_chan_ai(khach):
     cũng không có khái niệm quyền — mọi thứ mở như trước đợt 3."""
     c = khach(bi_mat=None, tai_khoan=False)
     assert c.get("/kho-du-lieu").status_code == 200
-    assert 'href="/kho-du-lieu"' in c.get("/lien-he").text
+    assert 'href="/kho-du-lieu"' in c.get("/san-pham").text
     assert '"hien_kho": true' in c.get("/khach-hang").text
 
 

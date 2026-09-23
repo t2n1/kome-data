@@ -7,14 +7,7 @@ from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from kome.bao_cao import (tinh_bao_cao, ve_bieu_do, tien_do_ngan_sach, ve_luy_ke,
-                          nhom_theo_nganh)
 from kome.coverage import tinh_bang_ngay, tinh_bang_phu
-# kome/ve_phan_tich.py chỉ tính hình học SVG thuần Python (không conn, không
-# pandas) — an toàn nhập ở mức ngoài cùng, cùng lý do với kome/san_pham.py.
-from kome.ve_phan_tich import (ve_duong_nho, ve_dong_gop, ve_cay_o, ve_nhiet,
-                               ve_pareto, ve_xu_huong)
-from kome.ngan_sach import thang_cua_ky
 from kome import khach_hang as KH
 # kome/tong_quan.py (đợt 5b Task 5) — dữ liệu cho `/`. Chỉ dataclasses +
 # gọi lại các hàm mart/khach_hang/san_pham đã có (+ psycopg qua `conn`),
@@ -598,8 +591,10 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     # Mã khách lạ: trang vẫn 200 (vỏ React), API trả 404 và giao diện nói
     # "không có khách mã …".
     def _man_khach(request: Request) -> HTMLResponse:
+        """Vỏ index.html của một màn React (tên giữ từ giai đoạn 2 — nay phục
+        vụ mọi màn đã chuyển ngoài `/`)."""
         if not SPA.co_ban_build():
-            return _loi(request, "mở màn khách hàng",
+            return _loi(request, "mở màn này",
                         RuntimeError("Thiếu bản build giao diện (kome/web/spa/index.html). "
                                      "Chạy: cd giao_dien && npm run build"))
         return _spa(request)
@@ -717,48 +712,15 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         except Exception as e:
             return _loi(request, "đổi quyền", e)
 
+    # Giai đoạn 3: Dự báo, Cần liên hệ, Báo cáo là ứng dụng React — dữ liệu qua
+    # /api/du-bao, /api/lien-he, /api/bao-cao (kome/web/api.py).
     @app.get("/du-bao", response_class=HTMLResponse)
-    def du_bao(request: Request, kb: str = "cs"):
-        """Dự báo doanh thu (đợt 8). ĐÚNG 3 lượt hỏi — có test đếm. Toàn công
-        ty, không lọc theo người đăng nhập (cùng nếp các khối số tổng của /)."""
-        from kome import du_bao as DB
-        from kome import ve_du_bao as VDB
-        try:
-            kb = kb if kb in DB.KICH_BAN else "cs"
-            with open_app_conn() as conn:
-                db = DB.du_bao(conn)
-            ctx = {"trang": "du-bao", "db": db, "kb": kb, "kich_ban": DB.KICH_BAN}
-            if db:
-                ctx["ve_chot"] = VDB.ve_chot_thang(db.chot) if db.chot else {"co": False}
-                ctx["ve_nam"] = VDB.ve_muoi_hai_thang(db.nam, kb)
-            return _ve(request, "du_bao.html", ctx)
-        except Exception as e:
-            return _loi(request, "mở màn dự báo", e)
+    def du_bao(request: Request):
+        return _man_khach(request)
 
     @app.get("/lien-he", response_class=HTMLResponse)
-    def lien_he(request: Request, tat_ca: int = 0, nv: str = "",
-                ly_do: str = "", loi_tx: str = ""):
-        """Danh sách ưu tiên liên hệ (đợt 7). ĐÚNG 3 lượt hỏi — có test đếm.
-        Lọc theo người đăng nhập là mặc định tiện dụng, KHÔNG phải hàng rào
-        (cùng nếp /khach-hang)."""
-        from kome import lien_he as LH
-        try:
-            sale, ten_sale = _sale_dang_loc(request, tat_ca, nv)
-            hom_nay = TDL.hom_nay_o_nhat()
-            with open_app_conn() as conn:
-                ds = LH.danh_sach(conn, hom_nay, sale=sale, ly_do=ly_do or None)
-                hoat_dong = LH.hoat_dong_gan_day(conn, sale=sale)
-                hen = LH.hen_goi_lai(conn, hom_nay, sale=sale)
-            return _ve(request, "lien_he.html", {
-                "trang": "lien-he", "ds": ds, "hoat_dong": hoat_dong, "hen": hen,
-                "hom_nay": hom_nay, "sale": sale, "ten_sale": ten_sale,
-                "tat_ca": bool(tat_ca), "nv": nv if nv != KH.NV_MOI_NGUOI else "",
-                "an_ngay": LH.AN_KHI_KHONG_HEN, "cot_thang": LH.COT_THANG, "kieu_tx": LH.KIEU,
-                "ket_qua_tx": LH.KET_QUA, "loi_tx": loi_tx[:200],
-                # Ghi xong quay về ĐÚNG trang này, kể cả bộ lọc đang xem.
-                "tiep": request.url.path + (f"?{request.url.query}" if request.url.query else "")})
-        except Exception as e:
-            return _loi(request, "mở danh sách cần liên hệ", e)
+    def lien_he(request: Request):
+        return _man_khach(request)
 
     @app.post("/khach-hang/{ma}/tiep-xuc")
     def ghi_tiep_xuc(request: Request, ma: str, kieu: str = Form(""),
@@ -977,51 +939,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         return RedirectResponse("/kho-du-lieu#theo-thang", status_code=301)
 
     @app.get("/bao-cao", response_class=HTMLResponse)
-    def bao_cao(request: Request, ky: int | None = None):
-        """Bảng điều khiển bán hàng. `?ky=` là company_fy (năm KẾT THÚC kỳ),
-        bỏ trống thì lấy kỳ gần nhất có dữ liệu.
-
-        Mọi định nghĩa chỉ số nằm ở schema `mart` (migration 014 và 026) —
-        trang này chỉ hiển thị. Xem ghi chú đầu kome/bao_cao.py.
-        """
-        try:
-            with open_app_conn() as conn:
-                bc = tinh_bao_cao(conn, ky)
-                td = tien_do_ngan_sach(conn, ky)
-            # [Đợt 5b Task 4] Bảy khối phân tích mới (spec §5) — mọi hình học
-            # tính sẵn ở kome/ve_phan_tich.py, route chỉ gọi và truyền vào
-            # template, không tính chỉ số nào ở đây.
-            nhom = nhom_theo_nganh(bc.nganh_ky, bc.hang_theo_nganh)
-            thang_ky = thang_cua_ky(bc.ky.company_fy)
-            # [Vòng soát 1, I-1] Ranh giới "tháng chưa tới" của bản đồ nhiệt —
-            # LẤY TỪ `bc.ky.ngay_cuoi` đã có sẵn (ngày bán mới nhất của CHÍNH
-            # kỳ đang xem), không hỏi CSDL thêm câu nào. None khi kho rỗng.
-            thang_cuoi = (bc.ky.ngay_cuoi.strftime("%Y-%m")
-                          if bc.ky.ngay_cuoi else None)
-            # [Vòng soát cuối, I-2] Tháng công ty có dòng bán ĐẦU TIÊN —
-            # `bc.moi_ky[0]` là kỳ SỚM NHẤT (dong_ky đã ORDER BY company_fy ở
-            # tinh_bao_cao()), lấy sẵn từ `bc`, KHÔNG hỏi CSDL thêm câu nào.
-            # Chặn ve_nhiet tô ¥0 cho các tháng TRƯỚC khi có dữ liệu (một
-            # NULL≠0 khác đối tượng nhưng cùng lớp lỗi với `san_pham_360.ton`
-            # đã ghi ở CLAUDE.md).
-            thang_dau = (bc.moi_ky[0].ngay_dau.strftime("%Y-%m")
-                         if bc.moi_ky and bc.moi_ky[0].ngay_dau else None)
-            so_nho = {
-                "dt": ve_duong_nho([o.doanh_thu for o in bc.thang]),
-                "lg": ve_duong_nho([o.lai_gop for o in bc.thang]),
-                "ts": ve_duong_nho([o.ty_suat for o in bc.thang]),
-                "kh": ve_duong_nho([o.so_khach for o in bc.thang]),
-            }
-            return _ve(request, "bao_cao.html",
-                       {"bc": bc, "bd": ve_bieu_do(bc.thang), "td": td,
-                        "lk": ve_luy_ke(td), "trang": "bao-cao",
-                        "so_nho": so_nho,
-                        "dg": ve_dong_gop(bc.nganh_ky),
-                        "co": ve_cay_o(nhom),
-                        "nh": ve_nhiet(bc.nganh_thang, thang_ky, thang_cuoi, thang_dau),
-                        "pa": ve_pareto(bc.tap_trung)})
-        except Exception as e:
-            return _loi(request, "mở trang báo cáo", e)
+    def bao_cao(request: Request):
+        return _man_khach(request)
 
     def _ngu_canh_ngan_sach(b) -> dict:
         """Đổi khoá bộ đôi sang khoá chuỗi cho Jinja, và cộng sẵn hai chiều

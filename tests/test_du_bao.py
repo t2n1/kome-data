@@ -1,5 +1,6 @@
 """Đợt 8 — Dự báo doanh thu. Phần thuần (không CSDL) + ngân sách truy vấn + web."""
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -170,17 +171,43 @@ def test_lich_kinh_doanh_la_nguon_cua_ngay_kinh_doanh(conn):
 
 # ---- Web -------------------------------------------------------------------
 
+NGUON = Path(__file__).resolve().parents[1] / "giao_dien" / "src"
+
+
 def test_trang_du_bao(conn, batch, test_db_url):
+    """Giai đoạn 3: màn là React — kiểm vỏ trang, dữ liệu API đủ cho năm
+    khối, mã giao diện có đủ năm tiêu đề, và mục "Dự báo doanh thu" của thanh
+    bên React được đánh dấu khi đang mở (cả class lẫn aria-current — bất biến
+    của thanh bên Jinja cũ, nay ở giao_dien/src/khung/Nav.tsx)."""
     _nen(conn, batch)
     c = TestClient(create_app(db_url=test_db_url))
-    t = c.get("/du-bao").text
-    for khoi in ("Chốt tháng 07/2026", "12 tháng tới", "Đơn kỳ vọng 14 ngày tới",
-                 "Nguy cơ ngừng mua", "Dự báo đã chuẩn tới đâu"):
-        assert khoi in t
-    assert 'href="/du-bao" class="dang-xem" aria-current="page"' in t
+    r = c.get("/du-bao")
+    assert r.status_code == 200 and 'id="goc"' in r.text
+    d = c.get("/api/du-bao").json()
+    db = d["db"]
+    assert db["chot"]["thang"] == "2026-07"                    # "Chốt tháng 07/2026"
+    assert "du_bao" in db["nam"] and set(d["tong"]) == set(DB.KICH_BAN)   # 12 tháng tới
+    assert [k["ma"] for k in db["kh"]["ky_vong"]] == ["K0021"]  # đơn kỳ vọng 14 ngày
+    assert {k["ma"] for k in db["kh"]["nguy_co"]} == {"K0022", "K0023"}   # nguy cơ ngừng mua
+    assert isinstance(db["chot"]["kiem"], list)                # dự báo đã chuẩn tới đâu
+    src = (NGUON / "du_bao" / "DuBao.tsx").read_text(encoding="utf-8")
+    for khoi in ("<h2>Chốt tháng {tNhan(c.thang)}</h2>", "<h2>12 tháng tới</h2>",
+                 "<h2>Đơn kỳ vọng 14 ngày tới</h2>", "<h2>Nguy cơ ngừng mua</h2>",
+                 "<h2>Dự báo đã chuẩn tới đâu</h2>"):
+        assert khoi in src, khoi
+    assert "const tNhan = (t: string) => `${t.slice(5)}/${t.slice(0, 4)}`;" in src   # 07/2026
+    assert 'url: "/du-bao"' in (NGUON / "khung" / "muc.ts").read_text(encoding="utf-8")
+    nav = (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")
+    assert 'aria-current={m.ma === dangMo ? "page" : undefined}' in nav
+    # Kịch bản lạ trên URL không làm trang nổ.
     assert c.get("/du-bao?kb=bay").status_code == 200
 
 
 def test_trang_du_bao_kho_rong(conn, test_db_url):
-    t = TestClient(create_app(db_url=test_db_url)).get("/du-bao").text
-    assert "chưa có gì để dự báo" in t
+    """Kho rỗng: API trả `db: null` và màn nói "chưa có gì để dự báo" —
+    không vẽ khung số 0."""
+    c = TestClient(create_app(db_url=test_db_url))
+    assert c.get("/du-bao").status_code == 200
+    assert c.get("/api/du-bao").json()["db"] is None
+    src = (NGUON / "du_bao" / "DuBao.tsx").read_text(encoding="utf-8")
+    assert "if (!d.db) return" in src and "chưa có gì để dự báo" in src

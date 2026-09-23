@@ -76,19 +76,19 @@ và màn Báo cáo hiện chúng khác nhau.</p>
      thuẫn với chính dòng ghi chú "ô trống nghĩa là chưa đặt chỉ tiêu" nếu
      dải TỔNG lại in ra một con số 0 cụ thể cho đúng cái "chưa đặt" đó.
 
-     [Vòng soát cuối, việc 10] Dấu PHẨY, không dấu chấm — khớp mọi trang
-     khác của app (`/bao-cao` dùng `"{:,}".format(...)` trần). Trước bản sửa
-     ba ô TỔNG này (và chỉ ba ô này — ô <input> phía trên KHÔNG đổi, nó là
-     ô ngưới ta GÕ LẠI theo quy ước Việt "chấm ngăn nghìn", và có test khoá
-     đúng hành vi đó: test_luu_roi_tai_lai_thi_thay_dung_so_vua_nhap) hiện
-     ¥12.000.000 trong khi /bao-cao hiện ¥12,000,000 cho CÙNG một số tiền. #}
-  <td class="so tong">{% if co_nguoi[n.ma] %}¥{{ "{:,}".format(tong_nguoi[n.ma]) }}{% else %}—{% endif %}</td></tr>
+     [Giai đoạn 3] Dấu CHẤM ngăn nghìn (¥12.000.000) — khớp /bao-cao và mọi màn
+     React (`giao_dien/src/dinh_dang.ts::yen`, định dạng của gói thiết kế). Vòng
+     soát cuối từng đổi ba ô TỔNG này sang dấu PHẨY để khớp bản Jinja cũ của
+     /bao-cao; bản đó đã thay bằng React, nên quy ước chung nay là dấu chấm —
+     cùng với ô <input> phía trên (quy ước Việt khi GÕ LẠI, có test khoá:
+     test_luu_roi_tai_lai_thi_thay_dung_so_vua_nhap). #}
+  <td class="so tong">{% if co_nguoi[n.ma] %}¥{{ "{:,}".format(tong_nguoi[n.ma]).replace(",", ".") }}{% else %}—{% endif %}</td></tr>
  {% endfor %}
  <tr class="tong"><td>Cả nhóm</td>
   {% for th in b.thang %}
-  <td class="so">{% if co_thang[th] %}¥{{ "{:,}".format(tong_thang[th]) }}{% else %}—{% endif %}</td>
+  <td class="so">{% if co_thang[th] %}¥{{ "{:,}".format(tong_thang[th]).replace(",", ".") }}{% else %}—{% endif %}</td>
   {% endfor %}
-  <td class="so">{% if co_bat_ky %}¥{{ "{:,}".format(tong_nguoi.values() | sum) }}{% else %}—{% endif %}</td></tr>
+  <td class="so">{% if co_bat_ky %}¥{{ "{:,}".format(tong_nguoi.values() | sum).replace(",", ".") }}{% else %}—{% endif %}</td></tr>
 </table>
 </div>
 <button class="luu" type="submit">Lưu</button>

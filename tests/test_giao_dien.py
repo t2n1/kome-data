@@ -210,10 +210,14 @@ def test_sidebar_hien_du_nam_muc_va_ba_nhom(conn, test_db_url):
 
 def test_muc_dang_mo_duoc_danh_dau(conn, test_db_url):
     """Đánh dấu mục đang mở bằng CẢ class lẫn aria-current: người dùng
-    trình đọc màn hình không thấy màu nền."""
+    trình đọc màn hình không thấy màu nền.
+
+    Giai đoạn 3: /bao-cao là React (thanh bên React đánh dấu bằng
+    aria-current trong giao_dien/src/khung/Nav.tsx) — thanh bên Jinja kiểm
+    trên một trang Jinja còn lại."""
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/bao-cao").text
-    assert 'href="/bao-cao" class="dang-xem" aria-current="page"' in html
+    html = client.get("/san-pham").text
+    assert 'href="/san-pham" class="dang-xem" aria-current="page"' in html
 
 
 def test_ban_chi_doc_van_hien_muc_kho_du_lieu(conn, test_db_url, monkeypatch):

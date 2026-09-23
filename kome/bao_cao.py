@@ -480,6 +480,22 @@ def ve_bieu_do(thang: list[O]) -> dict:
 # nếp của mọi module khác trong repo — không có vòng nhập nào vì
 # kome/ngan_sach.py không nhập kome/bao_cao.py.
 
+def chi_so_phu(ns: "TienDoNganSach") -> dict:
+    """Bốn con số phụ của khối tiến độ ngân sách — MỘT chỗ cho cả khối ngân
+    sách của `/` (kome/khoi_tong_quan.py::ngan_sach) lẫn `/bao-cao` React.
+    Chỉ là phép tính trên các cột đã có của mart.tien_do_ngan_sach:
+    ngày làm việc còn lại, cần bán mỗi ngày để chạm chỉ tiêu, nhịp chuẩn
+    (chỉ tiêu ÷ ngày làm việc cả tháng), thiếu (+) / vượt (−) so mốc hôm nay.
+    None khi không có mẫu số (chưa đặt chỉ tiêu, không còn ngày nào)."""
+    con_lai = max(ns.ngay_kd - ns.ngay_kd_da_qua, 0)
+    return {
+        "ngay_kd_con_lai": con_lai,
+        "can_ban_moi_ngay": (ns.muc_tieu - ns.thuc_te) / con_lai if ns.muc_tieu and con_lai else None,
+        "nhip_chuan": ns.muc_tieu / ns.ngay_kd if ns.muc_tieu and ns.ngay_kd else None,
+        "thieu_moc": (ns.muc_tieu_den_hom_nay - ns.thuc_te) if ns.muc_tieu_den_hom_nay is not None else None,
+    }
+
+
 def _pct_rong(tu_so, mau_so) -> float | None:
     """Phần trăm chiều rộng một thanh/vạch mốc tiến độ, KẸP về [0, 100].
 

@@ -3,8 +3,10 @@
 Đây là đường GHI đầu tiên của app ngoài luồng nạp OBC, nên phần lớn test ở
 đây canh cái CỬA chứ không canh con số.
 """
+import json
 import re
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -13,6 +15,7 @@ from fastapi.testclient import TestClient
 from kome.web.app import create_app
 
 MK = "mat-khau-cua-an-2026"
+NGUON = Path(__file__).resolve().parents[1] / "giao_dien" / "src"
 BI_MAT = "bi-mat-phien-du-dai-2026"
 
 
@@ -36,6 +39,11 @@ def khach(monkeypatch, test_db_url, conn):
         c.post("/dang-nhap", data={"ten": "an", "mat_khau": MK})
         return c
     return _tao
+
+
+def _khoi_dau(html: str) -> dict:
+    """window.__KOME__ mà máy chủ chèn vào vỏ React (kome/web/spa.py)."""
+    return json.loads(re.search(r"<script>window.__KOME__=(.*?)</script>", html, re.S).group(1))
 
 
 def _ban(conn, batch, ngay: date = date(2026, 5, 11), sale: str = "0104"):
@@ -87,10 +95,20 @@ def test_thu_hoi_co_AN_NGAY_khong_doi_het_ve(khach, conn, batch):
 
 
 def test_muc_ngan_sach_an_khoi_thanh_dieu_huong_khi_khong_co_co(khach, conn, batch):
-    """Mời người ta bấm vào một thứ sẽ từ chối họ thì tệ hơn là không hiện."""
+    """Mời người ta bấm vào một thứ sẽ từ chối họ thì tệ hơn là không hiện.
+
+    Giai đoạn 3: /bao-cao là React — thanh bên React dựng mục Ngân sách theo
+    `window.__KOME__.hien_ngan_sach` (giao_dien/src/khung/muc.ts); thanh bên
+    Jinja kiểm trên một trang Jinja còn lại (/san-pham)."""
     _ban(conn, batch)
-    assert 'href="/ngan-sach"' not in khach(ngan_sach=False).get("/bao-cao").text
-    assert 'href="/ngan-sach"' in khach(ngan_sach=True).get("/bao-cao").text
+    khong = khach(ngan_sach=False)
+    assert _khoi_dau(khong.get("/bao-cao").text)["hien_ngan_sach"] is False
+    assert 'href="/ngan-sach"' not in khong.get("/san-pham").text
+    co = khach(ngan_sach=True)
+    assert _khoi_dau(co.get("/bao-cao").text)["hien_ngan_sach"] is True
+    assert 'href="/ngan-sach"' in co.get("/san-pham").text
+    muc = (NGUON / "khung" / "muc.ts").read_text(encoding="utf-8")
+    assert '...(KD.hien_ngan_sach ? [{ ma: "ngansach", nhan: "Ngân sách", url: "/ngan-sach"' in muc
 
 
 def test_dat_chi_tieu_trong_khoi_bao_cao_gac_boi_hien_ngan_sach(khach, conn, batch):
@@ -104,15 +122,22 @@ def test_dat_chi_tieu_trong_khoi_bao_cao_gac_boi_hien_ngan_sach(khach, conn, bat
     `href="/ngan-sach"` (dấu ngoặc kép đóng NGAY sau đường dẫn) — liên kết
     "Đặt chỉ tiêu" viết `href="/ngan-sach?ky=2026"`, có dấu `?` chen giữa
     đường dẫn và dấu ngoặc kép, nên KHÔNG khớp chuỗi đó dù liên kết có mặt
-    hay không — bug lọt qua ngay cả khi có test canh mục sidebar."""
-    _ban(conn, batch, ngay=date(2026, 5, 11))
-    html_khong_quyen = khach(ngan_sach=False).get("/bao-cao?ky=2026").text
-    assert "Chưa đặt chỉ tiêu cho kỳ này." in html_khong_quyen
-    assert "/ngan-sach?ky=" not in html_khong_quyen
+    hay không — bug lọt qua ngay cả khi có test canh mục sidebar.
 
-    html_co_quyen = khach(ngan_sach=True).get("/bao-cao?ky=2026").text
-    assert "Chưa đặt chỉ tiêu cho kỳ này." in html_co_quyen
-    assert 'href="/ngan-sach?ky=2026">Đặt chỉ tiêu</a>' in html_co_quyen
+    Giai đoạn 3: /bao-cao là React — API nói kỳ 2026 chưa có chỉ tiêu, cờ đi
+    qua `window.__KOME__.hien_ngan_sach`, và trong BaoCao.tsx liên kết "Đặt
+    chỉ tiêu" nằm TRONG `{KD.hien_ngan_sach && …}` (không phải ngoài)."""
+    _ban(conn, batch, ngay=date(2026, 5, 11))
+    for co_quyen in (False, True):
+        c = khach(ngan_sach=co_quyen)
+        assert _khoi_dau(c.get("/bao-cao?ky=2026").text)["hien_ngan_sach"] is co_quyen
+        td = c.get("/api/bao-cao?ky=2026").json()["td"]
+        assert td["co_ngan_sach"] is False and td["company_fy"] == 2026
+    src = (NGUON / "bao_cao" / "BaoCao.tsx").read_text(encoding="utf-8")
+    assert re.search(r'Chưa đặt chỉ tiêu cho kỳ này\.\{" "\}\s*'
+                     r'\{KD\.hien_ngan_sach && <><a href=\{`/ngan-sach\?ky=\$\{td\.company_fy\}`\}>Đặt chỉ tiêu</a>',
+                     src), "liên kết 'Đặt chỉ tiêu' phải gác bởi KD.hien_ngan_sach"
+    assert src.count("/ngan-sach?ky=") == 1, "mọi liên kết /ngan-sach?ky= phải đi qua đúng một chỗ đã gác"
 
 
 def test_khong_co_cong_dang_nhap_thi_vao_duoc(conn, batch, test_db_url):
@@ -207,18 +232,23 @@ def test_o_chua_dat_hien_TRONG_khong_hien_0(khach, conn, batch):
     assert o == [""], f"ô chưa đặt phải trống, thấy {o}"
 
 
-def test_o_tong_dung_dau_PHAY_khop_bao_cao(khach, conn, batch):
-    """[Vòng soát cuối, việc 10] Trước bản sửa, ba ô TỔNG ("Cả kỳ"/"Cả nhóm")
-    hiện ¥12.000.000 (dấu chấm) trong khi /bao-cao hiện CÙNG một số tiền
-    kiểu ¥12.000.000 -> ¥12,000,000 (dấu phẩy) — hai trang nói khác nhau về
-    cùng một con số. Chỉ ba ô TỔNG đổi; ô <input> vẫn dấu chấm (quy ước Việt
-    khi GÕ LẠI, xem test_luu_roi_tai_lai_thi_thay_dung_so_vua_nhap)."""
+def test_o_tong_dung_dau_CHAM_khop_bao_cao(khach, conn, batch):
+    """Ba ô TỔNG ("Cả kỳ"/"Cả nhóm") và /bao-cao phải nói CÙNG một số tiền theo
+    CÙNG một cách. Giai đoạn 3: /bao-cao là React và in tiền bằng
+    `dinh_dang.ts::yen` — dấu CHẤM ngăn nghìn (¥9.000.000, định dạng của gói
+    thiết kế) — nên ô TỔNG ở đây cũng dấu chấm (trước đây là dấu phẩy để khớp
+    bản Jinja cũ của /bao-cao)."""
+    from pathlib import Path
     _ban(conn, batch)
     c = khach()
     c.post("/ngan-sach", data={"ky": "2026", "o-0104-2026-05": "9000000"})
     html = c.get("/ngan-sach?ky=2026").text
-    assert "¥9,000,000" in html, "ô TỔNG phải dùng dấu phẩy như /bao-cao"
-    assert "¥9.000.000" not in html
+    assert "¥9.000.000" in html, "ô TỔNG phải dùng dấu chấm như /bao-cao (React)"
+    assert "¥9,000,000" not in html
+    nguon = Path("giao_dien/src/dinh_dang.ts").read_text(encoding="utf-8")
+    assert 'new Intl.NumberFormat("de-DE"' in nguon, "yen() của React không còn dùng dấu chấm ngăn nghìn"
+    assert 'import { gon, ngay, so, yen } from "../dinh_dang"' in Path(
+        "giao_dien/src/bao_cao/BaoCao.tsx").read_text(encoding="utf-8")
 
 
 def test_ky_chua_co_doanh_thu_van_co_trong_dai_chip(khach, conn, batch):

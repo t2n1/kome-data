@@ -11,7 +11,7 @@
 .khoi-mo{margin-left:auto;font-size:.74rem;color:var(--lien-ket);text-decoration:none;white-space:nowrap;cursor:pointer}
 .khoi-mo:hover{text-decoration:underline}
 .nhan-vien{font-size:.7rem;font-weight:600;padding:.12rem .5rem;border-radius:99px;white-space:nowrap}
-.nhan-vien.do{background:var(--do-nen);color:var(--do-chu)}
+.nhan-vien.do,.nhan-vien.loi{background:var(--do-nen);color:var(--do-chu)}
 .nhan-vien.canh{background:var(--canh-nen);color:var(--canh-chu)}
 .nhan-vien.ok{background:var(--ok-nen);color:var(--ok-chu)}
 .nhan-vien.lam{background:var(--lam-nen);color:var(--lam-chu)}
@@ -94,3 +94,16 @@ table.bang a:hover{color:var(--lien-ket);text-decoration:underline}
 .bd-chu-giai i{width:10px;height:10px;border-radius:2px;display:inline-block;border:0 solid}
 .bd-chu-giai i.duong{height:0;width:14px;border-top-width:2px;border-radius:0}
 .bd-chu-giai i.duong_dut{height:0;width:14px;border-top-width:2px;border-top-style:dashed;border-radius:0}
+
+/* Thẻ khối dùng chung cho các màn (Khách hàng, Báo cáo, Dự báo, Cần liên hệ…) */
+button.lien-ket{font:inherit;background:none;border:0;padding:0;color:var(--lien-ket);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.nut-nho:disabled{opacity:.5;cursor:default}
+.nut-nho.chinh{background:var(--do);border-color:var(--do);color:#fff;font-weight:600}
+.nut-nho[aria-current="page"]{background:var(--do-nen);border-color:var(--do);color:var(--do-chu);font-weight:600}
+.kh-the{background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:.85rem .95rem;min-width:0}
+.kh-the > h2,.kh-the-dau h2{margin:0;font-size:.88rem;font-weight:600;border:0;padding:0}
+.kh-the-dau{display:flex;align-items:center;flex-wrap:wrap;gap:.3rem .7rem}
+.kh-the-dau h3{margin:0;font-size:.84rem}
+.kh-the-goc{margin-left:auto;font-size:.75rem;font-weight:600}
+.kh-the .phu,.kh-the-phu{font-size:.73rem;margin:.2rem 0 .6rem;line-height:1.45}
+.kh-chua-co .khoi-dau{cursor:auto;padding-right:0}

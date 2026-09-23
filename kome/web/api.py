@@ -65,6 +65,75 @@ def _khoa(goc: str, **ts) -> str:
     return goc + ("?" + q if q else "")
 
 
+def thanh_json(o, bo: tuple[str, ...] = ()):
+    """Dataclass -> dict KÈM mọi `@property` của lớp (asdict bỏ qua chúng, mà
+    màn Báo cáo / Dự báo / Cần liên hệ đọc đúng các thuộc tính đó: `rong_thanh`,
+    `tang_dt`, `lech`, `xong`…). Không tính gì mới — chỉ đọc lại thuộc tính đã
+    có ở kome/*.py. `bo`: tên trường bỏ ra (vd chuỗi ngày dài chỉ dùng để vẽ)."""
+    from dataclasses import fields, is_dataclass
+    if is_dataclass(o) and not isinstance(o, type):
+        d = {f.name: thanh_json(getattr(o, f.name), bo) for f in fields(o) if f.name not in bo}
+        for ten in dir(type(o)):
+            if ten not in bo and not ten.startswith("_") and isinstance(getattr(type(o), ten, None), property):
+                d[ten] = thanh_json(getattr(o, ten), bo)
+        return d
+    if isinstance(o, dict):
+        return {k: thanh_json(v, bo) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [thanh_json(v, bo) for v in o]
+    return o
+
+
+def du_lieu_bao_cao(c, ky: int | None = None) -> dict:
+    """Dữ liệu màn /bao-cao: số + hình học biểu đồ (tính ở kome/bao_cao.py và
+    kome/ve_phan_tich.py — bất biến đối soát có test ở đó). Cũng là thứ
+    `anh_chup.lam_nong` tính sẵn sau khi nạp."""
+    from kome.bao_cao import (chi_so_phu, nhom_theo_nganh, tien_do_ngan_sach,
+                              tinh_bao_cao, ve_bieu_do, ve_luy_ke)
+    from kome.ngan_sach import thang_cua_ky
+    from kome.ve_phan_tich import ve_cay_o, ve_dong_gop, ve_duong_nho, ve_nhiet, ve_pareto
+    bc = tinh_bao_cao(c, ky)
+    td = tien_do_ngan_sach(c, ky)
+    if bc.khong_co_du_lieu:
+        return {"bc": thanh_json(bc), "td": thanh_json(td)}
+    # Cùng cách dựng với route Jinja cũ (không hỏi CSDL thêm câu nào).
+    thang_cuoi = bc.ky.ngay_cuoi.strftime("%Y-%m") if bc.ky.ngay_cuoi else None
+    thang_dau = (bc.moi_ky[0].ngay_dau.strftime("%Y-%m")
+                 if bc.moi_ky and bc.moi_ky[0].ngay_dau else None)
+    return thanh_json({
+        "bc": bc, "td": td, "bd": ve_bieu_do(bc.thang), "lk": ve_luy_ke(td),
+        "so_nho": {"dt": ve_duong_nho([o.doanh_thu for o in bc.thang]),
+                   "lg": ve_duong_nho([o.lai_gop for o in bc.thang]),
+                   "ts": ve_duong_nho([o.ty_suat for o in bc.thang]),
+                   "kh": ve_duong_nho([o.so_khach for o in bc.thang])},
+        "dg": ve_dong_gop(bc.nganh_ky),
+        "co": ve_cay_o(nhom_theo_nganh(bc.nganh_ky, bc.hang_theo_nganh)),
+        "nh": ve_nhiet(bc.nganh_thang, thang_cua_ky(bc.ky.company_fy), thang_cuoi, thang_dau),
+        "pa": ve_pareto(bc.tap_trung),
+        "ngay_dau_du_lieu": bc.moi_ky[0].ngay_dau if bc.moi_ky else None,
+        "td_phu": chi_so_phu(td) if td else None,
+    })
+
+
+def du_lieu_du_bao(c) -> dict:
+    """Dữ liệu màn /du-bao (kome/du_bao.py + kome/ve_du_bao.py). `tong(kb)` /
+    `theo(kb)` là PHƯƠNG THỨC — tính sẵn cho cả ba kịch bản để đổi kịch bản ở
+    trình duyệt không phải hỏi lại máy chủ."""
+    from kome import du_bao as DB
+    from kome import ve_du_bao as VDB
+    db = DB.du_bao(c)
+    if db is None:
+        return {"db": None}
+    m = db.nam
+    return thanh_json({
+        "db": db, "kich_ban": DB.KICH_BAN,
+        "tong": {kb: m.tong(kb) for kb in DB.KICH_BAN},
+        "theo": {kb: [t.theo(kb) for t in m.du_bao] for kb in DB.KICH_BAN},
+        "ve_chot": VDB.ve_chot_thang(db.chot) if db.chot else {"co": False},
+        "ve_nam": {kb: VDB.ve_muoi_hai_thang(m, kb) for kb in DB.KICH_BAN} if m.du_bao else None,
+    }, bo=("ngay",))
+
+
 def _loi(thong_diep: str, ma: int = 500) -> JSONResponse:
     return JSONResponse({"loi": thong_diep}, status_code=ma)
 
@@ -219,6 +288,51 @@ def tao_api(open_app_conn) -> APIRouter:
             traceback.print_exc()
             return _loi("Không ghi được lần tiếp xúc.")
         return JSONResponse({"ok": True})
+
+    # ---- Giai đoạn 3: Báo cáo · Dự báo · Cần liên hệ ------------------
+    # Hình học biểu đồ vẫn tính ở kome/ve_phan_tich.py, kome/bao_cao.py,
+    # kome/ve_du_bao.py (các bất biến đối soát / "không vẽ" có test ở đó) —
+    # API trả nguyên, giao diện React chỉ vẽ + thêm tương tác.
+
+    @r.get("/bao-cao")
+    def bao_cao(request: Request, ky: int | None = None):
+        # Đọc app.ngan_sach (tiến độ) -> phiên bản đầy đủ.
+        return _chup(request, _khoa("bao-cao", ky=ky), lambda c: du_lieu_bao_cao(c, ky),
+                     "Không đọc được báo cáo.")
+
+    @r.get("/du-bao")
+    def du_bao(request: Request):
+        # Đọc app.ngan_sach -> phiên bản đầy đủ.
+        return _chup(request, "du-bao", du_lieu_du_bao, "Không đọc được dự báo.")
+
+    @r.get("/lien-he")
+    def lien_he(request: Request, tat_ca: int = 0, nv: str = "", ly_do: str = ""):
+        from kome import lien_he as LH
+        from kome.tuoi_du_lieu import hom_nay_o_nhat
+        sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
+        hom_nay = hom_nay_o_nhat()
+
+        def tinh_(c):
+            ds = LH.danh_sach(c, hom_nay, sale=sale, ly_do=ly_do or None)
+            return thanh_json({
+                "ds": ds, "hoat_dong": LH.hoat_dong_gan_day(c, sale=sale),
+                "hen": LH.hen_goi_lai(c, hom_nay, sale=sale), "hom_nay": hom_nay,
+                "sale": sale, "ten_sale": ten_sale, "cot_thang": LH.COT_THANG,
+                "an_ngay": LH.AN_KHI_KHONG_HEN, "ly_do_ds": {k: list(v) for k, v in LH.LY_DO.items()},
+                "kieu_tx": {k: list(v) for k, v in LH.KIEU.items()},
+                "ket_qua_tx": {k: list(v) for k, v in LH.KET_QUA.items()},
+                "nv_moi_nguoi": KH.NV_MOI_NGUOI,
+            })
+        # Đọc nhật ký tiếp xúc (phiên bản đầy đủ) VÀ đồng hồ thật giờ Tokyo
+        # (tạm ẩn / hẹn gọi lại hôm nay) -> theo_ngay.
+        try:
+            with open_app_conn() as conn:
+                du_lieu, pb = anh_chup.lay(conn, _khoa("lien-he", sale=sale or "*", ly_do=ly_do),
+                                           tinh_, theo_ngay=True)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được danh sách cần liên hệ.")
+        return _json(request, du_lieu, pb)
 
     @r.get("/ban-do")
     def ban_do(request: Request, tat_ca: int = 0, nv: str = "", chi_so: str = "khach"):
