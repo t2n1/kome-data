@@ -694,7 +694,7 @@ def test_nut_dang_xuat_co_icon_VA_van_con_chu(khach):
     """
     c = khach()
     _vao(c)
-    html = c.get("/").text
+    html = c.get("/nhat-ky").text
     thoat = re.search(r'<div class="thoat">(.*?)</div>', html, re.S).group(1)
     the_svg = re.findall(r"<svg[^>]*>", thoat)
     assert the_svg, "nút Đăng xuất thiếu icon"

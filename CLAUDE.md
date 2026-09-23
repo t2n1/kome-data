@@ -86,7 +86,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 ## Các trang của web app
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
-| `/` | Dashboard chung (đợt 5b): 4 ô chỉ số tháng đến hôm nay · tiến độ ngân sách · xu hướng 30 ngày · sức khoẻ khách · cần gọi hôm nay · hàng cận hạn · ô "hôm nay đã có dữ liệu chưa". Từ `034` mỗi người tự kéo thả / đổi cỡ / ẩn hiện khối, lưu theo tài khoản (`POST /tong-quan/bo-cuc`) | `mart.thang_den_hom_nay`, `mart.ban_theo_ngay`, `mart.khach_360` (qua `kome.khach_hang.dem_va_can_xu_ly`, MỘT lượt hỏi), `mart.tien_do_ngan_sach` (qua `kome.bao_cao.tien_do_ngan_sach`), `mart.ton_hien_tai` (qua `kome.san_pham.lo_can_han`, KHÔNG qua `kho_hang()`), `meta.ingest_batch` |
+| `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối kéo thả / đổi cỡ / ẩn hiện, xem theo vai trò, chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api` |
 | `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
 | `/lien-he` | **Cần liên hệ** (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc qua `POST /khach-hang/{mã}/tiep-xuc`. **3 truy vấn** | `mart.uu_tien_lien_he`, `app.nhat_ky_tiep_xuc` |
@@ -545,20 +545,42 @@ Có test canh: `tests/test_ve_phan_tich.py::test_ve_cay_o_bo_nganh_am_va_cong_do
 `::test_doi_soat_c_ca_nganh_am`,
 `tests/test_bao_cao_phan_tich_web.py::test_khong_ve_hien_dung_cau_khi_co_doanh_thu_am`.
 
-**Bất biến (034, bố cục Tổng quan):** chủ doanh nghiệp đổi quyết định P8 của đặc
-tả 5b ("không kéo thả") ngày 2026-09-23: mỗi người tự sắp khối như gói thiết kế,
-nhưng **cùng các khối và cùng con số** cho mọi người — bố cục là cách XẾP, không
-phải bộ lọc dữ liệu. Lưu ở `app.nguoi_dung.bo_cuc_tong_quan` (KHÔNG localStorage,
-cùng lý lẽ cookie giao diện: máy chủ vẽ sẵn đúng bố cục, không có khung hình giật)
-và đọc cùng lượt hỏi của cổng đăng nhập — **0 truy vấn thêm** cho `/`. Mọi bố cục
-đi qua `kome/web/bo_cuc.py::chuan_hoa` cả lúc ghi lẫn lúc đọc; thêm khối là thêm
-MỘT dòng `KHOI` + MỘT macro `khoi_<mã>` trong `tong_quan.html` (có test canh hai
-bên khớp). `static/tong_quan.js` là file JavaScript **DUY NHẤT** của app: tự host,
-không thư viện, không gọi ra ngoài, chỉ nạp khi có người đăng nhập; mọi trang
-khác vẫn không có `<script>`. Tắt JS thì trang vẫn đúng bố cục đã lưu và nút "Về
-bố cục mặc định" vẫn chạy (form thường). Dải "hôm nay đã có dữ liệu chưa" nằm
-NGOÀI lưới — không kéo xuống được. **Migration 034 phải chạy TRƯỚC khi triển khai**
-(cổng đăng nhập đọc cột đó ở mọi lượt gọi). Có test canh: `tests/test_bo_cuc.py`.
+**Bất biến (034, bố cục Tổng quan):** mỗi người tự sắp khối, nhưng **cùng các
+khối và cùng con số** cho mọi người — bố cục là cách XẾP, không phải bộ lọc dữ liệu.
+Lưu ở `app.nguoi_dung.bo_cuc_tong_quan` (KHÔNG localStorage — máy chủ chèn sẵn vào
+`window.__KOME__`, không có khung hình giật), đọc cùng lượt hỏi của cổng đăng nhập (0
+truy vấn thêm). Mọi bố cục đi qua `kome/web/bo_cuc.py::chuan_hoa` lúc ghi và lúc đọc;
+mã khối cũ của bản Jinja (`chi_so`, `can_han`…) đổi qua `MA_CU`. Danh mục 21 khối +
+6 nhóm + 4 vai trò là `bo_cuc.KHOI`/`NHOM`/`VAI_TRO` (chép `MODULES`/`VAI_TRO` của gói
+thiết kế) — giao diện ĐỌC danh mục đó, không tự chép. Mọi khối trong danh mục phải có
+hoặc một hàm trong `kome/khoi_tong_quan.py::KHOI`, hoặc một câu trong `CHUA_CO` (có
+test canh).
+
+**Bất biến (giao diện React, 2026-09-23):** chủ doanh nghiệp đổi nguyên tắc "không
+JavaScript" — màn nào đã chuyển (`/` trước tiên) là ứng dụng React (`giao_dien/`,
+Vite + TS + TanStack Query, KHÔNG thư viện biểu đồ — biểu đồ SVG tự vẽ như gói thiết
+kế, có ô nổi / bật tắt chú giải / bấm để lọc). Đặc tả:
+`docs/superpowers/specs/2026-09-23-giao-dien-react-design.md`.
+- **Bản build được COMMIT** ở `kome/web/spa/` (máy công ty không có Node). Sửa bất cứ
+  gì trong `giao_dien/` là phải `cd giao_dien && npm run build` — không build là
+  `tests/test_api.py::test_ban_build_khop_ma_nguon` đỏ (so dấu vân tay `spa/.nguon`).
+  `giao_dien/` nằm trong `.vercelignore`; KHÔNG đặt `package.json` ở gốc repo.
+- **API không định nghĩa chỉ số.** `/api/...` gọi lại hàm/view có sẵn; tỷ suất vẫn
+  là tỷ số của các tổng; ngân sách truy vấn từng khối có test đếm
+  (`tests/test_api.py::NGAN_SACH_TRUY_VAN`). Chưa đăng nhập -> **401 JSON**, không 303.
+- **Ảnh chụp theo phiên bản dữ liệu** (`kome/web/anh_chup.py`, migration `035`): đo
+  thật trang `/` cũ ~9 s ở máy chủ. Phiên bản = lô nạp mới nhất + lần hoàn tác mới
+  nhất + sửa ngân sách + ghi tiếp xúc + migration mới nhất + dấu vân tay mã `kome/`
+  (+ ngày Tokyo cho khối theo đồng hồ thật). **Thêm một bảng mà web ghi được và màn
+  nào đó đọc = PHẢI thêm nó vào `_PHIEN_BAN`**, không thì màn đó đứng yên sau khi
+  người ta sửa. Không bao giờ trả ảnh chụp của phiên bản cũ. Sau nạp/hoàn tác,
+  `lam_nong` tính sẵn trong luồng nền và nuốt lỗi. Test mặc định TẮT ảnh chụp
+  (`KOME_ANH_CHUP=0`, conftest). **Migration 035 phải chạy TRƯỚC khi triển khai.**
+- `window.__KOME__` (người đăng nhập, cờ quyền, bố cục, danh mục) chèn vào
+  `index.html` qua `kome/web/spa.py::trang` — `<`, `>`, `&` được thoát (có test).
+- Thanh bên: sáu nhóm của gói thiết kế; màn chưa có hiện MỜ kèm "chưa có" (không giả
+  vờ có); bốn màn bị cắt (lộ trình §4.2) không hiện; Kho dữ liệu / Ngân sách ẩn theo
+  cờ quyền. Chuông chỉ báo thứ có nguồn thật (`khoi_tong_quan.thong_bao`).
 
 **Bất biến:** Dashboard (`/`, đợt 5b) là "công ty đang thế nào" — mọi khối SỐ
 TỔNG (4 ô chỉ số tháng, xu hướng 30 ngày, sức khoẻ khách, tiến độ ngân sách,

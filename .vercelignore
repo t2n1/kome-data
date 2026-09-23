@@ -17,6 +17,9 @@ raw_archive_that/
 *.xlsx
 *.zip
 kome_data.egg-info/
+# Mã nguồn giao diện React — Vercel chỉ cần bản build ở kome/web/spa/ (được
+# commit). Để package.json lên Vercel là mời nó nhận nhầm dự án là Node.
+giao_dien/
 
 # pyproject.toml khai đầy đủ pandas + python-calamine cho máy trong công ty.
 # Vercel chấp nhận CẢ pyproject.toml lẫn requirements.txt để cài thư viện; để

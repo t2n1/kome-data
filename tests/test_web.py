@@ -222,19 +222,18 @@ def test_phu_du_lieu_ton_trong_db_url_va_khong_lo_thong_tin_ket_noi(
 
 
 def test_ba_trang_deu_co_thanh_dieu_huong_di_qua_lai(conn, test_db_url):
-    """Mọi trang phải đi lại được với nhau qua sidebar.
-
-    Đợt 2a (Task 4): /health và /phu-du-lieu gộp vào /kho-du-lieu, nên
-    sidebar giờ chỉ còn MỘT mục "Kho dữ liệu" thay vì ba mục riêng (trước
-    đây từ /health không có đường nào sang bảng phủ dữ liệu — giờ cả hai
-    nằm trên cùng một màn nên không cần liên kết riêng nữa). Xem thêm
-    tests/test_giao_dien.py::test_sidebar_hien_du_nam_muc_va_ba_nhom."""
+    """Mọi trang phải đi lại được với nhau qua sidebar. Trang Jinja có thanh
+    bên trong HTML; trang React (`/`) vẽ thanh bên từ giao_dien/src/khung/
+    muc.ts — cùng các địa chỉ đó."""
     client = TestClient(create_app(db_url=test_db_url))
-    for duong in ("/", "/kho-du-lieu"):
-        r = client.get(duong)
-        assert r.status_code == 200, duong
-        for link in ('href="/"', 'href="/kho-du-lieu"'):
-            assert link in r.text, f"{duong} thiếu {link}"
+    r = client.get("/kho-du-lieu")
+    assert r.status_code == 200
+    for link in ('href="/"', 'href="/kho-du-lieu"'):
+        assert link in r.text, f"/kho-du-lieu thiếu {link}"
+    assert client.get("/").status_code == 200
+    from pathlib import Path
+    muc = (Path(__file__).resolve().parents[1] / "giao_dien/src/khung/muc.ts").read_text(encoding="utf-8")
+    assert 'url: "/"' in muc and 'url: "/kho-du-lieu"' in muc
 
 
 def test_ba_trang_doc_duoc_o_che_do_toi(conn, test_db_url):
@@ -303,11 +302,18 @@ def test_health_hien_gach_ngang_thay_vi_yen_0_cho_file_khong_mang_tien(
     for ten in co_tien:
         assert o_cuoi[ten].startswith("¥"), f"{ten}: vẫn phải hiện số tiền"
 
+def _tuoi_khoi_dau(html):
+    import json
+    return json.loads(re.search(r"<script>window.__KOME__=(.*?)</script>", html, re.S).group(1))["tuoi"]
+
+
 def test_trang_chu_canh_bao_hom_nay_chua_co_du_lieu(conn, test_db_url, monkeypatch):
     """Sau 13:30 mà chưa nạp gì thì trang chủ phải nói thẳng, kèm tên 3 file cần xuất.
 
     Đặt ở `/` chứ không chỉ ở /health: /health là trang người ta mở khi ĐÃ
     nghi ngờ có chuyện, còn đây là chuyện phải đập vào mắt khi chưa nghi gì.
+    Trang React nhận trạng thái chèn SẴN trong HTML (không chờ /api) và
+    giao_dien/src/tong_quan/DaiTuoi.tsx vẽ đúng câu của bản Jinja.
     """
     from datetime import datetime
     from kome.tuoi_du_lieu import MUI_GIO
@@ -316,9 +322,13 @@ def test_trang_chu_canh_bao_hom_nay_chua_co_du_lieu(conn, test_db_url, monkeypat
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/")
     assert r.status_code == 200
-    assert "Chưa có dữ liệu hôm nay" in r.text
-    for ten in ("在庫一覧", "得意先全情報", "売上伝票データ"):
-        assert ten in r.text
+    t = _tuoi_khoi_dau(r.text)
+    assert t["co_thieu"] is True
+    assert {n["ten"] for n in t["nguon"] if n["trang_thai"] == "do"} >= {"在庫一覧", "得意先全情報", "売上伝票データ"}
+    from pathlib import Path
+    ve = (Path(__file__).resolve().parents[1] / "giao_dien/src/tong_quan/DaiTuoi.tsx").read_text(encoding="utf-8")
+    assert "Chưa có dữ liệu hôm nay" in ve and "Chưa tới giờ xuất file" in ve
+
 
 def test_trang_chu_khong_bao_dong_truoc_gio_chot(conn, test_db_url, monkeypatch):
     """8 giờ sáng chưa ai xuất file là bình thường — không được đỏ."""
@@ -329,8 +339,10 @@ def test_trang_chu_khong_bao_dong_truoc_gio_chot(conn, test_db_url, monkeypatch)
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/")
     assert r.status_code == 200
-    assert "Chưa có dữ liệu hôm nay" not in r.text
-    assert "Chưa tới giờ xuất file" in r.text
+    t = _tuoi_khoi_dau(r.text)
+    assert t["co_thieu"] is False
+    assert all(n["trang_thai"] == "cho" for n in t["nguon"])
+
 
 def test_trang_phu_du_lieu_co_bang_theo_tung_ngay(conn, test_db_url, monkeypatch):
     """Bảng tháng không trả lời được "hôm qua có sót ngày nào không"."""

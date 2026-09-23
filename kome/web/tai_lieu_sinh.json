@@ -1,6 +1,7 @@
 {
  "bang": {
   "app": [
+   "anh_chup_api",
    "ngan_sach",
    "ngan_sach_nhat_ky",
    "nguoi_dung",
@@ -76,6 +77,7 @@
   "`prefecture` của OBC là tên tỉnh chuẩn có hậu tố 都/道/府/県, đủ cả 47 tỉnh, và chỉ **1 trên 1.710 khách** bỏ trống — cột sạch nhất đã gặp, nên khoá nối (`core.dim_prefecture.ten` ↔ `core.dim_customer.prefecture`) là chính chuỗi tên, không cần lớp chuẩn hoá. Đổi một ký tự trong `core.dim_prefecture.ten` là tỉnh đó rỗng vĩnh viễn trên bản đồ khách hàng (`/ban-do`) mà không lỗi nào nổ ra — phép nối chỉ lặng lẽ không khớp dòng nào. Có test canh: `tests/test_ban_do.py::test_ten_tinh_khop_chuoi_OBC_that`, `::test_hau_to_dung_voi_tung_ma_jis_ca_47_dong` (khẳng định hậu tố theo ĐÚNG `ma_jis` — `01`→道, `13`→都, `26`/`27`→府, 43 mã còn lại→県; một điều kiện \"hậu tố nằm trong 都/道/府/県\" cho `大阪県` lọt qua)."
  ],
  "chu_thich": {
+  "app.anh_chup_api": "Bộ đệm kết quả API theo phiên bản dữ liệu (kome/web/anh_chup.py). Xoá sạch lúc nào cũng an toàn.",
   "app.ngan_sach": "Chỉ tiêu doanh thu do chủ DN đặt. KHÔNG có dòng = chưa đặt; muc_tieu = 0 = đã đặt và đặt bằng không. Hai thứ khác nhau và màn hình phải hiện khác nhau — cùng nếp mart.san_pham_360.ton.",
   "app.nhat_ky_quyen": "Ai bật/tắt cờ quyền nào của ai, lúc nào. Chỉ thêm — không sửa, không xoá.",
   "app.nhat_ky_tiep_xuc": "Gọi, ghé thăm, chat đã ghi nhận. Chỉ thêm — ghi sai thì thêm dòng đính chính.",

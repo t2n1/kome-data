@@ -331,7 +331,9 @@ def test_cac_trang_moi_mo_duoc(conn, batch, test_db_url):
     _mua_deu(conn, batch, "000000009292", nhip=7, so_lan=5)
     c = TestClient(create_app(db_url=test_db_url))
 
-    for duong in ("/", "/khach-hang", "/lien-he", "/khach-hang/000000009292"):
+    # "/" đã là trang React (đặc tả giao diện React) — các màn còn lại vẫn
+    # là Jinja không JavaScript cho tới khi được chuyển.
+    for duong in ("/khach-hang", "/lien-he", "/khach-hang/000000009292"):
         r = c.get(duong)
         assert r.status_code == 200, duong
         assert "<script" not in r.text, f"{duong}: không dùng JavaScript"
@@ -339,7 +341,7 @@ def test_cac_trang_moi_mo_duoc(conn, batch, test_db_url):
     assert "QUAN AN TEST" in c.get("/khach-hang/000000009292").text
     assert c.get("/khach-hang/MA-KHONG-CO").status_code == 404
     # Trang nạp chuyển từ "/" sang "/nap"; "/" giờ là Tổng quan.
-    assert "Tổng quan" in c.get("/").text
+    assert 'id="goc"' in c.get("/").text          # trang React Tổng quan
     assert "Nạp dữ liệu OBC" in c.get("/nap").text
 
 
@@ -348,7 +350,7 @@ def test_moi_trang_deu_co_khung_dieu_huong(conn, test_db_url):
     from kome.web.app import create_app
 
     c = TestClient(create_app(db_url=test_db_url))
-    for duong in ("/", "/khach-hang", "/lien-he", "/bao-cao", "/health",
+    for duong in ("/khach-hang", "/lien-he", "/bao-cao", "/health",
                   "/phu-du-lieu", "/nap"):
         t = c.get(duong).text
         for muc in ('href="/khach-hang"', 'href="/bao-cao"', 'href="/lien-he"'):

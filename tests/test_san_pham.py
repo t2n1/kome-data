@@ -721,8 +721,11 @@ def test_ba_muc_dieu_huong_moi_co_mat(conn, batch, test_db_url):
     """Trang chạy được mà không có trong thanh điều hướng thì không ai vào
     được — cùng thảm hoạ mà test_sidebar_hien_du_nam_muc canh cho đợt trước."""
     c = _khach_web(test_db_url)
-    html = c.get("/").text
+    html = c.get("/nhat-ky").text            # "/" là trang React; thanh bên React ở muc.ts
     assert "HÀNG HOÁ" in html, "thiếu nhóm HÀNG HOÁ trong sidebar"
+    from pathlib import Path
+    muc = (Path(__file__).resolve().parents[1] / "giao_dien/src/khung/muc.ts").read_text(encoding="utf-8")
+    assert 'url: "/san-pham"' in muc and 'url: "/kho-hang"' in muc
     for duong in ('href="/san-pham"', 'href="/kho-hang"'):
         assert duong in html, f"sidebar thiếu {duong}"
     assert 'href="/san-pham" class="dang-xem"' in c.get("/san-pham").text
