@@ -2,11 +2,18 @@
 
 Một bố cục cho mọi người: không kéo thả, không chọn khối, không cài đặt theo
 vai trò. Module này KHÔNG định nghĩa chỉ số nào — nó chỉ gọi lại các hàm/view
-đã có (`mart.thang_den_hom_nay`, `mart.ban_theo_ngay`, `mart.khach_360`,
-`kome.khach_hang.can_xu_ly`, `kome.bao_cao.tien_do_ngan_sach`,
-`kome.san_pham.kho_hang`) và gói chúng lại thành một khối cho template — cùng
-nguyên tắc "không tự mở kết nối, không chép lại công thức" của kome/bao_cao.py
-và kome/khach_hang.py.
+đã có (`mart.thang_den_hom_nay`, `mart.ban_theo_ngay`, `mart.khach_360` qua
+`kome.khach_hang.dem_va_can_xu_ly`, `kome.bao_cao.tien_do_ngan_sach`,
+`mart.ton_hien_tai` qua `kome.san_pham.lo_can_han`) và gói chúng lại thành
+một khối cho template — cùng nguyên tắc "không tự mở kết nối, không chép lại
+công thức" của kome/bao_cao.py và kome/khach_hang.py.
+
+KHÔNG gọi `kome.san_pham.kho_hang()`/`kome.khach_hang.can_xu_ly()` +
+`count(*) GROUP BY trang_thai` riêng: đo thật trên CSDL thật (2026-09-23),
+một mình `SELECT trang_thai, count(*) FROM mart.khach_360 GROUP BY 1` mất
+~1.185 ms, và `kho_hang()` vật hoá `mart.san_pham_360` (view nặng nhất) hai
+lần. `dem_va_can_xu_ly()`/`lo_can_han()` tồn tại RIÊNG cho dashboard để mỗi
+view đắt chỉ bị đánh giá đúng MỘT lần cho một lần mở trang chủ.
 
 Trang `/` KHÔNG còn gọi `tinh_bao_cao`: hàm đó chạy trọn 5 lượt hỏi của trang
 báo cáo chỉ để lấy ba con số của kỳ kế toán, trong khi dashboard cần con số
@@ -16,8 +23,8 @@ from dataclasses import dataclass
 from datetime import date
 
 from kome.bao_cao import TienDoNganSach, _SoCungKy, tien_do_ngan_sach
-from kome.khach_hang import Khach, can_xu_ly
-from kome.san_pham import kho_hang
+from kome.khach_hang import Khach, dem_va_can_xu_ly
+from kome.san_pham import lo_can_han
 
 # Bốn nhóm hiện trên thanh sức khoẻ — CÙNG bốn nhóm bản `/` cũ đã hiện.
 # KHÔNG có 'chua_du_lich_su': đó là "chưa đủ dữ liệu để nói", không phải một
@@ -103,8 +110,22 @@ def tong_quan(conn, sale: str | None) -> TongQuan:
     /bao-cao (bảng theo người phụ trách).
 
     Mỗi khối một câu lệnh riêng (không gộp): các view đứng sau khác hình,
-    gộp chỉ để tiết kiệm vài chục ms là đổi lấy sự rõ ràng. Ngân sách CẢ
-    TRANG (gồm cả tinh_tuoi ở tầng route) là <= 11 lượt hỏi — có test đếm.
+    gộp chỉ để tiết kiệm vài chục ms là đổi lấy sự rõ ràng. NGOẠI LỆ là khối
+    khách (`dem` + `can_goi`) và khối kho (`can_han` + `so_qua_han`): cả hai
+    ĐỀU tham chiếu view đắt nhất của `mart` (`khach_360`/`san_pham_360`) —
+    xem `kome.khach_hang.dem_va_can_xu_ly`/`kome.san_pham.lo_can_han` — nên ở
+    đây "gộp" chỉ có nghĩa GỌI ĐÚNG một hàm dùng chung, không viết SQL riêng
+    ở module này.
+
+    NGÂN SÁCH TRUY VẤN của CHÍNH hàm này (không tính tinh_tuoi ở tầng route):
+    thang_nay 1 + xu_huong 1 + khách (dem_va_can_xu_ly) 1 + ngân sách
+    (tien_do_ngan_sach) <= 3 + kho (lo_can_han) 1 = <= 7. Ngân sách CẢ TRANG
+    (gồm cả tinh_tuoi 2 lượt ở tầng route) là <= 9 lượt hỏi — có test đếm.
+    Trước vòng sửa này khối khách chạy 2 lượt (`count(*) GROUP BY` + 1) và
+    khối kho chạy nguyên `kho_hang()` (2 lượt, mỗi lượt vật hoá
+    `san_pham_360`) — đo thật 2026-09-23: một mình `count(*) GROUP BY
+    trang_thai FROM mart.khach_360` mất ~1.185 ms, nên trang này CHẮC CHẮN
+    vượt ngưỡng 1.500 ms của đặc tả §8 nếu để nguyên.
     """
     r = conn.execute(
         """SELECT thang, tu_ngay, den_ngay, tu_ngay_ck, den_ngay_ck,
@@ -119,16 +140,17 @@ def tong_quan(conn, sale: str | None) -> TongQuan:
         """SELECT ngay, doanh_thu_thuan FROM mart.ban_theo_ngay
            ORDER BY ngay DESC LIMIT %s""", (SO_NGAY_XU_HUONG,)).fetchall()][::-1]
 
-    dem = dict(conn.execute(
-        "SELECT trang_thai, count(*) FROM mart.khach_360 GROUP BY 1").fetchall())
-
-    can_goi = can_xu_ly(conn, gioi_han=GIOI_HAN_CAN_GOI, sale=sale)
+    # MỘT lượt hỏi cho cả bộ đếm (thanh sức khoẻ, TOÀN CÔNG TY) lẫn danh sách
+    # "cần gọi hôm nay" (lọc theo `sale`) — xem docstring của hàm dùng chung.
+    dem, can_goi = dem_va_can_xu_ly(conn, gioi_han=GIOI_HAN_CAN_GOI, sale=sale)
 
     ngan_sach = tien_do_ngan_sach(conn)
 
-    kho = kho_hang(conn)
+    # KHÔNG gọi kho_hang(): hàm đó vật hoá san_pham_360 hai lần cho một trang
+    # chỉ cần 5 dòng cận hạn + một con số đếm. lo_can_han() lấy đúng hai thứ
+    # đó từ mart.ton_hien_tai, không đụng san_pham_360.
+    can_han, so_qua_han = lo_can_han(conn, gioi_han=GIOI_HAN_CAN_HAN)
 
     return TongQuan(
         thang_nay=thang_nay, ngay=ngay, dem=dem, can_goi=can_goi,
-        ngan_sach=ngan_sach, can_han=kho.can_han[:GIOI_HAN_CAN_HAN],
-        so_qua_han=len(kho.qua_han))
+        ngan_sach=ngan_sach, can_han=can_han, so_qua_han=so_qua_han)

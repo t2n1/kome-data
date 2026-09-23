@@ -101,9 +101,14 @@ def khach(monkeypatch, test_db_url, conn):
 
 # ---------------------------------------------------------------------------
 
-def test_trang_chu_khong_qua_11_truy_van(conn, batch, monkeypatch):
+def test_trang_chu_khong_qua_9_truy_van(conn, batch, monkeypatch):
     """[IMPORTANT] Đo thật: một round-trip tới pooler Tokyo mất 47 ms. Ngân
-    sách của cả trang `/` (tong_quan + tinh_tuoi) là <= 11 lượt hỏi.
+    sách của cả trang `/` (tong_quan + tinh_tuoi) là <= 9 lượt hỏi — SIẾT từ
+    11 xuống 9 sau soát hiệu năng đợt 5b: khối khách (đếm + can_xu_ly) gộp
+    còn 1 lượt (`kome.khach_hang.dem_va_can_xu_ly`, trước là 2) và khối kho
+    (5 lô cận hạn + đếm quá hạn) không còn đi qua `kho_hang()` nữa (trước là
+    2 lượt, mỗi lượt vật hoá `mart.san_pham_360`) mà gọi thẳng
+    `kome.san_pham.lo_can_han()` (1 lượt trên `mart.ton_hien_tai`).
 
     [Soát vòng 1] Gieo SẴN một chỉ tiêu tháng — không seed thì khối ngân
     sách chạy trên nhánh "chưa ai đặt chỉ tiêu" (danh sách người rỗng), một
@@ -118,7 +123,32 @@ def test_trang_chu_khong_qua_11_truy_van(conn, batch, monkeypatch):
     dem = _dem_truy_van(conn, monkeypatch)
     TQ.tong_quan(conn, None)
     tinh_tuoi(conn)
-    assert dem["n"] <= 11, f"chạy {dem['n']} truy vấn"
+    assert dem["n"] <= 9, f"chạy {dem['n']} truy vấn"
+
+
+def test_trang_chu_dung_khach_360_MOT_lan_khong_dung_san_pham_360(conn, batch, monkeypatch):
+    """[CRITICAL] Soát hiệu năng đợt 5b: `mart.khach_360` (đo thật ~1.185 ms
+    một lần đánh giá) chỉ được ĐÁNH GIÁ trong ĐÚNG MỘT câu lệnh của cả trang
+    `/`, và `mart.san_pham_360` (view nặng nhất) không được đụng tới nữa —
+    khối "hàng cận hạn" giờ đọc thẳng `mart.ton_hien_tai`
+    (`kome.san_pham.lo_can_han`)."""
+    _ban(conn, batch, date(2026, 7, 10))
+    cau_lenh = []
+    that = conn.execute
+
+    def demo(sql, *a, **k):
+        if isinstance(sql, str):
+            cau_lenh.append(sql)
+        return that(sql, *a, **k)
+
+    monkeypatch.setattr(conn, "execute", demo)
+    TQ.tong_quan(conn, None)
+
+    cau_dung_khach_360 = [s for s in cau_lenh if "mart.khach_360" in s]
+    assert len(cau_dung_khach_360) == 1, \
+        f"mart.khach_360 xuất hiện trong {len(cau_dung_khach_360)} câu lệnh, phải đúng 1"
+    assert not any("mart.san_pham_360" in s for s in cau_lenh), \
+        "trang chủ không được đụng mart.san_pham_360 (view nặng nhất của mart)"
 
 
 def test_o_chi_so_so_cung_so_ngay(conn, batch):

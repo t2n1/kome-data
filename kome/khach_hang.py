@@ -442,6 +442,13 @@ def ho_so(conn, ma: str) -> HoSo | None:
                 diem_giao=diem_giao)
 
 
+# Trạng thái nào được coi là "cần xử lý" — khách đang rời đi. MỘT hằng dùng ở
+# cả can_xu_ly() và dem_va_can_xu_ly(), thay vì chép `IN ('canh_bao',
+# 'da_roi_bo')` ở hai nơi: hai bản chép là hai định nghĩa sẽ trôi khỏi nhau
+# đúng cái bài học mà `_vi_tu`/`TRANG_THAI` ở trên đã ghi.
+TRANG_THAI_CAN_XU_LY = ("canh_bao", "da_roi_bo")
+
+
 def can_xu_ly(conn, gioi_han: int = 100, sale: str | None = None) -> list[Khach]:
     """Danh sách việc cần làm: khách đang rời đi, xếp theo tiền đang mất.
 
@@ -452,12 +459,57 @@ def can_xu_ly(conn, gioi_han: int = 100, sale: str | None = None) -> list[Khach]
     `sale`: mặc định tiện dụng, như danh_sach() — không phải hàng rào.
     """
     dieu_kien = "AND salesperson_code = %s" if sale else ""
-    tham_so = ([sale] if sale else []) + [gioi_han]
+    tham_so = [list(TRANG_THAI_CAN_XU_LY)] + ([sale] if sale else []) + [gioi_han]
     return [_khach(r) for r in conn.execute(
         f"""SELECT {_COT} FROM mart.khach_360
-            WHERE trang_thai IN ('canh_bao', 'da_roi_bo') {dieu_kien}
+            WHERE trang_thai = ANY(%s) {dieu_kien}
             ORDER BY doanh_thu_thuan DESC NULLS LAST LIMIT %s""",
         tham_so).fetchall()]
+
+
+def dem_va_can_xu_ly(conn, gioi_han: int = 100,
+                      sale: str | None = None) -> tuple[dict[str, int], list[Khach]]:
+    """Bộ đếm trạng thái TOÀN CÔNG TY + danh sách "cần xử lý" của can_xu_ly(),
+    ĐÚNG MỘT lượt hỏi — thay cho `count(*) GROUP BY trang_thai` riêng cộng
+    can_xu_ly() riêng của kome.tong_quan.tong_quan().
+
+    Vì sao gộp: đo thật trên CSDL thật (2026-09-23),
+    `SELECT trang_thai, count(*) FROM mart.khach_360 GROUP BY 1` một mình đã
+    mất ~1.185 ms — view đắt nhất bị ĐÁNH GIÁ LẠI mỗi lần được tham chiếu
+    (bất biến CTE-trùng của CLAUDE.md). Trang chủ trước đây tham chiếu nó hai
+    lần (đếm + can_xu_ly) trong hai câu lệnh riêng, tức dựng view đó hai lần
+    cho một lần mở trang. CTE `k` ở đây vật hoá NÓ MỘT LẦN, `d` đếm trên đó,
+    `c` lọc lấy danh sách cũng trên đó.
+
+    Bộ đếm `d` KHÔNG lọc theo `sale` (dashboard dùng nó cho thanh sức khoẻ
+    TOÀN CÔNG TY); danh sách `c` thì CÓ, giống can_xu_ly().
+
+    `d` LUÔN có đúng một dòng (json_object_agg là hàm gộp, trả NULL chứ không
+    trả rỗng khi không có dòng nào) — `LEFT JOIN c ON true` nên khi `c` rỗng
+    (không khách nào khớp, kể cả CSDL trống) câu lệnh vẫn trả về đúng MỘT
+    dòng với mọi cột của `c` là NULL; lọc chúng ra bằng cách kiểm tra
+    `customer_code IS NOT NULL` trước khi coi một dòng là một Khach thật.
+    """
+    dieu_kien = "AND salesperson_code = %s" if sale else ""
+    tham_so = ([list(TRANG_THAI_CAN_XU_LY)]
+               + ([sale] if sale else []) + [gioi_han])
+    rows = conn.execute(f"""
+        WITH k AS MATERIALIZED (SELECT {_COT} FROM mart.khach_360),
+             d AS (
+                 SELECT json_object_agg(trang_thai, n) AS dem
+                   FROM (SELECT trang_thai, count(*) AS n FROM k GROUP BY 1) x
+             ),
+             c AS (
+                 SELECT * FROM k WHERE trang_thai = ANY(%s) {dieu_kien}
+                 ORDER BY doanh_thu_thuan DESC NULLS LAST LIMIT %s
+             )
+        SELECT d.dem, c.* FROM d LEFT JOIN c ON true
+        ORDER BY c.doanh_thu_thuan DESC NULLS LAST
+    """, tham_so).fetchall()
+
+    dem = rows[0][0] or {} if rows else {}
+    khach = [_khach(r[1:]) for r in rows if r[1] is not None]
+    return dem, khach
 
 
 def ve_duong(thang: list[dict], rong: int = 640, cao: int = 120) -> dict:

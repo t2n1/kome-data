@@ -261,6 +261,58 @@ def test_lo_da_qua_han_tach_khoi_lo_sap_het_han(conn, batch):
     assert k.can_han == [] and k.o_tong_quan["can_han"] == 0
 
 
+def test_lo_can_han_khop_kho_hang_khong_dung_san_pham_360(conn, batch, monkeypatch):
+    """[IMPORTANT] Soát hiệu năng đợt 5b: `lo_can_han()` phải trả về ĐÚNG
+    những lô mà `kho_hang(conn).can_han[:n]`/`len(kho_hang(conn).qua_han)` đã
+    trả (cùng lô, cùng thứ tự, cùng số quá hạn) — nhưng KHÔNG được đụng
+    `mart.san_pham_360`, view nặng nhất của mart. `kho_hang()` vật hoá view
+    đó hai lần chỉ để phục vụ đúng 5 dòng cận hạn của dashboard `/`."""
+    _san_pham(conn, batch, "P200", ten="Cận hạn 1")
+    _san_pham(conn, batch, "P201", ten="Cận hạn 2")
+    # P202 CỐ Ý không có dòng trong core.dim_product — ca hiếm "mã tồn kho
+    # không nằm trong 商品マスタ" mà cả kho_hang() lẫn lo_can_han() phải rơi về
+    # hiện product_code, KHÔNG lỗi ra.
+    _san_pham(conn, batch, "P203")  # sẽ quá hạn
+    truoc = HOM_NAY - timedelta(days=5)
+    sap1 = HOM_NAY + timedelta(days=3)
+    sap2 = HOM_NAY + timedelta(days=8)
+    sap3 = HOM_NAY + timedelta(days=10)
+    _ton(conn, batch, "P200", han=f"{sap1.year}年{sap1.month:02d}月{sap1.day:02d}日")
+    _ton(conn, batch, "P201", han=f"{sap2.year}年{sap2.month:02d}月{sap2.day:02d}日")
+    _ton(conn, batch, "P202", han=f"{sap3.year}年{sap3.month:02d}月{sap3.day:02d}日")
+    _ton(conn, batch, "P203",
+         han=f"{truoc.year}年{truoc.month:02d}月{truoc.day:02d}日")
+    _neo(conn, batch)
+
+    k = SP.kho_hang(conn)
+    assert [d["ma"] for d in k.can_han] == ["P200", "P201", "P202"]
+    assert len(k.qua_han) == 1
+
+    dem = {"n": 0, "cham_sp360": False}
+    that = conn.execute
+
+    def demo(sql, *a, **kw):
+        dem["n"] += 1
+        if isinstance(sql, str) and "san_pham_360" in sql:
+            dem["cham_sp360"] = True
+        return that(sql, *a, **kw)
+
+    monkeypatch.setattr(conn, "execute", demo)
+    can_han, so_qua_han = SP.lo_can_han(conn, gioi_han=5)
+    assert dem["n"] == 1, f"lo_can_han() phải chạy ĐÚNG 1 lượt hỏi, chạy {dem['n']}"
+    assert not dem["cham_sp360"], "lo_can_han() KHÔNG được đụng mart.san_pham_360"
+
+    assert [d["ma"] for d in can_han] == [d["ma"] for d in k.can_han[:5]]
+    assert [d["han_con_lai"] for d in can_han] == \
+        [d["han_con_lai"] for d in k.can_han[:5]]
+    assert so_qua_han == len(k.qua_han)
+    # Tên hàng phải khớp CHÍNH XÁC những gì kho_hang() hiện, kể cả mã không có
+    # tên trong core.dim_product (san_pham_360 rơi về chính mã).
+    ten_kho_hang = {d["ma"]: d["ten"] for d in k.can_han}
+    for d in can_han:
+        assert d["ten"] == ten_kho_hang[d["ma"]]
+
+
 def test_nhan_hien_thi_cung_mot_KIEU_o_ca_hai_man(conn, batch):
     """`nhan_trang_thai` phải là CHUỖI ở cả hai màn. Cùng một tên trả hai kiểu
     khác nhau là bắt template viết `d.nhan_trang_thai[0]` ở màn này và

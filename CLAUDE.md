@@ -86,7 +86,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 ## Các trang của web app
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
-| `/` | Dashboard chung (đợt 5b): 4 ô chỉ số tháng đến hôm nay · tiến độ ngân sách · xu hướng 30 ngày · sức khoẻ khách · cần gọi hôm nay · hàng cận hạn · ô "hôm nay đã có dữ liệu chưa" | `mart.thang_den_hom_nay`, `mart.ban_theo_ngay`, `mart.khach_360`, `mart.tien_do_ngan_sach` (qua `kome.bao_cao.tien_do_ngan_sach`), `mart.ton_hien_tai` (qua `kome.san_pham.kho_hang`), `meta.ingest_batch` |
+| `/` | Dashboard chung (đợt 5b): 4 ô chỉ số tháng đến hôm nay · tiến độ ngân sách · xu hướng 30 ngày · sức khoẻ khách · cần gọi hôm nay · hàng cận hạn · ô "hôm nay đã có dữ liệu chưa" | `mart.thang_den_hom_nay`, `mart.ban_theo_ngay`, `mart.khach_360` (qua `kome.khach_hang.dem_va_can_xu_ly`, MỘT lượt hỏi), `mart.tien_do_ngan_sach` (qua `kome.bao_cao.tien_do_ngan_sach`), `mart.ton_hien_tai` (qua `kome.san_pham.lo_can_han`, KHÔNG qua `kho_hang()`), `meta.ingest_batch` |
 | `/khach-hang` | Danh sách + tìm kiếm + lọc (trạng thái/nhóm việc/hạng/tỉnh/sale) + 4 khối phân tích | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360°** | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `ty_suat_mat_hang` |
 | `/can-xu-ly` | Khách đang rời đi, xếp theo tiền | `mart.khach_360` |
@@ -495,8 +495,44 @@ bỏ hẳn (`/kho-hang` đã có từ đợt 4b), không phải thay bằng số
 canh: `tests/test_tong_quan.py::test_can_goi_mac_dinh_loc_theo_nguoi_dang_nhap`,
 `::test_o_chi_so_so_cung_so_ngay`, `::test_khong_con_khoi_ton_kho_chua_co_du_lieu`.
 
-**Bất biến:** ngân sách truy vấn: `/bao-cao` ≤ **11** truy vấn, `/` ≤ **11**
-truy vấn (đếm cả các câu ở tầng route như `tinh_tuoi`). [Vòng soát cuối, M8]
+**Bất biến (soát hiệu năng đợt 5b):** dashboard `/` KHÔNG được gọi thẳng
+`kome.san_pham.kho_hang()` hay `kome.khach_hang.can_xu_ly()` cộng một câu
+`count(*) GROUP BY trang_thai` riêng — dù cả hai đều "đúng", chúng đánh giá
+lại `mart.khach_360`/`mart.san_pham_360` NHIỀU LẦN cho một lần mở trang. Đo
+thật trên CSDL thật (2026-09-23, chỉ đọc): một mình
+`SELECT trang_thai, count(*) FROM mart.khach_360 GROUP BY 1` mất **~1.185
+ms** — view đó bị dựng lại hoàn toàn, không phải một chỉ mục tra thẳng. Trước
+vòng sửa này `/` gọi nó (qua `count(*)` riêng) rồi gọi lại LẦN NỮA (qua
+`can_xu_ly()`) cho cùng một lần mở trang, cộng thêm `kho_hang()` — vốn vật
+hoá `mart.san_pham_360` (view NẶNG NHẤT của mart, kéo theo
+`mart.ty_suat_mat_hang` và hai lượt quét `fact_sales_line`) HAI LẦN — chỉ để
+lấy 5 dòng "hàng cận hạn" và một con số đếm quá hạn. Cộng dồn, trang chắc
+chắn vượt ngưỡng 1.500 ms của đặc tả §8.
+Sửa bằng hai hàm RIÊNG cho dashboard, không phải bằng một tham số điều kiện
+trên hai hàm cũ (thứ sẽ làm `kho_hang()`/`can_xu_ly()` phình ra để phục vụ
+một người gọi khác hẳn về hình dạng):
+- `kome.khach_hang.dem_va_can_xu_ly()` — MỘT câu lệnh, CTE `k AS MATERIALIZED`
+  vật hoá `mart.khach_360` đúng MỘT LẦN, nhánh `d` đếm trên đó (không lọc
+  `sale` — dashboard cần số TOÀN CÔNG TY), nhánh `c` lọc lấy danh sách (CÓ
+  lọc `sale`, giống `can_xu_ly()`).
+- `kome.san_pham.lo_can_han()` — MỘT câu lệnh trên `mart.ton_hien_tai`
+  (KHÔNG đụng `san_pham_360`); tên hàng tái tạo công thức
+  `san_pham_360.ten_hang` bằng `LEFT JOIN core.dim_product` thay vì vật hoá
+  cả view chỉ để lấy đúng một cột.
+Cả hai dùng chung HẰNG với hàm gốc (`kome.khach_hang.TRANG_THAI_CAN_XU_LY`,
+`kome.san_pham.VI_TU_CAN_HAN`/`VI_TU_QUA_HAN`) — MỘT định nghĩa "cần xử lý"/
+"cận hạn", không phải hai bản chép sẽ trôi khỏi nhau. `kho_hang()`/
+`can_xu_ly()` vẫn còn nguyên cho `/kho-hang` và `/can-xu-ly` — mỗi màn đó
+CẦN đủ mọi cột/bộ lọc mà hàm gốc tương ứng cung cấp, và không đánh giá view
+đắt hai lần cho MỘT lần mở CHÍNH MÀN CỦA NÓ. Có test canh:
+`tests/test_khach_hang.py::test_dem_va_can_xu_ly_dem_TOAN_CONG_TY_danh_sach_theo_sale`,
+`::test_dem_va_can_xu_ly_giong_HET_can_xu_ly_rieng`,
+`tests/test_san_pham.py::test_lo_can_han_khop_kho_hang_khong_dung_san_pham_360`,
+`tests/test_tong_quan.py::test_trang_chu_dung_khach_360_MOT_lan_khong_dung_san_pham_360`.
+
+**Bất biến:** ngân sách truy vấn: `/bao-cao` ≤ **11** truy vấn, `/` ≤ **9**
+truy vấn (đếm cả các câu ở tầng route như `tinh_tuoi`; siết từ 11 xuống 9 ở
+soát hiệu năng đợt 5b — xem bất biến ngay trên). [Vòng soát cuối, M8]
 `_sale_dang_loc` KHÔNG chạy câu SQL nào — nó chỉ đọc `request.state.nguoi`
 (đã gắn sẵn bởi middleware) và tham số `nv`/`tat_ca` trên URL, không mở kết
 nối — nên không tính vào ngân sách này; dòng trước đây liệt nó cùng
@@ -508,7 +544,7 @@ tham chiếu `ban_theo_nganh_thang_so_sanh` hai lần (một lần trực tiếp
 qua `nganh_ky_cung_ky` — view sau ĐỌC view trước), tức đánh giá lại view đó hai
 lần, đúng lớp lỗi của bất biến CTE-trùng đã ghi ở trên. Có test đếm:
 `tests/test_bao_cao_phan_tich.py::test_bao_cao_khong_qua_11_truy_van`,
-`tests/test_tong_quan.py::test_trang_chu_khong_qua_11_truy_van`.
+`tests/test_tong_quan.py::test_trang_chu_khong_qua_9_truy_van`.
 
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |
