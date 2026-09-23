@@ -182,7 +182,7 @@ def test_du_lieu_khoi_dau_khong_the_dong_the_script():
 
 def test_du_lieu_khoi_dau_du_danh_muc_va_quyen(test_db_url):
     kd = _khoi_dau(TestClient(create_app(db_url=test_db_url)).get("/").text)
-    assert len(kd["danh_muc"]["khoi"]) == 22 and kd["chua_co"]["cong_no"]
+    assert len(kd["danh_muc"]["khoi"]) == 22 and kd["chua_co"]["dong_tien"] and "cong_no" not in kd["chua_co"]
     assert kd["nguoi"] is None and kd["hien_kho"] is True
 
 
@@ -209,7 +209,7 @@ NGAN_SACH_TRUY_VAN = {
     "kpi": 8, "ns_thang": 3, "so_sanh_sale": 3, "theo_thang": 2, "xu_huong": 1,
     "suc_khoe_khach": 1, "han_su_dung": 1, "viec_hom_nay": 8, "don_hang": 3,
     "danh_sach_khach": 1, "hieu_suat_nganh": 1, "tuong_quan": 1, "tang_truong": 1,
-    "bien_loi_nhuan": 1, "thang_nay_chua_mua": 1,
+    "bien_loi_nhuan": 1, "thang_nay_chua_mua": 1, "cong_no": 2,
 }
 
 

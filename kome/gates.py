@@ -22,7 +22,7 @@ TEN_CONG = {
     2: "Khớp cột khai báo — thiếu cột là ColumnMismatch, chặn trước khi đọc",
     3: "Hợp lý nghiệp vụ: đủ min_rows, không trùng/rỗng khoá, cột mã không rỗng toàn bộ, ngày bắt buộc đọc được",
     4: "So với lần nạp trước: số dòng rơi, tổng tiền đại diện tăng/giảm vọt",
-    5: "Đối chiếu nội bộ: tích = thừa số × thừa số, khử trùng gặp giá trị khác nhau",
+    5: "Đối chiếu nội bộ: tích = thừa số × thừa số, khử trùng gặp giá trị khác nhau, sổ cái mang sang + tổng = số dư cuối",
 }
 CHAN = {1, 2, 3}   # cổng CHẶN; còn lại chỉ cảnh báo
 
@@ -95,6 +95,14 @@ def check(
         warnings.append(Warning_(
             5, f"{dedup_conflicts} nhóm trùng khoá {spec.keys} có giá trị khác nhau "
                f"khi khử trùng — đã giữ dòng đầu tiên, cần kiểm tra"))
+
+    # Cổng 5 — sổ cái (元帳): mang sang + 【合計】 phải bằng số dư cuối của từng bên
+    # (kome/so_cai.py). Lệch là OBC xuất thiếu dòng — cảnh báo, không tự sửa.
+    so_cai_lech = df.attrs.get("so_cai_lech", 0)
+    if so_cai_lech:
+        warnings.append(Warning_(
+            5, f"{so_cai_lech} bên nhận hoá đơn có mang sang + 【合計】 ≠ số dư cuối — "
+               f"nghi file xuất thiếu dòng, cần kiểm tra"))
 
     # Cổng 5 — đối chiếu tích
     pc = spec.product_check

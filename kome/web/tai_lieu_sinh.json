@@ -17,6 +17,7 @@
    "dim_shipto",
    "dim_supplier",
    "dim_warehouse",
+   "fact_ar_ledger",
    "fact_inventory_daily",
    "fact_price_list",
    "fact_sales_line"
@@ -31,6 +32,8 @@
    "ban_theo_san_pham",
    "ban_theo_thang",
    "ban_theo_thang_so_sanh",
+   "cong_no_ben_tra",
+   "cong_no_phieu",
    "dau_hieu_khach",
    "dong_ban",
    "hang_doanh_thu",
@@ -54,6 +57,7 @@
    "nhip_mua",
    "san_pham_360",
    "san_pham_theo_thang",
+   "so_cong_no_moi_nhat",
    "tai_nhan_vien",
    "tap_trung_khach",
    "thang_den_hom_nay",
@@ -72,7 +76,7 @@
   "Mã (`*コード`) là TEXT. `000000009292` đọc thành số sẽ mất số 0 đầu → hỏng mọi liên kết.",
   "Số lượng CÓ phần thập phân (`83.75` ケース). Tiền thì luôn là số nguyên yên.",
   "Có bản xuất `得意先全情報` chỉ 201 dòng (xuất một phần — **cổng 3** chặn vì dưới `min_rows`) và bản chỉ 5 cột (sai mẫu — **cổng 2** chặn trước, `ColumnMismatch`, vì thiếu cột khai báo).",
-  "File `元帳` có 5 dòng rác trước header (CHƯA kiểm chứng lại). `売上明細表` đã đo thật (2026-09-17): header ở dòng 1, KHÔNG có dòng rác — có thể do OBC đổi mẫu xuất, hoặc quan sát cũ chỉ đúng cho một cấu hình xuất khác. File master và `在庫一覧` thì header ở dòng 1.",
+  "File `元帳` có 5 dòng thông tin trước header — ĐÃ đo thật 2026-09-24 trên `請求先元帳` / `得意先元帳` (header ở dòng 6; sheet tên `得意先元帳` ở CẢ HAI loại sổ, phân biệt bằng dòng 集計軸項目 — `kome/so_cai.py`). `売上明細表` đã đo thật (2026-09-17): header ở dòng 1, KHÔNG có dòng rác — có thể do OBC đổi mẫu xuất, hoặc quan sát cũ chỉ đúng cho một cấu hình xuất khác. File master và `在庫一覧` thì header ở dòng 1.",
   "`担当者` của OBC (5 người) KHÁC người nhập đơn trên web (7 tài khoản, gồm 2 arubaito).",
   "Tên kho của OBC là **tên nghiệp vụ**, không phải địa điểm: `1002 新・賞味期限用` nghĩa là \"ngăn dùng cho hạn sử dụng\", không phải một địa chỉ kho. Gói thiết kế đợt 4b có viết cứng ba tên `Osaka` / `Nagoya` / `Kho lạnh Osaka` — **không có thật**. Thực tế công ty chỉ có HAI kho: `0001 茨城第１倉庫（出荷専用）` và `1002 新・賞味期限用`. Đặt tên kho cứng ở đâu đó (thay vì đọc từ `core.dim_warehouse`) là thêm một kho ảo vào mọi bộ lọc.",
   "`prefecture` của OBC là tên tỉnh chuẩn có hậu tố 都/道/府/県, đủ cả 47 tỉnh, và chỉ **1 trên 1.710 khách** bỏ trống — cột sạch nhất đã gặp, nên khoá nối (`core.dim_prefecture.ten` ↔ `core.dim_customer.prefecture`) là chính chuỗi tên, không cần lớp chuẩn hoá. Đổi một ký tự trong `core.dim_prefecture.ten` là tỉnh đó rỗng vĩnh viễn trên bản đồ khách hàng (`/ban-do`) mà không lỗi nào nổ ra — phép nối chỉ lặng lẽ không khớp dòng nào. Có test canh: `tests/test_ban_do.py::test_ten_tinh_khop_chuoi_OBC_that`, `::test_hau_to_dung_voi_tung_ma_jis_ca_47_dong` (khẳng định hậu tố theo ĐÚNG `ma_jis` — `01`→道, `13`→都, `26`/`27`→府, 43 mã còn lại→県; một điều kiện \"hậu tố nằm trong 都/道/府/県\" cho `大阪県` lọt qua)."
@@ -84,6 +88,7 @@
   "app.nhat_ky_tiep_xuc": "Gọi, ghé thăm, chat đã ghi nhận. Chỉ thêm — ghi sai thì thêm dòng đính chính.",
   "core.dim_customer": "SCD2. KHÔNG BAO GIỜ XOÁ DÒNG — chỉ đóng valid_to và đặt is_current=false.",
   "core.dim_prefecture": "Bảng tra 47 tỉnh của Nhật cho màn Bản đồ khách hàng (đợt 4c). Gieo TĨNH, không nạp từ OBC — không thay đổi giữa các lần chạy migration. LEFT JOIN từ bảng này sang số liệu khách, KHÔNG BAO GIỜ GROUP BY ngược từ khách rồi suy ra danh sách tỉnh: cách đó làm tỉnh không có khách biến mất khỏi bản đồ thay vì hiện ra là \"0 khách\". Xem §5.1, §5.2 của đặc tả đợt 4c.",
+  "core.fact_ar_ledger": "Sổ công nợ theo 請求先 (請求先元帳). Mỗi lô là ảnh chụp một kỳ; mart đọc lô period_to mới nhất. Số dư = cột 残高 của OBC, KHÔNG tự cộng lại.",
   "core.fact_inventory_daily": "Độ hạt: 商品コード + 倉庫コード + ngày. Đã kiểm chứng 177 khoá/177 dòng, 0 trùng.",
   "core.fact_price_list": "Giữ lịch sử giá. Ghép với dim_customer.price_level_code để ra giá đáng lẽ phải bán, so với fact_sales_line.unit_price để phát hiện bán dưới giá. Xem docs/data-linkage.md §3.4.",
   "core.fact_sales_line": "Độ hạt: 伝票No. + số thứ tự dòng. 赤伝 (hàng trả) giữ nguyên số ÂM, không lọc bỏ.",
@@ -125,7 +130,7 @@
   {
    "chan": false,
    "so": 5,
-   "ten": "Đối chiếu nội bộ: tích = thừa số × thừa số, khử trùng gặp giá trị khác nhau"
+   "ten": "Đối chiếu nội bộ: tích = thừa số × thừa số, khử trùng gặp giá trị khác nhau, sổ cái mang sang + tổng = số dư cuối"
   }
  ],
  "lo_trinh": {

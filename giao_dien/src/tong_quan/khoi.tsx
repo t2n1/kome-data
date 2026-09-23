@@ -43,9 +43,7 @@ export function KhoiKpi() {
           </> : <><div className="gia nhat-chu" style={{ fontSize: "1rem" }}>Chưa đặt chỉ tiêu</div>
             <div className="dong-phu nhat-chu">đặt ở màn Ngân sách</div></>}
         </a>
-        <div className="o-kpi chua" title={KD.chua_co.cong_no}>
-          <div className="nhan">Phải thu quá hạn</div><div className="gia">chưa có dữ liệu</div>
-          <div className="dong-phu nhat-chu">cần sổ công nợ OBC</div></div>
+        <OKpiCongNo />
         <div className="o-kpi chua" title={KD.chua_co.dong_tien}>
           <div className="nhan">Phải trả 7 ngày tới</div><div className="gia">chưa có dữ liệu</div>
           <div className="dong-phu nhat-chu">cần sổ phải trả</div></div>
@@ -61,6 +59,50 @@ export function KhoiKpi() {
           <div className="dong-phu canh-chu">{d.khach.can_goi} im lặng quá nhịp · {d.khach.roi_bo} đã rời bỏ</div>
         </a>
       </div>}
+    </Khoi>
+  );
+}
+
+// ---- Tuổi nợ phải thu (đợt 6 — sổ 請求先元帳, mart.cong_no_*) ------------------
+type CongNo = null | {
+  moc: string; cach_tinh: string; lau_nhat: { ma: string; ten: string; tien: number }[];
+  tq: { tong_phai_thu: number; qua_han: number; so_phieu_qua_han: number; so_ben_qua_han: number;
+        tuoi: { nhom: string; nhan: string; tien: number; dem: number }[] };
+};
+const MAU_TUOI: Record<string, string> = { d30: LUC.ok, d60: LUC.canh, d90: LUC.canh, d90p: LUC.do, truoc_ky: LUC.do };
+
+/** Ô "Phải thu quá hạn" của khối Chỉ số — đọc chung ảnh chụp của khối Tuổi nợ. */
+function OKpiCongNo() {
+  const { data: d, isLoading } = useKhoi<CongNo>("cong_no");
+  if (isLoading) return <div className="o-kpi"><div className="nhan">Phải thu quá hạn</div><div className="gia nhat-chu">…</div></div>;
+  if (!d) return (
+    <div className="o-kpi chua" title="Chưa nạp sổ 請求先元帳 nào."><div className="nhan">Phải thu quá hạn</div>
+      <div className="gia">chưa có dữ liệu</div><div className="dong-phu nhat-chu">chưa nạp sổ công nợ</div></div>);
+  return (
+    <a className="o-kpi" href="/cong-no?tab=qua_han">
+      <div className="nhan">Phải thu quá hạn</div><div className={"gia" + (d.tq.qua_han ? " giam" : "")}>{gon(d.tq.qua_han)}</div>
+      <div className="dong-phu nhat-chu">{d.tq.so_phieu_qua_han} phiếu · tổng phải thu {gon(d.tq.tong_phai_thu)} · đến {ngay_ngan(d.moc)}</div></a>);
+}
+
+export function KhoiCongNo() {
+  const { data: d, isLoading, error } = useKhoi<CongNo>("cong_no");
+  if (!isLoading && !error && !d) return <ChuaCoDuLieu tieu_de="Tuổi nợ phải thu" ly_do="Chưa nạp sổ 請求先元帳 nào — xuất từ OBC rồi nạp ở màn Kho dữ liệu." />;
+  const max = Math.max(1, ...(d?.tq.tuoi ?? []).map(t => t.tien));
+  return (
+    <Khoi tieu_de="Tuổi nợ phải thu" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/cong-no" }}
+      phu={d ? `tổng ${yen(d.tq.tong_phai_thu)} · tính đến ${ngay(d.moc)}` : undefined}>
+      {d && <>
+        <div className="tuoi-no">{d.tq.tuoi.map(t => (
+          <a key={t.nhom} className="tuoi-no-dong" href={`/cong-no?nhom=${t.nhom}`}>
+            <span className="nhat-chu">{t.nhan}</span>
+            <span className="tuoi-no-thanh"><i style={{ width: `${Math.max(2, t.tien / max * 100)}%`, background: MAU_TUOI[t.nhom] }} /></span>
+            <b className="so">{gon(t.tien)}</b></a>))}</div>
+        {d.lau_nhat.length > 0 && <><div className="tieu-muc">NỢ LÂU / QUÁ HẠN NHIỀU NHẤT</div>
+          <table className="bang"><tbody>{d.lau_nhat.map(x => (
+            <tr key={x.ma}><td className="ten-jp"><a href={`/cong-no?tim=${encodeURIComponent(x.ma)}`}>{x.ten}</a></td>
+              <td className="so">{yen(x.tien)}</td></tr>))}</tbody></table></>}
+        <p className="phu" style={{ fontSize: ".72rem" }}>{d.cach_tinh}</p>
+      </>}
     </Khoi>
   );
 }
@@ -521,7 +563,7 @@ export const VE: Record<string, () => React.ReactElement> = {
   danh_sach_khach: () => <KhoiDanhSachKhach />, han_su_dung: () => <KhoiHanSuDung />, hieu_suat_nganh: () => <KhoiNganh />,
   so_sanh_sale: () => <KhoiSale />, tuong_quan: () => <KhoiTuongQuan />, tang_truong: () => <KhoiTangTruong />,
   bien_loi_nhuan: () => <KhoiBien />, don_hang: () => <KhoiNap />,
-  thang_nay_chua_mua: () => <KhoiThangNay />,
+  thang_nay_chua_mua: () => <KhoiThangNay />, cong_no: () => <KhoiCongNo />,
 };
 
 export function veKhoi(id: string, nhan: string) {

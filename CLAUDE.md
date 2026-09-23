@@ -25,7 +25,9 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
 1. Mã (`*コード`) là TEXT. `000000009292` đọc thành số sẽ mất số 0 đầu → hỏng mọi liên kết.
 2. Số lượng CÓ phần thập phân (`83.75` ケース). Tiền thì luôn là số nguyên yên.
 3. Có bản xuất `得意先全情報` chỉ 201 dòng (xuất một phần — **cổng 3** chặn vì dưới `min_rows`) và bản chỉ 5 cột (sai mẫu — **cổng 2** chặn trước, `ColumnMismatch`, vì thiếu cột khai báo).
-4. File `元帳` có 5 dòng rác trước header (CHƯA kiểm chứng lại). `売上明細表`
+4. File `元帳` có 5 dòng thông tin trước header — ĐÃ đo thật 2026-09-24 trên
+   `請求先元帳` / `得意先元帳` (header ở dòng 6; sheet tên `得意先元帳` ở CẢ HAI loại sổ,
+   phân biệt bằng dòng 集計軸項目 — `kome/so_cai.py`). `売上明細表`
    đã đo thật (2026-09-17): header ở dòng 1, KHÔNG có dòng rác — có thể do
    OBC đổi mẫu xuất, hoặc quan sát cũ chỉ đúng cho một cấu hình xuất khác.
    File master và `在庫一覧` thì header ở dòng 1.
@@ -97,6 +99,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/san-pham` | **React** (giai đoạn 4, bám Sản phẩm.dc.html): MỘT trang — ô tổng quan · danh mục cả 232 mã (chip ngành / trạng thái, tìm, sắp — lọc ở trình duyệt trên MỘT ảnh chụp `/api/san-pham`, 1 lượt hỏi) · hồ sơ mã đang chọn ngay bên dưới | `mart.san_pham_360`, `mart.dong_ban`, `mart.moc_thoi_gian`, `core.dim_product` |
 | `/san-pham/{mã}` | Cùng màn Sản phẩm với một mã được chọn (`pushState`): hồ sơ (`/api/san-pham/{mã}`, ≤ 5 lượt) · bán theo ngày + cùng ngày tháng trước (`/ngay?thang=`, 1 lượt) · khách đang mua / đã bỏ · tồn theo kho · giá theo bậc · xu hướng theo tháng | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list`, `mart.dong_ban`, `mart.lich_kinh_doanh` |
 | `/kho-hang` | **React** (giai đoạn 4, bám Kho hàng.dc.html; `/api/kho-hang?kho=&loc=`, 2 lượt): tab Tồn hiện tại (5 ô · bảng tồn theo dòng + tìm + CSV · quá hạn / cận hạn / giá trị theo kho) · Hàng đang về (chưa có dữ liệu) · Cần đặt (hết + sắp thiếu, KHÔNG đề xuất số lượng) | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
+| `/cong-no` | **Công nợ & thu tiền — React** (đợt 6, bám Công nợ.dc.html; `/api/cong-no`, MỘT ảnh chụp 2 lượt hỏi, lọc ở trình duyệt): 6 ô tổng · tuổi nợ (bấm để lọc) · phiếu còn nợ (tab quá hạn / sắp đến hạn / không suy được hạn / theo bên nhận hoá đơn) · lịch thu 7 ngày sau mốc · việc nên làm. Mốc = cuối kỳ sổ mới nhất. Tab Công nợ của hồ sơ khách: `/api/cong-no/khach/{mã}` | `mart.cong_no_ben_tra`, `mart.cong_no_phieu` (← `core.fact_ar_ledger`, sổ `請求先元帳`) |
 | `/kho-du-lieu` | **React** (giai đoạn 5; máy chủ tính sẵn vào `window.__KOME__.man`, vai trò NẠP): nạp file OBC (`POST /upload`, biểu mẫu thật) · sức khoẻ · lô gần nhất + hoàn tác (`POST /undo/{lô}`) · độ phủ ngày / tháng | `meta.ingest_batch`, `core.*` |
 | `/kho-du-lieu/luong` | Tài liệu sống (đợt 2b): bốn tầng · các nguồn OBC · 5 cổng + ngưỡng từng file · cạm bẫy OBC · lộ trình. **0 truy vấn** | `config/files.yml`, `kome/web/tai_lieu_sinh.json` |
 | `/kho-du-lieu/cot-noi` | Tài liệu sống: ma trận khoá · file nối đi đâu · cột trong từng file (`?file=<spec>`). **0 truy vấn** | `config/files.yml` |
@@ -631,6 +634,25 @@ kế, có ô nổi / bật tắt chú giải / bấm để lọc). Đặc tả:
   vờ có); bốn màn bị cắt (lộ trình §4.2) không hiện; Kho dữ liệu / Ngân sách ẩn theo
   cờ quyền. Chuông chỉ báo thứ có nguồn thật (`khoi_tong_quan.thong_bao`).
 
+**Bất biến (Đợt 6, migration 038):** công nợ đọc sổ `請求先元帳` (spec `seikyu_motocho`
+→ `core.fact_ar_ledger`), mỗi lô là ẢNH CHỤP một kỳ (kỳ đọc từ dòng 集計期間), mart đọc lô
+có kỳ kết thúc muộn nhất (`mart.so_cong_no_moi_nhat`). Ba luật:
+- **Số dư là cột `残高` của OBC** (dòng cuối từng bên), KHÔNG tự cộng lại. Đo thật: 12/215
+  bên (nhóm mã 0090…) có phiếu thu mà 残高 không đổi — cộng tay 入金額 ra "đã thu" sai.
+  "Đã thu trong kỳ" = mang sang + nợ + điều chỉnh − số dư; cổng 5 đối chiếu mang sang +
+  【合計】 = số dư cuối (bản thật khớp 215/215).
+- **Phần còn nợ từng phiếu là GIẢ ĐỊNH trả cũ trước** (`mart.cong_no_phieu`) — OBC không
+  ghi phiếu nào đã trả. Màn phải in câu đó (`kome.cong_no.CACH_TINH["fifo"]`) và gọi cột là
+  "Đã thu (ước)".
+- **Hạn trả chỉ suy từ hai mẫu tên điều kiện** (`末締/翌月末日`, `末締/翌月N日`). 代引請求 /
+  その都度請求 / 前払い … → "không suy được hạn", KHÔNG BAO GIỜ tính là quá hạn — `代引専用`
+  (tiền hãng vận chuyển thu hộ) chiếm ~¥93M số dư, gán hạn đoán cho nó là thổi phồng
+  "quá hạn" lên gấp mấy lần. Tuổi nợ đếm từ ngày phiếu tới CUỐI KỲ SỔ (mốc dữ liệu).
+Công nợ ghi theo BÊN NHẬN HOÁ ĐƠN (請求先), không theo từng khách: danh sách khách không
+lọc/đếm theo nợ; hồ sơ khách hiện số của cả bên. `得意先元帳` (không có 残高) và
+`入金伝票データ` (đã nằm trong sổ) CỐ Ý chưa có bộ nạp. Đặc tả:
+`docs/superpowers/specs/2026-09-24-dot-6-cong-no-design.md`. Có test canh: `tests/test_cong_no.py`.
+
 **Bất biến:** Dashboard (`/`, đợt 5b) là "công ty đang thế nào" — mọi khối SỐ
 TỔNG (4 ô chỉ số tháng, xu hướng 30 ngày, sức khoẻ khách, tiến độ ngân sách,
 hàng cận hạn) KHÔNG lọc theo người đăng nhập. CHỈ khối "Cần gọi hôm nay" lọc
@@ -639,7 +661,8 @@ theo `sale` (mặc định người đăng nhập, `?tat_ca=1` bỏ lọc — c�
 `/bao-cao` (bảng theo người phụ trách) và `/khach-hang?nv=`. Khối nào của gói
 thiết kế không có nguồn dữ liệu thật (công nợ, dòng tiền, mua hàng, khiếu nại,
 thời tiết) thì KHÔNG được dựng bằng số bịa — dòng "Tồn kho — chưa có" cũ phải
-bỏ hẳn (`/kho-hang` đã có từ đợt 4b), không phải thay bằng số giả. Có test
+bỏ hẳn (`/kho-hang` đã có từ đợt 4b), không phải thay bằng số giả. Tuổi nợ phải thu
+có nguồn từ đợt 6 (khối `cong_no`, sổ 請求先元帳). Có test
 canh: `tests/test_tong_quan.py::test_can_goi_mac_dinh_loc_theo_nguoi_dang_nhap`,
 `::test_o_chi_so_so_cung_so_ngay`, `::test_khong_con_khoi_ton_kho_chua_co_du_lieu`.
 

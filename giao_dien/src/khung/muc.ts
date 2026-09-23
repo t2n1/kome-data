@@ -30,7 +30,7 @@ export function nhomDieuHuong(): Nhom[] {
     ] },
     { ma: "giaothu", ten: "GIAO & THU TIỀN", muc: [
       { ma: "giaohang", nhan: "Giao hàng & điều phối", url: null, icon: "truck", ly_do: CHUA },
-      { ma: "congno", nhan: "Công nợ & thu tiền", url: null, icon: "yen", ly_do: CHUA },
+      { ma: "congno", nhan: "Công nợ & thu tiền", url: "/cong-no", icon: "yen" },
       { ma: "trahang", nhan: "Trả hàng & khiếu nại", url: null, icon: "back", ly_do: CHUA },
       { ma: "dongtien", nhan: "Dòng tiền & phải trả", url: null, icon: "yen", ly_do: CHUA },
     ] },

@@ -78,12 +78,13 @@ COT = [
     CotLoaiFile("NCC", "shiiresaki", "仕入先", "nhà cung cấp"),
     CotLoaiFile("Giao", "chokusousaki", "直送先", "điểm giao thẳng"),
     CotLoaiFile("Gia", "tanka", "取引単価データ", "bảng giá"),
+    CotLoaiFile("No", "seikyu_motocho", "請求先元帳", "sổ công nợ, ô có khi tháng nằm trong kỳ của một lô"),
 ]
 
 THIEU_BO_NAP = [
     LoaiChuaCo("入金伝票データ", "phiếu thu", "1 quý (2026-05→07), chưa có bộ nạp"),
-    LoaiChuaCo("得意先元帳", "sổ cái khách", "1 quý, chưa có bộ nạp"),
-    LoaiChuaCo("請求先元帳", "sổ cái bên trả", "1 quý, chưa có bộ nạp"),
+    LoaiChuaCo("得意先元帳", "sổ cái khách",
+               "1 quý, chưa có bộ nạp — cùng nội dung 請求先元帳 nhưng KHÔNG có cột 残高 (số dư)"),
     LoaiChuaCo("他勘定振替明細", "xuất khác / hàng hỏng", "1 quý, chưa có bộ nạp"),
     LoaiChuaCo("仕入データ", "MUA HÀNG", "KHÔNG CÓ — lỗ hổng lớn nhất"),
     LoaiChuaCo("受注データ", "đơn đặt", "KHÔNG CÓ"),
@@ -91,7 +92,7 @@ THIEU_BO_NAP = [
 
 # Hai loại này có bảng fact riêng nên đếm theo NGÀY nghiệp vụ trong kho, không
 # theo tên file đã nạp.
-_CO_BANG_FACT = {"ban", "ton"}
+_CO_BANG_FACT = {"ban", "ton", "seikyu_motocho"}
 
 # Bảng THEO NGÀY chỉ có 3 nguồn của nhịp 13:30 (CLAUDE.md, "Quy trình hằng
 # ngày") — cùng bộ với ô cảnh báo ở `kome/tuoi_du_lieu.py`. 4 loại master còn
@@ -214,6 +215,12 @@ def tinh_bang_phu(conn, hom_nay: date | None = None,
            FROM core.fact_inventory_daily GROUP BY 1"""
     ).fetchall())
     master = _thang_master(conn)
+    # Sổ công nợ: mỗi lô phủ trọn các tháng trong kỳ của nó (period_from → period_to).
+    no = {r[0] for r in conn.execute(
+        """SELECT DISTINCT to_char(g, 'YYYY-MM')
+           FROM (SELECT DISTINCT period_from, period_to FROM core.fact_ar_ledger) k,
+                generate_series(date_trunc('month', k.period_from), k.period_to, interval '1 month') g"""
+    ).fetchall()}
 
     # Kỳ kế toán ĐỌC TỪ core.dim_date, không tính lại trong Python.
     thang_rows = conn.execute(
@@ -260,6 +267,8 @@ def tinh_bang_phu(conn, hom_nay: date | None = None,
                 co = bool(ban.get(thang))
             elif c.khoa == "ton":
                 co = bool(ton.get(thang))
+            elif c.khoa == "seikyu_motocho":
+                co = thang in no
             else:
                 co = thang in master.get(c.khoa, set())
             if co:

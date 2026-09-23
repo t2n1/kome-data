@@ -111,3 +111,9 @@ table.bang tr.dang-chay td{background:var(--nen)}
 .the-mod-dau{display:flex;align-items:center;gap:.35rem}
 .the-mod-dau b{flex:1;font-size:.82rem;font-weight:600}
 .the-mod .phu{font-size:.72rem;line-height:1.4}
+/* Khối Tuổi nợ phải thu (đợt 6) */
+.tuoi-no{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.7rem}
+a.tuoi-no-dong{display:grid;grid-template-columns:minmax(0,9.5rem) 1fr auto;align-items:center;gap:.55rem;font-size:.78rem;color:var(--chu);text-decoration:none}
+a.tuoi-no-dong:hover .nhat-chu{color:var(--chu)}
+.tuoi-no-thanh{height:7px;border-radius:99px;background:var(--nen-phu);overflow:hidden}
+.tuoi-no-thanh i{display:block;height:100%;border-radius:99px}

@@ -184,11 +184,12 @@ def test_lien_ket_ngan_sach_chi_hien_khi_co_quyen(khach, conn, batch):
 def test_khoi_chua_co_nguon_noi_ro_thieu_gi():
     """Khối của gói thiết kế không có nguồn thật được DỰNG KHUNG nhưng nói rõ
     thiếu nguồn nào — không số mẫu. Tồn kho KHÔNG nằm trong đó (đã có
-    /kho-hang từ đợt 4b)."""
+    /kho-hang từ đợt 4b); tuổi nợ cũng không (sổ 請求先元帳 từ đợt 6)."""
     from kome import khoi_tong_quan as KTQ
-    for ma in ("cong_no", "dong_tien", "mua_hang", "khieu_nai", "thoi_tiet"):
+    for ma in ("dong_tien", "mua_hang", "khieu_nai", "thoi_tiet"):
         assert KTQ.CHUA_CO[ma], ma
-    assert "han_su_dung" in KTQ.KHOI and "han_su_dung" not in KTQ.CHUA_CO
+    for ma in ("han_su_dung", "cong_no"):
+        assert ma in KTQ.KHOI and ma not in KTQ.CHUA_CO
 
 
 def _dang_nhap_lan(conn, batch, monkeypatch, test_db_url):

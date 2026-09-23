@@ -54,6 +54,10 @@ class FileSpec:
     # nguồn KHÔNG cần trùng tên khoá đích (billing_customer_code -> tokuisaki
     # trỏ vào customer_code); spec đích phải có đúng một khoá.
     references: dict[str, str] = field(default_factory=dict)
+    # Sổ cái OBC (元帳): giá trị BẮT BUỘC của dòng thông tin 集計軸項目 ('請求先'
+    # hay '得意先'). Khác None thì reader giao file cho kome/so_cai.py: đọc kỳ,
+    # đối chiếu tổng, bỏ dòng tổng phụ. Hai loại sổ dùng CHUNG tên sheet.
+    so_cai_truc: str | None = None
 
 def load_specs(path: Path) -> dict[str, FileSpec]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))

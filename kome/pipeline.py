@@ -6,7 +6,7 @@ import re
 from kome import archive, gates
 from kome.config import SPECS, FileSpec
 from kome.reader import read, ColumnMismatch
-from kome.loaders import inventory, customer, sales, master, price
+from kome.loaders import inventory, customer, sales, master, price, so_cai
 
 # SPECS chuyển sang kome/config.py — xem ghi chú ở đó. Vẫn nhập lại tên ở
 # đây vì nhiều nơi đã gọi `from kome.pipeline import SPECS`.
@@ -33,6 +33,7 @@ LOADERS = {
         ["shipto_code", "shipto_name", "customer_code", "postcode", "prefecture",
          "city", "address", "phone", "lead_time_code"]),
     "tanka": price.load,
+    "seikyu_motocho": so_cai.load,
 }
 
 # Bảng nào cần dọn khi hoàn tác một lô, theo từng loại file.
@@ -46,6 +47,7 @@ UNDO_TABLES = {
     "shiiresaki": ["core.dim_supplier"],
     "chokusousaki": ["core.dim_shipto"],
     "tanka": ["core.fact_price_list"],
+    "seikyu_motocho": ["core.fact_ar_ledger"],
 }
 
 # Bảng SCD2: hoàn tác phải mở lại phiên bản trước đó, không chỉ xoá phiên bản
@@ -75,7 +77,11 @@ def identify(path: Path) -> tuple[FileSpec, date] | tuple[None, None]:
     for spec in SPECS.values():
         m = re.match(spec.filename_pattern, path.name)
         if m:
-            return spec, datetime.strptime(m.group("date"), "%Y%m%d").date()
+            g = m.groupdict()
+            if g.get("date"):
+                return spec, datetime.strptime(g["date"], "%Y%m%d").date()
+            # Tên gốc của OBC mang cả kỳ (sổ cái): ngày dữ liệu = ngày CUỐI kỳ.
+            return spec, date(int(g["y"]), int(g["m"]), int(g["d"]))
     return None, None
 
 def _kiem_tra_trung_nguon(conn, spec: FileSpec, df) -> list[gates.Blocker]:

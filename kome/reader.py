@@ -91,4 +91,9 @@ def read(path: Path, spec: FileSpec) -> pd.DataFrame:
     for col in spec.code_columns:
         df[col] = df[col].fillna("").astype("object").str.strip()
 
+    # Sổ cái (元帳): kỳ, đối chiếu 【合計】, bỏ dòng tổng phụ — kome/so_cai.py.
+    if spec.so_cai_truc:
+        from kome import so_cai
+        return so_cai.chuan_bi(path, spec, df.reset_index(drop=True))
+
     return df.reset_index(drop=True)

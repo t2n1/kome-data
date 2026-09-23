@@ -73,7 +73,7 @@ export default function HoSo({ ma }: { ma: string }) {
       <div className="hs-tab" role="tablist">
         {TAB.map(([m, nhan]) => (
           <button key={m} type="button" role="tab" aria-selected={tab === m} onClick={() => chonTab(m)}>
-            {nhan}{m === "cong_no" && <span className="phu"> · chưa có</span>}
+            {nhan}
             {m === "san_pham" && h.o_so.so_ma_ngung > 0 && <span className="hs-cham" title={`${h.o_so.so_ma_ngung} mã đã ngừng mua`} />}
           </button>))}
       </div>
@@ -81,7 +81,7 @@ export default function HoSo({ ma }: { ma: string }) {
         {tab === "tong_quan" && <TabTongQuan h={h} />}
         {tab === "san_pham" && <TabSanPham h={h} />}
         {tab === "don_hang" && <TabDonHang h={h} />}
-        {tab === "cong_no" && <TabCongNo />}
+        {tab === "cong_no" && <TabCongNo ma={k.ma} />}
         {tab === "ho_so" && <TabHoSo h={h} />}
       </div>
     </div>
