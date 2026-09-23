@@ -521,6 +521,40 @@
  .tom-tat b{display:block;font-size:1.05rem;font-variant-numeric:tabular-nums}
  .chu-thich{color:var(--chu-nhat);font-size:.9rem}
  .chu-giai{display:flex;flex-wrap:wrap;gap:.5rem 1.25rem;margin:.5rem 0 1rem}
+ /* ---- Đợt 8: màn Dự báo (Dự báo.dc.html) ---------------------------- */
+ .the-bieu-do{background:var(--nen-the);border:1px solid var(--vien);border-radius:11px;padding:.75rem .85rem;margin:.75rem 0}
+ .luoi-truc{stroke:var(--vien-phu);stroke-width:1}
+ .chu-truc{fill:var(--chu-nhat);font-size:11px;font-family:var(--font-so)}
+ .dai-db{fill:var(--vien-phu)}
+ .duong-ns{fill:none;stroke:var(--chu-mo);stroke-width:2}
+ .duong-bien{fill:none;stroke:var(--do);stroke-width:1.4;opacity:.45}
+ .duong-cs{fill:none;stroke:var(--do);stroke-width:2.6;stroke-dasharray:7 4;stroke-linejoin:round}
+ .duong-tt{fill:none;stroke:var(--ok-vien);stroke-width:3;stroke-linejoin:round}
+ .vach-nay{stroke:var(--canh-chu);stroke-width:1;stroke-dasharray:3 3}
+ .cham-tt{fill:var(--ok-vien);stroke:var(--nen-the);stroke-width:2}
+ .cham-cs{fill:var(--nen-the);stroke:var(--do);stroke-width:2.5}
+ .cot-tt{fill:var(--chu-mo)} .cot-db{fill:var(--do);opacity:.85}
+ .rau-db{stroke:var(--canh-chu);stroke-width:1.6}
+ .vach-chia{stroke:var(--vien-dam);stroke-width:1;stroke-dasharray:4 4}
+ .dong-sale{margin:.55rem 0}
+ .dong-sale-dau{display:flex;justify-content:space-between;gap:.5rem;font-size:.82rem;margin-bottom:.25rem}
+ .thanh-sale{position:relative;display:flex;height:10px;border-radius:99px;background:var(--nen-phu);overflow:visible}
+ .thanh-sale .phan-ban{background:var(--ok-vien);border-radius:99px 0 0 99px}
+ .thanh-sale .phan-them{background:var(--do-nen);border:1px solid var(--do);border-left:0}
+ .thanh-sale .vach-ns{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--chu)}
+ .dong-dc.cot{flex-direction:column;align-items:stretch;gap:.3rem}
+ .dong-dc-dau{display:flex;align-items:baseline;gap:.5rem}
+ .dong-dc-dau a{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .thanh-nho{display:flex;align-items:center;gap:.5rem;font-size:.74rem}
+ .thanh-nho-nen{flex:1;height:6px;border-radius:99px;background:var(--nen-phu);overflow:hidden}
+ .thanh-nho-nen > div{height:100%;background:var(--ok-vien);border-radius:99px}
+ .thanh-nho.canh .thanh-nho-nen > div{background:var(--canh-chu)}
+ .thanh-nho.loi .thanh-nho-nen > div{background:var(--loi-vien)}
+ .dong-kiem{display:grid;grid-template-columns:3.5rem 1fr 4.5rem;gap:.6rem;align-items:center;
+   padding:.45rem .8rem;border-bottom:1px solid var(--vien-phu);font-size:.8rem}
+ .hai-thanh{display:flex;flex-direction:column;gap:3px}
+ .hai-thanh > div{height:7px;border-radius:99px}
+ .thanh-db{background:var(--do);opacity:.8} .thanh-tt{background:var(--chu-mo)}
  .chu-giai span{display:inline-flex;align-items:center;gap:.4rem}
  /* PHẢI có `.chu-giai` đứng trước: `bao_cao.html` cũng dùng lớp `.mau` cho ba
     ô màu chú giải biểu đồ, nhưng chỉ khai width/height/border-radius/display
