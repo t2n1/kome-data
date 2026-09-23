@@ -32,7 +32,8 @@ DAI_SALT = 16
 # người không phụ trách khách nào (chủ DN, kế toán) có salesperson_code NULL
 # và vẫn phải đăng nhập được.
 _CHON = f"""SELECT n.id, n.ten_dang_nhap, n.salesperson_code,
-                   n.duoc_vao_kho_du_lieu, n.duoc_sua_ngan_sach, s.ten
+                   n.duoc_vao_kho_du_lieu, n.duoc_sua_ngan_sach, s.ten,
+                   n.duoc_quan_tri
             FROM app.nguoi_dung n
             LEFT JOIN core.dim_salesperson s
                    ON s.salesperson_code = n.salesperson_code"""
@@ -48,12 +49,20 @@ class NguoiDung:
     duoc_vao_kho_du_lieu: bool
     duoc_sua_ngan_sach: bool
     ten_sale: str | None
+    # Quyền quản trị (033): đổi được cờ quyền của người khác trên /cai-dat.
+    # Mặc định để đối tượng dựng tay trong test cũ vẫn chạy.
+    duoc_quan_tri: bool = False
+
+
+# Ba cờ quyền đổi được — thứ tự này là thứ tự cột trên màn Cài đặt, và là
+# CHECK của app.nhat_ky_quyen.co (033). Thêm cờ thứ tư là sửa CẢ HAI.
+CO_QUYEN = ("duoc_vao_kho_du_lieu", "duoc_sua_ngan_sach", "duoc_quan_tri")
 
 
 def _nguoi(r) -> NguoiDung:
     return NguoiDung(id=r[0], ten_dang_nhap=r[1], salesperson_code=r[2],
                      duoc_vao_kho_du_lieu=r[3], duoc_sua_ngan_sach=r[4],
-                     ten_sale=r[5])
+                     ten_sale=r[5], duoc_quan_tri=bool(r[6]))
 
 
 def bam(mat_khau: str, salt: bytes) -> bytes:
@@ -116,19 +125,34 @@ def doi_mat_khau(conn, ten: str, mat_khau_moi: str) -> bool:
 
 
 def dat_quyen(conn, ten: str, kho_du_lieu: bool | None = None,
-              ngan_sach: bool | None = None) -> bool:
+              ngan_sach: bool | None = None, quan_tri: bool | None = None,
+              sua_boi: int | None = None) -> bool:
     """False nếu không có tài khoản tên đó.
 
     `None` = KHÔNG đổi cờ đó. Đặt mặc định False thay vì None sẽ làm lệnh
     "cấp quyền ngân sách" âm thầm thu hồi quyền Kho dữ liệu của cùng người —
     hai cờ độc lập, mỗi lệnh chỉ đụng cờ mà nó nói tới.
+
+    Mọi cờ ĐỔI THẬT được ghi một dòng vào app.nhat_ky_quyen (033) trong CÙNG
+    giao dịch — kể cả khi đổi bằng script (`sua_boi` NULL = "script trên máy
+    trong công ty"). Cờ bấm lại đúng giá trị cũ thì không ghi gì.
     """
-    return conn.execute(
-        """UPDATE app.nguoi_dung
-           SET duoc_vao_kho_du_lieu = coalesce(%s, duoc_vao_kho_du_lieu),
-               duoc_sua_ngan_sach   = coalesce(%s, duoc_sua_ngan_sach)
-           WHERE ten_dang_nhap = %s""",
-        (kho_du_lieu, ngan_sach, ten)).rowcount == 1
+    r = conn.execute(
+        f"SELECT id, {', '.join(CO_QUYEN)} FROM app.nguoi_dung WHERE ten_dang_nhap = %s",
+        (ten,)).fetchone()
+    if r is None:
+        return False
+    moi = dict(zip(CO_QUYEN, (kho_du_lieu, ngan_sach, quan_tri)))
+    cu = dict(zip(CO_QUYEN, r[1:]))
+    for co, gt in moi.items():
+        if gt is None or gt == cu[co]:
+            continue
+        conn.execute(f"UPDATE app.nguoi_dung SET {co} = %s WHERE id = %s", (gt, r[0]))
+        conn.execute(
+            """INSERT INTO app.nhat_ky_quyen
+                 (nguoi_dung_id, ten_dang_nhap, co, gia_tri_cu, gia_tri_moi, sua_boi)
+               VALUES (%s, %s, %s, %s, %s, %s)""", (r[0], ten, co, cu[co], gt, sua_boi))
+    return True
 
 
 def liet_ke(conn) -> list[NguoiDung]:

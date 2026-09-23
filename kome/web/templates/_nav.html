@@ -33,8 +33,9 @@
    trong kome.css nên mục "đang xem" đổi màu chữ thì icon đổi theo, đúng ở
    cả hai bảng màu sáng/tối.
 
-   Bảy icon (dashboard/chart/target/user/cube/box/db — `target` cho "Dự báo
-   doanh thu" thêm ở đợt 8) chép NGUYÊN VĂN từ object `I`
+   Chín icon (dashboard/chart/target/user/cube/box/db/cal/gear — `target` cho
+   "Dự báo doanh thu" thêm ở đợt 8, `cal`/`gear` cho Nhật ký/Cài đặt ở màn
+   20/21) chép NGUYÊN VĂN từ object `I`
    trong kome-nav.js của gói thiết kế, theo đúng ánh xạ NHOM của gói đó.
    Hai icon còn lại (bell cho "Cần liên hệ", pin cho "Bản đồ") do TA CHỌN
    trong chính bộ 24 icon của gói thiết kế — gói thiết kế không có mục
@@ -78,10 +79,16 @@
     {# `hien_kho` CHỈ bọc nhóm HỆ THỐNG — "Kho hàng" (tồn kho, việc của người
        bán) không liên quan gì tới "Kho dữ liệu" (nút xoá dữ liệu, cần quyền
        riêng từ đợt 3). Hai cái tên gần nhau, hai quyền khác nhau. #}
-    {% if hien_kho %}
+    {# Từ màn 20/21: nhóm HỆ THỐNG luôn hiện (Nhật ký thao tác và Cài đặt mở
+       cho mọi người đã đăng nhập); `hien_kho` giờ CHỈ che mục Kho dữ liệu.
+       `cal` và `gear` chép NGUYÊN VĂN từ object `I` của kome-nav.js, đúng ánh
+       xạ "nhatky" → cal, "caidat" → gear của gói thiết kế. #}
     <p class="nhom">HỆ THỐNG</p>
+    {% if hien_kho %}
     <a href="/kho-du-lieu"{% if trang == 'kho-du-lieu' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><ellipse cx="9" cy="4.6" rx="6" ry="2.2"></ellipse><path d="M3 4.6v8.8c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4.6"></path><path d="M3 9c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2"></path></svg>Kho dữ liệu</a>
     {% endif %}
+    <a href="/nhat-ky"{% if trang == 'nhat-ky' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><rect x="2.6" y="4" width="12.8" height="11.4" rx="1.4"></rect><path d="M2.6 7.6h12.8M6.4 2.6v2.6M11.6 2.6v2.6"></path></svg>Nhật ký thao tác</a>
+    <a href="/cai-dat"{% if trang == 'cai-dat' %} class="dang-xem" aria-current="page"{% endif %}><svg class="ic" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><circle cx="9" cy="9" r="2.6"></circle><path d="M14.4 11a1.2 1.2 0 0 0 .24 1.32l.04.05a1.5 1.5 0 1 1-2.12 2.12l-.05-.05a1.2 1.2 0 0 0-1.32-.24 1.2 1.2 0 0 0-.73 1.1v.13a1.5 1.5 0 1 1-3 0v-.07a1.2 1.2 0 0 0-.79-1.1 1.2 1.2 0 0 0-1.32.24l-.05.05a1.5 1.5 0 1 1-2.12-2.12l.05-.05a1.2 1.2 0 0 0 .24-1.32 1.2 1.2 0 0 0-1.1-.73H2.2a1.5 1.5 0 1 1 0-3h.07a1.2 1.2 0 0 0 1.1-.79 1.2 1.2 0 0 0-.24-1.32l-.05-.05A1.5 1.5 0 1 1 5.2 3.05l.05.05a1.2 1.2 0 0 0 1.32.24h.06a1.2 1.2 0 0 0 .73-1.1V2.2a1.5 1.5 0 1 1 3 0v.07a1.2 1.2 0 0 0 .73 1.1 1.2 1.2 0 0 0 1.32-.24l.05-.05a1.5 1.5 0 1 1 2.12 2.12l-.05.05a1.2 1.2 0 0 0-.24 1.32v.06a1.2 1.2 0 0 0 1.1.73h.13a1.5 1.5 0 1 1 0 3h-.07a1.2 1.2 0 0 0-1.1.73z"></path></svg>Cài đặt</a>
   </nav>
 
   <div class="chan-ben">

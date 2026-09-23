@@ -36,8 +36,11 @@ TEN_FONT = [
 # (/san-pham và /kho-hang của đợt 4b thì ĐÃ có sẵn — bản soát ghi chúng cũng
 # thiếu, nhưng đo lại trên nhánh này thì không.) Thêm một trang mới thì THÊM
 # VÀO ĐÂY — đây là chỗ duy nhất canh khung chung của mọi trang.
+# (2026-09-23: thêm /ngan-sach — sót từ đợt 5a — và các trang của đợt 2b, 8,
+# màn 20/21. /lien-he thay /can-xu-ly ở đợt 7.)
 TRANG = ["/", "/khach-hang", "/bao-cao", "/lien-he", "/kho-du-lieu",
-         "/san-pham", "/kho-hang", "/ban-do"]
+         "/san-pham", "/kho-hang", "/ban-do", "/ngan-sach", "/du-bao",
+         "/kho-du-lieu/luong", "/kho-du-lieu/cot-noi", "/nhat-ky", "/cai-dat"]
 
 
 def test_css_duoc_phuc_vu(conn, test_db_url):

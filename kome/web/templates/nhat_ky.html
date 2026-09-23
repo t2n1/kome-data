@@ -1,0 +1,88 @@
+<!-- kome/web/templates/nhat_ky.html — Nhật ký thao tác (màn 20).
+     Bố cục bám Nhật ký.dc.html: tiêu đề + "⤓ Xuất CSV" → 4 ô chỉ số → hai cột
+     (Dòng thời gian có tab loại + ô tìm | Thao tác nhiều nhất 30 ngày · Cần soát
+     lại · Quy tắc ghi nhật ký). Loại thao tác là của APP NÀY (nạp, hoàn tác,
+     ngân sách, quyền, tiếp xúc) — không dựng "sửa giá", "duyệt ngoại lệ", "hạn
+     mức" của prototype vì hệ thống không có thao tác nào như thế để ghi. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<title>KOME — nhật ký thao tác</title>
+{% include "_chung.html" %}
+{% include "_nav.html" %}
+{% set q = ("loai=" ~ loai ~ "&" if loai else "") ~ ("tim=" ~ tim|urlencode if tim else "") %}
+<div class="tieu-de-khoi"><h1>Nhật ký thao tác</h1>
+  <a class="nut-nap nut-phai" href="/nhat-ky.csv{{ '?' ~ q if q else '' }}">⤓ Xuất CSV</a></div>
+<p class="ghi-chu">Ai nạp dữ liệu, ai hoàn tác lô, ai sửa ngân sách, ai đổi quyền, ai ghi tiếp xúc — đọc gộp từ
+chính sổ của từng việc, không chép sang bảng thứ hai. Giữ vĩnh viễn, chỉ thêm, không sửa.</p>
+
+<div class="the-so">
+  <div><div class="nhan">Thao tác 30 ngày</div><div class="gia">{{ th.tong }}</div><div class="nhan">mọi loại</div></div>
+  <div><div class="nhan">Nạp dữ liệu</div><div class="gia">{{ th.theo_loai['nap'] }}</div><div class="nhan">lô trong 30 ngày</div></div>
+  <div><div class="nhan">Hoàn tác lô</div><div class="gia">{{ th.theo_loai['huy'] }}</div><div class="nhan">xoá dữ liệu khỏi kho</div></div>
+  <div><div class="nhan">Không rõ ai làm</div><div class="gia">{{ th.khong_ro_ai }}</div>
+       <div class="nhan">{% if th.khong_ro_ai %}máy chưa bật đăng nhập, hoặc đổi bằng script{% else %}mọi thao tác đều có tên{% endif %}</div></div>
+</div>
+
+<div class="hai-cot-nk tai-lieu">
+<section id="dong-thoi-gian">
+<div class="tieu-de-khoi"><h2>Dòng thời gian</h2>
+  <nav class="loc" aria-label="Loại thao tác">
+    <a href="/nhat-ky{{ '?tim=' ~ tim|urlencode if tim else '' }}"{% if not loai %} class="dang-xem" aria-current="true"{% endif %}>Tất cả</a>
+    {% for k, (icon, nhan, mau) in loai_ds.items() %}<a href="/nhat-ky?loai={{ k }}{{ '&tim=' ~ tim|urlencode if tim else '' }}"{% if loai == k %} class="dang-xem" aria-current="true"{% endif %}>{{ nhan }}</a>{% endfor %}
+  </nav></div>
+<form class="o-tim" method="get" action="/nhat-ky">
+  {% if loai %}<input type="hidden" name="loai" value="{{ loai }}">{% endif %}
+  <input type="search" name="tim" value="{{ tim }}" placeholder="Tìm người hoặc đối tượng…" aria-label="Tìm người hoặc đối tượng">
+  <button type="submit">Tìm</button>
+</form>
+<div class="the-nk">
+{% for d in ds %}
+<div class="dong-tl">
+  <span class="icon-tl vien {{ d.mau }}" aria-hidden="true">{{ d.icon }}</span>
+  <div class="than-dong">
+    <div class="dong-nk-dau"><strong>{{ d.nguoi or "(không rõ ai)" }}</strong>
+      <span class="vien {{ d.mau }}">{{ d.nhan }}</span>
+      <span class="khong-ap-dung so">{{ d.khi }}</span></div>
+    <div>{{ d.noi_dung }}</div>
+    {% set ts = d.truoc_sau %}{% if ts %}<div class="truoc-sau"><span class="truoc">{{ ts[0] }}</span> <span aria-hidden="true">→</span><span class="sr">thành</span> <span class="sau">{{ ts[1] }}</span></div>{% endif %}
+  </div>
+</div>
+{% else %}
+<div class="dong-dc khong-ap-dung">Không có thao tác nào{% if loai or tim %} khớp bộ lọc — <a href="/nhat-ky">bỏ lọc</a>{% endif %}.</div>
+{% endfor %}
+</div>
+<p class="ghi-chu">{{ ds|length }} dòng mới nhất{% if ds|length >= gioi_han %} (giới hạn {{ gioi_han }} — xuất CSV để có đủ){% endif %}.</p>
+</section>
+
+<div>
+<section>
+<h2>Thao tác nhiều nhất 30 ngày</h2>
+<div class="the-nk">
+{% set dinh = (th.theo_nguoi|map(attribute=1)|max) if th.theo_nguoi else 1 %}
+{% for ten, so in th.theo_nguoi %}
+<div class="dong-dc cot"><div class="dong-dc-dau"><span>{{ ten }}</span><strong class="so">{{ so }}</strong></div>
+  <div class="thanh-nho"><div class="thanh-nho-nen"><div style="width:{{ (so / dinh * 100)|round(1) }}%"></div></div></div></div>
+{% else %}<div class="dong-dc khong-ap-dung">Chưa có thao tác nào có tên người trong 30 ngày.</div>{% endfor %}
+</div>
+</section>
+<section>
+<h2 class="chu-canh">Cần soát lại</h2>
+<div class="the-nk">
+{% for d in th.soat_lai %}
+<div class="dong-dc cot"><div><strong>{{ d.nguoi or "(không rõ ai)" }}</strong> · {{ d.noi_dung }}</div>
+  <div class="khong-ap-dung">{{ d.khi }}{% set ts = d.truoc_sau %}{% if ts %} · {{ ts[0] }} → {{ ts[1] }}{% endif %}</div></div>
+{% else %}<div class="dong-dc khong-ap-dung">Không có lần hoàn tác lô hay đổi quyền nào trong 30 ngày.</div>{% endfor %}
+</div>
+</section>
+<section>
+<h2>Quy tắc ghi nhật ký</h2>
+<div class="the-nk"><div class="dong-dc cot khong-ap-dung">
+Mỗi lần nạp, hoàn tác lô, sửa chỉ tiêu, đổi quyền và ghi tiếp xúc đều ghi kèm người làm và giá trị trước–sau.
+Sổ tiếp xúc và sổ quyền bị CSDL chặn sửa/xoá; sổ ngân sách và sổ nạp chỉ được code ghi thêm
+(lô hoàn tác giữ nguyên dòng, chỉ đóng dấu thời điểm hoàn tác). "Không rõ ai" nghĩa là thao tác làm khi máy trong công ty
+chưa bật đăng nhập, hoặc đổi quyền bằng <code>scripts/tao_nguoi_dung.py</code>.
+</div></div>
+</section>
+</div>
+</div>
+</html>
+</main>

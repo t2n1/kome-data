@@ -1,0 +1,91 @@
+<!-- kome/web/templates/cai_dat.html — Cài đặt (màn 21).
+     Bố cục bám Cài đặt.dc.html: danh mục mục bên trái (tên + tên Nhật + một
+     câu), nội dung bên phải. CHỈ dựng những mục có thứ thật đằng sau:
+       - Người dùng & phân quyền: đổi ba cờ quyền (chỉ người có duoc_quan_tri).
+         Tạo tài khoản và mật khẩu VẪN chỉ bằng script — màn này không bao giờ
+         nhận một mật khẩu (đặc tả đợt 3 §4.2).
+       - Ngân sách & ngày nghỉ: liên kết /ngan-sach + ngày lễ sắp tới (032).
+       - Quy tắc khách hàng, Nguồn dữ liệu, Hiển thị: đọc — trỏ về nơi thật.
+     KHÔNG dựng "Tính năng bật/tắt", "Thông báo/kênh gửi", ngưỡng hạng sửa được
+     của prototype: không có gì đằng sau để bật, gửi hay áp — một công tắc không
+     nối vào đâu là nói dối người bấm. -->
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<title>KOME — cài đặt</title>
+{% include "_chung.html" %}
+{% include "_nav.html" %}
+<h1>Cài đặt</h1>
+<p class="ghi-chu">Mọi thay đổi ở đây được ghi vào <a href="/nhat-ky?loai=quyen">Nhật ký thao tác</a>.</p>
+{% if loi %}<p class="ngay-thieu" role="alert">{{ loi }}</p>{% endif %}
+{% if xong %}<p class="backup-ok" role="status">{{ xong }}</p>{% endif %}
+
+<div class="cai-dat tai-lieu">
+<nav class="muc-cd" aria-label="Các mục cài đặt">
+  {% for ma, ten, ja, mo_ta in muc %}<a href="#{{ ma }}"><strong>{{ ten }}</strong><span class="khong-ap-dung">{{ ja }}</span><span class="mo-cd">{{ mo_ta }}</span></a>{% endfor %}
+</nav>
+<div class="noi-dung-cd">
+
+<section id="nguoi-dung" class="the-cd">
+<h2>Người dùng &amp; phân quyền <span class="khong-ap-dung">ユーザー管理</span></h2>
+{% if not co_cong %}
+<p class="ngay-thieu tai-lieu">Máy này chưa bật đăng nhập (<code>KOME_SESSION_SECRET</code> trống) — ai mở được trang cũng làm được mọi thứ,
+nên ba cờ bên dưới chưa bảo vệ được gì. Xem <code>docs/runbook.md</code>, mục "Bật đăng nhập trên máy trong công ty".</p>
+{% elif not duoc_sua %}
+<p class="ghi-chu">Bạn xem được danh sách nhưng không đổi được quyền — cần cờ <strong>quản trị</strong>.</p>
+{% endif %}
+<div class="bang-cuon"><table>
+<tr><th>Tài khoản</th><th>Phụ trách khách</th>{% for co, nhan in co_quyen %}<th>{{ nhan }}</th>{% endfor %}<th></th></tr>
+{% for n in nguoi_dung %}
+<tr><td><strong>{{ n.ten_dang_nhap }}</strong>{% if nguoi and n.id == nguoi.id %} <span class="vien nhat">bạn</span>{% endif %}
+  {# form rỗng ở đây, ô tích ở từng cột trỏ về nó bằng thuộc tính form= (HTML5):
+     mỗi ô nằm ĐÚNG cột tiêu đề của nó, không phải một ô gộp lệch cột. #}
+  <form id="q{{ n.id }}" method="post" action="/cai-dat/quyen/{{ n.id }}"></form></td>
+<td>{{ n.ten_sale or ("mã " ~ n.salesperson_code if n.salesperson_code else "— (thấy toàn công ty)") }}</td>
+{% for co, nhan in co_quyen %}<td><label class="o-quyen"><input type="checkbox" form="q{{ n.id }}" name="{{ co }}" value="1"{% if n[co] %} checked{% endif %}{% if not duoc_sua %} disabled{% endif %}> <span class="sr">{{ nhan }} cho {{ n.ten_dang_nhap }}</span><span aria-hidden="true">{{ "có" if n[co] else "—" }}</span></label></td>{% endfor %}
+<td>{% if duoc_sua %}<button type="submit" form="q{{ n.id }}" class="nut-nap">Lưu</button>{% endif %}</td></tr>
+{% else %}
+<tr><td colspan="6" class="khong-ap-dung">Chưa có tài khoản nào — tạo bằng <code>python scripts/tao_nguoi_dung.py them &lt;tên&gt;</code>.</td></tr>
+{% endfor %}
+</table></div>
+<p class="ghi-chu"><strong>Kho dữ liệu</strong> = nạp file và bấm Hoàn tác (xoá được cả một tháng doanh thu) ·
+<strong>Ngân sách</strong> = đặt chỉ tiêu cả công ty · <strong>Quản trị</strong> = đổi ba cờ này của người khác.
+Tạo tài khoản, đổi mật khẩu: <code>python scripts/tao_nguoi_dung.py</code> (không làm trên web).
+Lọc "khách của tôi" là mặc định tiện dụng, không phải hàng rào — ai cũng xem được mọi khách.</p>
+</section>
+
+<section id="ngan-sach" class="the-cd">
+<h2>Ngân sách &amp; ngày nghỉ <span class="khong-ap-dung">予算設定</span></h2>
+<p>Chỉ tiêu doanh thu 5 người × 12 tháng đặt ở <a href="/ngan-sach">màn Ngân sách</a>.</p>
+<h3>Ngày lễ quốc gia sắp tới</h3>
+<p class="ghi-chu">Đã trừ khỏi "ngày làm việc" ở mọi chỗ (tiến độ ngân sách, dự báo, ngày thiếu dữ liệu).
+Ngày nghỉ riêng của công ty (Obon, 年末年始) CHƯA có — không có nguồn nào để đọc.</p>
+<ul class="ngay-le">{% for d, ten in ngay_le %}<li><span class="so">{{ d.strftime("%d/%m/%Y") }}</span> {{ ten }}</li>{% else %}<li class="khong-ap-dung">Không có ngày lễ nào trong dải lịch.</li>{% endfor %}</ul>
+</section>
+
+<section id="quy-tac" class="the-cd">
+<h2>Quy tắc khách hàng <span class="khong-ap-dung">ランク管理</span></h2>
+<p class="ghi-chu">Định nghĩa nằm trong <code>mart</code> (một khái niệm, một công thức) — đổi nó là một migration, không phải một ô nhập.</p>
+<ul>
+<li><strong>Nhịp mua</strong> = trung vị khoảng cách giữa các lần mua của CHÍNH khách đó (cần ≥ 3 lần mua).</li>
+<li><strong>Quá hạn mua lại</strong> khi im lặng ≥ 2 lần nhịp · <strong>lâu không mua</strong> khi ≥ 4 lần · <strong>sắp đến hạn</strong> khi 1–2 lần.</li>
+<li><strong>Hạng</strong> tính theo doanh thu 12 tháng của ta, KHÔNG phải 得意先ランク của OBC.</li>
+<li>Khách OBC đánh dấu ※廃業※ / ※取引停止※ không bao giờ vào danh sách gọi lại.</li>
+</ul>
+</section>
+
+<section id="nguon" class="the-cd">
+<h2>Nguồn dữ liệu &amp; đồng bộ <span class="khong-ap-dung">データ連携</span></h2>
+<p>3 file hằng ngày lúc 13:30, đối soát lại cả tháng trước vào đầu tháng. Bảng nguồn, khoá, 5 cổng kiểm và ngưỡng:
+<a href="/kho-du-lieu/luong">Sơ đồ luồng</a> · <a href="/kho-du-lieu/cot-noi">Cột nối</a>.</p>
+</section>
+
+<section id="hien-thi" class="the-cd">
+<h2>Hiển thị <span class="khong-ap-dung">表示設定</span></h2>
+<nav class="loc" aria-label="Giao diện">
+  {% for ma, nhan in [("sang", "Sáng"), ("toi", "Tối"), ("he-thong", "Theo hệ thống"), ("theo-gio", "Theo giờ")] %}<a href="/giao-dien?che_do={{ ma }}"{% if che_do_giao_dien == ma %} class="dang-xem" aria-current="true"{% endif %}>{{ nhan }}</a>{% endfor %}
+</nav>
+<p class="ghi-chu">Lưu trong cookie của trình duyệt này. Tiền luôn là yên nguyên (¥1,234); kỳ kế toán của công ty chạy 1/8 → 31/7 (kỳ 2026 = 8/2025 → 7/2026).</p>
+</section>
+</div>
+</div>
+</html>
+</main>

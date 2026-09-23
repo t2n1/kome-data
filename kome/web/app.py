@@ -588,6 +588,102 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         return RedirectResponse("/lien-he?tat_ca=1" if tat_ca else "/lien-he",
                                 status_code=301)
 
+    # ---- Nhật ký thao tác (màn 20) + Cài đặt (màn 21) ---------------------
+    @app.get("/nhat-ky", response_class=HTMLResponse)
+    def nhat_ky(request: Request, loai: str = "", tim: str = ""):
+        """Đọc gộp năm sổ đã có (kome/nhat_ky.py). ĐÚNG 2 lượt hỏi."""
+        from kome import nhat_ky as NK
+        try:
+            loai = loai if loai in NK.LOAI else ""
+            with open_app_conn() as conn:
+                ds = NK.dong_thoi_gian(conn, loai or None, tim)
+                th = NK.tong_hop_30_ngay(conn)
+            return _ve(request, "nhat_ky.html", {
+                "trang": "nhat-ky", "ds": ds, "th": th, "loai": loai, "tim": tim,
+                "loai_ds": NK.LOAI, "gioi_han": 200})
+        except Exception as e:
+            return _loi(request, "mở nhật ký thao tác", e)
+
+    @app.get("/nhat-ky.csv")
+    def nhat_ky_csv(loai: str = "", tim: str = ""):
+        from fastapi.responses import Response
+        from kome import nhat_ky as NK
+        loai = loai if loai in NK.LOAI else ""
+        with open_app_conn() as conn:
+            ds = NK.dong_thoi_gian(conn, loai or None, tim, gioi_han=100_000)
+        return Response(NK.csv(ds), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": 'attachment; filename="nhat-ky-thao-tac.csv"'})
+
+    # Nhãn cột quyền trên màn Cài đặt — thứ tự = ND.CO_QUYEN.
+    _NHAN_CO = {"duoc_vao_kho_du_lieu": "Kho dữ liệu", "duoc_sua_ngan_sach": "Ngân sách",
+                "duoc_quan_tri": "Quản trị"}
+    _MUC_CAI_DAT = [
+        ("nguoi-dung", "Người dùng & phân quyền", "ユーザー管理", "Ai đăng nhập được và ai được nạp/hoàn tác, sửa ngân sách, đổi quyền."),
+        ("ngan-sach", "Ngân sách & ngày nghỉ", "予算設定", "Chỉ tiêu theo người và lịch ngày lễ dùng cho mọi phép tính tiến độ."),
+        ("quy-tac", "Quy tắc khách hàng", "ランク管理", "Nhịp mua, im lặng, hạng theo doanh thu — định nghĩa trong mart."),
+        ("nguon", "Nguồn dữ liệu & đồng bộ", "データ連携", "Các file OBC, nhịp nạp và cổng kiểm."),
+        ("hien-thi", "Hiển thị", "表示設定", "Sáng/tối, đơn vị tiền, kỳ kế toán."),
+    ]
+
+    @app.get("/cai-dat", response_class=HTMLResponse)
+    def cai_dat(request: Request, loi: str = "", xong: str = ""):
+        """Xem được bởi mọi người đã đăng nhập; ĐỔI quyền chỉ người có
+        duoc_quan_tri (kiểm ở POST). 2 lượt hỏi: danh sách tài khoản + ngày lễ."""
+        nguoi = getattr(request.state, "nguoi", None)
+        try:
+            with open_app_conn() as conn:
+                ds = ND.liet_ke(conn)
+                ngay_le = conn.execute(
+                    """SELECT ngay, ngay_le FROM mart.lich_kinh_doanh
+                       WHERE ngay_le IS NOT NULL AND ngay >= %s ORDER BY ngay LIMIT 12""",
+                    (TDL.hom_nay_o_nhat(),)).fetchall()
+            return _ve(request, "cai_dat.html", {
+                "trang": "cai-dat", "nguoi_dung": ds, "nguoi": nguoi, "ngay_le": ngay_le,
+                "co_cong": bool(bi_mat), "duoc_sua": bool(bi_mat and nguoi and nguoi.duoc_quan_tri),
+                "co_quyen": [(c, _NHAN_CO[c]) for c in ND.CO_QUYEN], "muc": _MUC_CAI_DAT,
+                "loi": loi[:200], "xong": xong[:200]})
+        except Exception as e:
+            return _loi(request, "mở cài đặt", e)
+
+    @app.post("/cai-dat/quyen/{id_nguoi}")
+    async def doi_quyen(request: Request, id_nguoi: int):
+        """Đổi ba cờ quyền của MỘT tài khoản. Bốn cổng, theo thứ tự:
+        1. Không có cổng đăng nhập (máy chưa đặt KOME_SESSION_SECRET) → từ chối:
+           ở đó cờ quyền không bảo vệ được gì, và không biết AI đang đổi.
+        2. Người đổi không có duoc_quan_tri → 403.
+        3. Tự bỏ quyền quản trị của CHÍNH MÌNH → từ chối: bấm nhầm một ô là
+           công ty không còn ai đổi được quyền trên web nữa.
+        4. Mỗi cờ đổi thật ghi một dòng app.nhat_ky_quyen (ND.dat_quyen)."""
+        from urllib.parse import quote
+        nguoi = getattr(request.state, "nguoi", None)
+        if not bi_mat or nguoi is None:
+            return RedirectResponse("/cai-dat?loi=" + quote(
+                "Máy này chưa bật đăng nhập — không đổi quyền được ở đây."), status_code=303)
+        if not nguoi.duoc_quan_tri:
+            return _ve(request, "cam_cai_dat.html", {"trang": "cai-dat"}, status_code=403)
+        form = await request.form()
+        moi = {c: form.get(c) == "1" for c in ND.CO_QUYEN}
+        try:
+            with open_app_conn() as conn:
+                dich = next((n for n in ND.liet_ke(conn) if n.id == id_nguoi), None)
+                if dich is None:
+                    return RedirectResponse("/cai-dat?loi=" + quote("Không có tài khoản đó."),
+                                            status_code=303)
+                if dich.id == nguoi.id and not moi["duoc_quan_tri"]:
+                    return RedirectResponse("/cai-dat?loi=" + quote(
+                        "Không tự bỏ quyền quản trị của chính mình — nhờ một người quản trị khác."),
+                        status_code=303)
+                ND.dat_quyen(conn, dich.ten_dang_nhap,
+                             kho_du_lieu=moi["duoc_vao_kho_du_lieu"],
+                             ngan_sach=moi["duoc_sua_ngan_sach"],
+                             quan_tri=moi["duoc_quan_tri"], sua_boi=nguoi.id)
+                conn.commit()
+            return RedirectResponse("/cai-dat?xong=" + quote(
+                f"Đã lưu quyền của {dich.ten_dang_nhap} — có hiệu lực ở lượt bấm kế tiếp của họ."),
+                status_code=303)
+        except Exception as e:
+            return _loi(request, "đổi quyền", e)
+
     @app.get("/du-bao", response_class=HTMLResponse)
     def du_bao(request: Request, kb: str = "cs"):
         """Dự báo doanh thu (đợt 8). ĐÚNG 3 lượt hỏi — có test đếm. Toàn công
@@ -759,6 +855,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         with staged.open("wb") as out:
                             shutil.copyfileobj(f.file, out)
                         results.append(ingest(conn, staged, archive_dir))
+                _ghi_ai(conn, "nap_boi", [r.batch_id for r in results if r.batch_id],
+                        getattr(request.state, "nguoi", None))
             backup_dir = Path(os.environ.get("BACKUP_DIR", "./backups"))
             with open_conn() as conn:
                 ctx = _du_lieu_kho(conn)
@@ -767,6 +865,23 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                        {**ctx, "results": results, "trang": "kho-du-lieu", "tab": "van-hanh"})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e)
+
+    def _ghi_ai(conn, cot: str, batch_ids: list[int], nguoi) -> None:
+        """Ghi AI nạp / AI hoàn tác vào meta.ingest_batch (033) cho Nhật ký
+        thao tác. SAU khi ingest/undo đã commit, và nuốt mọi lỗi: đây là luồng
+        13:30 — một lô đã nạp đúng không được trả về trang lỗi chỉ vì không
+        ghi được tên người bấm (vd CSDL thật chưa chạy 033). Không có người
+        (máy trong công ty chưa bật đăng nhập) thì không có gì để ghi."""
+        if nguoi is None or not batch_ids:
+            return
+        assert cot in ("nap_boi", "huy_boi")
+        try:
+            conn.execute(f"UPDATE meta.ingest_batch SET {cot} = %s WHERE batch_id = ANY(%s)",
+                         (nguoi.id, batch_ids))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            _in(f"[nhat-ky] không ghi được {cot} cho lô {batch_ids}: {e!r}")
 
     def _du_lieu_kho(conn):
         """Mọi thứ màn Kho dữ liệu cần, gom một chỗ.
@@ -1017,6 +1132,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             from kome.pipeline import undo_batch
             with open_conn() as conn:
                 undo_batch(conn, batch_id)
+                _ghi_ai(conn, "huy_boi", [batch_id], getattr(request.state, "nguoi", None))
             return RedirectResponse("/kho-du-lieu", status_code=303)
         except Exception as e:
             return _loi(request, "hoàn tác lần nạp dữ liệu", e)
