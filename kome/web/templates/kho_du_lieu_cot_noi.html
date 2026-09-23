@@ -29,14 +29,24 @@ mã là TEXT — đọc thành số là mất số 0 đầu và không ghép đ�
 <nav class="loc" aria-label="Chọn file">
 {% for n in nguon %}<a href="/kho-du-lieu/cot-noi?file={{ n.ten }}#noi-di-dau"{% if n.ten == file %} class="dang-xem" aria-current="true"{% endif %}>{{ n.ja }}</a>{% endfor %}
 </nav>
-<h3>{{ file_ja }} trỏ ra</h3>
-{% if noi.tro_ra %}<ul>{% for x in noi.tro_ra %}
-<li>{{ x.ja }} <code>{{ x.cot }}</code> → <a href="/kho-du-lieu/cot-noi?file={{ x.dich }}#noi-di-dau">{{ x.dich_ja }}</a> <code>{{ x.khoa_dich }}</code></li>
-{% endfor %}</ul>{% else %}<p class="ghi-chu">Không trỏ sang file nào — đây là file gốc (master).</p>{% endif %}
-<h3>Được trỏ vào từ</h3>
-{% if noi.tro_vao %}<ul>{% for x in noi.tro_vao %}
-<li><a href="/kho-du-lieu/cot-noi?file={{ x.nguon }}#noi-di-dau">{{ x.nguon_ja }}</a> <code>{{ x.cot }}</code></li>
-{% endfor %}</ul>{% else %}<p class="ghi-chu">Không file nào trỏ vào.</p>{% endif %}
+<div class="the-nk so-do">
+  <div class="so-do-tom">{{ file_ja }} trỏ ra {{ noi.tro_ra|length }} cột ·
+    được {{ noi.tro_vao|length }} cột của file khác trỏ vào{% if not so_do.trai %} — không nối với file nào{% endif %}.</div>
+  {% if so_do.trai %}
+  <div class="so-do-nhan"><span>CỘT NỐI CỦA FILE ĐANG CHỌN</span><span>GHÉP ĐƯỢC VỚI</span></div>
+  {# Ba cột, mỗi hàng cao ĐÚNG dong_so_do px — SVG ở giữa vẽ đường từ tâm
+     hàng trái sang tâm hàng phải theo cùng số đó (kome.tai_lieu.DONG_SO_DO).
+     Đường là trang trí (aria-hidden): hai danh sách chữ hai bên đã nói đủ. #}
+  <div class="so-do-luoi">
+    <ul class="so-do-trai">{% for t in so_do.trai %}<li style="height: {{ dong_so_do }}px"><span>{{ t.ja }}</span> <code>{{ t.cot }}</code> <span class="khong-ap-dung">{{ t.vai }}</span></li>{% endfor %}</ul>
+    <svg viewBox="0 0 100 {{ so_do.cao }}" preserveAspectRatio="none" aria-hidden="true" focusable="false" style="height: {{ so_do.cao }}px">
+      {% for d in so_do.duong %}<path d="{{ d.d }}" class="duong-{{ d.loai }}" vector-effect="non-scaling-stroke"></path>{% endfor %}
+    </svg>
+    <ul class="so-do-phai">{% for p in so_do.phai %}<li style="height: {{ dong_so_do }}px"><a href="/kho-du-lieu/cot-noi?file={{ p.ten }}#noi-di-dau">{{ p.ja }}</a></li>{% endfor %}</ul>
+  </div>
+  <p class="khong-ap-dung so-do-chu">Đường <span class="chu-ra">xanh lam</span>: file này trỏ ra (khoá ngoại) · đường <span class="chu-vao">xanh lá</span>: file khác trỏ vào khoá chính của nó.</p>
+  {% endif %}
+</div>
 </section>
 
 <section id="cot">

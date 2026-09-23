@@ -90,7 +90,7 @@ def test_anh_chup_thieu_khong_no(tmp_path):
     anh = T.doc_anh_chup(tmp_path / "khong-co.json")
     assert anh is None
     assert T.cam_bay(anh) == [] and T.cong(anh) == []
-    assert [t["ma"] for t in T.bon_tang(anh, SPECS)] == ["raw", "core", "mart", "app"]
+    assert [t["ma"] for t in T.bon_tang(anh, SPECS)] == ["OBC", "raw", "core", "mart"]
 
 
 # ---- Ảnh chụp -------------------------------------------------------------

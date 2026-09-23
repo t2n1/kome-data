@@ -791,7 +791,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         anh = TL.doc_anh_chup()
         return _ve(request, "kho_du_lieu_luong.html", {
             "trang": "kho-du-lieu", "tab": "luong", "md": TL.md_dong,
-            "tang": TL.bon_tang(anh, SPECS), "nguon": TL.nguon_obc(SPECS),
+            "tang": TL.bon_tang(anh, SPECS), "nguon": TL.nguon_obc(SPECS, anh),
+            "ranh_gioi": TL.ranh_gioi(anh),
             "chua_nap": TL.chua_nap(), "cong": TL.cong(anh),
             "nguong": TL.nguong(SPECS), "cam_bay": TL.cam_bay(anh),
             "lo_trinh": TL.lo_trinh(anh)})
@@ -805,7 +806,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "trang": "kho-du-lieu", "tab": "cot-noi", "file": ten,
             "file_ja": SPECS[ten].display_name, "core_table": SPECS[ten].core_table,
             "nguon": TL.nguon_obc(SPECS), "ma_tran": TL.ma_tran(SPECS),
-            "noi": TL.noi_di_dau(SPECS, ten), "cot": TL.cot_cua(SPECS, ten)})
+            "noi": TL.noi_di_dau(SPECS, ten), "so_do": TL.so_do_noi(SPECS, ten),
+            "dong_so_do": TL.DONG_SO_DO, "cot": TL.cot_cua(SPECS, ten)})
 
     # Ba địa chỉ cũ -> màn gộp. 301 chứ không 302: chúng biến mất vĩnh viễn,
     # và 301 cho trình duyệt cập nhật dấu trang. Neo để người bấm dấu trang cũ

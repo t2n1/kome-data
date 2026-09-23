@@ -6,7 +6,7 @@ Chạy lại MỖI KHI sửa một trong bốn nguồn dưới đây — test
     python scripts/sinh_tai_lieu.py
 
 Nguồn (đều KHÔNG có trên Vercel, nên web đọc ảnh chụp thay vì đọc thẳng):
-- `db/migrations/*.sql`   → bảng/view theo schema (khối "Bốn tầng")
+- `db/migrations/*.sql`   → bảng/view theo schema + COMMENT ON ("Bốn tầng", "Ai là sự thật")
 - `kome/gates.py`         → hằng TEN_CONG (khối "Đối chiếu bắt buộc")
 - `CLAUDE.md`             → mục "Bẫy đã biết" (khối "Cạm bẫy riêng của OBC")
 - đặc tả lộ trình §7      → bảng các đợt (khối "Lộ trình")
@@ -44,6 +44,23 @@ def bang_theo_schema(thu_muc: Path) -> dict[str, list[str]]:
             s, t = m.group(1).lower(), m.group(2).lower()
             (con[s].add if loai == "tao" else con[s].discard)(t)
     return {s: sorted(v) for s, v in con.items()}
+
+
+_CHU_THICH = re.compile(
+    r"\bCOMMENT\s+ON\s+(?:TABLE|VIEW)\s+((?:core|mart|app|meta)\.\w+)\s+IS\s+'((?:[^']|'')*)'",
+    re.I)
+
+
+def chu_thich(thu_muc: Path) -> dict[str, str]:
+    """`COMMENT ON TABLE|VIEW x IS '…'` của mọi migration — lần sau đè lần
+    trước. Khoảng trắng nhiều dòng gộp thành một dấu cách. Đây là văn xuôi
+    của CHÍNH migration, nên trang tài liệu nói đúng điều CSDL nói về nó."""
+    ra: dict[str, str] = {}
+    for f in sorted(thu_muc.glob("*.sql")):
+        sql = re.sub(r"--[^\n]*", "", f.read_text(encoding="utf-8"))
+        for m in _CHU_THICH.finditer(sql):
+            ra[m.group(1).lower()] = " ".join(m.group(2).replace("''", "'").split())
+    return dict(sorted(ra.items()))
 
 
 def ten_cong() -> list[dict]:
@@ -93,6 +110,7 @@ def lo_trinh(dac_ta: Path) -> dict:
 def sinh(goc: Path = GOC) -> dict:
     return {
         "bang": bang_theo_schema(goc / "db" / "migrations"),
+        "chu_thich": chu_thich(goc / "db" / "migrations"),
         "cong": ten_cong(),
         "cam_bay": cam_bay(goc / "CLAUDE.md"),
         "lo_trinh": lo_trinh(goc / LO_TRINH.relative_to(GOC)),
