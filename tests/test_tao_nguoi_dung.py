@@ -222,5 +222,6 @@ def test_liet_ke_hien_dung_gia_tri_o_cot_ngan_sach(conn, capsys):
     ra = capsys.readouterr().out
     dong_an = next(d for d in ra.splitlines() if d.startswith("an "))
     dong_binh = next(d for d in ra.splitlines() if d.startswith("binh"))
-    assert dong_an.rstrip().endswith("CÓ"), dong_an
-    assert dong_binh.rstrip().endswith("—"), dong_binh
+    # Từ 033 cột CUỐI là "Quản trị"; "Ngân sách" là cột kế cuối.
+    assert dong_an.split()[-2:] == ["CÓ", "—"], dong_an
+    assert dong_binh.split()[-2:] == ["—", "—"], dong_binh

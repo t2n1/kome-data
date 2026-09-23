@@ -53,6 +53,7 @@ HUONG_DAN = """    python scripts/tao_nguoi_dung.py                        liệ
     python scripts/tao_nguoi_dung.py doi-mat-khau <tên>
     python scripts/tao_nguoi_dung.py quyen <tên> --kho-du-lieu | --bo-kho-du-lieu
     python scripts/tao_nguoi_dung.py quyen <tên> --ngan-sach | --bo-ngan-sach
+    python scripts/tao_nguoi_dung.py quyen <tên> --quan-tri | --bo-quan-tri
     (thêm --test ở cuối để chạy trên CSDL thử nghiệm)"""
 
 
@@ -75,15 +76,17 @@ def liet_ke(conn) -> int:
         print("Chưa có tài khoản nào. Tạo bằng:  python scripts/tao_nguoi_dung.py them <tên>")
         return 0
     print(f"{'Tên đăng nhập':<20}{'Mã sale':<10}{'Phụ trách':<24}"
-          f"{'Kho dữ liệu':<14}Ngân sách")
-    print("-" * 84)
+          f"{'Kho dữ liệu':<14}{'Ngân sách':<12}Quản trị")
+    print("-" * 96)
     for n in ds:
         print(f"{n.ten_dang_nhap:<20}{n.salesperson_code or '—':<10}"
               f"{n.ten_sale or '—':<24}"
               f"{('CÓ' if n.duoc_vao_kho_du_lieu else '—'):<14}"
-              f"{'CÓ' if n.duoc_sua_ngan_sach else '—'}")
+              f"{('CÓ' if n.duoc_sua_ngan_sach else '—'):<12}"
+              f"{'CÓ' if n.duoc_quan_tri else '—'}")
     print("\nKho dữ liệu = được nạp file VÀ hoàn tác lần nạp (xoá dữ liệu khỏi kho).")
     print("Ngân sách   = được đặt và sửa chỉ tiêu doanh thu của cả công ty.")
+    print("Quản trị    = được bật/tắt ba cờ quyền của người khác trên màn Cài đặt.")
     return 0
 
 
@@ -132,14 +135,15 @@ def doi_mat_khau(conn, ten: str, doc_mat_khau) -> int:
 
 
 def quyen(conn, ten: str, kho_du_lieu: bool | None,
-          ngan_sach: bool | None) -> int:
+          ngan_sach: bool | None, quan_tri: bool | None = None) -> int:
     """`None` = KHÔNG đụng tới cờ đó.
 
     Truyền False thay cho None sẽ làm lệnh "cấp quyền ngân sách" âm thầm thu
     hồi quyền Kho dữ liệu của cùng người — tức mất quyền nạp dữ liệu của
     người phụ trách nạp, và không ai biết cho tới 13:30 hôm sau.
     """
-    if not ND.dat_quyen(conn, ten, kho_du_lieu=kho_du_lieu, ngan_sach=ngan_sach):
+    if not ND.dat_quyen(conn, ten, kho_du_lieu=kho_du_lieu, ngan_sach=ngan_sach,
+                        quan_tri=quan_tri):
         print(f"Không có tài khoản tên '{ten}'. Chạy không tham số để xem danh sách.")
         return 1
     conn.commit()
@@ -149,7 +153,10 @@ def quyen(conn, ten: str, kho_du_lieu: bool | None,
     if ngan_sach is not None:
         print(f"'{ten}' " + ("GIỜ sửa được" if ngan_sach else "KHÔNG còn sửa được")
               + " Ngân sách.")
-    print("Có hiệu lực ngay ở lượt bấm kế tiếp của họ.")
+    if quan_tri is not None:
+        print(f"'{ten}' " + ("GIỜ đổi được" if quan_tri else "KHÔNG còn đổi được")
+              + " quyền của người khác trên màn Cài đặt.")
+    print("Có hiệu lực ngay ở lượt bấm kế tiếp của họ. Đã ghi vào Nhật ký thao tác.")
     return 0
 
 
@@ -172,6 +179,8 @@ def chay(argv: list[str], conn, doc_mat_khau=None) -> int:
     bo_kho = "--bo-kho-du-lieu" in phan_con_lai
     ns = "--ngan-sach" in phan_con_lai
     bo_ns = "--bo-ngan-sach" in phan_con_lai
+    qt = "--quan-tri" in phan_con_lai
+    bo_qt = "--bo-quan-tri" in phan_con_lai
     sale = None
     sale_thieu_gia_tri = False
     if "--sale" in phan_con_lai:
@@ -204,18 +213,22 @@ def chay(argv: list[str], conn, doc_mat_khau=None) -> int:
     if ns and bo_ns:
         print("Vừa --ngan-sach vừa --bo-ngan-sach — chỉ chọn một.")
         return 2
+    if qt and bo_qt:
+        print("Vừa --quan-tri vừa --bo-quan-tri — chỉ chọn một.")
+        return 2
     if lenh == "them":
         return them(conn, ten, sale, kho, ns, doc_mat_khau)
     if lenh == "doi-mat-khau":
         return doi_mat_khau(conn, ten, doc_mat_khau)
-    if not (kho or bo_kho or ns or bo_ns):
+    if not (kho or bo_kho or ns or bo_ns or qt or bo_qt):
         print("Lệnh quyền cần một trong: --kho-du-lieu, --bo-kho-du-lieu, "
-              "--ngan-sach, --bo-ngan-sach.")
+              "--ngan-sach, --bo-ngan-sach, --quan-tri, --bo-quan-tri.")
         return 2
     # None = không đụng tới cờ đó. Một lệnh chỉ đổi cờ mà nó nói tới.
     return quyen(conn, ten,
                  kho_du_lieu=True if kho else (False if bo_kho else None),
-                 ngan_sach=True if ns else (False if bo_ns else None))
+                 ngan_sach=True if ns else (False if bo_ns else None),
+                 quan_tri=True if qt else (False if bo_qt else None))
 
 
 if __name__ == "__main__":

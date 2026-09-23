@@ -208,6 +208,12 @@ màn mới dựng xong không ai vào được:
 2. Cấp cờ mới cho đúng người, ví dụ `--ngan-sach`:
    `python scripts/tao_nguoi_dung.py quyen <tên> --ngan-sach`.
 
+`033` (Nhật ký thao tác + Cài đặt) thêm cờ `duoc_quan_tri` — **luôn đi cùng
+bước 2**: không ai có cờ đó thì màn Cài đặt chỉ xem được, không đổi được gì.
+Cấp cho chủ doanh nghiệp:
+`python scripts/tao_nguoi_dung.py quyen <tên> --quan-tri`. Từ đó các cờ khác đổi
+được trên web (và được ghi vào Nhật ký thao tác). Mật khẩu vẫn chỉ đổi bằng script.
+
 `030` (đợt 7 — nhật ký tiếp xúc) **không thêm cột quyền nào**: mọi người đã
 đăng nhập đều ghi được lần tiếp xúc cho mọi khách (lọc theo người phụ trách là
 mặc định tiện dụng, không phải hàng rào). Chạy `python db/migrate.py` bằng

@@ -100,6 +100,8 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/kho-du-lieu` | Nạp file OBC · sức khoẻ · độ phủ · hoàn tác lô | `meta.ingest_batch`, `core.*` |
 | `/kho-du-lieu/luong` | Tài liệu sống (đợt 2b): bốn tầng · các nguồn OBC · 5 cổng + ngưỡng từng file · cạm bẫy OBC · lộ trình. **0 truy vấn** | `config/files.yml`, `kome/web/tai_lieu_sinh.json` |
 | `/kho-du-lieu/cot-noi` | Tài liệu sống: ma trận khoá · file nối đi đâu · cột trong từng file (`?file=<spec>`). **0 truy vấn** | `config/files.yml` |
+| `/nhat-ky` | **Nhật ký thao tác** (màn 20): ĐỌC GỘP năm sổ đã có — nạp + hoàn tác (`meta.ingest_batch`, `nap_boi`/`huy_boi` từ 033), sửa ngân sách (`app.ngan_sach_nhat_ky`), đổi quyền (`app.nhat_ky_quyen`), ghi tiếp xúc (`app.nhat_ky_tiep_xuc`). Lọc `?loai=`/`?tim=`, `/nhat-ky.csv`. **2 truy vấn** | năm sổ trên |
+| `/cai-dat` | **Cài đặt** (màn 21): người dùng & ba cờ quyền (đổi được CHỈ khi có `duoc_quan_tri` VÀ máy có cổng đăng nhập) · ngày lễ sắp tới · quy tắc khách · nguồn · hiển thị. Không bao giờ nhận mật khẩu | `app.nguoi_dung`, `mart.lich_kinh_doanh` |
 | `/giao-dien` | Đổi chế độ sáng/tối/theo hệ thống/theo giờ, ghi cookie, chuyển hướng về trang đã gọi | không đọc CSDL — chỉ đọc/ghi cookie |
 
 **Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
@@ -653,6 +655,21 @@ nút xoá thì phải ăn ngay hôm nay.
 hàng rào bảo mật**. Công ty năm người, ai cũng biết khách của ai; đăng nhập
 riêng là để cá nhân hoá, không phải để chặn. Không được thêm kiểm quyền vào
 `/khach-hang` hay `/lien-he`.
+
+**Bất biến (màn 20/21, migration 033):** Nhật ký thao tác KHÔNG có bảng gom
+riêng — nó đọc gộp các sổ đã có (`kome/nhat_ky.py::_NGUON`). Thêm một loại thao
+tác mới là thêm MỘT nhánh vào khối UNION đó, không phải chép sự kiện sang bảng
+thứ hai (hai sổ sẽ lệch nhau đúng ngày một đường ghi quên sổ kia). Ba cờ quyền
+(`duoc_vao_kho_du_lieu`, `duoc_sua_ngan_sach`, `duoc_quan_tri`) đổi qua đúng MỘT
+hàm — `nguoi_dung.dat_quyen` — và hàm đó ghi `app.nhat_ky_quyen` trong cùng giao
+dịch, cả khi gọi từ script (`sua_boi` NULL). `app.nhat_ky_quyen` chỉ thêm (CSDL
+chặn UPDATE/DELETE với `kome_app`). Màn Cài đặt từ chối đổi quyền khi máy CHƯA có
+`KOME_SESSION_SECRET` (không biết ai đang đổi, và cờ chưa bảo vệ gì), và từ chối
+người tự bỏ cờ quản trị của chính mình (bấm nhầm một ô là không còn ai đổi được
+quyền trên web). Tạo tài khoản và mật khẩu vẫn CHỈ qua script. `_ghi_ai` (ghi
+`nap_boi`/`huy_boi`) chạy SAU khi nạp/hoàn tác đã commit và nuốt lỗi — luồng 13:30
+không được hỏng vì không ghi được tên người bấm. Có test canh:
+`tests/test_nhat_ky.py`.
 
 **CẠM BẪY — cổng chỉ tồn tại khi có khoá ký.** Để trống `KOME_SESSION_SECRET`
 ở máy trong công ty là **không có đăng nhập và không có phân quyền**: ai mở
