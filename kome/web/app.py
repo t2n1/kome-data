@@ -771,6 +771,14 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             # kỳ đang xem), không hỏi CSDL thêm câu nào. None khi kho rỗng.
             thang_cuoi = (bc.ky.ngay_cuoi.strftime("%Y-%m")
                           if bc.ky.ngay_cuoi else None)
+            # [Vòng soát cuối, I-2] Tháng công ty có dòng bán ĐẦU TIÊN —
+            # `bc.moi_ky[0]` là kỳ SỚM NHẤT (dong_ky đã ORDER BY company_fy ở
+            # tinh_bao_cao()), lấy sẵn từ `bc`, KHÔNG hỏi CSDL thêm câu nào.
+            # Chặn ve_nhiet tô ¥0 cho các tháng TRƯỚC khi có dữ liệu (một
+            # NULL≠0 khác đối tượng nhưng cùng lớp lỗi với `san_pham_360.ton`
+            # đã ghi ở CLAUDE.md).
+            thang_dau = (bc.moi_ky[0].ngay_dau.strftime("%Y-%m")
+                         if bc.moi_ky and bc.moi_ky[0].ngay_dau else None)
             so_nho = {
                 "dt": ve_duong_nho([o.doanh_thu for o in bc.thang]),
                 "lg": ve_duong_nho([o.lai_gop for o in bc.thang]),
@@ -783,7 +791,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         "so_nho": so_nho,
                         "dg": ve_dong_gop(bc.nganh_ky),
                         "co": ve_cay_o(nhom),
-                        "nh": ve_nhiet(bc.nganh_thang, thang_ky, thang_cuoi),
+                        "nh": ve_nhiet(bc.nganh_thang, thang_ky, thang_cuoi, thang_dau),
                         "pa": ve_pareto(bc.tap_trung)})
         except Exception as e:
             return _loi(request, "mở trang báo cáo", e)

@@ -132,6 +132,30 @@ def test_tap_trung_top10_va_so_khach(conn, batch):
     assert tt.luy_ke_top10 == hang_10.luy_ke
 
 
+def test_pareto_doc_tap_trung_khach_MOT_LAN():
+    """[Vòng soát cuối, I-1] Câu SQL Pareto (khối (3) của `tinh_bao_cao`) chỉ
+    được tham chiếu `mart.tap_trung_khach` ĐÚNG MỘT LẦN. Bản trước đọc view
+    này hai lần trong CÙNG một câu — SELECT ngoài + truy vấn con
+    `(SELECT max(thu_hang) FROM mart.tap_trung_khach ...)` — đúng lớp lỗi
+    CTE-trùng đã ghi ở CLAUDE.md: Postgres KHÔNG gộp các truy vấn con trùng
+    nhau, mỗi lần tham chiếu là một lần đánh giá lại cả view (cùng phép
+    quét/CTE bên trong `mart.tap_trung_khach`). Đọc trực tiếp mã nguồn thay
+    vì EXPLAIN vì test này không cần CSDL thật."""
+    import inspect
+    import re
+
+    from kome import bao_cao as BC
+
+    src = inspect.getsource(BC.tinh_bao_cao)
+    m = re.search(r"SELECT customer_code, ten_khach.*?LIMIT 20", src, re.S)
+    assert m, "không tìm thấy câu SQL Pareto trong tinh_bao_cao()"
+    sql = m.group(0)
+    assert sql.count("tap_trung_khach") == 1, (
+        "câu SQL Pareto đọc mart.tap_trung_khach nhiều hơn một lần: " + sql)
+    assert "count(*) over ()" in sql.lower(), (
+        "phải dùng count(*) OVER () thay cho truy vấn con max(thu_hang)")
+
+
 def test_hang_top10_theo_lai_gop_giu_nguyen_hanh_vi(conn, batch):
     for i in range(15):
         ma = f"MA{i:02d}"
@@ -149,6 +173,32 @@ def test_hang_top10_theo_lai_gop_giu_nguyen_hanh_vi(conn, batch):
 
     assert [h["ma"] for h in bc.hang] == [h["ma"] for h in truy_van_cu]
     assert [h["lai_gop"] for h in bc.hang] == [h["lai_gop"] for h in truy_van_cu]
+
+
+def test_sap_xep_hang_top10_dung_am_vo_cuc_cho_lai_gop_none():
+    """[Vòng soát cuối, M4] Khoá sắp xếp bảng top-10 lãi gộp phải coi
+    `lai_gop is None` là `float('-inf')`, KHÔNG phải hằng số `-1`: `lai_gop`
+    là số nguyên yên KHÔNG CÓ CHẶN DƯỚI (một mã có thể lỗ hàng chục triệu),
+    nên `-1` không phải giá trị nhỏ nhất có thể — một mã lỗ -50.000 yên
+    (`-50_000 < -1`) sẽ bị hằng số `-1` xếp SAU nó, tức "không biết lãi gộp"
+    trông NHỎ HƠN một khoản lỗ thật, ngược với ý định "không biết luôn đứng
+    cuối". `gross_profit` là NOT NULL trong schema (007_fact_sales.sql) nên
+    không dàn dựng được một `lai_gop` NULL thật qua loader — kiểm bằng cách
+    đọc thẳng mã nguồn khoá sắp xếp, cùng nếp `test_pareto_doc_tap_trung_
+    khach_MOT_LAN`."""
+    import inspect
+    import re
+
+    from kome import bao_cao as BC
+
+    src = inspect.getsource(BC.tinh_bao_cao)
+    m = re.search(r"hang = sorted\(hang_theo_nganh,.*?\)\[:TOP\]", src, re.S)
+    assert m, "không tìm thấy khối sắp xếp `hang` trong tinh_bao_cao()"
+    khoi = m.group(0)
+    assert "float(\"-inf\")" in khoi or "float('-inf')" in khoi, (
+        "khoá sắp xếp phải dùng float('-inf') cho lai_gop None: " + khoi)
+    assert re.search(r"else\s*-1\b", khoi) is None, (
+        "khoá sắp xếp vẫn còn hằng số -1 làm giá trị thay thế cho None")
 
 
 def test_kho_rong_van_dung_duoc_bao_cao(conn):

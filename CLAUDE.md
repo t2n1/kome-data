@@ -496,7 +496,11 @@ canh: `tests/test_tong_quan.py::test_can_goi_mac_dinh_loc_theo_nguoi_dang_nhap`,
 `::test_o_chi_so_so_cung_so_ngay`, `::test_khong_con_khoi_ton_kho_chua_co_du_lieu`.
 
 **Bất biến:** ngân sách truy vấn: `/bao-cao` ≤ **11** truy vấn, `/` ≤ **11**
-truy vấn (đếm cả các câu ở tầng route như `tinh_tuoi`/`_sale_dang_loc`). Ngân
+truy vấn (đếm cả các câu ở tầng route như `tinh_tuoi`). [Vòng soát cuối, M8]
+`_sale_dang_loc` KHÔNG chạy câu SQL nào — nó chỉ đọc `request.state.nguoi`
+(đã gắn sẵn bởi middleware) và tham số `nv`/`tat_ca` trên URL, không mở kết
+nối — nên không tính vào ngân sách này; dòng trước đây liệt nó cùng
+`tinh_tuoi` (thứ CÓ chạy SQL) là sai. Ngân
 sách đo **số lượt hỏi**, không đo sức tính — cùng lý lẽ đã ghi cho `/khach-hang`
 ở trên. Ở `/bao-cao`, ngành × tháng (`mart.ban_theo_nganh_thang_so_sanh`) và
 ngành × kỳ (`mart.nganh_ky_cung_ky`) KHÔNG được gộp vào một câu: câu gộp sẽ

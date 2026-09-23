@@ -80,10 +80,16 @@
     <pattern> SVG — bản đồ nhiệt đã chuyển sang <table>, xem I-2. #}
  .bac-khong_ck{background:repeating-linear-gradient(45deg,var(--nhiet-khong),
    var(--nhiet-khong) 3px,var(--nhiet-soc) 3px,var(--nhiet-soc) 6px)}
- {# Hai bậc MỚI (I-1): "chưa tới tháng" (kỳ chưa đi tới, không phải thiếu so
-    sánh) dùng nền TRỐNG mờ; "không bán tháng này" (ngành thật sự 0 đồng cả
-    hai năm) dùng nền hơi đậm hơn nền trang — cả hai đều tái dùng token màu
-    ĐÃ CÓ (`--nen-phu`/`--vien-phu`/`--chu-mo`), không thêm biến CSS mới. #}
+ {# [Vòng soát cuối, M4] Bình luận cũ ở đây từng nói "cả hai đều tái dùng
+    token màu ĐÃ CÓ, không thêm biến CSS mới" — SAI ngay từ vòng soát kế
+    tiếp: `.bac-khong_ban` bên dưới (N-2) đã thêm hẳn token riêng
+    `--nhiet-khong-ban` vì tái dùng `--vien-phu` khiến nó trùng màu với bậc
+    "khong". "chưa tới tháng" ("chua_toi") là bậc DUY NHẤT ở đây thật sự chỉ
+    tái dùng token sẵn có (`--nen-phu`/`--chu-mo`), không thêm biến nào — bậc
+    "truoc_du_lieu" (I-2, tháng TRƯỚC ngày có dữ liệu, "không biết" giống
+    "chua_toi") CỐ Ý tái dùng NGUYÊN lớp `.bac-chua_toi` này (không tự khai
+    lớp riêng) vì hai trạng thái muốn nhìn giống hệt nhau — chỉ khác câu chữ
+    trong `title`. #}
  .bac-chua_toi{background:var(--nen-phu);color:var(--chu-mo)}
  {# [Vòng soát 1 vòng 2, N-2] Token RIÊNG cho "không bán tháng này" —
     trước bản sửa lớp này tái dùng --vien-phu, TRÙNG HỆT --nhiet-khong
@@ -171,7 +177,13 @@ Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
     {# Tỷ suất so bằng ĐIỂM PHẦN TRĂM (hiệu số), không phải %, xem
        kome/bao_cao.py::_SoCungKy.chenh_ty_suat — 0,8 điểm khác 0,8%. #}
     <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.chenh_ty_suat, " điểm", ngay_dau=ngay_dau_du_lieu) }}</div></div>
-  <div class="the"><div class="nhan">Khách có mua</div>
+  {# [Vòng soát cuối, M8] Nhãn "Khách có đơn" — khớp CHỮ với ô tương ứng của
+     `/` (tong_quan.html) và với đặc tả (§ "4 ô chỉ số"). Bản trước ghi "Khách
+     có mua" — cùng một chỉ số (`so_khach`/`count(DISTINCT customer_code)`)
+     mang hai tên khác nhau ở hai trang là đúng lớp lỗi "hai bản chép trôi
+     khỏi nhau" đã ghi ở CLAUDE.md, dù ở đây chỉ lệch câu CHỮ chứ không lệch
+     SỐ. #}
+  <div class="the"><div class="nhan">Khách có đơn</div>
     <div class="gia">{{ "{:,}".format(bc.ky.so_khach) }}</div>
     {{ spark_svg(so_nho.kh, "var(--lien-ket)") }}
     <div class="so-cung-ky">{{ so_ky_truoc(bc.cung_ky, bc.cung_ky.tang_khach, "%", "khach", ngay_dau_du_lieu) }}</div></div>
@@ -193,8 +205,13 @@ Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
 Ngày làm việc chưa trừ ngày lễ Nhật.</p>
 
 {% if not td.co_ngan_sach %}
+{# [Vòng soát cuối, M7] Liên kết "Đặt chỉ tiêu" gác bằng `hien_ngan_sach` —
+   CÙNG CỜ, CÙNG NẾP với `/` (tong_quan.html) — người không có
+   `duoc_sua_ngan_sach` (và có tài khoản riêng) mở `/ngan-sach` chỉ để bị
+   trang đó từ chối; mời bấm vào một thứ sẽ từ chối họ tệ hơn là không hiện
+   liên kết. #}
 <div class="ngay-thieu">Chưa đặt chỉ tiêu cho kỳ này.
-<a href="/ngan-sach?ky={{ td.company_fy }}">Đặt chỉ tiêu</a> rồi quay lại đây.</div>
+{% if hien_ngan_sach %}<a href="/ngan-sach?ky={{ td.company_fy }}">Đặt chỉ tiêu</a> rồi quay lại đây.{% endif %}</div>
 {% else %}
 <div class="so-lon">
  <div class="the"><div class="nhan">Thực tế</div>
@@ -384,7 +401,13 @@ bên trái kéo XUỐNG.</p>
  {% for t in dg.thanh %}
  <rect x="{{ t.x }}" y="{{ t.y }}" width="{{ t.w }}" height="{{ dg.cao_hang }}" rx="2"
        fill="{{ 'var(--loi-vien)' if t.am else 'var(--ok-vien)' }}">
-  <title>{{ t.nganh }}: {{ "%+d"|format(t.chenh_lech) }} yên so cùng kỳ{% if
+  {# [Vòng soát cuối, M6] Dùng LẠI `t.nhan` (đã định dạng `¥{:+,}` ở
+     `ve_dong_gop`, cùng chuỗi với nhãn trong/ngoài thanh) thay vì tự định
+     dạng "%+d yên" riêng ở đây — hai cách viết số khác nhau cho CÙNG một
+     con số trên CÙNG một phần tử (rê chuột thấy "+123 yên" trong khi mắt
+     đang nhìn nhãn "¥+123" ngay cạnh) là đúng lớp lỗi "hai bản chép trôi
+     khỏi nhau" đã ghi nhiều lần trong CLAUDE.md. #}
+  <title>{{ t.nganh }}: {{ t.nhan }} so cùng kỳ{% if
     t.tang_truong is not none %} ({{ "%+.1f"|format(t.tang_truong*100) }}%){% endif %}</title>
  </rect>
  {# [Vòng soát 1 vòng 2, M-1] Tên ngành đứng ở phía ĐỐI DIỆN trục so với
@@ -398,8 +421,13 @@ bên trái kéo XUỐNG.</p>
  <text x="{{ dg.x0 + 4 if t.am else dg.x0 - 4 }}" y="{{ t.y + dg.cao_hang/2 + 3 }}"
        font-size="10" fill="var(--chu-nhat)"
        text-anchor="{{ 'start' if t.am else 'end' }}">{{ t.nganh }}</text>
+ {# [Vòng soát cuối, M4] Nhãn TRONG thân thanh ÂM (đỏ `--loi-vien`, không đổi
+    theo chế độ) dùng `--dg-chu-am` (trắng cố định, ~4,9:1) chứ không
+    `--nen-the`: `--nen-the` bản TỐI là màu gần đen, chữ gần đen trên nền đỏ
+    chỉ đạt ~3,4:1 — dưới ngưỡng 4,5:1. Thanh DƯƠNG (xanh `--ok-vien`) vẫn
+    dùng `--nen-the` như cũ, tổ hợp đó đã đủ tương phản ở cả hai chế độ. #}
  <text x="{{ t.nhan_x }}" y="{{ t.y + dg.cao_hang/2 + 3 }}" font-size="9.5"
-       fill="{{ 'var(--nen-the)' if t.nhan_trong else 'var(--chu-nhat)' }}"
+       fill="{{ ('var(--dg-chu-am)' if t.am else 'var(--nen-the)') if t.nhan_trong else 'var(--chu-nhat)' }}"
        text-anchor="{{ t.nhan_neo }}">{{ t.nhan }}</text>
  {% endfor %}
 </svg>
@@ -475,8 +503,19 @@ màu trung tính.</p>
  {% for o in h.o %}
   {% if o.bac == 'chua_toi' %}
   <td class="bac-chua_toi" title="{{ o.nganh }} · {{ o.thang }}: chưa tới tháng này trong kỳ">·</td>
+  {% elif o.bac == 'truoc_du_lieu' %}
+  {# [Vòng soát cuối, I-2] Tháng TRƯỚC ngày bán đầu tiên trong kho — "không
+     biết", không phải "biết và bằng không" (NULL≠0). Render giống "chua_toi"
+     (cùng nền/màu, dấu "·"), nhưng title/chú giải RIÊNG vì lý do khác hẳn:
+     chua_toi là "kỳ chưa đi tới", đây là "kho chưa từng có dữ liệu ở đó". #}
+  <td class="bac-chua_toi" title="{{ o.nganh }} · {{ o.thang }}: chưa có dữ liệu (trước {{ nh.thang_dau_du_lieu }})">·</td>
   {% elif o.bac == 'khong_ban' %}
-  <td class="bac-khong_ban" title="{{ o.nganh }} · {{ o.thang }}: không bán tháng này (và tháng cùng kỳ năm trước cũng vậy)">¥0</td>
+  {# [Vòng soát cuối, I-2] "cùng kỳ năm trước cũng vậy" chỉ đúng khi tháng
+     M-12 CŨNG nằm trong khoảng đã có dữ liệu (`o.co_the_ck`) — nếu M-12 rơi
+     trước ngày bắt đầu, ta không hề biết ngành đó có bán gì tháng đó không,
+     nên không được khẳng định "cũng vậy" (NULL≠0, cùng lớp lỗi với dòng
+     trên). #}
+  <td class="bac-khong_ban" title="{{ o.nganh }} · {{ o.thang }}: không bán tháng này{{ ' (và tháng cùng kỳ năm trước cũng vậy)' if o.co_the_ck else '' }}">¥0</td>
   {% elif o.bac == 'khong_ck' %}
   <td class="bac-khong_ck" title="{{ o.nganh }} · {{ o.thang }}: không có cùng kỳ (¥{{ '{:,}'.format(o.doanh_thu) }})">—</td>
   {% elif o.tang_truong is not none %}
@@ -504,6 +543,7 @@ màu trung tính.</p>
  <span><i class="mau bac-khong_ck"></i> không có cùng kỳ</span>
  <span><i class="mau bac-khong_ban"></i> không bán tháng này</span>
  <span><i class="mau bac-chua_toi"></i> chưa tới tháng</span>
+ <span><i class="mau bac-chua_toi"></i> chưa có dữ liệu{% if nh.thang_dau_du_lieu %} (trước {{ nh.thang_dau_du_lieu }}){% endif %}</span>
 </div>
 {% else %}
 <p class="khoi-rong">Chưa có dữ liệu để vẽ khối này.</p>
@@ -511,8 +551,15 @@ màu trung tính.</p>
 
 <h2>Doanh thu tập trung ở khách nào</h2>
 {% if bc.tap_trung and bc.tap_trung.luy_ke_top10 is not none %}
+{# [Vòng soát cuối, M2] "khách có phát sinh trong kỳ", KHÔNG PHẢI "khách có
+   doanh thu": `bc.tap_trung.so_khach` đếm MỌI khách có ít nhất một dòng
+   trong `mart.dong_ban` của kỳ (migration 029 §3.5, mart.tap_trung_khach),
+   kể cả khách mà tổng doanh thu thuần ròng <= 0 (赤伝 — phiếu đỏ, số ÂM,
+   luật không được lọc bỏ, có thể làm net của một khách âm hoặc bằng 0) —
+   gọi họ là "khách có doanh thu" là nói một khách ròng ÂM/BẰNG-KHÔNG "có
+   doanh thu". #}
 <p class="ghi-chu">10 khách lớn nhất = {{ "%.1f"|format(bc.tap_trung.luy_ke_top10*100)
-}}% doanh thu kỳ này, trên {{ bc.tap_trung.so_khach }} khách có doanh thu.</p>
+}}% doanh thu kỳ này, trên {{ bc.tap_trung.so_khach }} khách có phát sinh trong kỳ.</p>
 {% endif %}
 {% if pa.co %}
 <div class="khung-bd">

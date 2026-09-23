@@ -269,16 +269,22 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
                WHERE company_fy = %s ORDER BY thang""", (ky.company_fy,)).fetchall()
     ]
 
-    # (3) Pareto 20 khách + tổng số khách có doanh thu trong CÙNG một câu:
-    # count(*) OVER() sẽ đếm SAU LIMIT nếu đặt thẳng trong SELECT ngoài, nên
-    # lấy max(thu_hang) bằng truy vấn con — vẫn một round-trip duy nhất.
+    # (3) Pareto 20 khách + tổng số khách có doanh thu trong CÙNG một câu,
+    # và trong CÙNG một lần đọc `mart.tap_trung_khach` — [Vòng soát cuối,
+    # I-1] bản trước đọc view này HAI LẦN (SELECT ngoài + truy vấn con
+    # `max(thu_hang)`), đúng lớp lỗi CTE-trùng đã ghi ở CLAUDE.md (view của
+    # `mart` bị Postgres ĐÁNH GIÁ LẠI mỗi lần được tham chiếu, kể cả trong
+    # cùng một câu lệnh). `count(*) OVER ()` được Postgres tính ở PHA CỬA SỔ
+    # (window) của quá trình xử lý câu lệnh — sau WHERE/GROUP BY, nhưng
+    # TRƯỚC ORDER BY và LIMIT — nên nó đếm đủ mọi dòng khớp `company_fy` của
+    # kỳ, không bị LIMIT 20 cắt bớt. (Bình luận cũ ở đây nói ngược: "đếm SAU
+    # LIMIT nếu đặt thẳng trong SELECT ngoài" — sai, và chính vì tin nhầm
+    # điều đó nên bản trước mới đi vòng qua truy vấn con.)
     dong_tt = conn.execute(
         """SELECT customer_code, ten_khach, doanh_thu_thuan, thu_hang,
-                  ty_trong, luy_ke,
-                  (SELECT max(thu_hang) FROM mart.tap_trung_khach
-                    WHERE company_fy = %s) AS tong_so_khach
+                  ty_trong, luy_ke, count(*) OVER () AS tong_so_khach
            FROM mart.tap_trung_khach WHERE company_fy = %s
-           ORDER BY thu_hang LIMIT 20""", (ky.company_fy, ky.company_fy)).fetchall()
+           ORDER BY thu_hang LIMIT 20""", (ky.company_fy,)).fetchall()
     tap_trung = None
     if dong_tt:
         khach_tt = [KhachTapTrung(
@@ -319,8 +325,14 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
     # `lai_gop` không nên bao giờ NULL (SUM trên ít nhất một dòng bán), nhưng
     # sắp xếp vẫn phòng thủ: một None lẫn vào so sánh với int sẽ ném
     # TypeError giữa lúc mở trang thay vì chỉ xếp nó xuống cuối.
+    # [Vòng soát cuối, M4] `-1` từng đứng thay cho None — sai khi CÓ mã lãi
+    # gộp âm hơn -1 (lãi gộp là số nguyên yên, không có chặn dưới): một mã lỗ
+    # -50.000 yên khi đó xếp TRƯỚC (được coi "lớn hơn") một mã None, dù
+    # "không biết" phải luôn đứng SAU mọi giá trị đã biết, kể cả giá trị biết
+    # rất xấu. `float('-inf')` không có ca này — luôn nhỏ hơn MỌI số nguyên.
     hang = sorted(hang_theo_nganh,
-                  key=lambda h: h["lai_gop"] if h["lai_gop"] is not None else -1,
+                  key=lambda h: (h["lai_gop"] if h["lai_gop"] is not None
+                                 else float("-inf")),
                   reverse=True)[:TOP]
 
     # (5) Người phụ trách — không đổi.

@@ -80,12 +80,22 @@
       cho .yeu/.manh khắp nơi). Đủ nhạt để chữ --chu (gần đen ở chế độ sáng)
       đọc được khi đè lên, không cần một --nhiet-chu-alt riêng.
       --nhiet-khong: trung tính cho "có cùng kỳ nhưng mẫu số ≤ 0" (bac
-      "khong" của bac_tang_truong). --nhiet-soc: màu sọc <pattern> cho ô
-      "không có cùng kỳ" của bản đồ nhiệt (bac "khong_ck") — khác --nhiet-
-      khong, vì đây là "không có DỮ LIỆU", không phải "có dữ liệu, không so
-      được". --duong-ck: đường doanh thu cùng kỳ nét đứt trên biểu đồ 12
-      tháng (ve_bieu_do::duong_ck) — dùng lại tông --lien-ket, khác --ok-vien
-      (đường tỷ suất) và --do (cột tháng chốt) đã có trên cùng biểu đồ.
+      "khong" của bac_tang_truong). --nhiet-soc: [Vòng soát cuối, M4] màu
+      sọc chéo CSS (`repeating-linear-gradient`, lớp `.bac-khong_ck` của
+      bao_cao.html) cho ô "không có cùng kỳ" của bản đồ nhiệt (bac
+      "khong_ck") — bình luận cũ ở đây nói "<pattern>" (một phần tử SVG),
+      stale từ trước khi bản đồ nhiệt chuyển từ SVG sang <table> (I-2, xem
+      chú thích ngay phía trên lớp `.bac-khong_ck` trong bao_cao.html) —
+      khác --nhiet-khong, vì đây là "không có DỮ LIỆU", không phải "có dữ
+      liệu, không so được". --duong-ck: đường doanh thu cùng kỳ nét đứt trên biểu đồ 12
+      tháng (ve_bieu_do::duong_ck) — [Vòng soát cuối, M3] TÔNG RIÊNG (xanh
+      lam trầm), khác hẳn --lien-ket: bản trước đặt CÙNG GIÁ TRỊ với
+      --lien-ket (cột doanh thu dùng chính --lien-ket làm `fill`, xem
+      bao_cao.html), nên đường nét đứt cùng kỳ và cột doanh thu năm nay tô
+      trùng một màu — mắt chỉ tách được nhờ hình dạng (đường vs cột), không
+      nhờ màu, và chú giải "màu X = cùng kỳ năm trước" nói dối vì màu đó
+      cũng chính là màu cột. Cũng khác --ok-vien (đường tỷ suất) và --do
+      (cột tháng chốt) đã có trên cùng biểu đồ.
       [Vòng soát 1, I-4] Bậc chẵn (g2/t2, cực trị) đậm/bão hoà HƠN HẲN bậc lẻ
       (g1/t1, nhẹ) và bậc 0 (gần như bằng nền/viền trang) — khoảng cách độ
       sáng phải đủ RỘNG để mắt phân biệt được 5 bậc liền kề nhau trên một
@@ -106,7 +116,21 @@
    --nhiet-g2:#E8938C; --nhiet-g1:#F5D2CD; --nhiet-0:#E6E2D9;
    --nhiet-t1:#CFEBDC; --nhiet-t2:#8FCDA9;
    --nhiet-khong:#F0EDE6; --nhiet-khong-ban:#DCE4EC; --nhiet-soc:#D8D3C8;
-   --duong-ck:#8A5E06;
+   --duong-ck:#5C7A99;
+   /* [Vòng soát cuối, M4] Chữ nhãn số tiền khi bị ĐẨY VÀO TRONG thân thanh
+      (khối "Ngành hàng kéo doanh thu lên/xuống", `ve_dong_gop::nhan_trong`,
+      bao_cao.html) — trước bản sửa dùng CHUNG `var(--nen-the)` cho cả thanh
+      dương (`--ok-vien`, xanh) lẫn thanh âm (`--loi-vien`, ĐỎ CÔNG TY
+      #D62C27, KHÔNG đổi theo chế độ sáng/tối). Ở chế độ TỐI, `--nen-the` là
+      màu gần đen (#211D17) — chữ gần đen trên nền đỏ đó chỉ đạt tỷ lệ tương
+      phản ~3,4:1, dưới ngưỡng 4,5:1 (WCAG AA cho chữ cỡ nhỏ). Vì nền đỏ
+      không đổi theo chế độ, chữ đặt lên nó cũng không nên đổi theo chế độ —
+      `--dg-chu-am` cố định TRẮNG ở CẢ HAI bảng màu (đạt ~4,9:1 với đỏ, còn
+      `var(--chu)` bản tối dù đã sáng hơn `--nen-the` vẫn chỉ ~4,3:1, chưa
+      đủ ngưỡng). Thanh DƯƠNG (xanh `--ok-vien`) vẫn giữ nguyên
+      `var(--nen-the)` — tổ hợp đó đã đạt >5:1 ở cả hai chế độ, không cần
+      đổi. */
+   --dg-chu-am:#FFFFFF;
    /* Nền bọc logo sidebar (đợt 4d, Task 1) — README gói thiết kế: "logo
       tròn, hiển thị 28px trong sidebar (nền tối thì bọc nền sáng, bo
       tròn)". Ở chế độ sáng giá trị này trùng --nen-the nên không thấy gì
@@ -162,7 +186,8 @@
    --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
    --nhiet-t1:#20452F; --nhiet-t2:#1E6E45;
    --nhiet-khong:#2B251D; --nhiet-khong-ban:#26313B; --nhiet-soc:#4A4239;
-   --duong-ck:#E2A72E;
+   --duong-ck:#8FA3C9;
+   --dg-chu-am:#FFFFFF;
    /* HET-BANG-TOI */
    }
  }
@@ -203,7 +228,8 @@
    --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
    --nhiet-t1:#20452F; --nhiet-t2:#1E6E45;
    --nhiet-khong:#2B251D; --nhiet-khong-ban:#26313B; --nhiet-soc:#4A4239;
-   --duong-ck:#E2A72E;
+   --duong-ck:#8FA3C9;
+   --dg-chu-am:#FFFFFF;
    /* HET-BANG-TOI */
  }
  /* Chọn "Sáng" bằng tay: đối xứng với color-scheme:dark ở trên — không cần

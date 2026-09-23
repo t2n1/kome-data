@@ -221,7 +221,7 @@ def test_thanh_suc_khoe_lien_ket_mang_tat_ca_1(conn, batch, test_db_url):
     _neo(conn, batch)
 
     html = _web(test_db_url).get("/").text
-    assert 'href="/can-xu-ly?tat_ca=1"' in html
+    assert 'href="/khach-hang?loc=canh_bao&amp;tat_ca=1"' in html
     assert 'href="/khach-hang?loc=binh_thuong&amp;tat_ca=1"' in html
     assert 'href="/khach-hang?loc=ngung_giao_dich&amp;tat_ca=1"' in html
 

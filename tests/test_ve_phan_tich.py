@@ -318,6 +318,60 @@ def test_ve_nhiet_cung_ky_bang_khong_la_khong():
     assert o["bac"] == "khong"
 
 
+def test_ve_nhiet_thang_truoc_du_lieu_KHONG_phai_khong_ban():
+    """[Vòng soát cuối, I-2] Tháng TRƯỚC `thang_dau_du_lieu` (kỳ 6 = 2024-08
+    .. 2025-07 nhưng dữ liệu bán chỉ bắt đầu 2025-03) là "không biết" — bậc
+    "truoc_du_lieu", KHÔNG PHẢI "khong_ban" (¥0), vì "không biết" khác "biết
+    và bằng không" (NULL≠0). Ngành "Gạo" không có dòng nào trước 2025-03
+    trong `dong` — đúng thực tế một view SQL sẽ trả về."""
+    thang_ky = [f"2024-{t:02d}" for t in range(8, 13)] + [f"2025-{t:02d}" for t in range(1, 8)]
+    dong = [_nt("2025-03", "Gạo", 1000, None, None),
+            _nt("2025-04", "Gạo", 1200, None, None)]
+    nh = ve_nhiet(dong, thang_ky, thang_cuoi_co_du_lieu="2025-07",
+                  thang_dau_du_lieu="2025-03")
+    o_gao = {o["thang"]: o for o in nh["o"] if o["nganh"] == "Gạo"}
+    for th in ("2024-08", "2024-09", "2024-10", "2024-11", "2024-12",
+               "2025-01", "2025-02"):
+        assert o_gao[th]["bac"] == "truoc_du_lieu", th
+        assert o_gao[th]["doanh_thu"] is None, th
+    # Tháng NẰM TRONG khoảng dữ liệu nhưng ngành không có dòng vẫn là
+    # "khong_ban" như trước — hành vi cũ không đổi.
+    assert nh["thang_dau_du_lieu"] == "2025-03"
+
+
+def test_ve_nhiet_khong_ban_co_the_ck_false_khi_m12_truoc_du_lieu():
+    """[Vòng soát cuối, I-2] Một tháng NẰM TRONG khoảng có dữ liệu mà ngành
+    không bán gì ("khong_ban") chỉ được coi "cùng kỳ năm trước cũng vậy" khi
+    tháng M-12 CŨNG nằm trong khoảng đã có dữ liệu. Với `thang_dau_du_lieu`
+    = "2025-03", tháng "2026-01" có M-12 = "2025-01" (TRƯỚC ngày bắt đầu) ->
+    `co_the_ck` phải là False; tháng "2026-04" có M-12 = "2025-04" (sau ngày
+    bắt đầu) -> `co_the_ck` phải là True."""
+    thang_ky = ["2026-01", "2026-04"]
+    dong = [_nt("2025-04", "Gạo", 500, None, None)]  # neo ngành "Gạo" vào dữ liệu
+    nh = ve_nhiet(dong, thang_ky, thang_cuoi_co_du_lieu="2026-07",
+                  thang_dau_du_lieu="2025-03")
+    o_gao = {o["thang"]: o for o in nh["o"] if o["nganh"] == "Gạo"}
+    assert o_gao["2026-01"]["bac"] == "khong_ban"
+    assert o_gao["2026-01"]["co_the_ck"] is False
+    assert o_gao["2026-04"]["bac"] == "khong_ban"
+    assert o_gao["2026-04"]["co_the_ck"] is True
+
+
+def test_ve_nhiet_khong_truyen_thang_dau_giu_nguyen_hanh_vi_cu():
+    """`thang_dau_du_lieu=None` (mặc định, gọi rời khỏi `/bao-cao` không biết
+    ranh giới) phải giữ NGUYÊN hành vi cũ: không có bậc "truoc_du_lieu" nào,
+    và "khong_ban" luôn có `co_the_ck=True`."""
+    thang_ky = [f"2025-{t:02d}" for t in range(8, 13)] + [f"2026-{t:02d}" for t in range(1, 8)]
+    dong = [_nt("2026-01", "Gạo", 1000, 900, 0.11)]
+    nh = ve_nhiet(dong, thang_ky, thang_cuoi_co_du_lieu="2026-01")
+    bac_gap = {o["bac"] for o in nh["o"] if o["nganh"] == "Gạo"}
+    assert "truoc_du_lieu" not in bac_gap
+    o_khong_ban = next(o for o in nh["o"]
+                        if o["nganh"] == "Gạo" and o["bac"] == "khong_ban")
+    assert o_khong_ban["co_the_ck"] is True
+    assert nh["thang_dau_du_lieu"] is None
+
+
 # ---- ve_pareto ---------------------------------------------------------------
 
 def _kt(ma, dt, hang, luy_ke):

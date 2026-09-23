@@ -173,16 +173,22 @@ theo THỨ TỰ NGÀY (ngày thứ 1 với ngày thứ 1) — không theo "cùng
 
    [Soát vòng 1] Bộ đếm của thanh này (`tq.dem`) LUÔN không lọc theo sale
    (toàn công ty — xem docstring `kome.tong_quan.tong_quan`), nên mọi liên
-   kết rời khỏi nó BẮT BUỘC mang `tat_ca=1`: `/khach-hang`/`/can-xu-ly`
-   không có tham số đó sẽ rơi về mặc định lọc theo NGƯỜI ĐANG ĐĂNG NHẬP, và
-   bấm vào một đoạn "1.710 khách" lại ra danh sách 216 khách của riêng mình
-   — đúng lớp lỗi đã ghi ở CLAUDE.md ("chip Tất cả (1.710) bấm vào ra 216
-   khách") và bất biến `/ban-do` (biến `giu` mang `tat_ca`/`nv` qua mọi liên
-   kết rời trang). #}
+   kết rời khỏi nó BẮT BUỘC mang `tat_ca=1`: `/khach-hang` không có tham số
+   đó sẽ rơi về mặc định lọc theo NGƯỜI ĐANG ĐĂNG NHẬP, và bấm vào một đoạn
+   "1.710 khách" lại ra danh sách 216 khách của riêng mình — đúng lớp lỗi đã
+   ghi ở CLAUDE.md ("chip Tất cả (1.710) bấm vào ra 216 khách") và bất biến
+   `/ban-do` (biến `giu` mang `tat_ca`/`nv` qua mọi liên kết rời trang).
+
+   [Soát cuối, I-3] Mọi đoạn — kể cả "Cần gọi lại" (`d.nhom == 'canh_bao'`)
+   — trỏ về `/khach-hang?loc=<nhom>&tat_ca=1`, KHÔNG về `/can-xu-ly`: đoạn
+   này đếm ĐÚNG `trang_thai = 'canh_bao'` (khớp `loc=canh_bao` của
+   `/khach-hang`), còn `/can-xu-ly` gộp CẢ `canh_bao` LẪN `da_roi_bo` và cắt
+   ở 100 dòng — bấm vào bộ đếm "canh_bao" mà ra một danh sách rộng hơn (và
+   có thể bị cắt bớt) là con số không khớp danh sách nó mở ra. #}
 <div class="thanh-suc-khoe">
 {% for d in doan_suc_khoe if d.so > 0 %}
   {% set nhan, mau = trang_thai_nhan[d.nhom] %}
-  <a href="{{ '/can-xu-ly?tat_ca=1' if d.nhom == 'canh_bao' else '/khach-hang?loc=' + d.nhom + '&tat_ca=1' }}"
+  <a href="{{ '/khach-hang?loc=' + d.nhom + '&tat_ca=1' }}"
      style="width:{{ d.rong }}%;background:{{ MAU_VAR[mau] }}"
      title="{{ nhan }}: {{ d.so }} khách" aria-label="{{ nhan }}: {{ d.so }} khách"></a>
 {% endfor %}

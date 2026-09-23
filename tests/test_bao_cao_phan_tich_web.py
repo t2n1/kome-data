@@ -176,8 +176,11 @@ def test_khong_hien_khong_ve_khi_khong_co_am(client, conn, batch):
 
 
 def test_pareto_cau_tom_tat(client, conn, batch):
-    """[Chữ bắt buộc] '{10} khách lớn nhất = {x}% doanh thu kỳ này, trên
-    {so_khach} khách có doanh thu'."""
+    """[Chữ bắt buộc, sửa vòng soát cuối M2] '10 khách lớn nhất = {x}%
+    doanh thu kỳ này, trên {so_khach} khách có phát sinh trong kỳ' — KHÔNG
+    phải 'khách có doanh thu': `so_khach` đếm mọi khách có dòng trong
+    `mart.dong_ban`, kể cả khách net <= 0 (赤伝 có thể làm net âm/bằng
+    không), nên gọi họ "có doanh thu" là sai."""
     for i in range(12):
         khach = f"00000000{9300 + i}"
         _ban(conn, batch, date(2026, 5, 11), "AA01", khach=khach,
@@ -185,7 +188,7 @@ def test_pareto_cau_tom_tat(client, conn, batch):
     r = client.get("/bao-cao?ky=2026")
     assert r.status_code == 200
     assert "10 khách lớn nhất = " in r.text
-    assert "% doanh thu kỳ này, trên 12 khách có doanh thu" in r.text
+    assert "% doanh thu kỳ này, trên 12 khách có phát sinh trong kỳ" in r.text
 
 
 def test_nhiet_chu_giai_co_khong_co_cung_ky(client, conn, batch):

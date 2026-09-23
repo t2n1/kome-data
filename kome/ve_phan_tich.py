@@ -28,8 +28,17 @@ def bac_tang_truong(t: float | None) -> str:
     """Bậc màu theo tăng trưởng, đối xứng quanh 0.
 
     `t is None` (không có cùng kỳ để so, hoặc mẫu số cùng kỳ <= 0) -> "khong".
-    Biên: -20% -> g2, -5% -> g1, +5% -> t1, +20% -> t2 (biên thuộc bậc PHÍA
-    ÂM/thấp hơn của khoảng, tức <= chứ không phải <).
+
+    [Vòng soát cuối, M5] Biên: đúng -20% -> g2, đúng -5% -> g1, đúng +5% ->
+    t1, đúng +20% -> t2 — nói cách khác, một giá trị NẰM ĐÚNG TRÊN biên luôn
+    rơi vào bậc XA HƠN 0 (cực trị hơn) trong hai bậc kề biên đó, ở CẢ HAI
+    phía. Bình luận cũ ở đây từng nói biên "thuộc bậc PHÍA ÂM/thấp hơn của
+    khoảng" — đúng cho hai biên âm (-20%, -5%: bậc xa-hơn-0 tình cờ cũng là
+    bậc "thấp hơn" vì phía âm càng xa 0 càng nhỏ), nhưng SAI cho hai biên
+    dương (+5%, +20%): ở phía dương, bậc xa-hơn-0 (t1, t2) là bậc CAO HƠN,
+    không phải thấp hơn — +5% rơi vào t1 (cao hơn "0"), không rơi vào "0".
+    Hành vi (các `if`/`elif` bên dưới) không đổi — chỉ sửa lại câu chữ cho
+    khớp với những gì code thật sự làm.
     """
     if t is None:
         return "khong"
@@ -463,8 +472,15 @@ def ve_cay_o(nhom: "list[tuple[str, int, float | None, list[tuple[str, str, int]
 
 # ---- Bản đồ nhiệt ngành x tháng --------------------------------------------
 
+def _lui_12_thang(th: str) -> str:
+    """"YYYY-MM" của đúng 12 tháng trước `th` — so sánh chuỗi (lexicographic)
+    vẫn đúng thứ tự thời gian cho định dạng này, nên không cần parse `date`."""
+    return f"{int(th[:4]) - 1:04d}-{th[5:7]}"
+
+
 def ve_nhiet(dong: "list[NganhThang]", thang: list[str],
-             thang_cuoi_co_du_lieu: str | None = None) -> dict:
+             thang_cuoi_co_du_lieu: str | None = None,
+             thang_dau_du_lieu: str | None = None) -> dict:
     """Lưới ngành × tháng. Hàng xếp theo TỔNG doanh thu kỳ giảm dần (tính
     bằng `sorted` trên dữ liệu đã có — chỉ để SẮP XẾP HIỂN THỊ, không phải
     một chỉ số mới). Luôn đủ 12 cột kể cả tháng ngành đó không có dòng bán —
@@ -494,7 +510,28 @@ def ve_nhiet(dong: "list[NganhThang]", thang: list[str],
     dù CHƯA bán gì ở tháng đang xét) vẫn có `d` khác `None` — lọt thẳng
     xuống nhánh `co_cung_ky` phía dưới và bị tô như một tháng CÓ SỐ, đúng
     lỗi gốc mà I-1 tồn tại để sửa. Ranh giới thời gian là một SỰ THẬT VỀ
-    KỲ, không phụ thuộc dòng nào có mặt trong view hay không."""
+    KỲ, không phụ thuộc dòng nào có mặt trong view hay không.
+
+    [Vòng soát cuối, I-2] `thang_dau_du_lieu` ("YYYY-MM", thường
+    `bc.moi_ky[0].ngay_dau` định dạng lại — KHÔNG hỏi CSDL thêm) chặn một lỗi
+    NULL≠0 đối xứng với `thang_cuoi_co_du_lieu`: tháng TRƯỚC khi công ty có
+    dòng bán đầu tiên (ví dụ kỳ 6 = 2024-08..2025-07 trong khi dữ liệu chỉ
+    bắt đầu 2025-03-03) không phải "ngành này không bán tháng đó" — đó là
+    "kho CHƯA CÓ dữ liệu ở tháng đó", một sự thật khác hẳn. Bản trước tô cả
+    dải tháng trước ngày bắt đầu bằng bậc "khong_ban" (¥0 · "không bán tháng
+    này và tháng cùng kỳ năm trước cũng vậy") — sai kiểu NULL≠0 y hệt lớp lỗi
+    `mart.san_pham_360.ton` đã ghi ở CLAUDE.md, chỉ khác đối tượng. Bậc mới
+    "truoc_du_lieu" render giống "chua_toi" (dấu "·", không phải ¥0) vì cả
+    hai đều là "không biết", không phải "biết và bằng không".
+
+    Với ô "khong_ban" (ngành thật sự không bán gì tháng đó VÀ nằm trong
+    khoảng đã có dữ liệu), câu "tháng cùng kỳ năm trước cũng vậy" chỉ đúng
+    khi tháng M-12 CŨNG nằm trong khoảng có dữ liệu — nếu M-12 rơi vào trước
+    `thang_dau_du_lieu`, ta không hề BIẾT tháng đó ngành có bán hay không
+    (kho không lưu), nên không được khẳng định "cũng vậy". Cờ `co_the_ck`
+    trên mỗi ô "khong_ban" mang đúng sự thật này cho template quyết định câu
+    chữ; `thang_dau_du_lieu=None` (gọi rời khỏi `/bao-cao`, không biết ranh
+    giới) giữ NGUYÊN hành vi cũ — luôn `co_the_ck=True`."""
     if not dong:
         return {"co": False}
 
@@ -513,9 +550,15 @@ def ve_nhiet(dong: "list[NganhThang]", thang: list[str],
             if thang_cuoi_co_du_lieu is not None and th > thang_cuoi_co_du_lieu:
                 cell = {"thang": th, "nganh": nganh, "bac": "chua_toi",
                         "tang_truong": None, "doanh_thu": None, "co_cung_ky": False}
+            elif thang_dau_du_lieu is not None and th < thang_dau_du_lieu:
+                cell = {"thang": th, "nganh": nganh, "bac": "truoc_du_lieu",
+                        "tang_truong": None, "doanh_thu": None, "co_cung_ky": False}
             elif d is None and thang_cuoi_co_du_lieu is not None:
+                co_the_ck = (thang_dau_du_lieu is None
+                             or _lui_12_thang(th) >= thang_dau_du_lieu)
                 cell = {"thang": th, "nganh": nganh, "bac": "khong_ban",
-                        "tang_truong": None, "doanh_thu": 0, "co_cung_ky": False}
+                        "tang_truong": None, "doanh_thu": 0, "co_cung_ky": False,
+                        "co_the_ck": co_the_ck}
             elif d is None:
                 cell = {"thang": th, "nganh": nganh, "bac": "khong_ck",
                         "tang_truong": None, "doanh_thu": 0, "co_cung_ky": False}
@@ -542,7 +585,8 @@ def ve_nhiet(dong: "list[NganhThang]", thang: list[str],
     # đơn giản, không cần tự chia hàng/cột bằng `loop.index0 // len(thang)`
     # (phép chia nguyên đó từng nằm trong Jinja, nay chuyển hẳn vào đây).
     # `o` (phẳng) giữ lại để không phá vỡ test cũ tham chiếu trực tiếp.
-    return {"co": True, "nganh": nganh_sap, "thang": thang, "o": o, "hang": hang}
+    return {"co": True, "nganh": nganh_sap, "thang": thang, "o": o, "hang": hang,
+            "thang_dau_du_lieu": thang_dau_du_lieu}
 
 
 # ---- Pareto khách hàng -------------------------------------------------------
