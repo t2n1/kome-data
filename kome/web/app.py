@@ -140,8 +140,10 @@ def _ky_du_lieu(conn) -> dict:
     nghỉ ốm, không ai kéo–thả, hôm sau nạp bình thường và /kho-du-lieu xanh hết.
     Ba tháng sau báo cáo thiếu một ngày và không ai truy được ngày nào.
 
-    Cuối tuần bỏ qua bằng core.dim_date.is_weekend. Ngày lễ Nhật KHÔNG có
-    trong dim_date nên vẫn bị liệt kê — cảnh báo nhắc người đọc kiểm tra.
+    Ngày nghỉ (cuối tuần VÀ ngày lễ Nhật, từ 032) bỏ qua bằng
+    mart.lich_kinh_doanh — định nghĩa duy nhất của ngày làm việc. Ngày nghỉ
+    riêng của công ty (Obon, 年末年始) KHÔNG có trong đó nên vẫn bị liệt kê —
+    cảnh báo nhắc người đọc kiểm tra.
     """
     dau, cuoi = conn.execute(
         "SELECT min(sales_date), max(sales_date) FROM core.fact_sales_line"
@@ -151,12 +153,12 @@ def _ky_du_lieu(conn) -> dict:
     tu = max(dau, cuoi - timedelta(days=SO_NGAY_SOAT - 1))
     thieu = [
         r[0] for r in conn.execute(
-            """SELECT d.date_key FROM core.dim_date d
-               WHERE d.is_weekend = false
-                 AND d.date_key BETWEEN %s AND %s
+            """SELECT d.ngay FROM mart.lich_kinh_doanh d
+               WHERE d.la_ngay_kd
+                 AND d.ngay BETWEEN %s AND %s
                  AND NOT EXISTS (SELECT 1 FROM core.fact_sales_line f
-                                 WHERE f.sales_date = d.date_key)
-               ORDER BY d.date_key""",
+                                 WHERE f.sales_date = d.ngay)
+               ORDER BY d.ngay""",
             (tu, cuoi),
         ).fetchall()
     ]

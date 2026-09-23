@@ -88,12 +88,15 @@ def test_moc_den_hom_nay_theo_ngay_lam_viec_da_qua(conn, batch):
         """SELECT ngay_kd, ngay_kd_da_qua, muc_tieu_den_hom_nay
            FROM mart.tien_do_ngan_sach
            WHERE thang = '2026-05' AND salesperson_code = '0104'""").fetchone()
-    # 5/2026: 21 ngày trong tuần; tới hết 15/5 là 11 ngày trong tuần.
-    assert (r[0], r[1]) == (21, 11)
+    # 5/2026: 21 ngày trong tuần − 3 ngày lễ Tuần lễ Vàng rơi vào ngày thường
+    # (4/5, 5/5, 6/5 振替休日 — migration 032) = 18; tới hết 15/5 là 11 − 3 = 8.
+    # Đây CHÍNH là hạn chế có tên của 026 được gỡ: trước 032 vạch mốc tháng 5
+    # khắt khe hơn thực tế ba ngày.
+    assert (r[0], r[1]) == (18, 8)
     # `::bigint` của Postgres LÀM TRÒN (không cắt cụt), nên cho phép lệch 1 yên
     # thay vì khẳng định một trong hai cách quy tròn — con số này không dùng để
     # đối chiếu sổ sách, nó là vạch mốc trên một thanh tiến độ.
-    assert r[2] == pytest.approx(10_000_000 * 11 / 21, abs=1)
+    assert r[2] == pytest.approx(10_000_000 * 8 / 18, abs=1)
 
 
 def test_thang_da_qua_han_thi_moc_bang_dung_chi_tieu(conn, batch):

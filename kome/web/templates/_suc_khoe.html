@@ -25,7 +25,7 @@
 <div class="ngay-thieu">
 ⚠️ <strong>Thiếu {{ ky.thieu|length }} ngày làm việc</strong> trong khoảng {{ ky.tu }} → {{ ky.cuoi }}:
 {% for d in ky.thieu %}<strong>{{ d }}</strong>{% if not loop.last %} · {% endif %}{% endfor %}
-<br>Kiểm tra xem hôm đó có phải ngày nghỉ lễ / công ty nghỉ không. Nếu không,
+<br>Ngày lễ quốc gia đã được bỏ qua — kiểm tra xem hôm đó công ty có nghỉ riêng (Obon, cuối năm) không. Nếu không,
 xuất lại 売上伝票データ của đúng ngày đó từ OBC rồi kéo–thả vào trang nạp.
 </div>
 {% endif %}

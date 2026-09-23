@@ -20,7 +20,7 @@
 {% else %}
 {% set c = db.chot %}{% set m = db.nam %}
 <p class="ghi-chu">Toàn công ty, tính từ dữ liệu bán tới <strong>{{ c.hom_nay }}</strong> (ngày bán mới nhất trong kho).
-Ba cách tính đều giải thích được bằng một câu — đọc ở chân từng khối. Ngày làm việc chỉ loại thứ Bảy/Chủ nhật (chưa có ngày lễ Nhật).</p>
+Ba cách tính đều giải thích được bằng một câu — đọc ở chân từng khối. Ngày làm việc đã trừ thứ Bảy, Chủ nhật và ngày lễ quốc gia Nhật (chưa trừ ngày nghỉ riêng của công ty).</p>
 
 <section id="chot-thang">
 <div class="tieu-de-khoi"><h2>Chốt tháng {{ c.thang[5:] }}/{{ c.thang[:4] }}</h2>

@@ -164,7 +164,8 @@ def test_lich_kinh_doanh_la_nguon_cua_ngay_kinh_doanh(conn):
                   (SELECT count(*) FROM mart.lich_kinh_doanh
                    WHERE la_ngay_kd AND to_char(ngay, 'YYYY-MM') = '2026-07'),
                   has_table_privilege('kome_ingest', 'mart.lich_kinh_doanh', 'SELECT')""").fetchone()
-    assert r[0] == r[1] == 23 and r[2] is True
+    # 7/2026: 23 ngày thường, trừ 海の日 20/7 (thứ Hai, migration 032) = 22
+    assert r[0] == r[1] == 22 and r[2] is True
 
 
 # ---- Web -------------------------------------------------------------------

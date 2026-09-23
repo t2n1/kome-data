@@ -202,7 +202,7 @@ Hãy nạp file <strong>売上伝票データ</strong> trước.</div>
    một khối không nói ngày mốc sẽ bị đọc là "tháng này bán được có thế". #}
 <p class="ghi-chu">Số liệu đến {{ td.hom_nay.strftime("%d/%m/%Y") }} ·
 {{ td.ngay_kd_da_qua }}/{{ td.ngay_kd }} ngày làm việc của tháng.
-Ngày làm việc chưa trừ ngày lễ Nhật.</p>
+Ngày làm việc đã trừ thứ Bảy, Chủ nhật và ngày lễ quốc gia Nhật (chưa trừ ngày nghỉ riêng của công ty).</p>
 
 {% if not td.co_ngan_sach %}
 {# [Vòng soát cuối, M7] Liên kết "Đặt chỉ tiêu" gác bằng `hien_ngan_sach` —

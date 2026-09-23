@@ -317,18 +317,19 @@ def tinh_bang_ngay(conn, hom_nay: date | None = None,
     Không tự mở kết nối (xem ghi chú ở `tinh_bang_phu`). `hom_nay` bơm được
     để test khỏi phụ thuộc đồng hồ thật.
 
-    Cuối tuần KHÔNG bao giờ tính là thiếu và không vào `thieu`: không ai xuất
-    file thứ Bảy, nên 26 ô đỏ mỗi quý chỉ dạy người đọc lướt qua cả cột. Ngày
-    lễ Nhật không có trong `core.dim_date` nên vẫn hiện thiếu — nhất quán với
-    `/health` và `kome/tuoi_du_lieu.py`.
+    Ngày NGHỈ (cuối tuần VÀ ngày lễ Nhật, từ 032) KHÔNG bao giờ tính là thiếu
+    và không vào `thieu`: không ai xuất file thứ Bảy, nên 26 ô đỏ mỗi quý chỉ
+    dạy người đọc lướt qua cả cột. "Nghỉ" đọc từ `mart.lich_kinh_doanh` — định
+    nghĩa DUY NHẤT của ngày làm việc, dùng chung với `/kho-du-lieu` và
+    `kome/tuoi_du_lieu.py`.
     """
     from kome.tuoi_du_lieu import hom_nay_o_nhat
 
     hom_nay = hom_nay or hom_nay_o_nhat()
     khung = conn.execute(
-        """SELECT date_key, extract(isodow FROM date_key)::int, is_weekend
-           FROM core.dim_date
-           WHERE date_key <= %s ORDER BY date_key DESC LIMIT %s""",
+        """SELECT ngay, extract(isodow FROM ngay)::int, NOT la_ngay_kd
+           FROM mart.lich_kinh_doanh
+           WHERE ngay <= %s ORDER BY ngay DESC LIMIT %s""",
         (hom_nay, so_ngay),
     ).fetchall()
     if not khung:
