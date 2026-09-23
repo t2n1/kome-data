@@ -92,6 +92,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/lien-he` | **Cần liên hệ** (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc qua `POST /khach-hang/{mã}/tiep-xuc`. **3 truy vấn** | `mart.uu_tien_lien_he`, `app.nhat_ky_tiep_xuc` |
 | `/ban-do` | Bản đồ khách hàng — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách | `core.dim_prefecture`, `mart.khach_theo_tinh` |
 | `/bao-cao` | Báo cáo bán hàng theo kỳ + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
+| `/du-bao` | **Dự báo doanh thu** (đợt 8): chốt tháng (đường luỹ kế + khoảng sai số thật + theo người phụ trách) · 12 tháng tới (3 kịch bản) · đơn kỳ vọng 14 ngày · nguy cơ ngừng mua · dự báo đã chuẩn tới đâu. Toàn công ty, **3 truy vấn** | `mart.lich_kinh_doanh`, `mart.ban_theo_ngay`, `mart.tien_do_ngan_sach`, `mart.khach_360`, `mart.khoang_cach_mua` |
 | `/ngan-sach` | Đặt chỉ tiêu doanh thu: 5 người phụ trách × 12 tháng một kỳ. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
 | `/san-pham` | Danh mục mã hàng + tìm kiếm + lọc theo trạng thái tồn | `mart.san_pham_360` |
 | `/san-pham/{mã}` | **Hồ sơ mã hàng** | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list` |
@@ -434,7 +435,10 @@ là nói một điều sai bằng con số. Và `kome.ngan_sach.luu()` **chỉ �
 phải "ai bấm Lưu lần cuối".
 
 **Bất biến:** `core.dim_date` **không có cột ngày lễ Nhật**, nên
-`mart.ngay_kinh_doanh` chỉ loại thứ Bảy và Chủ nhật. Tháng có Tuần lễ Vàng
+`mart.ngay_kinh_doanh` chỉ loại thứ Bảy và Chủ nhật. Từ đợt 8 (migration `031`),
+"ngày làm việc" có ĐÚNG MỘT định nghĩa: `mart.lich_kinh_doanh.la_ngay_kd` (từng
+ngày); `mart.ngay_kinh_doanh` (đếm theo tháng, dùng cho ngân sách) và màn `/du-bao`
+(nhịp mỗi ngày làm việc) đều ĐỌC view đó — thêm ngày lễ là sửa đúng một chỗ. Tháng có Tuần lễ Vàng
 (5月) hay Obon (8月) bị đếm thừa 2–4 ngày làm việc và vạch mốc "đáng lẽ đạt
 tới hôm nay" **khắt khe hơn thực tế** ở đúng những tháng đó. Đây là hạn chế
 CÓ TÊN, không phải thiếu sót chưa ai để ý: đừng "sửa" bằng cách bịa một định
@@ -451,6 +455,20 @@ nguyên nằm thừa trong giới hạn đó. Và bản Vercel là bản chạy 
 buộc** có `KOME_SESSION_SECRET`, tức là nơi cờ quyền LUÔN được thi hành — máy
 trong công ty mới là nơi có thể không có cổng nào. Chặn màn nhập ở Vercel là
 lấy nó đi đúng ở chỗ nó an toàn nhất.
+
+**Bất biến (Đợt 8):** mọi cách tính của `/du-bao` (`kome/du_bao.py`) phải giải
+thích được bằng MỘT câu in ngay dưới khối, và không có hằng số bịa. Chốt tháng =
+đã bán + (đã bán ÷ ngày làm việc đã qua) × ngày làm việc còn lại; khoảng thấp–cao
+là sai số nhỏ nhất/lớn nhất của CHÍNH cách tính đó trên các tháng đủ ngày trước
+(cần ≥ 3 tháng, không đủ thì in "—" chứ không đoán); 12 tháng tới = cùng tháng năm
+trước × hệ số, hệ số cơ sở là **tỷ số của các tổng** (bất biến tỷ suất ở trên áp cả
+ở đây — có test canh
+`tests/test_du_bao.py::test_he_so_la_TY_SO_CUA_CAC_TONG_khong_phai_trung_binh_ty_so`).
+"So với năm trước" chia cho tổng CÙNG CÁC THÁNG ĐÓ năm trước, không cho "12 tháng
+qua" (hai khoảng khác độ dài khi có tháng không dự báo được). Gói thiết kế có
+"88% chắc chắn" / "72% nguy cơ" — ta KHÔNG hiện phần trăm xác suất vì không đo
+được; thay bằng "x/y lần mua đúng nhịp" và "im lặng n× nhịp mua riêng". Tháng đầu
+của kho bắt đầu giữa chừng không bao giờ làm tháng đối chiếu hay tháng kiểm.
 
 **Bất biến (Đợt 5b):** hai màn có "so cùng kỳ" nhưng đi theo HAI kiểu so khác
 nhau, và mỗi ô phải luôn nói nó so cách nào — im lặng là để người đọc tự suy

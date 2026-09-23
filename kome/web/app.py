@@ -586,6 +586,24 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         return RedirectResponse("/lien-he?tat_ca=1" if tat_ca else "/lien-he",
                                 status_code=301)
 
+    @app.get("/du-bao", response_class=HTMLResponse)
+    def du_bao(request: Request, kb: str = "cs"):
+        """Dự báo doanh thu (đợt 8). ĐÚNG 3 lượt hỏi — có test đếm. Toàn công
+        ty, không lọc theo người đăng nhập (cùng nếp các khối số tổng của /)."""
+        from kome import du_bao as DB
+        from kome import ve_du_bao as VDB
+        try:
+            kb = kb if kb in DB.KICH_BAN else "cs"
+            with open_app_conn() as conn:
+                db = DB.du_bao(conn)
+            ctx = {"trang": "du-bao", "db": db, "kb": kb, "kich_ban": DB.KICH_BAN}
+            if db:
+                ctx["ve_chot"] = VDB.ve_chot_thang(db.chot) if db.chot else {"co": False}
+                ctx["ve_nam"] = VDB.ve_muoi_hai_thang(db.nam, kb)
+            return _ve(request, "du_bao.html", ctx)
+        except Exception as e:
+            return _loi(request, "mở màn dự báo", e)
+
     @app.get("/lien-he", response_class=HTMLResponse)
     def lien_he(request: Request, tat_ca: int = 0, nv: str = "",
                 ly_do: str = "", loi_tx: str = ""):
