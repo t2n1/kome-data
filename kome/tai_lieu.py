@@ -34,20 +34,38 @@ FILE_MAC_DINH = "uriage"
 # bảng phủ (`coverage.COT`) vì nó đổ vào cùng bảng với `uriage`.
 _MO_TA_NGOAI_COT = {"meisai": "bán hàng (nguồn dự phòng của 売上伝票データ)"}
 
-# Phần văn xuôi DUY NHẤT viết trong code: một câu cho mỗi tầng. Danh sách
-# bảng/view của từng tầng thì sinh từ migration (ảnh chụp).
+# Bốn tầng — ĐÚNG bốn tầng của gói thiết kế (Kho dữ liệu.dc.html: TANG):
+# OBC → raw → core → mart. (Schema `app` không phải một tầng của luồng OBC —
+# nó là "sự thật về hoạt động", nằm ở khối "Ai là sự thật về cái gì".)
+# Phần văn xuôi DUY NHẤT viết trong code: tên, một câu mô tả và dòng chân của
+# mỗi tầng. Danh sách của từng tầng thì SINH (file từ files.yml, bảng/view từ
+# migration).
 TANG = [
-    ("raw", "File gốc OBC",
-     "Bản sao nguyên vẹn từng file đã nạp, lưu theo lô (raw_archive/). "
-     "Không sửa, không xoá — là thứ để lần ngược mọi con số."),
-    ("core", "Dữ liệu OBC đã chuẩn hoá",
-     "Chỉ vai trò kome_ingest ghi. Mỗi dòng mang batch_id trỏ về meta.ingest_batch, "
-     "nên hoàn tác được cả lô."),
-    ("mart", "Định nghĩa chỉ số",
-     "Chỉ có view. Mọi chỉ số của web app được định nghĩa ở đây và CHỈ ở đây."),
-    ("app", "Dữ liệu web app tự ghi",
-     "Tài khoản, ngân sách… — thứ OBC không có. Không bao giờ ghi ngược vào OBC."),
+    ("OBC", "Hệ nguồn", "do",
+     "商奉行 / 蔵奉行 — nơi kế toán và kho thao tác hằng ngày. Web app không bao giờ ghi vào đây.",
+     ""),
+    ("raw", "Lưu nguyên văn", "canh",
+     "Chép y hệt file OBC đã nạp, không sửa một ký tự, kèm mã băm để biết file có bị đổi không (raw_archive/).",
+     "giữ vĩnh viễn"),
+    ("core", "Đã làm sạch", "lam",
+     "Mã giữ dạng TEXT, khách lưu theo hiệu lực từ–đến, mỗi dòng mang batch_id để hoàn tác cả lô. Chỉ kome_ingest ghi.",
+     "nguồn tính toán duy nhất"),
+    ("mart", "Định nghĩa chỉ số", "ok",
+     "Chỉ có view — tính lại mỗi lần đọc, không lưu gì. Mọi chỉ số của màn hình định nghĩa ở đây và CHỈ ở đây.",
+     "dẫn tới màn hình"),
 ]
+
+
+def kieu_nap(core_table: str | None, chu_thich: dict) -> tuple[str, str]:
+    """Kiểu nạp của một file — SUY từ bảng đích và câu COMMENT ON của chính
+    bảng đó trong migration (ảnh chụp), không khai tay. (nhãn, lớp .vien.<lớp>)"""
+    if core_table == "core.fact_sales_line":
+        return ("theo ngày + đối soát tháng", "canh")
+    if core_table == "core.fact_inventory_daily":
+        return ("snapshot ngày", "lam")
+    if "SCD2" in chu_thich.get(core_table or "", ""):
+        return ("full + lịch sử", "ok")
+    return ("full", "nhat")
 
 
 def md_dong(s: str) -> Markup:
@@ -78,12 +96,16 @@ def _tan_suat(s: FileSpec) -> str:
     return "hằng ngày 13:30" if c and c.khoa in coverage.KHOA_NGAY else "vài lần mỗi năm"
 
 
-def nguon_obc(specs: dict[str, FileSpec]) -> list[dict]:
-    return [{"ten": s.name, "ja": s.display_name, "mo_ta": _mo_ta(s),
-             "mau": s.filename_pattern, "header_row": s.header_row,
-             "khoa": list(s.keys), "core_table": s.core_table,
-             "tan_suat": _tan_suat(s)}
-            for s in specs.values()]
+def nguon_obc(specs: dict[str, FileSpec], anh: dict | None = None) -> list[dict]:
+    ct = (anh or {}).get("chu_thich", {})
+    ra = []
+    for s in specs.values():
+        nhan, mau = kieu_nap(s.core_table, ct)
+        ra.append({"ten": s.name, "ja": s.display_name, "mo_ta": _mo_ta(s),
+                   "mau": s.filename_pattern, "header_row": s.header_row,
+                   "khoa": list(s.keys), "core_table": s.core_table,
+                   "tan_suat": _tan_suat(s), "kieu": nhan, "kieu_mau": mau})
+    return ra
 
 
 def chua_nap() -> list:
@@ -159,6 +181,49 @@ def noi_di_dau(specs: dict[str, FileSpec], ten: str) -> dict:
     return {"tro_ra": tro_ra, "tro_vao": tro_vao}
 
 
+DONG_SO_DO = 34   # px mỗi hàng của sơ đồ nối — template dùng CÙNG số này
+
+
+def so_do_noi(specs: dict[str, FileSpec], ten: str) -> dict:
+    """Sơ đồ "File này nối đi đâu" của gói thiết kế: cột nối bên trái, file
+    ghép được bên phải, đường cong SVG ở giữa. Hình học tính ở máy chủ (không
+    JS): mỗi hàng cao DONG_SO_DO, đường đi từ tâm hàng trái sang tâm hàng phải.
+
+    Trái = khoá ngoại của file (trỏ RA) + khoá chính mà file khác trỏ VÀO.
+    Phải = mọi file ở đầu bên kia của các đường đó, không trùng."""
+    s = specs[ten]
+    n = noi_di_dau(specs, ten)
+    trai, phai, duong = [], [], []
+
+    def _phai(ma):
+        if ma not in phai:
+            phai.append(ma)
+        return phai.index(ma)
+
+    for x in n["tro_ra"]:
+        trai.append({"cot": x["cot"], "ja": x["ja"], "vai": "khoá ngoại"})
+        duong.append((len(trai) - 1, _phai(x["dich"]), "ra"))
+    if n["tro_vao"]:
+        k = s.keys[0]
+        trai.append({"cot": k, "ja": _ja_cua(specs, k), "vai": "khoá chính"})
+        for x in n["tro_vao"]:
+            d = (len(trai) - 1, _phai(x["nguon"]), "vao")
+            if d not in duong:          # uriage trỏ vào khách bằng HAI cột
+                duong.append(d)
+    h = DONG_SO_DO
+    cao = max(len(trai), len(phai), 1) * h
+
+    def y(i):
+        return i * h + h / 2
+    return {
+        "trai": trai,
+        "phai": [{"ten": m, "ja": specs[m].display_name} for m in phai],
+        "cao": cao,
+        "duong": [{"d": f"M0,{y(a):g} C50,{y(a):g} 50,{y(b):g} 100,{y(b):g}", "loai": l}
+                  for a, b, l in duong],
+    }
+
+
 def _kieu(s: FileSpec, cot: str) -> str:
     if cot in s.code_columns:
         return "mã (text)"
@@ -201,17 +266,33 @@ def doc_anh_chup(duong: Path = ANH_CHUP) -> dict | None:
 
 def bon_tang(anh: dict | None, specs: dict[str, FileSpec]) -> list[dict]:
     bang = (anh or {}).get("bang", {})
-    ra = []
-    for ma, ten, mo_ta in TANG:
-        if ma == "raw":
-            muc = [s.display_name for s in specs.values()]
-        elif ma == "core":
-            muc = [f"core.{b}" for b in bang.get("core", [])] + \
-                  [f"meta.{b}" for b in bang.get("meta", [])]
-        else:
-            muc = [f"{ma}.{b}" for b in bang.get(ma, [])]
-        ra.append({"ma": ma, "ten": ten, "mo_ta": mo_ta, "muc": muc})
-    return ra
+    muc = {
+        "OBC": [s.display_name for s in specs.values()],
+        "raw": ["raw_archive/ — một bản cho mỗi lô"] + [f"meta.{b}" for b in bang.get("meta", [])],
+        "core": [f"core.{b}" for b in bang.get("core", [])],
+        "mart": [f"mart.{b}" for b in bang.get("mart", [])],
+    }
+    return [{"ma": ma, "ten": ten, "mau": mau, "mo_ta": mo_ta, "giu": giu, "muc": muc[ma]}
+            for ma, ten, mau, mo_ta, giu in TANG]
+
+
+def ranh_gioi(anh: dict | None) -> list[dict]:
+    """Khối "Ai là sự thật về cái gì" — hai thẻ của gói thiết kế (RANH_GIOI).
+    Danh sách SINH từ schema: `core` là sự thật của OBC (tiền, hàng, khách),
+    `app` là sự thật của web app (hoạt động). Mỗi mục kèm câu COMMENT ON của
+    chính bảng đó nếu migration có viết."""
+    bang = (anh or {}).get("bang", {})
+    ct = (anh or {}).get("chu_thich", {})
+
+    def ds(schema):
+        return [{"ten": f"{schema}.{b}", "chu_thich": ct.get(f"{schema}.{b}", "")}
+                for b in bang.get(schema, [])]
+    return [
+        {"ten": "OBC là sự thật về tiền", "mau": "do", "muc": ds("core"),
+         "ghi_chu": "Chỉ đọc. Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE ở đây."},
+        {"ten": "App là sự thật về hoạt động", "mau": "ok", "muc": ds("app"),
+         "ghi_chu": "Thứ OBC không có. Không bao giờ ghi ngược vào OBC."},
+    ]
 
 
 def cong(anh: dict | None) -> list[dict]:
@@ -219,9 +300,27 @@ def cong(anh: dict | None) -> list[dict]:
             for c in (anh or {}).get("cong", [])]
 
 
-def cam_bay(anh: dict | None) -> list[str]:
-    return list((anh or {}).get("cam_bay", []))
+def cam_bay(anh: dict | None) -> list[dict]:
+    """Thẻ (tên, cách xử) như CAM_BAY của gói thiết kế: tên = câu ĐẦU của mục
+    trong CLAUDE.md, phần còn lại là thân. Tách tại dấu chấm/hai chấm đầu tiên
+    có khoảng trắng theo sau — `83.75` hay `1.710` không bị cắt."""
+    ra = []
+    for muc in (anh or {}).get("cam_bay", []):
+        m = re.match(r"^(.+?[.:])\s+(.*)$", muc, re.S)
+        ra.append({"ten": m.group(1), "cach": m.group(2)} if m else {"ten": muc, "cach": ""})
+    return ra
 
 
-def lo_trinh(anh: dict | None) -> dict:
-    return (anh or {}).get("lo_trinh", {"cot": [], "dong": []})
+def lo_trinh(anh: dict | None) -> list[dict]:
+    """Thẻ như LO_TRINH của gói thiết kế: số đợt, nội dung, dữ liệu mới, và
+    các màn (tách cột "Màn" theo `·`). Bảng §7 của đặc tả lộ trình có đúng bốn
+    cột Đợt · Nội dung · Màn · Dữ liệu mới."""
+    lt = (anh or {}).get("lo_trinh", {"cot": [], "dong": []})
+    ra = []
+    for d in lt["dong"]:
+        if len(d) < 4:
+            continue
+        so = d[0].replace("*", "")
+        man = [m.strip() for m in d[2].split("·") if m.strip() and m.strip() != "—"]
+        ra.append({"so": so, "noi_dung": d[1], "man": man, "du_lieu": d[3]})
+    return ra

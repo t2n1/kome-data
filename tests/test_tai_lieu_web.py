@@ -56,7 +56,11 @@ def test_tab_danh_dau_trang_dang_xem(client):
 def test_trang_luong_hien_cam_bay_cong_va_bang_moi(client):
     t = client.get("/kho-du-lieu/luong").text
     anh = TL.doc_anh_chup()
-    assert t.count("<li>", t.index('id="cam-bay"'), t.index('id="lo-trinh"')) == len(anh["cam_bay"])
+    assert t.count('class="the-tl"', t.index('id="cam-bay"'), t.index('id="lo-trinh"')) == len(anh["cam_bay"])
+    # "Ai là sự thật": mọi bảng app của migration hiện ở thẻ của app
+    khoi = t[t.index('id="ai-la-su-that"'):t.index('id="nguong"')]
+    for b in anh["bang"]["app"]:
+        assert f"app.{b}" in khoi
     for c in anh["cong"]:
         assert H.escape(c["ten"]) in t or c["ten"] in t
     assert "mart.thang_den_hom_nay" in t

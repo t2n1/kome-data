@@ -147,9 +147,25 @@ tạo spec tay vẫn chạy; test mới đòi mọi spec trong `files.yml` có g
 | `test_file_la_ve_mac_dinh` | `?file=khong-co` → 200, hiện `売上伝票データ` |
 | `test_tab_danh_dau_trang_dang_xem` | `aria-current` đúng tab |
 
+## 6b. Vòng bám thiết kế (2026-09-23, theo yêu cầu "bám sát handoff")
+
+- **Bốn tầng** đổi thành đúng bốn tầng của gói thiết kế: OBC → raw → core → mart
+  (thẻ viền trên màu, dòng chân "▸ …"). `app` chuyển sang khối mới bên dưới.
+- Thêm khối **"Ai là sự thật về cái gì"** (bản đầu bỏ sót): hai thẻ viền trái —
+  `core` (sự thật về tiền) và `app` (sự thật về hoạt động); danh sách SINH từ schema,
+  kèm câu `COMMENT ON` của chính bảng (ảnh chụp thêm khoá `chu_thich`).
+- **Đối chiếu** thành danh sách dòng + chip chặn/cảnh báo, đặt cạnh "Ai là sự thật"
+  thành hai cột như thiết kế; bảng ngưỡng từng file tách thành khối riêng.
+- **Cạm bẫy** và **Lộ trình** thành lưới thẻ; thẻ cạm bẫy tách tên = câu đầu của mục.
+- Bảng nguồn thêm cột **Kiểu nạp** (chip) — SUY từ bảng đích + chú thích `SCD2`.
+- **"File này nối đi đâu"** có sơ đồ SVG như thiết kế (tính hình học ở máy chủ,
+  `kome.tai_lieu.so_do_noi`, hàng cao `DONG_SO_DO`) — thay quyết định bỏ ở §7.
+- Thêm cặp biến màu `--lam-nen`/`--lam-chu` (xanh lam của gói thiết kế) vào cả
+  khối sáng và hai khối tối.
+
 ## 7. Ngoài phạm vi
 
-Đường cong SVG nối cột của gói thiết kế (thay bằng hai danh sách) · số dòng/ngày cập
+số dòng/ngày cập
 nhật từng bảng (đã có ở khối sức khoẻ của `/kho-du-lieu`; ở đây là 0 truy vấn) ·
 mọi thay đổi pipeline.
 

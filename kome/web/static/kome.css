@@ -63,6 +63,8 @@
    --ok-nen:#E6F2EB;  --ok-vien:#1E7A4D;  --ok-chu:#14603E;
    --loi-nen:#FDEDEC; --loi-vien:#D62C27; --loi-chu:#B4231C;
    --canh-nen:#FFF9E8;--canh-vien:#E6D08A;--canh-chu:#8A5E06;
+   /* Xanh lam của gói thiết kế (tầng core, kiểu nạp "snapshot" — Kho dữ liệu.dc.html). */
+   --lam-nen:#E8F0F7; --lam-chu:#1B5E8C;
    --ngoai-nen:#F0EDE6;--ngoai-chu:#8E8A82;
    /* Thang màu bản đồ khách hàng (đợt 4c): MỘT TÔNG (hổ phách, cùng họ với
       --lien-ket) đậm dần theo bậc, KHÔNG đỏ-xanh — khoảng 1/12 nam giới
@@ -173,6 +175,7 @@
    --ok-nen:#16301F;  --ok-vien:#3FA06C;  --ok-chu:#5FC492;
    --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
    --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
+   --lam-nen:#172633; --lam-chu:#7FB3D9;
    --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
    /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
       đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —
@@ -215,6 +218,7 @@
    --ok-nen:#16301F;  --ok-vien:#3FA06C;  --ok-chu:#5FC492;
    --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
    --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
+   --lam-nen:#172633; --lam-chu:#7FB3D9;
    --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
    /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
       đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —
@@ -272,17 +276,62 @@
  .the-so .gia{font-size:1.45rem;font-weight:600;line-height:1.25;margin-top:.15rem;
    font-family:var(--font-so);font-variant-numeric:tabular-nums}
  .bang-cuon{overflow-x:auto}
- /* Tài liệu sống (đợt 2b): lưới bốn tầng + ô ký hiệu của ma trận khoá. */
- .tang{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:.75rem}
- .tang-o{background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:.75rem 1rem}
- .tang-ds{margin:.25rem 0 0;padding-left:1.1rem;font-size:.85rem;max-height:14rem;overflow-y:auto;overflow-x:hidden;overflow-wrap:anywhere}
+ /* Tài liệu sống (đợt 2b) — bám Kho dữ liệu.dc.html (laLuong/laNoi). */
+ .tang{display:flex;flex-wrap:wrap;gap:.6rem}
+ .tang-o{flex:1 1 0;min-width:215px;display:flex;flex-direction:column;background:var(--nen-the);
+   border:1px solid var(--vien);border-top:3px solid var(--vien-dam);border-radius:11px;padding:.8rem .85rem}
+ .tang-o.do{border-top-color:var(--do)} .tang-o.canh{border-top-color:var(--canh-chu)}
+ .tang-o.lam{border-top-color:var(--lam-chu)} .tang-o.ok{border-top-color:var(--ok-vien)}
+ .tang-dau{display:flex;align-items:baseline;gap:.4rem;margin-bottom:.3rem}
+ .tang-ma{font-family:var(--font-so);font-weight:600;font-size:.82rem}
+ .tang-o.do .tang-ma,.tang-o.do .tang-giu{color:var(--do-chu)}
+ .tang-o.canh .tang-ma,.tang-o.canh .tang-giu{color:var(--canh-chu)}
+ .tang-o.lam .tang-ma,.tang-o.lam .tang-giu{color:var(--lam-chu)}
+ .tang-o.ok .tang-ma,.tang-o.ok .tang-giu{color:var(--ok-chu)}
+ .tang-ten{font-weight:600;font-size:.88rem}
+ .tang-mo{font-size:.78rem;color:var(--chu-thuong);line-height:1.45;margin-bottom:.45rem}
+ .tang-ds{margin:0;padding-left:1rem;font-size:.74rem;color:var(--chu-nhat);max-height:11rem;
+   overflow-y:auto;overflow-x:hidden;overflow-wrap:anywhere;flex:1}
+ .tang-giu{margin-top:.5rem;padding-top:.45rem;border-top:1px solid var(--vien-phu);font-size:.72rem;font-weight:600}
+ .vien.lam{background:var(--lam-nen);border-color:var(--lam-nen);color:var(--lam-chu)}
+ .tieu-de-khoi{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem}
+ .hai-cot-tl{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));gap:1.1rem;align-items:start}
+ .dong-dc{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.55rem .8rem;
+   border-bottom:1px solid var(--vien-phu);font-size:.8rem}
+ .dong-dc:last-child{border-bottom:0}
+ .ten-dc{font-weight:600;font-size:.84rem}
+ .ranh{display:grid;gap:.6rem}
+ .ranh-o{background:var(--nen-the);border:1px solid var(--vien);border-left:3px solid var(--vien-dam);
+   border-radius:11px;padding:.7rem .8rem;min-width:0;font-size:.78rem}
+ .ranh-o.do{border-left-color:var(--do)} .ranh-o.ok{border-left-color:var(--ok-vien)}
+ .ranh-o ul{margin:.4rem 0 0;padding-left:1rem;line-height:1.5}
+ .luoi-the{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:.6rem}
+ .the-tl{background:var(--nen-the);border:1px solid var(--vien);border-radius:11px;padding:.75rem .85rem;min-width:0}
+ .than-tl{font-size:.78rem;color:var(--chu-thuong);line-height:1.5;margin-top:.25rem}
+ .lt-dau{display:flex;align-items:flex-start;gap:.45rem;margin-bottom:.3rem}
+ .lt-so{font-size:.72rem;font-weight:700;min-width:22px;height:22px;padding:0 .25rem;border-radius:99px;
+   display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+   background:var(--ok-nen);color:var(--ok-chu)}
+ .lt-man{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.45rem}
  .bang-tl td:first-child{white-space:nowrap}
+ td.o-khoa{text-align:center;font-weight:600}
+ .so-do{padding:.75rem .85rem}
+ .so-do-tom{font-size:.82rem;margin-bottom:.55rem}
+ .so-do-nhan{display:flex;justify-content:space-between;font-size:.66rem;letter-spacing:.05em;
+   color:var(--chu-nhat);font-weight:600;margin-bottom:.3rem}
+ .so-do-luoi{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(50px,.8fr) minmax(0,1fr);align-items:start}
+ .so-do-luoi ul{list-style:none;margin:0;padding:0}
+ .so-do-luoi li{display:flex;align-items:center;gap:.35rem;font-size:.8rem;
+   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .so-do-phai li{justify-content:flex-start;padding-left:.4rem}
+ .so-do-luoi svg{width:100%;display:block}
+ .so-do-luoi path{fill:none;stroke-width:2}
+ .so-do-luoi path.duong-ra{stroke:var(--lam-chu)} .so-do-luoi path.duong-vao{stroke:var(--ok-vien)}
+ .so-do-chu{margin:.5rem 0 0} .chu-ra{color:var(--lam-chu);font-weight:600} .chu-vao{color:var(--ok-chu);font-weight:600}
  /* `code` toàn cục là KHỐI (dòng lệnh sao lưu); trang tài liệu cần mã NẰM TRONG câu. */
- .tai-lieu code{display:inline;padding:.05rem .3rem;border-radius:5px;margin:0;white-space:normal}
+ .tai-lieu code{display:inline;padding:.05rem .3rem;border-radius:5px;margin:0;white-space:normal;overflow:visible}
  /* Mã trong bảng KHÔNG bẻ giữa chữ (customer_c|ode đọc sai) — bảng tự cuộn ngang. */
  .tai-lieu .bang-tl code{white-space:nowrap}
- td.o-khoa{text-align:center;font-weight:600}
- ol.cong li,ol.cam-bay li{margin:.35rem 0}
  td.so,th.so{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;
    font-family:var(--font-so)}
  .ghi-chu{color:var(--chu-nhat);font-size:.85rem;margin:.25rem 0 .75rem}
