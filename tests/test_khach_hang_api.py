@@ -37,9 +37,9 @@ def _dem_luot_hoi(monkeypatch):
 
 
 @pytest.mark.parametrize("url, tran", [
-    ("/api/khach-hang/ds", 3), ("/api/khach-hang/ds?nhom=im&hang=S,A&nhan_thang=tre&sap=tb3", 3),
+    ("/api/khach-hang/ds", 5), ("/api/khach-hang/ds?nhom=im&hang=S,A&nhan_thang=tre&sap=tb3&thang=2026-06", 5),
     ("/api/khach-hang/K1", 8), ("/api/khach-hang/K1/dong?tu=2026-07-01&den=2026-07-31", 1),
-    ("/api/ban-do?chi_so=doanh_thu", 2),
+    ("/api/ban-do?chi_so=doanh_thu", 3), ("/api/khach-hang/K1/khoang", 2),
 ])
 def test_ngan_sach_luot_hoi_tung_endpoint(conn, batch, c, monkeypatch, url, tran):
     """[IMPORTANT] Nút thắt là SỐ LƯỢT HỎI (47 ms mạng mỗi lượt tới Tokyo).

@@ -153,3 +153,73 @@ def tinh_bao_cao(conn, kx: KhoangXem) -> BC.BaoCao:
         nganh_thang=BC.doc_nganh_thang(conn, kx.company_fy) if kx.company_fy else [],
         nganh_ky=nganh(conn, kx), tap_trung=tap_trung(conn, kx),
         hang_theo_nganh=hang_theo_nganh, so_sanh=ss)
+
+
+# ---- Đợt B: Khách hàng -------------------------------------------------------
+
+def _ss_phu(kx: KhoangXem):
+    """Phép so của CỘT SO SÁNH trên danh sách / hồ sơ khách: tháng trước (dạng
+    Tháng) / khoảng liền trước (dạng Khoảng) — `so_sanh[1]`; dạng Kỳ chỉ có
+    năm trước. Nhịp làm việc với khách là tháng này so tháng trước."""
+    return kx.so_sanh[1] if len(kx.so_sanh) > 1 else kx.so_sanh[0]
+
+
+def danh_ba_khoang(conn, kx: KhoangXem) -> dict:
+    """Doanh số trong khoảng của MỌI khách + dải so sánh phụ — MỘT lượt hỏi
+    (`mart.khach_khoang` hai dải, FULL JOIN: khách chỉ mua ở dải so sánh vẫn
+    có dòng). Ghép vào danh bạ ở kome/khach_hang.py::ghep_khoang."""
+    s = _ss_phu(kx)
+    rows = conn.execute(
+        """SELECT coalesce(a.customer_code, b.customer_code), a.dt, a.lg, a.so_phieu, b.dt
+             FROM mart.khach_khoang(%s, %s) a
+             FULL JOIN mart.khach_khoang(%s, %s) b USING (customer_code)""",
+        (kx.tu, kx.den, s.tu if s.co else None, s.den if s.co else None)).fetchall()
+    return {"khoang": kx, "so_sanh": s,
+            "dong": {r[0]: [_i(r[1]), _i(r[2]), r[3], _i(r[4])] for r in rows}}
+
+
+def cua_khach(conn, kx: KhoangXem, ma: str) -> dict:
+    """Số trong khoảng của MỘT khách — MỘT lượt hỏi (ba khối JSON trong một
+    dòng): tổng + mọi phép so (`mart.khach_khoang`), mặt hàng trong khoảng
+    (`mart.khach_mat_hang_khoang`), các ngày mua trong khoảng (`mart.lan_mua`).
+    Hồ sơ khách (`khach_hang.ho_so`) đã chạm trần 8 lượt hỏi — số theo khoảng
+    đi endpoint RIÊNG chứ không nới trần."""
+    dai = [(kx.tu, kx.den)]
+    for s in kx.so_sanh:
+        dai += [(s.tu_nay, s.den_nay), (s.tu, s.den) if s.co else (None, None)]
+    gia_tri = ", ".join(f"({i}, %s::date, %s::date)" for i in range(len(dai)))
+    r = conn.execute(
+        f"""SELECT
+              (SELECT json_agg(json_build_object('i', v.i, 'dt', t.dt, 'lg', t.lg,
+                                                 'so_phieu', t.so_phieu, 'so_ngay', t.so_ngay_mua) ORDER BY v.i)
+                 FROM (VALUES {gia_tri}) v(i, tu, den)
+                 LEFT JOIN LATERAL (SELECT * FROM mart.khach_khoang(v.tu, v.den) k
+                                     WHERE k.customer_code = %s) t ON true),
+              (SELECT coalesce(json_agg(json_build_object('ma', m.product_code, 'ten', m.ten_hang,
+                                  'doanh_thu', m.dt, 'lai_gop', m.lg, 'so_luong', m.so_luong,
+                                  'so_ngay', m.so_ngay_mua, 'lan_cuoi', m.lan_cuoi)
+                                  ORDER BY m.dt DESC NULLS LAST, m.product_code), '[]')
+                 FROM mart.khach_mat_hang_khoang(%s, %s) m WHERE m.customer_code = %s),
+              (SELECT coalesce(json_agg(json_build_object('ngay', l.sales_date, 'so_phieu', l.n,
+                                  'doanh_thu', l.dt) ORDER BY l.sales_date DESC), '[]')
+                 FROM (SELECT sales_date, count(*) AS n, sum(doanh_thu_thuan) AS dt
+                         FROM mart.lan_mua WHERE customer_code = %s AND sales_date BETWEEN %s AND %s
+                        GROUP BY 1) l)""",
+        [d for cap in dai for d in cap] + [ma, kx.tu, kx.den, ma, ma, kx.tu, kx.den]).fetchone()
+    t = {x["i"]: x for x in (r[0] or [])}
+
+    def so(i, k):
+        v = (t.get(i) or {}).get(k)
+        return int(v) if v is not None else 0
+    ss = []
+    for j, s in enumerate(kx.so_sanh):
+        ss.append(BC.SoSanhSo(
+            ma=s.ma, nhan=s.nhan, co=s.co, tu=s.tu, den=s.den, tu_nay=s.tu_nay, den_nay=s.den_nay,
+            dt=so(1 + 2 * j, "dt"), lg=so(1 + 2 * j, "lg"), so_khach=None,
+            dt_ck=so(2 + 2 * j, "dt") if s.co else None, lg_ck=so(2 + 2 * j, "lg") if s.co else None,
+            so_khach_ck=None))
+    return {"khoang": kx,
+            "tong": {"dt": so(0, "dt"), "lg": so(0, "lg"), "so_phieu": so(0, "so_phieu"),
+                     "so_ngay": so(0, "so_ngay"),
+                     "ty_suat": BC._SoCungKy._ty_suat(so(0, "dt"), so(0, "lg"))},
+            "so_sanh": ss, "mat_hang": r[1], "ngay": r[2]}

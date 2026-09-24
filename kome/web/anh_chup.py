@@ -73,6 +73,8 @@ _PHIEN_BAN_NAP = """concat_ws('|',
 
 # Khoá ảnh chụp danh bạ khách — api.py đọc, lam_nong làm nóng.
 KHOA_DANH_BA = "khach-hang/danh-ba"
+# Doanh số theo khoảng xem của mọi khách (đợt B) — khoá = cái này + tham số khoảng.
+KHOA_DANH_BA_KHOANG = "khach-hang/danh-ba-khoang"
 
 
 def bat() -> bool:
@@ -193,8 +195,13 @@ def lam_nong(open_conn) -> None:
         # Danh bạ khách (giai đoạn 2) — câu nặng nhất của màn Khách hàng.
         try:
             from kome import khach_hang as KH
+            from kome import khoang_xem as KX
+            from kome.web.api import du_lieu_danh_ba_khoang
             with open_conn() as c:
                 lay(c, KHOA_DANH_BA, KH.danh_ba, chi_nap=True)
+            with open_conn() as c:
+                lay(c, KHOA_DANH_BA_KHOANG, lambda cc: du_lieu_danh_ba_khoang(cc, KX.ThamSo()),
+                    chi_nap=True)
         except Exception as e:         # noqa: BLE001
             print(f"[anh-chup] không làm nóng được danh bạ: {e!r}")
         # Danh mục sản phẩm + màn Kho hàng không lọc (giai đoạn 4) — khoá khớp

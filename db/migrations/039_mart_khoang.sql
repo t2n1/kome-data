@@ -196,3 +196,33 @@ AS $$
     WINDOW w AS (ORDER BY k.dt DESC, k.customer_code
                  ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
 $$;
+
+
+-- Đợt B — một khách × mã hàng trong khoảng (tab Sản phẩm của hồ sơ khách).
+CREATE FUNCTION mart.khach_mat_hang_khoang(tu date, den date)
+RETURNS TABLE (customer_code text, product_code text, ten_hang text, dt numeric, lg numeric,
+               so_luong numeric, so_ngay_mua bigint, lan_cuoi date)
+LANGUAGE sql STABLE
+AS $$
+    SELECT b.customer_code, b.product_code, coalesce(nullif(s.product_name, ''), b.product_code),
+           sum(b.doanh_thu_thuan)::numeric, sum(b.gross_profit)::numeric, sum(b.qty)::numeric,
+           count(DISTINCT b.sales_date), max(b.sales_date)
+    FROM mart.dong_ban_khoang(tu, den) b
+    LEFT JOIN core.dim_product s ON s.product_code = b.product_code
+    GROUP BY b.customer_code, b.product_code, s.product_name
+$$;
+
+
+-- Đợt B — theo (tỉnh, người phụ trách) trong khoảng, cho bản đồ. Tỉnh / người
+-- phụ trách lấy từ bản HIỆN HÀNH của core.dim_customer (cùng nguồn với
+-- mart.khach_360 → mart.khach_theo_tinh); khách chưa có trong danh mục rơi vào
+-- tỉnh NULL ("không rõ tỉnh") chứ không mất tiền.
+CREATE FUNCTION mart.tinh_khoang(tu date, den date)
+RETURNS TABLE (prefecture text, salesperson_code text, dt numeric, so_khach_mua bigint)
+LANGUAGE sql STABLE
+AS $$
+    SELECT c.prefecture, c.salesperson_code, sum(k.dt)::numeric, count(*)
+    FROM mart.khach_khoang(tu, den) k
+    LEFT JOIN core.dim_customer c ON c.customer_code = k.customer_code AND c.is_current
+    GROUP BY 1, 2
+$$;

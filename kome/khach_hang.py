@@ -89,6 +89,11 @@ COT_SAP = {
     "so_thang_truoc": (lambda k: (k["thang_nay"] / k["thang_truoc_cung_ngay"])
                        if k["thang_truoc_cung_ngay"] and k["thang_nay"] is not None else None, True),
     "tb3": (lambda k: k["tb_3_thang"], True),
+    # Khoảng xem (đợt B): doanh thu trong khoảng và tỷ lệ so dải so sánh phụ
+    # (tháng trước / khoảng liền trước) — trường do `ghep_khoang` gắn vào.
+    "dt_khoang": (lambda k: k.get("dt_khoang"), True),
+    "so_khoang": (lambda k: (k["dt_khoang"] / k["dt_ss"])
+                  if k.get("dt_ss") and k.get("dt_khoang") is not None else None, True),
 }
 
 
@@ -115,6 +120,11 @@ class Khach:
     thang_truoc_cung_ngay: int | None = None
     tb_3_thang: int | None = None
     nhan_thang: str | None = None
+    # Khoảng xem (đợt B) — `ghep_khoang` gắn; None = khoảng không có dòng bán.
+    dt_khoang: int | None = None
+    lg_khoang: int | None = None
+    so_phieu_khoang: int | None = None
+    dt_ss: int | None = None
 
     @property
     def nhan_trang_thai(self) -> str:
@@ -155,6 +165,11 @@ class TrangKhach:
     tong_dt_thang_nay: int = 0
     tong_dt_thang_truoc_cung_ngay: int = 0
     tong_doanh_thu: int = 0
+    # Khoảng xem (đợt B): tổng doanh thu trong khoảng của CẢ nhóm đang lọc, và
+    # của dải so sánh phụ (None = dải so sánh không có dữ liệu).
+    co_mua: bool = False
+    tong_dt_khoang: int = 0
+    tong_dt_ss: int | None = None
     # = số khách nhóm 'im' của mart.khach_nhom_viec: nhánh đó của view ĐÚNG là
     # `trang_thai IN TRANG_THAI_CAN_XU_LY` (020), nên đếm thẳng bằng hằng này
     # thay vì EXISTS trên view (dựng lại khach_360 ba lần). Ô KPI "Im lặng >=
@@ -277,9 +292,26 @@ def danh_ba(conn) -> dict:
     return {"khach": r[0], "nhan_vien": r[1], "hom_nay": r[2]}
 
 
+def ghep_khoang(db: dict, kk: dict | None) -> dict:
+    """Danh bạ + doanh số trong khoảng xem (`kome.ban_khoang.danh_ba_khoang`).
+    Trả BẢN SAO nông (danh bạ là ảnh chụp dùng chung giữa các khoảng — không
+    được sửa tại chỗ). Khách không có dòng trong khoảng: `dt_khoang` = 0 (trong
+    dải dữ liệu, không có phiếu = bán 0 đồng), `so_phieu_khoang` = 0."""
+    if kk is None:
+        return db
+    dong, co_ss = kk["dong"], kk["so_sanh"]["co"]
+    khach = []
+    for k in db["khach"]:
+        d = dong.get(k["ma"]) or [None, None, None, None]
+        khach.append({**k, "dt_khoang": d[0] or 0, "lg_khoang": d[1] or 0,
+                      "so_phieu_khoang": d[2] or 0,
+                      "dt_ss": (d[3] or 0) if co_ss else None})
+    return {**db, "khach": khach}
+
+
 def _khop(k: dict, *, tim: str = "", loc: str = "", sale: str | None = None,
           nhom: str | None = None, hang=None, tinh: str | None = None,
-          thang: str | None = None) -> bool:
+          thang: str | None = None, co_mua: bool = False) -> bool:
     """Một khách (dòng của `danh_ba`) có khớp bộ lọc không. Ngữ nghĩa từng bộ
     lọc giữ ĐÚNG như bản SQL cũ:
       * tim — chứa (không phân biệt hoa thường) trong tên, mã, điện thoại,
@@ -312,6 +344,8 @@ def _khop(k: dict, *, tim: str = "", loc: str = "", sale: str | None = None,
     elif tinh and k["tinh"] != tinh:
         return False
     if thang in NHAN_THANG and k["nhan_thang"] != thang:
+        return False
+    if co_mua and not k.get("so_phieu_khoang"):
         return False
     return True
 
@@ -346,14 +380,17 @@ def _thanh_khach(k: dict) -> "Khach":
                  ty_le_im_lang=k["ty_le_im_lang"], trang_thai=k["trang_thai"],
                  dau_hieu_obc=k["dau_hieu_obc"], hang=k["hang"],
                  thang_nay=k["thang_nay"], thang_truoc_cung_ngay=k["thang_truoc_cung_ngay"],
-                 tb_3_thang=k["tb_3_thang"], nhan_thang=k["nhan_thang"])
+                 tb_3_thang=k["tb_3_thang"], nhan_thang=k["nhan_thang"],
+                 dt_khoang=k.get("dt_khoang"), lg_khoang=k.get("lg_khoang"),
+                 so_phieu_khoang=k.get("so_phieu_khoang"), dt_ss=k.get("dt_ss"))
 
 
 def trang_danh_sach(db: dict, tim: str = "", loc: str = "", sap: str = "doanh_thu",
                     trang: int = 1, sale: str | None = None,
                     ten_sale: str | None = None, nhom: str | None = None,
                     hang=None, tinh: str | None = None, thang: str | None = None,
-                    giam: bool | None = None, co: int = MOI_TRANG) -> TrangKhach:
+                    giam: bool | None = None, co: int = MOI_TRANG,
+                    co_mua: bool = False) -> TrangKhach:
     """Một trang của danh sách, tính trên danh bạ `db` (không SQL).
 
     Ô KPI đầu trang là TỔNG của CẢ nhóm đang lọc (không chỉ trang này), cùng
@@ -364,7 +401,7 @@ def trang_danh_sach(db: dict, tim: str = "", loc: str = "", sap: str = "doanh_th
     người, ai cũng biết khách của ai, và trang luôn có một liên kết bỏ lọc.
     Không có kiểm quyền nào ở đây, và đó là cố ý — xem đặc tả đợt 3 §5."""
     ds = _loc(db["khach"], tim=tim, loc=loc, sale=sale, nhom=nhom, hang=hang,
-              tinh=tinh, thang=thang)
+              tinh=tinh, thang=thang, co_mua=co_mua)
     ds, sap = _sap(ds, sap, giam)
     co = co if co in CO_TRANG else MOI_TRANG
     tong = len(ds)
@@ -379,6 +416,10 @@ def trang_danh_sach(db: dict, tim: str = "", loc: str = "", sap: str = "doanh_th
         tong_dt_thang_nay=sum(k["thang_nay"] or 0 for k in ds),
         tong_dt_thang_truoc_cung_ngay=sum(k["thang_truoc_cung_ngay"] or 0 for k in ds),
         tong_doanh_thu=sum(k["doanh_thu"] or 0 for k in ds),
+        co_mua=co_mua,
+        tong_dt_khoang=sum(k.get("dt_khoang") or 0 for k in ds),
+        tong_dt_ss=(sum(k.get("dt_ss") or 0 for k in ds)
+                    if ds and ds[0].get("dt_ss") is not None else None),
         so_can_xu_ly=sum(1 for k in ds if k["trang_thai"] in TRANG_THAI_CAN_XU_LY))
 
 
@@ -754,6 +795,9 @@ class TongQuan:
     # Mọi tỉnh có khách (theo `sale`), đông -> ít — cho Ô CHỌN tỉnh; khối
     # "Tập trung ở đâu" vẫn là `tinh` (top 8 + "(không rõ)").
     tinh_day_du: list[tuple[str, int]] = field(default_factory=list)
+    # Khoảng xem (đợt B): số khách CÓ phiếu trong khoảng (theo `sale`, như
+    # nhóm việc) — chip "Có mua trong khoảng".
+    co_mua: int = 0
 
 
 # Thứ tự hiển thị của hạng. S trước D, không phải thứ tự bảng chữ cái ngẫu
@@ -763,7 +807,7 @@ THU_TU_HANG = ("S", "A", "B", "C", "D")
 
 def tong_quan(db: dict, sale: str | None = None, nhom: str | None = None,
               hang=None, tinh: str | None = None, *, tim: str = "",
-              thang: str | None = None) -> TongQuan:
+              thang: str | None = None, co_mua: bool = False) -> TongQuan:
     """Bốn khối phân tích + các bộ đếm của trang danh sách, trên danh bạ `db`.
 
     BỐN BỘ LỌC, HAI PHẠM VI (giữ nguyên từ bản SQL):
@@ -778,7 +822,7 @@ def tong_quan(db: dict, sale: str | None = None, nhom: str | None = None,
     `tong_tat_ca` không lọc gì (liên kết của nó bỏ MỌI bộ lọc). `chua_pt` là
     toàn công ty (liên kết của nó THAY bộ lọc người phụ trách)."""
     theo_sale = _loc(db["khach"], sale=sale)
-    dem_ds = _loc(theo_sale, nhom=nhom, hang=hang, tinh=tinh, tim=tim, thang=thang)
+    dem_ds = _loc(theo_sale, nhom=nhom, hang=hang, tinh=tinh, tim=tim, thang=thang, co_mua=co_mua)
     nhom_dem = {n: sum(1 for k in theo_sale if n in (k["nhom"] or [])) for n in ("im", "tut", "moi")}
     hang_dem, hang_tien = {}, {}
     tinh_dem, tinh_tien = {}, {}
@@ -813,6 +857,7 @@ def tong_quan(db: dict, sale: str | None = None, nhom: str | None = None,
         dem_trang_thai=dem, tong_tat_ca=len(db["khach"]),
         hang_tien=hang_tien, tinh_tien={t: tinh_tien[t] for t, _ in tinh_ds},
         thang=thang_dem, chua_pt=sum(1 for k in db["khach"] if not k["co_pt"]),
+        co_mua=sum(1 for k in theo_sale if k.get("so_phieu_khoang")),
         tinh_day_du=sorted(tinh_dem.items(), key=lambda x: (x[0] == KHONG_RO, -x[1], x[0])),
     )
 

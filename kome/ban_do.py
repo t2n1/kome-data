@@ -20,9 +20,27 @@ CHI_SO = {
     "can_goi":   "Cần gọi lại",
 }
 
+# Khoảng xem (đợt B): hai chỉ số theo khoảng đang xem — chỉ có khi API giải
+# được khoảng (`kx`). "Doanh thu 12 tháng" ở trên GIỮ NGUYÊN (đọc
+# mart.hang_doanh_thu.dt_12t — bất biến CLAUDE.md); đây là chỉ số KHÁC, đọc
+# mart.tinh_khoang (migration 039).
+CHI_SO_KHOANG = {
+    "dt_khoang": "Doanh thu",
+    "khach_mua": "Khách có mua",
+}
+
 # Cột trên dataclass O ứng với từng khoá của CHI_SO — dùng để chọn `gia_tri`
 # bằng getattr() thay vì if/elif ba nhánh giống hệt nhau.
-_COT_THEO_CHI_SO = {"khach": "so_khach", "doanh_thu": "doanh_thu", "can_goi": "can_goi"}
+_COT_THEO_CHI_SO = {"khach": "so_khach", "doanh_thu": "doanh_thu", "can_goi": "can_goi",
+                    "dt_khoang": "dt_khoang", "khach_mua": "khach_mua"}
+
+
+def chi_so_ds(kx=None) -> dict[str, str]:
+    """Các chỉ số có thể tô màu: ba chỉ số gốc + (khi có khoảng xem) hai chỉ
+    số theo khoảng, nhãn mang tên khoảng ("Doanh thu · Tháng 7/2026")."""
+    if kx is None:
+        return dict(CHI_SO)
+    return {**CHI_SO, **{k: f"{v} · {kx.nhan}" for k, v in CHI_SO_KHOANG.items()}}
 
 # 8 地方 (vùng địa lý) theo đúng thứ tự bắc -> nam thật ngoài đời, KHÔNG theo
 # bảng chữ cái (bảng chữ cái sẽ xếp 中国 trước 中部, sai thứ tự địa lý — 中部
@@ -68,6 +86,9 @@ class O:
     # Toạ độ góc trên-trái của ô trong hệ toạ độ SVG, tính từ hang/cot.
     x: int
     y: int
+    # Khoảng xem (đợt B): doanh thu và số khách có phiếu trong khoảng.
+    dt_khoang: int = 0
+    khach_mua: int = 0
 
 
 @dataclass(frozen=True)
@@ -94,14 +115,14 @@ class TrangBanDo:
     cao: int
 
 
-def _chi_so_hop_le(chi_so: str) -> str:
+def _chi_so_hop_le(chi_so: str, co_khoang: bool = False) -> str:
     """`chi_so` không nằm trong CHI_SO thì rơi về "khach".
 
     Bắt buộc: đây là tham số đọc thẳng từ query string URL. Một người gõ
     `?chi_so=xyz` không được làm trang nổi 500 — trang phải luôn mở được,
     chỉ là mở ra với chỉ số mặc định.
     """
-    return chi_so if chi_so in CHI_SO else "khach"
+    return chi_so if chi_so in CHI_SO or (co_khoang and chi_so in CHI_SO_KHOANG) else "khach"
 
 
 def _dk_sale(sale: str | None) -> tuple[str, list]:
@@ -181,7 +202,7 @@ def _tinh_bac(gia_tri_theo_o: list[int]) -> list[int]:
     return bac
 
 
-def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
+def ban_do(conn, sale: str | None = None, chi_so: str = "khach", kx=None) -> TrangBanDo:
     """Dựng toàn bộ dữ liệu + hình học SVG của màn Bản đồ khách hàng.
 
     ĐÚNG HAI lượt hỏi — có test đếm LÚC CHẠY
@@ -190,8 +211,11 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
     `sale`: mặc định tiện dụng như mọi trang khác của đợt 3 (khach_hang.py,
     san_pham.py) — không phải hàng rào bảo mật, không kiểm quyền.
     """
-    chi_so = _chi_so_hop_le(chi_so)
+    chi_so = _chi_so_hop_le(chi_so, kx is not None)
     dk_sale, tham_so_sale = _dk_sale(sale)
+    # Khoảng xem (đợt B): không có khoảng thì truyền NULL — mart.tinh_khoang
+    # không trả dòng nào, hai cột theo khoảng bằng 0, câu lệnh vẫn MỘT hình dạng.
+    dai = [kx.tu, kx.den] if kx is not None else [None, None]
 
     # Truy vấn A (1 lượt): 47 dòng đã LEFT JOIN sẵn từ core.dim_prefecture
     # sang số liệu.
@@ -211,13 +235,20 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
               FROM mart.khach_theo_tinh s
              WHERE true {dk_sale}
              GROUP BY s.prefecture
+        ), kh AS MATERIALIZED (
+            SELECT s.prefecture, sum(s.dt) AS dt, sum(s.so_khach_mua) AS n
+              FROM mart.tinh_khoang(%s, %s) s
+             WHERE true {dk_sale}
+             GROUP BY s.prefecture
         )
         SELECT p.ma_jis, p.ten, p.ten_latin, p.ten_ngan, p.vung, p.hang_luoi, p.cot_luoi,
-               coalesce(t.so_khach, 0), coalesce(t.doanh_thu, 0), coalesce(t.can_goi, 0)
+               coalesce(t.so_khach, 0), coalesce(t.doanh_thu, 0), coalesce(t.can_goi, 0),
+               coalesce(kh.dt, 0), coalesce(kh.n, 0)
           FROM core.dim_prefecture p
           LEFT JOIN tinh t ON t.prefecture = p.ten
+          LEFT JOIN kh ON kh.prefecture = p.ten
          ORDER BY p.ma_jis
-    """, tham_so_sale).fetchall()
+    """, tham_so_sale + dai + tham_so_sale).fetchall()
 
     # Truy vấn B (1 lượt): phần KHÔNG khớp tỉnh nào ("(không rõ tỉnh)") và
     # tổng toàn công ty (hoặc tổng của riêng `sale` nếu có lọc) — gộp bằng
@@ -238,24 +269,31 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
     rows_b = conn.execute(f"""
         WITH s AS MATERIALIZED (
             SELECT * FROM mart.khach_theo_tinh s WHERE true {dk_sale}
+        ), k AS MATERIALIZED (
+            SELECT * FROM mart.tinh_khoang(%s, %s) s WHERE true {dk_sale}
         )
-        SELECT 'khong_ro'::text, coalesce(sum(so_khach),0), coalesce(sum(doanh_thu_12t),0), coalesce(sum(can_goi),0)
+        SELECT 'khong_ro'::text, coalesce(sum(so_khach),0), coalesce(sum(doanh_thu_12t),0), coalesce(sum(can_goi),0),
+               (SELECT coalesce(sum(k.dt),0) FROM k
+                 WHERE coalesce(k.prefecture, '') NOT IN (SELECT ten FROM core.dim_prefecture)),
+               (SELECT coalesce(sum(k.so_khach_mua),0) FROM k
+                 WHERE coalesce(k.prefecture, '') NOT IN (SELECT ten FROM core.dim_prefecture))
           FROM s
          WHERE coalesce(s.prefecture, '') NOT IN (SELECT ten FROM core.dim_prefecture)
         UNION ALL
-        SELECT 'tong', coalesce(sum(so_khach),0), coalesce(sum(doanh_thu_12t),0), coalesce(sum(can_goi),0)
+        SELECT 'tong', coalesce(sum(so_khach),0), coalesce(sum(doanh_thu_12t),0), coalesce(sum(can_goi),0),
+               (SELECT coalesce(sum(k.dt),0) FROM k), (SELECT coalesce(sum(k.so_khach_mua),0) FROM k)
           FROM s
-    """, tham_so_sale).fetchall()
+    """, tham_so_sale + dai + tham_so_sale).fetchall()
 
     # ---- Từ đây trở xuống: KHÔNG còn lượt hỏi CSDL nào nữa -----------------
 
     tho = []
-    for ma_jis, ten, ten_latin, ten_ngan, vung, hang, cot, so_khach, doanh_thu, can_goi in rows_a:
+    for ma_jis, ten, ten_latin, ten_ngan, vung, hang, cot, so_khach, doanh_thu, can_goi, dt_kx, n_kx in rows_a:
         d = {
             "ma_jis": ma_jis, "ten": ten, "ten_latin": ten_latin,
             "ten_ngan": ten_ngan, "vung": vung, "hang": hang, "cot": cot,
             "so_khach": int(so_khach), "doanh_thu": int(doanh_thu),
-            "can_goi": int(can_goi),
+            "can_goi": int(can_goi), "dt_khoang": int(dt_kx), "khach_mua": int(n_kx),
         }
         d["gia_tri"] = d[_COT_THEO_CHI_SO[chi_so]]
         # None khi so_khach == 0 — "không biết tỷ lệ" khác "0%" (xem chú
@@ -275,7 +313,8 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
           ten_latin=d["ten_latin"], vung=d["vung"], hang=d["hang"], cot=d["cot"],
           so_khach=d["so_khach"], doanh_thu=d["doanh_thu"], can_goi=d["can_goi"],
           ty_le_can_goi=d["ty_le_can_goi"], gia_tri=d["gia_tri"], bac=bac,
-          x=(d["cot"] - 1) * (O_RONG + KHE), y=(d["hang"] - 1) * (O_CAO + KHE))
+          x=(d["cot"] - 1) * (O_RONG + KHE), y=(d["hang"] - 1) * (O_CAO + KHE),
+          dt_khoang=d["dt_khoang"], khach_mua=d["khach_mua"])
         for d, bac in zip(tho, bac_theo_o)
     ]
 
@@ -286,6 +325,8 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
             "so_khach": sum(o.so_khach for o in cua_vung),
             "doanh_thu": sum(o.doanh_thu for o in cua_vung),
             "can_goi": sum(o.can_goi for o in cua_vung),
+            "dt_khoang": sum(o.dt_khoang for o in cua_vung),
+            "khach_mua": sum(o.khach_mua for o in cua_vung),
             # Tổng theo ĐÚNG chi_so đang chọn — để template khỏi phải viết
             # if/elif ba nhánh (khach/doanh_thu/can_goi) mỗi lần đọc khối này.
             "gia_tri": sum(o.gia_tri for o in cua_vung),
@@ -329,6 +370,8 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach") -> TrangBanDo:
         "so_khach": int(tong_row[1]) if tong_row else 0,
         "doanh_thu": int(tong_row[2]) if tong_row else 0,
         "can_goi": int(tong_row[3]) if tong_row else 0,
+        "dt_khoang": int(tong_row[4]) if tong_row else 0,
+        "khach_mua": int(tong_row[5]) if tong_row else 0,
     }
 
     return TrangBanDo(o=cac_o, vung=vung_gop, bang=bang, chu_giai=chu_giai,
