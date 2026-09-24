@@ -140,9 +140,11 @@ def test_khong_co_doi_chieu_hien_dung_cau(client, conn, batch):
     # Khối "Ngành hàng kéo doanh thu lên/xuống" cũng phải nói ra, KHÔNG ẩn
     # tiêu đề: tiêu đề đứng TRƯỚC (ngoài) nhánh điều kiện, câu nằm ở nhánh
     # "không có".
+    # Khoảng xem: điều kiện gộp dạng Kỳ (`ck.so_thang > 0`) và dạng Tháng /
+    # Khoảng (`chinh?.co`); nhánh rỗng vẫn nói ra cho CẢ HAI dạng.
     m = re.search(r"<h2>Ngành hàng kéo doanh thu lên/xuống</h2></div>\s*"
-                  r"\{ck && ck\.so_thang > 0 \? <>.*?</> : "
-                  r'<p className="phu">Kỳ này không có tháng nào để so cùng kỳ\.</p>\}', src, re.S)
+                  r"\{\(theoKy \? ck && ck\.so_thang > 0 : chinh\?\.co\) \? <>.*?</> : "
+                  r'<p className="phu">\{theoKy \? "Kỳ này không có tháng nào để so cùng kỳ\." : ', src, re.S)
     assert m, "tiêu đề khối đóng góp phải ở ngoài điều kiện, và nhánh rỗng phải nói ra"
 
 
@@ -472,7 +474,8 @@ def test_bang_chi_tiet_theo_thang_dong_trong_details(client, conn, batch):
     _hai_nam(conn, batch)
     assert len(_api(client)["bc"]["thang"]) == 12
     src = _src()
-    assert re.search(r"<details[^>]*>\s*<summary>Bảng số chi tiết theo tháng", src)
+    # Khoảng xem: nhãn "theo ngày / theo tháng" đổi theo chuỗi của API.
+    assert re.search(r"<details[^>]*>\s*<summary>Bảng số chi tiết theo \{theoNgay \? \"ngày\" : \"tháng\"\}", src)
     assert "<details open" not in src
 
 

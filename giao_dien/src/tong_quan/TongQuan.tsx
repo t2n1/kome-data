@@ -83,7 +83,7 @@ function TomTat() {
   if (ns?.muc_tieu_den_hom_nay != null) {
     const lech = ns.thuc_te - ns.muc_tieu_den_hom_nay;
     cau.push(lech < 0 ? `ngân sách tháng chậm ${gon(-lech)} so mốc ${pc(ns.moc)}` : `ngân sách tháng vượt mốc ${gon(lech)}`);
-  } else cau.push("chưa đặt chỉ tiêu tháng này");
+  } else if (!k.ngan_sach_chi_theo_thang) cau.push(`chưa đặt chỉ tiêu ${k.khoang?.nhan?.toLowerCase() ?? "tháng này"}`);
   if (k.kho.qua_han) cau.push(`${k.kho.qua_han} lô đã quá hạn dùng`);
   if (k.kho.het_hang) cau.push(`${k.kho.het_hang} mã hết hàng`);
   const gap = k.kho.qua_han || k.kho.het_hang || k.khach.roi_bo;

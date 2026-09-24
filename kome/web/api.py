@@ -17,6 +17,7 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
 from kome import khach_hang as KH
+from kome import khoang_xem as KX
 from kome import khach_thang as KT
 from kome import khoi_tong_quan as KTQ
 from kome.web import anh_chup
@@ -93,23 +94,30 @@ def thanh_json(o, bo: tuple[str, ...] = ()):
     return o
 
 
-def du_lieu_bao_cao(c, ky: int | None = None) -> dict:
-    """Dữ liệu màn /bao-cao: số + hình học biểu đồ (tính ở kome/bao_cao.py và
-    kome/ve_phan_tich.py — bất biến đối soát có test ở đó). Cũng là thứ
-    `anh_chup.lam_nong` tính sẵn sau khi nạp."""
+def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
+    """Dữ liệu màn /bao-cao theo khoảng xem: số + hình học biểu đồ (tính ở
+    kome/bao_cao.py, kome/ban_khoang.py và kome/ve_phan_tich.py — bất biến đối
+    soát có test ở đó). Dạng Kỳ = màn Báo cáo cũ, không đổi số. Không tham số
+    = tháng hiện tại — cũng là thứ `anh_chup.lam_nong` tính sẵn sau khi nạp."""
+    from kome import ban_khoang as BK
     from kome.bao_cao import (chi_so_phu, nhom_theo_nganh, tien_do_ngan_sach,
                               tinh_bao_cao, ve_bieu_do, ve_luy_ke)
     from kome.ngan_sach import thang_cua_ky
     from kome.ve_phan_tich import ve_cay_o, ve_dong_gop, ve_duong_nho, ve_nhiet, ve_pareto
-    bc = tinh_bao_cao(c, ky)
-    td = tien_do_ngan_sach(c, ky)
-    if bc.khong_co_du_lieu:
-        return {"bc": thanh_json(bc), "td": thanh_json(td)}
+    kx = KX.giai_conn(c, ts or KX.ThamSo())
+    if kx is None:
+        bc = tinh_bao_cao(c, None)
+        return {"bc": thanh_json(bc), "td": None, "khoang": None}
+    bc = BK.tinh_bao_cao(c, kx)
+    # Ngân sách: dạng Kỳ như cũ; dạng Tháng = tháng đang xem; dạng Khoảng
+    # không có (ngân sách chỉ đặt theo tháng).
+    td = (tien_do_ngan_sach(c, kx.company_fy) if kx.loai == "ky"
+          else tien_do_ngan_sach(c, kx.company_fy, kx.thang) if kx.loai == "thang" else None)
     # Cùng cách dựng với route Jinja cũ (không hỏi CSDL thêm câu nào).
-    thang_cuoi = bc.ky.ngay_cuoi.strftime("%Y-%m") if bc.ky.ngay_cuoi else None
-    thang_dau = (bc.moi_ky[0].ngay_dau.strftime("%Y-%m")
-                 if bc.moi_ky and bc.moi_ky[0].ngay_dau else None)
+    thang_cuoi = kx.den.strftime("%Y-%m")
+    thang_dau = kx.ngay_dau.strftime("%Y-%m")
     return thanh_json({
+        "khoang": kx,
         "bc": bc, "td": td, "bd": ve_bieu_do(bc.thang), "lk": ve_luy_ke(td),
         "so_nho": {"dt": ve_duong_nho([o.doanh_thu for o in bc.thang]),
                    "lg": ve_duong_nho([o.lai_gop for o in bc.thang]),
@@ -119,7 +127,7 @@ def du_lieu_bao_cao(c, ky: int | None = None) -> dict:
         "co": ve_cay_o(nhom_theo_nganh(bc.nganh_ky, bc.hang_theo_nganh)),
         "nh": ve_nhiet(bc.nganh_thang, thang_cua_ky(bc.ky.company_fy), thang_cuoi, thang_dau),
         "pa": ve_pareto(bc.tap_trung),
-        "ngay_dau_du_lieu": bc.moi_ky[0].ngay_dau if bc.moi_ky else None,
+        "ngay_dau_du_lieu": kx.ngay_dau,
         "td_phu": chi_so_phu(td) if td else None,
     })
 
@@ -166,20 +174,37 @@ def tao_api(open_app_conn) -> APIRouter:
     r = APIRouter(prefix="/api")
 
     @r.get("/tong-quan/{khoi}")
-    def khoi_tong_quan(request: Request, khoi: str, tat_ca: int = 0):
+    def khoi_tong_quan(request: Request, khoi: str, tat_ca: int = 0, thang: str = "",
+                       ky: str = "", tu: str = "", den: str = ""):
         muc = KTQ.KHOI.get(khoi)
         if muc is None:
             return JSONResponse({"loi": f"Không có khối '{khoi}'."}, status_code=404)
-        ham, theo_ngay, theo_sale = muc
+        ham, theo_ngay, theo_sale, theo_khoang = muc
         sale = _sale(request, tat_ca) if theo_sale else None
-        khoa = f"tong-quan/{khoi}" + (f"?sale={sale or '*'}" if theo_sale else "")
+        ts = None
+        if theo_khoang:
+            try:
+                ts = KX.doc_tham_so(thang, ky, tu, den)
+            except KX.LoiKhoang as e:
+                return _loi(str(e), 400)
+        khoa = _khoa(f"tong-quan/{khoi}", **({"sale": sale or "*"} if theo_sale else {}),
+                     **(ts.khoa() if ts else {}))
+        tinh = (lambda c: ham(c, sale, ts)) if theo_khoang else (lambda c: ham(c, sale))
         try:
             with open_app_conn() as conn:
-                du_lieu, pb = anh_chup.lay(conn, khoa, lambda c: ham(c, sale), theo_ngay)
+                du_lieu, pb = anh_chup.lay(conn, khoa, tinh, theo_ngay)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
         except Exception:
             traceback.print_exc()
             return JSONResponse({"loi": "Không đọc được dữ liệu khối này."}, status_code=500)
         return _json(request, du_lieu, pb)
+
+    @r.get("/pham-vi")
+    def pham_vi(request: Request):
+        """Dải dữ liệu bán hàng + các kỳ — cho bộ chọn khoảng xem (1 lượt hỏi)."""
+        return _chup(request, "pham-vi", lambda c: KX.pham_vi(c), "Không đọc được dải dữ liệu.",
+                     chi_nap=True)
 
     @r.get("/thong-bao")
     def thong_bao(request: Request):
@@ -199,6 +224,9 @@ def tao_api(open_app_conn) -> APIRouter:
         try:
             with open_app_conn() as conn:
                 du_lieu, pb = anh_chup.lay(conn, khoa, tinh, chi_nap=chi_nap)
+        except KX.LoiKhoang as e:
+            # Tháng / kỳ ngoài dải dữ liệu — chỉ biết được sau khi đọc dải.
+            return _loi(str(e), 400)
         except Exception:
             traceback.print_exc()
             return _loi(loi)
@@ -207,11 +235,14 @@ def tao_api(open_app_conn) -> APIRouter:
     @r.get("/khach-hang/ds")
     def kh_ds(request: Request, tim: str = "", loc: str = "", sap: str = "doanh_thu",
               giam: str = "", trang: int = 1, co: int = KH.MOI_TRANG, tat_ca: int = 0,
-              nv: str = "", nhom: str = "", hang: str = "", tinh: str = "", thang: str = ""):
+              nv: str = "", nhom: str = "", hang: str = "", tinh: str = "", nhan_thang: str = ""):
         """Màn danh sách: MỘT lượt gọi trả cả trang bảng lẫn khối tổng quan.
         Danh bạ (1 lượt hỏi nặng) đi qua ảnh chụp theo phiên bản NẠP; lọc /
         sắp / đếm làm bằng Python (kome.khach_hang._khop). Trúng ảnh chụp: 1
         lượt hỏi (phiên bản). Trượt: 2. Ngân sách màn danh sách <= 3 (bất biến)."""
+        # `nhan_thang` (nhãn mart.khach_thang_nay) — KHÔNG phải `thang`: `?thang=YYYY-MM`
+        # là tháng của khoảng xem chung (kome/khoang_xem.py).
+        thang = nhan_thang
         sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
         hang = ",".join(KH._ds_hang(hang))
         g = None if giam == "" else giam in ("1", "true")
@@ -319,9 +350,14 @@ def tao_api(open_app_conn) -> APIRouter:
     # API trả nguyên, giao diện React chỉ vẽ + thêm tương tác.
 
     @r.get("/bao-cao")
-    def bao_cao(request: Request, ky: int | None = None):
-        # Đọc app.ngan_sach (tiến độ) -> phiên bản đầy đủ.
-        return _chup(request, _khoa("bao-cao", ky=ky), lambda c: du_lieu_bao_cao(c, ky),
+    def bao_cao(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Báo cáo theo khoảng xem (`?thang=` · `?ky=` · `?tu=&den=`; không tham
+        số = tháng hiện tại). Đọc app.ngan_sach (tiến độ) -> phiên bản đầy đủ."""
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        return _chup(request, _khoa("bao-cao", **ts.khoa()), lambda c: du_lieu_bao_cao(c, ts),
                      "Không đọc được báo cáo.")
 
     @r.get("/du-bao")

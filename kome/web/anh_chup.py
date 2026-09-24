@@ -159,7 +159,9 @@ def lam_nong(open_conn) -> None:
     from kome import khoi_tong_quan as KTQ
 
     def chay():
-        for ma, (ham, theo_ngay, theo_sale) in KTQ.KHOI.items():
+        # Khối theo khoảng xem: làm nóng khoá MẶC ĐỊNH (tháng hiện tại, không
+        # tham số) — đúng khoá api.py dựng cho `/api/tong-quan/<khối>` trần.
+        for ma, (ham, theo_ngay, theo_sale, _theo_khoang) in KTQ.KHOI.items():
             if theo_sale:
                 continue
             try:
@@ -172,7 +174,14 @@ def lam_nong(open_conn) -> None:
                 lay(c, "thong-bao", KTQ.thong_bao, theo_ngay=True)
         except Exception as e:         # noqa: BLE001
             print(f"[anh-chup] không làm nóng được thong-bao: {e!r}")
-        # Báo cáo (kỳ gần nhất) và Dự báo (giai đoạn 3) — khoá khớp kome/web/api.py.
+        # Dải dữ liệu cho bộ chọn khoảng xem, Báo cáo (tháng hiện tại) và Dự
+        # báo (giai đoạn 3) — khoá khớp kome/web/api.py.
+        try:
+            from kome import khoang_xem as KX
+            with open_conn() as c:
+                lay(c, "pham-vi", KX.pham_vi, chi_nap=True)
+        except Exception as e:         # noqa: BLE001
+            print(f"[anh-chup] không làm nóng được pham-vi: {e!r}")
         try:
             from kome.web.api import du_lieu_bao_cao, du_lieu_du_bao
             with open_conn() as c:

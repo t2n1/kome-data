@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
+import { giuKhoang } from "../khung/khoang";
 import { ChuaCoDuLieu } from "../chung/Khoi";
 import { gon, ngay, so, so_luong, yen } from "../dinh_dang";
 import type { DongKho, KhoApi } from "./kieu";
@@ -33,7 +34,7 @@ function ghiUrl(b: Loc) {
   if (b.loc) q.set("loc", b.loc);
   if (b.tim.trim()) q.set("tim", b.tim.trim());
   const s = q.toString();
-  history.replaceState(null, "", "/kho-hang" + (s ? "?" + s : ""));
+  history.replaceState(null, "", giuKhoang("/kho-hang" + (s ? "?" + s : "")));
 }
 
 const conHan = (d: { han_con_lai: number | null }) =>

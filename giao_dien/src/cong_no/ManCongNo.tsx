@@ -12,6 +12,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
+import { giuKhoang } from "../khung/khoang";
 import { ChuaCoDuLieu } from "../chung/Khoi";
 import { gon, ngay, ngay_ngan, pc, so, yen } from "../dinh_dang";
 import { nhanHan, type Ben, type CongNoApi, type Phieu } from "./kieu";
@@ -44,7 +45,7 @@ export default function ManCongNo() {
     if (bb.tab !== "tat_ca") q.set("tab", bb.tab);
     if (bb.nhom) q.set("nhom", bb.nhom);
     if (bb.tim.trim()) q.set("tim", bb.tim.trim());
-    history.replaceState(null, "", "/cong-no" + (q.toString() ? "?" + q : ""));
+    history.replaceState(null, "", giuKhoang("/cong-no" + (q.toString() ? "?" + q : "")));
   };
   useEffect(() => { const h = setTimeout(() => { if (tim !== b.tim) dat({ tim }); }, 150); return () => clearTimeout(h); }, [tim]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { document.title = "KOME — công nợ"; }, []);

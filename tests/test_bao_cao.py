@@ -174,7 +174,10 @@ def test_trang_bao_cao_mo_duoc_va_hien_so(conn, batch, test_db_url):
     c = TestClient(create_app(db_url=test_db_url))
     r = c.get("/bao-cao")
     assert r.status_code == 200 and 'id="goc"' in r.text
-    d = c.get("/api/bao-cao").json()
+    # Khoảng xem mặc định = tháng hiện tại (5/2026); dạng Kỳ = màn Báo cáo cũ.
+    m = c.get("/api/bao-cao").json()
+    assert m["bc"]["ky"]["nhan"] == "Tháng 5/2026" and m["bc"]["ky"]["doanh_thu"] == 100_000
+    d = c.get("/api/bao-cao?ky=2026").json()
     assert d["bc"]["ky"]["doanh_thu"] == 100_000     # doanh thu THUẦN, không phải 110.000
     assert d["bc"]["thang"][0]["doanh_thu"] == 100_000
     assert "Kỳ 7" in d["bc"]["ky"]["nhan"]

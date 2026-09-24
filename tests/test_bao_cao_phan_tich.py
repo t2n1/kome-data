@@ -185,20 +185,14 @@ def test_sap_xep_hang_top10_dung_am_vo_cuc_cho_lai_gop_none():
     cuối". `gross_profit` là NOT NULL trong schema (007_fact_sales.sql) nên
     không dàn dựng được một `lai_gop` NULL thật qua loader — kiểm bằng cách
     đọc thẳng mã nguồn khoá sắp xếp, cùng nếp `test_pareto_doc_tap_trung_
-    khach_MOT_LAN`."""
-    import inspect
-    import re
-
+    khach_MOT_LAN`.
+    Từ đợt khoảng xem, khoá sắp xếp là hàm thuần `bao_cao.top_lai_gop` (dùng
+    chung cho dạng Kỳ và dạng Tháng / Khoảng) — kiểm thẳng hành vi."""
     from kome import bao_cao as BC
 
-    src = inspect.getsource(BC.tinh_bao_cao)
-    m = re.search(r"hang = sorted\(hang_theo_nganh,.*?\)\[:TOP\]", src, re.S)
-    assert m, "không tìm thấy khối sắp xếp `hang` trong tinh_bao_cao()"
-    khoi = m.group(0)
-    assert "float(\"-inf\")" in khoi or "float('-inf')" in khoi, (
-        "khoá sắp xếp phải dùng float('-inf') cho lai_gop None: " + khoi)
-    assert re.search(r"else\s*-1\b", khoi) is None, (
-        "khoá sắp xếp vẫn còn hằng số -1 làm giá trị thay thế cho None")
+    hang = [{"ma": "lo", "lai_gop": -50_000}, {"ma": "khong_biet", "lai_gop": None},
+            {"ma": "lai", "lai_gop": 10}]
+    assert [h["ma"] for h in BC.top_lai_gop(hang)] == ["lai", "lo", "khong_biet"]
 
 
 def test_kho_rong_van_dung_duoc_bao_cao(conn):

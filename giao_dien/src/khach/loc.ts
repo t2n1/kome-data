@@ -4,6 +4,7 @@
 // được giữ bằng CẤU TRÚC: bấm một tỉnh chỉ ĐỔI `tinh` và tab trên chính trạng
 // thái này, nên bộ lọc người phụ trách không có cách nào rơi mất.
 import { useCallback, useEffect, useState } from "react";
+import { giuKhoang } from "../khung/khoang";
 
 export type BoLoc = {
   tim: string; loc: string; nhom: string; hang: string[]; tinh: string; nv: string;
@@ -21,7 +22,7 @@ export function docUrl(search: string): BoLoc {
   return {
     tim: q.get("tim") ?? "", loc: q.get("loc") ?? "", nhom: q.get("nhom") ?? "",
     hang: (q.get("hang") ?? "").split(",").filter(Boolean), tinh: q.get("tinh") ?? "",
-    nv: q.get("nv") ?? "", tat_ca: q.get("tat_ca") === "1", thang: q.get("thang") ?? "",
+    nv: q.get("nv") ?? "", tat_ca: q.get("tat_ca") === "1", thang: q.get("nhan_thang") ?? "",
     sap: q.get("sap") ?? "doanh_thu", giam: (q.get("giam") as BoLoc["giam"]) ?? "",
     trang: Math.max(1, +(q.get("trang") ?? 1) || 1), co: +(q.get("co") ?? 50) || 50,
     chi_so: q.get("chi_so") ?? "khach",
@@ -34,7 +35,7 @@ export function chuoiLoc(b: BoLoc, bo: (keyof BoLoc)[] = []): string {
   const q = new URLSearchParams();
   const dat = (k: keyof BoLoc, v: string) => { if (!bo.includes(k) && v) q.set(k, v); };
   dat("tim", b.tim.trim()); dat("loc", b.loc); dat("nhom", b.nhom); dat("hang", b.hang.join(","));
-  dat("tinh", b.tinh); dat("nv", b.nv); dat("tat_ca", b.tat_ca ? "1" : ""); dat("thang", b.thang);
+  dat("tinh", b.tinh); dat("nv", b.nv); dat("tat_ca", b.tat_ca ? "1" : ""); if (!bo.includes("thang") && b.thang) q.set("nhan_thang", b.thang);
   dat("sap", b.sap === "doanh_thu" ? "" : b.sap); dat("giam", b.giam);
   dat("trang", b.trang > 1 ? String(b.trang) : ""); dat("co", b.co !== 50 ? String(b.co) : "");
   dat("chi_so", b.chi_so === "khach" ? "" : b.chi_so);
@@ -71,7 +72,7 @@ export function useBoLoc() {
       // Đổi bất kỳ bộ lọc nào (không phải chính số trang) là về trang 1.
       const b = { ...cu.b, ...phan, trang: "trang" in phan ? phan.trang! : 1 };
       const q = chuoiLoc(b);
-      const url = (tab === "ban_do" ? "/ban-do" : "/khach-hang") + (q ? "?" + q : "");
+      const url = giuKhoang((tab === "ban_do" ? "/ban-do" : "/khach-hang") + (q ? "?" + q : ""));
       if (url !== location.pathname + location.search) history[day ? "pushState" : "replaceState"](null, "", url);
       return { tab, b };
     });

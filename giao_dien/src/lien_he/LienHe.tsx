@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { lay } from "../api";
+import { giuKhoang } from "../khung/khoang";
 import { ngay, so, yen } from "../dinh_dang";
 import { KD } from "../khoi_dau";
 import { GhiTiepXuc } from "../khach/GhiTiepXuc";
@@ -40,7 +41,7 @@ export default function LienHe() {
     if (b.nv) q.set("nv", b.nv);
     if (b.tat_ca) q.set("tat_ca", "1");
     if (b.ly_do) q.set("ly_do", b.ly_do);
-    history.pushState(null, "", "/lien-he" + (q.toString() ? "?" + q : ""));
+    history.pushState(null, "", giuKhoang("/lien-he" + (q.toString() ? "?" + q : "")));
     datLoc(b);
   };
   const q = new URLSearchParams(Object.entries({ nv: loc.nv, tat_ca: loc.tat_ca ? "1" : "", ly_do: loc.ly_do })

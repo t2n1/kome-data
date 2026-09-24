@@ -6,6 +6,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { lay } from "../api";
+import { giuKhoang } from "../khung/khoang";
 import { Spark } from "../chung/Khoi";
 import { gon, ngay, pc, so, so_luong as soLuong, yen } from "../dinh_dang";
 import { HoSoSanPham } from "./HoSoSanPham";
@@ -37,7 +38,7 @@ export default function ManSanPham() {
   }, []);
   const ghi = (bb: LocSp, m: string | null, day = false) => {
     const q = chuoiLocSp(bb);
-    const url = (m ? `/san-pham/${encodeURIComponent(m)}` : "/san-pham") + (q ? "?" + q : "");
+    const url = giuKhoang((m ? `/san-pham/${encodeURIComponent(m)}` : "/san-pham") + (q ? "?" + q : ""));
     if (url !== location.pathname + location.search) history[day ? "pushState" : "replaceState"](null, "", url);
   };
   const dat = (sua: Partial<LocSp>) => { const bb = { ...b, ...sua }; datB(bb); ghi(bb, ma); };
