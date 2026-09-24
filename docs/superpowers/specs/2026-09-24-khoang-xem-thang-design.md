@@ -186,3 +186,14 @@ bất biến mới "khoảng xem" + "một chỗ hiểu khoảng xem") và `pyth
   103 ms, tổng + 2 phép so ~125 ms (lần đầu nguội ~2 s), chuỗi ngày 85 ms, mặt hàng 237 ms,
   ngành 35 ms, Pareto 98 ms, tương quan (đọc `khach_360`) ~1,2 s. Khoảng cả năm: tổng + so
   sánh ~4,8 s, mặt hàng ~1,5 s — chỉ lần đầu, sau đó là ảnh chụp.
+
+## 9. Ghi chú khi làm đợt B + C (2026-09-24)
+
+- Ngân sách lượt hỏi thật (ảnh chụp tắt, tính mới): `/api/khach-hang/ds` ≤ 5 (danh bạ 1 + phạm
+  vi 1 + doanh số theo khoảng 1 + khung), `/api/ban-do` ≤ 3 (phạm vi + 2 — `BD.ban_do` vẫn đúng
+  2), `/api/khach-hang/{mã}/khoang`, `/api/san-pham/khoang`, `/api/san-pham/{mã}/khoang` ≤ 2.
+  Trúng ảnh chụp: 1 lượt mỗi ảnh chụp như mọi màn.
+- 039 thêm `mart.khach_mat_hang_khoang` và `mart.tinh_khoang` (chưa chạy trên CSDL thật nên
+  sửa thẳng 039 thay vì thêm 040).
+- Điều hướng bằng JavaScript (dòng bảng khách, ô tìm nhanh, ⌘K, chấm tương quan) bọc
+  `giuKhoang()` — bộ viết lại `href` chỉ bắt thẻ `<a>`.

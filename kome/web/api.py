@@ -132,6 +132,14 @@ def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
     })
 
 
+def du_lieu_danh_ba_khoang(c, ts: "KX.ThamSo") -> dict | None:
+    """Doanh số trong khoảng của mọi khách (`BK.danh_ba_khoang`, +1 lượt
+    `pham_vi`). None = kho chưa có dòng bán nào."""
+    from kome import ban_khoang as BK
+    kx = KX.giai_conn(c, ts)
+    return None if kx is None else thanh_json(BK.danh_ba_khoang(c, kx))
+
+
 def du_lieu_du_bao(c) -> dict:
     """Dữ liệu màn /du-bao (kome/du_bao.py + kome/ve_du_bao.py). `tong(kb)` /
     `theo(kb)` là PHƯƠNG THỨC — tính sẵn cho cả ba kịch bản để đổi kịch bản ở
@@ -163,6 +171,7 @@ def du_lieu_kho_hang(c, kho: str = "", loc: str = "") -> dict:
 
 # Khoá ảnh chụp danh mục sản phẩm — `anh_chup.lam_nong` làm nóng đúng khoá này.
 KHOA_DANH_MUC = "san-pham/danh-muc"
+KHOA_DANH_MUC_KHOANG = "san-pham/khoang"
 KHOA_CONG_NO = "cong-no"
 
 
@@ -233,15 +242,20 @@ def tao_api(open_app_conn) -> APIRouter:
         return _json(request, du_lieu, pb)
 
     @r.get("/khach-hang/ds")
-    def kh_ds(request: Request, tim: str = "", loc: str = "", sap: str = "doanh_thu",
+    def kh_ds(request: Request, tim: str = "", loc: str = "", sap: str = "dt_khoang",
               giam: str = "", trang: int = 1, co: int = KH.MOI_TRANG, tat_ca: int = 0,
-              nv: str = "", nhom: str = "", hang: str = "", tinh: str = "", nhan_thang: str = ""):
+              nv: str = "", nhom: str = "", hang: str = "", tinh: str = "", nhan_thang: str = "",
+              co_mua: int = 0, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         """Màn danh sách: MỘT lượt gọi trả cả trang bảng lẫn khối tổng quan.
         Danh bạ (1 lượt hỏi nặng) đi qua ảnh chụp theo phiên bản NẠP; lọc /
         sắp / đếm làm bằng Python (kome.khach_hang._khop). Trúng ảnh chụp: 1
         lượt hỏi (phiên bản). Trượt: 2. Ngân sách màn danh sách <= 3 (bất biến)."""
         # `nhan_thang` (nhãn mart.khach_thang_nay) — KHÔNG phải `thang`: `?thang=YYYY-MM`
         # là tháng của khoảng xem chung (kome/khoang_xem.py).
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
         thang = nhan_thang
         sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
         hang = ",".join(KH._ds_hang(hang))
@@ -252,19 +266,28 @@ def tao_api(open_app_conn) -> APIRouter:
             with open_app_conn() as conn:
                 db, pb = anh_chup.lay_du_lieu(conn, anh_chup.KHOA_DANH_BA, KH.danh_ba,
                                               chi_nap=True)
+                # Doanh số trong khoảng xem của MỌI khách (đợt B): ảnh chụp riêng
+                # theo khoảng — +1 lượt hỏi khi trượt (ngân sách màn danh sách ≤ 4).
+                kk, _ = anh_chup.lay_du_lieu(conn, _khoa(anh_chup.KHOA_DANH_BA_KHOANG, **ts.khoa()),
+                                             lambda c: du_lieu_danh_ba_khoang(c, ts), chi_nap=True)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
         except Exception:
             traceback.print_exc()
             return _loi("Không đọc được danh bạ khách hàng.")
-        tq = KH.tong_quan(db, sale, tim=tim, thang=thang or None, **bo_loc)
+        db = KH.ghep_khoang(db, kk)
+        cm = bool(co_mua) and kk is not None
+        tq = KH.tong_quan(db, sale, tim=tim, thang=thang or None, co_mua=cm, **bo_loc)
         t = KH.trang_danh_sach(db, tim=tim, loc=loc, sap=sap, trang=trang, sale=sale,
-                               thang=thang or None, giam=g, co=co, **bo_loc)
+                               thang=thang or None, giam=g, co=co, co_mua=cm, **bo_loc)
         ten = ten_sale or next((n["ten"] for n in tq.nhan_vien if n["ma"] == sale), None)
         ra = {"trang": t, "tq": tq, "sale": sale, "ten_sale": ten, "hom_nay": db.get("hom_nay"),
               "nhan_trang_thai": {a: b[0] for a, b in KH.TRANG_THAI.items()},
               "can_xu_ly": list(KH.TRANG_THAI_CAN_XU_LY),
               "khong_ro": KH.KHONG_RO, "tinh_trong": KH.TINH_TRONG,
               "nv_moi_nguoi": KH.NV_MOI_NGUOI, "pt_trong": KH.PT_TRONG,
-              "nhan_thang": KT.NHAN}
+              "nhan_thang": KT.NHAN,
+              "khoang": kk["khoang"] if kk else None, "so_sanh_phu": kk["so_sanh"] if kk else None}
         # ETag = phiên bản danh bạ + chính URL: cùng URL, cùng dữ liệu -> 304.
         return _json(request, anh_chup.sang_json(ra),
                      hashlib.sha1(f"{pb}|{request.url.query}|{sale}".encode()).hexdigest()[:16] if pb else "")
@@ -285,6 +308,22 @@ def tao_api(open_app_conn) -> APIRouter:
         if du_lieu == "null":
             return _loi(f"Không có khách hàng mã {ma}.", 404)
         return _json(request, du_lieu, pb)
+
+    @r.get("/khach-hang/{ma}/khoang")
+    def kh_khoang(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Số trong khoảng xem của MỘT khách (đợt B): tổng + so sánh, mặt hàng, ngày
+        mua. Endpoint RIÊNG: hồ sơ (`KH.ho_so`) đã chạm trần 8 lượt hỏi. 2 lượt."""
+        from kome import ban_khoang as BK
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+
+        def tinh_(c):
+            kx = KX.giai_conn(c, ts)
+            return None if kx is None else thanh_json(BK.cua_khach(c, kx, ma))
+        return _chup(request, _khoa("khach-hang/khoang", ma=ma, **ts.khoa()), tinh_,
+                     "Không đọc được số theo khoảng của khách.", chi_nap=True)
 
     @r.get("/khach-hang/{ma}/dong")
     def kh_dong(request: Request, ma: str, tu: str, den: str):
@@ -395,16 +434,22 @@ def tao_api(open_app_conn) -> APIRouter:
         return _json(request, du_lieu, pb)
 
     @r.get("/ban-do")
-    def ban_do(request: Request, tat_ca: int = 0, nv: str = "", chi_so: str = "khach"):
+    def ban_do(request: Request, tat_ca: int = 0, nv: str = "", chi_so: str = "khach",
+               thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         from kome import ban_do as BD
         sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
 
         def tinh_(c):
-            t = BD.ban_do(c, sale=sale, chi_so=chi_so)
-            return {"t": t, "sale": sale, "ten_sale": ten_sale, "chi_so_ds": BD.CHI_SO,
-                    "o_rong": BD.O_RONG, "o_cao": BD.O_CAO}
+            kx = KX.giai_conn(c, ts)
+            t = BD.ban_do(c, sale=sale, chi_so=chi_so, kx=kx)
+            return {"t": t, "sale": sale, "ten_sale": ten_sale, "chi_so_ds": BD.chi_so_ds(kx),
+                    "o_rong": BD.O_RONG, "o_cao": BD.O_CAO, "khoang": kx}
         # Bản đồ chỉ đọc core/mart (không bảng `app` nào) -> phiên bản theo dữ liệu nạp.
-        return _chup(request, _khoa("ban-do", sale=sale or "*", chi_so=chi_so), tinh_,
+        return _chup(request, _khoa("ban-do", sale=sale or "*", chi_so=chi_so, **ts.khoa()), tinh_,
                      "Không đọc được bản đồ khách hàng.", chi_nap=True)
 
     # ---- Giai đoạn 4: Sản phẩm · Kho hàng -----------------------------
@@ -417,6 +462,38 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import san_pham as SP
         return _chup(request, KHOA_DANH_MUC, SP.danh_muc,
                      "Không đọc được danh mục sản phẩm.", chi_nap=True)
+
+    @r.get("/san-pham/khoang")
+    def sp_khoang(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Doanh số trong khoảng xem của mọi mã (đợt C) — ghép vào danh mục ở
+        trình duyệt. Endpoint riêng: danh mục vẫn MỘT ảnh chụp 1 lượt hỏi. 2 lượt.
+        Khai báo TRƯỚC `/san-pham/{ma}` — không thì "khoang" bị đọc thành mã hàng."""
+        from kome import ban_khoang as BK
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+
+        def tinh_(c):
+            kx = KX.giai_conn(c, ts)
+            return None if kx is None else thanh_json(BK.danh_muc_khoang(c, kx))
+        return _chup(request, _khoa(KHOA_DANH_MUC_KHOANG, **ts.khoa()), tinh_,
+                     "Không đọc được doanh số theo khoảng.", chi_nap=True)
+
+    @r.get("/san-pham/{ma}/khoang")
+    def sp_ma_khoang(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Một mã trong khoảng xem (đợt C): tổng + so sánh, khách mua trong khoảng. 2 lượt."""
+        from kome import ban_khoang as BK
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+
+        def tinh_(c):
+            kx = KX.giai_conn(c, ts)
+            return None if kx is None else thanh_json(BK.cua_ma(c, kx, ma))
+        return _chup(request, _khoa("san-pham/ma-khoang", ma=ma, **ts.khoa()), tinh_,
+                     "Không đọc được số theo khoảng của mã hàng.", chi_nap=True)
 
     @r.get("/san-pham/{ma}")
     def sp_ho_so(request: Request, ma: str):

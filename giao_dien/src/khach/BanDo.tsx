@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { lay } from "../api";
+import { chuoiKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { gon, so, yen } from "../dinh_dang";
 import type { BoLoc, Tab } from "./loc";
 import { thamSoBanDo } from "./loc";
@@ -18,8 +19,9 @@ const MAU_CHU = ["var(--chu-nhat)", "var(--chu)", "var(--chu)", "var(--map-chu-a
 
 export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: Tab }, day?: boolean) => void }) {
   const q = thamSoBanDo(b);
+  const kx = chuoiKhoang(useKhoang());
   const { data: d, error, isFetching } = useQuery<BanDoApi>({
-    queryKey: ["ban-do", q], queryFn: () => lay<BanDoApi>(`/api/ban-do${q ? "?" + q : ""}`),
+    queryKey: ["ban-do", q, kx], queryFn: () => lay<BanDoApi>(voiKhoang(`/api/ban-do${q ? "?" + q : ""}`)),
     placeholderData: keepPreviousData,
   });
   // Tên người phụ trách cho ô chọn — cùng lượt gọi danh sách (đã có trong bộ nhớ đệm nếu vừa xem).
@@ -27,7 +29,7 @@ export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: 
   const [tro, datTro] = useState<ONhanh | null>(null);
   if (error) return <div className="khoi-loi">Không tải được bản đồ: {(error as Error).message}</div>;
   if (!d) return <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div>;
-  const t = d.t, tien = t.chi_so === "doanh_thu";
+  const t = d.t, tien = t.chi_so === "doanh_thu" || t.chi_so === "dt_khoang";
   const f = (v: number) => tien ? yen(v) : so(v);
   const moTinh = (ten: string) => dat({ tab: "danh_sach", tinh: ten }, true);
   const nvDang = b.nv || d.sale || ds?.nv_moi_nguoi || "__moi_nguoi";

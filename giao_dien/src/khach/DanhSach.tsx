@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
+import { giuKhoang } from "../khung/khoang";
+import { chuoiKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { gon, so, thay_doi, yen } from "../dinh_dang";
 import type { BoLoc } from "./loc";
 import { nhoDanhSach, thamSoDs } from "./loc";
@@ -20,18 +22,14 @@ export const MAU_THANG: Record<string, string> = { da_mua: "ok", tre: "canh", ch
 
 export function useDs(b: BoLoc) {
   const q = thamSoDs(b);
+  const kx = chuoiKhoang(useKhoang());
   return useQuery<DsApi>({
-    queryKey: ["kh-ds", q], queryFn: () => lay<DsApi>(`/api/khach-hang/ds${q ? "?" + q : ""}`),
+    queryKey: ["kh-ds", q, kx], queryFn: () => lay<DsApi>(voiKhoang(`/api/khach-hang/ds${q ? "?" + q : ""}`)),
     placeholderData: keepPreviousData,
   });
 }
 
 type Dat = (sua: Partial<BoLoc>, day?: boolean) => void;
-
-function tenThang(iso: string | null) {
-  if (!iso) return "tháng này";
-  return `tháng ${+iso.slice(5, 7)}`;
-}
 
 export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
   const { data: d, error, isFetching } = useDs(b);
@@ -51,21 +49,24 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
   if (!d || !t || !tq) return <div className="kh-cho" aria-busy="true"><div className="khoi-cho"><span /><span /><span /></div></div>;
 
   const nvDang = b.nv || d.sale || d.nv_moi_nguoi;
-  const coLoc = !!(b.tim || b.loc || b.nhom || b.hang.length || b.tinh || b.thang || b.nv === d.pt_trong);
+  const coLoc = !!(b.tim || b.loc || b.nhom || b.hang.length || b.tinh || b.thang || b.co_mua || b.nv === d.pt_trong);
   const soChon = Object.values(chon).filter(Boolean).length;
   const dongChon = t.khach.filter(k => chon[k.ma]);
-  const tang = t.tong_dt_thang_truoc_cung_ngay ? t.tong_dt_thang_nay / t.tong_dt_thang_truoc_cung_ngay - 1 : null;
-  const ngayMoc = d.hom_nay ? +d.hom_nay.slice(8, 10) : null;
+  const kxNhan = d.khoang?.nhan ?? "khoảng xem";
+  const ssp = d.so_sanh_phu;
+  const tang = t.tong_dt_ss ? t.tong_dt_khoang / t.tong_dt_ss - 1 : null;
 
   const PHAN_KHUC: { ma: string; ten: string; mo: string; so: number | null; bat: boolean; ap: Partial<BoLoc> | null }[] = [
     { ma: "tat_ca", ten: "Toàn bộ danh bạ", mo: `${so(tq.tong)} khách${d.sale ? " của " + (d.ten_sale ?? d.sale) : " trong hệ thống"}`,
-      so: tq.tong, bat: !b.nhom && !b.thang && b.nv !== d.pt_trong, ap: { nhom: "", thang: "", nv: b.nv === d.pt_trong ? "" : b.nv } },
+      so: tq.tong, bat: !b.nhom && !b.thang && !b.co_mua && b.nv !== d.pt_trong, ap: { nhom: "", thang: "", co_mua: false, nv: b.nv === d.pt_trong ? "" : b.nv } },
+    { ma: "co_mua", ten: `Có mua · ${kxNhan}`, mo: "có ít nhất một phiếu trong khoảng đang xem", so: tq.co_mua, bat: b.co_mua,
+      ap: { co_mua: !b.co_mua, nhom: "", thang: "" } },
     { ma: "no", ten: "Nợ quá hạn", mo: "cần thu trước khi giao đơn mới", so: null, bat: false, ap: null },
-    { ma: "im", ten: "Im lặng ≥ 2× nhịp", mo: "đã quá chu kỳ mua thường lệ", so: tq.nhom.im, bat: b.nhom === "im", ap: { nhom: "im", thang: "" } },
-    { ma: "tut", ten: "Hạng S·A đang tụt", mo: "30 ngày < 80% TB ba kỳ 30 ngày trước", so: tq.nhom.tut, bat: b.nhom === "tut", ap: { nhom: "tut", thang: "" } },
-    { ma: "moi", ten: "Khách mới chưa quay lại", mo: "đơn đầu trong 90 ngày, đã im ≥ 1,2× nhịp", so: tq.nhom.moi, bat: b.nhom === "moi", ap: { nhom: "moi", thang: "" } },
-    { ma: "thang", ten: "Mua đều, tháng này chưa", mo: "≥ 2/3 tháng trước có đơn đến ngày này", so: tq.thang.tre ?? 0, bat: b.thang === "tre", ap: { thang: "tre", nhom: "" } },
-    { ma: "chuapt", ten: "Chưa ai phụ trách", mo: "mã phụ trách không có trong danh sách 担当者 · cả công ty", so: tq.chua_pt, bat: b.nv === d.pt_trong, ap: { nv: d.pt_trong, nhom: "", thang: "" } },
+    { ma: "im", ten: "Im lặng ≥ 2× nhịp", mo: "đã quá chu kỳ mua thường lệ · hôm nay", so: tq.nhom.im, bat: b.nhom === "im", ap: { nhom: "im", thang: "", co_mua: false } },
+    { ma: "tut", ten: "Hạng S·A đang tụt", mo: "30 ngày < 80% TB ba kỳ 30 ngày trước", so: tq.nhom.tut, bat: b.nhom === "tut", ap: { nhom: "tut", thang: "", co_mua: false } },
+    { ma: "moi", ten: "Khách mới chưa quay lại", mo: "đơn đầu trong 90 ngày, đã im ≥ 1,2× nhịp", so: tq.nhom.moi, bat: b.nhom === "moi", ap: { nhom: "moi", thang: "", co_mua: false } },
+    { ma: "thang", ten: "Mua đều, tháng này chưa", mo: "≥ 2/3 tháng trước có đơn đến ngày này · tính đến hôm nay", so: tq.thang.tre ?? 0, bat: b.thang === "tre", ap: { thang: "tre", nhom: "", co_mua: false } },
+    { ma: "chuapt", ten: "Chưa ai phụ trách", mo: "mã phụ trách không có trong danh sách 担当者 · cả công ty", so: tq.chua_pt, bat: b.nv === d.pt_trong, ap: { nv: d.pt_trong, nhom: "", thang: "", co_mua: false } },
   ];
 
   const sapCot = (cot: string, chu: string, cls = "", title?: string) => (
@@ -74,10 +75,10 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       {chu}{t.sap === cot ? (b.giam === "0" ? " ▲" : " ▼") : ""}</th>);
 
   const xuatCsv = () => {
-    const cot = ["Mã", "Tên", "Tỉnh", "Điện thoại", "Phụ trách", "Hạng theo doanh thu 12 tháng", "DT tháng này", "Tháng trước cùng ngày", "TB 3 tháng",
+    const cot = ["Mã", "Tên", "Tỉnh", "Điện thoại", "Phụ trách", "Hạng theo doanh thu 12 tháng", `DT ${kxNhan}`, ssp ? `DT ${ssp.nhan}` : "So sánh", "TB 3 tháng",
       "Doanh thu luỹ kế", "Im lặng (× nhịp)", "Đơn cuối", "Trạng thái"];
     const dong = dongChon.map(k => [k.ma, k.ten, k.tinh ?? "", k.dien_thoai ?? "", tenNv[k.nguoi_phu_trach ?? ""] ?? k.nguoi_phu_trach ?? "",
-      k.hang ?? "", k.thang_nay ?? "", k.thang_truoc_cung_ngay ?? "", k.tb_3_thang ?? "", k.doanh_thu,
+      k.hang ?? "", k.dt_khoang ?? "", k.dt_ss ?? "", k.tb_3_thang ?? "", k.doanh_thu,
       k.ty_le_im_lang ?? "", k.lan_cuoi ?? "", d.nhan_trang_thai[k.trang_thai] ?? k.trang_thai]);
     const csv = "﻿" + [cot, ...dong].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\r\n");
     const a = document.createElement("a");
@@ -98,11 +99,11 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       <div className="o-kpi-luoi kh-kpi">
         <div className="o-kpi"><div className="nhan">Khách đang lọc</div><div className="gia">{so(t.tong)}</div>
           <div className="dong-phu nhat-chu">trên tổng {so(tq.tong_tat_ca)} · {so(t.so_can_xu_ly)} cần xử lý</div></div>
-        <div className="o-kpi"><div className="nhan">Doanh thu {tenThang(d.hom_nay)}{ngayMoc ? ` (đến ngày ${ngayMoc})` : ""}</div>
-          <div className="gia">{gon(t.tong_dt_thang_nay)}</div>
+        <div className="o-kpi"><div className="nhan">Doanh thu · {kxNhan}</div>
+          <div className="gia">{gon(t.tong_dt_khoang)}</div>
           <div className={"dong-phu " + (tang == null ? "nhat-chu" : tang >= 0 ? "tang" : "giam")}>
-            {tang == null ? "tháng trước cùng ngày chưa có đơn" : `${thay_doi(tang)} so tháng trước cùng ngày`}</div></div>
-        <div className="o-kpi"><div className="nhan">Im lặng ≥ 2× nhịp</div><div className="gia">{so(t.so_can_xu_ly)}</div>
+            {!ssp?.co ? `${ssp?.nhan ?? "so sánh"}: không có dữ liệu để so` : tang == null ? `${ssp.nhan}: chưa có đơn` : `${thay_doi(tang)} so ${ssp.nhan}`}</div></div>
+        <div className="o-kpi"><div className="nhan">Im lặng ≥ 2× nhịp · hôm nay</div><div className="gia">{so(t.so_can_xu_ly)}</div>
           <div className="dong-phu nhat-chu">đã quá chu kỳ mua thường lệ</div></div>
         <a className="o-kpi" href="/cong-no?tab=qua_han" title={CHUA_CO_NO}><div className="nhan">Công nợ quá hạn</div>
           <div className="gia" style={{ fontSize: "1rem" }}>xem màn Công nợ →</div>
@@ -157,7 +158,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
         <label className="kh-chon" title="OBC chỉ xuất MÃ phân loại khách, không xuất tên — chưa hiện được loại hình.">
           <span>Loại hình</span><select disabled><option>chưa có tên loại hình</option></select></label>
         <button type="button" className="nut-nho" disabled={!coLoc}
-          onClick={() => { datTim(""); dat({ tim: "", loc: "", nhom: "", hang: [], tinh: "", thang: "", nv: b.nv === d.pt_trong ? "" : b.nv }, true); }}>Xoá lọc</button>
+          onClick={() => { datTim(""); dat({ tim: "", loc: "", nhom: "", hang: [], tinh: "", thang: "", co_mua: false, nv: b.nv === d.pt_trong ? "" : b.nv }, true); }}>Xoá lọc</button>
       </div>
 
       {soChon > 0 && <div className="kh-thanh-chon">
@@ -178,7 +179,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
               checked={t.khach.length > 0 && t.khach.every(k => chon[k.ma])}
               onChange={e => datChon(e.target.checked ? Object.fromEntries(t.khach.map(k => [k.ma, true])) : {})} /></th>
             {sapCot("ten", "Khách hàng")}{sapCot("hang", "Hạng", "", "hạng theo doanh thu 12 tháng (không phải 得意先ランク)")}{sapCot("pt", "Phụ trách")}
-            {sapCot("thang_nay", `DT ${tenThang(d.hom_nay)}`, "so")}{sapCot("so_thang_truoc", "So tháng trước")}
+            {sapCot("dt_khoang", `DT ${kxNhan}`, "so", "doanh thu thuần trong khoảng đang xem")}{sapCot("so_khoang", ssp ? `So ${ssp.nhan}` : "So sánh", "", ssp ? `${ssp.tu} → ${ssp.den}` : undefined)}
             {sapCot("tb3", "TB 3 tháng", "so")}{sapCot("im_lang", "Im lặng", "so")}{sapCot("don_cuoi", "Đơn cuối", "so")}
             {sapCot("trang_thai", "Trạng thái")}
           </tr></thead>
@@ -191,7 +192,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       </div>
 
       <div className="kh-phan-trang">
-        <span className="phu">Hiện {t.tong ? dau + 1 : 0}–{dau + t.khach.length} trong {so(t.tong)} khách · doanh thu luỹ kế nhóm {yen(t.tong_doanh_thu)}</span>
+        <span className="phu">Hiện {t.tong ? dau + 1 : 0}–{dau + t.khach.length} trong {so(t.tong)} khách · doanh thu {kxNhan} của nhóm {yen(t.tong_dt_khoang)}</span>
         <span className="day-phai">
           <button type="button" className="nut-nho" disabled={t.trang <= 1} onClick={() => dat({ trang: t.trang - 1 })}>‹ Trước</button>
           {cacTrang(t.trang, t.so_trang).map((p, i) => p === 0 ? <span key={"g" + i} className="phu">…</span> :
@@ -247,8 +248,8 @@ function cacTrang(tr: number, tong: number): number[] {
 
 function Dong({ k, d, tenNv, chon, datChon }: { k: KhachDong; d: DsApi; tenNv: Record<string, string>;
   chon: boolean; datChon: (v: boolean) => void }) {
-  const ss = k.thang_truoc_cung_ngay ? (k.thang_nay ?? 0) / k.thang_truoc_cung_ngay - 1 : null;
-  const mo = () => { location.href = `/khach-hang/${encodeURIComponent(k.ma)}`; };
+  const ss = k.dt_ss ? (k.dt_khoang ?? 0) / k.dt_ss - 1 : null;
+  const mo = () => { location.href = giuKhoang(`/khach-hang/${encodeURIComponent(k.ma)}`); };
   return (
     <tr className={"kh-dong" + (chon ? " chon" : "")} onClick={e => { if (!(e.target as HTMLElement).closest("input,a")) mo(); }}>
       <td className="kh-o-chon"><input type="checkbox" checked={chon} onChange={e => datChon(e.target.checked)} aria-label={`Chọn ${k.ten}`} /></td>
@@ -256,8 +257,8 @@ function Dong({ k, d, tenNv, chon, datChon }: { k: KhachDong; d: DsApi; tenNv: R
         <div className="ma-nho"><code>{k.ma}</code>{k.tinh ? ` · ${k.tinh}` : ""}{k.dau_hieu_obc ? ` · ※${k.dau_hieu_obc}※` : ""}</div></td>
       <td>{k.hang ? <span className={"kh-hang-nhan h" + k.hang}>{k.hang}</span> : <span className="nhat-chu">—</span>}</td>
       <td className="kh-pt">{k.nguoi_phu_trach ? (tenNv[k.nguoi_phu_trach] ?? k.nguoi_phu_trach) : <span className="nhat-chu">— chưa giao —</span>}</td>
-      <td className="so"><b>{k.thang_nay == null ? "—" : yen(k.thang_nay)}</b></td>
-      <td className="kh-ss">{ss == null ? <span className="nhat-chu">{k.thang_nay ? "tháng trước chưa mua" : "—"}</span> : <>
+      <td className="so"><b>{k.dt_khoang == null ? "—" : yen(k.dt_khoang)}</b></td>
+      <td className="kh-ss">{ss == null ? <span className="nhat-chu">{k.dt_ss == null ? "—" : k.dt_khoang ? "kỳ so chưa mua" : "—"}</span> : <>
         <span className="kh-ss-thanh"><i className={ss >= 0 ? "tang" : ss > -0.2 ? "canh" : "giam"}
           style={{ width: `${Math.min(50, Math.abs(ss) * 50)}%`, [ss >= 0 ? "left" : "right"]: "50%" } as React.CSSProperties} /></span>
         <span className={ss >= 0 ? "tang" : ss > -0.2 ? "canh-chu" : "giam"}>{thay_doi(ss, 0)}</span></>}</td>

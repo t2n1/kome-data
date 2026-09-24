@@ -14,7 +14,7 @@ export type LocSp = { tim: string; loc: string; nganh: string; sap: string; giam
 export function docLocSp(search: string): LocSp {
   const q = new URLSearchParams(search);
   return { tim: q.get("tim") ?? "", loc: q.get("loc") ?? "", nganh: q.get("nganh") ?? "",
-    sap: q.get("sap") ?? "dt_12t", giam: (q.get("giam") as LocSp["giam"]) ?? "" };
+    sap: q.get("sap") ?? "dt_khoang", giam: (q.get("giam") as LocSp["giam"]) ?? "" };
 }
 
 export function chuoiLocSp(b: LocSp): string {
@@ -22,7 +22,7 @@ export function chuoiLocSp(b: LocSp): string {
   if (b.tim.trim()) q.set("tim", b.tim.trim());
   if (b.loc) q.set("loc", b.loc);
   if (b.nganh) q.set("nganh", b.nganh);
-  if (b.sap !== "dt_12t") q.set("sap", b.sap);
+  if (b.sap !== "dt_khoang") q.set("sap", b.sap);
   if (b.giam) q.set("giam", b.giam);
   return q.toString();
 }
@@ -50,6 +50,10 @@ export const SAP: Record<string, { lay: (m: MaHang) => number | string | null; t
   toc_do: { lay: m => m.toc_do_ngay_theo_tuoi, tang: false },
   du_ban: { lay: m => m.du_ban_ngay, tang: true },
   dt_12t: { lay: m => m.dt_12t, tang: false },
+  dt_khoang: { lay: m => m.dt_khoang ?? null, tang: false },
+  sl_khoang: { lay: m => m.sl_khoang ?? null, tang: false },
+  kh_khoang: { lay: m => m.kh_khoang ?? null, tang: false },
+  so_khoang: { lay: m => m.dt_ss ? (m.dt_khoang ?? 0) / m.dt_ss : null, tang: false },
   doanh_thu: { lay: m => m.doanh_thu, tang: false },
   ty_suat: { lay: m => m.ts_12t, tang: false },
   so_khach: { lay: m => m.so_khach, tang: false },
@@ -57,7 +61,7 @@ export const SAP: Record<string, { lay: (m: MaHang) => number | string | null; t
 };
 
 export function sapXep(ds: MaHang[], sap: string, giam: LocSp["giam"]): MaHang[] {
-  const c = SAP[sap] ?? SAP.dt_12t;
+  const c = SAP[sap] ?? SAP.dt_khoang;
   const tang = giam === "" ? c.tang : giam === "0";
   return [...ds].sort((a, b) => {
     const x = c.lay(a), y = c.lay(b);

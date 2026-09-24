@@ -73,6 +73,8 @@ _PHIEN_BAN_NAP = """concat_ws('|',
 
 # Khoá ảnh chụp danh bạ khách — api.py đọc, lam_nong làm nóng.
 KHOA_DANH_BA = "khach-hang/danh-ba"
+# Doanh số theo khoảng xem của mọi khách (đợt B) — khoá = cái này + tham số khoảng.
+KHOA_DANH_BA_KHOANG = "khach-hang/danh-ba-khoang"
 
 
 def bat() -> bool:
@@ -193,8 +195,13 @@ def lam_nong(open_conn) -> None:
         # Danh bạ khách (giai đoạn 2) — câu nặng nhất của màn Khách hàng.
         try:
             from kome import khach_hang as KH
+            from kome import khoang_xem as KX
+            from kome.web.api import du_lieu_danh_ba_khoang
             with open_conn() as c:
                 lay(c, KHOA_DANH_BA, KH.danh_ba, chi_nap=True)
+            with open_conn() as c:
+                lay(c, KHOA_DANH_BA_KHOANG, lambda cc: du_lieu_danh_ba_khoang(cc, KX.ThamSo()),
+                    chi_nap=True)
         except Exception as e:         # noqa: BLE001
             print(f"[anh-chup] không làm nóng được danh bạ: {e!r}")
         # Danh mục sản phẩm + màn Kho hàng không lọc (giai đoạn 4) — khoá khớp
@@ -204,6 +211,13 @@ def lam_nong(open_conn) -> None:
             from kome.web.api import KHOA_DANH_MUC, du_lieu_kho_hang
             with open_conn() as c:
                 lay(c, KHOA_DANH_MUC, SP.danh_muc, chi_nap=True)
+            from kome import ban_khoang as BK
+            from kome import khoang_xem as KX
+            from kome.web.api import KHOA_DANH_MUC_KHOANG, thanh_json
+            with open_conn() as c:
+                lay(c, KHOA_DANH_MUC_KHOANG,
+                    lambda cc: (lambda kx: None if kx is None else thanh_json(BK.danh_muc_khoang(cc, kx)))(
+                        KX.giai_conn(cc, KX.ThamSo())), chi_nap=True)
             with open_conn() as c:
                 lay(c, "kho-hang", du_lieu_kho_hang, chi_nap=True)
         except Exception as e:         # noqa: BLE001

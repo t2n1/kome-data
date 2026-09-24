@@ -11,6 +11,14 @@ import { BieuDo } from "../chung/BieuDo";
 import { ChuaCoDuLieu } from "../chung/Khoi";
 import { gon, ngay, pc, so, so_luong as soLuong, thang_nhan, thay_doi, yen } from "../dinh_dang";
 import type { HoSoSpApi, MaHang, NgayApi } from "./kieu";
+import { chuoiKhoang, useKhoang, voiKhoang, type KhoangMayChu } from "../khung/khoang";
+
+/** Một mã trong KHOẢNG XEM (/api/san-pham/{mã}/khoang — đợt C). */
+type MaKhoang = {
+  khoang: KhoangMayChu; so_sanh: { ma: string; nhan: string; co: boolean; tu: string; den: string };
+  tong: { dt: number; lg: number; so_luong: number; so_khach: number }; dt_ss: number | null; tang: number | null;
+  khach: { ma: string; ten: string; doanh_thu: number; so_luong: number; so_ngay: number; lan_cuoi: string }[];
+} | null;
 
 const CHI_SO = [["so_luong", "Số lượng"], ["doanh_thu", "Doanh thu"], ["lai_gop", "Lãi gộp"]] as const;
 type ChiSo = typeof CHI_SO[number][0];
@@ -22,13 +30,21 @@ export function HoSoSanPham({ ma, dong, onDong }: { ma: string; dong: MaHang | n
   });
   const [thang, datThang] = useState<string | null>(null);
   useEffect(() => { datThang(null); }, [ma]);
+  const kxs = chuoiKhoang(useKhoang());
+  const { data: mk } = useQuery<MaKhoang>({
+    queryKey: ["sp-ma-khoang", ma, kxs], placeholderData: keepPreviousData,
+    queryFn: () => lay<MaKhoang>(voiKhoang(`/api/san-pham/${encodeURIComponent(ma)}/khoang`)),
+  });
+  useEffect(() => { datThang(null); }, [kxs]);
 
   if (error) return <section className="kh-the sp-hs"><div className="khoi-loi">{(error as Error).message}</div></section>;
   if (!data) return <section className="kh-the sp-hs"><div className="khoi-cho" aria-busy="true"><span /><span /><span /></div></section>;
   const h = data.h, sp = h.sp;
   const cu = sp.ma !== ma;                           // đang hiện hồ sơ mã trước trong lúc tải mã mới
   const thangCuoi = h.thang.length ? h.thang[h.thang.length - 1].thang : null;
-  const thangXem = thang ?? thangCuoi;
+  // Biểu đồ theo ngày mặc định = tháng của ngày cuối khoảng xem (nếu nằm trong 12 tháng của mã).
+  const thangKx = mk?.khoang.den.slice(0, 7);
+  const thangXem = thang ?? (thangKx && h.thang.some(t => t.thang === thangKx) ? thangKx : thangCuoi);
   const tongKhach = h.khach_mua.reduce((s, k) => s + k.doanh_thu, 0);
   const maxKhach = Math.max(1, ...h.khach_mua.map(k => k.doanh_thu));
   const tonTong = sp.ton;
@@ -65,6 +81,20 @@ export function HoSoSanPham({ ma, dong, onDong }: { ma: string; dong: MaHang | n
       </section>
 
       <BanTheoNgay ma={sp.ma} thang={thangXem} ds_thang={h.thang.map(t => t.thang)} datThang={datThang} />
+
+      {mk && <section className="kh-the">
+        <div className="kh-the-dau"><h2>Khách mua · {mk.khoang.nhan}</h2>
+          <span className="kh-the-goc nhat-chu">{so(mk.tong.so_khach)} khách · {yen(mk.tong.dt)} · {soLuong(mk.tong.so_luong)} đơn vị
+            {mk.so_sanh.co && mk.tang != null ? <> · <span className={mk.tang >= 0 ? "tang" : "giam"}>{thay_doi(mk.tang, 0)} so {mk.so_sanh.nhan}</span></> : ""}</span></div>
+        {!mk.khach.length ? <p className="trong-nho">Không khách nào mua mã này trong khoảng đang xem.</p> :
+        <div className="bang-cuon" style={{ maxHeight: 300 }}><table className="bang"><thead><tr><th>Khách hàng</th>
+          <th className="so">Doanh thu</th><th className="so">Số lượng</th><th className="so">Số ngày mua</th><th className="so">Mua cuối</th></tr></thead>
+          <tbody>{mk.khach.map(k => (
+            <tr key={k.ma}><td className="ten-jp"><a href={`/khach-hang/${encodeURIComponent(k.ma)}`}>{k.ten}</a></td>
+              <td className="so">{yen(k.doanh_thu)}</td><td className="so">{soLuong(k.so_luong)}</td>
+              <td className="so">{so(k.so_ngay)}</td><td className="so">{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table></div>}
+        {mk.tong.so_khach > mk.khach.length && <p className="phu">Hiện {so(mk.khach.length)} khách doanh thu cao nhất trên {so(mk.tong.so_khach)}.</p>}
+      </section>}
 
       <div className="sp-luoi-3">
         <section className="kh-the">

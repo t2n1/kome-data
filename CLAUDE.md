@@ -664,9 +664,18 @@ gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hi�
 Liên kết nội bộ giữ khoảng xem nhờ MỘT bộ viết lại `href` ở `document`
 (`khoang.ts::ganVietLaiLienKet`); mọi `history.pushState/replaceState` của từng màn đi
 qua `giuKhoang()` — thêm một màn có bộ lọc trên URL mà quên hàm đó là đổi bộ lọc xong mất
-khoảng xem. Bộ lọc nhãn tháng của `/khach-hang` là `?nhan_thang=` (KHÔNG `?thang=` — trùng tên
-là bộ lọc nhãn bị đọc thành tháng xem). Đợt A = Tổng quan + Báo cáo; Khách hàng (đợt B) và Sản phẩm (đợt C) còn hiện bộ
-chọn mờ "chưa theo khoảng xem". Đặc tả: `docs/superpowers/specs/2026-09-24-khoang-xem-thang-design.md`.
+khoảng xem; điều hướng bằng JavaScript (`location.href = …`) cũng phải bọc `giuKhoang()`.
+Bộ lọc nhãn tháng của `/khach-hang` là `?nhan_thang=` (KHÔNG `?thang=` — trùng tên là bộ lọc
+nhãn bị đọc thành tháng xem). Màn theo khoảng: Tổng quan, Báo cáo (đợt A), Khách hàng — danh
+sách / hồ sơ / bản đồ (đợt B), Sản phẩm — danh mục / hồ sơ mã (đợt C). Số theo khoảng của hồ
+sơ khách và của Sản phẩm đi endpoint RIÊNG (`/api/khach-hang/{mã}/khoang`,
+`/api/san-pham/khoang`, `/api/san-pham/{mã}/khoang`, mỗi cái 2 lượt) — hồ sơ khách đã chạm
+trần 8 lượt, danh mục vẫn MỘT ảnh chụp 1 lượt. Danh sách khách ghép doanh số theo khoảng
+(ảnh chụp riêng theo khoảng, `anh_chup.KHOA_DANH_BA_KHOANG`) vào danh bạ bằng
+`KH.ghep_khoang` — BẢN SAO, không sửa danh bạ gốc (nó là ảnh chụp dùng chung mọi khoảng).
+Cột so sánh ở Khách hàng / Sản phẩm là phép so PHỤ (`so_sanh[1]`: tháng trước / khoảng liền
+trước; dạng Kỳ: năm trước). Bản đồ thêm hai chỉ số `dt_khoang` / `khach_mua`
+(`mart.tinh_khoang`) — "Doanh thu 12 tháng" giữ nguyên. Đặc tả: `docs/superpowers/specs/2026-09-24-khoang-xem-thang-design.md`.
 
 **Bất biến (Đợt 6, migration 038):** công nợ đọc sổ `請求先元帳` (spec `seikyu_motocho`
 → `core.fact_ar_ledger`), mỗi lô là ẢNH CHỤP một kỳ (kỳ đọc từ dòng 集計期間), mart đọc lô

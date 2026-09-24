@@ -360,7 +360,9 @@ def test_ban_do_khong_qua_2_truy_van(conn, batch, monkeypatch):
 
     monkeypatch.setattr(conn, "execute", demo)
     ban_do(conn)
-    assert dem["n"] <= 2, f"{dem['n']} lượt hỏi, trần là 2"
+    # Khoảng xem (đợt B): +1 lượt `khoang_xem.pham_vi` ở tầng API; bản thân
+    # BD.ban_do vẫn đúng 2 (test_ban_do_khong_qua_2_truy_van).
+    assert dem["n"] <= 3, f"{dem['n']} lượt hỏi, trần là 3"
 
 
 # ---------------------------------------------------------------------------
@@ -509,7 +511,9 @@ def test_trang_ban_do_khong_qua_2_truy_van(conn, client, batch, monkeypatch):
     monkeypatch.setattr(psycopg.Connection, "execute", demo)
     r = client.get("/api/ban-do")
     assert r.status_code == 200
-    assert dem["n"] <= 2, f"{dem['n']} lượt hỏi, trần là 2"
+    # Khoảng xem (đợt B): +1 lượt `khoang_xem.pham_vi` ở tầng API; bản thân
+    # BD.ban_do vẫn đúng 2 (test_ban_do_khong_qua_2_truy_van).
+    assert dem["n"] <= 3, f"{dem['n']} lượt hỏi, trần là 3"
 
 
 def test_chu_giai_bo_qua_bac_rong_nhung_luon_hien_bac_0(conn, client, batch):

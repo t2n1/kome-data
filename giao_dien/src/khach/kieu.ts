@@ -1,4 +1,5 @@
 // Hình dạng JSON của /api/khach-hang/* và /api/ban-do (kome/web/api.py).
+import type { KhoangMayChu } from "../khung/khoang";
 
 export type KhachDong = {
   ma: string; ten: string; tinh: string | null; thanh_pho: string | null; dien_thoai: string | null;
@@ -7,6 +8,7 @@ export type KhachDong = {
   ty_le_im_lang: number | null; trang_thai: string; dau_hieu_obc: string | null;
   hang: string | null; thang_nay: number | null; thang_truoc_cung_ngay: number | null;
   tb_3_thang: number | null; nhan_thang: string | null;
+  dt_khoang: number | null; lg_khoang: number | null; so_phieu_khoang: number | null; dt_ss: number | null;
 };
 
 export type NhanVien = { ma: string; ten: string; so_khach: number; doanh_thu: number; canh_bao: number };
@@ -16,25 +18,26 @@ export type TongQuan = {
   hang: [string, number][]; tinh: [string, number][]; nhan_vien: NhanVien[];
   dem_trang_thai: Record<string, number>; tong_tat_ca: number;
   hang_tien: Record<string, number>; tinh_tien: Record<string, number>;
-  thang: Record<string, number>; chua_pt: number; tinh_day_du: [string, number][];
+  thang: Record<string, number>; chua_pt: number; tinh_day_du: [string, number][]; co_mua: number;
 };
 
 export type TrangDs = {
   khach: KhachDong[]; tong: number; trang: number; so_trang: number; sap: string; co: number;
   tong_dt_thang_nay: number; tong_dt_thang_truoc_cung_ngay: number; tong_doanh_thu: number;
-  so_can_xu_ly: number;
+  so_can_xu_ly: number; tong_dt_khoang: number; tong_dt_ss: number | null; co_mua: boolean;
 };
 
 export type DsApi = {
   trang: TrangDs; tq: TongQuan; sale: string | null; ten_sale: string | null; hom_nay: string | null;
   nhan_trang_thai: Record<string, string>; can_xu_ly: string[]; khong_ro: string; tinh_trong: string;
   nv_moi_nguoi: string; pt_trong: string; nhan_thang: Record<string, string>;
+  khoang: KhoangMayChu | null; so_sanh_phu: { ma: string; nhan: string; co: boolean; tu: string; den: string } | null;
 };
 
 export type ONhanh = {
   ma_jis: string; ten: string; ten_ngan: string; ten_latin: string; vung: string; hang: number; cot: number;
   so_khach: number; doanh_thu: number; can_goi: number; ty_le_can_goi: number | null;
-  gia_tri: number; bac: number; x: number; y: number;
+  gia_tri: number; bac: number; x: number; y: number; dt_khoang: number; khach_mua: number;
 };
 export type BanDoApi = {
   t: {
@@ -44,6 +47,7 @@ export type BanDoApi = {
     chi_so: string; rong: number; cao: number;
   };
   sale: string | null; ten_sale: string | null; chi_so_ds: Record<string, string>; o_rong: number; o_cao: number;
+  khoang: KhoangMayChu | null;
 };
 
 export type MatHang = {
