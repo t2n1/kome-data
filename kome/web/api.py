@@ -609,4 +609,79 @@ def tao_api(open_app_conn) -> APIRouter:
                      _voi_moc(ts, lambda c: thanh_json(CN.cua_khach(c, ma))),
                      "Không đọc được công nợ của khách.", chi_nap=True)
 
+    # ---- Kho dữ liệu → xem từng bảng (đợt C) ---------------------------
+    # CHỈ ĐỌC bằng kome_app trong giao dịch READ ONLY (kome/bang_kho.py). Nằm
+    # dưới /api/kho-du-lieu → middleware gác bằng duoc_vao_kho_du_lieu (403
+    # JSON). KHÔNG qua ảnh chụp: người mở màn này muốn thấy đúng dòng vừa nạp.
+
+    def _jd(o) -> Response:
+        """JSON có ngày / Decimal (dòng của một bảng bất kỳ) — không qua ảnh chụp."""
+        import json
+        from kome import bang_kho as BK
+
+        def conv(x):
+            if isinstance(x, dict):
+                return {k: conv(v) for k, v in x.items()}
+            if isinstance(x, (list, tuple)):
+                return [conv(v) for v in x]
+            return BK._gia(x)
+        return Response(json.dumps(conv(o), ensure_ascii=False), media_type="application/json",
+                        headers={"Cache-Control": "private, no-store"})
+
+    def _bang(ten):
+        from kome import bang_kho as BK
+        with open_app_conn() as conn:
+            return BK.thong_tin(conn, ten)
+
+    @r.get("/kho-du-lieu/bang")
+    def kdl_ds_bang():
+        from kome import bang_kho as BK
+        try:
+            with open_app_conn() as conn:
+                return _jd((BK.danh_sach(conn)))
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được danh sách bảng.")
+
+    @r.get("/kho-du-lieu/bang/{ten}")
+    def kdl_bang(ten: str):
+        from kome import bang_kho as BK
+        try:
+            return _jd((_bang(ten)))
+        except BK.KhongCoBang:
+            return _loi(f"Không có bảng '{ten}' (hay bạn không được xem nó).", 404)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được thông tin bảng.")
+
+    @r.get("/kho-du-lieu/bang/{ten}/dong")
+    def kdl_dong(ten: str, tim: str = "", chip: str = "tat_ca", trang: int = 1):
+        from kome import bang_kho as BK
+        try:
+            with open_app_conn() as conn:
+                tt = BK.thong_tin(conn, ten)
+                return _jd((BK.dong(conn, tt, tim, chip, trang)))
+        except BK.KhongCoBang:
+            return _loi(f"Không có bảng '{ten}'.", 404)
+        except Exception as e:
+            traceback.print_exc()
+            het_gio = "statement timeout" in str(e) or "canceling statement" in str(e)
+            return _loi("Bảng / view này tính quá lâu (quá 20 giây) — thử lọc hẹp hơn." if het_gio
+                        else "Không đọc được dữ liệu bảng.")
+
+    @r.get("/kho-du-lieu/bang/{ten}/csv")
+    def kdl_csv(ten: str, tim: str = "", chip: str = "tat_ca"):
+        from kome import bang_kho as BK
+        try:
+            with open_app_conn() as conn:
+                tt = BK.thong_tin(conn, ten)
+                van = BK.csv_van_ban(conn, tt, tim, chip)
+        except BK.KhongCoBang:
+            return _loi(f"Không có bảng '{ten}'.", 404)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không xuất được CSV.")
+        return Response(van, media_type="text/csv; charset=utf-8", headers={
+            "Content-Disposition": f'attachment; filename="{tt["ngan"]}.csv"'})
+
     return r

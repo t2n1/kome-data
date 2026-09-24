@@ -107,7 +107,7 @@ SO_NGAY_SOAT = 30
 # Mọi đường dẫn thuộc màn Kho dữ liệu — màn DUY NHẤT có nút xoá dữ liệu.
 # Ba địa chỉ cũ ở cuối danh sách vẫn phải chặn dù chúng chỉ còn trả 301: để
 # hở chúng là để người không có quyền dò ra cấu trúc màn bị cấm.
-DUONG_KHO_DU_LIEU = ("/kho-du-lieu", "/upload", "/undo",
+DUONG_KHO_DU_LIEU = ("/kho-du-lieu", "/api/kho-du-lieu", "/upload", "/undo",
                      "/nap", "/health", "/phu-du-lieu")
 
 
@@ -1002,6 +1002,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "nguon": TL.nguon_obc(SPECS), "ma_tran": TL.ma_tran(SPECS),
             "noi": TL.noi_di_dau(SPECS, ten), "so_do": TL.so_do_noi(SPECS, ten),
             "dong_so_do": TL.DONG_SO_DO, "cot": TL.cot_cua(SPECS, ten)})
+
+    # Xem một bảng (đợt C): vỏ React, dữ liệu qua /api/kho-du-lieu/bang/{tên}.
+    @app.get("/kho-du-lieu/bang/{ten}", response_class=HTMLResponse)
+    def kho_du_lieu_bang(request: Request, ten: str):
+        return _spa(request, man={"bang": ten})
 
     # "Dữ liệu đi đâu" (2026-09-24): cột OBC nào bỏ được ở lần xuất sau. 0 truy
     # vấn — ảnh chụp kome/web/cot_dung_sinh.json (scripts/sinh_cot_dung.py).
