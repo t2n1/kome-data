@@ -37,6 +37,13 @@ Phân bố số dư (bản 5–7/2026): 代引請求 75 bên ≈ ¥93,9M (một 
 - **Màn `/cong-no`** (Công nợ.dc.html), tab Công nợ + ô "Công nợ quá hạn" của hồ sơ
   khách, khối "Tuổi nợ phải thu" + ô "Phải thu quá hạn" của `/`.
 - **Dòng tiền & phải trả** vẫn "chưa có": `仕入先元帳` chỉ có một bản 2025, không nạp đều.
+  Đo thật 2026-09-24 (`OBCデータ保管 202505~202507/`, chỉ đọc): `仕入先元帳` cùng khung 元帳
+  (header dòng 6, 集計軸項目 = 仕入先, 26 nhà cung cấp, 325 dòng chi tiết) nhưng **không có
+  dòng 繰越残高 và không có cột 残高**; mọi dòng là `債務支払`, 468/481 dòng `その都度精算`.
+  ⇒ không suy được số còn phải trả — cần OBC xuất bản CÓ số dư (kiểu 請求先元帳) và xuất đều.
+  `仕入先別発注残明細表…xlsx` thực chất là 仕入明細表 (tiêu đề `仕入先別仕入明細表`), không phải
+  đơn đặt còn treo; `発注伝票…xlsx` có 納品期日 nhưng không có trạng thái đã nhận ⇒ tab "Hàng
+  đang về" của `/kho-hang` cũng chưa có nguồn đáng tin.
 
 ## 3. Mô hình
 
