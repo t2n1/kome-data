@@ -65,7 +65,7 @@ def test_cau_chu_khoi_hoan_tac_du_ba_dieu_bat_buoc():
 # Mỗi khối một dấu hiệu nhận biết ổn định (không phải chuỗi trang trí dễ đổi).
 DAU_HIEU_KHOI = {
     "tuoi du lieu": "hom-nay",
-    "nap": 'id="nap"',
+    "so do nguon": "<SoDoNguon",
     "suc khoe": "Sức khoẻ dữ liệu",
     "bang 7 loai": "在庫一覧",
     "bang theo ngay": "theo-ngay",
@@ -84,9 +84,13 @@ def test_man_kho_du_lieu_co_du_cac_khoi(conn, test_db_url):
     for ten, dau_hieu in DAU_HIEU_KHOI.items():
         assert dau_hieu in src or dau_hieu in r.text, f"thiếu khối: {ten}"
     m = man(r.text)
-    for khoa in ("status", "ky", "bang", "bang_ngay", "lo", "backup"):
+    for khoa in ("status", "ky", "bang", "bang_ngay", "backup", "nguon", "o_so", "luoi"):
         assert khoa in m, f"thiếu dữ liệu khối {khoa}"
     assert kd(r.text)["tuoi"]["nguon"], "thiếu ô tuổi dữ liệu"
+    # Đợt B: nạp + lô gần nhất + hoàn tác sang màn Nạp riêng (theo gói thiết kế).
+    m = man(client.get("/kho-du-lieu/nap").text)
+    for khoa in ("nguon", "lo", "cho"):
+        assert khoa in m, f"màn Nạp thiếu dữ liệu khối {khoa}"
 
 
 def test_man_co_hai_neo_cho_dau_trang_cu(conn, test_db_url):
@@ -94,7 +98,8 @@ def test_man_co_hai_neo_cho_dau_trang_cu(conn, test_db_url):
     #nap / #theo-thang. Neo không tồn tại thì người bấm rơi lên đầu trang
     và phải cuộn đi tìm — đúng thứ chuyển hướng sinh ra để tránh."""
     src = nguon(*KDL)
-    assert '<section id="nap">' in src
+    assert '<section id="nap">' in src        # màn Nạp (/nap cũ -> /kho-du-lieu/nap)
+    assert '<section id="lo-nap">' in src     # hoàn tác xong quay về đúng khối này
     assert '<section id="theo-thang">' in src
 
 
@@ -105,8 +110,9 @@ def test_ban_chi_doc_an_o_tha_file(conn, test_db_url, monkeypatch):
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/kho-du-lieu").text
     assert kd(html)["chi_doc"] is True
-    assert "{!KD.chi_doc && <Nap" in nguon(*KDL)
+    assert "{KD.chi_doc ? <div className=\"ky\">Bản công khai không nạp được" in nguon(*KDL)
     assert any(x["name"] == "在庫一覧" for x in man(html)["status"]), "khối chỉ-đọc khác vẫn phải hiện"
+    assert man(client.get("/kho-du-lieu/nap").text)["cho"] == [], "bản chỉ-đọc không đọc thư mục chờ"
 
 
 def test_khoi_hoan_tac_hien_lo_va_giau_nut_sau_mot_buoc(conn, test_db_url):
@@ -118,7 +124,7 @@ def test_khoi_hoan_tac_hien_lo_va_giau_nut_sau_mot_buoc(conn, test_db_url):
     _nha_cung_cap(conn, b, 3)
     conn.commit()
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/kho-du-lieu").text
+    html = client.get("/kho-du-lieu/nap").text
 
     l = _khoi_hoan_tac(html)[b]
     assert l["ten_file"] == "仕入先_20260908.xlsx"
@@ -132,7 +138,7 @@ def test_ban_chi_doc_an_khoi_hoan_tac(conn, test_db_url, monkeypatch):
     mời người ta bấm một thứ chắc chắn thất bại — và là nút XOÁ."""
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     client = TestClient(create_app(db_url=test_db_url))
-    html = client.get("/kho-du-lieu").text
+    html = client.get("/kho-du-lieu/nap").text
     assert kd(html)["chi_doc"] is True
     assert "{!KD.chi_doc && <LoNap" in nguon(*KDL)
 
@@ -151,7 +157,7 @@ def test_hoan_tac_master_upsert_hien_canh_bao_se_trong(conn, test_db_url):
     _nha_cung_cap(conn, b, 49)
     conn.commit()
     client = TestClient(create_app(db_url=test_db_url))
-    khoi = _khoi_hoan_tac(client.get("/kho-du-lieu").text)[b]
+    khoi = _khoi_hoan_tac(client.get("/kho-du-lieu/nap").text)[b]
     assert khoi["so_dong_xoa"] == 49
     assert khoi["lam_trong_bang"] is True
 
@@ -181,7 +187,7 @@ def test_hoan_tac_uriage_doi_soat_thang_noi_dung_so_dong_se_mat(conn, test_db_ur
     _ban_hang(conn, b2, [("A", 1), ("B", 1), ("C", 1)])
     conn.commit()
     client = TestClient(create_app(db_url=test_db_url))
-    khoi = _khoi_hoan_tac(client.get("/kho-du-lieu").text)
+    khoi = _khoi_hoan_tac(client.get("/kho-du-lieu/nap").text)
 
     assert khoi[b2]["so_dong_xoa"] == 3, "lô đối soát đang giữ 3 dòng, phải nói đúng 3"
     assert "doanh thu" in khoi[b2]["ten_bang"], "phải nói rõ mất dòng của BẢNG NÀO"
@@ -205,7 +211,7 @@ def test_khong_doa_se_trong_khi_bang_con_dong_cua_lo_khac(conn, test_db_url):
     _ban_hang(conn, b2, [("B", 1)])
     conn.commit()
     client = TestClient(create_app(db_url=test_db_url))
-    khoi = _khoi_hoan_tac(client.get("/kho-du-lieu").text)
+    khoi = _khoi_hoan_tac(client.get("/kho-du-lieu/nap").text)
     assert khoi[b2]["so_dong_xoa"] == 1
     assert khoi[b2]["lam_trong_bang"] is False
     assert khoi[b1]["lam_trong_bang"] is False
@@ -220,7 +226,7 @@ def test_ba_dia_chi_cu_chuyen_huong_301(conn, test_db_url):
     """
     client = TestClient(create_app(db_url=test_db_url))
     mong_doi = {"/health": "/kho-du-lieu",
-                "/nap": "/kho-du-lieu#nap",
+                "/nap": "/kho-du-lieu/nap",
                 "/phu-du-lieu": "/kho-du-lieu#theo-thang"}
     for cu, moi in mong_doi.items():
         r = client.get(cu, follow_redirects=False)
@@ -246,9 +252,9 @@ def test_upload_render_man_gop(conn, test_db_url):
         r = client.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", f)})
     assert r.status_code == 200
     m = man(r.text)
-    assert "bang" in m and "lo" in m, "phải là màn gộp, không phải trang nạp cũ"
+    assert m["man"] == "nap" and "lo" in m, "phải là màn Nạp (đợt B), không phải trang nạp cũ"
     assert any("nghi file xuất một phần" in b["message"] for k in m["results"] for b in k["blockers"]),         "kết quả nạp vẫn phải hiện"
-    assert '"/upload") return () => <KhoDuLieu />' in (nguon("main.tsx"))
+    assert 'duong === "/upload" || duong.startsWith("/upload/")) return () => <NapDuLieu />' in nguon("main.tsx")
 
 
 def test_tai_lieu_khong_con_tro_toi_ba_dia_chi_cu():
@@ -259,12 +265,15 @@ def test_tai_lieu_khong_con_tro_toi_ba_dia_chi_cu():
     canh = [Path("docs/runbook.md"), Path("CLAUDE.md"),
             Path("docs/trien-khai-vercel.md")]
     cu = ("/phu-du-lieu", "/health", "/nap")
+    # Đợt B: `/kho-du-lieu/nap` là màn MỚI (không phải địa chỉ cũ) — bỏ nó khỏi
+    # dòng trước khi dò, không miễn trừ cả dòng.
+    import re as _re
     loi = []
     for f in canh:
         for i, dong in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
             # Chỉ bắt địa chỉ dùng như ĐƯỜNG DẪN (có dấu / đứng trước),
             # không bắt chữ "nạp" tiếng Việt hay tên biến.
-            if any(d in dong for d in cu):
+            if any(d in _re.sub(r"/kho-du-lieu/nap", "", dong) for d in cu):
                 loi.append(f"{f}:{i}: {dong.strip()[:70]}")
     assert not loi, "tài liệu còn trỏ tới địa chỉ cũ:\n" + "\n".join(loi)
 
@@ -353,6 +362,9 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
         Path("kome/web/app.py"),
     ]
     cu = ("/phu-du-lieu", "/health", "/nap")
+    # Đợt B: `/kho-du-lieu/nap` là màn MỚI (không phải địa chỉ cũ) — bỏ nó khỏi
+    # dòng trước khi dò, không miễn trừ cả dòng.
+    import re as _re
     # Định nghĩa route redirect thật (`@app.get("/nap", ...)`) và comment mô
     # tả đúng ngay hành vi của chính route /nap đó — hai chỗ DUY NHẤT (ngoài
     # câu lệnh gán DUONG_KHO_DU_LIEU, miễn trừ riêng bằng AST ở dưới) được
@@ -383,6 +395,6 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
                 continue
             if any(h in dong for h in hop_le):
                 continue
-            if any(d in dong for d in cu):
+            if any(d in _re.sub(r"/kho-du-lieu/nap", "", dong) for d in cu):
                 loi.append(f"{f}:{i}: {dong.strip()[:70]}")
     assert not loi, "code còn nhắc địa chỉ cũ như thể còn sống:\n" + "\n".join(loi)

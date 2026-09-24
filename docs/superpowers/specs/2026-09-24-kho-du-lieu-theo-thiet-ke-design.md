@@ -40,9 +40,16 @@ Chọn file · bảng cột (huy hiệu loại, cột `core`, view, màn, lý do
 tải CSV danh sách bỏ được · hình đường đi 4 cột (OBC → core → mart → màn, bấm để sáng) · sơ đồ
 nối khoá (`files.yml.references` + khoá ngoại thật). Tab thứ tư của dải tab Kho dữ liệu.
 
-## B, C (hướng, chốt ở đợt đó)
-B: thanh trái 4 mục + danh sách bảng; Tổng quan (sơ đồ nguồn 8 nhánh, 4 ô số, lưới ngày theo
-tháng có ‹ ›, lưới tháng; giữ dải tuổi dữ liệu / sao lưu / ngày thiếu); Nạp: mỗi loại một ô,
-bước Kiểm (5 cổng, không ghi) → Xác nhận (chạy lại `ingest` đầy đủ) / Huỷ; sai ô → chặn.
+## B. Khung + Tổng quan + Nạp hai bước (đã làm)
+- Khung: `TabKho.tsx::KhungKho` — thanh trái 5 mục (Nạp ẩn ở bản chỉ-đọc); dưới 860px thành dải ngang.
+- Tổng quan: sơ đồ 8 nguồn (`kho_du_lieu.O_NAP`; nhịp 'ngay' đọc `tinh_tuoi`, 'nen'/'ky' không bao giờ
+  đỏ) · 4 ô số (một câu `pg_class.reltuples` — "khoảng") · lưới theo ngày MỘT tháng (`?ngay_thang=`,
+  tái dùng `coverage.tinh_bang_ngay`) · DaiTuoi / sức khoẻ / bảng tháng giữ nguyên (thiết kế không có
+  chỗ, lệch có chủ ý). "Nạp hôm nay" tính theo giờ Tokyo.
+- Nạp: `pipeline.kiem` = `_chuan_bi` (5 cổng) của `ingest`, không ghi. File chờ: `kome/nap_cho.py` (mã
+  32 hex kiểm dạng; tên file chỉ lấy phần tên). Xác nhận chạy lại `ingest` đầy đủ; bấm hai lần → "file
+  chờ không còn". Năm dòng cổng: cổng 1/2 chặn thì cổng sau "không chạy".
+
+## C (hướng, chốt ở đợt đó)
 C: `/kho-du-lieu/bang/<schema.bảng>` — Dữ liệu (tìm, 50 dòng/trang, CSV), Cột & khoá, Lần nạp
 (+ hoàn tác); danh sách bảng cho phép là danh mục cố định (chặn chèn tên).

@@ -779,13 +779,99 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         getattr(request.state, "nguoi", None))
             if any(r.batch_id for r in results):
                 anh_chup.lam_nong(open_app_conn)
-            backup_dir = Path(os.environ.get("BACKUP_DIR", "./backups"))
             with open_conn() as conn:
-                ctx = _du_lieu_kho(conn)
-            ctx["backup"] = None if chi_doc else backup_status(backup_dir)
+                ctx = _du_lieu_nap(conn)
             return _man_kho(request, {**ctx, "results": results})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e)
+
+    # ---- Nạp hai bước (đợt B, 2026-09-24) ------------------------------
+    # Kiểm: chép file vào thư mục chờ + 5 cổng (pipeline.kiem, KHÔNG ghi CSDL).
+    # Xác nhận: pipeline.ingest ĐẦY ĐỦ trên đúng file đó (5 cổng chạy lại).
+    # Huỷ: xoá file chờ. Cả ba nằm dưới /upload → middleware gác bằng
+    # duoc_vao_kho_du_lieu như POST /upload; bản chỉ-đọc từ chối cả ba.
+
+    def _ket_kiem(conn, ma: str, duong: Path, o: str) -> dict:
+        from kome.gates import TEN_CONG
+        from kome.pipeline import identify, kiem
+        from kome import gates as G, kho_du_lieu as KDL, nap_cho
+        from kome.config import SPECS
+        spec, _ = identify(duong)
+        if o and spec is not None and spec.name not in KDL.O_CUA.get(o, {}).get("specs", []):
+            # Thả nhầm ô: không kiểm tiếp — người thả đang nghĩ là một file khác.
+            dich = KDL.O_CUA_SPEC.get(spec.name)
+            from kome.pipeline import IngestResult
+            kq = IngestResult(ok=False, spec_name=spec.name, blockers=[G.Blocker(
+                1, f"File này là {spec.display_name} ({dich['nhan'] if dich else spec.name}), "
+                   f"không phải ô {KDL.O_CUA[o]['nhan']} — thả vào đúng ô của nó.")])
+        else:
+            kq = kiem(conn, duong)
+        conn.rollback()                  # kiem chỉ đọc; không để giao dịch đọc treo
+        cho = kq.ok and not kq.skipped
+        if not cho:
+            nap_cho.xoa(archive_dir, ma)
+        sp = SPECS.get(kq.spec_name) if kq.spec_name else None
+        return {"ma": ma if cho else None, "ten_file": duong.name, "o": o, "spec_name": kq.spec_name,
+                "ja": sp.display_name if sp else None, "bang": sp.core_table if sp else None,
+                "ok": kq.ok, "skipped": kq.skipped, "row_count": kq.row_count, "total": kq.total,
+                "co_tien": bool(sp and sp.total_column), "data_date": kq.data_date,
+                "blockers": kq.blockers, "warnings": kq.warnings,
+                "cong": KDL.dong_cong(kq, TEN_CONG)}
+
+    @app.post("/upload/kiem", response_class=HTMLResponse)
+    def upload_kiem(request: Request, files: list[UploadFile], o: str = Form("")):
+        if chi_doc:
+            return _cam(request)
+        try:
+            from kome import nap_cho
+            nap_cho.don_cu(archive_dir)
+            ket = []
+            with open_conn() as conn:
+                for f in files:
+                    ma, duong = nap_cho.luu(archive_dir, f.file, f.filename, o)
+                    ket.append(_ket_kiem(conn, ma, duong, o))
+                ctx = _du_lieu_nap(conn)
+            return _man_kho(request, {**ctx, "kiem": ket})
+        except Exception as e:
+            return _loi(request, "kiểm file dữ liệu", e)
+
+    @app.post("/upload/xac-nhan", response_class=HTMLResponse)
+    def upload_xac_nhan(request: Request, ma: list[str] = Form([])):
+        if chi_doc:
+            return _cam(request)
+        try:
+            from kome import nap_cho
+            from kome.pipeline import IngestResult, ingest
+            from kome import gates as G
+            results = []
+            with open_conn() as conn:
+                for m_ in ma:
+                    x = nap_cho.doc(archive_dir, m_)
+                    if x is None:
+                        results.append(IngestResult(ok=False, blockers=[G.Blocker(
+                            1, "File chờ không còn (đã xác nhận, đã huỷ, hay quá "
+                               f"{nap_cho.GIU_GIO} giờ) — thả lại file để kiểm lại.")]))
+                        continue
+                    results.append(ingest(conn, x[0], archive_dir))
+                    nap_cho.xoa(archive_dir, m_)
+                _ghi_ai(conn, "nap_boi", [r.batch_id for r in results if r.batch_id],
+                        getattr(request.state, "nguoi", None))
+            if any(r.batch_id for r in results):
+                anh_chup.lam_nong(open_app_conn)
+            with open_conn() as conn:
+                ctx = _du_lieu_nap(conn)
+            return _man_kho(request, {**ctx, "results": results})
+        except Exception as e:
+            return _loi(request, "nạp file dữ liệu", e)
+
+    @app.post("/upload/huy")
+    def upload_huy(request: Request, ma: list[str] = Form([])):
+        if chi_doc:
+            return _cam(request)
+        from kome import nap_cho
+        for m_ in ma:
+            nap_cho.xoa(archive_dir, m_)
+        return RedirectResponse("/kho-du-lieu/nap", status_code=303)
 
     def _ghi_ai(conn, cot: str, batch_ids: list[int], nguoi) -> None:
         """Ghi AI nạp / AI hoàn tác vào meta.ingest_batch (033) cho Nhật ký
@@ -804,17 +890,40 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             conn.rollback()
             _in(f"[nhat-ky] không ghi được {cot} cho lô {batch_ids}: {e!r}")
 
-    def _du_lieu_kho(conn):
+    def _du_lieu_kho(conn, ngay_thang: str | None = None):
         """Mọi thứ màn Kho dữ liệu cần, gom một chỗ.
 
         Route GET và route POST /upload đều render cùng màn này, nên cùng
         gọi hàm này — tách ra để hai chỗ không bao giờ trôi khỏi nhau.
         """
-        return {"status": trang_thai_nap(conn),
+        from kome import coverage as COV, kho_du_lieu as KDL
+        tuoi = tinh_tuoi(conn)
+        status = trang_thai_nap(conn)
+        dau, cuoi, luoi = KDL.thang_luoi(ngay_thang, tuoi.hom_nay, COV.DAU_DU_LIEU)
+        nguon = KDL.nut_nguon(status, tuoi, tuoi.hom_nay)
+        # MỘT câu danh mục cho hai ô "Bảng trong kho" / "Tổng số dòng": reltuples
+        # (ước tính của Postgres sau ANALYZE) — đếm thật count(*) từng bảng là
+        # quét cả fact_sales_line mỗi lần mở màn.
+        danh_muc = conn.execute(
+            """SELECT n.nspname, c.relname, c.relkind::text, greatest(c.reltuples, 0)::bigint
+               FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+               WHERE n.nspname IN ('core', 'mart', 'meta') AND c.relkind IN ('r', 'v', 'm')
+               ORDER BY 1, 2""").fetchall()
+        return {"man": "tong_quan", "status": status,
                 "ky": _ky_du_lieu(conn),
-                "tuoi": tinh_tuoi(conn),
+                "tuoi": tuoi,
                 "bang": tinh_bang_phu(conn),
-                "bang_ngay": tinh_bang_ngay(conn),
+                "bang_ngay": tinh_bang_ngay(conn, hom_nay=cuoi, so_ngay=(cuoi - dau).days + 1),
+                "luoi": luoi, "nguon": nguon, "o_so": KDL.o_so(danh_muc, nguon)}
+
+    def _du_lieu_nap(conn):
+        """Màn Nạp: các ô nạp (cùng danh sách với sơ đồ nguồn), file đang chờ
+        xác nhận, lô gần nhất + hoàn tác."""
+        from kome import kho_du_lieu as KDL, nap_cho
+        tuoi = tinh_tuoi(conn)
+        nguon = KDL.nut_nguon(trang_thai_nap(conn), tuoi, tuoi.hom_nay)
+        return {"man": "nap", "tuoi": tuoi, "nguon": nguon,
+                "cho": [] if chi_doc else nap_cho.danh_sach(archive_dir),
                 "lo": lo_nap_gan_nhat(conn)}
 
     def _man_kho(request: Request, ctx: dict) -> HTMLResponse:
@@ -826,11 +935,12 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         man = _json_man(ctx)
         # `BangPhu.database` (tên CSDL) CHỈ dành cho terminal — không bao giờ ra
         # trình duyệt (có test: không lộ thông tin kết nối).
-        man["bang"].pop("database", None)
-        for bang in (man["bang_ngay"]["ngay"], *[k["thang"] for k in man["bang"]["ky"]]):
-            for dong in bang:
-                for o in dong["o"]:
-                    o.pop("cot", None)
+        if "bang" in man:
+            man["bang"].pop("database", None)
+        for bang in ([*man["bang_ngay"]["ngay"], *[th for k in man["bang"]["ky"] for th in k["thang"]]]
+                     if "bang" in man else []):
+            for o in bang["o"]:
+                o.pop("cot", None)
         kd = _khoi_dau(request)
         kd["man"] = man
         kd["tuoi"] = {"hom_nay": t.hom_nay, "co_thieu": t.co_thieu,
@@ -838,14 +948,23 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                                  "trang_thai": n.trang_thai, "tre": n.tre} for n in t.nguon]}
         return HTMLResponse(SPA.trang(_data_theme(_che_do_giao_dien(request)), kd))
 
+    @app.get("/kho-du-lieu/nap", response_class=HTMLResponse)
+    def kho_du_lieu_nap(request: Request):
+        try:
+            with open_conn() as conn:
+                ctx = _du_lieu_nap(conn)
+            return _man_kho(request, ctx)
+        except Exception as e:
+            return _loi(request, "mở màn nạp dữ liệu", e)
+
     @app.get("/kho-du-lieu", response_class=HTMLResponse)
-    def kho_du_lieu(request: Request):
+    def kho_du_lieu(request: Request, ngay_thang: str | None = None):
         try:
             # BACKUP_DIR đọc mỗi lần gọi, không chốt lúc tạo app — test và
             # người vận hành đổi biến môi trường thì trang phải thấy ngay.
             backup_dir = Path(os.environ.get("BACKUP_DIR", "./backups"))
             with open_conn() as conn:
-                ctx = _du_lieu_kho(conn)
+                ctx = _du_lieu_kho(conn, ngay_thang)
             # Bản chỉ-đọc KHÔNG nói gì về sao lưu: sao lưu chạy trên máy nội
             # bộ, máy chủ công khai không nhìn thấy thư mục .zip đó nên sẽ
             # luôn kết luận "chưa sao lưu" — một dải đỏ vĩnh viễn dạy người
@@ -904,7 +1023,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
 
     @app.get("/nap", include_in_schema=False)
     def _cu_nap():
-        return RedirectResponse("/kho-du-lieu#nap", status_code=301)
+        return RedirectResponse("/kho-du-lieu/nap", status_code=301)
 
     @app.get("/health", include_in_schema=False)
     def _cu_health():
@@ -1032,7 +1151,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 undo_batch(conn, batch_id)
                 _ghi_ai(conn, "huy_boi", [batch_id], getattr(request.state, "nguoi", None))
             anh_chup.lam_nong(open_app_conn)
-            return RedirectResponse("/kho-du-lieu", status_code=303)
+            return RedirectResponse("/kho-du-lieu/nap#lo-nap", status_code=303)
         except Exception as e:
             return _loi(request, "hoàn tác lần nạp dữ liệu", e)
 

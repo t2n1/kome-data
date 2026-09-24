@@ -71,6 +71,7 @@ class IngestResult:
     skipped: bool = False
     blockers: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
+    data_date: date | None = None
 
 def identify(path: Path) -> tuple[FileSpec, date] | tuple[None, None]:
     """Cổng 1: nhận ra loại file và ngày dữ liệu từ tên file."""
@@ -114,28 +115,52 @@ def _kiem_tra_trung_nguon(conn, spec: FileSpec, df) -> list[gates.Blocker]:
         f"hai lần. Hoàn tác lô {nguon_khac} trước nếu muốn đổi nguồn.")]
 
 
-def ingest(conn, path: Path, archive_dir: Path) -> IngestResult:
+def _chuan_bi(conn, path: Path):
+    """Năm cổng kiểm — KHÔNG ghi gì. Trả (chuẩn bị, kết quả): chuẩn bị là None
+    khi file không được đi tiếp (chặn, hay đã nạp rồi)."""
     spec, data_date = identify(path)
     if spec is None:
-        return IngestResult(ok=False, blockers=[gates.Blocker(1, f"Không nhận ra loại file: {path.name}")])
+        return None, IngestResult(ok=False, blockers=[gates.Blocker(1, f"Không nhận ra loại file: {path.name}")])
 
     digest = archive.sha256_of(path)
     if archive.already_loaded(conn, digest):
-        return IngestResult(ok=True, spec_name=spec.name, skipped=True)
+        return None, IngestResult(ok=True, spec_name=spec.name, skipped=True, data_date=data_date)
 
     try:
         df = read(path, spec)
     except ColumnMismatch as e:
-        return IngestResult(ok=False, spec_name=spec.name, blockers=[gates.Blocker(2, str(e))])
+        return None, IngestResult(ok=False, spec_name=spec.name, data_date=data_date,
+                                  blockers=[gates.Blocker(2, str(e))])
 
     blockers, warnings = gates.check(path, spec, df, archive.previous_stats(conn, spec.name))
     blockers = blockers + _kiem_tra_trung_nguon(conn, spec, df)
     if blockers:
-        return IngestResult(ok=False, spec_name=spec.name, blockers=blockers, warnings=warnings)
+        return None, IngestResult(ok=False, spec_name=spec.name, blockers=blockers,
+                                  warnings=warnings, data_date=data_date)
 
     # Tổng tiền đại diện: cột khai TAY trong files.yml (spec.total_column),
     # không phải money_columns[-1]. Xem ghi chú ở kome/config.py.
     total = int(df[spec.total_column].sum()) if spec.total_column else 0
+    return (spec, data_date, digest, df, total), IngestResult(
+        ok=True, spec_name=spec.name, row_count=len(df), total=total,
+        warnings=warnings, data_date=data_date)
+
+
+def kiem(conn, path: Path) -> IngestResult:
+    """Bước 1 của nạp hai bước (màn Kho dữ liệu → Nạp): chạy đủ 5 cổng như
+    `ingest` nhưng KHÔNG ghi một dòng nào vào `core` hay `meta` — chỉ đọc
+    (lô trước để so, file đã nạp chưa, ngày trùng nguồn). Bước 2 gọi lại
+    `ingest` ĐẦY ĐỦ, tức 5 cổng chạy lại trên trạng thái kho lúc xác nhận: ai
+    nạp chen vào giữa hai bước thì lần kiểm thứ hai vẫn đúng."""
+    return _chuan_bi(conn, path)[1]
+
+
+def ingest(conn, path: Path, archive_dir: Path) -> IngestResult:
+    chuan_bi, kq = _chuan_bi(conn, path)
+    if chuan_bi is None:
+        return kq
+    spec, data_date, digest, df, total = chuan_bi
+    warnings = kq.warnings
     batch_id = archive.store(conn, path, spec.name, digest, len(df), total,
                              archive_dir, data_date)
 
@@ -156,7 +181,8 @@ def ingest(conn, path: Path, archive_dir: Path) -> IngestResult:
         raise
 
     return IngestResult(ok=True, spec_name=spec.name, row_count=len(df),
-                        total=total, batch_id=batch_id, warnings=warnings)
+                        total=total, batch_id=batch_id, warnings=warnings,
+                        data_date=data_date)
 
 
 def _huy_lo_hong(conn, batch_id: int) -> None:

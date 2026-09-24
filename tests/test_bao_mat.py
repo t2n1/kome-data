@@ -372,7 +372,8 @@ def test_trang_chi_doc_khong_duoc_dung_ket_noi_nap_du_lieu():
 
     import kome.web.app as A
 
-    DUOC_GHI = {"upload", "kho_du_lieu", "undo"}
+    # Đợt B: nạp hai bước (kiem / xac_nhan) và màn Nạp đọc meta bằng CÙNG vai trò nạp.
+    DUOC_GHI = {"upload", "kho_du_lieu", "undo", "upload_kiem", "upload_xac_nhan", "kho_du_lieu_nap"}
 
     tao = next(n for n in ast.parse(inspect.getsource(A)).body
                if isinstance(n, ast.FunctionDef) and n.name == "create_app")
@@ -415,12 +416,12 @@ def test_tren_vercel_khong_nap_va_khong_hoan_tac_duoc(khach):
     # "/" giờ là trang Tổng quan — chỉ đọc, nên bản công khai xem được bình
     # thường.
     assert c.get("/").status_code == 200
-    # /nap giờ LUÔN 301 sang /kho-du-lieu#nap (Task 4), kể cả ở bản chỉ-đọc:
+    # /nap giờ LUÔN 301 sang /kho-du-lieu/nap (Task 4), kể cả ở bản chỉ-đọc:
     # màn đích tự ẩn khối nạp thay vì trả 403 cho một dấu trang cũ. Chặn
     # thật sự nằm ở POST /upload phía trên, không phải ở GET /nap.
     r = c.get("/nap", follow_redirects=False)
     assert r.status_code == 301
-    assert r.headers["location"] == "/kho-du-lieu#nap"
+    assert r.headers["location"] == "/kho-du-lieu/nap"
     assert c.get("/kho-du-lieu").status_code == 200
 
 
@@ -434,7 +435,8 @@ def test_ban_chi_doc_an_han_muc_nap_du_lieu(khach):
     _vao(c)
     t = c.get("/kho-du-lieu").text
     assert kd(t)["chi_doc"] is True
-    assert "{!KD.chi_doc && <Nap" in nguon("he_thong", "KhoDuLieu.tsx")
+    assert "{KD.chi_doc ? <div className=\"ky\">Bản công khai không nạp được" in nguon("he_thong", "KhoDuLieu.tsx")
+    assert 'ma !== "nap" || !KD.chi_doc' in nguon("he_thong", "TabKho.tsx")
     assert any(x["name"] == "在庫一覧" for x in man(t)["status"])
 
 
@@ -452,15 +454,16 @@ def test_ban_chi_doc_khong_bao_dong_sao_luu_gia(khach):
 
 
 def test_ban_o_may_ca_nhan_van_nap_duoc(khach):
-    """/nap giờ LUÔN 301 sang /kho-du-lieu#nap (Task 4) — theo tới đích để
+    """/nap giờ LUÔN 301 sang /kho-du-lieu/nap (Task 4) — theo tới đích để
     xác nhận khối nạp vẫn còn, còn hiện."""
     c = khach(bi_mat=None, tai_khoan=False)
     r = c.get("/nap", follow_redirects=False)
     assert r.status_code == 301
-    assert r.headers["location"] == "/kho-du-lieu#nap"
+    assert r.headers["location"] == "/kho-du-lieu/nap"
     t = c.get("/kho-du-lieu").text
     assert kd(t)["chi_doc"] is False
-    assert "Nạp dữ liệu OBC" in nguon("he_thong", "KhoDuLieu.tsx")
+    assert kd(c.get("/kho-du-lieu/nap").text)["chi_doc"] is False
+    assert "<h1>Nạp dữ liệu mới</h1>" in nguon("he_thong", "KhoDuLieu.tsx")
 
 
 def test_trang_chi_doc_khong_phu_thuoc_pandas():

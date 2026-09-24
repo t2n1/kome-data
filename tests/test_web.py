@@ -353,7 +353,10 @@ def test_trang_phu_du_lieu_co_bang_theo_tung_ngay(conn, test_db_url, monkeypatch
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/phu-du-lieu")
     assert r.status_code == 200
-    assert "90 ngày gần nhất" in nguon("he_thong", "KhoDuLieu.tsx")
+    # Đợt B (gói thiết kế): lưới THEO THÁNG, mặc định tháng hiện tại, ‹ › lùi tháng.
+    assert "<h2>Theo ngày — tháng {nhanThang(luoi.thang)}</h2>" in nguon("he_thong", "KhoDuLieu.tsx")
     ngay = [n["ngay"] for n in man(r.text)["bang_ngay"]["ngay"]]
     assert ngay[0] == "2026-09-17"          # dòng đầu là hôm nay
-    assert ngay[-1] == "2026-06-20"         # dòng cuối, đủ 90 ngày
+    assert ngay[-1] == "2026-09-01"         # dòng cuối là mùng 1 của tháng
+    ngay = [n["ngay"] for n in man(client.get("/kho-du-lieu?ngay_thang=2026-06").text)["bang_ngay"]["ngay"]]
+    assert (ngay[0], ngay[-1], len(ngay)) == ("2026-06-30", "2026-06-01", 30)

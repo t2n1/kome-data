@@ -35,14 +35,15 @@ def trang_thai_nap(conn) -> list[dict]:
     """
     rows = conn.execute(
         """SELECT DISTINCT ON (spec_name)
-                  spec_name, loaded_at, row_count, total_amount
+                  spec_name, loaded_at, row_count, total_amount, data_date
            FROM meta.ingest_batch WHERE undone_at IS NULL
            ORDER BY spec_name, loaded_at DESC, batch_id DESC"""
     ).fetchall()
     seen = {r[0]: r for r in rows}
     return [
-        {"name": s.display_name,
+        {"name": s.display_name, "spec": k,
          "last": seen[k][1] if k in seen else None,
+         "data_date": seen[k][4] if k in seen else None,
          "rows": seen[k][2] if k in seen else 0,
          "total": seen[k][3] if k in seen else 0,
          # File master / bảng giá KHÔNG mang giá trị tiền: `total_column` để
