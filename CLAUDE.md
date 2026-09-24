@@ -95,7 +95,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/ban-do` | Tab **Bản đồ** của màn Khách hàng (React) — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại + doanh thu / khách có mua trong khoảng xem — `mart.tinh_khoang`), lọc theo người phụ trách; bấm ô → tab Danh sách lọc tỉnh đó. `/api/ban-do` | `core.dim_prefecture`, `mart.khach_theo_tinh` |
 | `/bao-cao` | **React** (giai đoạn 3, `/api/bao-cao?thang=` · `?ky=` · `?tu=&den=` — mặc định tháng hiện tại; dạng Kỳ = báo cáo theo kỳ cũ, không đổi số; hình học biểu đồ vẫn tính ở Python) Báo cáo bán hàng + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
 | `/du-bao` | **Dự báo doanh thu — React** (giai đoạn 3, `/api/du-bao`, đổi kịch bản ở trình duyệt) (đợt 8): chốt tháng (đường luỹ kế + khoảng sai số thật + theo người phụ trách) · 12 tháng tới (3 kịch bản) · đơn kỳ vọng 14 ngày · nguy cơ ngừng mua · dự báo đã chuẩn tới đâu. Toàn công ty, **3 truy vấn** | `mart.lich_kinh_doanh`, `mart.ban_theo_ngay`, `mart.tien_do_ngan_sach`, `mart.khach_360`, `mart.khoang_cach_mua` |
-| `/ngan-sach` | Đặt chỉ tiêu doanh thu: 5 người phụ trách × 12 tháng một kỳ. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
+| `/ngan-sach` | Ngân sách theo tháng (041): khối **công ty** (12 tháng × doanh thu + lãi gộp, nhập thẳng) rồi khối **từng người phụ trách** (doanh thu + lãi gộp, không bắt buộc) + tổng từng người + phần lệch so với công ty. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach_cong_ty`, `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
 | `/san-pham` | **React** (giai đoạn 4, bám Sản phẩm.dc.html; khoảng xem: cột doanh thu / SL / khách trong khoảng từ `/api/san-pham/khoang`, ghép ở trình duyệt): MỘT trang — ô tổng quan · danh mục cả 232 mã (chip ngành / trạng thái, tìm, sắp — lọc ở trình duyệt trên MỘT ảnh chụp `/api/san-pham`, 1 lượt hỏi) · hồ sơ mã đang chọn ngay bên dưới | `mart.san_pham_360`, `mart.dong_ban`, `mart.moc_thoi_gian`, `core.dim_product` |
 | `/san-pham/{mã}` | Cùng màn Sản phẩm với một mã được chọn (`pushState`): khách mua trong khoảng xem (`/api/san-pham/{mã}/khoang`, 2 lượt), biểu đồ theo ngày mở đúng tháng đang xem · hồ sơ (`/api/san-pham/{mã}`, ≤ 5 lượt) · bán theo ngày + cùng ngày tháng trước (`/ngay?thang=`, 1 lượt) · khách đang mua / đã bỏ · tồn theo kho · giá theo bậc · xu hướng theo tháng | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list`, `mart.dong_ban`, `mart.lich_kinh_doanh` |
 | `/kho-hang` | **React** (giai đoạn 4, bám Kho hàng.dc.html; `/api/kho-hang?kho=&loc=`, 2 lượt): tab Tồn hiện tại (5 ô · bảng tồn theo dòng + tìm + CSV · quá hạn / cận hạn / giá trị theo kho) · Hàng đang về (chưa có dữ liệu) · Cần đặt (hết + sắp thiếu, KHÔNG đề xuất số lượng) | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
@@ -457,14 +457,28 @@ canh: `tests/test_ngan_sach_mart.py::test_nguoi_co_chi_tieu_ma_KHONG_ban_duoc_do
 `::test_thang_co_doanh_thu_ma_QUEN_dat_chi_tieu_van_co_dong`,
 `::test_ma_phu_trach_ngoai_dim_salesperson_van_hien_doanh_thu`.
 
+**Bất biến (041, ngân sách công ty):** ngân sách CÔNG TY là **số nhập thẳng**
+(`app.ngan_sach_cong_ty`: `doanh_thu`, `lai_gop` — lãi gộp = 粗利益), **KHÔNG phải tổng chỉ tiêu
+từng người**, và chưa đặt thì là "chưa đặt" — KHÔNG rơi về tổng từng người (hai định nghĩa cùng
+tên là hai con số nói hai điều). Mọi chỗ đọc tiến độ công ty — Tổng quan (ô KPI, khối ngân sách,
+khối theo tháng), Báo cáo, Dự báo chốt tháng — đọc `mart.tien_do_cong_ty` /
+`mart.ngan_sach_cong_ty_thang`; `mart.tien_do_ngan_sach` chỉ còn là tiến độ TỪNG NGƯỜI (thêm bốn
+cột lãi gộp cùng công thức). Mốc lãi gộp đến hôm nay = cùng công thức ngày làm việc. Hai bảng
+ghi chung MỘT sổ `app.ngan_sach_nhat_ky` (`salesperson_code` NULL = công ty, `chi_so` =
+`doanh_thu`/`lai_gop`) nên `anh_chup._PHIEN_BAN` và `/nhat-ky` không cần nhánh mới. Ô trống ≠ 0
+ở cả bốn loại ô. Có test canh:
+`tests/test_ngan_sach_bao_cao.py::test_ngan_sach_cong_ty_la_so_NHAP_THANG_khong_phai_tong_tung_nguoi`.
+Đặc tả: `docs/superpowers/specs/2026-09-24-ngan-sach-cong-ty-design.md`.
+
 **Bất biến:** `app.ngan_sach.thang` là **`date` mùng 1 có khoá ngoại tới
 `core.dim_date`**, không phải `text 'YYYY-MM'`. `core.dim_date` phủ 2024-01-01
 → 2035-12-31, và `mart.ngan_sach_thang` nối sang nó để lấy `company_fy` — nên
 một dòng chỉ tiêu ngoài dải lịch **biến mất khỏi mọi báo cáo mà không lỗi nào
 nổ ra**: dữ liệu còn trong bảng, chỉ là không ai nhìn thấy nữa. Khoá ngoại
 biến nó thành một lỗi ghi ngay tại chỗ nhập. Việc đổi `date` sang `'YYYY-MM'`
-xảy ra ở **đúng một chỗ** — `mart.ngan_sach_thang` — vì mọi view khác của
-`mart` đều dùng khoá tháng dạng chuỗi.
+xảy ra ở **đúng một chỗ** cho mỗi bảng — `mart.ngan_sach_thang` (từng người) và
+`mart.ngan_sach_cong_ty_thang` (công ty, 041) — vì mọi view khác của `mart` đều dùng khoá
+tháng dạng chuỗi.
 
 **Bất biến:** **không có dòng** trong `app.ngan_sach` = *chưa đặt chỉ tiêu*;
 `muc_tieu = 0` = *đã đặt và đặt bằng không*. Màn nhập để ô trống cho cái thứ

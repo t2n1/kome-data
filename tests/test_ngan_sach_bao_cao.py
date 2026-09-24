@@ -59,6 +59,13 @@ def _chi_tieu(conn, sale, thang: date, muc_tieu):
     conn.commit()
 
 
+def _cong_ty(conn, thang: date, doanh_thu, lai_gop=None):
+    """Ngân sách CÔNG TY (041) — số nhập thẳng, không phải tổng từng người."""
+    conn.execute("INSERT INTO app.ngan_sach_cong_ty (thang, doanh_thu, lai_gop) "
+                 "VALUES (%s, %s, %s)", (thang, doanh_thu, lai_gop))
+    conn.commit()
+
+
 def test_thang_lay_theo_HOM_NAY_khong_theo_dong_ho_that(conn, batch):
     """[CRITICAL] Đo thật 2026-09-22: phiếu bán mới nhất trong kho là
     2026-07-31 — gần hai tháng không ai nạp file bán hàng. Lấy current_date
@@ -94,15 +101,39 @@ def test_khong_ai_dat_chi_tieu_thi_co_ngan_sach_FALSE(conn, batch):
     assert td.muc_tieu is None and td.tien_do is None
 
 
-def test_tong_nhom_cong_du_moi_nguoi(conn, batch):
+def test_ngan_sach_cong_ty_la_so_NHAP_THANG_khong_phai_tong_tung_nguoi(conn, batch):
+    """041: chủ DN đặt ngân sách công ty riêng. Từng người cộng lại 10M, công ty đặt 12M
+    -> tiến độ công ty so với 12M; công ty CHƯA đặt -> "chưa đặt", KHÔNG rơi về 10M."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
     _ban(conn, batch, date(2026, 7, 30), "0105", khach="000000009293")
     _chi_tieu(conn, "0104", date(2026, 7, 1), 6_000_000)
     _chi_tieu(conn, "0105", date(2026, 7, 1), 4_000_000)
     td = tien_do_ngan_sach(conn)
-    assert td.muc_tieu == 10_000_000
+    assert td.co_ngan_sach is False and td.muc_tieu is None
     assert td.thuc_te == 200_000
-    assert td.co_ngan_sach is True
+    assert sum(n.muc_tieu for n in td.nguoi if n.muc_tieu) == 10_000_000
+    _cong_ty(conn, date(2026, 7, 1), 12_000_000, 3_000_000)
+    td = tien_do_ngan_sach(conn)
+    assert td.co_ngan_sach is True and td.muc_tieu == 12_000_000
+    assert td.muc_tieu_lg == 3_000_000 and td.thuc_te_lg == 60_000
+    assert td.tien_do == 200_000 / 12_000_000
+
+
+def test_cong_ty_dat_ma_tung_nguoi_KHONG_dat_van_co_tien_do(conn, batch):
+    _ban(conn, batch, date(2026, 7, 31), "0104")
+    _cong_ty(conn, date(2026, 7, 1), 1_000_000, None)
+    td = tien_do_ngan_sach(conn)
+    assert td.co_ngan_sach is True and td.tien_do == 0.1
+    assert td.muc_tieu_lg is None and td.co_ngan_sach_lg is False
+    assert all(n.muc_tieu is None for n in td.nguoi)
+
+
+def test_moc_lai_gop_DUNG_cong_thuc_ngay_lam_viec(conn, batch):
+    _ban(conn, batch, date(2026, 7, 15), "0104")
+    _cong_ty(conn, date(2026, 7, 1), 22_000_000, 2_200_000)
+    td = tien_do_ngan_sach(conn)
+    assert td.muc_tieu_lg_den_hom_nay == round(2_200_000 * td.ngay_kd_da_qua / td.ngay_kd)
+    assert td.muc_tieu_den_hom_nay == round(22_000_000 * td.ngay_kd_da_qua / td.ngay_kd)
 
 
 def test_luy_ke_DUNG_o_thang_cua_hom_nay(conn, batch):
@@ -112,6 +143,7 @@ def test_luy_ke_DUNG_o_thang_cua_hom_nay(conn, batch):
     _ban(conn, batch, date(2025, 10, 15), "0104", khach="000000009293")
     for t in ("2025-08", "2025-09", "2025-10", "2025-11"):
         _chi_tieu(conn, "0104", date(int(t[:4]), int(t[5:]), 1), 1_000_000)
+        _cong_ty(conn, date(int(t[:4]), int(t[5:]), 1), 1_000_000)
     td = tien_do_ngan_sach(conn, 2026)
     sau = {m.thang: m.thuc_te for m in td.luy_ke}
     assert sau["2025-10"] == 200_000, "luỹ kế tới tháng của hom_nay"
@@ -131,6 +163,7 @@ def test_ve_luy_ke_tra_toa_do_nhan_truc_hoanh(conn, batch):
     tháng nào. Giờ mỗi mục phải mang `x` (toạ độ SVG) và `thang`."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
     _chi_tieu(conn, "0104", date(2026, 7, 1), 6_000_000)
+    _cong_ty(conn, date(2026, 7, 1), 6_000_000)
     lk = ve_luy_ke(tien_do_ngan_sach(conn))
     assert lk["co"] is True
     assert len(lk["nhan"]) == 12
@@ -149,6 +182,7 @@ def test_luy_ke_chi_tieu_DUNG_BANG_0_giu_nguyen_la_0_khong_thanh_None(conn, batc
     nguyên là số 0, không bị đổi thành None và biến mất khỏi đường luỹ kế."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
     _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
+    _cong_ty(conn, date(2026, 7, 1), 0)
     td = tien_do_ngan_sach(conn)
     thang_7 = next(m for m in td.luy_ke if m.thang == "2026-07")
     assert thang_7.ngan_sach == 0, "0 hợp lệ phải giữ nguyên 0, không phải None"
@@ -175,7 +209,7 @@ def test_trang_bao_cao_khong_co_chi_tieu_thi_moi_sang_man_ngan_sach(client, conn
     td = _td(client)
     assert td["co_ngan_sach"] is False
     src = _src()
-    assert "{!td.co_ngan_sach ? <div className=\"khoi-loi\">Chưa đặt chỉ tiêu cho kỳ này." in src
+    assert "{!v.co ? <div className=\"khoi-loi\">Chưa đặt ngân sách {ten} của công ty cho tháng này." in src
     assert "href={`/ngan-sach?ky=${td.company_fy}`}" in src
 
 
@@ -201,6 +235,7 @@ def test_chi_tieu_bang_0_la_HOP_LE_tien_do_None_khong_no(conn, batch):
     để chia), KHÔNG được để lộ ZeroDivisionError."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
     _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
+    _cong_ty(conn, date(2026, 7, 1), 0)
     td = tien_do_ngan_sach(conn)
     assert td.co_ngan_sach is True
     assert td.muc_tieu == 0
@@ -218,12 +253,13 @@ def test_trang_bao_cao_khong_no_khi_chi_tieu_bang_0(client, conn, batch):
     thanh 0%."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
     _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
+    _cong_ty(conn, date(2026, 7, 1), 0)
     td = _td(client)
     assert td["co_ngan_sach"] is True and td["muc_tieu"] == 0
     assert td["tien_do"] is None and td["rong_thanh"] is None
     assert _nguoi(td, "0104")["tien_do"] is None
     src = _src()
-    assert '{td.tien_do != null ? p1(td.tien_do) : "—"}' in src
+    assert '{v.td != null ? p1(v.td) : "—"}' in src
     assert 'if (rong == null) return <div className="phu">chưa có chỉ tiêu</div>;' in src
 
 
@@ -384,6 +420,7 @@ def test_trang_bao_cao_khong_ve_thanh_am_khi_thuc_te_am(client, conn, batch):
     _ban(conn, batch, date(2026, 7, 31), "0104", amount=-60_000, tax=-10_000,
          gp=-20_000)
     _chi_tieu(conn, "0104", date(2026, 7, 1), 1_000_000)
+    _cong_ty(conn, date(2026, 7, 1), 1_000_000)
     td = _td(client)
     assert td["thuc_te"] < 0
     assert td["rong_thanh"] == 0.0, "không được vẽ chiều rộng thanh ÂM"
@@ -396,6 +433,7 @@ def test_trang_bao_cao_khong_ve_thanh_khi_chi_tieu_bang_0(client, conn, batch):
     cho 0 làm trang 500. Giai đoạn 3: API 200, `rong_thanh` None."""
     _ban(conn, batch, date(2026, 7, 31), "0104")
     _chi_tieu(conn, "0104", date(2026, 7, 1), 0)
+    _cong_ty(conn, date(2026, 7, 1), 0)
     td = _td(client)
     assert td["rong_thanh"] is None and _nguoi(td, "0104")["rong_thanh"] is None
 

@@ -921,9 +921,15 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         cộng từ `o_txt`) in "—" khi không ô nào đứng sau nó, chứ không in ¥0.
         KHÔNG thêm truy vấn nào.
         """
+        # 041: khoá ô = `<đối tượng>-<chi_so>-<tháng>` (đối tượng = mã phụ trách hoặc
+        # `CONG_TY`), đúng tên ô biểu mẫu `o-<khoá>`.
+        from kome.ngan_sach import CONG_TY
+        o = {f"{ma}-doanh_thu-{th}": v for (ma, th), v in b.o.items()}
+        o.update({f"{ma}-lai_gop-{th}": v for (ma, th), v in b.o_lg.items()})
+        o.update({f"{CONG_TY}-{cs}-{th}": v for (cs, th), v in b.cong_ty.items()})
         return {"ky": b.company_fy, "moi_ky": b.moi_ky, "thang": b.thang,
                 "nguoi": [{"ma": n.ma, "ten": n.ten} for n in b.nguoi],
-                "o_txt": {f"{ma}-{th}": v for (ma, th), v in b.o.items()}}
+                "cong_ty": CONG_TY, "o_txt": o}
 
     @app.get("/ngan-sach", response_class=HTMLResponse)
     def ngan_sach(request: Request, ky: int | None = None):
@@ -958,7 +964,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         méo vẫn rơi vào `except Exception` bên dưới, ra trang lỗi tiếng Việt
         của `_loi` chứ không phải vết ngăn xếp tiếng Anh.
         """
-        from kome.ngan_sach import LoiSo, bang_nhap, doc_so, luu
+        from kome.ngan_sach import CHI_SO, LoiSo, bang_nhap, doc_so, luu
         form = await request.form()
         nguoi = getattr(request.state, "nguoi", None)
         try:
@@ -973,14 +979,23 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 # tách từ PHẢI sang mới không lừa được. Tên ô không tách ra
                 # đúng ba phần (kể cả rỗng, hay chỉ một khúc chữ) là một ô
                 # rác — vào `loi`, không phải một lỗi lập trình.
-                phan = khoa.rsplit("-", 2)
-                if len(phan) != 3:
+                # 041: `<đối tượng>-<chi_so>-YYYY-MM`; tên ô cũ `<mã>-YYYY-MM` (không
+                # có chi_so) = doanh thu của người đó.
+                phan = khoa.rsplit("-", 3)
+                if len(phan) == 4 and phan[1] in CHI_SO:
+                    ma, chi_so, nam, thang_phan = phan
+                else:
+                    phan = khoa.rsplit("-", 2)
+                    if len(phan) != 3:
+                        loi.append(khoa)
+                        continue
+                    (ma, nam, thang_phan), chi_so = phan, "doanh_thu"
+                if not ma:
                     loi.append(khoa)
                     continue
-                ma, nam, thang_phan = phan
                 thang = f"{nam}-{thang_phan}"
                 try:
-                    gia_tri[(ma, thang)] = doc_so(chuoi)
+                    gia_tri[(ma, chi_so, thang)] = doc_so(chuoi)
                 except LoiSo:
                     loi.append(khoa)
 

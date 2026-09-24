@@ -454,6 +454,8 @@ def test_ba_khoi_ngan_sach_5a_va_bang_nhan_vien_con_nguyen(client, conn, batch):
     conn.execute(
         "INSERT INTO app.ngan_sach (salesperson_code, thang, muc_tieu) "
         "VALUES (%s, %s, %s)", ("0104", date(2026, 7, 1), 6_000_000))
+    # 041: tiến độ công ty đọc ngân sách CÔNG TY nhập thẳng.
+    conn.execute("INSERT INTO app.ngan_sach_cong_ty (thang, doanh_thu) VALUES ('2026-07-01', 6000000)")
     conn.commit()
     assert client.get("/bao-cao?ky=2026").status_code == 200
     d = _api(client)

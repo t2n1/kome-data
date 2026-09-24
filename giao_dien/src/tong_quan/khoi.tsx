@@ -121,35 +121,48 @@ export function KhoiCongNo() {
 }
 
 // ---- Tiến độ ngân sách tháng ------------------------------------------------
-type NguoiNS = { ma: string; ten: string | null; thuc_te: number; muc_tieu: number | null; muc_tieu_den_hom_nay: number | null; tien_do: number | null };
+type NguoiNS = { ma: string; ten: string | null; thuc_te: number; muc_tieu: number | null; muc_tieu_den_hom_nay: number | null; tien_do: number | null;
+  muc_tieu_lg: number | null; thuc_te_lg: number; tien_do_lg: number | null };
 type NganSach = {
   chi_theo_thang?: boolean;
   thang: string; co_ngan_sach: boolean; thuc_te: number; muc_tieu: number | null; muc_tieu_den_hom_nay: number | null;
   tien_do: number | null; moc: number | null; ngay_kd: number; ngay_kd_da_qua: number; ngay_kd_con_lai: number;
   can_ban_moi_ngay: number | null; nhip_chuan: number | null; nguoi: NguoiNS[];
+  // 041: lãi gộp của CÔNG TY — ngân sách công ty nhập thẳng, không cộng từ từng người.
+  co_ngan_sach_lg: boolean; thuc_te_lg: number; muc_tieu_lg: number | null; muc_tieu_lg_den_hom_nay: number | null;
+  tien_do_lg: number | null; moc_lg: number | null;
   duong?: DuongNS;
 };
-type DuongNS = { kieu: "ngay" | "thang"; nhan_ss: string | null; den?: string;
-  diem: { nhan: string; tt: number | null; ns: number | null; ss: number | null }[] };
+type DiemNS = { nhan: string; tt: number | null; ns: number | null; ss: number | null;
+  tt_lg: number | null; ns_lg: number | null; ss_lg: number | null };
+type DuongNS = { kieu: "ngay" | "thang"; nhan_ss: string | null; den?: string; diem: DiemNS[] };
 
 /** Đường luỹ kế của khối ngân sách: thực tế cộng dồn · nhịp ngân sách · tháng trước. */
 function DuongNganSach({ duong }: { duong: DuongNS }) {
+  const [cs, datCs] = useState<"dt" | "lg">("dt");
   const ds = duong.diem;
   if (!ds.length) return null;
+  const lg = cs === "lg";
+  const tt = (x: DiemNS) => lg ? x.tt_lg : x.tt, ns = (x: DiemNS) => lg ? x.ns_lg : x.ns, ss = (x: DiemNS) => lg ? x.ss_lg : x.ss;
   const theoNgay = duong.kieu === "ngay";
-  const coNS = ds.some(x => x.ns != null);
-  const coSS = ds.some(x => x.ss != null);
+  const coNS = ds.some(x => ns(x) != null);
+  const coSS = ds.some(x => ss(x) != null);
   const iDen = theoNgay && duong.den ? ds.findIndex(x => x.nhan === duong.den) : -1;
+  const ten = lg ? "Lãi gộp" : "Doanh thu";
   const chuoi: Chuoi[] = [
-    { ten: "Thực tế (luỹ kế)", kieu: "duong", gia_tri: ds.map(x => x.tt), mau: "var(--lien-ket)" },
-    ...(coNS ? [{ ten: theoNgay ? "Nhịp ngân sách" : "Ngân sách (luỹ kế)", kieu: "duong_dut" as const, gia_tri: ds.map(x => x.ns), mau: LUC.ok }] : []),
-    ...(coSS ? [{ ten: `${duong.nhan_ss} (luỹ kế)`, kieu: "duong_dut" as const, gia_tri: ds.map(x => x.ss), mau: "var(--vien-dam)" }] : []),
+    { ten: `${ten} thực tế (luỹ kế)`, kieu: "duong", gia_tri: ds.map(tt), mau: "var(--lien-ket)" },
+    ...(coNS ? [{ ten: theoNgay ? "Nhịp ngân sách" : "Ngân sách (luỹ kế)", kieu: "duong_dut" as const, gia_tri: ds.map(ns), mau: LUC.ok }] : []),
+    ...(coSS ? [{ ten: `${duong.nhan_ss} (luỹ kế)`, kieu: "duong_dut" as const, gia_tri: ds.map(ss), mau: "var(--vien-dam)" }] : []),
   ];
   return (
     <div className="ns-duong">
-      <BieuDo nhan={ds.map(x => theoNgay ? ngay_ngan(x.nhan) : thang_nhan(x.nhan))}
+      <div className="ns-chon" role="group" aria-label="Chỉ số của biểu đồ">
+        {(["dt", "lg"] as const).map(k => <button key={k} type="button" aria-pressed={cs === k} className={cs === k ? "dang-chon" : undefined}
+          onClick={() => datCs(k)}>{k === "dt" ? "Doanh thu" : "Lãi gộp"}</button>)}
+      </div>
+      <BieuDo key={cs} nhan={ds.map(x => theoNgay ? ngay_ngan(x.nhan) : thang_nhan(x.nhan))}
         nhan_day_du={ds.map(x => theoNgay ? ngay(x.nhan) : thang_nhan(x.nhan))}
-        cao={180} mo_ta="Doanh thu luỹ kế so với nhịp ngân sách" chuoi={chuoi}
+        cao={180} mo_ta={`${ten} luỹ kế so với nhịp ngân sách`} chuoi={chuoi}
         vach={iDen >= 0 && iDen < ds.length - 1 ? { i: iDen, chu: "mốc" } : null}
         dinh_dang={v => yen(v)} dinh_dang_truc={v => gon(v)} />
     </div>
@@ -187,17 +200,23 @@ export function KhoiNganSach() {
           </>}
         </div>
         <div className="ns-thanh">
-          {/* Ngân sách CHUNG của công ty đứng trước, rồi mới tới từng người (chủ DN, 2026-09-24). */}
+          {/* Ngân sách CHUNG của công ty đứng trước (doanh thu + lãi gộp, nhập thẳng — 041), rồi mới tới từng người. */}
           <div className="ns-cong-ty">
-            <div className="ns-dong"><span>Toàn công ty</span>
-              <span className="so-nhat">{yen(d.thuc_te)}{d.co_ngan_sach ? ` / ${yen(d.muc_tieu)}` : ""}</span>
-              {d.co_ngan_sach && <b style={{ color: mauTienDo(d.tien_do, d.moc) }}>{pc(d.tien_do)}</b>}</div>
-            {d.co_ngan_sach && <ThanhMoc ty_le={d.tien_do} moc={d.moc} mau={mauTienDo(d.tien_do, d.moc)} />}
+            <div className="ns-nhom-nhan">Toàn công ty</div>
+            {([["Doanh thu", d.thuc_te, d.muc_tieu, d.tien_do, d.moc, d.co_ngan_sach],
+               ["Lãi gộp", d.thuc_te_lg, d.muc_tieu_lg, d.tien_do_lg, d.moc_lg, d.co_ngan_sach_lg]] as const).map(([ten, tt, mt, td, moc, co]) => (
+              <div key={ten}>
+                <div className="ns-dong"><span>{ten}</span>
+                  <span className="so-nhat">{yen(tt)}{co ? ` / ${yen(mt)}` : " · chưa đặt ngân sách"}</span>
+                  {co && <b style={{ color: mauTienDo(td, moc) }}>{pc(td)}</b>}</div>
+                {co && <ThanhMoc ty_le={td} moc={moc} mau={mauTienDo(td, moc)} />}
+              </div>))}
           </div>
           {nguoi.length > 0 && <div className="ns-nhom-nhan">Từng người phụ trách</div>}
           {nguoi.map(n => (
             <div key={n.ma}>
               <div className="ns-dong"><span>{tenNguoi(n.ten, n.ma)}</span>
+                {n.muc_tieu_lg != null && <span className="so-nhat">lãi gộp {pc(n.tien_do_lg)}</span>}
                 <b style={{ color: mauTienDo(n.tien_do, d.moc) }}>{n.muc_tieu ? pc(n.tien_do) : yen(n.thuc_te)}</b></div>
               <div className="ns-ba-lop">
                 <div className="lop-ns" style={{ width: `${(n.muc_tieu ?? 0) / maxNS * 100}%` }} />

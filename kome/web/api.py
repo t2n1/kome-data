@@ -119,6 +119,7 @@ def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
     return thanh_json({
         "khoang": kx,
         "bc": bc, "td": td, "bd": ve_bieu_do(bc.thang), "lk": ve_luy_ke(td),
+        "lk_lg": ve_luy_ke(td, lg=True),
         "so_nho": {"dt": ve_duong_nho([o.doanh_thu for o in bc.thang]),
                    "lg": ve_duong_nho([o.lai_gop for o in bc.thang]),
                    "ts": ve_duong_nho([o.ty_suat for o in bc.thang]),
@@ -129,6 +130,7 @@ def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
         "pa": ve_pareto(bc.tap_trung),
         "ngay_dau_du_lieu": kx.ngay_dau,
         "td_phu": chi_so_phu(td) if td else None,
+        "td_phu_lg": chi_so_phu(td, lg=True) if td else None,
     })
 
 
