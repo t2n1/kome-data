@@ -172,3 +172,17 @@ không hiện bộ chọn. Trong lúc đợt B/C chưa xong, màn Khách hàng /
 Đợt A → B → C, mỗi đợt một nhánh, test đủ, build, merge `--no-ff`. Migration `039` chạy bằng
 `postgres` trên CSDL thật TRƯỚC khi push đợt A. Sau mỗi đợt cập nhật `CLAUDE.md` (bảng trang,
 bất biến mới "khoảng xem" + "một chỗ hiểu khoảng xem") và `python scripts/sinh_tai_lieu.py`.
+
+## 8. Ghi chú khi làm đợt A (2026-09-24)
+
+- **Thứ tự phép so**: `so_sanh[0]` luôn là **năm trước** (so "chính": nét đứt trên biểu đồ,
+  ngành kéo lên/xuống, cây ô); `so_sanh[1]` là tháng trước (dạng Tháng) / khoảng liền trước
+  (dạng Khoảng). Dạng Kỳ chỉ có năm trước.
+- **Trùng tên tham số**: màn Khách hàng từng dùng `?thang=` cho bộ lọc NHÃN
+  (`mart.khach_thang_nay`: `tre`, `da_mua`…). Đổi thành `?nhan_thang=` (URL và
+  `/api/khach-hang/ds`) để `?thang=` chỉ còn nghĩa "tháng đang xem"; `khoang.ts::docKhoang`
+  chỉ nhận `thang` đúng dạng `YYYY-MM`.
+- **Đo thật (CHỈ SELECT, thân hàm 039 chạy như câu thường, 2026-09-24)**: một tháng — phạm vi
+  103 ms, tổng + 2 phép so ~125 ms (lần đầu nguội ~2 s), chuỗi ngày 85 ms, mặt hàng 237 ms,
+  ngành 35 ms, Pareto 98 ms, tương quan (đọc `khach_360`) ~1,2 s. Khoảng cả năm: tổng + so
+  sánh ~4,8 s, mặt hàng ~1,5 s — chỉ lần đầu, sau đó là ảnh chụp.

@@ -86,11 +86,14 @@ def test_ty_suat_theo_thang_la_ty_so_cua_cac_tong(kho, conn):
 
 def test_so_khoi_khop_ham_goc(kho, conn):
     """Khối không tự định nghĩa lại chỉ số: doanh thu tháng của ô KPI BẰNG
-    mart.thang_den_hom_nay, tổng xu hướng BẰNG mart.ban_theo_ngay."""
+    mart.thang_den_hom_nay (khoảng xem mặc định = tháng hiện tại), tổng xu
+    hướng BẰNG mart.ban_theo_ngay trên cùng các ngày đó."""
     dt = conn.execute("SELECT dt FROM mart.thang_den_hom_nay").fetchone()[0]
     assert KTQ.kpi(conn)["doanh_thu"]["gia_tri"] == int(dt)
-    tong = conn.execute("SELECT sum(doanh_thu_thuan) FROM mart.ban_theo_ngay").fetchone()[0]
-    assert sum(x[1] for x in KTQ.xu_huong(conn)["ngay"]) == int(tong)
+    tong = conn.execute(
+        """SELECT sum(b.doanh_thu_thuan) FROM mart.ban_theo_ngay b, mart.thang_den_hom_nay t
+            WHERE b.ngay BETWEEN t.tu_ngay AND t.den_ngay""").fetchone()[0]
+    assert sum(x[1] for x in KTQ.xu_huong(conn)["diem"]) == int(tong)
 
 
 # ---- Ảnh chụp theo phiên bản dữ liệu ----------------------------------------
@@ -204,12 +207,13 @@ def test_vercel_khong_day_ma_nguon_giao_dien():
 
 # Ngân sách truy vấn của từng khối — đo lượt hỏi, không đo sức tính (CLAUDE.md).
 # Khối nặng nhất (kpi) gom 6 nguồn cho 6 ô; mọi khối đi qua ảnh chụp nên người
-# xem chỉ trả 1 lượt khi trúng.
+# xem chỉ trả 1 lượt khi trúng. Khối theo khoảng xem (KHOI[..][3]) cộng 1 lượt
+# `khoang_xem.pham_vi` (đặc tả khoảng xem §5).
 NGAN_SACH_TRUY_VAN = {
-    "kpi": 8, "ns_thang": 3, "so_sanh_sale": 3, "theo_thang": 2, "xu_huong": 1,
+    "kpi": 9, "ns_thang": 4, "so_sanh_sale": 4, "theo_thang": 2, "xu_huong": 2,
     "suc_khoe_khach": 1, "han_su_dung": 1, "viec_hom_nay": 8, "don_hang": 3,
-    "danh_sach_khach": 1, "hieu_suat_nganh": 1, "tuong_quan": 1, "tang_truong": 1,
-    "bien_loi_nhuan": 1, "thang_nay_chua_mua": 1, "cong_no": 2,
+    "danh_sach_khach": 2, "hieu_suat_nganh": 2, "tuong_quan": 2, "tang_truong": 2,
+    "bien_loi_nhuan": 2, "thang_nay_chua_mua": 1, "cong_no": 2,
 }
 
 

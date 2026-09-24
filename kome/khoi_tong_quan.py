@@ -19,7 +19,9 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+from kome import ban_khoang as BK
 from kome import khach_hang as KH
+from kome import khoang_xem as KX
 from kome import san_pham as SP
 from kome import tong_quan as TQ
 from kome.bao_cao import tien_do_ngan_sach
@@ -40,27 +42,49 @@ def _ty_so(tu, mau):
     return (tu / mau) if (tu is not None and mau) else None
 
 
+def _kx(conn, ts):
+    """Khoảng xem của khối (đặc tả khoảng xem §3.1). `ts` None = tháng hiện
+    tại. +1 lượt hỏi (`pham_vi`). None = kho chưa có dòng bán nào."""
+    return KX.giai_conn(conn, ts or KX.ThamSo())
+
+
+def _ns_theo_khoang(conn, kx):
+    """Ngân sách của khoảng: dạng Tháng = tháng đang xem; dạng Kỳ = như màn
+    Báo cáo theo kỳ; dạng Khoảng = không có (chỉ tiêu chỉ đặt theo tháng)."""
+    if kx is None or kx.loai == "khoang":
+        return None
+    return tien_do_ngan_sach(conn, kx.company_fy, kx.thang if kx.loai == "thang" else None)
+
+
+def _so_sanh_json(ss) -> list[dict]:
+    return [{"ma": s.ma, "nhan": s.nhan, "co": s.co, "tu": s.tu, "den": s.den,
+             "dt": s.dt, "dt_ck": s.dt_ck, "tang": s.tang_dt, "lg": s.lg, "lg_ck": s.lg_ck,
+             "tang_lg": s.tang_lg, "so_khach": s.so_khach, "so_khach_ck": s.so_khach_ck,
+             "tang_khach": s.tang_khach} for s in ss]
+
+
 # ---- Chỉ số hôm nay (6 ô) ---------------------------------------------------
 
-def kpi(conn, sale=None) -> dict:
-    tn = conn.execute(
-        """SELECT tu_ngay, den_ngay, dt, lg, so_khach, co_cung_ky, dt_ck, lg_ck
-           FROM mart.thang_den_hom_nay""").fetchone()
-    ngay = conn.execute(
-        """SELECT ngay, doanh_thu_thuan FROM mart.ban_theo_ngay
-           ORDER BY ngay DESC LIMIT 14""").fetchall()[::-1]
-    ns = tien_do_ngan_sach(conn)
+def kpi(conn, sale=None, ts=None) -> dict:
+    """Ô doanh thu + ngân sách theo KHOẢNG XEM; ô kho và ô khách tính đến hôm nay."""
+    kx = _kx(conn, ts)
+    nay, ss, spark = ({"dt": 0, "lg": 0, "so_khach": 0, "so_phieu": 0, "ty_suat": None}, [], [])
+    if kx is not None:
+        nay, ss = BK.tong(conn, kx)
+        spark = [o.doanh_thu for o in BK.chuoi(conn, kx)[1]]
+    ns = _ns_theo_khoang(conn, kx)
     dem, _ = KH.dem_va_can_xu_ly(conn, gioi_han=0, sale=None)
     kho = dict(conn.execute(
         "SELECT trang_thai, count(*)::int FROM mart.san_pham_360 GROUP BY 1").fetchall())
     can_han, so_qua_han = SP.lo_can_han(conn, gioi_han=1000)
-    dt = int(tn[2] or 0) if tn else 0
-    dt_ck = int(tn[6]) if tn and tn[6] is not None else None
+    chinh = ss[0] if ss else None
     return {
+        "khoang": kx,
         "doanh_thu": {
-            "gia_tri": dt, "tu_ngay": tn[0] if tn else None, "den_ngay": tn[1] if tn else None,
-            "cung_ky": dt_ck, "tang": _ty_so(dt - dt_ck, dt_ck) if dt_ck else None,
-            "spark": [int(r[1] or 0) for r in ngay],
+            "gia_tri": nay["dt"], "tu_ngay": kx.tu if kx else None, "den_ngay": kx.den if kx else None,
+            "cung_ky": chinh.dt_ck if chinh else None, "tang": chinh.tang_dt if chinh else None,
+            "lai_gop": nay["lg"], "ty_suat": nay["ty_suat"], "so_khach": nay["so_khach"],
+            "so_phieu": nay["so_phieu"], "so_sanh": _so_sanh_json(ss), "spark": spark,
         },
         "ngan_sach": None if ns is None or not ns.co_ngan_sach else {
             "tien_do": ns.tien_do, "thuc_te": ns.thuc_te, "muc_tieu": ns.muc_tieu,
@@ -69,6 +93,7 @@ def kpi(conn, sale=None) -> dict:
             "spark": [m.thuc_te for m in ns.luy_ke if m.thuc_te is not None],
             "thang": ns.thang,
         },
+        "ngan_sach_chi_theo_thang": kx is not None and kx.loai == "khoang",
         "kho": {"het_hang": kho.get("het_hang", 0), "can_han": len(can_han),
                 "qua_han": so_qua_han},
         "khach": {"can_goi": dem.get("canh_bao", 0), "roi_bo": dem.get("da_roi_bo", 0)},
@@ -77,8 +102,11 @@ def kpi(conn, sale=None) -> dict:
 
 # ---- Tiến độ ngân sách tháng / Doanh thu theo sale ---------------------------
 
-def ngan_sach(conn, sale=None) -> dict | None:
-    ns = tien_do_ngan_sach(conn)
+def ngan_sach(conn, sale=None, ts=None) -> dict | None:
+    kx = _kx(conn, ts)
+    if kx is not None and kx.loai == "khoang":
+        return {"chi_theo_thang": True, "khoang": kx}
+    ns = _ns_theo_khoang(conn, kx)
     if ns is None:
         return None
     from kome.bao_cao import chi_so_phu
@@ -93,22 +121,25 @@ def ngan_sach(conn, sale=None) -> dict | None:
         "nhip_chuan": phu["nhip_chuan"],
         "nguoi": [asdict(n) for n in ns.nguoi],
         "luy_ke": [asdict(m) for m in ns.luy_ke],
+        "khoang": kx,
     }
 
 
 # ---- Kết quả theo từng tháng (kỳ kế toán hiện hành) -------------------------
 
-def theo_thang(conn, sale=None) -> dict:
-    rows = conn.execute(
-        """WITH ky AS (SELECT max(company_fy) AS fy FROM mart.ban_theo_thang_so_sanh),
-                ns AS (SELECT thang, sum(muc_tieu)::bigint AS muc_tieu
+def theo_thang(conn, sale=None, ts=None) -> dict:
+    """Các tháng của KỲ chứa ngày cuối khoảng xem; giao diện tô đậm các tháng
+    thuộc khoảng (`khoang.tu` → `khoang.den`)."""
+    kx = _kx(conn, ts)
+    rows = [] if kx is None else conn.execute(
+        """WITH ns AS (SELECT thang, sum(muc_tieu)::bigint AS muc_tieu
                          FROM mart.ngan_sach_thang GROUP BY thang)
            SELECT s.thang, s.company_fy, s.thang_trong_ky, s.doanh_thu_thuan, s.lai_gop,
                   s.so_khach, s.dt_cung_ky, s.co_cung_ky, ns.muc_tieu
              FROM mart.ban_theo_thang_so_sanh s
-             JOIN ky ON s.company_fy = ky.fy
              LEFT JOIN ns ON ns.thang = s.thang
-            ORDER BY s.thang""").fetchall()
+            WHERE s.company_fy = %s
+            ORDER BY s.thang""", (kx.company_fy,)).fetchall()
     thang = [{
         "thang": r[0], "company_fy": r[1], "thang_trong_ky": r[2],
         "doanh_thu": int(r[3] or 0), "lai_gop": int(r[4] or 0),
@@ -117,18 +148,20 @@ def theo_thang(conn, sale=None) -> dict:
         "ngan_sach": int(r[8]) if r[8] is not None else None,
     } for r in rows]
     return {"company_fy": thang[0]["company_fy"] if thang else None, "thang": thang,
-            "hom_nay": conn.execute("SELECT hom_nay FROM mart.moc_thoi_gian").fetchone()[0]}
+            "hom_nay": kx.hom_nay if kx else None, "khoang": kx}
 
 
-# ---- Xu hướng doanh thu (giao diện chọn khung 7N/30N/90N/1N) -----------------
+# ---- Xu hướng doanh thu theo khoảng xem -------------------------------------
 
-def xu_huong(conn, sale=None) -> dict:
-    """Hai năm doanh thu theo ngày (cũ -> mới) — đủ cho khung 1N so với 1N
-    liền trước. Đổi khung ở trình duyệt, không gọi lại máy chủ."""
-    rows = conn.execute(
-        """SELECT ngay, doanh_thu_thuan, lai_gop, so_khach FROM mart.ban_theo_ngay
-           ORDER BY ngay DESC LIMIT 730""").fetchall()[::-1]
-    return {"ngay": [[r[0], int(r[1] or 0), int(r[2] or 0), r[3] or 0] for r in rows]}
+def xu_huong(conn, sale=None, ts=None) -> dict:
+    """Doanh thu từng ngày (khoảng ≤ 92 ngày) hoặc từng tháng (dài hơn) của
+    khoảng xem, kèm phép so chính (năm trước) khớp theo thứ tự."""
+    kx = _kx(conn, ts)
+    if kx is None:
+        return {"khoang": None, "kieu": "ngay", "diem": []}
+    kieu, o = BK.chuoi(conn, kx)
+    return {"khoang": kx, "kieu": kieu,
+            "diem": [[x.thang, x.doanh_thu, x.lai_gop, x.so_khach, x.dt_cung_ky] for x in o]}
 
 
 # ---- Sức khoẻ khách hàng ----------------------------------------------------
@@ -214,75 +247,91 @@ def nap_gan_nhat(conn, sale=None) -> dict:
 
 # ---- Danh sách khách hàng ---------------------------------------------------
 
-def danh_sach_khach(conn, sale=None) -> dict:
+def danh_sach_khach(conn, sale=None, ts=None) -> dict:
+    """60 khách doanh thu cao nhất TRONG KHOẢNG XEM, kèm doanh thu của phép so
+    phụ (tháng trước / khoảng liền trước; dạng Kỳ: năm trước) và các nhãn
+    tính đến hôm nay (trạng thái, nhịp, doanh thu 12 tháng)."""
+    kx = _kx(conn, ts)
+    nhan = {k: v[0] for k, v in KH.TRANG_THAI.items()}
+    if kx is None:
+        return {"khoang": None, "so_sanh": None, "khach": [], "nhan": nhan}
+    ss = kx.so_sanh[1] if len(kx.so_sanh) > 1 else kx.so_sanh[0]
     rows = conn.execute(
-        """WITH m AS (SELECT to_char(hom_nay, 'YYYY-MM') AS t,
-                             to_char(hom_nay - interval '1 month', 'YYYY-MM') AS t1
-                        FROM mart.moc_thoi_gian)
+        """WITH a AS (SELECT customer_code, dt FROM mart.khach_khoang(%s, %s)),
+                b AS (SELECT customer_code, dt FROM mart.khach_khoang(%s, %s))
            SELECT k.customer_code, k.ten, k.salesperson_code, s.ten, k.doanh_thu_thuan,
                   k.ty_le_im_lang, k.trang_thai, k.so_ngay_im_lang, k.nhip_ngay,
-                  coalesce(a.doanh_thu_thuan, 0), coalesce(b.doanh_thu_thuan, 0)
-             FROM mart.khach_360 k CROSS JOIN m
-             LEFT JOIN mart.khach_theo_thang a ON a.customer_code = k.customer_code AND a.thang = m.t
-             LEFT JOIN mart.khach_theo_thang b ON b.customer_code = k.customer_code AND b.thang = m.t1
+                  a.dt, coalesce(b.dt, 0)
+             FROM a JOIN mart.khach_360 k USING (customer_code)
+             LEFT JOIN b USING (customer_code)
              LEFT JOIN core.dim_salesperson s ON s.salesperson_code = k.salesperson_code
             WHERE NOT k.da_ngung
-            ORDER BY k.doanh_thu_thuan DESC NULLS LAST LIMIT 60""").fetchall()
-    return {"khach": [{
-        "ma": r[0], "ten": r[1], "sale": r[2], "ten_sale": r[3],
-        "doanh_thu": int(r[4] or 0), "ty_le_im_lang": float(r[5]) if r[5] is not None else None,
-        "trang_thai": r[6], "so_ngay_im_lang": r[7], "nhip_ngay": r[8],
-        "thang_nay": int(r[9]), "thang_truoc": int(r[10])} for r in rows],
-        "nhan": {k: v[0] for k, v in KH.TRANG_THAI.items()}}
+            ORDER BY a.dt DESC NULLS LAST LIMIT 60""",
+        (kx.tu, kx.den, ss.tu if ss.co else None, ss.den if ss.co else None)).fetchall()
+    return {"khoang": kx, "so_sanh": {"ma": ss.ma, "nhan": ss.nhan, "co": ss.co, "tu": ss.tu, "den": ss.den},
+            "khach": [{
+                "ma": r[0], "ten": r[1], "sale": r[2], "ten_sale": r[3],
+                "doanh_thu": int(r[4] or 0), "ty_le_im_lang": float(r[5]) if r[5] is not None else None,
+                "trang_thai": r[6], "so_ngay_im_lang": r[7], "nhip_ngay": r[8],
+                "thang_nay": int(r[9] or 0), "thang_truoc": int(r[10]) if ss.co else None} for r in rows],
+            "nhan": nhan}
 
 
 # ---- Hiệu suất theo ngành hàng ----------------------------------------------
 
-def hieu_suat_nganh(conn, sale=None) -> dict:
-    rows = conn.execute(
-        """WITH t AS (SELECT max(thang) AS thang FROM mart.ban_theo_nganh_thang_so_sanh)
-           SELECT s.thang, s.nganh, s.doanh_thu_thuan, s.lai_gop, s.dt_cung_ky,
-                  s.co_cung_ky, s.tang_truong
-             FROM mart.ban_theo_nganh_thang_so_sanh s JOIN t USING (thang)
-            ORDER BY s.doanh_thu_thuan DESC""").fetchall()
-    tong = sum(int(r[2] or 0) for r in rows)
-    return {"thang": rows[0][0] if rows else None, "nganh": [{
-        "nganh": r[1], "doanh_thu": int(r[2] or 0), "lai_gop": int(r[3] or 0),
-        "ty_trong": _ty_so(int(r[2] or 0), tong), "ty_suat": _ty_so(int(r[3] or 0), int(r[2] or 0)),
-        "cung_ky": int(r[4]) if r[4] is not None else None, "co_cung_ky": r[5],
-        "tang_truong": float(r[6]) if r[6] is not None else None} for r in rows]}
+def hieu_suat_nganh(conn, sale=None, ts=None) -> dict:
+    """Ngành của khoảng xem so phép so chính (`mart.nganh_so_sanh_khoang`)."""
+    kx = _kx(conn, ts)
+    rows = [] if kx is None else sorted(BK.nganh(conn, kx), key=lambda n: -n.doanh_thu)
+    co = bool(kx and kx.so_sanh and kx.so_sanh[0].co)
+    tong = sum(n.doanh_thu for n in rows)
+    return {"thang": kx.nhan if kx else None, "khoang": kx, "nganh": [{
+        "nganh": n.nganh, "doanh_thu": n.doanh_thu, "lai_gop": n.lai_gop,
+        "ty_trong": _ty_so(n.doanh_thu, tong), "ty_suat": _ty_so(n.lai_gop, n.doanh_thu),
+        "cung_ky": n.dt_cung_ky, "co_cung_ky": co, "tang_truong": n.tang_truong} for n in rows]}
 
 
 # ---- Doanh thu × tần suất mua -----------------------------------------------
 
-def tuong_quan(conn, sale=None) -> dict:
-    rows = conn.execute(
-        """SELECT customer_code, ten, doanh_thu_thuan, so_lan_mua, trang_thai, ty_suat
-             FROM mart.khach_360 WHERE NOT da_ngung AND doanh_thu_thuan > 0
-            ORDER BY doanh_thu_thuan DESC LIMIT 400""").fetchall()
-    return {"khach": [{"ma": r[0], "ten": r[1], "doanh_thu": int(r[2] or 0), "so_lan": r[3],
-                       "trang_thai": r[4], "ty_suat": float(r[5]) if r[5] is not None else None}
-                      for r in rows]}
+def tuong_quan(conn, sale=None, ts=None) -> dict:
+    """Doanh thu × số ngày mua TRONG KHOẢNG XEM; màu = trạng thái tính đến hôm nay."""
+    kx = _kx(conn, ts)
+    rows = [] if kx is None else conn.execute(
+        """SELECT k.customer_code, h.ten, k.dt, k.so_ngay_mua, h.trang_thai, k.ty_suat
+             FROM mart.khach_khoang(%s, %s) k
+             JOIN mart.khach_360 h USING (customer_code)
+            WHERE NOT h.da_ngung AND k.dt > 0
+            ORDER BY k.dt DESC LIMIT 400""", (kx.tu, kx.den)).fetchall()
+    return {"khoang": kx, "khach": [{"ma": r[0], "ten": r[1], "doanh_thu": int(r[2] or 0), "so_lan": r[3],
+                                     "trang_thai": r[4], "ty_suat": float(r[5]) if r[5] is not None else None}
+                                    for r in rows]}
 
 
 # ---- Số khách đang mua theo kỳ ----------------------------------------------
 
-def tang_truong(conn, sale=None) -> dict:
+def tang_truong(conn, sale=None, ts=None) -> dict:
+    """Theo kỳ (bản chất nhiều kỳ) — `chon` = kỳ chứa ngày cuối khoảng xem."""
+    kx = _kx(conn, ts)
     rows = conn.execute(
         """SELECT company_fy, nhan, so_thang_co_du_lieu, so_khach, doanh_thu_thuan
              FROM mart.tong_theo_ky ORDER BY company_fy""").fetchall()
-    return {"ky": [{"company_fy": r[0], "nhan": r[1], "so_thang": r[2], "so_khach": r[3],
+    return {"chon": kx.company_fy if kx else None, "khoang": kx,
+            "ky": [{"company_fy": r[0], "nhan": r[1], "so_thang": r[2], "so_khach": r[3],
                     "doanh_thu": int(r[4] or 0)} for r in rows]}
 
 
 # ---- Biên lợi nhuận GỘP theo quý (biên ròng: chưa có chi phí) ---------------
 
-def bien_loi_nhuan(conn, sale=None) -> dict:
+def bien_loi_nhuan(conn, sale=None, ts=None) -> dict:
+    """Theo quý (6 quý gần nhất) — `thang_chon` = tháng của ngày cuối khoảng xem;
+    giao diện tô đậm quý có `tu ≤ thang_chon ≤ den`."""
+    kx = _kx(conn, ts)
     rows = conn.execute(
         """SELECT company_fy, (thang_trong_ky - 1) / 3 + 1 AS quy, min(thang), max(thang),
                   count(*)::int, sum(doanh_thu_thuan)::bigint, sum(lai_gop)::bigint
              FROM mart.ban_theo_thang GROUP BY 1, 2 ORDER BY 1, 2""").fetchall()[-6:]
-    return {"quy": [{"company_fy": r[0], "quy": r[1], "tu": r[2], "den": r[3], "so_thang": r[4],
+    return {"thang_chon": kx.den.strftime("%Y-%m") if kx else None, "khoang": kx,
+            "quy": [{"company_fy": r[0], "quy": r[1], "tu": r[2], "den": r[3], "so_thang": r[4],
                      "doanh_thu": int(r[5] or 0), "lai_gop": int(r[6] or 0),
                      "bien_gop": _ty_so(int(r[6] or 0), int(r[5] or 0))} for r in rows]}
 
@@ -335,22 +384,24 @@ def cong_no(conn, sale=None) -> dict | None:
     return CN.khoi_tong_quan(conn)
 
 
-# Mã khối -> (hàm, theo_ngay, theo_sale). Mã trùng `kome/web/bo_cuc.py::KHOI`.
+# Mã khối -> (hàm, theo_ngay, theo_sale, theo_khoang). Mã trùng
+# `kome/web/bo_cuc.py::KHOI`. `theo_khoang`: hàm nhận `ts` (khoảng xem,
+# kome/khoang_xem.py) và khoá ảnh chụp mang tham số khoảng.
 KHOI = {
-    "kpi": (kpi, False, False),
-    "ns_thang": (ngan_sach, False, False),
-    "so_sanh_sale": (ngan_sach, False, False),
-    "theo_thang": (theo_thang, False, False),
-    "xu_huong": (xu_huong, False, False),
-    "suc_khoe_khach": (suc_khoe, False, False),
-    "han_su_dung": (han_su_dung, False, False),
-    "viec_hom_nay": (viec_hom_nay, True, True),
-    "thang_nay_chua_mua": (thang_nay_chua_mua, False, True),
-    "cong_no": (cong_no, False, False),
-    "don_hang": (nap_gan_nhat, False, False),
-    "danh_sach_khach": (danh_sach_khach, False, False),
-    "hieu_suat_nganh": (hieu_suat_nganh, False, False),
-    "tuong_quan": (tuong_quan, False, False),
-    "tang_truong": (tang_truong, False, False),
-    "bien_loi_nhuan": (bien_loi_nhuan, False, False),
+    "kpi": (kpi, False, False, True),
+    "ns_thang": (ngan_sach, False, False, True),
+    "so_sanh_sale": (ngan_sach, False, False, True),
+    "theo_thang": (theo_thang, False, False, True),
+    "xu_huong": (xu_huong, False, False, True),
+    "suc_khoe_khach": (suc_khoe, False, False, False),
+    "han_su_dung": (han_su_dung, False, False, False),
+    "viec_hom_nay": (viec_hom_nay, True, True, False),
+    "thang_nay_chua_mua": (thang_nay_chua_mua, False, True, False),
+    "cong_no": (cong_no, False, False, False),
+    "don_hang": (nap_gan_nhat, False, False, False),
+    "danh_sach_khach": (danh_sach_khach, False, False, True),
+    "hieu_suat_nganh": (hieu_suat_nganh, False, False, True),
+    "tuong_quan": (tuong_quan, False, False, True),
+    "tang_truong": (tang_truong, False, False, True),
+    "bien_loi_nhuan": (bien_loi_nhuan, False, False, True),
 }

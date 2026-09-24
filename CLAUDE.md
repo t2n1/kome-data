@@ -88,12 +88,12 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 ## Các trang của web app
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
-| `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối kéo thả / đổi cỡ / ẩn hiện, xem theo vai trò, chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api` |
+| `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối kéo thả / đổi cỡ / ẩn hiện, xem theo vai trò, chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu". Từ 2026-09-24 khối số bán hàng theo **khoảng xem** (`?thang=`/`?ky=`/`?tu=&den=`, mặc định tháng hiện tại) — xem bất biến "Khoảng xem" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api` |
 | `/khach-hang` | **React** (giai đoạn 2, bám Customer 360.dc.html) tab **Danh sách**: KPI · 7 phân khúc (gồm "mua đều, tháng này chưa") · lọc tìm/hạng (nhiều)/phụ trách/tỉnh/trạng thái/nhãn tháng · bảng sắp xếp máy chủ 50/100/200 dòng · xuất CSV dòng đã chọn · 3 khối phân tích. `/api/khach-hang/ds` — một ảnh chụp danh bạ (`KH.danh_ba`) lọc bằng Python | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `khach_thang_nay`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360° React**: 5 tab (Tổng quan · Sản phẩm · Đơn hàng · Công nợ [chưa có] · Hồ sơ & liên hệ), biểu đồ 12 tháng bấm tháng xem mặt hàng, lưới 26 tuần, giỏ theo ngành, lịch mua dự kiến, ghi tiếp xúc (`POST /api/khach-hang/{mã}/tiep-xuc`, chỉ JSON). `/api/khach-hang/{mã}` (+ `/dong?tu=&den=`) | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `khach_thang_nay`, `lan_mua`, `dong_ban`, `ty_suat_mat_hang` |
 | `/lien-he` | **Cần liên hệ — React** (giai đoạn 3, bố cục CRM.dc.html; `/api/lien-he`) (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn · mua đều tháng này chưa — 036) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc ngay trên thẻ qua `POST /api/khach-hang/{mã}/tiep-xuc` (form cũ `POST /khach-hang/{mã}/tiep-xuc` vẫn còn). **3 truy vấn** | `mart.uu_tien_lien_he`, `mart.khach_thang_nay`, `app.nhat_ky_tiep_xuc` |
 | `/ban-do` | Tab **Bản đồ** của màn Khách hàng (React) — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại), lọc theo người phụ trách; bấm ô → tab Danh sách lọc tỉnh đó. `/api/ban-do` | `core.dim_prefecture`, `mart.khach_theo_tinh` |
-| `/bao-cao` | **React** (giai đoạn 3, `/api/bao-cao?ky=` — hình học biểu đồ vẫn tính ở Python) Báo cáo bán hàng theo kỳ + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
+| `/bao-cao` | **React** (giai đoạn 3, `/api/bao-cao?thang=` · `?ky=` · `?tu=&den=` — mặc định tháng hiện tại; dạng Kỳ = báo cáo theo kỳ cũ, không đổi số; hình học biểu đồ vẫn tính ở Python) Báo cáo bán hàng + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
 | `/du-bao` | **Dự báo doanh thu — React** (giai đoạn 3, `/api/du-bao`, đổi kịch bản ở trình duyệt) (đợt 8): chốt tháng (đường luỹ kế + khoảng sai số thật + theo người phụ trách) · 12 tháng tới (3 kịch bản) · đơn kỳ vọng 14 ngày · nguy cơ ngừng mua · dự báo đã chuẩn tới đâu. Toàn công ty, **3 truy vấn** | `mart.lich_kinh_doanh`, `mart.ban_theo_ngay`, `mart.tien_do_ngan_sach`, `mart.khach_360`, `mart.khoang_cach_mua` |
 | `/ngan-sach` | Đặt chỉ tiêu doanh thu: 5 người phụ trách × 12 tháng một kỳ. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
 | `/san-pham` | **React** (giai đoạn 4, bám Sản phẩm.dc.html): MỘT trang — ô tổng quan · danh mục cả 232 mã (chip ngành / trạng thái, tìm, sắp — lọc ở trình duyệt trên MỘT ảnh chụp `/api/san-pham`, 1 lượt hỏi) · hồ sơ mã đang chọn ngay bên dưới | `mart.san_pham_360`, `mart.dong_ban`, `mart.moc_thoi_gian`, `core.dim_product` |
@@ -521,8 +521,9 @@ chiếu tay. Có test canh:
 
 **Bất biến:** "ngành hàng" là `food_category_name`, và biểu thức
 `coalesce(nullif(food_category_name, ''), '(chưa phân loại)')` viết ĐÚNG MỘT
-LẦN, trong `mart.ban_theo_nganh_thang` (LEFT JOIN từ dòng bán sang
-`core.dim_product`, migration `029`). Mọi view ngành khác (`..._so_sanh`,
+LẦN — từ migration `039` là hàm `mart.ten_nganh()`, và `mart.ban_theo_nganh_thang`
+(LEFT JOIN từ dòng bán sang `core.dim_product`, `029`, thay lại ở `039`) cùng
+`mart.nganh_khoang` gọi hàm đó. Mọi view ngành khác (`..._so_sanh`,
 `nganh_ky_cung_ky`) đọc lại view đó, không tự viết biểu thức riêng — hai bản
 chép của cùng một `coalesce` trôi khỏi nhau là mã hàng rỗng tách ra hai ô
 "(chưa phân loại)" khác nhau trên cùng một trang. Hằng `kome.bao_cao.NGANH_TRONG`
@@ -633,6 +634,39 @@ kế, có ô nổi / bật tắt chú giải / bấm để lọc). Đặc tả:
 - Thanh bên: sáu nhóm của gói thiết kế; màn chưa có hiện MỜ kèm "chưa có" (không giả
   vờ có); bốn màn bị cắt (lộ trình §4.2) không hiện; Kho dữ liệu / Ngân sách ẩn theo
   cờ quyền. Chuông chỉ báo thứ có nguồn thật (`khoi_tong_quan.thong_bao`).
+
+**Bất biến (Khoảng xem, migration 039 — 2026-09-24):** cả website có MỘT khoảng xem,
+nằm TRÊN URL (`?thang=YYYY-MM` · `?ky=<company_fy>` · `?tu=&den=`; không tham số = tháng
+của `mart.moc_thoi_gian.hom_nay`, mùng 1 → hôm nay). Không cookie, không localStorage —
+gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hiện tại. Bốn luật:
+- **Một chỗ hiểu khoảng xem**: `kome/khoang_xem.py` (đọc tham số · cắt vào dải dữ liệu ·
+  dải so sánh · câu mô tả). `so_sanh[0]` luôn là NĂM TRƯỚC; `[1]` là tháng trước / khoảng
+  liền trước. Tháng dở dang so CÙNG DẢI NGÀY (29/2 → 28/2, đúng `mart.thang_den_hom_nay`),
+  tháng trọn so trọn tháng; Kỳ so trên các tháng CẢ HAI phía có dữ liệu (đúng
+  `mart.ky_cung_ky`). Phép so vào trước dải dữ liệu → `co = false`, màn in "không có dữ liệu
+  để so". Giao diện KHÔNG tự tính ngày so sánh (`giao_dien/src/khung/khoang.ts` chỉ đọc/ghi
+  URL và in `mo_ta` của máy chủ).
+- **Chỉ số theo khoảng vẫn ở `mart`**: hàm `mart.*_khoang(tu, den)` (`LANGUAGE sql STABLE`,
+  gộp thẳng vào câu gọi). `kome/ban_khoang.py` chỉ hỏi chúng và dựng lại hình dạng của
+  `kome/bao_cao.py`. Đẳng thức có test canh (`tests/test_mart_khoang.py`,
+  `tests/test_ban_khoang.py`): tháng trọn = `mart.ban_theo_thang`; tháng hiện tại =
+  `mart.thang_den_hom_nay`; Σ ngày = Σ ngành = tổng khoảng; dạng Kỳ của `/bao-cao` = đúng
+  số cũ (`BK.tinh_bao_cao` gọi thẳng `bao_cao.tinh_bao_cao`).
+- **Số bán hàng đổi theo khoảng, NHÃN giữ theo hôm nay** (hạng 12 tháng, trạng thái /
+  nhịp mua, tồn, tốc độ 90 ngày) — khối nào tính theo hôm nay phải ghi "hôm nay". Kho hàng ·
+  Công nợ · Cần liên hệ · Dự báo không theo khoảng (bộ chọn hiện MỜ kèm lý do). Ngân sách chỉ
+  theo tháng / kỳ — dạng Khoảng hiện câu nói rõ, không tự chia chỉ tiêu.
+- **Khoá ảnh chụp** = đường dẫn + tham số khoảng chuẩn hoá THEO CÚ PHÁP
+  (`ThamSo.khoa()`, không hỏi CSDL — "trúng ảnh chụp: 1 lượt hỏi" giữ nguyên); giải khoảng
+  (+1 lượt `pham_vi`) chạy TRONG hàm tính. Khối Tổng quan theo khoảng: `KHOI[..][3] = True`,
+  ngân sách lượt hỏi = cũ + 1 (`tests/test_api.py::NGAN_SACH_TRUY_VAN`). `/bao-cao` vẫn ≤ 11
+  ở cả ba dạng (`tests/test_ban_khoang.py::test_bao_cao_thang_khong_qua_11_truy_van`).
+Liên kết nội bộ giữ khoảng xem nhờ MỘT bộ viết lại `href` ở `document`
+(`khoang.ts::ganVietLaiLienKet`); mọi `history.pushState/replaceState` của từng màn đi
+qua `giuKhoang()` — thêm một màn có bộ lọc trên URL mà quên hàm đó là đổi bộ lọc xong mất
+khoảng xem. Bộ lọc nhãn tháng của `/khach-hang` là `?nhan_thang=` (KHÔNG `?thang=` — trùng tên
+là bộ lọc nhãn bị đọc thành tháng xem). Đợt A = Tổng quan + Báo cáo; Khách hàng (đợt B) và Sản phẩm (đợt C) còn hiện bộ
+chọn mờ "chưa theo khoảng xem". Đặc tả: `docs/superpowers/specs/2026-09-24-khoang-xem-thang-design.md`.
 
 **Bất biến (Đợt 6, migration 038):** công nợ đọc sổ `請求先元帳` (spec `seikyu_motocho`
 → `core.fact_ar_ledger`), mỗi lô là ẢNH CHỤP một kỳ (kỳ đọc từ dòng 集計期間), mart đọc lô

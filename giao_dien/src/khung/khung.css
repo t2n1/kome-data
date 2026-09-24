@@ -102,3 +102,15 @@ a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
   .knav-than.mo{display:flex;max-height:calc(100vh - 60px);overflow-y:auto;padding-bottom:.6rem}
   .khung-than{padding:1rem 1rem 2.5rem}
 }
+
+/* Bộ chọn khoảng xem chung (đặc tả khoảng xem §4) — dải mỏng đầu vùng nội dung. */
+.kx{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem .7rem;margin:0 0 1rem;padding:.5rem .75rem;
+  background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;font-size:.8rem}
+.kx-mo{background:var(--nen-phu)}
+.kx-nhan{font-size:.64rem;font-weight:600;letter-spacing:.1em;color:var(--chu-nhat)}
+.kx-dieu{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem;margin:0}
+.kx-o{font:inherit;font-size:.8rem;padding:.24rem .45rem;border-radius:8px;border:1px solid var(--vien);
+  background:var(--nen-the);color:var(--chu);min-width:0}
+.kx-mo-ta{flex-basis:100%;margin:0;font-size:.74rem;line-height:1.45}
+.kx-ghi{color:var(--canh-chu)}
+@media (max-width: 640px){ .kx{padding:.5rem .6rem} .kx-o{max-width:100%} }

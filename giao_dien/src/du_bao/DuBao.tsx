@@ -7,6 +7,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { lay } from "../api";
+import { giuKhoang } from "../khung/khoang";
 import { ngay, yen } from "../dinh_dang";
 import "./du_bao.css";
 
@@ -39,7 +40,7 @@ const tNhan = (t: string) => `${t.slice(5)}/${t.slice(0, 4)}`;
 export default function DuBao() {
   const [kb, datKb] = useState(() => new URLSearchParams(location.search).get("kb") ?? "cs");
   const { data: d, error } = useQuery<DuBaoApi>({ queryKey: ["du-bao"], queryFn: () => lay<DuBaoApi>("/api/du-bao") });
-  const chonKb = (k: string) => { datKb(k); history.replaceState(null, "", k === "cs" ? "/du-bao" : `/du-bao?kb=${k}`); };
+  const chonKb = (k: string) => { datKb(k); history.replaceState(null, "", giuKhoang(k === "cs" ? "/du-bao" : `/du-bao?kb=${k}`)); };
 
   if (error) return <div className="khoi-loi">Không tải được dự báo: {(error as Error).message}</div>;
   if (!d) return <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div>;

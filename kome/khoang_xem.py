@@ -171,6 +171,8 @@ class KhoangXem:
     tron_thang: bool
     so_sanh: tuple[SoSanh, ...]
     ghi_chu: tuple[str, ...]
+    ngay_dau: date               # ngày bán đầu tiên trong kho (dải dữ liệu)
+    hom_nay: date                # mart.moc_thoi_gian.hom_nay
 
     @property
     def so_ngay(self) -> int:
@@ -276,7 +278,8 @@ def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
     return KhoangXem(loai=loai, tu=tu, den=den, nhan=nhan, mo_ta=mo_ta, thang=thang,
                      company_fy=ky.company_fy if ky else None, so_ky=ky.so_ky if ky else None,
                      mac_dinh=ts.loai == "mac_dinh", tron_thang=tron,
-                     so_sanh=so_sanh, ghi_chu=tuple(ghi_chu))
+                     so_sanh=so_sanh, ghi_chu=tuple(ghi_chu),
+                     ngay_dau=pv.ngay_dau, hom_nay=pv.hom_nay)
 
 
 def giai_conn(conn, ts: ThamSo) -> KhoangXem | None:

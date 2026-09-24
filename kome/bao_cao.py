@@ -146,6 +146,27 @@ class CungKy(_SoCungKy):
 
 
 @dataclass
+class SoSanhSo(_SoCungKy):
+    """Một phép so của khoảng xem (kome/khoang_xem.py::SoSanh) kèm số — dạng
+    Tháng / Khoảng. `dt/lg/so_khach` = phần khoảng đem so (`tu_nay → den_nay`),
+    `..._ck` = dải so sánh (`tu → den`); các phép chia thừa kế `_SoCungKy`.
+    `co = False`: không có dữ liệu để so — mọi cột `_ck` là None."""
+    ma: str
+    nhan: str
+    co: bool
+    tu: date
+    den: date
+    tu_nay: date
+    den_nay: date
+    dt: int | None
+    lg: int | None
+    so_khach: int | None
+    dt_ck: int | None
+    lg_ck: int | None
+    so_khach_ck: int | None
+
+
+@dataclass
 class NganhThang:
     """Một dòng `mart.ban_theo_nganh_thang_so_sanh` — cho bản đồ nhiệt."""
     thang: str
@@ -205,6 +226,9 @@ class BaoCao:
     nganh_ky: list[NganhKy] = field(default_factory=list)
     tap_trung: TapTrung | None = None
     hang_theo_nganh: list[dict] = field(default_factory=list)
+    # Khoảng xem dạng Tháng / Khoảng (kome/ban_khoang.py): các phép so của
+    # khoảng. Dạng Kỳ để rỗng và dùng `cung_ky` như trước.
+    so_sanh: list[SoSanhSo] = field(default_factory=list)
 
 
 def _ky_tu_dong(r) -> Ky:
@@ -330,10 +354,7 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
     # -50.000 yên khi đó xếp TRƯỚC (được coi "lớn hơn") một mã None, dù
     # "không biết" phải luôn đứng SAU mọi giá trị đã biết, kể cả giá trị biết
     # rất xấu. `float('-inf')` không có ca này — luôn nhỏ hơn MỌI số nguyên.
-    hang = sorted(hang_theo_nganh,
-                  key=lambda h: (h["lai_gop"] if h["lai_gop"] is not None
-                                 else float("-inf")),
-                  reverse=True)[:TOP]
+    hang = top_lai_gop(hang_theo_nganh)
 
     # (5) Người phụ trách — không đổi.
     nhan_vien = [dict(zip(("ma", "doanh_thu", "lai_gop", "ty_suat", "so_khach",
@@ -343,14 +364,7 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
            ORDER BY doanh_thu_thuan DESC""", (ky.company_fy,)).fetchall()]
 
     # (6) Ngành × tháng — cho bản đồ nhiệt.
-    nganh_thang = [NganhThang(
-        thang=r[0], nganh=r[1], doanh_thu=int(r[2] or 0),
-        dt_cung_ky=int(r[3]) if r[3] is not None else None,
-        co_cung_ky=r[4],
-        tang_truong=float(r[5]) if r[5] is not None else None) for r in conn.execute(
-        """SELECT thang, nganh, doanh_thu_thuan, dt_cung_ky, co_cung_ky, tang_truong
-           FROM mart.ban_theo_nganh_thang_so_sanh
-           WHERE company_fy = %s ORDER BY nganh, thang""", (ky.company_fy,)).fetchall()]
+    nganh_thang = doc_nganh_thang(conn, ky.company_fy)
 
     # (7) Ngành × kỳ — cho khối "ngành kéo doanh thu lên/xuống". KHÔNG gộp
     # với (6): câu gộp sẽ đánh giá lại mart.ban_theo_nganh_thang_so_sanh một
@@ -382,6 +396,30 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
                   nhan_vien=nhan_vien, canh_bao=canh_bao, cung_ky=cung_ky,
                   nganh_thang=nganh_thang, nganh_ky=nganh_ky, tap_trung=tap_trung,
                   hang_theo_nganh=hang_theo_nganh)
+
+
+def top_lai_gop(hang_theo_nganh: list[dict]) -> list[dict]:
+    """TOP mặt hàng lãi gộp cao nhất — dùng chung cho dạng Kỳ và dạng Tháng /
+    Khoảng (kome/ban_khoang.py). `lai_gop` None xếp SAU mọi giá trị đã biết,
+    kể cả giá trị âm rất xấu ([Vòng soát cuối, M4]: `float('-inf')`, không
+    phải `-1`)."""
+    return sorted(hang_theo_nganh,
+                  key=lambda h: (h["lai_gop"] if h["lai_gop"] is not None
+                                 else float("-inf")),
+                  reverse=True)[:TOP]
+
+
+def doc_nganh_thang(conn, company_fy: int) -> list[NganhThang]:
+    """Ngành × tháng của MỘT kỳ — cho bản đồ nhiệt (một lượt hỏi). Dạng Tháng
+    / Khoảng dùng kỳ chứa ngày cuối khoảng."""
+    return [NganhThang(
+        thang=r[0], nganh=r[1], doanh_thu=int(r[2] or 0),
+        dt_cung_ky=int(r[3]) if r[3] is not None else None,
+        co_cung_ky=r[4],
+        tang_truong=float(r[5]) if r[5] is not None else None) for r in conn.execute(
+        """SELECT thang, nganh, doanh_thu_thuan, dt_cung_ky, co_cung_ky, tang_truong
+           FROM mart.ban_theo_nganh_thang_so_sanh
+           WHERE company_fy = %s ORDER BY nganh, thang""", (company_fy,)).fetchall()]
 
 
 def nhom_theo_nganh(nganh_ky: list[NganhKy], hang_theo_nganh: list[dict]
@@ -606,7 +644,8 @@ class TienDoNganSach:
         return self.muc_tieu_den_hom_nay / self.muc_tieu * 100
 
 
-def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | None":
+def tien_do_ngan_sach(conn, company_fy: int | None = None,
+                      thang: str | None = None) -> "TienDoNganSach | None":
     """Tiến độ so với chỉ tiêu. None khi kho chưa có dòng bán nào.
 
     Tháng đang xét là tháng của `mart.moc_thoi_gian.hom_nay`, KHÔNG phải tháng
@@ -622,7 +661,10 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None) -> "TienDoNganSach | 
         return None
     hom_nay, fy_hom_nay, thang_hom_nay = r[0], r[1], r[2]
     ky = company_fy or fy_hom_nay
-    thang = thang_hom_nay if ky == fy_hom_nay else thang_cua_ky(ky)[-1]
+    # `thang` (khoảng xem dạng Tháng) chọn thẳng tháng đang xét; bỏ trống thì
+    # như trước: tháng của hom_nay nếu là kỳ hiện tại, tháng cuối kỳ nếu không.
+    if thang is None:
+        thang = thang_hom_nay if ky == fy_hom_nay else thang_cua_ky(ky)[-1]
 
     # Một câu cho cả dòng theo người của tháng đang xét, kèm tên và cùng kỳ.
     # LEFT JOIN dim_salesperson: mã ngoài danh sách phụ trách vẫn có dòng, chỉ
