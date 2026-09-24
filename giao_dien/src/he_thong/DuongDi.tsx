@@ -5,7 +5,7 @@
 // lọc, vẽ và cho tải danh sách.
 import { useMemo, useState } from "react";
 import { KD } from "../khoi_dau";
-import { TabKho } from "./TabKho";
+import { KhungKho } from "./TabKho";
 import "./he_thong.css";
 
 type Loai = "nap" | "man" | "luu" | "khong_nap";
@@ -60,17 +60,16 @@ export default function DuongDi() {
   }, [f, loc, tim]);
 
   if (!f) return (
-    <div className="ht"><h1>Kho dữ liệu</h1><TabKho dang="duong-di" />
-      <p className="trong">Chưa sinh ảnh chụp — chạy <code>python scripts/sinh_cot_dung.py</code>.</p></div>);
+    <KhungKho dang="duong-di">
+      <p className="trong">Chưa sinh ảnh chụp — chạy <code>python scripts/sinh_cot_dung.py</code>.</p></KhungKho>);
 
   const dem = m.files.find(x => x.ten === f.ten)!.dem;
   const boDuoc = f.cot.filter(c => BO_DUOC.includes(c.loai));
 
   return (
-    <div className="ht">
-      <h1>Kho dữ liệu</h1>
-      <TabKho dang="duong-di" />
+    <KhungKho dang="duong-di">
       <div className="tai-lieu dd">
+        <h1>Dữ liệu đi đâu</h1>
         <p className="ghi-chu">Mỗi cột trong file xuất từ OBC đi đâu trong web app — và <strong>bỏ khỏi bản xuất lần sau có sao không</strong>.
           Phân loại SINH từ danh mục CSDL, khai báo nạp và mã của web app; không có dòng nào chép tay.</p>
         <div className="ngay-thieu">⚠️ Cột <strong>đang khai báo nạp</strong> mà biến mất khỏi file thì <strong>cổng 2 chặn cả file</strong> hôm đó.
@@ -139,7 +138,7 @@ export default function DuongDi() {
           </ul>
         </section>
       </div>
-    </div>
+    </KhungKho>
   );
 }
 

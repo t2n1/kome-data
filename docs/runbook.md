@@ -25,13 +25,16 @@ python -m uvicorn kome.web.app:app --host 127.0.0.1 --port 8000
 ```
 
 Rồi mở trình duyệt vào <http://127.0.0.1:8000>. Trang kéo–thả file nằm ở
-mục **Kho dữ liệu** (<http://127.0.0.1:8000/kho-du-lieu>). Lệnh này **tự đọc `.env`** nên
+mục **Kho dữ liệu → Nạp dữ liệu mới** (<http://127.0.0.1:8000/kho-du-lieu/nap>). Lệnh này **tự đọc `.env`** nên
 không cần nạp biến môi trường trước. Cứ để cửa sổ đó mở; đóng cửa sổ là trang
 tắt.
 
-Nạp dữ liệu, sức khoẻ dữ liệu và bảng phủ dữ liệu nay nằm chung trong **một
-màn Kho dữ liệu duy nhất** (những địa chỉ cũ tự chuyển hướng sang đó). Bản trên
-mạng (Vercel) mở **cùng màn này**, chỉ ẩn hai khối: ô kéo–thả file và nút
+Màn Kho dữ liệu có thanh trái: **Tổng quan độ phủ** (sức khoẻ, bảng phủ ngày /
+tháng) · **Nạp dữ liệu mới** · sơ đồ luồng · cột nối · dữ liệu đi đâu. Nạp có
+**hai bước**: thả file vào đúng ô của nó (hay thả cả 3 file 13:30 vào ô "Nạp
+nhiều file") → màn hiện kết quả 5 cổng kiểm, **chưa ghi gì** → bấm **Xác nhận nạp
+vào kho** (hay **Huỷ**). Quên bấm Xác nhận thì file nằm ở khối "Đang chờ xác
+nhận" tới 24 giờ. Bản trên mạng (Vercel) không có mục Nạp và không có nút
 **Hoàn tác** — xem [docs/trien-khai-vercel.md](trien-khai-vercel.md) để biết vì
 sao và cách đưa lên.
 

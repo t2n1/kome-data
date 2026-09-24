@@ -172,4 +172,4 @@ def test_man_200_khong_truy_van_mot_file(client):
 
 def test_tab_moi_trong_dai_tab():
     assert '"duong-di", "/kho-du-lieu/duong-di"' in nguon("he_thong", "TabKho.tsx")
-    assert '<TabKho dang="duong-di" />' in nguon("he_thong", "DuongDi.tsx")
+    assert '<KhungKho dang="duong-di">' in nguon("he_thong", "DuongDi.tsx")

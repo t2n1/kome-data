@@ -31,6 +31,7 @@ const KhoHang = lazy(() => import("./san_pham/KhoHang"));
 const ManCongNo = lazy(() => import("./cong_no/ManCongNo"));
 // Giai đoạn 5 — nhóm HỆ THỐNG. Máy chủ tính sẵn dữ liệu vào window.__KOME__.man.
 const KhoDuLieu = lazy(() => import("./he_thong/KhoDuLieu"));
+const NapDuLieu = lazy(() => import("./he_thong/KhoDuLieu").then(m => ({ default: m.NapDuLieu })));
 const TaiLieuLuong = lazy(() => import("./he_thong/TaiLieu").then(m => ({ default: m.TaiLieuLuong })));
 const TaiLieuCotNoi = lazy(() => import("./he_thong/TaiLieu").then(m => ({ default: m.TaiLieuCotNoi })));
 const DuongDi = lazy(() => import("./he_thong/DuongDi"));
@@ -52,7 +53,9 @@ function man(duong: string): (() => React.ReactElement) | null {
   if (duong === "/kho-hang") return () => <KhoHang />;
   if (duong === "/cong-no") return () => <ManCongNo />;
   if (KD.man != null) {
-    if (duong === "/kho-du-lieu" || duong === "/upload") return () => <KhoDuLieu />;
+    if (duong === "/kho-du-lieu") return () => <KhoDuLieu />;
+    // POST /upload (một bước, giữ cho tương thích) và /upload/kiem | /xac-nhan vẽ lại màn Nạp kèm kết quả.
+    if (duong === "/kho-du-lieu/nap" || duong === "/upload" || duong.startsWith("/upload/")) return () => <NapDuLieu />;
     if (duong === "/kho-du-lieu/luong") return () => <TaiLieuLuong />;
     if (duong === "/kho-du-lieu/cot-noi") return () => <TaiLieuCotNoi />;
     if (duong === "/kho-du-lieu/duong-di") return () => <DuongDi />;

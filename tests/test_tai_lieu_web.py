@@ -54,7 +54,7 @@ def test_file_la_ve_mac_dinh(client):
 
 def test_tab_danh_dau_trang_dang_xem(client):
     src = nguon("he_thong", "TaiLieu.tsx")
-    assert '<TabKho dang="luong" />' in src and '<TabKho dang="cot-noi" />' in src
+    assert '<KhungKho dang="luong">' in src and '<KhungKho dang="cot-noi">' in src
     tab = nguon("he_thong", "TabKho.tsx")
     assert 'aria-current={dang === ma ? "page" : undefined}' in tab
 
@@ -91,7 +91,8 @@ def test_cam_bay_khong_de_html_lot_qua(client):
 def test_man_van_hanh_co_tab(conn, test_db_url):
     r = TestClient(A.create_app(db_url=test_db_url)).get("/kho-du-lieu")
     assert r.status_code == 200 and "man" in kd(r.text)
-    assert '<TabKho dang="van-hanh" />' in nguon("he_thong", "KhoDuLieu.tsx")
+    src = nguon("he_thong", "KhoDuLieu.tsx")
+    assert '<KhungKho dang="tong-quan" lop="kdl">' in src and '<KhungKho dang="nap" lop="kdl">' in src
 
 
 def test_khong_co_quyen_kho_du_lieu_thi_tai_lieu_cung_403():

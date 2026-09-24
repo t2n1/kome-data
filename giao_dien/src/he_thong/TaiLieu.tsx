@@ -5,7 +5,7 @@
 import type { ReactNode } from "react";
 import { KD } from "../khoi_dau";
 import { so } from "../dinh_dang";
-import { TabKho } from "./TabKho";
+import { KhungKho } from "./TabKho";
 import "./he_thong.css";
 
 /** Markdown MỘT dòng -> phần tử React: chỉ `**đậm**` và `` `mã` `` (cùng hai mẫu
@@ -42,10 +42,9 @@ type Luong = {
 export function TaiLieuLuong() {
   const m = KD.man as Luong;
   return (
-    <div className="ht">
-      <h1>Kho dữ liệu</h1>
-      <TabKho dang="luong" />
+    <KhungKho dang="luong">
       <div className="tai-lieu">
+        <h1>Sơ đồ luồng dữ liệu OBC → web app</h1>
         <p className="ghi-chu">Sơ đồ luồng dữ liệu OBC → web app: bảng nào lấy từ đâu, bao lâu một lần, khoá chính là gì, đối chiếu thế nào.</p>
         <section id="bon-tang">
           <h2>Bốn tầng</h2>
@@ -122,7 +121,7 @@ export function TaiLieuLuong() {
               {g.man.length > 0 && <div className="lt-man">{g.man.map(x => <span key={x} className="vien nhat">màn {x}</span>)}</div>}</div>))}</div> : NHAC}
         </section>
       </div>
-    </div>
+    </KhungKho>
   );
 }
 
@@ -138,10 +137,9 @@ type CotNoi = {
 export function TaiLieuCotNoi() {
   const m = KD.man as CotNoi;
   return (
-    <div className="ht">
-      <h1>Kho dữ liệu</h1>
-      <TabKho dang="cot-noi" />
+    <KhungKho dang="cot-noi">
       <div className="tai-lieu">
+        <h1>Cột nối giữa các file OBC</h1>
         <p className="ghi-chu">Mỗi file OBC chỉ ghép được với file khác qua mấy cột mã dưới đây. Mọi cột mã là TEXT — đọc thành số là mất số 0 đầu
           và không ghép được với gì nữa.</p>
         <section id="ma-tran">
@@ -184,6 +182,6 @@ export function TaiLieuCotNoi() {
           </table></div>
         </section>
       </div>
-    </div>
+    </KhungKho>
   );
 }
