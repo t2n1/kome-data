@@ -68,3 +68,39 @@
 .ns-bang td.ns-cs{white-space:nowrap;color:var(--chu-nhat);font-size:.82rem}
 .ns-bang tr.ns-dong-2 td{border-top:0}
 .ns-bang tr.ns-bien td,.ns-bang tr.ns-lech td{color:var(--chu-nhat);font-size:.82rem;font-variant-numeric:tabular-nums}
+
+/* Kho dữ liệu → Dữ liệu đi đâu (2026-09-24). */
+.dd .dd-loai{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:.6rem;margin:.8rem 0 1.2rem}
+.dd .dd-loai-o{border:1px solid var(--vien);border-radius:8px;background:var(--nen-the);padding:.6rem .7rem;display:flex;flex-direction:column;gap:.3rem;font-size:.84rem}
+.dd .dd-bo{font-size:.86rem}
+.dd .dd-dem{color:var(--chu-nhat);font-weight:400}
+.dd .dd-tong{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0}
+.dd .dd-so{font:inherit;cursor:pointer;display:flex;align-items:baseline;gap:.4rem;padding:.35rem .7rem;border-radius:8px;border:1px solid var(--vien);background:var(--nen-the);color:var(--chu);font-size:.84rem}
+.dd .dd-so .dd-so-gia{font-family:var(--font-so);font-size:1.15rem;font-weight:600}
+.dd .dd-so.loi .dd-so-gia{color:var(--loi-chu)} .dd .dd-so.canh .dd-so-gia{color:var(--canh-chu)}
+.dd .dd-so.ok .dd-so-gia{color:var(--ok-chu)} .dd .dd-so.nhat .dd-so-gia{color:var(--chu-nhat)}
+.dd .dd-so[aria-pressed="true"]{border-color:var(--do);box-shadow:inset 0 0 0 1px var(--do)}
+.dd .dd-thanh{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.6rem 0}
+.dd .dd-tim{flex:1 1 14rem;min-width:0;font:inherit;padding:.35rem .6rem;border:1px solid var(--vien);border-radius:6px;background:var(--nen-the);color:var(--chu)}
+.dd .dd-bang tbody tr{cursor:pointer}
+.dd .dd-bang tr.dd-dang td{background:var(--do-nen)}
+.dd .dd-man{margin:0 .2rem .2rem 0;display:inline-block}
+.dd .dd-han{font-size:.86rem;color:var(--chu-thuong);padding-left:1.1rem}
+.dd .dd-han li{margin:.25rem 0}
+.dd-svg{display:block;width:100%;height:auto;font-family:var(--font-ui);font-size:12px}
+.dd-svg .dd-cot-nhan{font-size:11px;letter-spacing:.06em;fill:var(--chu-nhat);font-weight:600}
+.dd-svg .dd-nut,.dd-svg .dd-hop{cursor:pointer}
+.dd-svg .dd-nut rect{fill:var(--nen-the);stroke:var(--vien)}
+.dd-svg .dd-nut text,.dd-svg .dd-hop text{fill:var(--chu)}
+.dd-svg .dd-nut.mo{opacity:.3}
+.dd-svg .dd-nut.sang rect{stroke:var(--do);fill:var(--do-nen)}
+.dd-svg .dd-nut.bat rect{stroke-width:2}
+.dd-svg .dd-nut:focus-visible rect,.dd-svg .dd-hop:focus-visible rect{stroke:var(--do);stroke-width:2}
+.dd-svg .dd-nut:focus{outline:none} .dd-svg .dd-hop:focus{outline:none}
+.dd-svg .dd-duong path{fill:none;stroke:var(--vien-dam);stroke-width:1;opacity:.55}
+.dd-svg .dd-duong path.sang{stroke:var(--do);stroke-width:2;opacity:1}
+.dd-svg .dd-duong path.mo{opacity:.12}
+.dd-svg .dd-duong path.dut{stroke-dasharray:4 3}
+.dd-svg .dd-hop rect{fill:var(--nen-the);stroke:var(--vien)}
+.dd-svg .dd-hop.bat rect{stroke:var(--do);stroke-width:2;fill:var(--do-nen)}
+.dd-svg .dd-hop-ten{font-weight:600}

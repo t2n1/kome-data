@@ -103,6 +103,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/kho-du-lieu` | **React** (giai đoạn 5; máy chủ tính sẵn vào `window.__KOME__.man`, vai trò NẠP): nạp file OBC (`POST /upload`, biểu mẫu thật) · sức khoẻ · lô gần nhất + hoàn tác (`POST /undo/{lô}`) · độ phủ ngày / tháng | `meta.ingest_batch`, `core.*` |
 | `/kho-du-lieu/luong` | Tài liệu sống (đợt 2b): bốn tầng · các nguồn OBC · 5 cổng + ngưỡng từng file · cạm bẫy OBC · lộ trình. **0 truy vấn** | `config/files.yml`, `kome/web/tai_lieu_sinh.json` |
 | `/kho-du-lieu/cot-noi` | Tài liệu sống: ma trận khoá · file nối đi đâu · cột trong từng file (`?file=<spec>`). **0 truy vấn** | `config/files.yml` |
+| `/kho-du-lieu/duong-di` | **Dữ liệu đi đâu** (2026-09-24): mỗi cột OBC một phán quyết "bỏ khỏi bản xuất lần sau có sao không" — bộ nạp cần · màn hình đang dùng · nạp vào kho chưa ai dùng · có trong file kho không nạp; hình đường đi OBC → core → mart → màn; sơ đồ nối khoá; tải CSV cột bỏ được. **0 truy vấn** | `kome/web/cot_dung_sinh.json` (← `scripts/sinh_cot_dung.py`) |
 | `/nhat-ky` | **Nhật ký thao tác** (màn 20): ĐỌC GỘP năm sổ đã có — nạp + hoàn tác (`meta.ingest_batch`, `nap_boi`/`huy_boi` từ 033), sửa ngân sách (`app.ngan_sach_nhat_ky`), đổi quyền (`app.nhat_ky_quyen`), ghi tiếp xúc (`app.nhat_ky_tiep_xuc`). Lọc `?loai=`/`?tim=`, `/nhat-ky.csv`. **2 truy vấn** | năm sổ trên |
 | `/cai-dat` | **Cài đặt** (màn 21): người dùng & ba cờ quyền (đổi được CHỈ khi có `duoc_quan_tri` VÀ máy có cổng đăng nhập) · ngày lễ sắp tới · quy tắc khách · nguồn · hiển thị. Không bao giờ nhận mật khẩu | `app.nguoi_dung`, `mart.lich_kinh_doanh` |
 | `/giao-dien` | Đổi chế độ sáng/tối/theo hệ thống/theo giờ, ghi cookie, chuyển hướng về trang đã gọi | không đọc CSDL — chỉ đọc/ghi cookie |
@@ -230,6 +231,17 @@ thì chạy lại `python scripts/sinh_tai_lieu.py`** — không chạy là
 `tests/test_tai_lieu.py::test_anh_chup_tai_lieu_khong_cu` đỏ. `files.yml.core_table`
 khai lại bảng đích của `pipeline.UNDO_TABLES` vì web không được nhập pipeline —
 có test canh hai bản khớp (`::test_core_table_khop_undo_tables`).
+
+**Bất biến ("Dữ liệu đi đâu", 2026-09-24):** phân loại "cột OBC nào bỏ được" SINH bởi
+`scripts/sinh_cot_dung.py` (danh mục Postgres của CSDL test + `files.yml` + quét mã `kome/`) vào
+`kome/web/cot_dung_sinh.json`; tiêu đề file thật chụp riêng ở `config/obc_tieu_de.json`
+(`--doc-tieu-de`, chỉ dòng tiêu đề của file mới nhất trong `raw_archive*/`). **Sai nguy hiểm duy
+nhất là báo "bỏ được" cho cột đang dùng**, nên mọi phép dò nghiêng về "đang dùng" (trùng tên là
+dùng, `SELECT *` là dùng mọi cột, view không tách được là dùng cả view). Thêm một mô-đun đọc
+`mart`/`core` = PHẢI khai vào `MAN` của script; loader ghi cột sang chỗ khác tên = khai
+`LUU_RIENG`; sửa migration / files.yml / mã đọc cột = chạy lại script — ba điều đều có test canh
+(`tests/test_cot_dung.py`). Bỏ một cột ĐANG khai nạp khỏi bản xuất mà chưa sửa `files.yml` là
+cổng 2 chặn cả file. Đặc tả: `docs/superpowers/specs/2026-09-24-kho-du-lieu-theo-thiet-ke-design.md`.
 
 Ba trang cũ — nạp (`nap`), sức khoẻ (`health`), độ phủ dữ liệu (`phu-du-lieu`)
 — nay chỉ còn 301 về `/kho-du-lieu`, không render nội dung gì nữa.
