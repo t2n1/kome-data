@@ -121,3 +121,4 @@ a.tuoi-no-dong:hover .nhat-chu{color:var(--chu)}
 .tuoi-no-thanh{height:7px;border-radius:99px;background:var(--nen-phu);overflow:hidden}
 .tuoi-no-thanh i{display:block;height:100%;border-radius:99px}
 .bang tr.dang-xem td{font-weight:600}
+.ns-duong{margin-top:.9rem;padding-top:.7rem;border-top:1px solid var(--vien)}

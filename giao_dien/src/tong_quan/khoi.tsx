@@ -127,7 +127,34 @@ type NganSach = {
   thang: string; co_ngan_sach: boolean; thuc_te: number; muc_tieu: number | null; muc_tieu_den_hom_nay: number | null;
   tien_do: number | null; moc: number | null; ngay_kd: number; ngay_kd_da_qua: number; ngay_kd_con_lai: number;
   can_ban_moi_ngay: number | null; nhip_chuan: number | null; nguoi: NguoiNS[];
+  duong?: DuongNS;
 };
+type DuongNS = { kieu: "ngay" | "thang"; nhan_ss: string | null; den?: string;
+  diem: { nhan: string; tt: number | null; ns: number | null; ss: number | null }[] };
+
+/** Đường luỹ kế của khối ngân sách: thực tế cộng dồn · nhịp ngân sách · tháng trước. */
+function DuongNganSach({ duong }: { duong: DuongNS }) {
+  const ds = duong.diem;
+  if (!ds.length) return null;
+  const theoNgay = duong.kieu === "ngay";
+  const coNS = ds.some(x => x.ns != null);
+  const coSS = ds.some(x => x.ss != null);
+  const iDen = theoNgay && duong.den ? ds.findIndex(x => x.nhan === duong.den) : -1;
+  const chuoi: Chuoi[] = [
+    { ten: "Thực tế (luỹ kế)", kieu: "duong", gia_tri: ds.map(x => x.tt), mau: "var(--lien-ket)" },
+    ...(coNS ? [{ ten: theoNgay ? "Nhịp ngân sách" : "Ngân sách (luỹ kế)", kieu: "duong_dut" as const, gia_tri: ds.map(x => x.ns), mau: LUC.ok }] : []),
+    ...(coSS ? [{ ten: `${duong.nhan_ss} (luỹ kế)`, kieu: "duong_dut" as const, gia_tri: ds.map(x => x.ss), mau: "var(--vien-dam)" }] : []),
+  ];
+  return (
+    <div className="ns-duong">
+      <BieuDo nhan={ds.map(x => theoNgay ? ngay_ngan(x.nhan) : thang_nhan(x.nhan))}
+        nhan_day_du={ds.map(x => theoNgay ? ngay(x.nhan) : thang_nhan(x.nhan))}
+        cao={180} mo_ta="Doanh thu luỹ kế so với nhịp ngân sách" chuoi={chuoi}
+        vach={iDen >= 0 && iDen < ds.length - 1 ? { i: iDen, chu: "mốc" } : null}
+        dinh_dang={v => yen(v)} dinh_dang_truc={v => gon(v)} />
+    </div>
+  );
+}
 
 const NS_THEO_THANG = "Chỉ tiêu chỉ đặt theo tháng — chọn dạng Tháng hoặc Kỳ ở thanh KHOẢNG XEM để xem tiến độ.";
 
@@ -181,6 +208,7 @@ export function KhoiNganSach() {
           <div className="phu">{d.co_ngan_sach ? `Vạch đen = mốc đáng lẽ đạt tới hôm nay (${pc(d.moc)}) — tính theo ngày làm việc, trừ ngày lễ.` : "Thanh = doanh thu thực tế của từng người phụ trách."}</div>
         </div>
       </div>}
+      {d?.duong && <DuongNganSach duong={d.duong} />}
     </Khoi>
   );
 }
