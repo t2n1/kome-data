@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { lay } from "../api";
-import { giuKhoang } from "../khung/khoang";
+import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { ngay, so, yen } from "../dinh_dang";
 import { KD } from "../khoi_dau";
 import { GhiTiepXuc } from "../khach/GhiTiepXuc";
@@ -47,7 +47,7 @@ export default function LienHe() {
   const q = new URLSearchParams(Object.entries({ nv: loc.nv, tat_ca: loc.tat_ca ? "1" : "", ly_do: loc.ly_do })
     .filter(([, v]) => v)).toString();
   const { data: d, error, isFetching } = useQuery<LienHeApi>({
-    queryKey: ["lien-he", q], queryFn: () => lay<LienHeApi>(`/api/lien-he${q ? "?" + q : ""}`), placeholderData: keepPreviousData,
+    queryKey: ["lien-he", q, chuoiKhoang(useKhoang())], queryFn: () => lay<LienHeApi>(voiKhoang(`/api/lien-he${q ? "?" + q : ""}`)), placeholderData: keepPreviousData,
   });
   const [mo, datMo] = useState<string | null>(null);
 

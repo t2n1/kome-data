@@ -168,6 +168,9 @@ class Kho:
     # Tổng giá trị của ĐÚNG các dòng bảng tồn đang hiện (theo CẢ HAI bộ lọc) —
     # cộng lại từ `dong`, nên ô "Giá trị tồn" không thể lệch tổng của bảng.
     gia_tri_ton: int = 0
+    # Ảnh chụp tồn sớm nhất trong kho (040) — `ngay_chup` None mà cột này có giá
+    # trị nghĩa là đang xem lùi về TRƯỚC ảnh chụp đầu tiên.
+    ngay_chup_dau: date | None = None
 
 
 _COT = """product_code, ten_hang, nhom, doanh_thu_thuan, lai_gop, ty_suat,
@@ -544,6 +547,10 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
             UNION ALL
             SELECT 'ngay', '', '', 0, 0, max(snapshot_date)
               FROM core.fact_inventory_daily
+             WHERE snapshot_date <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))
+            UNION ALL
+            SELECT 'ngay_dau', '', '', 0, 0, min(snapshot_date)
+              FROM core.fact_inventory_daily
         ) u ORDER BY khoi, khoa
     """, [CAN_HAN_NGAY] + p_kho + p_loc + p_kho + p_loc + p_loc).fetchall()
 
@@ -552,6 +559,9 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                  "so_dong": int(r[4])} for r in tq if r[0] == "kho"]
     ds_kho = [(r[1], r[2]) for r in tq if r[0] == "dsk"]
     ngay_chup = next((r[5] for r in tq if r[0] == "ngay"), None)
+    # Ảnh chụp tồn SỚM NHẤT trong kho — để màn nói "chưa có ảnh chụp tồn tại mốc
+    # này, ảnh chụp sớm nhất là …" khi xem lùi về trước nó (040).
+    ngay_chup_dau = next((r[5] for r in tq if r[0] == "ngay_dau"), None)
 
     # Lượt hỏi 2: bảng tồn + khối cận hạn + khối quá hạn, cả ba đều theo CẢ
     # HAI bộ lọc (chúng là khối nội dung, không điều khiển gì). Cùng một view,
@@ -636,7 +646,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                theo_kho=theo_kho,
                can_han=[_dong(r) for r in rows if r[0] == "han"],
                qua_han=[_dong(r) for r in rows if r[0] == "qua"],
-               ds_kho=ds_kho, kho=kho, loc=loc)
+               ds_kho=ds_kho, kho=kho, loc=loc, ngay_chup_dau=ngay_chup_dau)
 
 
 def lo_can_han(conn, gioi_han: int = 5) -> tuple[list[dict], int]:

@@ -62,10 +62,12 @@ def test_danh_sach_theo_khoang(conn, batch, c):
     # Chip "có mua trong khoảng" = đúng số khách có phiếu trong khoảng.
     cm = c.get("/api/khach-hang/ds?nv=__moi_nguoi&thang=2026-06&co_mua=1").json()
     assert cm["trang"]["tong"] == cm["tq"]["co_mua"] == 2
-    # Nhãn tính đến hôm nay không đổi theo khoảng.
-    m7 = {k["ma"]: k for k in c.get("/api/khach-hang/ds?nv=__moi_nguoi").json()["trang"]["khach"]}
+    # Từ migration 040 danh bạ (lần mua cuối, trạng thái, hạng…) tính đến MỐC của
+    # khoảng — cuối tháng 6 — không phải hôm nay.
     m6 = {k["ma"]: k for k in t["khach"]}
-    assert all(m6[m]["trang_thai"] == m7[m]["trang_thai"] and m6[m]["hang"] == m7[m]["hang"] for m in m6)
+    assert m6["KA01"]["lan_cuoi"] == "2026-06-08"
+    m7 = {k["ma"]: k for k in c.get("/api/khach-hang/ds?nv=__moi_nguoi").json()["trang"]["khach"]}
+    assert m7["KA01"]["lan_cuoi"] == "2026-07-09"
 
 
 def test_danh_sach_khoang_sai_la_400(conn, batch, c):

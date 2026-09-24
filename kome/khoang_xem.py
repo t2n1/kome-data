@@ -34,6 +34,8 @@ import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 
+import psycopg
+
 
 class LoiKhoang(ValueError):
     """Tham số khoảng xem sai — API trả 400 kèm câu này."""
@@ -69,6 +71,18 @@ class ThamSo:
         if self.tu is not None:
             return {"tu": self.tu.isoformat(), "den": self.den.isoformat()}
         return {}
+
+    def moc(self) -> date | None:
+        """Ngày cuối của khoảng, suy THEO CÚ PHÁP (không hỏi CSDL) — mốc thời gian
+        mà mọi chỉ số "tính đến hôm nay" lùi về (migration 040). None = không dời.
+        Mốc ≥ ngày bán mới nhất thì `mart.moc_lui()` tự coi như không dời."""
+        if self.thang:
+            return _cuoi_thang(int(self.thang[:4]), int(self.thang[5:]))
+        if self.ky is not None:
+            return date(self.ky, 7, 31)
+        if self.den is not None:
+            return self.den
+        return None
 
 
 def _doc_ngay(s: str, ten: str) -> date:
@@ -121,27 +135,68 @@ class PhamVi:
     ngay_dau: date
     hom_nay: date
     ky: tuple[KyDl, ...]
+    # Ngày bán mới nhất THẬT của kho (không theo mốc) — khác `hom_nay` khi đang
+    # xem lùi (migration 040). None = như `hom_nay` (dựng tay trong test).
+    hom_nay_that: date | None = None
 
     def ky_chua(self, d: date) -> KyDl | None:
         return next((k for k in self.ky if k.tu <= d <= k.den), None)
 
 
-def pham_vi(conn) -> PhamVi | None:
+_PHAM_VI = """WITH r AS (SELECT (SELECT min(sales_date) FROM core.fact_sales_line) AS dau,
+                             (SELECT hom_nay FROM mart.moc_thoi_gian) AS cuoi,
+                             (SELECT max(sales_date) FROM core.fact_sales_line) AS that)
+           SELECT r.dau, r.cuoi, d.company_fy, min(d.company_fy_no),
+                  min(d.date_key), max(d.date_key), r.that
+             FROM r LEFT JOIN core.dim_date d ON d.date_key BETWEEN r.dau AND r.cuoi
+            GROUP BY r.dau, r.cuoi, r.that, d.company_fy
+            ORDER BY d.company_fy"""
+
+
+def _cau_dat_moc(moc: date | None) -> str:
+    """Câu đặt mốc cho GIAO DỊCH hiện tại (`set_config(…, true)` — hết hiệu lực khi
+    commit/rollback; KHÔNG dùng SET cấp phiên: Supavisor giữ nó sang kết nối
+    sau). `moc` là một `date` do chính ta dựng — isoformat an toàn để ghép chuỗi,
+    nhờ vậy câu này đi CHUNG một lượt hỏi với câu sau (không tham số = simple
+    query, cho phép nhiều câu)."""
+    return f"SELECT set_config('kome.moc', '{moc.isoformat() if moc else ''}', true)"
+
+
+def dat_moc(conn, ts: "ThamSo | None") -> None:
+    """Đặt mốc thời gian của khoảng xem cho giao dịch hiện tại (migration 040) — cho
+    màn KHÔNG giải khoảng (hồ sơ, kho, công nợ, …). Không tham số khoảng và chưa
+    từng đặt trên kết nối này: 0 lượt hỏi (ngân sách mặc định không đổi)."""
+    moc = ts.moc() if ts is not None else None
+    # Không có mốc cần đặt, và không có mốc nào còn sống: hoặc chưa từng đặt trên
+    # kết nối này, hoặc giao dịch đã kết thúc (set_config(…, true) tự hết khi
+    # commit/rollback — kết nối không ở trong giao dịch nào thì chắc chắn sạch).
+    if moc is None and (not getattr(conn, "_kome_moc", None)
+                        or conn.info.transaction_status == psycopg.pq.TransactionStatus.IDLE):
+        return
+    conn.execute(_cau_dat_moc(moc))
+    conn._kome_moc = moc
+
+
+def pham_vi(conn, ts: "ThamSo | None" = None) -> PhamVi | None:
     """Dải dữ liệu bán hàng + các kỳ của nó. Một lượt hỏi. None = kho rỗng.
     Kỳ lấy từ `core.dim_date` (company_fy / company_fy_no) — không tự tính lại
-    quy tắc 1/8 → 31/7 ở đây."""
-    rows = conn.execute(
-        """WITH r AS (SELECT (SELECT min(sales_date) FROM core.fact_sales_line) AS dau,
-                             (SELECT hom_nay FROM mart.moc_thoi_gian) AS cuoi)
-           SELECT r.dau, r.cuoi, d.company_fy, min(d.company_fy_no),
-                  min(d.date_key), max(d.date_key)
-             FROM r JOIN core.dim_date d ON d.date_key BETWEEN r.dau AND r.cuoi
-            GROUP BY r.dau, r.cuoi, d.company_fy
-            ORDER BY d.company_fy""").fetchall()
-    if not rows:
+    quy tắc 1/8 → 31/7 ở đây. `ts` khác None: ĐẶT MỐC của khoảng đó trong cùng
+    lượt hỏi (hai câu, một round-trip) — `hom_nay` khi đó là ngày bán cuối ≤ mốc."""
+    if ts is None:
+        rows = conn.execute(_PHAM_VI).fetchall()
+    else:
+        cur = conn.execute(_cau_dat_moc(ts.moc()) + "; " + _PHAM_VI)
+        cur.nextset()
+        rows = cur.fetchall()
+        conn._kome_moc = ts.moc()
+    # LEFT JOIN: mốc lùi về TRƯỚC ngày bán đầu tiên thì `cuoi` NULL nhưng vẫn có
+    # một dòng — để `giai` báo "không có dữ liệu tới thời điểm này" (400) thay vì
+    # nhầm thành "kho rỗng".
+    if not rows or rows[0][0] is None:
         return None
     return PhamVi(ngay_dau=rows[0][0], hom_nay=rows[0][1],
-                  ky=tuple(KyDl(r[2], r[3], r[4], r[5]) for r in rows))
+                  ky=tuple(KyDl(r[2], r[3], r[4], r[5]) for r in rows if r[2] is not None),
+                  hom_nay_that=rows[0][6])
 
 
 @dataclass(frozen=True)
@@ -172,7 +227,10 @@ class KhoangXem:
     so_sanh: tuple[SoSanh, ...]
     ghi_chu: tuple[str, ...]
     ngay_dau: date               # ngày bán đầu tiên trong kho (dải dữ liệu)
-    hom_nay: date                # mart.moc_thoi_gian.hom_nay
+    hom_nay: date                # mart.moc_thoi_gian.hom_nay (theo mốc đang xem)
+    # Đang xem LÙI (040): mọi chỉ số "tính đến hôm nay" là tính đến `hom_nay`, sớm
+    # hơn ngày bán mới nhất thật — màn đổi nhãn "hôm nay" thành "đến <ngày>".
+    dang_lui: bool = False
 
     @property
     def so_ngay(self) -> int:
@@ -212,6 +270,9 @@ def _so(ma: str, nhan: str, tu: date, den: date, tu_nay: date, den_nay: date,
 
 
 def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
+    if pv.hom_nay is None:
+        raise LoiKhoang(f"Không có dữ liệu bán nào tới thời điểm đang xem — dữ liệu bắt đầu "
+                        f"{_n(pv.ngay_dau)}.")
     ghi_chu: list[str] = []
     thang = None
     tron = False
@@ -279,10 +340,12 @@ def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
                      company_fy=ky.company_fy if ky else None, so_ky=ky.so_ky if ky else None,
                      mac_dinh=ts.loai == "mac_dinh", tron_thang=tron,
                      so_sanh=so_sanh, ghi_chu=tuple(ghi_chu),
-                     ngay_dau=pv.ngay_dau, hom_nay=pv.hom_nay)
+                     ngay_dau=pv.ngay_dau, hom_nay=pv.hom_nay,
+                     dang_lui=pv.hom_nay_that is not None and pv.hom_nay < pv.hom_nay_that)
 
 
 def giai_conn(conn, ts: ThamSo) -> KhoangXem | None:
-    """Giải khoảng trên dải dữ liệu thật (+1 lượt hỏi). None = kho rỗng."""
-    pv = pham_vi(conn)
+    """ĐẶT MỐC của khoảng (migration 040) và giải khoảng trên dải dữ liệu thật —
+    MỘT lượt hỏi. None = kho rỗng (tới mốc)."""
+    pv = pham_vi(conn, ts)
     return None if pv is None else giai(pv, ts)

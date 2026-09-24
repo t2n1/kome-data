@@ -179,6 +179,15 @@ def _loi(thong_diep: str, ma: int = 500) -> JSONResponse:
     return JSONResponse({"loi": thong_diep}, status_code=ma)
 
 
+def _voi_moc(ts: "KX.ThamSo", tinh):
+    """Hàm tính của ảnh chụp, chạy SAU khi đặt mốc thời gian của khoảng xem
+    (migration 040) — cho màn không tự giải khoảng. Mặc định: 0 lượt hỏi thêm."""
+    def f(c):
+        KX.dat_moc(c, ts)
+        return tinh(c)
+    return f
+
+
 def tao_api(open_app_conn) -> APIRouter:
     r = APIRouter(prefix="/api")
 
@@ -264,8 +273,10 @@ def tao_api(open_app_conn) -> APIRouter:
         bo_loc = dict(nhom=nhom or None, hang=hang or None, tinh=tinh or None)
         try:
             with open_app_conn() as conn:
-                db, pb = anh_chup.lay_du_lieu(conn, anh_chup.KHOA_DANH_BA, KH.danh_ba,
-                                              chi_nap=True)
+                # Danh bạ (trạng thái, hạng, nhịp…) tính đến MỐC của khoảng (040) —
+                # khoá theo khoảng; mặc định vẫn đúng khoá `KHOA_DANH_BA` cũ.
+                db, pb = anh_chup.lay_du_lieu(conn, _khoa(anh_chup.KHOA_DANH_BA, **ts.khoa()),
+                                              _voi_moc(ts, KH.danh_ba), chi_nap=True)
                 # Doanh số trong khoảng xem của MỌI khách (đợt B): ảnh chụp riêng
                 # theo khoảng — +1 lượt hỏi khi trượt (ngân sách màn danh sách ≤ 4).
                 kk, _ = anh_chup.lay_du_lieu(conn, _khoa(anh_chup.KHOA_DANH_BA_KHOANG, **ts.khoa()),
@@ -293,15 +304,19 @@ def tao_api(open_app_conn) -> APIRouter:
                      hashlib.sha1(f"{pb}|{request.url.query}|{sale}".encode()).hexdigest()[:16] if pb else "")
 
     @r.get("/khach-hang/{ma}")
-    def kh_ho_so(request: Request, ma: str):
+    def kh_ho_so(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         from kome import ho_so_khach as HSK
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
         # Nhật ký tiếp xúc thuộc phiên bản dữ liệu (app.nhat_ky_tiep_xuc có
         # trong _PHIEN_BAN), nên ghi xong một lần tiếp xúc là ảnh chụp tự mới.
         try:
             with open_app_conn() as conn:
                 du_lieu, pb = anh_chup.lay(
-                    conn, _khoa("khach-hang/ho-so", ma=ma),
-                    lambda c: (lambda h: None if h is None else HSK.cho_giao_dien(h))(KH.ho_so(c, ma)))
+                    conn, _khoa("khach-hang/ho-so", ma=ma, **ts.khoa()),
+                    _voi_moc(ts, lambda c: (lambda h: None if h is None else HSK.cho_giao_dien(h))(KH.ho_so(c, ma))))
         except Exception:
             traceback.print_exc()
             return _loi("Không đọc được hồ sơ khách hàng.")
@@ -400,18 +415,31 @@ def tao_api(open_app_conn) -> APIRouter:
                      "Không đọc được báo cáo.")
 
     @r.get("/du-bao")
-    def du_bao(request: Request):
-        # Đọc app.ngan_sach -> phiên bản đầy đủ.
-        return _chup(request, "du-bao", du_lieu_du_bao, "Không đọc được dự báo.")
+    def du_bao(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Dự báo như tính vào MỐC của khoảng xem (040). Đọc app.ngan_sach -> phiên bản đầy đủ."""
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        return _chup(request, _khoa("du-bao", **ts.khoa()), _voi_moc(ts, du_lieu_du_bao),
+                     "Không đọc được dự báo.")
 
     @r.get("/lien-he")
-    def lien_he(request: Request, tat_ca: int = 0, nv: str = "", ly_do: str = ""):
+    def lien_he(request: Request, tat_ca: int = 0, nv: str = "", ly_do: str = "",
+                thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         from kome import lien_he as LH
         from kome.tuoi_du_lieu import hom_nay_o_nhat
         sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
         hom_nay = hom_nay_o_nhat()
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
 
         def tinh_(c):
+            # Danh sách cần gọi tính đến MỐC của khoảng (040); tạm ẩn / hẹn gọi
+            # lại vẫn theo đồng hồ thật (`hom_nay`).
+            KX.dat_moc(c, ts)
             ds = LH.danh_sach(c, hom_nay, sale=sale, ly_do=ly_do or None)
             return thanh_json({
                 "ds": ds, "hoat_dong": LH.hoat_dong_gan_day(c, sale=sale),
@@ -426,7 +454,7 @@ def tao_api(open_app_conn) -> APIRouter:
         # (tạm ẩn / hẹn gọi lại hôm nay) -> theo_ngay.
         try:
             with open_app_conn() as conn:
-                du_lieu, pb = anh_chup.lay(conn, _khoa("lien-he", sale=sale or "*", ly_do=ly_do),
+                du_lieu, pb = anh_chup.lay(conn, _khoa("lien-he", sale=sale or "*", ly_do=ly_do, **ts.khoa()),
                                            tinh_, theo_ngay=True)
         except Exception:
             traceback.print_exc()
@@ -457,10 +485,15 @@ def tao_api(open_app_conn) -> APIRouter:
     # liệu NẠP (`chi_nap`): ghi một lần tiếp xúc không làm chúng cũ.
 
     @r.get("/san-pham")
-    def sp_danh_muc(request: Request):
-        """Cả danh mục một lượt (232 mã) — lọc / sắp / tìm ở trình duyệt."""
+    def sp_danh_muc(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Cả danh mục một lượt (232 mã) — lọc / sắp / tìm ở trình duyệt. Tồn / tốc
+        độ / trạng thái tính đến MỐC của khoảng xem (040)."""
         from kome import san_pham as SP
-        return _chup(request, KHOA_DANH_MUC, SP.danh_muc,
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        return _chup(request, _khoa(KHOA_DANH_MUC, **ts.khoa()), _voi_moc(ts, SP.danh_muc),
                      "Không đọc được danh mục sản phẩm.", chi_nap=True)
 
     @r.get("/san-pham/khoang")
@@ -496,16 +529,22 @@ def tao_api(open_app_conn) -> APIRouter:
                      "Không đọc được số theo khoảng của mã hàng.", chi_nap=True)
 
     @r.get("/san-pham/{ma}")
-    def sp_ho_so(request: Request, ma: str):
-        """Hồ sơ một mã: `SP.ho_so` (trần 5 lượt hỏi, bất biến đặc tả 4b §5.5)."""
+    def sp_ho_so(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Hồ sơ một mã: `SP.ho_so` (trần 5 lượt hỏi, bất biến đặc tả 4b §5.5; +1 đặt
+        mốc khi có khoảng xem — 040)."""
         from kome import san_pham as SP
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
 
         def tinh_(c):
             h = SP.ho_so(c, ma)
             return None if h is None else thanh_json({"h": h, "quy_cach": SP.QUY_CACH})
         try:
             with open_app_conn() as conn:
-                du_lieu, pb = anh_chup.lay(conn, _khoa("san-pham/ho-so", ma=ma), tinh_, chi_nap=True)
+                du_lieu, pb = anh_chup.lay(conn, _khoa("san-pham/ho-so", ma=ma, **ts.khoa()),
+                                           _voi_moc(ts, tinh_), chi_nap=True)
         except Exception:
             traceback.print_exc()
             return _loi("Không đọc được hồ sơ mã hàng.")
@@ -525,32 +564,47 @@ def tao_api(open_app_conn) -> APIRouter:
                      "Không đọc được lượng bán theo ngày.", chi_nap=True)
 
     @r.get("/kho-hang")
-    def kho_hang(request: Request, kho: str = "", loc: str = ""):
+    def kho_hang(request: Request, kho: str = "", loc: str = "",
+                 thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         """Màn Kho hàng: `SP.kho_hang` (ĐÚNG 2 lượt hỏi, bất biến đặc tả 4b).
         Mỗi khối theo đúng những bộ lọc nó không điều khiển — xem docstring
         của kho_hang(); giao diện chỉ hiện, không lọc lại."""
         from kome import san_pham as SP
         loc = loc if loc in SP.TRANG_THAI_TON else ""
-
-        return _chup(request, _khoa("kho-hang", kho=kho, loc=loc),
-                     lambda c: du_lieu_kho_hang(c, kho, loc),
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        # Tồn = ảnh chụp mới nhất ≤ MỐC (040); không có thì màn nói rõ là không có.
+        return _chup(request, _khoa("kho-hang", kho=kho, loc=loc, **ts.khoa()),
+                     _voi_moc(ts, lambda c: du_lieu_kho_hang(c, kho, loc)),
                      "Không đọc được tồn kho.", chi_nap=True)
 
     # ---- Đợt 6: Công nợ ------------------------------------------------
     # Chỉ đọc core/mart -> phiên bản theo dữ liệu NẠP.
 
     @r.get("/cong-no")
-    def cong_no(request: Request):
-        """Màn Công nợ: MỘT ảnh chụp (`CN.man_hinh`, 2 lượt hỏi) — lọc ở trình duyệt."""
+    def cong_no(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Màn Công nợ: MỘT ảnh chụp (`CN.man_hinh`, 2 lượt hỏi) — lọc ở trình duyệt.
+        Sổ = kỳ kết thúc muộn nhất ≤ MỐC của khoảng xem (040)."""
         from kome import cong_no as CN
-        return _chup(request, KHOA_CONG_NO, lambda c: thanh_json(CN.man_hinh(c)),
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        return _chup(request, _khoa(KHOA_CONG_NO, **ts.khoa()), _voi_moc(ts, lambda c: thanh_json(CN.man_hinh(c))),
                      "Không đọc được sổ công nợ.", chi_nap=True)
 
     @r.get("/cong-no/khach/{ma}")
-    def cong_no_khach(request: Request, ma: str):
-        """Tab Công nợ của hồ sơ khách (`CN.cua_khach`, ≤ 3 lượt hỏi)."""
+    def cong_no_khach(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Công nợ của hồ sơ khách (`CN.cua_khach`, ≤ 3 lượt hỏi; +1 mốc — 040)."""
         from kome import cong_no as CN
-        return _chup(request, _khoa("cong-no/khach", ma=ma), lambda c: thanh_json(CN.cua_khach(c, ma)),
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        return _chup(request, _khoa("cong-no/khach", ma=ma, **ts.khoa()),
+                     _voi_moc(ts, lambda c: thanh_json(CN.cua_khach(c, ma))),
                      "Không đọc được công nợ của khách.", chi_nap=True)
 
     return r

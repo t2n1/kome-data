@@ -3,14 +3,15 @@
 // chung một bên (vd. 代引専用) thấy số của CẢ bên, và màn nói rõ điều đó.
 import { useQuery } from "@tanstack/react-query";
 import { lay } from "../api";
+import { chuoiKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { ChuaCoDuLieu } from "../chung/Khoi";
 import { gon, ngay, so, yen } from "../dinh_dang";
 import { nhanHan, type CongNoKhach } from "./kieu";
 
 export function useCongNoKhach(ma: string) {
   return useQuery<CongNoKhach>({
-    queryKey: ["cong-no-khach", ma],
-    queryFn: () => lay<CongNoKhach>(`/api/cong-no/khach/${encodeURIComponent(ma)}`),
+    queryKey: ["cong-no-khach", ma, chuoiKhoang(useKhoang())],
+    queryFn: () => lay<CongNoKhach>(voiKhoang(`/api/cong-no/khach/${encodeURIComponent(ma)}`)),
   });
 }
 

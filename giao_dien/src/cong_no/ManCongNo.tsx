@@ -12,7 +12,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
-import { giuKhoang } from "../khung/khoang";
+import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { ChuaCoDuLieu } from "../chung/Khoi";
 import { gon, ngay, ngay_ngan, pc, so, yen } from "../dinh_dang";
 import { nhanHan, type Ben, type CongNoApi, type Phieu } from "./kieu";
@@ -50,7 +50,8 @@ export default function ManCongNo() {
   useEffect(() => { const h = setTimeout(() => { if (tim !== b.tim) dat({ tim }); }, 150); return () => clearTimeout(h); }, [tim]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { document.title = "KOME — công nợ"; }, []);
 
-  const { data: d, error } = useQuery<CongNoApi>({ queryKey: ["cong-no"], queryFn: () => lay<CongNoApi>("/api/cong-no") });
+  const kxs = chuoiKhoang(useKhoang());
+  const { data: d, error } = useQuery<CongNoApi>({ queryKey: ["cong-no", kxs], queryFn: () => lay<CongNoApi>(voiKhoang("/api/cong-no")) });
   const benTheoMa = useMemo(() => new Map((d?.ben ?? []).map(x => [x.ma, x])), [d]);
   const quaHanBen = useMemo(() => {
     const m = new Map<string, number>();
@@ -73,7 +74,8 @@ export default function ManCongNo() {
   if (!d) return <div className="sp"><h1>Công nợ &amp; thu tiền</h1><div className="khoi-cho" aria-busy="true"><span /><span /><span /></div></div>;
   if (!d.co_du_lieu) return (
     <div className="sp"><div className="tieu-de-trang"><div><h1>Công nợ &amp; thu tiền</h1></div></div>
-      <ChuaCoDuLieu tieu_de="Sổ công nợ" ly_do="Chưa nạp sổ 請求先元帳 nào. Xuất 請求先元帳 từ OBC (cả kỳ, tên file giữ nguyên) rồi kéo–thả vào màn Kho dữ liệu." /></div>);
+      <ChuaCoDuLieu tieu_de="Sổ công nợ" ly_do={kxs ? "Chưa có sổ 請求先元帳 nào có kỳ kết thúc trước thời điểm đang xem — chọn tháng hiện tại hoặc nạp sổ của kỳ cũ hơn."
+        : "Chưa nạp sổ 請求先元帳 nào. Xuất 請求先元帳 từ OBC (cả kỳ, tên file giữ nguyên) rồi kéo–thả vào màn Kho dữ liệu."} /></div>);
 
   const tq = d.tq;
   const maxTuoi = Math.max(1, ...tq.tuoi.map(t => t.tien));

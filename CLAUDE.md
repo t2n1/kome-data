@@ -298,6 +298,23 @@ ngưỡng chung. Đo thật: ngưỡng chung 90 ngày bỏ sót 49 khách đang 
 (`mart.moc_thoi_gian`), KHÔNG phải `current_date`. Dùng `current_date` thì một
 ngày không ai nạp file sẽ làm cả 1.710 khách "im lặng thêm một ngày".
 
+**Bất biến (Mốc thời gian dời được, migration 040):** mốc đó LÙI được trong MỘT giao dịch —
+`set_config('kome.moc', 'YYYY-MM-DD', true)` (`true` = chỉ giao dịch hiện tại; **KHÔNG BAO
+GIỜ `SET` cấp phiên**: Supavisor giữ nó sang kết nối sau — sự cố thật 2026-09-24). `mart.moc_lui()`
+= ngày lùi về hoặc NULL (mốc ≥ ngày bán mới nhất ⇒ NULL, tức y như không dời). MỘT chỗ viết điều
+kiện "≤ mốc": `mart.ban_den_moc`; mọi view từng đọc thẳng `core.fact_sales_line` (`dong_ban`,
+`lan_mua`, `khach_chua_mua`, `khach_mat_hang`, `khoang_cach_mat_hang`, `san_pham_360`,
+`toc_do_ban`) đọc view đó — **view mới nào đọc bảng bán cũng phải đọc `mart.ban_den_moc`**,
+đọc thẳng `core.fact_sales_line` là view đó không quay về khi xem tháng cũ. `ton_hien_tai` =
+ảnh chụp ≤ mốc (không có ⇒ rỗng, màn nói "chưa có ảnh chụp tồn tới thời điểm này" — KHÔNG lấy
+ảnh chụp sau mốc, quyết định của chủ DN); `so_cong_no_moi_nhat` = sổ kỳ ≤ mốc. Mốc của khoảng
+xem suy theo cú pháp (`ThamSo.moc()`); `khoang_xem.giai_conn` đặt mốc + đọc dải trong MỘT lượt
+(hai câu một round-trip), màn không giải khoảng dùng `khoang_xem.dat_moc` (0 lượt khi không có
+tham số khoảng — ngân sách mặc định không đổi). Không quay về (có chủ ý): tên khách / người phụ
+trách (bản hiện hành), tạm ẩn / hẹn gọi lại / "hôm nay đã nạp chưa" (đồng hồ thật). Đẳng thức
+vàng có test canh: mốc D ≡ như thể kho chỉ có dữ liệu bán tới D (`tests/test_moc_lui.py`).
+Đặc tả: `docs/superpowers/specs/2026-09-24-moc-thoi-gian-doi-duoc-design.md`.
+
 **Ngoại lệ DUY NHẤT của bất biến trên:** ô "hôm nay đã có dữ liệu chưa"
 (`kome/tuoi_du_lieu.py`) cố ý dùng ĐỒNG HỒ THẬT, vì câu hỏi của nó đúng là
 "đến giờ này đã ai nạp chưa" — không thể trả lời bằng chính dữ liệu đang
@@ -652,9 +669,10 @@ gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hi�
   `tests/test_ban_khoang.py`): tháng trọn = `mart.ban_theo_thang`; tháng hiện tại =
   `mart.thang_den_hom_nay`; Σ ngày = Σ ngành = tổng khoảng; dạng Kỳ của `/bao-cao` = đúng
   số cũ (`BK.tinh_bao_cao` gọi thẳng `bao_cao.tinh_bao_cao`).
-- **Số bán hàng đổi theo khoảng, NHÃN giữ theo hôm nay** (hạng 12 tháng, trạng thái /
-  nhịp mua, tồn, tốc độ 90 ngày) — khối nào tính theo hôm nay phải ghi "hôm nay". Kho hàng ·
-  Công nợ · Cần liên hệ · Dự báo không theo khoảng (bộ chọn hiện MỜ kèm lý do). Ngân sách chỉ
+- **Số bán hàng đổi theo khoảng, và từ migration 040 MỌI THỨ quay về mốc của khoảng** (ngày
+  cuối khoảng): hạng 12 tháng, trạng thái / nhịp mua, nhóm cần gọi, tồn, tốc độ, công nợ, dự
+  báo — xem bất biến "Mốc thời gian dời được" bên dưới. Nhãn "hôm nay" đổi thành "đến
+  <ngày>" khi đang xem lùi (`KhoangMayChu.dang_lui`, `khoang.ts::useNhanMoc`). Ngân sách chỉ
   theo tháng / kỳ — dạng Khoảng hiện câu nói rõ, không tự chia chỉ tiêu.
 - **Khoá ảnh chụp** = đường dẫn + tham số khoảng chuẩn hoá THEO CÚ PHÁP
   (`ThamSo.khoa()`, không hỏi CSDL — "trúng ảnh chụp: 1 lượt hỏi" giữ nguyên); giải khoảng
