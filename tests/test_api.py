@@ -210,7 +210,7 @@ def test_vercel_khong_day_ma_nguon_giao_dien():
 # xem chỉ trả 1 lượt khi trúng. Khối theo khoảng xem (KHOI[..][3]) cộng 1 lượt
 # `khoang_xem.pham_vi` (đặc tả khoảng xem §5).
 NGAN_SACH_TRUY_VAN = {
-    "kpi": 9, "ns_thang": 4, "so_sanh_sale": 4, "theo_thang": 2, "xu_huong": 2,
+    "kpi": 9, "ns_thang": 5, "so_sanh_sale": 4, "theo_thang": 2, "xu_huong": 2,
     "suc_khoe_khach": 1, "han_su_dung": 1, "viec_hom_nay": 8, "don_hang": 3,
     "danh_sach_khach": 2, "hieu_suat_nganh": 2, "tuong_quan": 2, "tang_truong": 2,
     "bien_loi_nhuan": 2, "thang_nay_chua_mua": 1, "cong_no": 2,

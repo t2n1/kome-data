@@ -18,6 +18,7 @@ vẽ khung "chưa có dữ liệu" và nói rõ thiếu nguồn nào (`CHUA_CO`)
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import date
 
 from kome import ban_khoang as BK
 from kome import khach_hang as KH
@@ -123,6 +124,60 @@ def ngan_sach(conn, sale=None, ts=None) -> dict | None:
         "luy_ke": [asdict(m) for m in ns.luy_ke],
         "khoang": kx,
     }
+
+
+def ngan_sach_thang(conn, sale=None, ts=None) -> dict | None:
+    """Khối "Tiến độ ngân sách tháng": như `ngan_sach` + đường luỹ kế để vẽ."""
+    d = ngan_sach(conn, sale, ts)
+    if d is not None and not d.get("chi_theo_thang"):
+        d["duong"] = duong_luy_ke(conn, d["khoang"], d)
+    return d
+
+
+def duong_luy_ke(conn, kx, ns: dict) -> dict:
+    """Đường luỹ kế của khối ngân sách tháng.
+
+    Dạng Tháng (+1 lượt hỏi): mỗi ngày của tháng — doanh thu cộng dồn tới ngày đó
+    (tháng hiện tại: tới mốc hôm nay, sau đó None; tháng cũ: trọn tháng), nhịp ngân sách = chỉ tiêu × số ngày làm việc
+    đã qua ÷ số ngày làm việc của tháng — ĐÚNG công thức `muc_tieu_den_hom_nay` của
+    `mart.tien_do_ngan_sach` áp cho từng ngày, nên tại mốc hai số trùng nhau (có
+    test canh) — và luỹ kế tháng trước cùng ngày để so. Ngày làm việc đọc
+    `mart.lich_kinh_doanh` (định nghĩa duy nhất), doanh thu đọc `mart.ngay_khoang`.
+    Dạng Kỳ (0 lượt): luỹ kế theo tháng `TienDoNganSach.luy_ke` đã có sẵn."""
+    if kx.loai != "thang":
+        return {"kieu": "thang", "diem": [
+            {"nhan": m["thang"], "tt": m["thuc_te"], "ns": m["ngan_sach"], "ss": None}
+            for m in ns["luy_ke"]], "nhan_ss": None}
+    dau = kx.tu
+    cuoi = KX._cuoi_thang(dau.year, dau.month)
+    # Tháng đang xem LÙI là tháng đã khép: vẽ trọn tới cuối tháng (ngày cuối không
+    # bán gì thì đường nằm ngang — đúng sự thật). Tháng hiện tại dừng ở mốc hôm nay.
+    den = cuoi if kx.dang_lui else kx.den
+    dau_truoc = date(dau.year - (dau.month == 1), 12 if dau.month == 1 else dau.month - 1, 1)
+    rows = conn.execute(
+        """SELECT l.ngay, l.la_ngay_kd, coalesce(n.dt, 0)
+             FROM mart.lich_kinh_doanh l
+             LEFT JOIN mart.ngay_khoang(%s, %s) n ON n.ngay = l.ngay
+            WHERE l.ngay BETWEEN %s AND %s ORDER BY l.ngay""",
+        (dau_truoc, den, dau_truoc, cuoi)).fetchall()
+    truoc, cong = {}, 0
+    for r in rows:
+        if r[0] < dau:
+            cong += int(r[2])
+            truoc[r[0].day] = cong
+    nay = [r for r in rows if r[0] >= dau]
+    ngay_kd = sum(1 for r in nay if r[1])
+    muc_tieu = ns["muc_tieu"]
+    diem, cong, kd = [], 0, 0
+    for r in nay:
+        kd += bool(r[1])
+        cong += int(r[2])
+        diem.append({
+            "nhan": r[0].isoformat(),
+            "tt": cong if r[0] <= den else None,
+            "ns": round(muc_tieu * kd / ngay_kd) if muc_tieu is not None and ngay_kd else None,
+            "ss": truoc.get(r[0].day)})
+    return {"kieu": "ngay", "diem": diem, "nhan_ss": "Tháng trước", "den": den.isoformat()}
 
 
 # ---- Kết quả theo từng tháng (kỳ kế toán hiện hành) -------------------------
@@ -398,7 +453,7 @@ def cong_no(conn, sale=None, ts=None) -> dict | None:
 # kome/khoang_xem.py) và khoá ảnh chụp mang tham số khoảng.
 KHOI = {
     "kpi": (kpi, False, False, True),
-    "ns_thang": (ngan_sach, False, False, True),
+    "ns_thang": (ngan_sach_thang, False, False, True),
     "so_sanh_sale": (ngan_sach, False, False, True),
     "theo_thang": (theo_thang, False, False, True),
     "xu_huong": (xu_huong, False, False, True),
