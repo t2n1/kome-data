@@ -398,3 +398,15 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
             if any(d in _re.sub(r"/kho-du-lieu/nap", "", dong) for d in cu):
                 loi.append(f"{f}:{i}: {dong.strip()[:70]}")
     assert not loi, "code còn nhắc địa chỉ cũ như thể còn sống:\n" + "\n".join(loi)
+
+
+def test_man_nap_an_o_khong_dung_so_do_nguon_van_du(conn, test_db_url):
+    """Chủ DN (2026-09-24) chưa dùng công nợ / bảng giá / nhà cung cấp: màn Nạp
+    không có ô riêng cho chúng — nhưng sơ đồ nguồn của Tổng quan vẫn đủ 8 nhánh
+    (độ phủ nói thật: nguồn đó chưa nạp, không phải không tồn tại)."""
+    from kome import kho_du_lieu as K
+    client = TestClient(create_app(db_url=test_db_url))
+    o_nap = [n["ma"] for n in man(client.get("/kho-du-lieu/nap").text)["nguon"]]
+    assert o_nap == ["ban", "ton", "khach", "sp", "giao"]
+    assert not {"ncc", "gia", "no"} & set(o_nap)
+    assert [n["ma"] for n in man(client.get("/kho-du-lieu").text)["nguon"]] == [o["ma"] for o in K.O_NAP]

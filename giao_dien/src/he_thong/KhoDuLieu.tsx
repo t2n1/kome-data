@@ -94,7 +94,7 @@ function SoDoNguon({ nut }: { nut: Nut[] }) {
         </svg>
         <div className="kdl-tam"><b>OBC</b><span>hệ thống<br />bán hàng</span></div>
         {nut.map((n, i) => (
-          <a key={n.ma} href={`/kho-du-lieu/duong-di?file=${n.spec}`} className={"kdl-nut " + n.mau}
+          <a key={n.ma} href={`/kho-du-lieu/bang/${n.bang}`} className={"kdl-nut " + n.mau}
             style={{ left: `${(vi[i].x / W) * 100}%`, top: `${(vi[i].y / H) * 100}%` }}>
             <span className="cham" aria-hidden="true" />
             <b>{n.nhan}</b><span className="ja">{n.ja}</span><span className="cau">{n.cau}</span></a>))}
@@ -102,7 +102,7 @@ function SoDoNguon({ nut }: { nut: Nut[] }) {
       <div className="kdl-chu-giai-nguon">
         <span><i className="ok" />đúng nhịp hằng ngày</span><span><i className="nen" />dữ liệu nền / sổ theo kỳ, ít đổi</span>
         <span><i className="cho" />chưa tới 13:30</span><span><i className="do" />trễ so với nhịp — cần nạp</span>
-        <span className="phai">Bấm một nhánh để xem cột của file đó đi đâu.</span>
+        <span className="phai">Bấm một nhánh để xem dữ liệu của loại đó.</span>
       </div>
     </section>
   );

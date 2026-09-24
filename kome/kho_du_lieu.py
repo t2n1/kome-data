@@ -17,19 +17,23 @@ from kome.tuoi_du_lieu import MUI_GIO
 # file ô đó nhận (Bán hàng nhận cả 売上伝票データ lẫn nguồn dự phòng 売上明細表 —
 # cùng đổ vào core.fact_sales_line). `nhip`: 'ngay' = nhịp 13:30 hằng ngày (cùng
 # bộ với kome/tuoi_du_lieu.NGUON_HANG_NGAY), 'nen' = dữ liệu nền ít đổi, 'ky' =
-# sổ theo kỳ.
+# sổ theo kỳ. `an_khoi_nap`: loại file công ty CHƯA dùng (quyết định chủ DN
+# 2026-09-24: chưa cần công nợ, bảng giá, nhà cung cấp) — không có ô riêng trên
+# màn Nạp, nhưng vẫn ở sơ đồ nguồn của Tổng quan (độ phủ nói thật) và vẫn nạp
+# được qua ô "Nạp nhiều file" (kho tự nhận loại theo tên file).
 O_NAP = [
     {"ma": "ban", "nhan": "Bán hàng", "specs": ["uriage", "meisai"], "nhip": "ngay"},
     {"ma": "ton", "nhan": "Tồn kho", "specs": ["zaiko"], "nhip": "ngay"},
     {"ma": "khach", "nhan": "Khách hàng", "specs": ["tokuisaki"], "nhip": "ngay"},
     {"ma": "sp", "nhan": "Sản phẩm", "specs": ["shohin"], "nhip": "nen"},
-    {"ma": "ncc", "nhan": "Nhà cung cấp", "specs": ["shiiresaki"], "nhip": "nen"},
+    {"ma": "ncc", "nhan": "Nhà cung cấp", "specs": ["shiiresaki"], "nhip": "nen", "an_khoi_nap": True},
     {"ma": "giao", "nhan": "Giao thẳng", "specs": ["chokusousaki"], "nhip": "nen"},
-    {"ma": "gia", "nhan": "Bảng giá", "specs": ["tanka"], "nhip": "nen"},
-    {"ma": "no", "nhan": "Công nợ", "specs": ["seikyu_motocho"], "nhip": "ky"},
+    {"ma": "gia", "nhan": "Bảng giá", "specs": ["tanka"], "nhip": "nen", "an_khoi_nap": True},
+    {"ma": "no", "nhan": "Công nợ", "specs": ["seikyu_motocho"], "nhip": "ky", "an_khoi_nap": True},
 ]
 O_CUA = {o["ma"]: o for o in O_NAP}
 O_CUA_SPEC = {s: o for o in O_NAP for s in o["specs"]}
+O_TREN_MAN_NAP = {o["ma"] for o in O_NAP if not o.get("an_khoi_nap")}
 
 
 def _ngay(x) -> date | None:

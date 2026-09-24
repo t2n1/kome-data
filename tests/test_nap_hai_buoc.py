@@ -119,7 +119,7 @@ def test_man_nap_va_duong_dan_cu(c):
     r = c.get("/kho-du-lieu/nap")
     assert r.status_code == 200
     m = man(r.text)
-    assert [n["ma"] for n in m["nguon"]] == [o["ma"] for o in KDL.O_NAP]
+    assert [n["ma"] for n in m["nguon"]] == [o["ma"] for o in KDL.O_NAP if o["ma"] in KDL.O_TREN_MAN_NAP]
     assert "lo" in m and m["cho"] == []
     assert c.get("/nap", follow_redirects=False).headers["location"] == "/kho-du-lieu/nap"
     src = nguon("he_thong", "KhoDuLieu.tsx")

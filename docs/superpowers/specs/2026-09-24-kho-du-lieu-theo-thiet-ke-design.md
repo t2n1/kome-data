@@ -50,6 +50,17 @@ nối khoá (`files.yml.references` + khoá ngoại thật). Tab thứ tư của
   32 hex kiểm dạng; tên file chỉ lấy phần tên). Xác nhận chạy lại `ingest` đầy đủ; bấm hai lần → "file
   chờ không còn". Năm dòng cổng: cổng 1/2 chặn thì cổng sau "không chạy".
 
-## C (hướng, chốt ở đợt đó)
-C: `/kho-du-lieu/bang/<schema.bảng>` — Dữ liệu (tìm, 50 dòng/trang, CSV), Cột & khoá, Lần nạp
-(+ hoàn tác); danh sách bảng cho phép là danh mục cố định (chặn chèn tên).
+## C. Xem từng bảng (đã làm)
+- `/kho-du-lieu/bang/<schema.bảng>` (vỏ React) + `/api/kho-du-lieu/bang[/{tên}[/dong|/csv]]`
+  (`kome/bang_kho.py`). Tabs: Dữ liệu (tìm trên cả dòng `t::text ILIKE`, 50 dòng/trang, "Tháng gần
+  nhất" = từ mùng 1 của tháng có giá trị lớn nhất ở cột ngày đầu tiên, "Lô mới nhất" = `max(batch_id)`
+  của chính bảng; "Có cảnh báo" để mờ — cổng kiểm cảnh báo theo LÔ, không đánh dấu dòng) · Cột & khoá
+  (danh mục + tên gốc OBC từ files.yml) · Lần nạp (30 lô của các file đổ vào bảng; hoàn tác vẫn ở màn
+  Nạp — nơi có câu "xoá bao nhiêu dòng"). "Tải Excel" của thiết kế → CSV có BOM (Excel mở thẳng; bản
+  Vercel không có thư viện ghi .xlsx).
+- An toàn: vai trò `kome_app`, `READ ONLY`, `statement_timeout` 20 s; tên bảng tra danh mục +
+  `has_table_privilege`, rồi `sql.Identifier`; `app` bị loại. Đo thật (CSDL thật, chỉ đọc):
+  fact_sales_line 291k dòng trang đầu 0,4 s (đếm riêng — `count(*) OVER ()` là 6,1 s), khach_360 1,6 s,
+  san_pham_360 2,5 s.
+- Màn xem bảng đọc `SELECT t.*` của bảng bất kỳ — nó KHÔNG phải một "chỗ dùng" cột theo nghĩa của §A
+  (không hiện số nào cho nghiệp vụ), nên phép dò "cột nào bỏ được" không tính nó.

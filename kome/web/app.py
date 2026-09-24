@@ -107,7 +107,7 @@ SO_NGAY_SOAT = 30
 # Mọi đường dẫn thuộc màn Kho dữ liệu — màn DUY NHẤT có nút xoá dữ liệu.
 # Ba địa chỉ cũ ở cuối danh sách vẫn phải chặn dù chúng chỉ còn trả 301: để
 # hở chúng là để người không có quyền dò ra cấu trúc màn bị cấm.
-DUONG_KHO_DU_LIEU = ("/kho-du-lieu", "/upload", "/undo",
+DUONG_KHO_DU_LIEU = ("/kho-du-lieu", "/api/kho-du-lieu", "/upload", "/undo",
                      "/nap", "/health", "/phu-du-lieu")
 
 
@@ -803,7 +803,9 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             from kome.pipeline import IngestResult
             kq = IngestResult(ok=False, spec_name=spec.name, blockers=[G.Blocker(
                 1, f"File này là {spec.display_name} ({dich['nhan'] if dich else spec.name}), "
-                   f"không phải ô {KDL.O_CUA[o]['nhan']} — thả vào đúng ô của nó.")])
+                   f"không phải ô {KDL.O_CUA[o]['nhan']} — "
+                   + ("thả vào đúng ô của nó." if dich and dich["ma"] in KDL.O_TREN_MAN_NAP
+                      else "loại file này không có ô riêng; thả vào ô \"Nạp nhiều file\"."))])
         else:
             kq = kiem(conn, duong)
         conn.rollback()                  # kiem chỉ đọc; không để giao dịch đọc treo
@@ -921,7 +923,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         xác nhận, lô gần nhất + hoàn tác."""
         from kome import kho_du_lieu as KDL, nap_cho
         tuoi = tinh_tuoi(conn)
-        nguon = KDL.nut_nguon(trang_thai_nap(conn), tuoi, tuoi.hom_nay)
+        nguon = [n for n in KDL.nut_nguon(trang_thai_nap(conn), tuoi, tuoi.hom_nay)
+                 if n["ma"] in KDL.O_TREN_MAN_NAP]
         return {"man": "nap", "tuoi": tuoi, "nguon": nguon,
                 "cho": [] if chi_doc else nap_cho.danh_sach(archive_dir),
                 "lo": lo_nap_gan_nhat(conn)}
@@ -1002,6 +1005,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "nguon": TL.nguon_obc(SPECS), "ma_tran": TL.ma_tran(SPECS),
             "noi": TL.noi_di_dau(SPECS, ten), "so_do": TL.so_do_noi(SPECS, ten),
             "dong_so_do": TL.DONG_SO_DO, "cot": TL.cot_cua(SPECS, ten)})
+
+    # Xem một bảng (đợt C): vỏ React, dữ liệu qua /api/kho-du-lieu/bang/{tên}.
+    @app.get("/kho-du-lieu/bang/{ten}", response_class=HTMLResponse)
+    def kho_du_lieu_bang(request: Request, ten: str):
+        return _spa(request, man={"bang": ten})
 
     # "Dữ liệu đi đâu" (2026-09-24): cột OBC nào bỏ được ở lần xuất sau. 0 truy
     # vấn — ảnh chụp kome/web/cot_dung_sinh.json (scripts/sinh_cot_dung.py).

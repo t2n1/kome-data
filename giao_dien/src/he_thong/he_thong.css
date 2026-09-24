@@ -199,3 +199,48 @@
 .kdl-cho{list-style:none;padding:0}
 .kdl-cho li{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;padding:.35rem 0;border-top:1px solid var(--vien-phu)}
 .kdl-cho form{margin:0}
+
+/* Duyệt bảng (thanh trái) + xem một bảng (đợt C). */
+.kdl-duyet{margin-top:.7rem;border-top:1px solid var(--vien-phu);padding-top:.5rem;display:flex;flex-direction:column;gap:.1rem}
+.kdl-duyet-tim{font:inherit;font-size:.83rem;padding:.38rem .55rem;border:1px solid var(--vien);border-radius:7px;background:var(--nen);color:var(--chu);margin:0 .1rem .5rem}
+.kdl-duyet-nhom{margin-bottom:.6rem;display:flex;flex-direction:column;gap:.05rem}
+.kdl-duyet-dau{display:flex;gap:.4rem;align-items:baseline;padding:0 .45rem .2rem;font-size:.72rem}
+.kdl-duyet-dau b{font-family:var(--font-so);letter-spacing:.1em;text-transform:uppercase}
+.kdl-duyet-dau span{color:var(--chu-nhat)}
+.kdl-nav .kdl-duyet a{padding:.28rem .5rem;font-size:.79rem;font-weight:400;gap:.4rem}
+.kdl-duyet-ten{font-family:var(--font-so);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kdl-duyet-so{margin-left:auto;font-size:.7rem;color:var(--chu-nhat);font-variant-numeric:tabular-nums}
+.kdl-duyet summary{cursor:pointer;list-style:none}
+.kdl-duyet summary::-webkit-details-marker{display:none}
+.kdl-duyet summary::after{content:" ▾";font-weight:400}
+.kdl-duyet:not([open]) summary::after{content:" ▸"}
+@media (max-width:860px){
+  .kdl-nav{flex-wrap:wrap}
+  .kdl-duyet{flex-basis:100%;margin-top:.2rem;padding-top:.35rem}
+  .kdl-duyet summary.kdl-nav-ten{display:block;padding:.2rem .45rem}
+}
+.kdl-bang-schema{font-family:var(--font-so);font-size:.78rem;color:var(--chu-nhat);letter-spacing:.06em}
+.kdl-bang-dau h1{font-family:var(--font-so);margin:.1rem 0 .2rem}
+.kdl-bang-meta{display:flex;flex-wrap:wrap;gap:.3rem 1.2rem;font-size:.84rem;color:var(--chu-thuong);margin:.4rem 0 .8rem}
+.kdl-bang-tab{display:flex;gap:.2rem;border-bottom:1px solid var(--vien);margin-bottom:.8rem;overflow-x:auto}
+.kdl-bang-tab button{font:inherit;font-size:.86rem;cursor:pointer;padding:.45rem .8rem;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--chu-nhat);margin-bottom:-1px;white-space:nowrap}
+.kdl-bang-tab button[aria-selected="true"]{border-bottom-color:var(--do);color:var(--do-chu);font-weight:600}
+.kdl-bang-loc{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;margin-bottom:.6rem}
+.kdl-bang-loc input{flex:1 1 16rem;min-width:0;font:inherit;padding:.38rem .6rem;border:1px solid var(--vien);border-radius:7px;background:var(--nen-the);color:var(--chu)}
+.kdl-chip{font:inherit;font-size:.79rem;cursor:pointer;padding:.3rem .7rem;border-radius:999px;border:1px solid var(--vien);background:var(--nen-the);color:var(--chu-thuong)}
+.kdl-chip[aria-pressed="true"]{border-color:var(--do);background:var(--do-nen);color:var(--do-chu);font-weight:600}
+.kdl-chip:disabled{opacity:.45;cursor:not-allowed}
+.kdl-bang-luoi{max-height:36rem;overflow:auto}
+.kdl-bang-luoi.dang-tai{opacity:.6}
+.kdl-bang-luoi th{position:sticky;top:0;z-index:1;background:var(--nen-phu);white-space:nowrap;font-family:var(--font-so);font-size:.78rem}
+.kdl-bang-luoi td{white-space:nowrap;font-size:.8rem}
+.kdl-bang-luoi .so{text-align:right;font-variant-numeric:tabular-nums}
+.kdl-cot-kieu{font-weight:400;font-size:.68rem;color:var(--chu-nhat);display:flex;gap:.25rem;align-items:center}
+.kdl-cot-kieu .vien{padding:0 .25rem;font-size:.62rem}
+.kdl-trang{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.5rem;font-size:.82rem;color:var(--chu-thuong);margin:.5rem 0}
+.kdl-lan-nap{display:flex;flex-direction:column;gap:.5rem}
+.kdl-lan-nap-o{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.6rem;border:1px solid var(--vien);border-radius:10px;background:var(--nen-the);padding:.65rem .8rem}
+.kdl-lan-nap-o.huy{opacity:.6}
+.kdl-lan-nap-ten{min-width:0;flex:1 1 20rem;font-size:.84rem}
+.kdl-lan-nap-ten code{word-break:break-all}
+.kdl-lan-nap-so{display:flex;gap:1.1rem;font-size:.84rem;font-variant-numeric:tabular-nums}
