@@ -142,7 +142,7 @@ export function KhoiNganSach() {
       {d && <div className="ns-luoi">
         <div className="ns-so">
           {d.co_ngan_sach ? <>
-            <div><div className="nhan">Tiến độ tháng</div>
+            <div><div className="nhan">Tiến độ toàn công ty</div>
               <div className="gia" style={{ color: mauTienDo(d.tien_do, d.moc) }}>{pc(d.tien_do)}</div>
               <div className="phu">mốc hôm nay {pc(d.moc)}</div></div>
             <div><div className="nhan">{d.muc_tieu_den_hom_nay != null && d.thuc_te >= d.muc_tieu_den_hom_nay ? "Vượt mốc" : "Thiếu so mốc"}</div>
@@ -160,6 +160,14 @@ export function KhoiNganSach() {
           </>}
         </div>
         <div className="ns-thanh">
+          {/* Ngân sách CHUNG của công ty đứng trước, rồi mới tới từng người (chủ DN, 2026-09-24). */}
+          <div className="ns-cong-ty">
+            <div className="ns-dong"><span>Toàn công ty</span>
+              <span className="so-nhat">{yen(d.thuc_te)}{d.co_ngan_sach ? ` / ${yen(d.muc_tieu)}` : ""}</span>
+              {d.co_ngan_sach && <b style={{ color: mauTienDo(d.tien_do, d.moc) }}>{pc(d.tien_do)}</b>}</div>
+            {d.co_ngan_sach && <ThanhMoc ty_le={d.tien_do} moc={d.moc} mau={mauTienDo(d.tien_do, d.moc)} />}
+          </div>
+          {nguoi.length > 0 && <div className="ns-nhom-nhan">Từng người phụ trách</div>}
           {nguoi.map(n => (
             <div key={n.ma}>
               <div className="ns-dong"><span>{tenNguoi(n.ten, n.ma)}</span>
@@ -170,10 +178,6 @@ export function KhoiNganSach() {
                 {n.muc_tieu_den_hom_nay != null && <div className="lop-moc" style={{ left: `${n.muc_tieu_den_hom_nay / maxNS * 100}%` }} />}
               </div>
             </div>))}
-          {d.co_ngan_sach && <div>
-            <div className="ns-dong"><span>Toàn nhóm</span><b style={{ color: mauTienDo(d.tien_do, d.moc) }}>{pc(d.tien_do)}</b></div>
-            <ThanhMoc ty_le={d.tien_do} moc={d.moc} mau={mauTienDo(d.tien_do, d.moc)} />
-          </div>}
           <div className="phu">{d.co_ngan_sach ? `Vạch đen = mốc đáng lẽ đạt tới hôm nay (${pc(d.moc)}) — tính theo ngày làm việc, trừ ngày lễ.` : "Thanh = doanh thu thực tế của từng người phụ trách."}</div>
         </div>
       </div>}
