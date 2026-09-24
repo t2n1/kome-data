@@ -44,6 +44,9 @@
 .ns-dong{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem;font-size:.76rem;margin-bottom:.25rem}
 .ns-dong > span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ns-dong b{font-variant-numeric:tabular-nums}
+.ns-cong-ty{padding-bottom:.6rem;border-bottom:1px solid var(--vien)}
+.ns-cong-ty .ns-dong{font-size:.84rem;font-weight:600}
+.ns-nhom-nhan{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--chu-nhat);margin-bottom:-.3rem}
 .ns-ba-lop{position:relative;height:13px}
 .ns-ba-lop > div{position:absolute;top:0;height:100%;border-radius:4px}
 .lop-ns{left:0;background:var(--nen-phu)}
