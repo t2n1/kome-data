@@ -5,6 +5,7 @@
 // Lệch có chủ ý so với gói thiết kế: tab "Lãi gộp" của khối ngân sách vô hiệu
 // (chỉ có ngân sách DOANH THU); "Khách hiện hữu / khách mới" chưa có định nghĩa
 // trong mart; điểm dự báo trên đường luỹ kế nằm ở /du-bao (không bịa ở đây).
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { lay } from "../api";
@@ -25,10 +26,15 @@ type SoSanhSo = { ma: string; nhan: string; co: boolean; tu: string; den: string
   tang_dt: number | null; tang_lg: number | null; tang_khach: number | null; chenh_ty_suat: number | null };
 type KhTT = { ma: string; ten: string; doanh_thu: number; thu_hang: number; ty_trong: number | null; luy_ke: number | null };
 type Nguoi = { ma: string; ten: string | null; thuc_te: number; muc_tieu: number | null; muc_tieu_den_hom_nay: number | null;
-  tien_do: number | null; cung_ky: number | null; co_cung_ky: boolean; tang_truong: number | null; rong_thanh: number | null; rong_moc: number | null };
+  tien_do: number | null; cung_ky: number | null; co_cung_ky: boolean; tang_truong: number | null; rong_thanh: number | null; rong_moc: number | null;
+  muc_tieu_lg: number | null; thuc_te_lg: number; muc_tieu_lg_den_hom_nay: number | null; tien_do_lg: number | null;
+  rong_thanh_lg: number | null; rong_moc_lg: number | null };
 type Td = { company_fy: number; thang: string; hom_nay: string | null; ngay_kd: number; ngay_kd_da_qua: number; thuc_te: number;
   muc_tieu: number | null; muc_tieu_den_hom_nay: number | null; tien_do: number | null; nguoi: Nguoi[]; co_ngan_sach: boolean;
-  rong_thanh: number | null; rong_moc: number | null; pct_moc_chi_tieu: number | null };
+  rong_thanh: number | null; rong_moc: number | null; pct_moc_chi_tieu: number | null;
+  // 041: lãi gộp của CÔNG TY (ngân sách công ty nhập thẳng).
+  co_ngan_sach_lg: boolean; thuc_te_lg: number; muc_tieu_lg: number | null; muc_tieu_lg_den_hom_nay: number | null;
+  tien_do_lg: number | null; rong_thanh_lg: number | null; rong_moc_lg: number | null; pct_moc_chi_tieu_lg: number | null };
 type Spark = { co: boolean; rong: number; cao: number; doan: string[]; diem_don: [number, number][] };
 type BaoCaoApi = {
   khoang: KhoangMayChu | null;
@@ -38,6 +44,7 @@ type BaoCaoApi = {
   td: Td | null;
   td_phu: { ngay_kd_con_lai: number; can_ban_moi_ngay: number | null; nhip_chuan: number | null; thieu_moc: number | null } | null;
   so_nho: Record<"dt" | "lg" | "ts" | "kh", Spark>;
+  lk_lg: BaoCaoApi["lk"]; td_phu_lg: BaoCaoApi["td_phu"];
   lk: { co: boolean; rong: number; cao: number; ngan_sach: string; thuc_te: string; nhan: { x: number; thang: string; hien: boolean }[]; dinh: number };
   bd: { co: boolean; rong: number; cao: number; cot: { x: number; y: number; w: number; h: number; o: O }[]; diem: [number, number, O][];
     duong: string; duong_ck: string[]; ts_lo: number; ts_hi: number };
@@ -143,7 +150,7 @@ export default function BaoCao() {
       </div>
       <p className="ghi-chu">Doanh thu thuần đã trừ thuế tiêu dùng. Phiếu đỏ (hàng trả lại) được tính vào như số âm — cố ý, vì hàng trả lại là doanh thu âm thật.</p>
 
-      {td ? <NganSach td={td} phu={td_phu} lk={d.lk} />
+      {td ? <NganSach td={td} phu={td_phu} lk={d.lk} phu_lg={d.td_phu_lg} lk_lg={d.lk_lg} />
         : kx?.loai === "khoang" && <section className="kh-the bc-khoi"><div className="kh-the-dau"><h2>Tiến độ ngân sách</h2></div>
           <p className="phu">Chỉ tiêu chỉ đặt theo tháng — chọn dạng <b>Tháng</b> hoặc <b>Kỳ</b> ở thanh KHOẢNG XEM để xem tiến độ.</p></section>}
 
@@ -308,35 +315,50 @@ function ONhiet({ o, dau_du_lieu }: { o: BaoCaoApi["nh"]["hang"][0]["o"][0]; dau
   return <td className="bac-khong" title={`${nhan}: mẫu số cùng kỳ ≤ 0, không tính được % (${yen(o.doanh_thu)})`}>—</td>;
 }
 
-function NganSach({ td, phu, lk }: { td: Td; phu: BaoCaoApi["td_phu"]; lk: BaoCaoApi["lk"] }) {
-  const moc = td.pct_moc_chi_tieu != null ? td.pct_moc_chi_tieu / 100 : null;
+function NganSach({ td, phu: phuDt, lk: lkDt, phu_lg, lk_lg }: { td: Td; phu: BaoCaoApi["td_phu"]; lk: BaoCaoApi["lk"];
+  phu_lg: BaoCaoApi["td_phu"]; lk_lg: BaoCaoApi["lk"] }) {
+  // 041: Doanh thu / Lãi gộp — cùng khối, cùng công thức, đổi cột (ngân sách CÔNG TY nhập thẳng).
+  const [cs, datCs] = useState<"dt" | "lg">("dt");
+  const lg = cs === "lg";
+  const v = lg
+    ? { co: td.co_ngan_sach_lg, tt: td.thuc_te_lg, mt: td.muc_tieu_lg, den: td.muc_tieu_lg_den_hom_nay, td: td.tien_do_lg,
+        pct: td.pct_moc_chi_tieu_lg, rong: td.rong_thanh_lg, rmoc: td.rong_moc_lg }
+    : { co: td.co_ngan_sach, tt: td.thuc_te, mt: td.muc_tieu, den: td.muc_tieu_den_hom_nay, td: td.tien_do,
+        pct: td.pct_moc_chi_tieu, rong: td.rong_thanh, rmoc: td.rong_moc };
+  const vn = (n: Nguoi) => lg
+    ? { tt: n.thuc_te_lg, mt: n.muc_tieu_lg, den: n.muc_tieu_lg_den_hom_nay, td: n.tien_do_lg, rong: n.rong_thanh_lg, rmoc: n.rong_moc_lg }
+    : { tt: n.thuc_te, mt: n.muc_tieu, den: n.muc_tieu_den_hom_nay, td: n.tien_do, rong: n.rong_thanh, rmoc: n.rong_moc };
+  const phu = lg ? phu_lg : phuDt;
+  const lk = lg ? lk_lg : lkDt;
+  const ten = lg ? "lãi gộp" : "doanh thu";
+  const moc = v.pct != null ? v.pct / 100 : null;
   const tNhan = `${td.thang.slice(5)}/${td.thang.slice(0, 4)}`;
   return (
     <section className="kh-the bc-khoi bc-ns">
       <div className="kh-the-dau"><h2>Tiến độ ngân sách tháng {tNhan}</h2>
         <div className="tab-pill" role="group" aria-label="Chỉ số">
-          <button type="button" aria-pressed>Doanh thu</button>
-          <button type="button" disabled title="Chưa có ngân sách lãi gộp — màn Ngân sách chỉ đặt chỉ tiêu doanh thu.">Lãi gộp</button></div>
+          <button type="button" aria-pressed={!lg} onClick={() => datCs("dt")}>Doanh thu</button>
+          <button type="button" aria-pressed={lg} onClick={() => datCs("lg")}>Lãi gộp</button></div>
         {phu && <span className="kh-the-goc"><span className="nhan-vien do">Còn {phu.ngay_kd_con_lai} ngày kinh doanh</span></span>}</div>
-      <p className="phu">Số liệu đến {ngay(td.hom_nay)} · {td.ngay_kd_da_qua}/{td.ngay_kd} ngày làm việc của tháng (đã trừ thứ Bảy, Chủ nhật và ngày lễ quốc gia Nhật — chưa trừ ngày nghỉ riêng của công ty) · nguồn 予算進捗管理表 = mart.tien_do_ngan_sach</p>
-      {!td.co_ngan_sach ? <div className="khoi-loi">Chưa đặt chỉ tiêu cho kỳ này.{" "}
+      <p className="phu">Số liệu đến {ngay(td.hom_nay)} · {td.ngay_kd_da_qua}/{td.ngay_kd} ngày làm việc của tháng (đã trừ thứ Bảy, Chủ nhật và ngày lễ quốc gia Nhật — chưa trừ ngày nghỉ riêng của công ty) · công ty = mart.tien_do_cong_ty (ngân sách công ty nhập thẳng), từng người = mart.tien_do_ngan_sach</p>
+      {!v.co ? <div className="khoi-loi">Chưa đặt ngân sách {ten} của công ty cho tháng này.{" "}
         {KD.hien_ngan_sach && <><a href={`/ngan-sach?ky=${td.company_fy}`}>Đặt chỉ tiêu</a> rồi quay lại đây.</>}</div> : <>
         <div className="o-kpi-luoi bc-ns-o">
           <div className="o-kpi"><div className="nhan">Tiến độ tháng</div>
-            <div className={"gia " + mauTd(td.tien_do, moc)}>{td.tien_do != null ? p1(td.tien_do) : "—"}</div>
+            <div className={"gia " + mauTd(v.td, moc)}>{v.td != null ? p1(v.td) : "—"}</div>
             <div className="dong-phu nhat-chu">mốc hôm nay {moc != null ? p1(moc) : "—"}</div></div>
-          <div className="o-kpi"><div className="nhan">Thực tế</div><div className="gia">{yen(td.thuc_te)}</div>
-            <div className="dong-phu nhat-chu">trên ngân sách {td.muc_tieu != null ? yen(td.muc_tieu) : "—"}</div></div>
+          <div className="o-kpi"><div className="nhan">Thực tế ({ten})</div><div className="gia">{yen(v.tt)}</div>
+            <div className="dong-phu nhat-chu">trên ngân sách {v.mt != null ? yen(v.mt) : "—"}</div></div>
           <div className="o-kpi"><div className="nhan">{phu?.thieu_moc != null && phu.thieu_moc > 0 ? "Thiếu so mốc hôm nay" : "Vượt mốc hôm nay"}</div>
             <div className={"gia " + (phu?.thieu_moc != null && phu.thieu_moc > 0 ? "giam" : "tang")}>{phu?.thieu_moc != null ? yen(Math.abs(phu.thieu_moc)) : "—"}</div>
-            <div className="dong-phu nhat-chu">{phu?.thieu_moc != null && td.muc_tieu_den_hom_nay ? `${p1(Math.abs(phu.thieu_moc) / td.muc_tieu_den_hom_nay)} của mốc ${yen(td.muc_tieu_den_hom_nay)}` : "—"}</div></div>
-          <div className="o-kpi"><div className="nhan">Cần bán mỗi ngày</div>
+            <div className="dong-phu nhat-chu">{phu?.thieu_moc != null && v.den ? `${p1(Math.abs(phu.thieu_moc) / v.den)} của mốc ${yen(v.den)}` : "—"}</div></div>
+          <div className="o-kpi"><div className="nhan">{lg ? "Cần lãi gộp mỗi ngày" : "Cần bán mỗi ngày"}</div>
             <div className="gia canh-chu">{phu?.can_ban_moi_ngay != null ? yen(phu.can_ban_moi_ngay) : "—"}</div>
             <div className="dong-phu nhat-chu">{phu ? `${phu.ngay_kd_con_lai} ngày còn lại` : ""}{phu?.can_ban_moi_ngay != null && phu.nhip_chuan ? ` · gấp ${(phu.can_ban_moi_ngay / phu.nhip_chuan).toFixed(2).replace(".", ",")}× nhịp chuẩn` : ""}</div></div>
         </div>
         <div className="bc-ns-hai">
           <div>
-            <h3>Luỹ kế thực tế so với nhịp ngân sách — cả kỳ</h3>
+            <h3>Luỹ kế thực tế so với nhịp ngân sách ({ten}) — cả kỳ</h3>
             {lk.co ? <><svg viewBox={`0 0 ${lk.rong} ${lk.cao}`} width="100%" className="bc-svg" role="img" aria-label="Luỹ kế doanh thu so với nhịp ngân sách">
               <polyline points={lk.ngan_sach} fill="none" stroke="var(--chu-nhat)" strokeWidth={2} strokeDasharray="5 4" />
               <polyline points={lk.thuc_te} fill="none" stroke="var(--do)" strokeWidth={2.5} />
@@ -348,13 +370,13 @@ function NganSach({ td, phu, lk }: { td: Td; phu: BaoCaoApi["td_phu"]; lk: BaoCa
           </div>
           <div>
             <h3>Tiến độ theo nhân viên</h3>
-            <div className="bc-bullet tong"><div className="bc-bl-dau"><b>Toàn nhóm</b>
-              <span>{yen(td.thuc_te)} / {td.muc_tieu != null ? yen(td.muc_tieu) : "—"} · <b className={mauTd(td.tien_do, moc)}>{td.tien_do != null ? p1(td.tien_do) : "—"}</b></span></div>
-              <Thanh rong={td.rong_thanh} moc={td.rong_moc} lon /></div>
-            {td.nguoi.map(n => (
+            <div className="bc-bullet tong"><div className="bc-bl-dau"><b>Toàn công ty</b>
+              <span>{yen(v.tt)} / {v.mt != null ? yen(v.mt) : "—"} · <b className={mauTd(v.td, moc)}>{v.td != null ? p1(v.td) : "—"}</b></span></div>
+              <Thanh rong={v.rong} moc={v.rmoc} lon /></div>
+            {td.nguoi.map(n => { const x = vn(n); return (
               <div key={n.ma} className="bc-bullet"><div className="bc-bl-dau"><span>{n.ten ?? <>{n.ma} <small className="nhat-chu">(mã không có trong danh sách phụ trách)</small></>}</span>
-                <span>{yen(n.thuc_te)} / {n.muc_tieu != null ? yen(n.muc_tieu) : "—"}{n.tien_do != null && <> · <b className={n.tien_do >= 1 ? "tang" : "giam"}>{p1(n.tien_do)}</b></>}</span></div>
-                <Thanh rong={n.rong_thanh} moc={n.rong_moc} /></div>))}
+                <span>{yen(x.tt)} / {x.mt != null ? yen(x.mt) : "—"}{x.td != null && <> · <b className={x.td >= 1 ? "tang" : "giam"}>{p1(x.td)}</b></>}</span></div>
+                <Thanh rong={x.rong} moc={x.rmoc} /></div>); })}
             <p className="phu">Vạch đen là mốc đáng lẽ đạt tới hôm nay.</p>
           </div>
         </div>

@@ -45,7 +45,8 @@ _NGUON = """
     FROM meta.ingest_batch b WHERE b.undone_at IS NOT NULL
     UNION ALL
     SELECT 'ngan_sach', n.sua_luc, n.sua_boi,
-           n.salesperson_code || ' · ' || to_char(n.thang, 'YYYY-MM'), NULL,
+           coalesce(n.salesperson_code, 'Công ty') || ' · ' || to_char(n.thang, 'YYYY-MM')
+             || CASE n.chi_so WHEN 'lai_gop' THEN ' · lãi gộp' ELSE ' · doanh thu' END, NULL,
            n.muc_tieu_cu::text, n.muc_tieu_moi::text
     FROM app.ngan_sach_nhat_ky n
     UNION ALL

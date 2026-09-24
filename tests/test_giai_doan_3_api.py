@@ -55,6 +55,9 @@ def _hai_nam_ban(conn, batch):
                      n=i * 100 + ngay)
     conn.execute("INSERT INTO app.ngan_sach (salesperson_code, thang, muc_tieu) "
                  "VALUES ('0104', '2026-07-01', 6000000)")
+    # 041: ngân sách CÔNG TY là số nhập thẳng (không cộng từ từng người).
+    conn.execute("INSERT INTO app.ngan_sach_cong_ty (thang, doanh_thu, lai_gop) "
+                 "VALUES ('2026-07-01', 8000000, 2000000)")
     conn.commit()
 
 

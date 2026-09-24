@@ -64,3 +64,7 @@
 .ht .noi-dung-cd,.ht .tai-lieu > *{min-width:0}
 @media (max-width:900px){.ht .cai-dat{grid-template-columns:minmax(0,1fr)}}
 .ht p code,.ht li code,.ht .ghi-chu code,.ht .the-tl code{white-space:normal;overflow-wrap:anywhere}
+.ns .ns-muc{font-size:1.02rem;margin:1.4rem 0 .2rem}
+.ns-bang td.ns-cs{white-space:nowrap;color:var(--chu-nhat);font-size:.82rem}
+.ns-bang tr.ns-dong-2 td{border-top:0}
+.ns-bang tr.ns-bien td,.ns-bang tr.ns-lech td{color:var(--chu-nhat);font-size:.82rem;font-variant-numeric:tabular-nums}

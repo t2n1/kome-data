@@ -29,6 +29,8 @@ def _gieo(conn, batch):
     _ban(conn, batch, date(2026, 7, 20))
     conn.execute("INSERT INTO app.ngan_sach (salesperson_code, thang, muc_tieu) "
                  "VALUES ('0104', '2026-07-01', 10000000)")
+    conn.execute("INSERT INTO app.ngan_sach_cong_ty (thang, doanh_thu, lai_gop) "
+                 "VALUES ('2026-07-01', 10000000, 2000000)")
     conn.commit()
 
 
@@ -80,3 +82,13 @@ def test_dang_ky_dung_luy_ke_theo_thang(conn, batch):
     d = KTQ.ngan_sach_thang(conn, None, KX.ThamSo(ky=2026))
     assert d["duong"]["kieu"] == "thang"
     assert [x["nhan"] for x in d["duong"]["diem"]] == [m["thang"] for m in d["luy_ke"]]
+
+
+def test_duong_lai_gop_trung_con_so_chu_tai_moc(conn, batch):
+    _gieo(conn, batch)
+    d = KTQ.ngan_sach_thang(conn, None, KX.ThamSo())
+    p = _theo_ngay(d)
+    assert p["2026-07-20"]["tt_lg"] == d["thuc_te_lg"] == 60_000
+    assert p["2026-07-20"]["ns_lg"] == d["muc_tieu_lg_den_hom_nay"]
+    assert p["2026-07-31"]["ns_lg"] == d["muc_tieu_lg"] == 2_000_000
+    assert p["2026-07-05"]["ss_lg"] == 30_000

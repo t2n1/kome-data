@@ -93,6 +93,7 @@ def kpi(conn, sale=None, ts=None) -> dict:
             "moc": _ty_so(ns.muc_tieu_den_hom_nay, ns.muc_tieu),
             "spark": [m.thuc_te for m in ns.luy_ke if m.thuc_te is not None],
             "thang": ns.thang,
+            "tien_do_lg": ns.tien_do_lg, "thuc_te_lg": ns.thuc_te_lg, "muc_tieu_lg": ns.muc_tieu_lg,
         },
         "ngan_sach_chi_theo_thang": kx is not None and kx.loai == "khoang",
         "kho": {"het_hang": kho.get("het_hang", 0), "can_han": len(can_han),
@@ -117,6 +118,10 @@ def ngan_sach(conn, sale=None, ts=None) -> dict | None:
         "thuc_te": ns.thuc_te, "muc_tieu": ns.muc_tieu,
         "muc_tieu_den_hom_nay": ns.muc_tieu_den_hom_nay, "tien_do": ns.tien_do,
         "moc": _ty_so(ns.muc_tieu_den_hom_nay, ns.muc_tieu),
+        # 041: lãi gộp của CÔNG TY — ngân sách công ty nhập thẳng.
+        "co_ngan_sach_lg": ns.co_ngan_sach_lg, "thuc_te_lg": ns.thuc_te_lg,
+        "muc_tieu_lg": ns.muc_tieu_lg, "muc_tieu_lg_den_hom_nay": ns.muc_tieu_lg_den_hom_nay,
+        "tien_do_lg": ns.tien_do_lg, "moc_lg": _ty_so(ns.muc_tieu_lg_den_hom_nay, ns.muc_tieu_lg),
         "ngay_kd": ns.ngay_kd, "ngay_kd_da_qua": ns.ngay_kd_da_qua,
         "ngay_kd_con_lai": phu["ngay_kd_con_lai"], "can_ban_moi_ngay": phu["can_ban_moi_ngay"],
         "nhip_chuan": phu["nhip_chuan"],
@@ -146,7 +151,8 @@ def duong_luy_ke(conn, kx, ns: dict) -> dict:
     Dạng Kỳ (0 lượt): luỹ kế theo tháng `TienDoNganSach.luy_ke` đã có sẵn."""
     if kx.loai != "thang":
         return {"kieu": "thang", "diem": [
-            {"nhan": m["thang"], "tt": m["thuc_te"], "ns": m["ngan_sach"], "ss": None}
+            {"nhan": m["thang"], "tt": m["thuc_te"], "ns": m["ngan_sach"], "ss": None,
+             "tt_lg": m["thuc_te_lg"], "ns_lg": m["ngan_sach_lg"], "ss_lg": None}
             for m in ns["luy_ke"]], "nhan_ss": None}
     dau = kx.tu
     cuoi = KX._cuoi_thang(dau.year, dau.month)
@@ -155,28 +161,35 @@ def duong_luy_ke(conn, kx, ns: dict) -> dict:
     den = cuoi if kx.dang_lui else kx.den
     dau_truoc = date(dau.year - (dau.month == 1), 12 if dau.month == 1 else dau.month - 1, 1)
     rows = conn.execute(
-        """SELECT l.ngay, l.la_ngay_kd, coalesce(n.dt, 0)
+        """SELECT l.ngay, l.la_ngay_kd, coalesce(n.dt, 0), coalesce(n.lg, 0)
              FROM mart.lich_kinh_doanh l
              LEFT JOIN mart.ngay_khoang(%s, %s) n ON n.ngay = l.ngay
             WHERE l.ngay BETWEEN %s AND %s ORDER BY l.ngay""",
         (dau_truoc, den, dau_truoc, cuoi)).fetchall()
-    truoc, cong = {}, 0
+    truoc, cong, cong_lg = {}, 0, 0
     for r in rows:
         if r[0] < dau:
             cong += int(r[2])
-            truoc[r[0].day] = cong
+            cong_lg += int(r[3])
+            truoc[r[0].day] = (cong, cong_lg)
     nay = [r for r in rows if r[0] >= dau]
     ngay_kd = sum(1 for r in nay if r[1])
-    muc_tieu = ns["muc_tieu"]
-    diem, cong, kd = [], 0, 0
+    muc_tieu, muc_tieu_lg = ns["muc_tieu"], ns["muc_tieu_lg"]
+    diem, cong, cong_lg, kd = [], 0, 0, 0
     for r in nay:
         kd += bool(r[1])
         cong += int(r[2])
+        cong_lg += int(r[3])
+        co = r[0] <= den
+        tr = truoc.get(r[0].day)
         diem.append({
             "nhan": r[0].isoformat(),
-            "tt": cong if r[0] <= den else None,
+            "tt": cong if co else None,
             "ns": round(muc_tieu * kd / ngay_kd) if muc_tieu is not None and ngay_kd else None,
-            "ss": truoc.get(r[0].day)})
+            "ss": tr[0] if tr else None,
+            "tt_lg": cong_lg if co else None,
+            "ns_lg": round(muc_tieu_lg * kd / ngay_kd) if muc_tieu_lg is not None and ngay_kd else None,
+            "ss_lg": tr[1] if tr else None})
     return {"kieu": "ngay", "diem": diem, "nhan_ss": "Tháng trước", "den": den.isoformat()}
 
 
@@ -187,12 +200,10 @@ def theo_thang(conn, sale=None, ts=None) -> dict:
     thuộc khoảng (`khoang.tu` → `khoang.den`)."""
     kx = _kx(conn, ts)
     rows = [] if kx is None else conn.execute(
-        """WITH ns AS (SELECT thang, sum(muc_tieu)::bigint AS muc_tieu
-                         FROM mart.ngan_sach_thang GROUP BY thang)
-           SELECT s.thang, s.company_fy, s.thang_trong_ky, s.doanh_thu_thuan, s.lai_gop,
-                  s.so_khach, s.dt_cung_ky, s.co_cung_ky, ns.muc_tieu
+        """SELECT s.thang, s.company_fy, s.thang_trong_ky, s.doanh_thu_thuan, s.lai_gop,
+                  s.so_khach, s.dt_cung_ky, s.co_cung_ky, ns.doanh_thu, ns.lai_gop
              FROM mart.ban_theo_thang_so_sanh s
-             LEFT JOIN ns ON ns.thang = s.thang
+             LEFT JOIN mart.ngan_sach_cong_ty_thang ns ON ns.thang = s.thang
             WHERE s.company_fy = %s
             ORDER BY s.thang""", (kx.company_fy,)).fetchall()
     thang = [{
@@ -200,7 +211,9 @@ def theo_thang(conn, sale=None, ts=None) -> dict:
         "doanh_thu": int(r[3] or 0), "lai_gop": int(r[4] or 0),
         "ty_suat": _ty_so(int(r[4] or 0), int(r[3] or 0)), "so_khach": r[5],
         "cung_ky": int(r[6]) if r[6] is not None else None, "co_cung_ky": r[7],
+        # 041: ngân sách CÔNG TY (nhập thẳng), không cộng từ từng người.
         "ngan_sach": int(r[8]) if r[8] is not None else None,
+        "ngan_sach_lg": int(r[9]) if r[9] is not None else None,
     } for r in rows]
     return {"company_fy": thang[0]["company_fy"] if thang else None, "thang": thang,
             "hom_nay": kx.hom_nay if kx else None, "khoang": kx}

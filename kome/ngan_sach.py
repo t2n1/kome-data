@@ -1,4 +1,7 @@
-"""Chỉ tiêu doanh thu theo nhân viên theo tháng — đọc bảng nhập và ghi nó.
+"""Ngân sách theo tháng — CÔNG TY (doanh thu + lãi gộp, `app.ngan_sach_cong_ty`, 041) và
+TỪNG NGƯỜI (`app.ngan_sach`: `muc_tieu` = doanh thu, `lai_gop`) — đọc bảng nhập và ghi nó.
+Ngân sách công ty là số NHẬP THẲNG, không phải tổng từng người (đặc tả
+2026-09-24-ngan-sach-cong-ty-design.md).
 
 Module này KHÔNG biết gì về HTTP: không FastAPI, không biểu mẫu, không cookie.
 Nó chỉ nói chuyện với `app.ngan_sach` và `app.ngan_sach_nhat_ky` (migration
@@ -13,7 +16,7 @@ Mọi công thức ("tiến độ", "mốc đến hôm nay") nằm trong view c�
 nằm ở đây — xem db/migrations/026_ngan_sach.sql.
 """
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 # Dấu phân cách hàng nghìn mà người ta thật sự gõ: dấu chấm (kiểu Việt), dấu
@@ -36,6 +39,12 @@ _NGUYEN = re.compile(r"^[0-9]+$")
 # tháng là ¥15. Mọi nhóm sau dấu phân cách phải đúng 3 chữ số.
 _LOP_KY_TU_PHAN_CACH = "".join(re.escape(c) for c in _KY_TU_PHAN_CACH)
 _NHOM = re.compile(rf"^[0-9]{{1,3}}(?:[{_LOP_KY_TU_PHAN_CACH}][0-9]{{3}})*$")
+
+
+# Đối tượng "công ty" trong khoá ô (tên ô biểu mẫu `o-__cong_ty-doanh_thu-2026-05`) và
+# hai chỉ số — trùng giá trị CHECK của app.ngan_sach_nhat_ky.chi_so (041).
+CONG_TY = "__cong_ty"
+CHI_SO = ("doanh_thu", "lai_gop")
 
 
 class LoiSo(ValueError):
@@ -96,7 +105,9 @@ class BangNhap:
     moi_ky: list[int]
     thang: list[str]           # 12 tháng 'YYYY-MM' theo THỨ TỰ KỲ (8月 trước)
     nguoi: list[Nguoi]
-    o: dict[tuple[str, str], int]   # (salesperson_code, 'YYYY-MM') -> muc_tieu
+    o: dict[tuple[str, str], int]   # (salesperson_code, 'YYYY-MM') -> chỉ tiêu doanh thu
+    o_lg: dict[tuple[str, str], int] = field(default_factory=dict)     # -> chỉ tiêu lãi gộp
+    cong_ty: dict[tuple[str, str], int] = field(default_factory=dict)  # (chi_so, 'YYYY-MM') -> ngân sách công ty
 
 
 def thang_cua_ky(company_fy: int) -> list[str]:
@@ -151,87 +162,128 @@ def bang_nhap(conn, company_fy: int | None = None) -> BangNhap:
         "ORDER BY salesperson_code").fetchall()]
 
     thang = thang_cua_ky(ky)
-    o = {(r[0], r[1]): int(r[2]) for r in conn.execute(
-        """SELECT salesperson_code, to_char(thang, 'YYYY-MM'), muc_tieu
-           FROM app.ngan_sach WHERE thang >= %s AND thang <= %s""",
-        (_mung_1(thang[0]), _mung_1(thang[-1]))).fetchall()}
+    # MỘT câu cho cả hai bảng (UNION ALL, cột đầu NULL = công ty) — không thêm lượt hỏi.
+    o, o_lg, cong_ty = {}, {}, {}
+    for r in conn.execute(
+            """SELECT salesperson_code, to_char(thang, 'YYYY-MM'), muc_tieu, lai_gop
+                 FROM app.ngan_sach WHERE thang >= %s AND thang <= %s
+               UNION ALL
+               SELECT NULL, to_char(thang, 'YYYY-MM'), doanh_thu, lai_gop
+                 FROM app.ngan_sach_cong_ty WHERE thang >= %s AND thang <= %s""",
+            (_mung_1(thang[0]), _mung_1(thang[-1])) * 2).fetchall():
+        if r[0] is None:
+            if r[2] is not None:
+                cong_ty[("doanh_thu", r[1])] = int(r[2])
+            if r[3] is not None:
+                cong_ty[("lai_gop", r[1])] = int(r[3])
+        else:
+            if r[2] is not None:
+                o[(r[0], r[1])] = int(r[2])
+            if r[3] is not None:
+                o_lg[(r[0], r[1])] = int(r[3])
 
-    return BangNhap(company_fy=ky, moi_ky=moi_ky, thang=thang, nguoi=nguoi, o=o)
+    return BangNhap(company_fy=ky, moi_ky=moi_ky, thang=thang, nguoi=nguoi, o=o,
+                    o_lg=o_lg, cong_ty=cong_ty)
 
 
-def luu(conn, gia_tri: dict[tuple[str, str], int | None],
-        nguoi_id: int | None) -> int:
+def luu(conn, gia_tri: dict[tuple, int | None], nguoi_id: int | None) -> int:
     """Ghi những ô ĐÃ ĐỔI, trả về số ô đã đổi. Không tự commit.
 
-    Chỉ đụng ô đã đổi, vì `sua_luc`/`sua_boi` phải trả lời "ai đổi con số NÀY
-    lần cuối", không phải "ai bấm Lưu lần cuối". Ghi đè cả 60 ô mỗi lần bấm
-    Lưu là xoá sạch thông tin đó và làm nhật ký đầy dòng không có gì thay đổi.
+    Khoá ô: `(đối tượng, chi_so, 'YYYY-MM')` — đối tượng là mã phụ trách hoặc `CONG_TY`,
+    `chi_so` ∈ `CHI_SO`. Khoá hai phần `(mã, 'YYYY-MM')` (bản trước 041) = doanh thu của
+    người đó.
 
-    BỐN câu lệnh là trần, không phải bốn chục: đọc hiện trạng · ghi những ô
-    có giá trị mới · xoá những ô vừa bị để trống · ghi nhật ký. Một biểu mẫu
-    chỉ đặt thêm chỉ tiêu (không xoá ô nào) chạy ba câu. Mỗi vòng hỏi qua
-    pooler Tokyo mất ~47 ms chỉ riêng mạng, nên 60 ô ghi thành 60 câu lệnh là
-    gần ba giây chỉ để bấm một nút Lưu.
+    Chỉ đụng ô đã đổi, vì `sua_luc`/`sua_boi` phải trả lời "ai đổi con số NÀY lần cuối",
+    không phải "ai bấm Lưu lần cuối". Một DÒNG (người hay công ty × tháng) mang hai ô; dòng
+    không còn ô nào thì xoá cả dòng (CHECK của 041 cấm dòng rỗng).
 
-    Câu đọc hiện trạng dùng `unnest` thay vì `WHERE (a, b) = ANY(%s)` với một
-    danh sách bộ đôi Python: psycopg 3 không có adapter cho
-    list[tuple[str, date]] khớp kiểu composite của Postgres — thử nghiệm thật
-    trên CSDL này ném lỗi adapter. `unnest` trên hai mảng song song không có
-    vấn đề đó, và ba câu lệnh còn lại vốn đã theo lối này.
+    Số câu lệnh là hằng, không theo số ô: đọc hiện trạng (một câu cho cả hai bảng) · ghi
+    / xoá dòng từng người · ghi / xoá dòng công ty · nhật ký — câu nào không có việc thì
+    không chạy. Mỗi vòng hỏi qua pooler Tokyo ~47 ms; 60 ô thành 60 câu là ~3 giây.
+    `unnest` trên mảng song song thay vì `(a, b) = ANY(%s)`: psycopg 3 không có adapter
+    cho list[tuple[str, date]].
     """
     if not gia_tri:
         return 0
+    chuan: dict[tuple[str, str, str], int | None] = {}
+    for k, v in gia_tri.items():
+        chuan[(k[0], "doanh_thu", k[1]) if len(k) == 2 else k] = v
 
-    ma_ds = [ma for ma, _ in gia_tri]
-    thang_ds = [_mung_1(th) for _, th in gia_tri]
-    hien = {(r[0], to_thang(r[1])): int(r[2]) for r in conn.execute(
-        """SELECT ns.salesperson_code, ns.thang, ns.muc_tieu
-           FROM app.ngan_sach ns
-           JOIN unnest(%s::text[], %s::date[]) AS x(ma, thang)
-             ON ns.salesperson_code = x.ma AND ns.thang = x.thang""",
-        (ma_ds, thang_ds)).fetchall()}
+    dong_ds = sorted({(doi, th) for doi, _, th in chuan})
+    ng = [(d, t) for d, t in dong_ds if d != CONG_TY]
+    hien: dict[tuple[str, str], dict[str, int | None]] = {}
+    for r in conn.execute(
+            """SELECT ns.salesperson_code, ns.thang, ns.muc_tieu, ns.lai_gop
+                 FROM app.ngan_sach ns
+                 JOIN unnest(%s::text[], %s::date[]) AS x(ma, thang)
+                   ON ns.salesperson_code = x.ma AND ns.thang = x.thang
+               UNION ALL
+               SELECT %s, c.thang, c.doanh_thu, c.lai_gop
+                 FROM app.ngan_sach_cong_ty c WHERE c.thang = ANY(%s::date[])""",
+            ([d for d, _ in ng], [_mung_1(t) for _, t in ng], CONG_TY,
+             [_mung_1(t) for d, t in dong_ds if d == CONG_TY])).fetchall():
+        hien[(r[0], to_thang(r[1]))] = {
+            "doanh_thu": int(r[2]) if r[2] is not None else None,
+            "lai_gop": int(r[3]) if r[3] is not None else None}
 
-    dat, xoa, nhat_ky = [], [], []
-    for (ma, th), moi in gia_tri.items():
-        cu = hien.get((ma, th))
+    nhat_ky, dong_moi, doi = [], {}, set()
+    for (dt, cs, th), moi in chuan.items():
+        dong = dong_moi.setdefault(
+            (dt, th), dict(hien.get((dt, th), {"doanh_thu": None, "lai_gop": None})))
+        cu = dong[cs]
         if cu == moi:
             continue
-        nhat_ky.append((ma, _mung_1(th), cu, moi, nguoi_id))
-        if moi is None:
-            xoa.append((ma, _mung_1(th)))
-        else:
-            dat.append((ma, _mung_1(th), moi, nguoi_id))
-
+        dong[cs] = moi
+        doi.add((dt, th))
+        nhat_ky.append((None if dt == CONG_TY else dt, _mung_1(th), cs, cu, moi, nguoi_id))
     if not nhat_ky:
         return 0
 
-    if dat:
+    dat_ng, xoa_ng, dat_ct, xoa_ct = [], [], [], []
+    for (dt, th) in sorted(doi):
+        d = dong_moi[(dt, th)]
+        rong = d["doanh_thu"] is None and d["lai_gop"] is None
+        if dt == CONG_TY:
+            (xoa_ct if rong else dat_ct).append((_mung_1(th), d["doanh_thu"], d["lai_gop"]))
+        else:
+            (xoa_ng if rong else dat_ng).append((dt, _mung_1(th), d["doanh_thu"], d["lai_gop"]))
+
+    if dat_ng:
         conn.execute(
-            """INSERT INTO app.ngan_sach (salesperson_code, thang, muc_tieu, sua_boi)
-               SELECT x.ma, x.thang, x.muc_tieu, x.sua_boi
+            """INSERT INTO app.ngan_sach (salesperson_code, thang, muc_tieu, lai_gop, sua_boi)
+               SELECT x.ma, x.thang, x.dt, x.lg, %s::bigint
                FROM unnest(%s::text[], %s::date[], %s::bigint[], %s::bigint[])
-                    AS x(ma, thang, muc_tieu, sua_boi)
+                    AS x(ma, thang, dt, lg)
                ON CONFLICT (salesperson_code, thang) DO UPDATE
-                 SET muc_tieu = EXCLUDED.muc_tieu,
-                     sua_boi  = EXCLUDED.sua_boi,
-                     sua_luc  = now()""",
-            ([d[0] for d in dat], [d[1] for d in dat],
-             [d[2] for d in dat], [d[3] for d in dat]))
-    if xoa:
+                 SET muc_tieu = EXCLUDED.muc_tieu, lai_gop = EXCLUDED.lai_gop,
+                     sua_boi  = EXCLUDED.sua_boi,  sua_luc = now()""",
+            (nguoi_id, [d[0] for d in dat_ng], [d[1] for d in dat_ng],
+             [d[2] for d in dat_ng], [d[3] for d in dat_ng]))
+    if xoa_ng:
         conn.execute(
             """DELETE FROM app.ngan_sach ns
                USING unnest(%s::text[], %s::date[]) AS x(ma, thang)
                WHERE ns.salesperson_code = x.ma AND ns.thang = x.thang""",
-            ([d[0] for d in xoa], [d[1] for d in xoa]))
+            ([d[0] for d in xoa_ng], [d[1] for d in xoa_ng]))
+    if dat_ct:
+        conn.execute(
+            """INSERT INTO app.ngan_sach_cong_ty (thang, doanh_thu, lai_gop, sua_boi)
+               SELECT x.thang, x.dt, x.lg, %s::bigint
+               FROM unnest(%s::date[], %s::bigint[], %s::bigint[]) AS x(thang, dt, lg)
+               ON CONFLICT (thang) DO UPDATE
+                 SET doanh_thu = EXCLUDED.doanh_thu, lai_gop = EXCLUDED.lai_gop,
+                     sua_boi   = EXCLUDED.sua_boi,   sua_luc = now()""",
+            (nguoi_id, [d[0] for d in dat_ct], [d[1] for d in dat_ct], [d[2] for d in dat_ct]))
+    if xoa_ct:
+        conn.execute("DELETE FROM app.ngan_sach_cong_ty WHERE thang = ANY(%s::date[])",
+                     ([d[0] for d in xoa_ct],))
 
     conn.execute(
         """INSERT INTO app.ngan_sach_nhat_ky
-             (salesperson_code, thang, muc_tieu_cu, muc_tieu_moi, sua_boi)
-           SELECT * FROM unnest(%s::text[], %s::date[], %s::bigint[],
+             (salesperson_code, thang, chi_so, muc_tieu_cu, muc_tieu_moi, sua_boi)
+           SELECT * FROM unnest(%s::text[], %s::date[], %s::text[], %s::bigint[],
                                 %s::bigint[], %s::bigint[])""",
-        ([n[0] for n in nhat_ky], [n[1] for n in nhat_ky],
-         [n[2] for n in nhat_ky], [n[3] for n in nhat_ky],
-         [n[4] for n in nhat_ky]))
+        tuple([n[i] for n in nhat_ky] for i in range(6)))
     return len(nhat_ky)
 
 

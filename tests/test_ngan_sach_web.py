@@ -136,7 +136,7 @@ def test_dat_chi_tieu_trong_khoi_bao_cao_gac_boi_hien_ngan_sach(khach, conn, bat
         td = c.get("/api/bao-cao?ky=2026").json()["td"]
         assert td["co_ngan_sach"] is False and td["company_fy"] == 2026
     src = (NGUON / "bao_cao" / "BaoCao.tsx").read_text(encoding="utf-8")
-    assert re.search(r'Chưa đặt chỉ tiêu cho kỳ này\.\{" "\}\s*'
+    assert re.search(r'Chưa đặt ngân sách \{ten\} của công ty cho tháng này\.\{" "\}\s*'
                      r'\{KD\.hien_ngan_sach && <><a href=\{`/ngan-sach\?ky=\$\{td\.company_fy\}`\}>Đặt chỉ tiêu</a>',
                      src), "liên kết 'Đặt chỉ tiêu' phải gác bởi KD.hien_ngan_sach"
     assert src.count("/ngan-sach?ky=") == 1, "mọi liên kết /ngan-sach?ky= phải đi qua đúng một chỗ đã gác"
@@ -162,11 +162,11 @@ def test_luu_roi_tai_lai_thi_thay_dung_so_vua_nhap(khach, conn, batch):
     assert conn.execute(
         "SELECT muc_tieu FROM app.ngan_sach").fetchone()[0] == 9_000_000
     m = _khoi_dau(c.get("/ngan-sach?ky=2026").text)["man"]
-    assert m["o_txt"]["0104-2026-05"] == 9_000_000
+    assert m["o_txt"]["0104-doanh_thu-2026-05"] == 9_000_000
     # Ô gõ lại in dấu CHẤM ngăn nghìn (quy ước Việt khi GÕ LẠI): cham() = de-DE.
     ns = (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
     assert 'const cham = (n: number) => n.toLocaleString("de-DE");' in ns
-    assert "cham(o(n.ma, th))" in ns
+    assert "cham(v)" in ns and "const v = o(doi, cs, th);" in ns
 
 
 def test_mot_o_sai_thi_KHONG_ghi_o_nao(khach, conn, batch):
@@ -185,7 +185,7 @@ def test_mot_o_sai_thi_KHONG_ghi_o_nao(khach, conn, batch):
     assert m["da_go"]["0104-2026-05"] == "9000000"
     assert m["loi"] == ["0105-2026-05"]
     # Giao diện ưu tiên đúng những gì vừa gõ, rồi mới tới giá trị đang lưu.
-    assert "coGo && khoa in m.da_go ? m.da_go[khoa]" in (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
+    assert "coGo && k in m.da_go ? m.da_go[k]" in (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
 
 
 def test_o_dan_tu_excel_kem_NBSP_khong_lam_trang_500(khach, conn, batch):
@@ -239,8 +239,8 @@ def test_o_chua_dat_hien_TRONG_khong_hien_0(khach, conn, batch):
     """[CRITICAL] Hiện 0 cho thứ chưa biết là nói một điều sai bằng con số."""
     _ban(conn, batch)
     m = _khoi_dau(khach().get("/ngan-sach?ky=2026").text)["man"]
-    assert "0104-2026-05" not in m["o_txt"], "ô chưa đặt không được có giá trị (không phải 0)"
-    assert ': o(n.ma, th) != null ? cham(o(n.ma, th)) : "";' in (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
+    assert not any(k.endswith("2026-05") for k in m["o_txt"]), "ô chưa đặt không được có giá trị (không phải 0)"
+    assert ': v != null ? cham(v) : "";' in (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
 
 
 def test_o_tong_dung_dau_CHAM_khop_bao_cao(khach, conn, batch):
@@ -254,7 +254,7 @@ def test_o_tong_dung_dau_CHAM_khop_bao_cao(khach, conn, batch):
     c = khach()
     c.post("/ngan-sach", data={"ky": "2026", "o-0104-2026-05": "9000000"})
     m = _khoi_dau(c.get("/ngan-sach?ky=2026").text)["man"]
-    assert m["o_txt"]["0104-2026-05"] == 9_000_000
+    assert m["o_txt"]["0104-doanh_thu-2026-05"] == 9_000_000
     ns = (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
     # Ô TỔNG in bằng CHÍNH yen() của /bao-cao (dấu chấm) và "—" khi không ô nào đứng sau.
     assert 'import { yen } from "../dinh_dang";' in ns

@@ -277,21 +277,33 @@ class DuBaoNguoi:
         return self.co_so / self.ngan_sach if self.ngan_sach else None
 
 
-def theo_nguoi(conn, th: str) -> list[DuBaoNguoi]:
+def theo_nguoi(conn, th: str) -> tuple[list[DuBaoNguoi], int | None]:
     """Một lượt hỏi: `mart.tien_do_ngan_sach` của tháng đang xét (FULL JOIN
-    chỉ tiêu ↔ thực tế — người có chỉ tiêu mà bán 0 đồng vẫn có dòng)."""
-    ra = []
-    for ma, ten, tt, ns, kd, qua in conn.execute(
-            """SELECT t.salesperson_code, s.ten, t.thuc_te, t.muc_tieu, t.ngay_kd, t.ngay_kd_da_qua
-               FROM mart.tien_do_ngan_sach t
-               LEFT JOIN core.dim_salesperson s ON s.salesperson_code = t.salesperson_code
-               WHERE t.thang = %s
-               ORDER BY t.thuc_te DESC NULLS LAST, t.salesperson_code""", (th,)).fetchall():
+    chỉ tiêu ↔ thực tế — người có chỉ tiêu mà bán 0 đồng vẫn có dòng), kèm ngân sách
+    doanh thu CÔNG TY của tháng (041, `mart.ngan_sach_cong_ty_thang` — số nhập thẳng,
+    không phải tổng từng người). Dòng `c` luôn có đúng một dòng, nên ngân sách công ty
+    vẫn đọc được khi tháng chưa có dòng nào theo người."""
+    ra, ns_ct = [], None
+    for co, ma, ten, tt, ns, kd, qua, nsc in conn.execute(
+            """WITH c AS (SELECT (SELECT doanh_thu FROM mart.ngan_sach_cong_ty_thang
+                                   WHERE thang = %s) AS ns_ct)
+               SELECT t.co, t.salesperson_code, t.ten, t.thuc_te, t.muc_tieu,
+                      t.ngay_kd, t.ngay_kd_da_qua, c.ns_ct
+               FROM c LEFT JOIN (
+                   SELECT true AS co, t.salesperson_code, s.ten, t.thuc_te, t.muc_tieu,
+                          t.ngay_kd, t.ngay_kd_da_qua
+                   FROM mart.tien_do_ngan_sach t
+                   LEFT JOIN core.dim_salesperson s ON s.salesperson_code = t.salesperson_code
+                   WHERE t.thang = %s) t ON true
+               ORDER BY t.thuc_te DESC NULLS LAST, t.salesperson_code""", (th, th)).fetchall():
+        ns_ct = int(nsc) if nsc is not None else None
+        if not co:
+            continue
         tt = int(tt or 0)
         ra.append(DuBaoNguoi(ma=ma, ten=ten, da_ban=tt,
                              co_so=round(du_bao_chot(tt, int(qua or 0), int(kd or 0))),
                              ngan_sach=int(ns) if ns is not None else None))
-    return ra
+    return ra, ns_ct
 
 
 # ---- 3 + 4. Khách: đơn kỳ vọng + nguy cơ ngừng mua --------------------------
@@ -399,7 +411,7 @@ def du_bao(conn) -> DuBao | None:
     ds, hom_nay = doc_lich(conn)
     if hom_nay is None:
         return None
-    nguoi = theo_nguoi(conn, thang(hom_nay))
-    ns = [x.ngan_sach for x in nguoi if x.ngan_sach is not None]
-    return DuBao(chot=chot_thang(ds, hom_nay, sum(ns) if ns else None),
+    nguoi, ns_ct = theo_nguoi(conn, thang(hom_nay))
+    # Chốt tháng so với ngân sách CÔNG TY (041) — không cộng từ từng người.
+    return DuBao(chot=chot_thang(ds, hom_nay, ns_ct),
                  nam=muoi_hai_thang(ds, hom_nay), nguoi=nguoi, kh=khach(conn))

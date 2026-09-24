@@ -518,7 +518,7 @@ def ve_bieu_do(thang: list[O]) -> dict:
 # nếp của mọi module khác trong repo — không có vòng nhập nào vì
 # kome/ngan_sach.py không nhập kome/bao_cao.py.
 
-def chi_so_phu(ns: "TienDoNganSach") -> dict:
+def chi_so_phu(ns: "TienDoNganSach", lg: bool = False) -> dict:
     """Bốn con số phụ của khối tiến độ ngân sách — MỘT chỗ cho cả khối ngân
     sách của `/` (kome/khoi_tong_quan.py::ngan_sach) lẫn `/bao-cao` React.
     Chỉ là phép tính trên các cột đã có của mart.tien_do_ngan_sach:
@@ -526,11 +526,14 @@ def chi_so_phu(ns: "TienDoNganSach") -> dict:
     (chỉ tiêu ÷ ngày làm việc cả tháng), thiếu (+) / vượt (−) so mốc hôm nay.
     None khi không có mẫu số (chưa đặt chỉ tiêu, không còn ngày nào)."""
     con_lai = max(ns.ngay_kd - ns.ngay_kd_da_qua, 0)
+    # lg=True: cùng bốn con số cho LÃI GỘP công ty (041) — cùng công thức, cột khác.
+    mt, tt, moc = ((ns.muc_tieu_lg, ns.thuc_te_lg, ns.muc_tieu_lg_den_hom_nay) if lg
+                   else (ns.muc_tieu, ns.thuc_te, ns.muc_tieu_den_hom_nay))
     return {
         "ngay_kd_con_lai": con_lai,
-        "can_ban_moi_ngay": (ns.muc_tieu - ns.thuc_te) / con_lai if ns.muc_tieu and con_lai else None,
-        "nhip_chuan": ns.muc_tieu / ns.ngay_kd if ns.muc_tieu and ns.ngay_kd else None,
-        "thieu_moc": (ns.muc_tieu_den_hom_nay - ns.thuc_te) if ns.muc_tieu_den_hom_nay is not None else None,
+        "can_ban_moi_ngay": (mt - tt) / con_lai if mt and con_lai else None,
+        "nhip_chuan": mt / ns.ngay_kd if mt and ns.ngay_kd else None,
+        "thieu_moc": (moc - tt) if moc is not None else None,
     }
 
 
@@ -576,6 +579,11 @@ class TienDoNguoi:
     # DẤU. Template chỉ nhân 100 và định dạng.
     co_cung_ky: bool
     tang_truong: float | None
+    # 041: chỉ tiêu lãi gộp của người này — cùng công thức, đọc thẳng mart.tien_do_ngan_sach.
+    muc_tieu_lg: int | None = None
+    thuc_te_lg: int = 0
+    muc_tieu_lg_den_hom_nay: int | None = None
+    tien_do_lg: float | None = None
 
     @property
     def rong_thanh(self) -> float | None:
@@ -590,12 +598,22 @@ class TienDoNguoi:
         người này, kẹp [0, 100]."""
         return _pct_rong(self.muc_tieu_den_hom_nay, self.muc_tieu)
 
+    @property
+    def rong_thanh_lg(self) -> float | None:
+        return _pct_rong(self.thuc_te_lg, self.muc_tieu_lg)
+
+    @property
+    def rong_moc_lg(self) -> float | None:
+        return _pct_rong(self.muc_tieu_lg_den_hom_nay, self.muc_tieu_lg)
+
 
 @dataclass(frozen=True)
 class MocLuyKe:
     thang: str
     thuc_te: int | None      # None = tháng nằm SAU hom_nay (chưa có dữ liệu)
-    ngan_sach: int | None
+    ngan_sach: int | None    # luỹ kế ngân sách DOANH THU công ty (041), None = chưa đặt tháng nào
+    thuc_te_lg: int | None = None
+    ngan_sach_lg: int | None = None
 
 
 @dataclass(frozen=True)
@@ -612,6 +630,29 @@ class TienDoNganSach:
     nguoi: list[TienDoNguoi]
     luy_ke: list[MocLuyKe]
     co_ngan_sach: bool
+    # 041: lãi gộp của CÔNG TY (ngân sách công ty nhập thẳng, mart.tien_do_cong_ty).
+    thuc_te_lg: int = 0
+    muc_tieu_lg: int | None = None
+    muc_tieu_lg_den_hom_nay: int | None = None
+    tien_do_lg: float | None = None
+
+    @property
+    def co_ngan_sach_lg(self) -> bool:
+        return self.muc_tieu_lg is not None
+
+    @property
+    def rong_thanh_lg(self) -> float | None:
+        return _pct_rong(self.thuc_te_lg, self.muc_tieu_lg)
+
+    @property
+    def rong_moc_lg(self) -> float | None:
+        return _pct_rong(self.muc_tieu_lg_den_hom_nay, self.muc_tieu_lg)
+
+    @property
+    def pct_moc_chi_tieu_lg(self) -> float | None:
+        if not self.muc_tieu_lg or self.muc_tieu_lg_den_hom_nay is None:
+            return None
+        return self.muc_tieu_lg_den_hom_nay / self.muc_tieu_lg * 100
 
     @property
     def rong_thanh(self) -> float | None:
@@ -689,7 +730,8 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None,
             """SELECT t.salesperson_code, s.ten, t.thuc_te, t.muc_tieu,
                       t.muc_tieu_den_hom_nay, t.tien_do,
                       t.cung_ky, t.co_cung_ky, t.tang_truong,
-                      t.ngay_kd, t.ngay_kd_da_qua
+                      t.ngay_kd, t.ngay_kd_da_qua,
+                      t.muc_tieu_lg, t.thuc_te_lg, t.muc_tieu_lg_den_hom_nay, t.tien_do_lg
                FROM mart.tien_do_ngan_sach t
                LEFT JOIN core.dim_salesperson s
                       ON s.salesperson_code = t.salesperson_code
@@ -703,75 +745,82 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None,
         tien_do=float(x[5]) if x[5] is not None else None,
         cung_ky=int(x[6]) if x[6] is not None else None,
         co_cung_ky=bool(x[7]),
-        tang_truong=float(x[8]) if x[8] is not None else None) for x in dong]
+        tang_truong=float(x[8]) if x[8] is not None else None,
+        muc_tieu_lg=int(x[11]) if x[11] is not None else None,
+        thuc_te_lg=int(x[12] or 0),
+        muc_tieu_lg_den_hom_nay=int(x[13]) if x[13] is not None else None,
+        tien_do_lg=float(x[14]) if x[14] is not None else None) for x in dong]
     # Tháng không có dòng nào (chọn một kỳ đã qua mà tháng cuối kỳ không có
     # doanh thu lẫn chỉ tiêu) -> 0/0. Khi đó `co_ngan_sach` cũng FALSE nên
     # màn hình hiện khối "chưa đặt chỉ tiêu", không hiện bộ đếm ngày.
     ngay_kd, ngay_kd_da_qua = (dong[0][9], dong[0][10]) if dong else (0, 0)
 
-    # Luỹ kế 12 tháng của kỳ, VÀ tổng cả công ty của tháng đang xét — cùng một
-    # câu. Alias bảng nguồn là `b`: câu này chỉ CỘNG DỒN các cột mart đã tính
-    # sẵn (thuc_te, muc_tieu, muc_tieu_den_hom_nay) và chia hai tổng đó để ra
-    # tiến độ công ty — không định nghĩa lại công thức nào, hỏi hẳn SQL thay
-    # vì Python để không có phép cộng/chia chỉ số nào lọt vào phía Python.
-    # `nullif(sum(b.muc_tieu), 0)` cho tiến độ NULL khi tổng chỉ tiêu bằng 0,
-    # cùng nếp `nullif` mà mart.tien_do_ngan_sach đã dùng cho từng dòng.
+    # Luỹ kế 12 tháng của kỳ VÀ tổng công ty của tháng đang xét — cùng một câu, đọc
+    # mart.tien_do_cong_ty (041): ngân sách công ty là số NHẬP THẲNG
+    # (app.ngan_sach_cong_ty), KHÔNG phải tổng chỉ tiêu từng người. Chưa đặt = None —
+    # không rơi về tổng từng người (hai định nghĩa cùng tên là hai con số nói hai điều).
+    # Thực tế công ty = mart.ban_theo_thang (mọi dòng bán, kể cả mã ngoài danh sách phụ
+    # trách). Mọi công thức ở view; ở đây chỉ cộng dồn cho luỹ kế.
     thang_ky = thang_cua_ky(ky)
     theo_thang = {x[0]: x[1:] for x in conn.execute(
-        """SELECT thang, sum(b.thuc_te), sum(b.muc_tieu),
-                  sum(b.muc_tieu_den_hom_nay),
-                  sum(b.thuc_te)::numeric / nullif(sum(b.muc_tieu), 0)
-           FROM mart.tien_do_ngan_sach b WHERE company_fy = %s
-           GROUP BY thang""", (ky,)).fetchall()}
+        """SELECT thang, thuc_te, muc_tieu, muc_tieu_den_hom_nay, tien_do,
+                  thuc_te_lg, muc_tieu_lg, muc_tieu_lg_den_hom_nay, tien_do_lg,
+                  ngay_kd, ngay_kd_da_qua
+           FROM mart.tien_do_cong_ty WHERE company_fy = %s""", (ky,)).fetchall()}
 
-    luy_ke, c_tt, c_ns = [], 0, 0
+    def _so(v):
+        return int(v) if v is not None else None
+
+    luy_ke, c_tt, c_ns, c_tl, c_nl, co_ns, co_nl = [], 0, 0, 0, 0, False, False
     for th in thang_ky:
         row = theo_thang.get(th)
-        tt = int(row[0] or 0) if row else 0
-        ns = int(row[1]) if row and row[1] is not None else None
-        c_tt += tt
-        c_ns += ns or 0
+        c_tt += int(row[0] or 0) if row else 0
+        c_tl += int(row[4] or 0) if row else 0
+        if row and row[1] is not None:
+            c_ns += int(row[1]); co_ns = True
+        if row and row[5] is not None:
+            c_nl += int(row[5]); co_nl = True
+        da_co = th <= thang_hom_nay
+        # Luỹ kế ngân sách bằng 0 (mọi tháng đều đặt = 0) là sự thật hợp lệ, không phải
+        # "chưa có" — None CHỈ khi chưa tháng nào của kỳ tới đây được đặt.
         luy_ke.append(MocLuyKe(
-            thang=th,
-            thuc_te=c_tt if th <= thang_hom_nay else None,
-            # [Vòng soát cuối, việc 10] `if c_ns else None` coi 0 và "chưa có
-            # gì" là MỘT — đúng cái lẫn "chỉ tiêu bằng 0 khác chưa đặt" mà cả
-            # đợt 5a này tồn tại để phân biệt (app.ngan_sach CHECK >= 0 cho
-            # phép muc_tieu = 0 là một giá trị ĐÃ ĐẶT). Luỹ kế chỉ tiêu đúng
-            # bằng 0 (ví dụ mọi tháng tới giờ đều đặt = 0) là một sự thật hợp
-            # lệ, không phải "chưa có dữ liệu để vẽ" — `is not None` giữ
-            # đúng con số 0 đó trên đường luỹ kế thay vì bỏ nó khỏi biểu đồ.
-            ngan_sach=c_ns if c_ns is not None else None))
+            thang=th, thuc_te=c_tt if da_co else None, ngan_sach=c_ns if co_ns else None,
+            thuc_te_lg=c_tl if da_co else None, ngan_sach_lg=c_nl if co_nl else None))
 
-    # Tổng công ty của tháng đang xét: dòng CHÍNH LÀ một trong những dòng
-    # `theo_thang` vừa gộp — không hỏi thêm câu nào, không cộng gì ở Python.
     r_thang = theo_thang.get(thang)
-    tong_tt = int(r_thang[0] or 0) if r_thang else 0
-    tong_mt = int(r_thang[1]) if r_thang and r_thang[1] is not None else None
-    tong_moc = int(r_thang[2]) if r_thang and r_thang[2] is not None else None
-    tien_do_ct = float(r_thang[3]) if r_thang and r_thang[3] is not None else None
+    if r_thang is not None and r_thang[8] is not None:
+        ngay_kd, ngay_kd_da_qua = r_thang[8], r_thang[9]
 
     return TienDoNganSach(
         company_fy=ky, thang=thang, hom_nay=hom_nay,
         ngay_kd=ngay_kd, ngay_kd_da_qua=ngay_kd_da_qua,
-        thuc_te=tong_tt, muc_tieu=tong_mt,
-        muc_tieu_den_hom_nay=tong_moc,
-        tien_do=tien_do_ct,
-        nguoi=nguoi, luy_ke=luy_ke, co_ngan_sach=tong_mt is not None)
+        thuc_te=int(r_thang[0] or 0) if r_thang else 0,
+        muc_tieu=_so(r_thang[1]) if r_thang else None,
+        muc_tieu_den_hom_nay=_so(r_thang[2]) if r_thang else None,
+        tien_do=float(r_thang[3]) if r_thang and r_thang[3] is not None else None,
+        nguoi=nguoi, luy_ke=luy_ke,
+        co_ngan_sach=bool(r_thang) and r_thang[1] is not None,
+        thuc_te_lg=int(r_thang[4] or 0) if r_thang else 0,
+        muc_tieu_lg=_so(r_thang[5]) if r_thang else None,
+        muc_tieu_lg_den_hom_nay=_so(r_thang[6]) if r_thang else None,
+        tien_do_lg=float(r_thang[7]) if r_thang and r_thang[7] is not None else None)
 
 
-def ve_luy_ke(td: "TienDoNganSach | None") -> dict:
+def ve_luy_ke(td: "TienDoNganSach | None", lg: bool = False) -> dict:
     """Toạ độ hai đường luỹ kế (thực tế và nhịp ngân sách) trên cùng một trục.
 
     Tự tính toạ độ SVG như `ve_bieu_do`: trang phải chạy cả trên Vercel (CSP
     chặn script ngoài) lẫn ở máy không có mạng.
     """
-    if td is None or not td.co_ngan_sach:
+    # lg=True: cùng hình cho LÃI GỘP công ty (041).
+    if td is None or not (td.co_ngan_sach_lg if lg else td.co_ngan_sach):
         return {"co": False}
+    _tt = (lambda m: m.thuc_te_lg) if lg else (lambda m: m.thuc_te)
+    _ns = (lambda m: m.ngan_sach_lg) if lg else (lambda m: m.ngan_sach)
     cao_ve = CAO - LE_TREN - LE_DUOI
     rong_ve = RONG - LE_T - LE_P
-    dinh = max([m.thuc_te or 0 for m in td.luy_ke]
-               + [m.ngan_sach or 0 for m in td.luy_ke]) or 1
+    dinh = max([_tt(m) or 0 for m in td.luy_ke]
+               + [_ns(m) or 0 for m in td.luy_ke]) or 1
     buoc = rong_ve / max(len(td.luy_ke) - 1, 1)
 
     def _duong(lay) -> str:
@@ -796,6 +845,6 @@ def ve_luy_ke(td: "TienDoNganSach | None") -> dict:
             for i, m in enumerate(td.luy_ke)]
 
     return {"co": True, "rong": RONG, "cao": CAO, "dinh": dinh,
-            "thuc_te": _duong(lambda m: m.thuc_te),
-            "ngan_sach": _duong(lambda m: m.ngan_sach),
+            "thuc_te": _duong(_tt),
+            "ngan_sach": _duong(_ns),
             "nhan": nhan}

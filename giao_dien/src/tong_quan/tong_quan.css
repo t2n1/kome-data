@@ -122,3 +122,7 @@ a.tuoi-no-dong:hover .nhat-chu{color:var(--chu)}
 .tuoi-no-thanh i{display:block;height:100%;border-radius:99px}
 .bang tr.dang-xem td{font-weight:600}
 .ns-duong{margin-top:.9rem;padding-top:.7rem;border-top:1px solid var(--vien)}
+.ns-cong-ty > div + div{margin-top:.45rem}
+.ns-chon{display:flex;gap:.3rem;margin-bottom:.4rem}
+.ns-chon button{font:inherit;font-size:.72rem;padding:.15rem .6rem;border:1px solid var(--vien);border-radius:999px;background:transparent;color:var(--chu-nhat);cursor:pointer}
+.ns-chon button.dang-chon{background:var(--nen-phu);color:var(--chu);border-color:var(--vien-dam)}
