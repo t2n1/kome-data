@@ -166,7 +166,8 @@ def xu_huong(conn, sale=None, ts=None) -> dict:
 
 # ---- Sức khoẻ khách hàng ----------------------------------------------------
 
-def suc_khoe(conn, sale=None) -> dict:
+def suc_khoe(conn, sale=None, ts=None) -> dict:
+    KX.dat_moc(conn, ts)
     dem, _ = KH.dem_va_can_xu_ly(conn, gioi_han=0, sale=None)
     return {"dem": dem, "nhom": list(TQ.NHOM_SUC_KHOE),
             "nhan": {k: v[0] for k, v in KH.TRANG_THAI.items()}}
@@ -174,7 +175,8 @@ def suc_khoe(conn, sale=None) -> dict:
 
 # ---- Sản phẩm sắp hết hạn ---------------------------------------------------
 
-def han_su_dung(conn, sale=None) -> dict:
+def han_su_dung(conn, sale=None, ts=None) -> dict:
+    KX.dat_moc(conn, ts)
     rows = conn.execute(
         f"""WITH t AS MATERIALIZED (SELECT * FROM mart.ton_hien_tai)
             SELECT t.product_code, coalesce(nullif(p.product_name, ''), t.product_code),
@@ -190,8 +192,11 @@ def han_su_dung(conn, sale=None) -> dict:
 
 # ---- Việc cần làm hôm nay (của người đang xem) ------------------------------
 
-def viec_hom_nay(conn, sale=None) -> dict:
+def viec_hom_nay(conn, sale=None, ts=None) -> dict:
+    """Việc của người đang xem. Danh sách cần gọi / hàng cận hạn tính đến MỐC của
+    khoảng xem (040); hẹn gọi lại và "hôm nay đã nạp chưa" theo ĐỒNG HỒ THẬT."""
     from kome import lien_he as LH
+    KX.dat_moc(conn, ts)
     hom_nay = hom_nay_o_nhat()
     ds = LH.danh_sach(conn, hom_nay, sale=sale)
     hen = LH.hen_goi_lai(conn, hom_nay, sale=sale)
@@ -223,14 +228,16 @@ def viec_hom_nay(conn, sale=None) -> dict:
 
 # ---- Tháng này chưa mua (036) -----------------------------------------------
 
-def thang_nay_chua_mua(conn, sale=None) -> dict:
+def thang_nay_chua_mua(conn, sale=None, ts=None) -> dict:
+    KX.dat_moc(conn, ts)
     from kome.khach_thang import chua_mua
     return chua_mua(conn, sale=sale)
 
 
 # ---- Nạp dữ liệu / phiếu gần nhất ------------------------------------------
 
-def nap_gan_nhat(conn, sale=None) -> dict:
+def nap_gan_nhat(conn, sale=None, ts=None) -> dict:
+    KX.dat_moc(conn, ts)
     from kome.nhat_ky_nap import lo_nap_gan_nhat
     lo = lo_nap_gan_nhat(conn, gioi_han=6)
     phieu = conn.execute(
@@ -378,9 +385,11 @@ def thong_bao(conn, sale=None) -> dict:
 
 # ---- Tuổi nợ phải thu (đợt 6) -----------------------------------------------
 
-def cong_no(conn, sale=None) -> dict | None:
-    """Sổ 請求先元帳 mới nhất (mart.cong_no_*, migration 038). None = chưa nạp sổ."""
+def cong_no(conn, sale=None, ts=None) -> dict | None:
+    """Sổ 請求先元帳 có kỳ kết thúc muộn nhất ≤ mốc (mart.cong_no_*, 038 + 040).
+    None = chưa có sổ tới mốc."""
     from kome import cong_no as CN
+    KX.dat_moc(conn, ts)
     return CN.khoi_tong_quan(conn)
 
 
@@ -393,12 +402,14 @@ KHOI = {
     "so_sanh_sale": (ngan_sach, False, False, True),
     "theo_thang": (theo_thang, False, False, True),
     "xu_huong": (xu_huong, False, False, True),
-    "suc_khoe_khach": (suc_khoe, False, False, False),
-    "han_su_dung": (han_su_dung, False, False, False),
-    "viec_hom_nay": (viec_hom_nay, True, True, False),
-    "thang_nay_chua_mua": (thang_nay_chua_mua, False, True, False),
-    "cong_no": (cong_no, False, False, False),
-    "don_hang": (nap_gan_nhat, False, False, False),
+    # Từ 040 ("mọi thứ quay về tháng đó") cả các khối "tính đến hôm nay" cũng
+    # theo khoảng xem: chúng đặt MỐC của khoảng (KX.dat_moc) trước khi đọc mart.
+    "suc_khoe_khach": (suc_khoe, False, False, True),
+    "han_su_dung": (han_su_dung, False, False, True),
+    "viec_hom_nay": (viec_hom_nay, True, True, True),
+    "thang_nay_chua_mua": (thang_nay_chua_mua, False, True, True),
+    "cong_no": (cong_no, False, False, True),
+    "don_hang": (nap_gan_nhat, False, False, True),
     "danh_sach_khach": (danh_sach_khach, False, False, True),
     "hieu_suat_nganh": (hieu_suat_nganh, False, False, True),
     "tuong_quan": (tuong_quan, False, False, True),

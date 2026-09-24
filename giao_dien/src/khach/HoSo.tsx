@@ -5,7 +5,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { lay } from "../api";
-import { giuKhoang } from "../khung/khoang";
+import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { so } from "../dinh_dang";
 import { docDanhSach } from "./loc";
 import type { DsApi, HoSoApi } from "./kieu";
@@ -19,7 +19,7 @@ type MaTab = typeof TAB[number][0];
 
 export default function HoSo({ ma }: { ma: string }) {
   const { data: h, error } = useQuery<HoSoApi>({
-    queryKey: ["kh-ho-so", ma], queryFn: () => lay<HoSoApi>(`/api/khach-hang/${encodeURIComponent(ma)}`),
+    queryKey: ["kh-ho-so", ma, chuoiKhoang(useKhoang())], queryFn: () => lay<HoSoApi>(voiKhoang(`/api/khach-hang/${encodeURIComponent(ma)}`)),
   });
   const [tab, datTab] = useState<MaTab>(() => {
     const t = location.hash.slice(1) as MaTab;

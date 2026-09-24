@@ -23,6 +23,7 @@
    "fact_sales_line"
   ],
   "mart": [
+   "ban_den_moc",
    "ban_theo_khach",
    "ban_theo_nganh_thang",
    "ban_theo_nganh_thang_so_sanh",

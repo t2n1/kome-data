@@ -7,7 +7,7 @@ import { BieuDo, type Chuoi } from "../chung/BieuDo";
 import { ChuaCoDuLieu, Khoi, Spark, ThanhMoc, mauTienDo } from "../chung/Khoi";
 import { gon, ngay, ngay_ngan, pc, so, thang_nhan, thay_doi, yen } from "../dinh_dang";
 import { KD } from "../khoi_dau";
-import type { KhoangMayChu } from "../khung/khoang";
+import { useNhanMoc, type KhoangMayChu } from "../khung/khoang";
 
 const LUC = { ok: "var(--ok-vien)", canh: "var(--lien-ket)", do: "var(--do)", nhat: "var(--chu-mo)", nen: "var(--vien)" };
 const tenNguoi = (ten: string | null | undefined, ma: string) => ten || `(mã ${ma})`;
@@ -30,9 +30,10 @@ type Kpi = {
 
 export function KhoiKpi() {
   const { data: d, isLoading, error } = useKhoi<Kpi>("kpi");
+  const nm = useNhanMoc();
   return (
     <Khoi tieu_de={`Chỉ số · ${d?.khoang?.nhan ?? "tháng này"}`} dang_tai={isLoading} loi={error?.message}
-      phu={d?.doanh_thu.tu_ngay ? `${ngay(d.doanh_thu.tu_ngay)} – ${ngay(d.doanh_thu.den_ngay)} · kho & khách: tính đến hôm nay` : undefined}>
+      phu={d?.doanh_thu.tu_ngay ? `${ngay(d.doanh_thu.tu_ngay)} – ${ngay(d.doanh_thu.den_ngay)} · kho & khách: tính ${nm}` : undefined}>
       {d && <div className="o-kpi-luoi">
         <a className="o-kpi" href="/bao-cao">
           <div className="nhan">Doanh thu · {d.khoang?.nhan ?? "tháng này"}</div>
@@ -60,13 +61,13 @@ export function KhoiKpi() {
           <div className="nhan">Phải trả 7 ngày tới</div><div className="gia">chưa có dữ liệu</div>
           <div className="dong-phu nhat-chu">cần sổ phải trả</div></div>
         <a className="o-kpi" href="/kho-hang">
-          <div className="nhan">Kho cần xử lý · hôm nay</div>
+          <div className="nhan">Kho cần xử lý · {nm}</div>
           <div className="gia">{so(d.kho.het_hang + d.kho.can_han + d.kho.qua_han)}</div>
           <div className={"dong-phu " + (d.kho.het_hang + d.kho.qua_han ? "giam" : "canh-chu")}>
             {d.kho.het_hang} mã hết hàng · {d.kho.can_han} lô cận hạn · {d.kho.qua_han} lô quá hạn</div>
         </a>
         <a className="o-kpi" href="/lien-he?tat_ca=1">
-          <div className="nhan">Khách cần gọi · hôm nay</div>
+          <div className="nhan">Khách cần gọi · {nm}</div>
           <div className="gia">{so(d.khach.can_goi + d.khach.roi_bo)}</div>
           <div className="dong-phu canh-chu">{d.khach.can_goi} im lặng quá nhịp · {d.khach.roi_bo} đã rời bỏ</div>
         </a>
@@ -302,10 +303,11 @@ const MAU_TT: Record<string, string> = { binh_thuong: LUC.ok, canh_bao: LUC.canh
 
 export function KhoiSucKhoe() {
   const { data: d, isLoading, error } = useKhoi<{ dem: Record<string, number>; nhom: string[]; nhan: Record<string, string> }>("suc_khoe_khach");
+  const nm = useNhanMoc();
   const tong = d ? d.nhom.reduce((s, n) => s + (d.dem[n] ?? 0), 0) : 0;
   const hd = d ? (d.dem.binh_thuong ?? 0) + (d.dem.canh_bao ?? 0) : 0;
   return (
-    <Khoi tieu_de="Sức khoẻ khách hàng" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}>
+    <Khoi tieu_de="Sức khoẻ khách hàng" phu={`tính ${nm}`} dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}>
       {d && <>
         <div className="sk-dau">{so(hd)} <span>khách đang mua</span></div>
         <div className="phu" style={{ marginBottom: ".6rem" }}>{so(d.dem.canh_bao ?? 0)} khách im lặng quá nhịp mua riêng · so với nhịp của CHÍNH từng khách</div>
@@ -329,6 +331,7 @@ export function KhoiDanhSachKhach() {
   const { data: d, isLoading, error } = useKhoi<{ khach: KhachDS[]; nhan: Record<string, string>; khoang: KhoangMayChu | null;
     so_sanh: { ma: string; nhan: string; co: boolean; tu: string; den: string } | null }>("danh_sach_khach");
   const nhanSs = d?.so_sanh ? d.so_sanh.nhan.replace(/^./, c => c.toUpperCase()) : "So sánh";
+  const nm = useNhanMoc();
   const [sap, datSap] = useState<{ cot: CotSap; giam: boolean }>({ cot: "can", giam: false });
   const ds = useMemo(() => {
     const a = [...(d?.khach ?? [])];
@@ -346,7 +349,7 @@ export function KhoiDanhSachKhach() {
       lien_ket={{ href: "/khach-hang?tat_ca=1" }}>
       {d && <div className="bang-cuon" style={{ maxHeight: 420 }}><table className="bang">
         <thead><tr>{th("ten", "Khách hàng")}{th("thang_nay", d.khoang?.nhan ?? "Khoảng xem", true)}{th("thang_truoc", nhanSs, true)}
-          <th className="so">So {d.so_sanh?.nhan ?? ""}</th>{th("ty_le", "Im lặng · hôm nay", true)}{th("doanh_thu", "Doanh thu 12 tháng", true)}<th>Phụ trách</th>{th("can", "Cần làm")}</tr></thead>
+          <th className="so">So {d.so_sanh?.nhan ?? ""}</th>{th("ty_le", `Im lặng · ${nm}`, true)}{th("doanh_thu", "Doanh thu 12 tháng", true)}<th>Phụ trách</th>{th("can", "Cần làm")}</tr></thead>
         <tbody>{ds.map(k => (
           <tr key={k.ma}>
             <td className="ten-jp"><a href={`/khach-hang/${k.ma}`}>{k.ten}</a></td>
@@ -360,7 +363,7 @@ export function KhoiDanhSachKhach() {
               {k.trang_thai === "da_roi_bo" ? "Gọi lại ngay" : k.trang_thai === "canh_bao" ? "Gọi lại trong tuần" : d.nhan[k.trang_thai]}</span></td>
           </tr>))}</tbody>
       </table></div>}
-      <div className="phu" style={{ marginTop: ".4rem" }}>Im lặng = số ngày chưa mua ÷ nhịp mua riêng của khách, tính đến hôm nay.{d?.so_sanh && !d.so_sanh.co ? ` ${d.so_sanh.nhan}: không có dữ liệu để so.` : ""}</div>
+      <div className="phu" style={{ marginTop: ".4rem" }}>Im lặng = số ngày chưa mua ÷ nhịp mua riêng của khách, tính {nm}.{d?.so_sanh && !d.so_sanh.co ? ` ${d.so_sanh.nhan}: không có dữ liệu để so.` : ""}</div>
     </Khoi>
   );
 }

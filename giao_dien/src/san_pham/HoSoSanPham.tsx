@@ -25,7 +25,7 @@ type ChiSo = typeof CHI_SO[number][0];
 
 export function HoSoSanPham({ ma, dong, onDong }: { ma: string; dong: MaHang | null; onDong: () => void }) {
   const { data, error } = useQuery<HoSoSpApi>({
-    queryKey: ["sp-ho-so", ma], queryFn: () => lay<HoSoSpApi>(`/api/san-pham/${encodeURIComponent(ma)}`),
+    queryKey: ["sp-ho-so", ma, chuoiKhoang(useKhoang())], queryFn: () => lay<HoSoSpApi>(voiKhoang(`/api/san-pham/${encodeURIComponent(ma)}`)),
     placeholderData: keepPreviousData,
   });
   const [thang, datThang] = useState<string | null>(null);

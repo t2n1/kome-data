@@ -66,12 +66,11 @@ function man(duong: string): (() => React.ReactElement) | null {
 // Bộ chọn khoảng xem (đặc tả khoảng xem §3): màn doanh số -> bật; màn luôn
 // tính theo hôm nay -> hiện MỜ kèm lý do; màn hệ thống -> không hiện. Tham số
 // khoảng vẫn nằm trên URL ở mọi màn, nên quay lại màn doanh số không mất lựa chọn.
-const THEO_HOM_NAY = "Màn này luôn tính theo hôm nay — khoảng xem không áp dụng ở đây.";
 function boChon(duong: string): { hien: boolean; mo?: string } {
   if (KD.thong_bao || !KD.nguoi && KD.co_dang_nhap) return { hien: false };
   if (duong === "/" || duong === "/bao-cao") return { hien: true };
-  if (duong === "/cong-no") return { hien: true, mo: "Công nợ luôn tính theo kỳ của sổ 請求先元帳 mới nhất — khoảng xem không áp dụng ở đây." };
-  if (["/kho-hang", "/lien-he", "/du-bao"].includes(duong)) return { hien: true, mo: THEO_HOM_NAY };
+  // Từ migration 040 ("mọi thứ quay về tháng đó") cả bốn màn này cũng theo mốc của khoảng.
+  if (["/cong-no", "/kho-hang", "/lien-he", "/du-bao"].includes(duong)) return { hien: true };
   if (duong === "/khach-hang" || duong === "/ban-do" || /^\/khach-hang\//.test(duong)) return { hien: true };
   if (/^\/san-pham(\/|$)/.test(duong)) return { hien: true };
   return { hien: false };

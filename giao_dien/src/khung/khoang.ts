@@ -16,7 +16,7 @@ export type Khoang = Partial<Record<(typeof THAM_SO)[number], string>>;
 export type KhoangMayChu = {
   loai: "thang" | "ky" | "khoang"; tu: string; den: string; nhan: string; mo_ta: string;
   thang: string | null; company_fy: number | null; so_ky: number | null; mac_dinh: boolean;
-  tron_thang: boolean; ghi_chu: string[]; ngay_dau: string; hom_nay: string; so_ngay: number;
+  tron_thang: boolean; ghi_chu: string[]; ngay_dau: string; hom_nay: string; so_ngay: number; dang_lui: boolean;
   so_sanh: { ma: string; nhan: string; tu: string; den: string; tu_nay: string; den_nay: string; co: boolean }[];
 };
 export type PhamVi = { ngay_dau: string; hom_nay: string; ky: { company_fy: number; so_ky: number; tu: string; den: string }[] };
@@ -126,4 +126,13 @@ export function useKhoangMayChu(): KhoangMayChu | null {
   const k = useSyncExternalStore(f => { ngheMoTa.add(f); return () => { ngheMoTa.delete(f); }; }, () => moTa);
   const s = useSyncExternalStore(f => { nghe.add(f); return () => { nghe.delete(f); }; }, () => hienTai);
   return k && k.khoa === s ? k.k : null;
+}
+
+/** Nhãn cho các số "tính đến hôm nay": "hôm nay", hoặc "đến 31/3/2026" khi khoảng
+ *  đang xem LÙI mốc thời gian (migration 040 — `KhoangMayChu.dang_lui`). */
+export function useNhanMoc(): string {
+  const k = useKhoangMayChu();
+  if (!k?.dang_lui) return "hôm nay";
+  const [y, m, d] = k.hom_nay.slice(0, 10).split("-");
+  return `đến ${+d}/${+m}/${y}`;
 }

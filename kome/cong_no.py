@@ -131,7 +131,8 @@ def cua_khach(conn, ma: str) -> dict:
     ben_ma = (r[0] if r and r[0] else ma)
     ben = _ben(conn, ben_ma)
     if not ben:
-        co = conn.execute("SELECT EXISTS (SELECT 1 FROM core.fact_ar_ledger)").fetchone()[0]
+        # Có sổ nào TỚI MỐC đang xem không (040: sổ có kỳ kết thúc ≤ mốc).
+        co = conn.execute("SELECT EXISTS (SELECT 1 FROM mart.so_cong_no_moi_nhat)").fetchone()[0]
         return {"co_so": bool(co), "ben": None, "ben_ma": ben_ma, "phieu": [], "tq": None,
                 "cach_tinh": CACH_TINH}
     phieu = _phieu(conn, ben_ma)

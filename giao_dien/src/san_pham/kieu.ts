@@ -54,7 +54,7 @@ export type DongKho = TonDong & {
 
 export type KhoApi = {
   k: {
-    ngay_chup: string | null; o_tong_quan: Record<string, number>; dong: DongKho[];
+    ngay_chup: string | null; ngay_chup_dau: string | null; o_tong_quan: Record<string, number>; dong: DongKho[];
     theo_kho: { ma: string; ten: string; gia_tri: number; so_dong: number }[];
     can_han: DongKho[]; qua_han: DongKho[]; ds_kho: [string, string][];
     kho: string; loc: string; gia_tri_ton: number;

@@ -10,7 +10,7 @@ import { gon, ngay, pc, so, thay_doi, yen } from "../dinh_dang";
 import type { DongBan, HoSoApi, LichMa, MatHang } from "./kieu";
 import { GhiTiepXuc } from "./GhiTiepXuc";
 import { OCongNo } from "../cong_no/CongNoKhach";
-import { chuoiKhoang, useKhoang, voiKhoang, type KhoangMayChu } from "../khung/khoang";
+import { chuoiKhoang, useKhoang, useNhanMoc, voiKhoang, type KhoangMayChu } from "../khung/khoang";
 
 /** Số trong KHOẢNG XEM của một khách (/api/khach-hang/{mã}/khoang — đợt B;
  *  endpoint riêng vì hồ sơ đã chạm trần 8 lượt hỏi). Nhiều khối gọi chung —
@@ -68,6 +68,7 @@ export function TabTongQuan({ h }: { h: HoSoApi }) {
   const ss30 = tiLe(o.dt_30, o.dt_30_truoc);
   const lan_cuoi = h.nhat_ky[0];
   const { data: kh } = useKhoangKhach(k.ma);
+  const nm = useNhanMoc();
   return (<>
     <div className="o-kpi-luoi hs-o">
       <div className="o-kpi"><div className="nhan">DT · {kh?.khoang.nhan ?? "…"}</div>
@@ -75,7 +76,7 @@ export function TabTongQuan({ h }: { h: HoSoApi }) {
         {kh?.so_sanh.map(s => <div key={s.ma} className={"dong-phu " + (!s.co || s.tang_dt == null ? "nhat-chu" : s.tang_dt >= 0 ? "tang" : "giam")}
           title={s.co ? `${ngay(s.tu)} → ${ngay(s.den)}: ${yen(s.dt_ck)}` : undefined}>
           {!s.co ? `${s.nhan}: không có dữ liệu` : s.tang_dt == null ? `${s.nhan}: ${s.dt_ck ? "—" : "chưa mua"}` : `${thay_doi(s.tang_dt, 0)} so ${s.nhan}`}</div>)}</div>
-      <div className="o-kpi"><div className="nhan">DT 30 ngày · hôm nay</div><div className="gia">{gon(o.dt_30)}</div>
+      <div className="o-kpi"><div className="nhan">DT 30 ngày · {nm}</div><div className="gia">{gon(o.dt_30)}</div>
         <div className={"dong-phu " + (ss30 == null ? "nhat-chu" : ss30 >= 0 ? "tang" : "giam")}>{ss30 == null ? "30 ngày trước chưa mua" : `${thay_doi(ss30, 0)} so 30 ngày trước`}</div></div>
       <div className="o-kpi"><div className="nhan">Chu kỳ mua</div><div className="gia">{k.nhip_ngay == null ? "—" : `${Math.round(k.nhip_ngay)} ngày`}</div>
         <div className="dong-phu nhat-chu">{k.nhip_ngay == null ? "chưa đủ 3 lần mua" : `im ${k.so_ngay_im_lang} ngày · ${(k.ty_le_im_lang ?? 0).toFixed(1).replace(".", ",")}× nhịp`}</div></div>

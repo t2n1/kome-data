@@ -16,7 +16,9 @@ import type { LocSp } from "./loc";
 import "./san_pham.css";
 
 export function useDanhMuc() {
-  return useQuery<DanhMucApi>({ queryKey: ["sp-danh-muc"], queryFn: () => lay<DanhMucApi>("/api/san-pham") });
+  const kx = chuoiKhoang(useKhoang());
+  return useQuery<DanhMucApi>({ queryKey: ["sp-danh-muc", kx], placeholderData: keepPreviousData,
+    queryFn: () => lay<DanhMucApi>(voiKhoang("/api/san-pham")) });
 }
 
 /** Doanh số trong khoảng xem của mọi mã (/api/san-pham/khoang — đợt C). */

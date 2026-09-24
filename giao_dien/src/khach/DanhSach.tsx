@@ -6,7 +6,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
 import { giuKhoang } from "../khung/khoang";
-import { chuoiKhoang, useKhoang, voiKhoang } from "../khung/khoang";
+import { chuoiKhoang, useKhoang, useNhanMoc, voiKhoang } from "../khung/khoang";
 import { gon, so, thay_doi, yen } from "../dinh_dang";
 import type { BoLoc } from "./loc";
 import { nhoDanhSach, thamSoDs } from "./loc";
@@ -33,6 +33,7 @@ type Dat = (sua: Partial<BoLoc>, day?: boolean) => void;
 
 export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
   const { data: d, error, isFetching } = useDs(b);
+  const nm = useNhanMoc();
   const [tim, datTim] = useState(b.tim);
   const [chon, datChon] = useState<Record<string, boolean>>({});
   useEffect(() => { datTim(b.tim); }, [b.tim]);
@@ -62,10 +63,10 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
     { ma: "co_mua", ten: `Có mua · ${kxNhan}`, mo: "có ít nhất một phiếu trong khoảng đang xem", so: tq.co_mua, bat: b.co_mua,
       ap: { co_mua: !b.co_mua, nhom: "", thang: "" } },
     { ma: "no", ten: "Nợ quá hạn", mo: "cần thu trước khi giao đơn mới", so: null, bat: false, ap: null },
-    { ma: "im", ten: "Im lặng ≥ 2× nhịp", mo: "đã quá chu kỳ mua thường lệ · hôm nay", so: tq.nhom.im, bat: b.nhom === "im", ap: { nhom: "im", thang: "", co_mua: false } },
+    { ma: "im", ten: "Im lặng ≥ 2× nhịp", mo: `đã quá chu kỳ mua thường lệ · ${nm}`, so: tq.nhom.im, bat: b.nhom === "im", ap: { nhom: "im", thang: "", co_mua: false } },
     { ma: "tut", ten: "Hạng S·A đang tụt", mo: "30 ngày < 80% TB ba kỳ 30 ngày trước", so: tq.nhom.tut, bat: b.nhom === "tut", ap: { nhom: "tut", thang: "", co_mua: false } },
     { ma: "moi", ten: "Khách mới chưa quay lại", mo: "đơn đầu trong 90 ngày, đã im ≥ 1,2× nhịp", so: tq.nhom.moi, bat: b.nhom === "moi", ap: { nhom: "moi", thang: "", co_mua: false } },
-    { ma: "thang", ten: "Mua đều, tháng này chưa", mo: "≥ 2/3 tháng trước có đơn đến ngày này · tính đến hôm nay", so: tq.thang.tre ?? 0, bat: b.thang === "tre", ap: { thang: "tre", nhom: "", co_mua: false } },
+    { ma: "thang", ten: "Mua đều, tháng này chưa", mo: `≥ 2/3 tháng trước có đơn đến ngày này · tính ${nm}`, so: tq.thang.tre ?? 0, bat: b.thang === "tre", ap: { thang: "tre", nhom: "", co_mua: false } },
     { ma: "chuapt", ten: "Chưa ai phụ trách", mo: "mã phụ trách không có trong danh sách 担当者 · cả công ty", so: tq.chua_pt, bat: b.nv === d.pt_trong, ap: { nv: d.pt_trong, nhom: "", thang: "", co_mua: false } },
   ];
 
@@ -103,7 +104,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
           <div className="gia">{gon(t.tong_dt_khoang)}</div>
           <div className={"dong-phu " + (tang == null ? "nhat-chu" : tang >= 0 ? "tang" : "giam")}>
             {!ssp?.co ? `${ssp?.nhan ?? "so sánh"}: không có dữ liệu để so` : tang == null ? `${ssp.nhan}: chưa có đơn` : `${thay_doi(tang)} so ${ssp.nhan}`}</div></div>
-        <div className="o-kpi"><div className="nhan">Im lặng ≥ 2× nhịp · hôm nay</div><div className="gia">{so(t.so_can_xu_ly)}</div>
+        <div className="o-kpi"><div className="nhan">Im lặng ≥ 2× nhịp · {nm}</div><div className="gia">{so(t.so_can_xu_ly)}</div>
           <div className="dong-phu nhat-chu">đã quá chu kỳ mua thường lệ</div></div>
         <a className="o-kpi" href="/cong-no?tab=qua_han" title={CHUA_CO_NO}><div className="nhan">Công nợ quá hạn</div>
           <div className="gia" style={{ fontSize: "1rem" }}>xem màn Công nợ →</div>

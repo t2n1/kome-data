@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
-import { giuKhoang } from "../khung/khoang";
+import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { ChuaCoDuLieu } from "../chung/Khoi";
 import { gon, ngay, so, so_luong, yen } from "../dinh_dang";
 import type { DongKho, KhoApi } from "./kieu";
@@ -50,9 +50,10 @@ export default function KhoHang() {
   const q = new URLSearchParams();
   if (b.kho) q.set("kho", b.kho);
   if (b.loc) q.set("loc", b.loc);
+  const kxs = chuoiKhoang(useKhoang());
   const { data: d, error, isFetching } = useQuery<KhoApi>({
-    queryKey: ["kho-hang", q.toString()], placeholderData: keepPreviousData,
-    queryFn: () => lay<KhoApi>(`/api/kho-hang${q.toString() ? "?" + q : ""}`),
+    queryKey: ["kho-hang", q.toString(), kxs], placeholderData: keepPreviousData,
+    queryFn: () => lay<KhoApi>(voiKhoang(`/api/kho-hang${q.toString() ? "?" + q : ""}`)),
   });
   const dm = useDanhMuc();
 
@@ -83,7 +84,9 @@ export default function KhoHang() {
       <div className="tieu-de-trang">
         <div><h1>Kho hàng</h1>
           <div className="phu">{k.ngay_chup ? <>Ảnh chụp <b className="ten-jp">在庫一覧</b> ngày <b>{ngay(k.ngay_chup)}</b> — tồn lúc xuất file, không phải lúc này.
-            Số ngày "còn"/"quá" đếm từ mốc dữ liệu (ngày bán mới nhất), có thể lệch vài ngày so với ngày chụp.</> : "Chưa có bản xuất 在庫一覧 nào trong kho dữ liệu."}</div></div>
+            Số ngày "còn"/"quá" đếm từ mốc dữ liệu (ngày bán mới nhất), có thể lệch vài ngày so với ngày chụp.</> : k.ngay_chup_dau
+              ? <>Chưa có ảnh chụp <b className="ten-jp">在庫一覧</b> nào tới thời điểm đang xem — ảnh chụp sớm nhất trong kho là ngày <b>{ngay(k.ngay_chup_dau)}</b>. Chọn tháng từ đó trở đi để xem tồn.</>
+              : "Chưa có bản xuất 在庫一覧 nào trong kho dữ liệu."}</div></div>
         <div className="sp-dau-phai">
           <button type="button" className="nut-nho" onClick={xuatCsv} disabled={!dong.length} title="Xuất đúng các dòng bảng tồn đang hiện (theo bộ lọc + ô tìm)">⤓ Xuất CSV</button>
           <a className="nut-nho" href="/san-pham">Sản phẩm →</a>
