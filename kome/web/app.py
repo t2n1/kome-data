@@ -884,6 +884,13 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "noi": TL.noi_di_dau(SPECS, ten), "so_do": TL.so_do_noi(SPECS, ten),
             "dong_so_do": TL.DONG_SO_DO, "cot": TL.cot_cua(SPECS, ten)})
 
+    # "Dữ liệu đi đâu" (2026-09-24): cột OBC nào bỏ được ở lần xuất sau. 0 truy
+    # vấn — ảnh chụp kome/web/cot_dung_sinh.json (scripts/sinh_cot_dung.py).
+    @app.get("/kho-du-lieu/duong-di", response_class=HTMLResponse)
+    def kho_du_lieu_duong_di(request: Request, file: str | None = None):
+        from kome import cot_dung as CD
+        return _spa(request, man=CD.man(file))
+
     # Ba địa chỉ cũ -> màn gộp. 301 chứ không 302: chúng biến mất vĩnh viễn,
     # và 301 cho trình duyệt cập nhật dấu trang. Neo để người bấm dấu trang cũ
     # rơi đúng khối họ vẫn mở, không phải cuộn đi tìm.

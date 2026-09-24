@@ -33,6 +33,7 @@ const ManCongNo = lazy(() => import("./cong_no/ManCongNo"));
 const KhoDuLieu = lazy(() => import("./he_thong/KhoDuLieu"));
 const TaiLieuLuong = lazy(() => import("./he_thong/TaiLieu").then(m => ({ default: m.TaiLieuLuong })));
 const TaiLieuCotNoi = lazy(() => import("./he_thong/TaiLieu").then(m => ({ default: m.TaiLieuCotNoi })));
+const DuongDi = lazy(() => import("./he_thong/DuongDi"));
 const NhatKy = lazy(() => import("./he_thong/NhatKy"));
 const CaiDat = lazy(() => import("./he_thong/CaiDat"));
 const NganSach = lazy(() => import("./he_thong/NganSach"));
@@ -54,6 +55,7 @@ function man(duong: string): (() => React.ReactElement) | null {
     if (duong === "/kho-du-lieu" || duong === "/upload") return () => <KhoDuLieu />;
     if (duong === "/kho-du-lieu/luong") return () => <TaiLieuLuong />;
     if (duong === "/kho-du-lieu/cot-noi") return () => <TaiLieuCotNoi />;
+    if (duong === "/kho-du-lieu/duong-di") return () => <DuongDi />;
     if (duong === "/nhat-ky") return () => <NhatKy />;
     if (duong === "/cai-dat") return () => <CaiDat />;
     if (duong === "/ngan-sach") return () => <NganSach />;
