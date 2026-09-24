@@ -2,6 +2,7 @@
 // /api/tong-quan/<khối> (kome/khoi_tong_quan.py). Không số mẫu ở đâu cả.
 import { useMemo, useState } from "react";
 import { useKhoi } from "../api";
+import { giuKhoang } from "../khung/khoang";
 import { BieuDo, type Chuoi } from "../chung/BieuDo";
 import { ChuaCoDuLieu, Khoi, Spark, ThanhMoc, mauTienDo } from "../chung/Khoi";
 import { gon, ngay, ngay_ngan, pc, so, thang_nhan, thay_doi, yen } from "../dinh_dang";
@@ -428,7 +429,7 @@ export function KhoiTuongQuan() {
           <line x1={l} y1={t} x2={l} y2={b} className="bd-luoi" /><line x1={l} y1={b} x2={r} y2={b} className="bd-luoi" />
           {k.map(x => <circle key={x.ma} cx={px(x)} cy={py(x)} r={tro?.ma === x.ma ? 6 : 4} fill={MAU_TT[x.trang_thai] ?? LUC.nhat}
             opacity={tro && tro.ma !== x.ma ? 0.35 : 0.72} style={{ cursor: "pointer" }}
-            onPointerEnter={() => datTro(x)} onPointerLeave={() => datTro(null)} onClick={() => { location.href = `/khach-hang/${x.ma}`; }} />)}
+            onPointerEnter={() => datTro(x)} onPointerLeave={() => datTro(null)} onClick={() => { location.href = giuKhoang(`/khach-hang/${x.ma}`); }} />)}
           <text x={(l + r) / 2} y={H - 8} textAnchor="middle" className="bd-truc">Số ngày mua trong khoảng (thang log) →</text>
           <text x={12} y={(t + b) / 2} textAnchor="middle" className="bd-truc" transform={`rotate(-90 12 ${(t + b) / 2})`}>Doanh thu trong khoảng (log) →</text>
         </svg>

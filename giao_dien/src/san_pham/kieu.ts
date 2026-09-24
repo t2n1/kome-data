@@ -9,7 +9,15 @@ export type MaHang = {
   du_ban_ngay: number | null; trang_thai: string; nhan_trang_thai: string; mau: string;
   so_khach: number; lan_dau: string | null; lan_cuoi: string | null;
   dt_12t: number; lg_12t: number; ts_12t: number | null; thang_dt: number[]; thang_sl: (number | null)[];
+  // Khoảng xem (đợt C) — ghép ở trình duyệt từ /api/san-pham/khoang (số của máy chủ).
+  dt_khoang?: number; sl_khoang?: number | null; kh_khoang?: number; dt_ss?: number | null;
 };
+
+export type DanhMucKhoangApi = {
+  khoang: import("../khung/khoang").KhoangMayChu;
+  so_sanh: { ma: string; nhan: string; co: boolean; tu: string; den: string };
+  dong: Record<string, [number | null, number | null, number | null, number | null, number | null]>;
+} | null;
 
 export type DanhMucApi = {
   hom_nay: string | null; thang: string[]; ma: MaHang[];

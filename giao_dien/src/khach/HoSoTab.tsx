@@ -10,6 +10,28 @@ import { gon, ngay, pc, so, thay_doi, yen } from "../dinh_dang";
 import type { DongBan, HoSoApi, LichMa, MatHang } from "./kieu";
 import { GhiTiepXuc } from "./GhiTiepXuc";
 import { OCongNo } from "../cong_no/CongNoKhach";
+import { chuoiKhoang, useKhoang, voiKhoang, type KhoangMayChu } from "../khung/khoang";
+
+/** Số trong KHOẢNG XEM của một khách (/api/khach-hang/{mã}/khoang — đợt B;
+ *  endpoint riêng vì hồ sơ đã chạm trần 8 lượt hỏi). Nhiều khối gọi chung —
+ *  TanStack Query gộp thành một lượt. */
+type SoSanhKh = { ma: string; nhan: string; co: boolean; tu: string; den: string; dt: number | null;
+  dt_ck: number | null; tang_dt: number | null };
+type KhoangKhach = {
+  khoang: KhoangMayChu; tong: { dt: number; lg: number; so_phieu: number; so_ngay: number; ty_suat: number | null };
+  so_sanh: SoSanhKh[];
+  mat_hang: { ma: string; ten: string; doanh_thu: number; lai_gop: number; so_luong: number; so_ngay: number; lan_cuoi: string }[];
+  ngay: { ngay: string; so_phieu: number; doanh_thu: number }[];
+} | null;
+function useKhoangKhach(ma: string) {
+  const kx = chuoiKhoang(useKhoang());
+  return useQuery<KhoangKhach>({
+    queryKey: ["kh-khoang", ma, kx],
+    queryFn: () => lay<KhoangKhach>(voiKhoang(`/api/khach-hang/${encodeURIComponent(ma)}/khoang`)),
+  });
+}
+const trongKhoang = (k: KhoangMayChu | undefined, thang: string) =>
+  !!k && thang >= k.tu.slice(0, 7) && thang <= k.den.slice(0, 7);
 
 /** Khung "chưa có dữ liệu" trong một thẻ (ChuaCoDuLieu trả fragment — không bọc là vỡ lưới). */
 function ChuaCo(p: { tieu_de: string; ly_do: string }) {
@@ -42,16 +64,18 @@ const tiLe = (a: number | null | undefined, b: number | null | undefined) => (a 
 
 // ============================================================ Tổng quan
 export function TabTongQuan({ h }: { h: HoSoApi }) {
-  const k = h.khach, tn = h.thang_nay, o = h.o_so;
-  const ss = tn ? tiLe(tn.dt_thang_nay, tn.dt_thang_truoc_den_ngay) : null;
+  const k = h.khach, o = h.o_so;
   const ss30 = tiLe(o.dt_30, o.dt_30_truoc);
   const lan_cuoi = h.nhat_ky[0];
+  const { data: kh } = useKhoangKhach(k.ma);
   return (<>
     <div className="o-kpi-luoi hs-o">
-      <div className="o-kpi"><div className="nhan">DT tháng {tn ? +tn.thang.slice(5) : "này"}{h.hom_nay ? ` (đến ${+h.hom_nay.slice(8)})` : ""}</div>
-        <div className="gia">{gon(tn?.dt_thang_nay ?? 0)}</div>
-        <div className={"dong-phu " + (ss == null ? "nhat-chu" : ss >= 0 ? "tang" : "giam")}>{ss == null ? "tháng trước cùng ngày chưa mua" : `${thay_doi(ss, 0)} so tháng trước cùng ngày`}</div></div>
-      <div className="o-kpi"><div className="nhan">DT 30 ngày</div><div className="gia">{gon(o.dt_30)}</div>
+      <div className="o-kpi"><div className="nhan">DT · {kh?.khoang.nhan ?? "…"}</div>
+        <div className="gia">{kh ? gon(kh.tong.dt) : "…"}</div>
+        {kh?.so_sanh.map(s => <div key={s.ma} className={"dong-phu " + (!s.co || s.tang_dt == null ? "nhat-chu" : s.tang_dt >= 0 ? "tang" : "giam")}
+          title={s.co ? `${ngay(s.tu)} → ${ngay(s.den)}: ${yen(s.dt_ck)}` : undefined}>
+          {!s.co ? `${s.nhan}: không có dữ liệu` : s.tang_dt == null ? `${s.nhan}: ${s.dt_ck ? "—" : "chưa mua"}` : `${thay_doi(s.tang_dt, 0)} so ${s.nhan}`}</div>)}</div>
+      <div className="o-kpi"><div className="nhan">DT 30 ngày · hôm nay</div><div className="gia">{gon(o.dt_30)}</div>
         <div className={"dong-phu " + (ss30 == null ? "nhat-chu" : ss30 >= 0 ? "tang" : "giam")}>{ss30 == null ? "30 ngày trước chưa mua" : `${thay_doi(ss30, 0)} so 30 ngày trước`}</div></div>
       <div className="o-kpi"><div className="nhan">Chu kỳ mua</div><div className="gia">{k.nhip_ngay == null ? "—" : `${Math.round(k.nhip_ngay)} ngày`}</div>
         <div className="dong-phu nhat-chu">{k.nhip_ngay == null ? "chưa đủ 3 lần mua" : `im ${k.so_ngay_im_lang} ngày · ${(k.ty_le_im_lang ?? 0).toFixed(1).replace(".", ",")}× nhịp`}</div></div>
@@ -120,6 +144,7 @@ function DongHo({ ty_le }: { ty_le: number | null }) {
 
 function BieuDo12Thang({ h }: { h: HoSoApi }) {
   const thang = dsThang(h.hom_nay);
+  const kx = useKhoangKhach(h.khach.ma).data?.khoang;
   const theo = Object.fromEntries(h.thang.map(t => [t.thang, t]));
   const gt = thang.map(t => theo[t]?.doanh_thu ?? 0);
   const tb = gt.reduce((s, x) => s + x, 0) / (gt.length || 1);
@@ -129,10 +154,11 @@ function BieuDo12Thang({ h }: { h: HoSoApi }) {
   return (
     <The tieu_de="Doanh thu 12 tháng" className="rong2"
       goc={ss != null ? <span className={ss >= 0 ? "tang" : "giam"}>{thay_doi(ss, 0)} tháng này so tháng trước cùng ngày</span> : null}
-      phu={<>cột = tháng · nét đứt = trung bình 12 tháng · <b>bấm một tháng</b> để xem mặt hàng tháng đó{tb3 != null && <> · TB 3 tháng trước {gon(tb3)}</>}</>}>
+      phu={<>cột = tháng{kx ? <> · cột đậm = thuộc {kx.nhan}</> : null} · nét đứt = trung bình 12 tháng · <b>bấm một tháng</b> để xem mặt hàng tháng đó{tb3 != null && <> · TB 3 tháng trước {gon(tb3)}</>}</>}>
       <BieuDo nhan={thang.map(tNhan)} nhan_day_du={thang.map(t => `Tháng ${+t.slice(5)}/${t.slice(0, 4)}`)} cao={170}
         chuoi={[{ ten: "Doanh thu", kieu: "cot", gia_tri: gt, mau: "var(--ok-vien)",
-                  mau_tung_cot: gt.map((v, i) => i === gt.length - 1 ? "var(--do)" : v >= tb ? "var(--ok-vien)" : "var(--canh-vien)") },
+                  mau_tung_cot: gt.map((v, i) => kx && !trongKhoang(kx, thang[i]) ? "color-mix(in srgb, var(--ok-vien) 30%, var(--nen-the))"
+                    : i === gt.length - 1 ? "var(--do)" : v >= tb ? "var(--ok-vien)" : "var(--canh-vien)") },
                 { ten: "Trung bình 12 tháng", kieu: "duong_dut", gia_tri: gt.map(() => tb), mau: "var(--chu-nhat)" }]}
         dinh_dang={v => v == null ? "—" : v === 0 ? "không mua" : yen(v)} dinh_dang_truc={gon}
         onBam={i => datChon(thang[i])} mo_ta="Doanh thu 12 tháng của khách, bấm một cột để xem mặt hàng" />
@@ -270,6 +296,7 @@ export function TabSanPham({ h }: { h: HoSoApi }) {
   const mx = Math.max(1, ...top.map(m => m.doanh_thu));
   const thang = dsThang(h.hom_nay, 3);
   const [tatCa, datTatCa] = useState(false);
+  const { data: kh } = useKhoangKhach(h.khach.ma);
   // Lịch đầy đủ (không chỉ 10 mã của tab Tổng quan) cho nhãn đề xuất.
   const lichDu = useMemo(() => {
     if (!h.hom_nay) return lich;
@@ -279,6 +306,15 @@ export function TabSanPham({ h }: { h: HoSoApi }) {
                nhip: m.nhip, lan_cuoi: m.lan_cuoi, doanh_thu: m.doanh_thu, tb_moi_lan: null }]));
   }, [h]); // eslint-disable-line react-hooks/exhaustive-deps
   return (<>
+    {kh && <The tieu_de={`Mặt hàng mua · ${kh.khoang.nhan}`} phu={`${kh.mat_hang.length} mã · ${yen(kh.tong.dt)} · ${kh.tong.so_ngay} ngày có mua (${ngay(kh.khoang.tu)} → ${ngay(kh.khoang.den)})`}>
+      {!kh.mat_hang.length ? <p className="phu">Không mua mã nào trong khoảng này.</p> :
+      <div className="bang-cuon" style={{ maxHeight: 320 }}><table className="bang"><thead><tr><th>Mặt hàng</th><th className="so">Doanh thu</th>
+        <th className="so">Lãi gộp</th><th className="so">Số lượng</th><th className="so">Số ngày mua</th><th className="so">Mua cuối</th></tr></thead>
+        <tbody>{kh.mat_hang.map(m => (
+          <tr key={m.ma}><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></td>
+            <td className="so">{yen(m.doanh_thu)}</td><td className="so">{yen(m.lai_gop)}</td><td className="so">{so(m.so_luong)}</td>
+            <td className="so">{so(m.so_ngay)}</td><td className="so">{ngay(m.lan_cuoi)}</td></tr>))}</tbody></table></div>}
+    </The>}
     <The tieu_de="Top 10 sản phẩm hay mua" phu={<>xếp theo doanh thu luỹ kế · <span className="nhan-vien ok">◎ Đề xuất</span> đã tới ngày mua lại ·{" "}
       <span className="nhan-vien canh">○ Sắp tới</span> ≤ 7 ngày · <span className="nhan-vien nhat">△ Còn sớm</span></>}>
       <div className="hs-top">{top.map((m, i) => (
@@ -356,12 +392,17 @@ function BangMatHang({ ds, thang }: { ds: MatHang[]; thang: string[] }) {
 
 // ============================================================ Đơn hàng
 export function TabDonHang({ h }: { h: HoSoApi }) {
-  const [mo, datMo] = useState<string | null>(h.lan_mua_gan_day[0]?.ngay ?? null);
+  const { data: kh } = useKhoangKhach(h.khach.ma);
+  // Khoảng xem (đợt B): dòng thời gian = các ngày mua TRONG khoảng; chưa tải
+  // xong thì 12 ngày mua gần nhất như trước.
+  const ds = kh ? kh.ngay : h.lan_mua_gan_day;
+  const [mo, datMo] = useState<string | null>(null);
   return (
     <div className="hs-hang hai-mot">
-      <The tieu_de="Dòng thời gian đơn hàng" phu="12 ngày mua gần nhất · bấm một mốc để xem các dòng hàng">
-        {!h.lan_mua_gan_day.length ? <p className="phu">Chưa có đơn hàng nào trong kỳ dữ liệu.</p> :
-        <ol className="hs-dong-tg">{h.lan_mua_gan_day.map((l, i) => (
+      <The tieu_de={kh ? `Đơn hàng · ${kh.khoang.nhan}` : "Dòng thời gian đơn hàng"}
+        phu={kh ? `${ds.length} ngày có mua (${ngay(kh.khoang.tu)} → ${ngay(kh.khoang.den)}) · bấm một mốc để xem các dòng hàng` : "12 ngày mua gần nhất · bấm một mốc để xem các dòng hàng"}>
+        {!ds.length ? <p className="phu">{kh ? "Không có đơn hàng nào trong khoảng này." : "Chưa có đơn hàng nào trong kỳ dữ liệu."}</p> :
+        <ol className="hs-dong-tg">{ds.map((l, i) => (
           <li key={l.ngay} className={i === 0 ? "moi" : ""}>
             <button type="button" className="hs-dtg-dau" aria-expanded={mo === l.ngay} onClick={() => datMo(mo === l.ngay ? null : l.ngay)}>
               <b>{ngay(l.ngay)}</b><span className="phu">{l.so_phieu} phiếu · {yen(l.doanh_thu)}</span></button>

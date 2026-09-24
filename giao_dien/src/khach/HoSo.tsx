@@ -5,6 +5,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { lay } from "../api";
+import { giuKhoang } from "../khung/khoang";
 import { so } from "../dinh_dang";
 import { docDanhSach } from "./loc";
 import type { DsApi, HoSoApi } from "./kieu";
@@ -30,7 +31,7 @@ export default function HoSo({ ma }: { ma: string }) {
   const chonTab = (t: MaTab) => { datTab(t); history.replaceState(null, "", "#" + t); };
   const ds = docDanhSach();
   const vi = ds ? ds.ma.indexOf(ma) : -1;
-  const di = (m: string) => { location.href = `/khach-hang/${encodeURIComponent(m)}`; };
+  const di = (m: string) => { location.href = giuKhoang(`/khach-hang/${encodeURIComponent(m)}`); };
   useEffect(() => { if (h) document.title = `KOME — ${h.khach.ten}`; }, [h]);
 
   const thanhTren = (
@@ -107,7 +108,7 @@ function ChuyenKhach() {
     <div className="hs-tim" ref={o}>
       <input type="search" placeholder="Chuyển sang khách khác — gõ mã hoặc tên…" value={q} aria-label="Chuyển sang khách khác"
         onChange={e => { datQ(e.target.value); datMo(true); }} onFocus={() => datMo(true)}
-        onKeyDown={e => { if (e.key === "Enter" && kq[0]) location.href = `/khach-hang/${encodeURIComponent(kq[0].ma)}`; if (e.key === "Escape") datMo(false); }} />
+        onKeyDown={e => { if (e.key === "Enter" && kq[0]) location.href = giuKhoang(`/khach-hang/${encodeURIComponent(kq[0].ma)}`); if (e.key === "Escape") datMo(false); }} />
       {mo && tre && data && <div className="hs-tim-kq" role="listbox">
         <div className="phu">{so(data.trang.tong)} khách khớp "{tre}"</div>
         {kq.map(k => (

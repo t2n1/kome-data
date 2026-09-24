@@ -223,3 +223,50 @@ def cua_khach(conn, kx: KhoangXem, ma: str) -> dict:
                      "so_ngay": so(0, "so_ngay"),
                      "ty_suat": BC._SoCungKy._ty_suat(so(0, "dt"), so(0, "lg"))},
             "so_sanh": ss, "mat_hang": r[1], "ngay": r[2]}
+
+
+# ---- Đợt C: Sản phẩm ---------------------------------------------------------
+
+def danh_muc_khoang(conn, kx: KhoangXem) -> dict:
+    """Doanh số trong khoảng của MỌI mã + dải so sánh phụ — MỘT lượt hỏi
+    (`mart.mat_hang_khoang` hai dải, FULL JOIN). Giao diện ghép vào danh mục
+    theo mã (không cộng / chia gì thêm)."""
+    s = _ss_phu(kx)
+    rows = conn.execute(
+        """SELECT coalesce(a.product_code, b.product_code), a.dt, a.lg, a.so_luong, a.so_khach, b.dt
+             FROM mart.mat_hang_khoang(%s, %s) a
+             FULL JOIN mart.mat_hang_khoang(%s, %s) b USING (product_code)""",
+        (kx.tu, kx.den, s.tu if s.co else None, s.den if s.co else None)).fetchall()
+    return {"khoang": kx, "so_sanh": s,
+            "dong": {r[0]: [_i(r[1]), _i(r[2]), float(r[3]) if r[3] is not None else None, r[4], _i(r[5])]
+                     for r in rows}}
+
+
+def cua_ma(conn, kx: KhoangXem, ma: str, gioi_han: int = 30) -> dict:
+    """Một mã trong khoảng — MỘT lượt hỏi: tổng + phép so phụ
+    (`mart.mat_hang_khoang`) và khách mua mã này trong khoảng
+    (`mart.khach_mat_hang_khoang`, `gioi_han` khách doanh thu cao nhất + tổng số khách)."""
+    s = _ss_phu(kx)
+    r = conn.execute(
+        """SELECT
+              (SELECT json_build_object('dt', a.dt, 'lg', a.lg, 'so_luong', a.so_luong, 'so_khach', a.so_khach)
+                 FROM mart.mat_hang_khoang(%s, %s) a WHERE a.product_code = %s),
+              (SELECT b.dt FROM mart.mat_hang_khoang(%s, %s) b WHERE b.product_code = %s),
+              (SELECT coalesce(json_agg(json_build_object('ma', x.customer_code, 'ten', x.ten,
+                                  'doanh_thu', x.dt, 'so_luong', x.so_luong, 'so_ngay', x.so_ngay_mua,
+                                  'lan_cuoi', x.lan_cuoi) ORDER BY x.dt DESC NULLS LAST, x.customer_code), '[]')
+                 FROM (SELECT k.*, coalesce(nullif(c.customer_name, ''), k.customer_code) AS ten
+                         FROM mart.khach_mat_hang_khoang(%s, %s) k
+                         LEFT JOIN core.dim_customer c ON c.customer_code = k.customer_code AND c.is_current
+                        WHERE k.product_code = %s
+                        ORDER BY k.dt DESC NULLS LAST, k.customer_code LIMIT %s) x)""",
+        (kx.tu, kx.den, ma, s.tu if s.co else None, s.den if s.co else None, ma,
+         kx.tu, kx.den, ma, gioi_han)).fetchone()
+    t = r[0] or {}
+    dt = int(t.get("dt") or 0)
+    return {"khoang": kx, "so_sanh": s,
+            "tong": {"dt": dt, "lg": int(t.get("lg") or 0), "so_luong": t.get("so_luong") or 0,
+                     "so_khach": t.get("so_khach") or 0},
+            "dt_ss": (int(r[1] or 0) if s.co else None),
+            "tang": BC._SoCungKy._tang(dt, int(r[1] or 0)) if s.co else None,
+            "khach": r[2]}

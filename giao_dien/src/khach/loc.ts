@@ -9,12 +9,12 @@ import { giuKhoang } from "../khung/khoang";
 export type BoLoc = {
   tim: string; loc: string; nhom: string; hang: string[]; tinh: string; nv: string;
   tat_ca: boolean; thang: string; sap: string; giam: "" | "1" | "0"; trang: number; co: number;
-  chi_so: string;
+  chi_so: string; co_mua: boolean;
 };
 
 export const MAC_DINH: BoLoc = {
   tim: "", loc: "", nhom: "", hang: [], tinh: "", nv: "", tat_ca: false, thang: "",
-  sap: "doanh_thu", giam: "", trang: 1, co: 50, chi_so: "khach",
+  sap: "dt_khoang", giam: "", trang: 1, co: 50, chi_so: "khach", co_mua: false,
 };
 
 export function docUrl(search: string): BoLoc {
@@ -23,9 +23,9 @@ export function docUrl(search: string): BoLoc {
     tim: q.get("tim") ?? "", loc: q.get("loc") ?? "", nhom: q.get("nhom") ?? "",
     hang: (q.get("hang") ?? "").split(",").filter(Boolean), tinh: q.get("tinh") ?? "",
     nv: q.get("nv") ?? "", tat_ca: q.get("tat_ca") === "1", thang: q.get("nhan_thang") ?? "",
-    sap: q.get("sap") ?? "doanh_thu", giam: (q.get("giam") as BoLoc["giam"]) ?? "",
+    sap: q.get("sap") ?? "dt_khoang", giam: (q.get("giam") as BoLoc["giam"]) ?? "",
     trang: Math.max(1, +(q.get("trang") ?? 1) || 1), co: +(q.get("co") ?? 50) || 50,
-    chi_so: q.get("chi_so") ?? "khach",
+    chi_so: q.get("chi_so") ?? "khach", co_mua: q.get("co_mua") === "1",
   };
 }
 
@@ -36,7 +36,7 @@ export function chuoiLoc(b: BoLoc, bo: (keyof BoLoc)[] = []): string {
   const dat = (k: keyof BoLoc, v: string) => { if (!bo.includes(k) && v) q.set(k, v); };
   dat("tim", b.tim.trim()); dat("loc", b.loc); dat("nhom", b.nhom); dat("hang", b.hang.join(","));
   dat("tinh", b.tinh); dat("nv", b.nv); dat("tat_ca", b.tat_ca ? "1" : ""); if (!bo.includes("thang") && b.thang) q.set("nhan_thang", b.thang);
-  dat("sap", b.sap === "doanh_thu" ? "" : b.sap); dat("giam", b.giam);
+  dat("sap", b.sap === "dt_khoang" ? "" : b.sap); dat("giam", b.giam); dat("co_mua", b.co_mua ? "1" : "");
   dat("trang", b.trang > 1 ? String(b.trang) : ""); dat("co", b.co !== 50 ? String(b.co) : "");
   dat("chi_so", b.chi_so === "khach" ? "" : b.chi_so);
   return q.toString();

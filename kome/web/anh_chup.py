@@ -211,6 +211,13 @@ def lam_nong(open_conn) -> None:
             from kome.web.api import KHOA_DANH_MUC, du_lieu_kho_hang
             with open_conn() as c:
                 lay(c, KHOA_DANH_MUC, SP.danh_muc, chi_nap=True)
+            from kome import ban_khoang as BK
+            from kome import khoang_xem as KX
+            from kome.web.api import KHOA_DANH_MUC_KHOANG, thanh_json
+            with open_conn() as c:
+                lay(c, KHOA_DANH_MUC_KHOANG,
+                    lambda cc: (lambda kx: None if kx is None else thanh_json(BK.danh_muc_khoang(cc, kx)))(
+                        KX.giai_conn(cc, KX.ThamSo())), chi_nap=True)
             with open_conn() as c:
                 lay(c, "kho-hang", du_lieu_kho_hang, chi_nap=True)
         except Exception as e:         # noqa: BLE001

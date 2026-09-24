@@ -3,14 +3,14 @@
 // DƯỚI. /san-pham và /san-pham/{mã} là hai địa chỉ của màn này; chọn một dòng là
 // pushState, không tải lại trang. Cả danh mục là MỘT ảnh chụp (/api/san-pham),
 // nên lọc / sắp / tìm chạy ở trình duyệt, không hỏi lại máy chủ.
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { lay } from "../api";
-import { giuKhoang } from "../khung/khoang";
+import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { Spark } from "../chung/Khoi";
-import { gon, ngay, pc, so, so_luong as soLuong, yen } from "../dinh_dang";
+import { gon, ngay, pc, so, so_luong as soLuong, thay_doi, yen } from "../dinh_dang";
 import { HoSoSanPham } from "./HoSoSanPham";
-import type { DanhMucApi, MaHang } from "./kieu";
+import type { DanhMucApi, DanhMucKhoangApi, MaHang } from "./kieu";
 import { chuoiLocSp, docLocSp, locDanhMuc, SAP } from "./loc";
 import type { LocSp } from "./loc";
 import "./san_pham.css";
@@ -19,13 +19,27 @@ export function useDanhMuc() {
   return useQuery<DanhMucApi>({ queryKey: ["sp-danh-muc"], queryFn: () => lay<DanhMucApi>("/api/san-pham") });
 }
 
+/** Doanh số trong khoảng xem của mọi mã (/api/san-pham/khoang — đợt C). */
+function useDanhMucKhoang() {
+  const kx = chuoiKhoang(useKhoang());
+  return useQuery<DanhMucKhoangApi>({ queryKey: ["sp-khoang", kx], placeholderData: keepPreviousData,
+    queryFn: () => lay<DanhMucKhoangApi>(voiKhoang("/api/san-pham/khoang")) });
+}
+
 function maTuUrl(): string | null {
   const m = location.pathname.match(/^\/san-pham\/([^/]+)$/);
   return m ? decodeURIComponent(m[1]) : null;
 }
 
 export default function ManSanPham() {
-  const { data: d, error } = useDanhMuc();
+  const { data: d0, error } = useDanhMuc();
+  const { data: kh } = useDanhMucKhoang();
+  // Ghép số theo khoảng vào từng mã — chỉ gắn số của máy chủ, không tính gì.
+  const d = useMemo(() => d0 && { ...d0, ma: d0.ma.map(m => {
+    const x = kh?.dong[m.ma];
+    return { ...m, dt_khoang: x?.[0] ?? 0, sl_khoang: x?.[2] ?? null, kh_khoang: x?.[3] ?? 0,
+             dt_ss: kh?.so_sanh.co ? (x?.[4] ?? 0) : null };
+  }) }, [d0, kh]);
   const [b, datB] = useState<LocSp>(() => docLocSp(location.search));
   const [ma, datMa] = useState<string | null>(maTuUrl);
   const [tim, datTim] = useState(b.tim);
@@ -65,6 +79,10 @@ export default function ManSanPham() {
   const tongTT = Object.values(kq.dem_trang_thai).reduce((s, n) => s + n, 0);
   const tongNganh = kq.dem_nganh.reduce((s, [, n]) => s + n, 0);
   const locHopLe = b.loc in d.trang_thai ? b.loc : "";
+  const kxNhan = kh?.khoang.nhan ?? "khoảng xem", ss = kh?.so_sanh;
+  const dtKx = tatCa.reduce((s, m) => s + (m.dt_khoang ?? 0), 0);
+  const dtSs = ss?.co ? tatCa.reduce((s, m) => s + (m.dt_ss ?? 0), 0) : null;
+  const coBanKx = tatCa.filter(m => m.dt_khoang).length;
   const ten12 = d.thang.length ? `${d.thang[0].slice(5)}/${d.thang[0].slice(2, 4)} → ${d.thang[11].slice(5)}/${d.thang[11].slice(2, 4)}` : "";
 
   const cot = (k: string, chu: string, cls = "", title?: string) => {
@@ -88,6 +106,10 @@ export default function ManSanPham() {
       </div>
 
       <div className="o-kpi-luoi sp-kpi">
+        <div className="o-kpi"><div className="nhan">Doanh thu · {kxNhan}</div><div className="gia">{gon(dtKx)}</div>
+          <div className={"dong-phu " + (!dtSs ? "nhat-chu" : dtKx >= dtSs ? "tang" : "giam")}>
+            {!ss ? "…" : !ss.co ? `${ss.nhan}: không có dữ liệu để so` : dtSs ? `${thay_doi(dtKx / dtSs - 1)} so ${ss.nhan}` : `${ss.nhan}: không bán`}
+            {" "}· {so(coBanKx)} mã có bán</div></div>
         <div className="o-kpi"><div className="nhan">Mã có bán trong 12 tháng</div><div className="gia">{so(coBan)}</div>
           <div className="dong-phu nhat-chu">trên {so(tatCa.length)} mã trong 商品マスタ</div></div>
         <div className="o-kpi"><div className="nhan">Doanh thu 12 tháng · cả danh mục</div><div className="gia">{gon(dt12)}</div>
@@ -129,6 +151,10 @@ export default function ManSanPham() {
               {cot("ton", "Tồn", "so", "Tổng mọi kho, ảnh chụp 在庫一覧 mới nhất. — = chưa rõ tồn (không phải 0)")}
               {cot("toc_do", "Bán/ngày", "so", "Chia cho tuổi thật của mã (tối đa 90 ngày) — chính con số xếp trạng thái")}
               {cot("du_ban", "Còn đủ bán", "so", "Tồn ÷ Bán/ngày")}
+              {cot("dt_khoang", `DT ${kxNhan}`, "so", "Doanh thu thuần trong khoảng đang xem")}
+              {cot("so_khoang", ss ? `So ${ss.nhan}` : "So sánh", "so", ss ? `${ss.tu} → ${ss.den}` : undefined)}
+              {cot("sl_khoang", "SL", "so", "Số lượng bán trong khoảng đang xem")}
+              {cot("kh_khoang", "Khách mua", "so", "Số khách có mua mã này trong khoảng đang xem")}
               {cot("dt_12t", "DT 12 tháng", "so", "Doanh thu thuần 365 ngày tới mốc dữ liệu")}
               <th title={`Doanh thu theo tháng ${ten12}`}>12 tháng</th>
               {cot("ty_suat", "Tỷ suất 12T", "so", "Lãi gộp 12 tháng ÷ doanh thu 12 tháng")}
@@ -137,7 +163,7 @@ export default function ManSanPham() {
             </tr></thead>
             <tbody>
               {kq.hang.map(m => <Dong key={m.ma} m={m} chon={m.ma === ma} onChon={() => chon(m.ma)} />)}
-              {!kq.hang.length && <tr><td colSpan={11} className="trong">Không có mã hàng nào khớp{b.tim ? ` với "${b.tim}"` : ""}. Thử bỏ bớt bộ lọc.</td></tr>}
+              {!kq.hang.length && <tr><td colSpan={15} className="trong">Không có mã hàng nào khớp{b.tim ? ` với "${b.tim}"` : ""}. Thử bỏ bớt bộ lọc.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -165,7 +191,11 @@ function Dong({ m, chon, onChon }: { m: MaHang; chon: boolean; onChon: () => voi
       <td className="so">{m.ton == null ? <span className="nhat-chu" title="chưa rõ tồn — không có dòng nào trong 在庫一覧">—</span> : soLuong(m.ton)}</td>
       <td className="so">{soLuong(m.toc_do_ngay_theo_tuoi)}</td>
       <td className={"so " + (m.du_ban_ngay != null && m.du_ban_ngay < 14 ? "giam" : "")}>{m.du_ban_ngay == null ? "—" : `${Math.round(m.du_ban_ngay)} ngày`}</td>
-      <td className="so"><b>{m.dt_12t ? yen(m.dt_12t) : <span className="nhat-chu">¥0</span>}</b></td>
+      <td className="so"><b>{m.dt_khoang ? yen(m.dt_khoang) : <span className="nhat-chu">¥0</span>}</b></td>
+      <td className="so">{m.dt_ss ? <span className={(m.dt_khoang ?? 0) >= m.dt_ss ? "tang" : "giam"}>{thay_doi((m.dt_khoang ?? 0) / m.dt_ss - 1, 0)}</span> : <span className="nhat-chu">—</span>}</td>
+      <td className="so">{m.sl_khoang == null ? <span className="nhat-chu">—</span> : soLuong(m.sl_khoang)}</td>
+      <td className="so">{so(m.kh_khoang ?? 0)}</td>
+      <td className="so">{m.dt_12t ? yen(m.dt_12t) : <span className="nhat-chu">¥0</span>}</td>
       <td className="sp-spark">{m.thang_dt.some(v => v) ? <Spark gia_tri={m.thang_dt} cao={20} mau="var(--lien-ket)" /> : <span className="nhat-chu">không bán</span>}</td>
       <td className="so">{pc(m.ts_12t)}</td>
       <td className="so">{so(m.so_khach)}</td>

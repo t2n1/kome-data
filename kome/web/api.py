@@ -171,6 +171,7 @@ def du_lieu_kho_hang(c, kho: str = "", loc: str = "") -> dict:
 
 # Khoá ảnh chụp danh mục sản phẩm — `anh_chup.lam_nong` làm nóng đúng khoá này.
 KHOA_DANH_MUC = "san-pham/danh-muc"
+KHOA_DANH_MUC_KHOANG = "san-pham/khoang"
 KHOA_CONG_NO = "cong-no"
 
 
@@ -461,6 +462,38 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import san_pham as SP
         return _chup(request, KHOA_DANH_MUC, SP.danh_muc,
                      "Không đọc được danh mục sản phẩm.", chi_nap=True)
+
+    @r.get("/san-pham/khoang")
+    def sp_khoang(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Doanh số trong khoảng xem của mọi mã (đợt C) — ghép vào danh mục ở
+        trình duyệt. Endpoint riêng: danh mục vẫn MỘT ảnh chụp 1 lượt hỏi. 2 lượt.
+        Khai báo TRƯỚC `/san-pham/{ma}` — không thì "khoang" bị đọc thành mã hàng."""
+        from kome import ban_khoang as BK
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+
+        def tinh_(c):
+            kx = KX.giai_conn(c, ts)
+            return None if kx is None else thanh_json(BK.danh_muc_khoang(c, kx))
+        return _chup(request, _khoa(KHOA_DANH_MUC_KHOANG, **ts.khoa()), tinh_,
+                     "Không đọc được doanh số theo khoảng.", chi_nap=True)
+
+    @r.get("/san-pham/{ma}/khoang")
+    def sp_ma_khoang(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Một mã trong khoảng xem (đợt C): tổng + so sánh, khách mua trong khoảng. 2 lượt."""
+        from kome import ban_khoang as BK
+        try:
+            ts = KX.doc_tham_so(thang, ky, tu, den)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+
+        def tinh_(c):
+            kx = KX.giai_conn(c, ts)
+            return None if kx is None else thanh_json(BK.cua_ma(c, kx, ma))
+        return _chup(request, _khoa("san-pham/ma-khoang", ma=ma, **ts.khoa()), tinh_,
+                     "Không đọc được số theo khoảng của mã hàng.", chi_nap=True)
 
     @r.get("/san-pham/{ma}")
     def sp_ho_so(request: Request, ma: str):

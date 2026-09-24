@@ -1,3 +1,4 @@
+import { giuKhoang } from "./khoang";
 // Bảng lệnh ⌘K / Ctrl+K — nhảy tới bất kỳ màn nào có thật bằng bàn phím.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icon";
@@ -19,7 +20,7 @@ export function TimNhanh({ dong }: { dong: () => void }) {
     return q ? tat_ca.filter(m => bo_dau(m.nhan + " " + m.nhom).includes(q)) : tat_ca;
   }, [tu]);
 
-  const di = (i: number) => { const m = ds[i]; if (m?.url) location.href = m.url; };
+  const di = (i: number) => { const m = ds[i]; if (m?.url) location.href = giuKhoang(m.url); };
 
   return (
     <div className="lop-phu" onMouseDown={dong}>
