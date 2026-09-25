@@ -5,7 +5,7 @@ import { useKhoi } from "../api";
 import { giuKhoang } from "../khung/khoang";
 import { BieuDo, type Chuoi } from "../chung/BieuDo";
 import { ChuaCoDuLieu, Khoi, Spark, ThanhMoc, mauTienDo } from "../chung/Khoi";
-import { gon, ngay, ngay_ngan, pc, so, thang_nhan, thay_doi, yen } from "../dinh_dang";
+import { gio_tokyo, gon, ngay, ngay_ngan, pc, so, thang_nhan, thay_doi, yen } from "../dinh_dang";
 import { KD } from "../khoi_dau";
 import { useNhanMoc, type KhoangMayChu } from "../khung/khoang";
 
@@ -622,7 +622,7 @@ export function KhoiNap() {
         <div><div className="tieu-muc">LẦN NẠP GẦN NHẤT</div>
           <table className="bang"><tbody>{d.lo.map((x, i) => (
             <tr key={i}><td>{x.loai}<div className="ma-nho">{x.ten_file}</div></td><td className="so">{so(x.so_dong)} dòng</td>
-              <td className="so nhat-chu">{x.nap_luc.slice(0, 16).replace("T", " ")}</td></tr>))}</tbody></table></div>
+              <td className="so nhat-chu">{gio_tokyo(x.nap_luc)}</td></tr>))}</tbody></table></div>
         <div><div className="tieu-muc">PHIẾU BÁN MỚI NHẤT</div>
           <table className="bang"><tbody>{d.phieu.map(x => (
             <tr key={x.so}><td className="nhat-chu">{ngay_ngan(x.ngay)}</td><td className="ten-jp"><a href={`/khach-hang/${x.ma}`}>{x.ten}</a></td>

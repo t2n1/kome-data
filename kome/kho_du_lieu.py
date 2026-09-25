@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from kome.config import SPECS
-from kome.tuoi_du_lieu import MUI_GIO
+from kome.tuoi_du_lieu import MUI_GIO, spec_cua_o
 
 # Các ô của màn Nạp = các nhánh của sơ đồ nguồn — MỘT danh sách. `specs`: loại
 # file ô đó nhận (Bán hàng nhận cả 売上伝票データ lẫn nguồn dự phòng 売上明細表 —
@@ -61,8 +61,10 @@ def nut_nguon(status: list[dict], tuoi, hom_nay: date) -> list[dict]:
         lo = [theo_spec[s] for s in o["specs"] if s in theo_spec and theo_spec[s]["last"]]
         moi = max(lo, key=lambda s: s["last"]) if lo else None
         nap_luc = _ngay(moi["last"]) if moi else None
-        if o["nhip"] == "ngay" and o["specs"][0] in tuoi_spec:
-            t = tuoi_spec[o["specs"][0]]
+        # Ô tuổi của ô nạp = ô nào của tuoi_du_lieu nhận MỘT trong các spec của
+        # nó (ô Bán hàng: `meisai` gom cả `uriage`) — đừng đọc `specs[0]`.
+        t = next((tuoi_spec[s] for s in tuoi_spec if set(spec_cua_o(s)) & set(o["specs"])), None)
+        if o["nhip"] == "ngay" and t is not None:
             mau, cau = {
                 "xanh": ("ok", "cập nhật hôm nay"),
                 "cho": ("cho", f"chưa tới 13:30 · dữ liệu đến {_dd(t.ngay)}" if t.ngay else "chưa tới 13:30"),

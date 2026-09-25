@@ -1,7 +1,7 @@
 """Hôm nay đã có dữ liệu chưa? — cho 3 nguồn nhân viên xuất mỗi ngày.
 
 Trả lời đúng một câu hỏi: kho đã có dữ liệu MANG NGÀY HÔM NAY của 在庫一覧,
-得意先全情報 và 売上伝票データ chưa. Trang chỉ hiển thị; mọi quy tắc nằm ở đây
+得意先全情報 và dữ liệu bán hàng chưa (売上明細表 hằng ngày — hoặc 売上伝票データ). Trang chỉ hiển thị; mọi quy tắc nằm ở đây
 để lệnh terminal dùng lại được và để test bơm giờ giả vào.
 """
 from dataclasses import dataclass
@@ -11,10 +11,20 @@ from zoneinfo import ZoneInfo
 from kome.config import SPECS
 
 # Ba nguồn của nhịp 13:30 hằng ngày (xem CLAUDE.md, "Quy trình hằng ngày").
-# 5 spec còn lại (商品データ, 仕入先, 直送先, 取引単価データ, 売上明細表) xuất
-# thưa hoặc chỉ dùng khi cần, nên KHÔNG nằm trong ô cảnh báo này — đưa chúng
-# vào là tạo ra một dải đỏ gần như thường trực.
-NGUON_HANG_NGAY = ("zaiko", "tokuisaki", "uriage")
+# Từ 2026-09-24 file bán hằng ngày là 売上明細表 (`meisai`); 売上伝票データ
+# (`uriage`) chỉ còn xuất theo quý. Ô "bán hàng" vì vậy là MỘT ô cho cả hai
+# spec (`CUNG_O`): lô nào của hai loại mang ngày mới nhất thì tính — đòi riêng
+# `uriage` là ô đỏ "trễ 36 ngày" trong khi hôm nay đã nạp đủ (sự cố thật
+# 2026-09-25). Các spec còn lại (商品データ, 仕入先, 直送先, 取引単価データ) xuất
+# thưa, nên KHÔNG nằm trong ô cảnh báo này — đưa chúng vào là tạo ra một dải
+# đỏ gần như thường trực.
+NGUON_HANG_NGAY = ("zaiko", "tokuisaki", "meisai")
+CUNG_O = {"meisai": ("meisai", "uriage")}
+
+
+def spec_cua_o(spec: str) -> tuple[str, ...]:
+    """Các spec cùng đổ vào ô `spec` của nhịp hằng ngày."""
+    return CUNG_O.get(spec, (spec,))
 
 # 13:30 là giờ nhân viên xuất file từ OBC (CLAUDE.md). Trước giờ này mà chưa
 # có dữ liệu thì KHÔNG phải sự cố.
@@ -89,17 +99,19 @@ def tinh_tuoi(conn, bay_gio: datetime | None = None) -> Tuoi:
     # gộp một lượt: mỗi vòng hỏi-đáp qua pooler Tokyo mất ~60 ms.
     moi_nhat = {
         r[0]: (r[1], r[2]) for r in conn.execute(
-            """WITH m AS (
-                 SELECT spec_name, max(data_date) AS ngay
-                 FROM meta.ingest_batch
-                 WHERE undone_at IS NULL AND spec_name = ANY(%s)
-                 GROUP BY spec_name)
+            """WITH o AS (SELECT * FROM unnest(%s::text[], %s::text[]) AS o(o, spec)),
+               m AS (
+                 SELECT o.o AS spec_name, max(b.data_date) AS ngay
+                 FROM meta.ingest_batch b JOIN o ON o.spec = b.spec_name
+                 WHERE b.undone_at IS NULL
+                 GROUP BY o.o)
                SELECT m.spec_name, m.ngay,
                       (SELECT count(*) FROM mart.lich_kinh_doanh d
                         WHERE d.la_ngay_kd
                           AND d.ngay > m.ngay AND d.ngay <= %s)
                FROM m""",
-            (list(NGUON_HANG_NGAY), hom_nay),
+            ([o for o in NGUON_HANG_NGAY for _ in spec_cua_o(o)],
+             [s for o in NGUON_HANG_NGAY for s in spec_cua_o(o)], hom_nay),
         ).fetchall()
     }
 

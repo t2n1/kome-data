@@ -103,6 +103,25 @@ def test_he_so_la_TY_SO_CUA_CAC_TONG_khong_phai_trung_binh_ty_so():
     assert m.tong_cung_ky == sum(A[DB.cong_thang(t.thang, -12)] for t in m.du_bao)
 
 
+def test_thang_KHONG_CO_DONG_NAO_khong_lam_thang_doi_chieu():
+    """Sự cố thật 2026-09-25: thiếu hẳn tháng 8/2026 trong kho (mart.ban_theo_ngay
+    điền 0 cho mọi ngày). Tháng đó từng lọt vào làm tháng đối chiếu như một
+    tháng "bán ¥0" — hệ số cơ sở ×0,96 thay vì ~×1,11, và kịch bản thận trọng
+    (tỷ số nhỏ nhất) ra 0 cho mọi tháng dự báo."""
+    hn = date(2026, 9, 30)
+
+    def dt(d):
+        if d.year == 2026 and d.month == 8:
+            return 0                 # chưa nạp
+        return 110 if d.year == 2026 else 100
+    m = DB.muoi_hai_thang(_lich(date(2025, 1, 1), hn, hn, dt), hn)
+    assert "2026-08" not in m.doi_chieu
+    assert m.he_so == pytest.approx(1.1)
+    assert m.he_so_thap > 0 and all(t.thap > 0 for t in m.du_bao)
+    # và tháng trống không làm "tháng kiểm" cho khoảng sai số của chốt tháng
+    assert not DB._day_du([n for n in _lich(date(2026, 8, 1), date(2026, 8, 31), hn, lambda d: 0)], date(2025, 1, 1))
+
+
 def test_chua_du_13_thang_thi_khong_du_bao_nam():
     hn = date(2026, 5, 31)
     m = DB.muoi_hai_thang(_lich(date(2026, 1, 1), hn, hn), hn)

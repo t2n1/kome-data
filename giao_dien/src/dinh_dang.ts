@@ -54,3 +54,18 @@ export function thang_nhan(t: string): string {
 export function so_luong(n: number | null | undefined, chu_so = 2): string {
   return n == null ? "—" : n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: chu_so });
 }
+
+const GIO_TOKYO = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit",
+  day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+
+/** "YYYY-MM-DD HH:MM" GIỜ TOKYO của một mốc ISO. `loaded_at` là timestamptz,
+ *  máy chủ gửi kèm `+00:00` — cắt chuỗi thẳng là in giờ UTC (nạp lúc 20:33 hiện
+ *  11:33, sự cố thật 2026-09-25). Chuỗi không mang múi giờ thì giữ nguyên chữ. */
+export function gio_tokyo(iso: string | null | undefined): string {
+  if (!iso) return "";
+  if (!/(Z|[+-]\d\d:?\d\d)$/.test(iso)) return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`.trim();
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const p = GIO_TOKYO.formatToParts(d), g = (t: string) => p.find(x => x.type === t)?.value ?? "";
+  return `${g("year")}-${g("month")}-${g("day")} ${g("hour") === "24" ? "00" : g("hour")}:${g("minute")}`;
+}

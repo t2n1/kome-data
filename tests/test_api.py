@@ -84,6 +84,21 @@ def test_ty_suat_theo_thang_la_ty_so_cua_cac_tong(kho, conn):
             assert q["bien_gop"] == pytest.approx(q["lai_gop"] / q["doanh_thu"])
 
 
+def test_theo_thang_giu_THANG_CO_NGAN_SACH_ma_khong_co_dong_ban(kho, conn):
+    """Cùng bất biến FULL JOIN của mart.tien_do_ngan_sach. Sự cố thật
+    2026-09-25: tháng 8/2026 có ngân sách ¥92,7M nhưng chưa nạp dữ liệu bán —
+    khối LEFT JOIN từ doanh thu làm tháng đó biến mất và in "chưa đặt chỉ tiêu
+    tháng nào". Ngân sách tháng SAU mốc thì không phải "kết quả" nên không vào."""
+    conn.execute("""INSERT INTO app.ngan_sach_cong_ty (thang, doanh_thu, lai_gop)
+                    VALUES ('2026-03-01', 5000000, 1500000), ('2026-08-01', 7000000, NULL)""")
+    conn.commit()
+    thang = {t["thang"]: t for t in KTQ.theo_thang(conn)["thang"]}
+    assert thang["2026-03"]["ngan_sach"] == 5_000_000
+    assert thang["2026-03"]["doanh_thu"] == 0 and thang["2026-03"]["thang_trong_ky"] == 8
+    assert thang["2026-07"]["doanh_thu"] > 0            # tháng có bán vẫn còn nguyên
+    assert "2026-08" not in thang                        # kỳ khác, và sau mốc
+
+
 def test_so_khoi_khop_ham_goc(kho, conn):
     """Khối không tự định nghĩa lại chỉ số: doanh thu tháng của ô KPI BẰNG
     mart.thang_den_hom_nay (khoảng xem mặc định = tháng hiện tại), tổng xu

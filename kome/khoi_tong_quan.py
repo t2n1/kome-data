@@ -199,13 +199,25 @@ def theo_thang(conn, sale=None, ts=None) -> dict:
     """Các tháng của KỲ chứa ngày cuối khoảng xem; giao diện tô đậm các tháng
     thuộc khoảng (`khoang.tu` → `khoang.den`)."""
     kx = _kx(conn, ts)
+    # FULL JOIN, không LEFT JOIN từ doanh thu (cùng bất biến của
+    # mart.tien_do_ngan_sach): tháng ĐÃ ĐẶT ngân sách mà không có dòng bán nào
+    # vẫn phải có dòng — bản LEFT JOIN làm tháng 8/2026 (ngân sách ¥92,7M, chưa
+    # nạp dữ liệu) biến mất, và khối in "chưa đặt chỉ tiêu tháng nào". Chỉ lấy
+    # tháng ≤ tháng của mốc: ngân sách các tháng tương lai không phải "kết quả".
     rows = [] if kx is None else conn.execute(
-        """SELECT s.thang, s.company_fy, s.thang_trong_ky, s.doanh_thu_thuan, s.lai_gop,
-                  s.so_khach, s.dt_cung_ky, s.co_cung_ky, ns.doanh_thu, ns.lai_gop
-             FROM mart.ban_theo_thang_so_sanh s
-             LEFT JOIN mart.ngan_sach_cong_ty_thang ns ON ns.thang = s.thang
-            WHERE s.company_fy = %s
-            ORDER BY s.thang""", (kx.company_fy,)).fetchall()
+        """WITH s AS (SELECT * FROM mart.ban_theo_thang_so_sanh WHERE company_fy = %(fy)s),
+                ns AS (SELECT * FROM mart.ngan_sach_cong_ty_thang WHERE company_fy = %(fy)s)
+           SELECT coalesce(s.thang, ns.thang), %(fy)s, coalesce(s.thang_trong_ky, d.company_fy_month),
+                  s.doanh_thu_thuan, s.lai_gop, s.so_khach,
+                  coalesce(s.dt_cung_ky, ck.doanh_thu_thuan), coalesce(s.co_cung_ky, ck.thang IS NOT NULL),
+                  ns.doanh_thu, ns.lai_gop
+             FROM s FULL JOIN ns ON ns.thang = s.thang
+             LEFT JOIN core.dim_date d ON s.thang IS NULL
+                   AND d.date_key = to_date(ns.thang || '-01', 'YYYY-MM-DD')
+             LEFT JOIN mart.ban_theo_thang ck ON s.thang IS NULL
+                   AND ck.thang = to_char(to_date(ns.thang || '-01', 'YYYY-MM-DD') - interval '12 months', 'YYYY-MM')
+            WHERE coalesce(s.thang, ns.thang) <= to_char(%(den)s::date, 'YYYY-MM')
+            ORDER BY 1""", {"fy": kx.company_fy, "den": kx.den}).fetchall()
     thang = [{
         "thang": r[0], "company_fy": r[1], "thang_trong_ky": r[2],
         "doanh_thu": int(r[3] or 0), "lai_gop": int(r[4] or 0),
