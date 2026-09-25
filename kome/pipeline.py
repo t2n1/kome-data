@@ -156,7 +156,8 @@ def kiem(conn, path: Path) -> IngestResult:
     return _chuan_bi(conn, path)[1]
 
 
-def ingest(conn, path: Path, archive_dir: Path) -> IngestResult:
+def ingest(conn, path: Path, archive_dir: Path | None) -> IngestResult:
+    """`archive_dir=None` = không lưu file gốc (bản Vercel, 045)."""
     chuan_bi, kq = _chuan_bi(conn, path)
     if chuan_bi is None:
         return kq

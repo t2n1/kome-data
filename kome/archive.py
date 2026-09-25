@@ -22,17 +22,22 @@ def already_loaded(conn: psycopg.Connection, digest: str) -> bool:
 
 
 def store(conn, path: Path, spec_name: str, digest: str,
-          row_count: int, total: int, archive_dir: Path, data_date: date) -> int:
+          row_count: int, total: int, archive_dir: Path | None, data_date: date) -> int:
     """Lưu file gốc rồi ghi nhật ký. Lưu file TRƯỚC khi ghi CSDL.
 
     `data_date` KHÔNG có giá trị mặc định có chủ ý: mặc định `date.today()`
     sẽ biến một lô nạp bù thành "dữ liệu của hôm nay" mà không ai nhận ra, và
     đó đúng là thứ ô cảnh báo tuổi dữ liệu sinh ra để bắt.
+
+    `archive_dir=None` = KHÔNG lưu file gốc (bản Vercel, ổ đĩa tạm — migration
+    045): `archived_to` NULL, mã băm vẫn ghi nên chặn nạp trùng không đổi.
     """
-    folder = Path(archive_dir) / spec_name / date.today().strftime("%Y/%m")
-    folder.mkdir(parents=True, exist_ok=True)
-    dest = folder / f"{path.stem}__{digest[:12]}{path.suffix}"
-    shutil.copy2(path, dest)
+    dest = None
+    if archive_dir is not None:
+        folder = Path(archive_dir) / spec_name / date.today().strftime("%Y/%m")
+        folder.mkdir(parents=True, exist_ok=True)
+        dest = folder / f"{path.stem}__{digest[:12]}{path.suffix}"
+        shutil.copy2(path, dest)
 
     # INSERT lỗi (trùng digest, mất kết nối, ...) thì dọn luôn file vừa chép:
     # không để lại file mồ côi trong kho lưu trữ mà không có lô nào trỏ tới.
@@ -42,11 +47,13 @@ def store(conn, path: Path, spec_name: str, digest: str,
                  (spec_name, source_file, digest, archived_to, row_count,
                   total_amount, data_date)
                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING batch_id""",
-            (spec_name, path.name, digest, str(dest), row_count, total, data_date),
+            (spec_name, path.name, digest, str(dest) if dest else None, row_count, total,
+             data_date),
         ).fetchone()
         conn.commit()
     except Exception:
-        dest.unlink(missing_ok=True)
+        if dest is not None:
+            dest.unlink(missing_ok=True)
         raise
     return row[0]
 
