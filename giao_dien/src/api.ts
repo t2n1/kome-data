@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { baoKhoangMayChu, chuoiKhoang, docKhoang, useKhoang, type KhoangMayChu } from "./khung/khoang";
+import { batDau, docJson } from "./khung/tien_do";
 
 export class LoiApi extends Error {
   constructor(public ma: number, thong_diep: string) { super(thong_diep); }
@@ -8,6 +9,11 @@ export class LoiApi extends Error {
 // fetch() thường: trình duyệt tự gửi If-None-Match và nhận 304 khi dữ liệu
 // chưa đổi (máy chủ trả ETag = phiên bản dữ liệu, kome/web/api.py).
 export async function lay<T>(url: string): Promise<T> {
+  const td = batDau();  // thanh tải chung (khung/ThanhTai.tsx)
+  try { return await layThat<T>(url, td); } finally { td.xong(); }
+}
+
+async function layThat<T>(url: string, td: ReturnType<typeof batDau>): Promise<T> {
   const r = await fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } });
   if (r.status === 401) {
     location.href = "/dang-nhap";
@@ -18,7 +24,7 @@ export async function lay<T>(url: string): Promise<T> {
     try { thong_diep = (await r.json()).loi ?? thong_diep; } catch { /* không phải JSON */ }
     throw new LoiApi(r.status, thong_diep);
   }
-  const d = await r.json();
+  const d = await docJson(r, td);
   // Dữ liệu doanh số mang `khoang` (kome/khoang_xem.py) — báo cho bộ chọn chung
   // để nó in đúng câu mô tả của máy chủ.
   if (d && typeof d === "object" && "khoang" in d)

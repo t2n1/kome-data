@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Nav } from "./khung/Nav";
 import { KhoangXem } from "./khung/KhoangXem";
+import { ThanhTai } from "./khung/ThanhTai";
 import { ganVietLaiLienKet } from "./khung/khoang";
 import { TongQuan } from "./tong_quan/TongQuan";
 import { KD } from "./khoi_dau";
@@ -91,6 +92,7 @@ function Ung() {
   const bc = boChon(location.pathname);
   return (
     <div className="khung">
+      <ThanhTai />
       <Nav />
       <main className="khung-than">
         {bc.hien && <KhoangXem mo={bc.mo} />}

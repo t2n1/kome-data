@@ -118,3 +118,12 @@ a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
 .kx-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.12rem .2rem .12rem .6rem;border-radius:999px;
   border:1px solid var(--vien);background:var(--nen-phu)}
 @media (max-width: 640px){ .kx{padding:.5rem .6rem} .kx-o{max-width:100%} }
+
+/* Thanh tải chung (ThanhTai.tsx) */
+.thanh-tai{position:fixed;top:0;left:0;right:0;z-index:70;pointer-events:none}
+.thanh-tai-vach{height:3px;background:var(--do);transition:width .15s ease-out}
+.thanh-tai-nhan{position:fixed;right:1rem;bottom:1rem;font-size:.75rem;font-weight:600;
+  font-variant-numeric:tabular-nums;padding:.3rem .65rem;border-radius:99px;
+  background:var(--nen-the);color:var(--chu-thuong);border:1px solid var(--vien);
+  box-shadow:0 2px 8px color-mix(in srgb, var(--chu) 12%, transparent)}
+@media (prefers-reduced-motion:reduce){.thanh-tai-vach{transition:none}}
