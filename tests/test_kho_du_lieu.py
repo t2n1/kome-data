@@ -64,12 +64,13 @@ def test_cau_chu_khoi_hoan_tac_du_ba_dieu_bat_buoc():
 
 # Mỗi khối một dấu hiệu nhận biết ổn định (không phải chuỗi trang trí dễ đổi).
 DAU_HIEU_KHOI = {
-    "tuoi du lieu": "hom-nay",
-    "so do nguon": "<SoDoNguon",
+    "tom tat": 'id="hom-nay"',
+    "luoi thang": 'id="theo-thang"',
+    "tung ngay": 'id="theo-ngay"',
     "suc khoe": "Sức khoẻ dữ liệu",
-    "bang 7 loai": "在庫一覧",
-    "bang theo ngay": "theo-ngay",
-    "bang theo thang": 'id="theo-thang"',
+    "bang lan nap cuoi": "在庫一覧",
+    "loai chua vao kho": "Loại dữ liệu chưa vào kho",
+    "han che": "Hạn chế cần biết",
 }
 
 
@@ -84,7 +85,7 @@ def test_man_kho_du_lieu_co_du_cac_khoi(conn, test_db_url):
     for ten, dau_hieu in DAU_HIEU_KHOI.items():
         assert dau_hieu in src or dau_hieu in r.text, f"thiếu khối: {ten}"
     m = man(r.text)
-    for khoa in ("status", "ky", "bang", "bang_ngay", "backup", "nguon", "o_so", "luoi"):
+    for khoa in ("status", "phu", "backup", "nguon", "ngay_thang", "thieu_bo_nap"):
         assert khoa in m, f"thiếu dữ liệu khối {khoa}"
     assert kd(r.text)["tuoi"]["nguon"], "thiếu ô tuổi dữ liệu"
     # Đợt B: nạp + lô gần nhất + hoàn tác sang màn Nạp riêng (theo gói thiết kế).
@@ -100,7 +101,7 @@ def test_man_co_hai_neo_cho_dau_trang_cu(conn, test_db_url):
     src = nguon(*KDL)
     assert '<section id="nap">' in src        # màn Nạp (/nap cũ -> /kho-du-lieu/nap)
     assert '<section id="lo-nap">' in src     # hoàn tác xong quay về đúng khối này
-    assert '<section id="theo-thang">' in src
+    assert '<section id="theo-thang"' in src
 
 
 def test_ban_chi_doc_an_o_tha_file(conn, test_db_url, monkeypatch):
@@ -410,3 +411,5 @@ def test_man_nap_an_o_khong_dung_so_do_nguon_van_du(conn, test_db_url):
     assert o_nap == ["ban", "ton", "khach", "sp", "giao"]
     assert not {"ncc", "gia", "no"} & set(o_nap)
     assert [n["ma"] for n in man(client.get("/kho-du-lieu").text)["nguon"]] == [o["ma"] for o in K.O_NAP]
+    # Lưới độ phủ cũng đủ 8 dòng — nguồn chưa nạp hiện "không có", không biến mất.
+    assert len(man(client.get("/kho-du-lieu").text)["phu"]["dong"]) == len(K.O_NAP)

@@ -282,3 +282,107 @@ def test_cuoi_tuan_khong_lam_tang_so_thieu(conn):
     bang = tinh_bang_ngay(conn, hom_nay=date(2026, 9, 20), so_ngay=7)
     # 14/9 T2 .. 20/9 CN -> chỉ 5 ngày làm việc
     assert bang.thieu["ban"] == 5
+
+
+# --- Lưới toàn cảnh (đặc tả 2026-09-25-tong-quan-do-phu-luoi) ---------------
+# Ngày làm việc tháng 5/2026 tới 13/5: 1, 7, 8, 11, 12, 13 (4–6/5 là lễ, 2–3,
+# 9–10 cuối tuần) — đọc từ mart.lich_kinh_doanh, không đoán.
+NGAY_KD_T5 = [1, 7, 8, 11, 12, 13]
+
+
+def _dong(luoi, khoa):
+    return next(d for d in luoi.dong if d.khoa == khoa)
+
+
+def _o_luoi(luoi, khoa, thang):
+    i = [t.thang for t in luoi.thang].index(thang)
+    return _dong(luoi, khoa).o[i]
+
+
+def _lo_nen(conn, spec, ngay, huy=False, digest=None):
+    conn.execute(
+        f"""INSERT INTO meta.ingest_batch
+              (spec_name, source_file, digest, archived_to, row_count, undone_at, data_date)
+            VALUES (%s, %s, %s, '/tmp/x', 1, {'now()' if huy else 'NULL'}, %s)""",
+        (spec, f"{spec}_{ngay:%Y%m%d}.xlsx", digest or f"{spec}{ngay}{huy}", ngay))
+    conn.commit()
+
+
+def test_luoi_dem_NGAY_LAM_VIEC_va_neu_dich_danh_ngay_thieu(conn, batch):
+    """[IMPORTANT] Ô tháng phải nói ĐỦ hay THIẾU, không chỉ có/không: tháng có
+    5/6 ngày bán mà hiện như tháng đủ là giấu đúng ngày cần xuất lại. Ngày lễ
+    (4–6/5) không bao giờ là "thiếu"."""
+    from kome.coverage import tinh_luoi_phu
+    for d in (1, 7, 8, 11, 13):                      # sót 12/5
+        _nap_ban(conn, batch, date(2026, 5, d))
+    luoi = tinh_luoi_phu(conn, hom_nay=date(2026, 5, 13))
+    o = _o_luoi(luoi, "ban", "2026-05")
+    assert (o.trang_thai, o.so_co) == ("thieu", 5)
+    t5 = next(t for t in luoi.thang if t.thang == "2026-05")
+    assert t5.so_kd == 6 and [i + 1 for i, c in enumerate(t5.lich) if c == "1"] == NGAY_KD_T5
+    assert o.ngay[11] == "k" and o.ngay[3] == "n" and o.ngay[0] == "c"   # 12/5 thiếu · 4/5 lễ · 1/5 có
+    b = _dong(luoi, "ban")
+    assert (b.dau, b.cuoi, b.thieu) == (date(2026, 5, 1), date(2026, 5, 13), [date(2026, 5, 12)])
+    assert _o_luoi(luoi, "ban", "2026-04").trang_thai == "khong"
+    assert luoi.thang[0].thang == "2025-03" and luoi.thang[-1].thang == "2026-05"
+
+
+def test_luoi_thang_du_va_ngay_nghi_co_ban_van_la_co(conn, batch):
+    from kome.coverage import tinh_luoi_phu
+    for d in NGAY_KD_T5 + [9]:                       # 9/5 thứ Bảy vẫn có phiếu
+        _nap_ban(conn, batch, date(2026, 5, d))
+    luoi = tinh_luoi_phu(conn, hom_nay=date(2026, 5, 13))
+    o = _o_luoi(luoi, "ban", "2026-05")
+    assert (o.trang_thai, o.so_co, o.meisai) == ("du", 6, False)
+    assert o.ngay[8] == "c" and _dong(luoi, "ban").thieu == []
+
+
+def test_luoi_danh_dau_ngay_ban_tu_MEISAI(conn, batch):
+    """Bẫy #8: `amount` của 売上明細表 là số chưa thuế, ít cột hơn — tháng đến từ
+    nguồn đó phải nhìn ra được trên lưới."""
+    from kome.coverage import tinh_luoi_phu
+    for d in NGAY_KD_T5:
+        _nap_ban(conn, batch, date(2026, 5, d))
+    conn.execute("UPDATE core.fact_sales_line SET source = 'meisai' WHERE sales_date = '2026-05-13'")
+    conn.commit()
+    luoi = tinh_luoi_phu(conn, hom_nay=date(2026, 5, 13))
+    o = _o_luoi(luoi, "ban", "2026-05")
+    assert o.trang_thai == "du" and o.meisai is True
+    assert o.ngay[12] == "m" and o.ngay[0] == "c"
+
+
+def test_luoi_ton_kho_dem_ngay_anh_chup(conn, batch):
+    from kome.coverage import tinh_luoi_phu
+    _nap_ton(conn, batch, date(2026, 5, 11), n=3)
+    luoi = tinh_luoi_phu(conn, hom_nay=date(2026, 5, 13))
+    o = _o_luoi(luoi, "ton", "2026-05")
+    assert (o.trang_thai, o.so_co) == ("thieu", 3)
+    t = _dong(luoi, "ton")
+    assert (t.dau, t.cuoi, t.thieu) == (date(2026, 5, 11), date(2026, 5, 13), [])
+
+
+def test_luoi_du_lieu_nen_theo_data_date_bo_lo_hoan_tac(conn):
+    """Dữ liệu nền: bản mới đè bản cũ — ô là "tháng này có bản mới", không phải
+    đủ/thiếu. Lô đã hoàn tác không còn trong kho nên không tính."""
+    from kome.coverage import tinh_luoi_phu
+    _lo_nen(conn, "shohin", date(2026, 4, 10))
+    _lo_nen(conn, "shohin", date(2026, 5, 12), huy=True)
+    _lo_nen(conn, "tokuisaki", date(2026, 5, 13))
+    luoi = tinh_luoi_phu(conn, hom_nay=date(2026, 5, 13))
+    sp = _dong(luoi, "shohin")
+    assert sp.nhom == "nen" and sp.cuoi == date(2026, 4, 10)
+    assert _o_luoi(luoi, "shohin", "2026-04").trang_thai == "moi"
+    assert _o_luoi(luoi, "shohin", "2026-04").ngay[9] == "b"
+    assert _o_luoi(luoi, "shohin", "2026-05").trang_thai == "trong"
+    assert _o_luoi(luoi, "tokuisaki", "2026-05").ngay[12] == "b"
+    assert _dong(luoi, "ban").nhom == "lich_su" and _dong(luoi, "ban").dau is None
+
+
+def test_luoi_chi_co_nguon_dang_dung_va_bang_dich(conn):
+    from kome.coverage import COT, tinh_luoi_phu
+    luoi = tinh_luoi_phu(conn, hom_nay=date(2026, 5, 13))
+    assert [d.khoa for d in luoi.dong] == [c.khoa for c in COT]
+    assert _dong(luoi, "seikyu_motocho").nhom == "lich_su" and _dong(luoi, "tanka").nhom == "nen"
+    assert _dong(luoi, "ban").bang == "core.fact_sales_line" and _dong(luoi, "ban").spec == "uriage"
+    assert _dong(luoi, "ban").nhan == "Bán hàng"
+    assert all(len(o.ngay) == len(t.lich) for d in luoi.dong for o, t in zip(d.o, luoi.thang))

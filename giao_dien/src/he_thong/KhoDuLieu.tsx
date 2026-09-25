@@ -1,5 +1,6 @@
 // Màn Kho dữ liệu theo gói thiết kế (Kho dữ liệu.dc.html, đợt B 2026-09-24) —
-// hai màn con: Tổng quan độ phủ (/kho-du-lieu) và Nạp dữ liệu mới
+// hai màn con: Tổng quan độ phủ (/kho-du-lieu — lưới tháng × loại dữ liệu từ
+// 2026-09-25) và Nạp dữ liệu mới
 // (/kho-du-lieu/nap). Máy chủ tính sẵn (kome/web/app.py::_du_lieu_kho /
 // _du_lieu_nap — vai trò NẠP, không qua ảnh chụp: phải thấy lô vừa nạp ngay) và
 // chèn vào window.__KOME__.man. Màu và câu của từng nguồn tính ở
@@ -11,15 +12,14 @@
 // khối hoàn tác. Hoàn tác nằm sau <details>: người bấm phải đọc "xoá bao nhiêu
 // dòng, khỏi bảng nào" trước. Bản Vercel (045) nạp được file hằng ngày, nhưng trần
 // 4,5 MB mỗi yêu cầu: trình duyệt chặn file quá KD.gioi_han_tai_len trước khi gửi.
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { KD } from "../khoi_dau";
-import { gio_tokyo, so, yen } from "../dinh_dang";
+import { gio_tokyo, ngay, so, yen } from "../dinh_dang";
+import { giuKhoang } from "../khung/khoang";
 import { DaiTuoi } from "../tong_quan/DaiTuoi";
 import { KhungKho } from "./TabKho";
 import "./he_thong.css";
 
-type O = { trang_thai: string; ky_hieu: string; mo_ta: string };
-type Cot = { khoa?: string; nhan: string; chu_giai: string; ten_obc: string; mo_ta?: string };
 type Loi = { gate: number; message: string };
 type Ket = { spec_name: string | null; skipped: boolean; ok: boolean; row_count: number; total: number;
   blockers: Loi[]; warnings: Loi[] };
@@ -33,16 +33,11 @@ type Kiem = { ma: string | null; ten_file: string; o: string; spec_name: string 
   cong: { so: number; ten: string; trang_thai: "dat" | "chan" | "canh" | "khong_chay"; loi: string[] }[] };
 type Man = {
   status: { name: string; spec: string; last: string | null; rows: number; total: number; co_tien: boolean }[];
-  ky: { dau: string | null; cuoi: string | null; thieu: string[]; tu?: string; thang_trong?: string[] };
   backup: { stale: boolean; last: string | null } | null;
   nguon: Nut[];
-  o_so: { nhan: string; gia: number; phu: string; mau: string }[];
-  luoi: { thang: string; truoc: string | null; sau: string | null };
-  bang_ngay: { dau: string; cuoi: string; co_thieu: boolean; cot: Cot[]; thieu: Record<string, number>;
-    ngay: { ngay: string; nhan_thu: string; la_cuoi_tuan: boolean; o: O[] }[] };
-  bang: { dau_du_lieu: string; cot: Cot[]; thieu_bo_nap: { ten_obc: string; mo_ta: string; ghi_chu: string }[];
-    ky: { nhan: string; dau: string; cuoi: string; du_12_thang: boolean; doanh_thu_thuan: number; lai_gop: number; ty_suat: number | null;
-      thang: { thang: string; company_fy_month: number; la_thang_chot_ky: boolean; o: O[] }[] }[] };
+  phu: Phu;
+  ngay_thang: string | null;
+  thieu_bo_nap: { ten_obc: string; mo_ta: string; ghi_chu: string }[];
 };
 type ManNap = { nguon: Nut[]; lo: Lo[]; cho: { ma: string; ten_file: string; o: string; luc: string }[]; kiem?: Kiem[]; results?: Ket[] };
 
@@ -51,89 +46,222 @@ const gio = (iso: string | null) => gio_tokyo(iso);
 const nhanThang = (t: string) => `${+t.slice(5)}/${t.slice(0, 4)}`;
 
 // ---------------------------------------------------------------------------
-// Tổng quan độ phủ
+// Tổng quan độ phủ — lưới tháng × loại dữ liệu (đặc tả
+// 2026-09-25-tong-quan-do-phu-luoi-design.md). Câu hỏi của màn: "đã có dữ liệu
+// tháng nào, loại nào". Máy chủ tính mọi ô (kome/coverage.py::tinh_luoi_phu),
+// kể cả từng NGÀY của mọi tháng — đổi tháng ở khối chi tiết không hỏi máy chủ.
 // ---------------------------------------------------------------------------
 
 export default function KhoDuLieu() {
   const m = KD.man as Man;
+  const p = m.phu;
+  const [chon, datChon] = useState(() => {
+    const i = p.thang.findIndex(t => t.thang === m.ngay_thang);
+    return i >= 0 ? i : p.thang.length - 1;
+  });
+  const doiThang = (i: number, cuon = false) => {
+    datChon(i);
+    history.replaceState(null, "", giuKhoang(`/kho-du-lieu?ngay_thang=${p.thang[i].thang}`));
+    if (cuon) document.getElementById("theo-ngay")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   return (
     <KhungKho dang="tong-quan" lop="kdl">
       <h1>Tổng quan độ phủ dữ liệu</h1>
-      <p className="ghi-chu">Có gì trong kho, cập nhật đến ngày nào — theo NGÀY cho 3 loại dữ liệu cập nhật hằng ngày, theo THÁNG cho mọi loại file.</p>
-      <section id="hom-nay"><DaiTuoi /></section>
-      <SoDoNguon nut={m.nguon} />
-      <div className="kdl-o-so">{m.o_so.map(o => (
-        <div key={o.nhan} className="kdl-o-so-o"><div className="nhan">{o.nhan}</div>
-          <div className={"gia" + (o.mau ? " " + o.mau : "")}>{so(o.gia)}</div><div className="phu">{o.phu}</div></div>))}</div>
-      <section id="theo-ngay"><LuoiNgay b={m.bang_ngay} luoi={m.luoi} /></section>
-      <SucKhoe m={m} />
-      <ChuGiai dau={m.bang.dau_du_lieu} />
-      <BangThang b={m.bang} />
+      <p className="ghi-chu">Kho đang có dữ liệu tháng nào, của loại nào. Mỗi dòng một loại dữ liệu, mỗi cột một tháng — bấm một tháng để xem từng ngày.</p>
+      <TomTat m={m} />
+      <LuoiThang m={m} chon={chon} doiThang={doiThang} />
+      <ChiTietThang p={p} i={chon} doiThang={doiThang} />
+      <CuoiTrang m={m} />
     </KhungKho>
   );
 }
 
-// Sơ đồ nguồn: OBC ở giữa, mỗi ô nạp một nhánh (vị trí là trang trí — chữ mới là
-// thứ đọc được, nên dưới 640px sơ đồ thành lưới thẻ, xem he_thong.css).
-const W = 760, H = 500, CX = 380, CY = 250, RX = 285, RY = 190;
-const MAU_DAY: Record<Nut["mau"], string> = { ok: "var(--ok-chu)", cho: "var(--canh-chu)", do: "var(--loi-chu)", nen: "var(--vien-dam)" };
+type OL = { trang_thai: "du" | "thieu" | "khong" | "moi" | "trong"; so_co: number; meisai: boolean; ngay: string };
+type DongL = { khoa: string; spec: string; nhan: string; ten_obc: string; nhom: "lich_su" | "nen"; bang: string;
+  o: OL[]; dau: string | null; cuoi: string | null; thieu: string[] };
+type ThangL = { thang: string; ky: string; chot: boolean; so_kd: number; lich: string };
+type Phu = { dau_du_lieu: string; hom_nay: string; thang: ThangL[]; dong: DongL[] };
 
-function SoDoNguon({ nut }: { nut: Nut[] }) {
-  const vi = nut.map((_, i) => {
-    const g = -Math.PI / 2 + (2 * Math.PI * i) / nut.length;
-    return { x: CX + RX * Math.cos(g), y: CY + RY * Math.sin(g) };
-  });
+const nutCua = (nguon: Nut[], d: DongL) => nguon.find(n => n.spec === d.spec);
+
+function TomTat({ m }: { m: Man }) {
+  const p = m.phu;
+  const hangNgay = m.nguon.filter(n => n.nhip === "ngay");
+  const da = hangNgay.filter(n => n.nap_hom_nay);
+  // Ngày nghỉ (cuối tuần, lễ) không ai xuất file — "0/3 · còn: …" hôm đó là một nhắc việc sai.
+  const nghi = hangNgay.length > 0 && hangNgay.every(n => n.cau.startsWith("hôm nay nghỉ"));
+  const mauHomNay = nghi ? "" : hangNgay.some(n => n.mau === "do") ? "loi" : da.length < hangNgay.length ? "canh" : "ok";
   return (
-    <section className="kdl-so-do-khung" aria-label="Các nguồn dữ liệu OBC">
-      <div className="kdl-so-do">
-        <svg viewBox={`0 0 ${W} ${H}`} aria-hidden="true" focusable="false">
-          {vi.map((p, i) => {
-            const n = nut[i];
-            return <path key={n.ma} d={`M${CX},${CY} Q${(CX + p.x) / 2 + (p.y - CY) * .15},${(CY + p.y) / 2 - (p.x - CX) * .15} ${p.x},${p.y}`}
-              fill="none" stroke={MAU_DAY[n.mau]} strokeWidth={n.mau === "nen" ? 1.5 : 2.5} strokeLinecap="round"
-              strokeDasharray={n.mau === "nen" ? "4 5" : undefined} />;
-          })}
-        </svg>
-        <div className="kdl-tam"><b>OBC</b><span>hệ thống<br />bán hàng</span></div>
-        {nut.map((n, i) => (
-          <a key={n.ma} href={`/kho-du-lieu/bang/${n.bang}`} className={"kdl-nut " + n.mau}
-            style={{ left: `${(vi[i].x / W) * 100}%`, top: `${(vi[i].y / H) * 100}%` }}>
-            <span className="cham" aria-hidden="true" />
-            <b>{n.nhan}</b><span className="ja">{n.ja}</span><span className="cau">{n.cau}</span></a>))}
-      </div>
-      <div className="kdl-chu-giai-nguon">
-        <span><i className="ok" />đúng nhịp hằng ngày</span><span><i className="nen" />dữ liệu nền / sổ theo kỳ, ít đổi</span>
-        <span><i className="cho" />chưa tới 13:30</span><span><i className="do" />trễ so với nhịp — cần nạp</span>
-        <span className="phai">Bấm một nhánh để xem dữ liệu của loại đó.</span>
+    <section id="hom-nay" className="kdl-tt">
+      {m.phu.dong.filter(d => d.nhom === "lich_su").map(d => {
+        const meisai = d.o.filter(o => o.meisai).length;
+        // Cả THÁNG trống giữa ngày đầu và ngày cuối (sự cố thật: tháng 8/2026) — gọi
+        // đích danh, không để nó chìm trong "thiếu n ngày": mọi màn coi tháng đó là bán ¥0.
+        const trong = d.dau ? p.thang.filter((t, i) => d.o[i].trang_thai === "khong"
+          && t.thang > d.dau!.slice(0, 7) && t.thang < d.cuoi!.slice(0, 7)).map(t => nhanThang(t.thang)) : [];
+        return (
+          <div key={d.khoa} className="kdl-tt-o">
+            <div className="nhan">{d.nhan} có liên tục</div>
+            <div className="gia">{d.dau ? <>{ngay(d.dau)} → {ngay(d.cuoi)}</> : "chưa có dữ liệu"}</div>
+            {d.dau && <div className={"phu " + (d.thieu.length ? "canh" : "ok")}>{d.thieu.length
+              ? `thiếu ${d.thieu.length} ngày làm việc`
+              : "không thiếu ngày làm việc nào"}</div>}
+            {trong.length > 0 && <div className="phu loi">cả tháng không có dòng nào: {trong.join(" · ")} — mọi màn đang coi là ¥0</div>}
+            {meisai > 0 && <div className="phu">{meisai} tháng có ngày lấy từ 売上明細表</div>}
+          </div>);
+      })}
+      <div className="kdl-tt-o">
+        <div className="nhan">Hôm nay (nhịp 13:30)</div>
+        <div className="gia">{da.length}/{hangNgay.length} file đã nạp</div>
+        <div className={"phu " + mauHomNay}>{nghi && da.length < hangNgay.length ? "hôm nay nghỉ — không cần nạp"
+          : da.length === hangNgay.length ? "đủ nhịp"
+          : "còn: " + hangNgay.filter(n => !n.nap_hom_nay).map(n => n.nhan).join(" · ")}</div>
       </div>
     </section>
   );
 }
 
-const TEN_NGAY: Record<string, string> = { ban: "Bán hàng", ton: "Tồn kho", tokuisaki: "Khách hàng" };
+const CHU_O: Record<OL["trang_thai"], string> = {
+  du: "đủ mọi ngày làm việc", thieu: "thiếu một phần", khong: "không có dữ liệu",
+  moi: "có xuất bản mới trong tháng", trong: "không có bản mới — vẫn dùng bản trước",
+};
 
-function LuoiNgay({ b, luoi }: { b: Man["bang_ngay"]; luoi: Man["luoi"] }) {
-  const ngay = [...b.ngay].reverse();              // máy chủ trả mới nhất trước
-  const dat = (t: string | null) => t ? `/kho-du-lieu?ngay_thang=${t}#theo-ngay` : undefined;
+function moTaO(d: DongL, o: OL, t: ThangL) {
+  const dau = `${d.nhan} · tháng ${nhanThang(t.thang)}: `;
+  if (d.nhom === "nen") return dau + (o.so_co ? `${o.so_co} lần xuất bản mới` : CHU_O.trong);
+  if (o.trang_thai === "khong") return dau + CHU_O.khong;
+  return dau + `${o.so_co}/${t.so_kd} ngày làm việc có dữ liệu` + (o.meisai ? " · có ngày lấy từ 売上明細表" : "");
+}
+
+function LuoiThang({ m, chon, doiThang }: { m: Man; chon: number; doiThang: (i: number, cuon?: boolean) => void }) {
+  const p = m.phu, n = p.thang.length;
+  // Dải kỳ kế toán: gộp các tháng liền nhau cùng một kỳ thành một ô.
+  const ky: { ky: string; so: number }[] = [];
+  p.thang.forEach(t => { if (ky.length && ky[ky.length - 1].ky === t.ky) ky[ky.length - 1].so++; else ky.push({ ky: t.ky, so: 1 }); });
+  const nhom = [["lich_su", "Lịch sử — mỗi ngày một phần, thiếu ngày là thiếu số"],
+    ["nen", "Dữ liệu nền — bản mới đè bản cũ, tháng trống không phải thiếu"]] as const;
+  return (
+    <section id="theo-thang" aria-label="Độ phủ theo tháng">
+      <div className="bang-cuon">
+        <div className="kdl-l" style={{ gridTemplateColumns: `minmax(8.5rem,11rem) repeat(${n}, minmax(1.7rem,1fr)) minmax(8rem,12rem)` }}>
+          <div />{ky.map(k => <div key={k.ky} className="kdl-l-ky" style={{ gridColumn: `span ${k.so}` }}>{k.ky}</div>)}<div />
+          <div />{p.thang.map((t, i) => (
+            <button key={t.thang} type="button" className={"kdl-l-thang" + (i === chon ? " chon" : "") + (t.chot ? " chot" : "")}
+              aria-pressed={i === chon} aria-label={`Xem từng ngày tháng ${nhanThang(t.thang)}`} onClick={() => doiThang(i, true)}>
+              {+t.thang.slice(5)}<span>{i === 0 || t.thang.endsWith("-01") ? `’${t.thang.slice(2, 4)}` : " "}</span></button>))}
+          <div className="kdl-l-dau-cot">Tình trạng</div>
+          {nhom.map(([ma, nhan]) => {
+            const ds = p.dong.filter(d => d.nhom === ma);
+            return ds.length ? [
+              <div key={ma} className="kdl-l-nhom">{nhan}</div>,
+              ...ds.flatMap(d => {
+                const nut = nutCua(m.nguon, d);
+                return [
+                  <a key={d.khoa + "-ten"} className="kdl-l-ten" href={`/kho-du-lieu/bang/${d.bang}`}><b>{d.nhan}</b><span>{d.ten_obc}</span></a>,
+                  ...d.o.map((o, i) => (
+                    <div key={d.khoa + i} className={`kdl-l-o o-${o.trang_thai}` + (o.meisai ? " meisai" : "") + (i === chon ? " chon" : "")}
+                      title={moTaO(d, o, p.thang[i])} onClick={() => doiThang(i, true)}>
+                      {o.trang_thai === "thieu" ? o.so_co : ""}</div>)),
+                  <div key={d.khoa + "-tt"} className={"kdl-l-tt " + (nut?.mau ?? "nen")}>
+                    {nut?.cau ?? ""}{d.nhom === "nen" && d.cuoi && <span>bản {ngay(d.cuoi)}</span>}</div>,
+                ];
+              }),
+            ] : null;
+          })}
+        </div>
+      </div>
+      <div className="kdl-l-chu-giai">
+        <span><i className="kdl-l-o o-du" />đủ mọi ngày làm việc</span>
+        <span><i className="kdl-l-o o-du meisai" />đủ, có ngày lấy từ 売上明細表 (ít cột, doanh thu chưa thuế)</span>
+        <span><i className="kdl-l-o o-thieu">5</i>thiếu một phần — số là ngày làm việc có dữ liệu</span>
+        <span><i className="kdl-l-o o-khong" />không có dữ liệu</span>
+        <span><i className="kdl-l-o o-moi" />có xuất bản mới trong tháng</span>
+        <span><i className="kdl-chot-mau" />tháng chốt kỳ</span>
+      </div>
+    </section>
+  );
+}
+
+const LOP_NGAY: Record<string, string> = { c: "o-du", m: "o-du meisai", k: "o-khong", n: "o-nghi", x: "o-ngoai", b: "o-moi", ".": "" };
+const CHU_NGAY: Record<string, string> = { c: "có dữ liệu", m: "có dữ liệu (từ 売上明細表)", k: "THIẾU — ngày làm việc không có dữ liệu",
+  n: "ngày nghỉ", x: "trước ngày đầu của kho — không tồn tại", b: "có xuất bản mới", ".": "không có bản mới" };
+
+function ChiTietThang({ p, i, doiThang }: { p: Phu; i: number; doiThang: (i: number) => void }) {
+  const t = p.thang[i];
+  if (!t) return null;
+  const lichSu = p.dong.filter(d => d.nhom === "lich_su");
+  const viec: { loai: string; d: DongL; cau: ReactNode }[] = [];
+  for (const d of lichSu) {
+    const o = d.o[i], thieu = d.thieu.filter(x => x.startsWith(t.thang));
+    if (thieu.length) viec.push({ loai: "canh", d, cau: <>thiếu {thieu.length} ngày làm việc: <strong>{thieu.map(x => +x.slice(8)).join(", ")}</strong> — xuất
+      lại {d.ten_obc} của đúng những ngày đó từ OBC rồi nạp.</> });
+    else if (o.trang_thai === "khong") viec.push({ loai: "nhat", d, cau: <>chưa có dữ liệu tháng này{d.dau && t.thang < d.dau.slice(0, 7)
+      ? <> — dữ liệu bắt đầu từ {ngay(d.dau)}</> : null}.</> });
+  }
+  const coMeisai = lichSu.some(d => d.o[i].meisai);
+  return (
+    <section id="theo-ngay">
+      <div className="tieu-de-khoi">
+        <h2>Từng ngày — tháng {nhanThang(t.thang)}</h2>
+        <span className="kdl-dieu">
+          <button type="button" className="nut-nho" disabled={i === 0} onClick={() => doiThang(i - 1)} aria-label="Tháng trước">‹</button>
+          <button type="button" className="nut-nho" disabled={i === p.thang.length - 1} onClick={() => doiThang(i + 1)} aria-label="Tháng sau">›</button>
+        </span>
+        <span className="khong-ap-dung">{t.ky} · {t.so_kd} ngày làm việc{t.chot ? " · tháng chốt kỳ" : ""}</span>
+      </div>
+      <div className="bang-cuon">
+        <div className="kdl-l kdl-l-ngay" style={{ gridTemplateColumns: `minmax(8.5rem,11rem) repeat(${t.lich.length}, minmax(1.25rem,1fr))` }}>
+          <div />{[...t.lich].map((c, j) => <div key={j} className={"kdl-l-so" + (c === "0" ? " nghi" : "")}>{j + 1}</div>)}
+          {p.dong.flatMap(d => [
+            <div key={d.khoa} className="kdl-l-ten"><b>{d.nhan}</b><span>{d.ten_obc}</span></div>,
+            ...[...d.o[i].ngay].map((c, j) => <div key={d.khoa + j} className={"kdl-l-o " + LOP_NGAY[c]}
+              title={`${j + 1}/${nhanThang(t.thang)} · ${d.nhan}: ${CHU_NGAY[c]}`} />),
+          ])}
+        </div>
+      </div>
+      {viec.length ? viec.map(v => <div key={v.d.khoa} className={v.loai === "canh" ? "ngay-thieu" : "ky"}><strong>{v.d.nhan}</strong> {v.cau}</div>)
+        : <div className="backup-ok">✅ Đủ dữ liệu mọi ngày làm việc trong tháng này.</div>}
+      {coMeisai && <div className="ky">Ô sọc: ngày bán lấy từ <strong>売上明細表</strong> — bản đó ít cột hơn 売上伝票データ và doanh thu là số chưa thuế.</div>}
+      <p className="chu-thich">Ngày nghỉ (cuối tuần, ngày lễ quốc gia) không bao giờ tính là thiếu. Ngày nghỉ riêng của công ty (Obon, cuối năm) kho
+        không biết, nên vẫn đếm là ngày làm việc — kiểm tra trước khi đi tìm file.</p>
+    </section>
+  );
+}
+
+function CuoiTrang({ m }: { m: Man }) {
+  const b = m.backup;
   return (<>
-    <div className="tieu-de-khoi">
-      <h2>Theo ngày — tháng {nhanThang(luoi.thang)}</h2>
-      <span className="kdl-dieu">
-        {luoi.truoc ? <a className="nut-nho" href={dat(luoi.truoc)} aria-label="Tháng trước">‹</a> : <span className="nut-nho mo" aria-hidden="true">‹</span>}
-        {luoi.sau ? <a className="nut-nho" href={dat(luoi.sau)} aria-label="Tháng sau">›</a> : <span className="nut-nho mo" aria-hidden="true">›</span>}
-      </span>
-      <span className="khong-ap-dung">3 loại cập nhật hằng ngày · {b.dau} → {b.cuoi}</span>
-    </div>
-    {b.co_thieu ? <div className="ngay-thieu">⚠️ Trong tháng này:{" "}
-      {b.cot.filter(c => b.thieu[c.khoa!]).map((c, i, a) => <span key={c.khoa}><strong>{c.ten_obc}</strong> thiếu {b.thieu[c.khoa!]} ngày làm việc{i < a.length - 1 ? " · " : ""}</span>)}</div>
-      : <div className="backup-ok">✅ Đủ dữ liệu mọi ngày làm việc trong tháng này.</div>}
-    <div className="bang-cuon"><table className="phu kdl-luoi">
-      <thead><tr><th />{ngay.map(n => <th key={n.ngay} className={n.la_cuoi_tuan ? "nghi" : undefined} title={`${n.ngay} · ${n.nhan_thu}`}>{+n.ngay.slice(8)}</th>)}</tr></thead>
-      <tbody>{b.cot.map((c, j) => (
-        <tr key={c.nhan}><th className="ten"><div>{TEN_NGAY[c.khoa!] ?? c.nhan}</div><div className="ja">{c.ten_obc}</div></th>
-          {ngay.map(n => { const o = n.o[j]; return <td key={n.ngay} className={"o o-" + o.trang_thai} title={`${n.ngay} · ${c.ten_obc}: ${o.mo_ta}`}>{o.ky_hieu}</td>; })}</tr>))}</tbody>
-    </table></div>
-    <p className="chu-thich">Cuối tuần và ngày lễ để trống — không ai xuất file hôm đó. 4 loại master xuất thưa nằm ở bảng tháng bên dưới.</p>
+    {/* Sao lưu cũ thì khối tự mở: một cảnh báo nằm sau nút thu gọn là cảnh báo không ai đọc. */}
+    <details id="suc-khoe" className="kdl-gon" open={b?.stale || undefined}>
+      <summary><h2>Sức khoẻ dữ liệu — sao lưu, lần nạp cuối</h2></summary>
+      {/* backup null ở bản chỉ-đọc: máy chủ công khai không thấy thư mục sao lưu — im lặng đúng hơn một dải đỏ vĩnh viễn. */}
+      {b == null ? <div className="ky">💾 Tình trạng sao lưu chỉ xem được trên bản chạy ở máy trong công ty.</div>
+        : b.stale ? <div className="backup-bad">⚠️ Chưa sao lưu {b.last ? `từ ${gio(b.last)}` : "— chưa có bản sao lưu nào"} — chạy sao lưu ngay:
+          <code>python -c "from ops.backup import dump, prune; import os, pathlib; dump(os.environ['DATABASE_URL'], pathlib.Path('backups')); prune(pathlib.Path('backups'))"</code></div>
+        : <div className="backup-ok">✅ Sao lưu gần nhất: {gio(b.last)}</div>}
+      <div className="bang-cuon"><table>
+        <thead><tr><th>Loại file</th><th>Nạp lần cuối</th><th>Số dòng</th><th>Tổng tiền</th></tr></thead>
+        <tbody>{m.status.map(s => (
+          <tr key={s.name}><td>{s.name}</td>
+            <td>{s.last ? gio(s.last) : <span className="missing">CHƯA CÓ DỮ LIỆU</span>}</td>
+            <td>{so(s.rows)}</td>
+            {/* "—" cho loại file không mang tiền (master): "¥0" sẽ bị đọc là đếm hụt tiền. */}
+            <td>{s.co_tien ? yen(s.total) : <span className="khong-ap-dung" title="Loại file này không mang giá trị tiền">—</span>}</td></tr>))}</tbody>
+      </table></div>
+    </details>
+    <details className="kdl-gon">
+      <summary><h2>Loại dữ liệu chưa vào kho</h2></summary>
+      <div className="bang-cuon"><table><tbody>{m.thieu_bo_nap.map(l => <tr key={l.ten_obc}><td>{l.ten_obc}</td><td>{l.mo_ta}</td><td>{l.ghi_chu}</td></tr>)}</tbody></table></div>
+    </details>
+    <details className="kdl-gon">
+      <summary><h2>Hạn chế cần biết</h2></summary>
+      <div className="ky">📌 Dữ liệu bán hàng bắt đầu từ <strong>{ngay(m.phu.dau_du_lieu)}</strong>. Trước mốc đó dữ liệu{" "}
+        <strong>không tồn tại</strong> (công ty không còn lưu) — lưới bắt đầu từ tháng đó, không có gì để đi tìm.</div>
+      <div className="ngay-thieu">⚠️ Ô "không có dữ liệu" <strong>không phân biệt được</strong> hai trường hợp: (a) chưa bao giờ xuất file cho
+        khoảng đó, và (b) đã xuất nhưng file bị cổng kiểm tra chặn (bản xuất thiếu dòng, sai mẫu…). Cổng kiểm tra chặn <strong>trước khi</strong>{" "}
+        ghi nhật ký nạp, nên kho không hề biết file đó từng tồn tại. Muốn biết chắc thì đối chiếu với thư mục xuất của OBC.</div>
+      <div className="ky">Dải trên đầu lưới là kỳ kế toán của công ty: <strong>1/8 → 31/7</strong> năm sau (không phải 1/4 → 31/3).</div>
+    </details>
   </>);
 }
 
@@ -292,40 +420,6 @@ function KhoiKet({ ket }: { ket?: Ket[] }) {
   );
 }
 
-function SucKhoe({ m }: { m: Man }) {
-  const b = m.backup, k = m.ky;
-  return (
-    <section id="suc-khoe">
-      <h2>Sức khoẻ dữ liệu</h2>
-      {/* backup null ở bản chỉ-đọc: máy chủ công khai không thấy thư mục sao lưu — im lặng đúng hơn một dải đỏ vĩnh viễn. */}
-      {b == null ? <div className="ky">💾 Tình trạng sao lưu chỉ xem được trên bản chạy ở máy trong công ty.</div>
-        : b.stale ? <div className="backup-bad">⚠️ Chưa sao lưu {b.last ? `từ ${gio(b.last)}` : "— chưa có bản sao lưu nào"} — chạy sao lưu ngay:
-          <code>python -c "from ops.backup import dump, prune; import os, pathlib; dump(os.environ['DATABASE_URL'], pathlib.Path('backups')); prune(pathlib.Path('backups'))"</code></div>
-        : <div className="backup-ok">✅ Sao lưu gần nhất: {gio(b.last)}</div>}
-      {k.cuoi ? <>
-        <div className="ky">📅 Kỳ dữ liệu bán hàng: <strong>{k.dau}</strong> → <strong>{k.cuoi}</strong></div>
-        {(k.thang_trong ?? []).length > 0 && <div className="ngay-thieu">⚠️ <strong>Cả tháng không có dòng bán nào:</strong>{" "}
-          {k.thang_trong!.map((t, i) => <span key={t}><strong>{t}</strong>{i < k.thang_trong!.length - 1 ? " · " : ""}</span>)}
-          <br />Mọi màn đang coi các tháng này là bán ¥0 — "tháng trước", nhịp mua, tốc độ bán, dự báo đều lệch theo. Xuất
-          売上明細表 của trọn tháng đó từ OBC rồi kéo–thả vào trang nạp.</div>}
-        {k.thieu.length > 0 && <div className="ngay-thieu">⚠️ <strong>Thiếu {k.thieu.length} ngày làm việc</strong> trong khoảng {k.tu} → {k.cuoi}:{" "}
-          {k.thieu.map((d, i) => <span key={d}><strong>{d}</strong>{i < k.thieu.length - 1 ? " · " : ""}</span>)}
-          <br />Ngày lễ quốc gia đã được bỏ qua — kiểm tra xem hôm đó công ty có nghỉ riêng (Obon, cuối năm) không. Nếu không, xuất lại
-          売上明細表 của đúng ngày đó từ OBC rồi kéo–thả vào trang nạp.</div>}
-      </> : <div className="ky">📅 Chưa có dòng bán hàng nào — chưa xác định được kỳ dữ liệu.</div>}
-      <div className="bang-cuon"><table>
-        <thead><tr><th>Loại file</th><th>Nạp lần cuối</th><th>Số dòng</th><th>Tổng tiền</th></tr></thead>
-        <tbody>{m.status.map(s => (
-          <tr key={s.name}><td>{s.name}</td>
-            <td>{s.last ? gio(s.last) : <span className="missing">CHƯA CÓ DỮ LIỆU</span>}</td>
-            <td>{so(s.rows)}</td>
-            {/* "—" cho loại file không mang tiền (master): "¥0" sẽ bị đọc là đếm hụt tiền. */}
-            <td>{s.co_tien ? yen(s.total) : <span className="khong-ap-dung" title="Loại file này không mang giá trị tiền">—</span>}</td></tr>))}</tbody>
-      </table></div>
-    </section>
-  );
-}
-
 function LoNap({ lo }: { lo: Lo[] }) {
   return (
     <section id="lo-nap">
@@ -358,57 +452,3 @@ function LoNap({ lo }: { lo: Lo[] }) {
     </section>
   );
 }
-
-function ChuGiai({ dau }: { dau: string }) {
-  return (<>
-    <div className="chu-giai">
-      <span><i className="mau o-co">●</i> có dữ liệu trong kho</span>
-      <span><i className="mau o-khong">·</i> không có dữ liệu</span>
-      <span><i className="mau o-ngoai">—</i> ngoài phạm vi</span>
-      <span><i className="mau o-co">7</i> cột tồn kho: SỐ NGÀY có ảnh chụp</span>
-      <span><i className="mau" style={{ background: "var(--do-nen)", color: "var(--do-chu)" }}>7月</i> tháng chốt kỳ</span>
-    </div>
-    <div className="ky">📌 <strong>Ràng buộc vĩnh viễn:</strong> dữ liệu bán hàng bắt đầu từ <strong>{dau}</strong>. Trước mốc đó{" "}
-      <strong>không tồn tại</strong> — công ty không còn lưu (đặc tả §2.2.1). Các tháng trước mốc hiện là <strong>"ngoài phạm vi"</strong>, đó{" "}
-      <em>không phải</em> là thiếu dữ liệu và <em>không</em> có gì để đi tìm.</div>
-    <div className="ngay-thieu">⚠️ <strong>Hạn chế cần biết:</strong> ô "không có dữ liệu" <strong>không phân biệt được</strong> hai trường hợp:
-      (a) chưa bao giờ xuất file cho tháng đó, và (b) đã xuất nhưng file bị cổng kiểm tra chặn (bản xuất thiếu dòng, sai mẫu…). Cổng kiểm tra
-      chặn <strong>trước khi</strong> ghi nhật ký nạp, nên kho không hề biết file đó từng tồn tại. Muốn biết chắc thì đối chiếu với thư mục xuất của OBC.</div>
-  </>);
-}
-
-function BangThang({ b }: { b: Man["bang"] }) {
-  return (
-    <section id="theo-thang">
-      <h2 className="kdl-vach">Theo tháng, nhóm theo kỳ kế toán</h2>
-      <p className="chu-thich">Mỗi dòng là một tháng, mỗi cột là một loại file xuất từ OBC. Nhóm theo <strong>kỳ kế toán của công ty: 1/8 → 31/7
-        năm sau</strong> (không phải năm tài chính Nhật chuẩn 1/4 → 31/3).</p>
-      <p className="chu-thich">Bảng này có đủ 7 loại file và trải toàn bộ lịch sử. Dùng để soát lịch sử; muốn biết hôm qua có sót ngày nào thì xem
-        bảng ngày ở trên.</p>
-      {b.ky.map(k => (
-        <div key={k.nhan} className="khoi-ky">
-          <h2>{k.nhan}</h2>
-          <div className="chu-thich">{k.dau} → {k.cuoi}{!k.du_12_thang && <> · <strong>kỳ không đủ 12 tháng trong phạm vi dữ liệu</strong> — đừng
-            đem so tổng kỳ này với kỳ khác</>}</div>
-          <div className="tom-tat">
-            <div>Doanh thu thuần<b>{yen(k.doanh_thu_thuan)}</b></div>
-            <div>Lãi gộp<b>{yen(k.lai_gop)}</b></div>
-            <div>Tỷ suất lãi gộp<b>{k.ty_suat == null ? <span className="khong-ap-dung">chưa có doanh thu</span> : (k.ty_suat * 100).toFixed(1).replace(".", ",") + "%"}</b></div>
-          </div>
-          <div className="bang-cuon"><table className="phu">
-            <thead><tr><th>Tháng</th><th>Tháng thứ<br />trong kỳ</th>{b.cot.map(c => <th key={c.nhan} title={c.chu_giai}>{c.nhan}</th>)}</tr></thead>
-            <tbody>{k.thang.map(t => (
-              <tr key={t.thang} className={t.la_thang_chot_ky ? "chot-ky" : undefined}>
-                <td className="thang">{t.thang}{t.la_thang_chot_ky ? " · chốt kỳ" : ""}</td><td>{t.company_fy_month}</td>
-                {t.o.map((o, i) => <td key={i} className={"o o-" + o.trang_thai} title={`${b.cot[i]?.chu_giai ?? ""}: ${o.mo_ta}`}>{o.ky_hieu}</td>)}
-              </tr>))}</tbody>
-          </table></div>
-        </div>))}
-      <h2>Chú giải cột</h2>
-      <div className="bang-cuon"><table><tbody>{b.cot.map(c => <tr key={c.nhan}><td><strong>{c.nhan}</strong></td><td>{c.ten_obc}</td><td>{c.mo_ta}</td></tr>)}</tbody></table></div>
-      <h2>Loại dữ liệu CHƯA vào kho</h2>
-      <div className="bang-cuon"><table><tbody>{b.thieu_bo_nap.map(l => <tr key={l.ten_obc}><td>{l.ten_obc}</td><td>{l.mo_ta}</td><td>{l.ghi_chu}</td></tr>)}</tbody></table></div>
-    </section>
-  );
-}
-

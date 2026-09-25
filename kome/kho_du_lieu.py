@@ -1,14 +1,14 @@
 """Màn Kho dữ liệu theo gói thiết kế (đợt B, 2026-09-24): Tổng quan + Nạp hai bước.
 
-Hàm thuần — mọi truy vấn vẫn là của `kome/web/app.py::_du_lieu_kho` (cộng MỘT câu
-danh mục `pg_class` cho ô "Bảng trong kho"/"Tổng số dòng"). Ở đây chỉ dựng hình
-dạng cho giao diện: nút của sơ đồ nguồn, bốn ô số, các ô nạp, năm dòng cổng kiểm.
+Hàm thuần — mọi truy vấn là của `kome/web/app.py::_du_lieu_kho` / `_du_lieu_nap`.
+Ở đây chỉ dựng hình dạng cho giao diện: tình trạng từng nguồn (cột cuối của lưới độ
+phủ, các ô nạp), năm dòng cổng kiểm.
 
 Đặc tả: docs/superpowers/specs/2026-09-24-kho-du-lieu-theo-thiet-ke-design.md §B.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from kome.config import SPECS
 from kome.tuoi_du_lieu import MUI_GIO, spec_cua_o
@@ -87,28 +87,6 @@ def nut_nguon(status: list[dict], tuoi, hom_nay: date) -> list[dict]:
     return ra
 
 
-def o_so(danh_muc: list[tuple], nut: list[dict]) -> list[dict]:
-    """Bốn ô số của Tổng quan. `danh_muc` = (schema, tên, relkind, số dòng ước tính)
-    của core/mart/meta — `reltuples` của Postgres, cập nhật sau mỗi ANALYZE, nên
-    ghi "khoảng"."""
-    bang_core = [(t, n) for s, t, k, n in danh_muc if s == "core" and k == "r"]
-    tong = sum(max(n, 0) for _, n in bang_core)
-    lon = max(bang_core, key=lambda x: x[1], default=(None, 0))
-    theo_schema = {s: sum(1 for x in danh_muc if x[0] == s) for s in ("core", "mart", "meta")}
-    tre = [n for n in nut if n["mau"] == "do"]
-    hom_nay = [n for n in nut if n["nap_hom_nay"]]
-    return [
-        {"nhan": "Bảng trong kho", "gia": sum(theo_schema.values()),
-         "phu": " · ".join(f"{s} {n}" for s, n in theo_schema.items()), "mau": ""},
-        {"nhan": "Tổng số dòng (khoảng)", "gia": tong,
-         "phu": f"lớn nhất: {lon[0]}" if lon[0] else "", "mau": ""},
-        {"nhan": "Nguồn trễ lịch nạp", "gia": len(tre),
-         "phu": " · ".join(n["nhan"] for n in tre) or "không nguồn nào trễ", "mau": "do" if tre else "ok"},
-        {"nhan": "Loại file nạp hôm nay", "gia": len(hom_nay),
-         "phu": " · ".join(n["nhan"] for n in hom_nay) or "chưa nạp gì hôm nay", "mau": ""},
-    ]
-
-
 def dong_cong(kq, ten_cong: dict[int, str]) -> list[dict]:
     """Năm dòng cổng kiểm của MỘT file: đạt / chặn / cảnh báo / không chạy (cổng
     trước đã chặn thì cổng sau không được chạy tới)."""
@@ -133,25 +111,3 @@ def dong_cong(kq, ten_cong: dict[int, str]) -> list[dict]:
             tt, loi = "dat", []
         ra.append({"so": n, "ten": ten_cong[n], "trang_thai": tt, "loi": loi})
     return ra
-
-
-def thang_luoi(tham_so: str | None, hom_nay: date, dau_du_lieu: date) -> tuple[date, date, dict]:
-    """Tháng của lưới "Theo ngày": `?ngay_thang=YYYY-MM` (KHÔNG `?thang=` — tên đó
-    là khoảng xem chung của cả website). Trả (ngày đầu, ngày cuối cắt ở hôm nay,
-    điều hướng ‹ ›)."""
-    dau = date(hom_nay.year, hom_nay.month, 1)
-    if tham_so:
-        try:
-            y, m = (int(x) for x in tham_so.split("-"))
-            dau = date(y, m, 1)
-        except ValueError:
-            pass
-    dau = min(max(dau, date(dau_du_lieu.year, dau_du_lieu.month, 1)), date(hom_nay.year, hom_nay.month, 1))
-    sau = date(dau.year + (dau.month == 12), dau.month % 12 + 1, 1)
-    cuoi = min(sau - timedelta(days=1), hom_nay)
-    truoc = date(dau.year - (dau.month == 1), (dau.month - 2) % 12 + 1, 1)
-    return dau, cuoi, {
-        "thang": dau.strftime("%Y-%m"),
-        "truoc": truoc.strftime("%Y-%m") if truoc >= date(dau_du_lieu.year, dau_du_lieu.month, 1) else None,
-        "sau": sau.strftime("%Y-%m") if sau <= hom_nay else None,
-    }

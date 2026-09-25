@@ -379,3 +379,146 @@ def tinh_bang_ngay(conn, hom_nay: date | None = None,
         ngay.append(Ngay(d, thu, cuoi_tuan, o))
 
     return BangNgay(COT_NGAY, ngay, dau, hom_nay, thieu)
+
+
+# --- Lưới toàn cảnh: tháng × loại dữ liệu (đặc tả 2026-09-25) ------------
+# Màn Tổng quan độ phủ trả lời "đã có dữ liệu tháng nào, loại nào" trên MỘT
+# lưới. Ô tháng nói ĐỦ / THIẾU (ngày làm việc có dữ liệu ÷ ngày làm việc), không
+# chỉ có/không — tháng 3 ngày bán hiện như tháng đủ là giấu đúng chỗ cần xuất lại.
+# Hai nhóm dòng trả lời hai câu khác nhau: LỊCH SỬ (mỗi ngày một phần lịch sử,
+# mất ngày là mất số) và NỀN (bản mới đè bản cũ — ô trống không phải thiếu).
+KHOA_LICH_SU = ("ban", "ton", "seikyu_motocho")
+
+# Ký tự của một NGÀY trong `OLuoi.ngay` (một chuỗi mỗi dòng × tháng: nhẹ hơn
+# một mảng object ~570 ngày × 5 dòng, và giao diện đổi tháng không hỏi máy chủ).
+NGAY_CO, NGAY_MEISAI, NGAY_THIEU, NGAY_NGHI, NGAY_NGOAI = "c", "m", "k", "n", "x"
+NGAY_BAN_MOI, NGAY_TRONG = "b", "."
+
+
+def _spec(khoa: str) -> str:
+    return {"ban": "uriage", "ton": "zaiko"}.get(khoa, khoa)
+
+
+@dataclass(frozen=True)
+class ThangLuoi:
+    thang: str      # 'YYYY-MM'
+    ky: str         # core.dim_date.company_fy_label
+    chot: bool      # tháng chốt kỳ
+    so_kd: int      # ngày làm việc trong tháng, cắt ở DAU_DU_LIEU và hôm nay
+    lich: str       # mỗi ngày một ký tự: '1' ngày làm việc, '0' nghỉ
+
+
+@dataclass(frozen=True)
+class OLuoi:
+    trang_thai: str  # lịch sử: du / thieu / khong · nền: moi / trong
+    so_co: int       # lịch sử: ngày LÀM VIỆC có dữ liệu · nền: số ngày có bản mới
+    meisai: bool     # bán hàng: có ngày đến từ 売上明細表 (bẫy #8)
+    ngay: str        # xem NGAY_*
+
+
+@dataclass(frozen=True)
+class DongLuoi:
+    khoa: str
+    spec: str        # spec_name của nguồn (khớp `kho_du_lieu.nut_nguon`)
+    nhan: str
+    ten_obc: str
+    nhom: str        # 'lich_su' | 'nen'
+    bang: str        # bảng core đích
+    o: list[OLuoi]
+    dau: date | None     # ngày đầu có dữ liệu (nền: bản đầu)
+    cuoi: date | None    # ngày cuối có dữ liệu (nền: bản mới nhất)
+    thieu: list[date]    # lịch sử: ngày làm việc không có, giữa dau và cuoi
+
+
+@dataclass(frozen=True)
+class LuoiPhu:
+    dau_du_lieu: date
+    hom_nay: date
+    thang: list[ThangLuoi]
+    dong: list[DongLuoi]
+
+
+def tinh_luoi_phu(conn, hom_nay: date | None = None) -> LuoiPhu:
+    """Lưới tháng × loại dữ liệu (`COT`), từ tháng của
+    `DAU_DU_LIEU` tới tháng của `hom_nay`. Không tự mở kết nối.
+
+    "Ngày làm việc" đọc `mart.lich_kinh_doanh` (định nghĩa DUY NHẤT). Khách
+    hàng và mọi dữ liệu nền đọc `data_date` của lô chưa hoàn tác — không đếm
+    dòng: `core.dim_customer` là SCD2, ngày không đổi gì thì không sinh dòng.
+    """
+    from datetime import timedelta
+    from kome.config import SPECS
+    from kome.tuoi_du_lieu import hom_nay_o_nhat
+
+    hom_nay = hom_nay or hom_nay_o_nhat()
+    tu = date(DAU_DU_LIEU.year, DAU_DU_LIEU.month, 1)
+    lich = conn.execute(
+        """SELECT l.ngay, l.la_ngay_kd, d.company_fy_label, d.is_fy_end_month
+           FROM mart.lich_kinh_doanh l JOIN core.dim_date d ON d.date_key = l.ngay
+           WHERE l.ngay BETWEEN %s AND %s ORDER BY l.ngay""", (tu, hom_nay)).fetchall()
+
+    khoa = {c.khoa for c in COT}
+    co: dict[str, set[date]] = {k: set() for k in khoa}
+    meisai: set[date] = set()
+    if "ban" in khoa:
+        for d, m in conn.execute(
+                """SELECT sales_date, bool_or(source = 'meisai') FROM core.fact_sales_line
+                   WHERE sales_date BETWEEN %s AND %s GROUP BY 1""", (tu, hom_nay)).fetchall():
+            co["ban"].add(d)
+            if m:
+                meisai.add(d)
+    if "ton" in khoa:
+        co["ton"] = {r[0] for r in conn.execute(
+            """SELECT DISTINCT snapshot_date FROM core.fact_inventory_daily
+               WHERE snapshot_date BETWEEN %s AND %s""", (tu, hom_nay)).fetchall()}
+    if "seikyu_motocho" in khoa:
+        for a, b in conn.execute(
+                "SELECT DISTINCT period_from, period_to FROM core.fact_ar_ledger").fetchall():
+            d = max(a, tu)
+            while d <= min(b, hom_nay):
+                co["seikyu_motocho"].add(d)
+                d += timedelta(days=1)
+    nen = [k for k in khoa if k not in KHOA_LICH_SU]
+    if nen:
+        for spec, d in conn.execute(
+                """SELECT DISTINCT spec_name, data_date FROM meta.ingest_batch
+                   WHERE undone_at IS NULL AND spec_name = ANY(%s)
+                     AND data_date BETWEEN %s AND %s""", (nen, tu, hom_nay)).fetchall():
+            co[spec].add(d)
+
+    theo_thang: dict[str, list[tuple]] = {}
+    for d, kd, ky, chot in lich:
+        theo_thang.setdefault(d.strftime("%Y-%m"), []).append((d, kd, ky, chot))
+    thang = [ThangLuoi(t, n[-1][2], any(x[3] for x in n),
+                       sum(1 for x in n if x[1] and x[0] >= DAU_DU_LIEU),
+                       "".join("1" if x[1] else "0" for x in n))
+             for t, n in theo_thang.items()]
+
+    dong = []
+    for c in COT:
+        s, lich_su = co[c.khoa], c.khoa in KHOA_LICH_SU
+        o = []
+        for n in theo_thang.values():
+            if lich_su:
+                ky_tu = "".join(
+                    NGAY_NGOAI if d < DAU_DU_LIEU
+                    else (NGAY_MEISAI if d in meisai else NGAY_CO) if d in s
+                    else NGAY_THIEU if kd else NGAY_NGHI
+                    for d, kd, _, _ in n)
+                so_kd = sum(1 for d, kd, _, _ in n if kd and d >= DAU_DU_LIEU)
+                so_co = sum(1 for d, kd, _, _ in n if kd and d in s)
+                co_ngay = any(d in s for d, _, _, _ in n)
+                tt = ("khong" if not co_ngay else
+                      "du" if so_co >= so_kd else "thieu")
+                o.append(OLuoi(tt, so_co, any(d in meisai for d, _, _, _ in n), ky_tu))
+            else:
+                ky_tu = "".join(NGAY_BAN_MOI if d in s else NGAY_TRONG for d, _, _, _ in n)
+                so_co = ky_tu.count(NGAY_BAN_MOI)
+                o.append(OLuoi("moi" if so_co else "trong", so_co, False, ky_tu))
+        dau, cuoi = (min(s), max(s)) if s else (None, None)
+        thieu = [d for d, kd, _, _ in lich if kd and dau <= d <= cuoi and d not in s] \
+            if lich_su and s else []
+        dong.append(DongLuoi(c.khoa, _spec(c.khoa), c.mo_ta.split(",")[0].capitalize(), c.ten_obc,
+                             "lich_su" if lich_su else "nen", SPECS[_spec(c.khoa)].core_table,
+                             o, dau, cuoi, thieu))
+    return LuoiPhu(DAU_DU_LIEU, hom_nay, thang, dong)

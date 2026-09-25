@@ -155,20 +155,12 @@ def test_nap_hom_nay_tinh_theo_gio_tokyo():
     assert nut["sp"]["nap_hom_nay"] is True
 
 
-def test_thang_luoi_cat_trong_dai_du_lieu():
-    hn, dau_dl = date(2026, 9, 24), date(2025, 3, 3)
-    dau, cuoi, l = KDL.thang_luoi(None, hn, dau_dl)
-    assert (dau, cuoi, l["sau"]) == (date(2026, 9, 1), hn, None) and l["truoc"] == "2026-08"
-    dau, cuoi, l = KDL.thang_luoi("2026-02", hn, dau_dl)
-    assert (dau, cuoi, l["sau"]) == (date(2026, 2, 1), date(2026, 2, 28), "2026-03")
-    dau, _, l = KDL.thang_luoi("2020-01", hn, dau_dl)
-    assert dau == date(2025, 3, 1) and l["truoc"] is None
-    assert KDL.thang_luoi("rac", hn, dau_dl)[0] == date(2026, 9, 1)
-
-
 def test_tong_quan_co_du_khoi(c):
+    """`?ngay_thang=` (không phải `?thang=` — khoảng xem chung) chỉ chọn sẵn tháng
+    của khối từng ngày; mọi ngày của mọi tháng đã đi cùng lưới. Rác thì bỏ qua."""
     m = man(c.get("/kho-du-lieu?ngay_thang=2026-08").text)
-    assert m["luoi"]["thang"] == "2026-08"
-    assert m["bang_ngay"]["dau"] == "2026-08-01" and m["bang_ngay"]["cuoi"] == "2026-08-31"
-    assert len(m["nguon"]) == 8 and len(m["o_so"]) == 4
+    assert m["ngay_thang"] == "2026-08"
+    assert "2026-08" in [t["thang"] for t in m["phu"]["thang"]]
+    assert len(m["nguon"]) == len(KDL.O_NAP)
+    assert man(c.get("/kho-du-lieu?ngay_thang=rac").text)["ngay_thang"] is None
     assert kd(c.get("/kho-du-lieu").text)["tuoi"]["nguon"]
