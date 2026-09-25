@@ -357,15 +357,9 @@ export function TabSanPham({ h }: { h: HoSoApi }) {
           <tbody>{h.goi_y.map((g, i) => (
             <tr key={g.ma}><td className="nhat-chu">{i + 1}</td><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(g.ma)}`}>{g.ten}</a>
               <div className="ma-nho"><code>{g.ma}</code></div></td><td className="so">{pc(g.ty_suat)}</td></tr>))}</tbody></table></div>}
-        <p className="phu">Giá để báo cho khách: xem bảng giá của bậc bên cạnh (tách lẻ / thùng).</p>
+        <p className="phu">Giá để báo cho khách: xem giá theo bậc ở hồ sơ từng mã (bấm tên mã).</p>
       </The>
-      <The tieu_de={`Bảng giá của bậc ${h.ho_so.bac_gia ?? "—"} (売価No.)`} phu="giá niêm yết mới nhất của bậc giá khách đang hưởng, tách theo quy cách · giá riêng & chiết khấu theo khách: chưa có nguồn">
-        {!h.bac_gia.length ? <p className="phu">Khách chưa có bậc giá hoặc bậc chưa có dòng giá.</p> :
-        <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th><th>Quy cách</th><th className="so">Giá (chưa thuế)</th><th className="so">Từ ngày</th></tr></thead>
-          <tbody>{h.bac_gia.map(g => (
-            <tr key={g.ma + g.quy_cach}><td className="ten-jp">{g.ten}<div className="ma-nho"><code>{g.ma}</code></div></td>
-              <td className="phu">{g.quy_cach}</td><td className="so">{yen(g.gia)}</td><td className="so">{ngay(g.tu_ngay)}</td></tr>))}</tbody></table></div>}
-      </The>
+      <ChuaCo tieu_de="Bảng giá của bậc (売価No.)" ly_do="Bản xuất 得意先全情報 không còn cột 売価No.コード, nên không biết khách hưởng bậc giá nào. Giá theo từng bậc vẫn có ở hồ sơ mỗi mã hàng." />
     </div>
 
     <The tieu_de={`Tất cả mặt hàng (${h.mat_hang.length})`} phu="mọi mã khách từng mua · 3 cột tháng gần nhất để thấy ngay tháng nào vắng"
@@ -436,22 +430,25 @@ function DongNgay({ ma, ngay_ }: { ma: string; ngay_: string }) {
 export { TabCongNo } from "../cong_no/CongNoKhach";
 
 // ============================================================ Hồ sơ & liên hệ
+// 043 (mẫu 16 cột): bỏ phân loại / bậc giá / vãng lai (cột đã bỏ khỏi bản xuất).
+// "Hạng OBC" là 得意先ランク của OBC — KHÁC hạng theo doanh thu 12 tháng ở đầu hồ sơ.
 const NHAN_HO_SO: [string, string][] = [["chi_nhanh", "Chi nhánh"], ["buu_chinh", "Bưu chính"], ["dia_chi", "Địa chỉ"],
-  ["phan_loai", "Mã phân loại (OBC)"], ["ngay_chot", "Mã ngày chốt công nợ"], ["bac_gia", "Bậc giá (売価No.)"],
-  ["vang_lai", "Khách vãng lai"], ["lan_dau", "Mua lần đầu"], ["so_lan_mua", "Số ngày có mua"], ["so_phieu", "Số phiếu"],
+  ["toa_nha", "Toà nhà / phòng"], ["ngay_dang_ky", "Ngày đăng ký (theo mã khách)"], ["hang_obc", "Hạng của OBC (得意先ランク — không phải hạng theo doanh thu 12 tháng)"], ["ngay_chot", "Điều kiện chốt công nợ"],
+  ["tai_khoan_ck", "TK chuyển khoản riêng (振込専用口座)"],
+  ["lan_dau", "Mua lần đầu"], ["so_lan_mua", "Số ngày có mua"], ["so_phieu", "Số phiếu"],
   ["gia_tri_tb", "Giá trị TB mỗi lần"]];
 
 export function TabHoSo({ h }: { h: HoSoApi }) {
   const k = h.khach, hs = h.ho_so;
   const hien = (m: string, v: unknown) => v == null || v === "" ? <span className="nhat-chu">—</span>
-    : m === "lan_dau" ? ngay(String(v)) : m === "gia_tri_tb" ? yen(Number(v)) : m === "so_lan_mua" || m === "so_phieu" ? so(Number(v)) : String(v);
+    : m === "lan_dau" || (m === "ngay_dang_ky" && /^\d{4}-/.test(String(v))) ? ngay(String(v)) : m === "gia_tri_tb" ? yen(Number(v)) : m === "so_lan_mua" || m === "so_phieu" ? so(Number(v)) : String(v);
   return (<>
     <div className="hs-hang hai">
       <The tieu_de="Thông tin khách hàng" phu="từ 得意先全情報 của OBC — sửa trong OBC rồi xuất lại">
         <dl className="hs-dl">
           <dt>Điện thoại</dt><dd>{k.dien_thoai ? <a href={`tel:${k.dien_thoai}`}>{k.dien_thoai}</a> : "—"}</dd>
           <dt>Tỉnh / thành phố</dt><dd className="ten-jp">{[k.tinh, k.thanh_pho].filter(Boolean).join(" ") || "—"}</dd>
-          {NHAN_HO_SO.map(([m, nhan]) => <div key={m} className="hs-dl-dong"><dt>{nhan}</dt><dd className={m === "dia_chi" ? "ten-jp" : ""}>{hien(m, hs[m])}</dd></div>)}
+          {NHAN_HO_SO.map(([m, nhan]) => <div key={m} className="hs-dl-dong"><dt>{nhan}</dt><dd className={m === "dia_chi" || m === "toa_nha" || m === "hang_obc" || m === "ngay_chot" ? "ten-jp" : m === "tai_khoan_ck" ? "so" : ""}>{hien(m, hs[m])}</dd></div>)}
         </dl>
       </The>
       <The tieu_de="Thông tin giao hàng 直送先" phu="điểm giao thẳng của khách · khung giờ nhận, ghi chú tài xế: chưa có nguồn">

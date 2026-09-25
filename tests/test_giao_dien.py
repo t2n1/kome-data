@@ -371,8 +371,8 @@ def test_trang_danh_sach_co_du_bon_khoi_va_ba_bo_loc(conn, test_db_url):
 
 
 def test_nhan_hang_khong_bao_gio_tro_troi():
-    """[IMPORTANT] core.dim_customer.rank_code (得意先ランク của OBC, 10 nhóm
-    không có tên ở đâu) cũng tồn tại. Gọi tắt chỉ số của ta là "hạng" thì sáu
+    """[IMPORTANT] core.dim_customer.rank_code (得意先ランク của OBC, 10 nhóm;
+    từ 043 có cả tên — rank_name, hiện ở tab Hồ sơ) cũng tồn tại. Gọi tắt chỉ số của ta là "hạng" thì sáu
     tháng nữa sẽ có người đối chiếu với OBC, thấy lệch, và không biết tin cái
     nào. Giai đoạn 2: màn Khách hàng là React — MỌI dòng mã giao diện nhắc
     "hạng" phải mang theo "doanh thu 12 tháng" trên CHÍNH phần tử đó (chữ hiện

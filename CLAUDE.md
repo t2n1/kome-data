@@ -118,11 +118,53 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/giao-dien` | Đổi chế độ sáng/tối/theo hệ thống/theo giờ, ghi cookie, chuyển hướng về trang đã gọi | không đọc CSDL — chỉ đọc/ghi cookie |
 
 **Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
-tháng**, KHÔNG phải `得意先ランク` của OBC. `core.dim_customer.rank_code` có tồn tại
-(10 nhóm) nhưng không file xuất nào ta nạp có TÊN của các mã đó, nên nó không dùng
-được để hiển thị. Nhãn trên trang phải luôn đọc là "hạng theo doanh thu 12 tháng" —
-gọi tắt là "hạng" thì sẽ có người đối chiếu với OBC rồi thấy lệch và không biết tin
-cái nào.
+tháng**, KHÔNG phải `得意先ランク` của OBC. Từ 043 `得意先全情報` mang cả TÊN hạng OBC
+(`core.dim_customer.rank_name`, vd. `Cランク／年間粗利額 200,000以上`,
+`ZZZランク/電話禁止又は不要`) — nó CHỈ hiện ở tab Hồ sơ & liên hệ dưới nhãn
+"Hạng OBC (得意先ランク)", không bao giờ thay hạng theo doanh thu. Nhãn trên trang phải
+luôn đọc là "hạng theo doanh thu 12 tháng" — gọi tắt là "hạng" thì sẽ có người đối
+chiếu với OBC rồi thấy lệch và không biết tin cái nào.
+
+**Bất biến (043, 得意先全情報 mẫu 16 cột — chủ DN chốt 2026-09-25):** bản xuất BỎ
+`業種・カテゴリーコード`, `注文アプリコード`, `売価No.コード`, `請求先コード`,
+`インボイス登録番号`, `スポット区分コード`; THÊM `ビル等` (`building`), `ランク名`,
+`売上主担当者名`, `請求締日名`, `振込専用口座番号１` (`transfer_account` — tài khoản chuyển
+khoản riêng, TEXT; sale gõ số đó vào ô tìm của danh sách khách để ra khách). Sáu cột
+cũ còn trong `core.dim_customer` (SCD2 = lịch sử) nhưng bộ nạp không ghi nữa — phiên
+bản mới mang NULL, và **không chỗ nào được đọc chúng**. Hoàn tác SCD2 gán lại ĐÚNG
+những cột mà ảnh trước của lô đó đã chụp (`customer.TRACKED + TRACKED_CU`), nên lô
+nạp theo mẫu cũ vẫn hoàn tác được. Bên nhận hoá đơn (請求先) của một khách = 請求先コード
+trên PHIẾU BÁN gần nhất ≤ mốc (`mart.ben_tra_cua_khach`, đo thật: khớp master cũ
+1.704/1.710; chưa có phiếu = chính khách) — tab Công nợ của hồ sơ khách và
+`mart.cong_no_ben_tra.so_khach` đọc CÙNG view đó. Khối "Bảng giá của bậc" ở hồ sơ
+khách đã bỏ (không còn biết bậc giá của khách); giá theo bậc của từng MÃ vẫn ở
+`/san-pham/{mã}`. Có test canh: `tests/test_load_customer.py`,
+`tests/test_cong_no.py::test_ben_tra_cua_khach_doc_tu_PHIEU_BAN_GAN_NHAT`,
+`tests/test_khach_hang.py::test_ho_so_mang_cot_mau_16_cot_va_tim_duoc_theo_so_tai_khoan`.
+**Migration 043 phải chạy TRƯỚC khi nạp file mẫu mới / triển khai.**
+
+**Bất biến (044, mã nội bộ — chủ DN chốt 2026-09-25):** `0090…`/`0099…` là NHÂN VIÊN mua
+hàng; `999999999999` ("代引き登録用データ") và `202411000000` là mã giữ chỗ OBC. Định nghĩa
+ĐÚNG MỘT LẦN: `mart.la_ma_noi_bo()`. Lọc ở `mart.ban_den_moc` (+ `mart.khach_chua_mua`) nên
+bỏ khỏi MỌI số liệu bán hàng — **kể cả TỔNG doanh thu** (chủ DN chọn: nhân viên mua không
+phải doanh thu bán hàng). Hệ quả có chủ ý: tổng doanh thu trên web THẤP hơn sổ OBC đúng phần
+nhân viên mua (đo thật: 15 mã, ¥388.667 ≈ 0,02%) — đối soát tháng phải trừ ra. Không lọc:
+`core` (OBC chỉ đọc), trang Kho dữ liệu (đối chiếu với FILE nên phải đủ dòng), sổ công nợ
+(nợ thật). View mới đọc bảng bán phải đọc `mart.ban_den_moc` — đọc thẳng
+`core.fact_sales_line` là vừa không quay về theo mốc vừa lọt nhân viên. Có test canh:
+`tests/test_ma_noi_bo.py`.
+
+**Bất biến (044, hạn trả):** `その都度請求` = trả trong **5 ngày làm việc sau ngày xuất
+hàng** (ngày phiếu), ngày làm việc = `mart.lich_kinh_doanh.la_ngay_kd` (chưa trừ ngày nghỉ
+riêng của công ty — cùng hạn chế đã ghi). Ba mẫu suy được hạn: `末締/翌月末日`,
+`末締/翌月N日`, `その都度請求`; `代引請求` (thu hộ khi giao) / `前払い` vẫn "không suy được
+hạn". Có test canh: `tests/test_cong_no.py::test_han_tra_TUNG_LAN_la_5_ngay_lam_viec_sau_ngay_xuat`.
+
+**Mã khách = ngày đăng ký** (chủ DN xác nhận 2026-09-25): từ 2023-08 mã là `YYYYMMDD` + số
+thứ tự 4 chữ số trong ngày (`202609240002` = khách mới thứ 2 ngày 24/9/2026); mã cũ
+`000000xxxxxx` không mang ngày ("trước 8/2023"). Đọc ở `kome.khach_hang.ngay_dang_ky`, hiện ở
+tab Hồ sơ. "Khách mới" của các màn vẫn theo LẦN MUA ĐẦU, không theo ngày đăng ký.
+**Migration 044 phải chạy TRƯỚC khi triển khai.**
 
 **Bất biến:** `kome/khach_hang.py::ho_so()` chạy **không quá 8 truy vấn** (giai
 đoạn 2 gộp "đã ngừng mua" vào câu mặt hàng nên nay là 7 — chỗ trống là cố ý), và

@@ -21,12 +21,12 @@ def _nhu_reader(df: pd.DataFrame) -> pd.DataFrame:
 def _df(rank="0003"):
     return _nhu_reader(pd.DataFrame([{
         "customer_code": "000000009292", "customer_name": "株式会社ASIANEX",
-        "branch_name": "あじさい支店", "rank_code": rank, "category_code": "0202",
-        "order_app_code": "0001", "salesperson_code": "0105", "price_level_code": "10",
-        "closing_day_code": "99", "billing_customer_code": "000000009292",
+        "branch_name": "あじさい支店", "rank_code": rank, "rank_name": "Cランク",
+        "salesperson_code": "0105", "salesperson_name": "TRAN THI LAN THANH",
+        "closing_day_code": "99", "closing_day_name": "代引請求",
         "postcode": "3720855", "prefecture": "群馬県", "city": "伊勢崎市",
-        "address": "長沼町 615-4", "phone": "0270-75-6396",
-        "invoice_reg_no": "", "spot_flag": "0",
+        "address": "長沼町 615-4", "building": "橋下ビル101号", "phone": "0270-75-6396",
+        "transfer_account": "0001234567",
     }]))
 
 
@@ -263,6 +263,47 @@ def test_sua_roi_xuat_lai_trong_cung_ngay_khong_sinh_khoang_am(conn, batch):
     assert rows[0][1] == D1                     # valid_from = đúng ngày đó
     assert rows[0][2] is None                   # không có khoảng âm
     assert rows[0][3] is True
+
+
+def test_mau_16_cot_ghi_cot_moi_va_de_NULL_cot_da_bo(conn, batch):
+    """043: năm cột mới được ghi (số tài khoản giữ số 0 đầu); sáu cột đã bỏ khỏi
+    bản xuất nằm NULL ở phiên bản mới — không ai ghi giá trị đoán vào đó."""
+    customer.load(conn, _df(), D1, batch(1))
+    r = conn.execute(
+        """SELECT building, rank_name, salesperson_name, closing_day_name, transfer_account,
+                  category_code, order_app_code, price_level_code, billing_customer_code,
+                  invoice_reg_no, spot_flag
+             FROM core.dim_customer WHERE is_current""").fetchone()
+    assert r[:5] == ("橋下ビル101号", "Cランク", "TRAN THI LAN THANH", "代引請求", "0001234567")
+    assert r[5:] == (None,) * 6
+
+
+def test_hoan_tac_lo_CU_voi_anh_truoc_theo_mau_cu(conn):
+    """[IMPORTANT] Lô nạp theo mẫu 17 cột cũ lưu ảnh trước (`scd2_preimage`) với
+    sáu cột đã bỏ và KHÔNG có cột mới. Hoàn tác lô đó sau khi đổi mẫu phải gán
+    lại đúng những cột ảnh trước đã chụp — không nổ KeyError, không ghi NULL đè
+    lên cột mới mà lô cũ chưa từng chạm."""
+    import json
+    b1 = _batch_tokuisaki(conn, 1)
+    b2 = _batch_tokuisaki(conn, 2)
+    customer.load(conn, _df(rank="0001"), D1, b2)
+    conn.execute("UPDATE core.dim_customer SET price_level_code = '10'")
+    cu = {"customer_name": "株式会社ASIANEX", "branch_name": "あじさい支店", "rank_code": "0003",
+          "category_code": "0202", "order_app_code": "0001", "salesperson_code": "0105",
+          "price_level_code": "03", "closing_day_code": "99",
+          "billing_customer_code": "000000009292", "postcode": "3720855",
+          "prefecture": "群馬県", "city": "伊勢崎市", "address": "長沼町 615-4",
+          "phone": "0270-75-6396", "invoice_reg_no": "", "spot_flag": "0"}
+    conn.execute("UPDATE meta.ingest_batch SET scd2_preimage = %s WHERE batch_id = %s",
+                 (json.dumps([{"code": "000000009292", "batch_id": b1, "values": cu}]), b2))
+    conn.commit()
+
+    undo_batch(conn, b2)
+
+    r = conn.execute(
+        """SELECT rank_code, price_level_code, building, transfer_account, batch_id
+             FROM core.dim_customer WHERE customer_code = '000000009292'""").fetchone()
+    assert r == ("0003", "03", "橋下ビル101号", "0001234567", b1)
 
 
 def test_csdl_chan_khoang_thoi_gian_am(conn, batch):

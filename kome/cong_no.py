@@ -15,9 +15,10 @@ CACH_TINH = {
              "TRẢ CŨ TRƯỚC: số dư là của các phiếu mới nhất; phần lớn hơn tổng phiếu trong kỳ "
              "là nợ mang sang từ trước kỳ."),
     "tuoi": "Tuổi nợ đếm từ ngày phiếu tới cuối kỳ sổ.",
-    "han": ("Hạn trả suy từ tên điều kiện thanh toán, chỉ hai mẫu: 末締/翌月末日 (chốt cuối tháng, "
-            "trả cuối tháng sau) và 末締/翌月N日 (trả ngày N tháng sau). 代引請求 / その都度請求 / "
-            "前払い … không suy được hạn nên KHÔNG tính là quá hạn."),
+    "han": ("Hạn trả suy từ tên điều kiện thanh toán, ba mẫu: 末締/翌月末日 (chốt cuối tháng, "
+            "trả cuối tháng sau), 末締/翌月N日 (trả ngày N tháng sau) và その都度請求 (trả trong 5 ngày "
+            "làm việc sau ngày xuất hàng — chưa trừ ngày nghỉ riêng của công ty). 代引請求 / 前払い … "
+            "không suy được hạn nên KHÔNG tính là quá hạn."),
     "da_thu": "Đã thu trong kỳ = mang sang + bán chịu − số dư (phần tiền thu thật sự làm giảm nợ).",
 }
 
@@ -126,7 +127,9 @@ def cua_khach(conn, ma: str) -> dict:
     ≤ 3 lượt hỏi. Công nợ ghi theo 請求先, nên khách dùng chung bên (vd. 代引専用)
     thấy số của CẢ bên — màn nói rõ điều đó bằng `so_khach`."""
     r = conn.execute(
-        "SELECT billing_customer_code FROM core.dim_customer WHERE customer_code = %s AND is_current",
+        # 043: 請求先 đọc từ phiếu bán (mart.ben_tra_cua_khach) — master khách không
+        # còn cột 請求先コード.
+        "SELECT billing_customer_code FROM mart.ben_tra_cua_khach WHERE customer_code = %s",
         (ma,)).fetchone()
     ben_ma = (r[0] if r and r[0] else ma)
     ben = _ben(conn, ben_ma)

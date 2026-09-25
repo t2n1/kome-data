@@ -232,3 +232,51 @@ def test_api_cong_no_va_vo_react(conn, tmp_path, test_db_url):
     r = c.get("/api/cong-no/khach/000000000070")
     assert r.status_code == 200 and r.json()["ben"]["so_du"] == 1500
     assert c.get("/cong-no").status_code == 200
+
+
+def test_ben_tra_cua_khach_doc_tu_PHIEU_BAN_GAN_NHAT(conn, tmp_path, batch):
+    """043: master 得意先全情報 không còn 請求先コード — bên nhận hoá đơn của khách
+    là 請求先コード trên phiếu bán GẦN NHẤT (khách đổi bên thì theo bên mới); khách
+    chưa có phiếu bán nào là bên của chính mình. Tab Công nợ của hồ sơ khách và
+    `so_khach` của mart.cong_no_ben_tra đọc CÙNG view đó."""
+    from kome import cong_no as CN
+    from kome.loaders import sales
+    _mau_man(conn, tmp_path)
+    b = batch(777)
+    for ma in ("000000000099", "000000000098"):
+        conn.execute(
+            """INSERT INTO core.dim_customer (customer_code, valid_from, is_current,
+                                              customer_name, batch_id)
+               VALUES (%s, '2025-01-01', true, %s, %s)""", (ma, f"KHÁCH {ma}", b))
+    for i, (ngay, ben_) in enumerate([(date(2026, 5, 1), "000000000072"),
+                                      (date(2026, 7, 15), "000000000071")]):
+        sales.load(conn, pd.DataFrame([{
+            "slip_no": f"B{i}", "line_seq": 1, "sales_date": ngay,
+            "customer_code": "000000000099", "billing_customer_code": ben_,
+            "product_code": "XT07", "pack_code": "02", "case_qty": 1, "qty": 1,
+            "unit_price": 100, "unit_cost": 50, "amount": 110, "tax_amount": 10,
+            "cost": 50, "gross_profit": 50, "paid_amount": 0, "batch_id": b}]), ngay, b)
+    conn.commit()
+
+    assert CN.cua_khach(conn, "000000000099")["ben"]["so_du"] == 300   # bên 071, không phải 072
+    assert conn.execute(
+        """SELECT billing_customer_code, tu_phieu_ban FROM mart.ben_tra_cua_khach
+            WHERE customer_code = '000000000098'""").fetchone() == ("000000000098", False)
+    so_khach = dict(conn.execute(
+        "SELECT billing_customer_code, so_khach FROM mart.cong_no_ben_tra").fetchall())
+    assert so_khach["000000000071"] == 1 and so_khach["000000000072"] == 0
+
+
+def test_han_tra_TUNG_LAN_la_5_ngay_lam_viec_sau_ngay_xuat(conn, tmp_path):
+    """044: その都度請求 trả trong 5 ngày làm việc sau ngày xuất hàng (chủ DN xác
+    nhận 2026-09-25). Phiếu thứ Năm 30/7/2026 → 31/7 (T6), 3/8, 4/8, 5/8, 6/8 → hạn
+    6/8; mốc sổ 31/7 nên CHƯA quá hạn. Phiếu 1/7 → hạn 8/7 → quá 23 ngày."""
+    d = ben("000000000080", "その都度請求", 0,
+            [("ban", date(2026, 7, 1), "T1", 400), ("ban", date(2026, 7, 30), "T2", 600)],
+            dk_ma="00") + dem()
+    assert _nap(conn, tmp_path, d).ok
+    han = dict((r[0], (r[1], r[2])) for r in conn.execute(
+        """SELECT slip_no, han_tra, qua_han_ngay FROM mart.cong_no_phieu
+            WHERE billing_customer_code = '000000000080'"""))
+    assert han["T2"] == (date(2026, 8, 6), -6)
+    assert han["T1"] == (date(2026, 7, 8), 23)

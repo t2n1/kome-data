@@ -122,7 +122,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       </div>
 
       <div className="kh-cong-cu">
-        <input type="search" className="kh-tim" placeholder={`Tìm mã, tên, điện thoại, địa chỉ… (${so(tq.tong_tat_ca)} khách)`}
+        <input type="search" className="kh-tim" placeholder={`Tìm mã, tên, điện thoại, địa chỉ, số TK chuyển khoản… (${so(tq.tong_tat_ca)} khách)`}
           value={tim} onChange={e => datTim(e.target.value)} aria-label="Tìm khách hàng" />
         <div className="kh-hang" role="group" aria-label="Hạng theo doanh thu 12 tháng">
           {["S", "A", "B", "C", "D"].map(h => (

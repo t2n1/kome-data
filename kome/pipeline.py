@@ -59,7 +59,8 @@ UNDO_TABLES = {
 # Bảng nào có mặt ở đây thì undo_batch() xử lý riêng, KHÔNG xoá lại theo
 # UNDO_TABLES nữa (tránh xoá hai lần) — nhưng vẫn giữ trong UNDO_TABLES để
 # test lưới an toàn set(LOADERS) == set(UNDO_TABLES) còn đúng.
-UNDO_SCD2 = {"tokuisaki": ("core.dim_customer", "customer_code", customer.TRACKED)}
+UNDO_SCD2 = {"tokuisaki": ("core.dim_customer", "customer_code",
+                            customer.TRACKED + customer.TRACKED_CU)}
 
 @dataclass
 class IngestResult:
@@ -281,13 +282,22 @@ def _hoan_nguyen_de_tai_cho(conn, batch_id: int, table: str, key: str,
     preimage = row[0] if row else None
     if not preimage:
         return 0
-    sets = ", ".join(f"{c} = %s" for c in cols)
+    # Mỗi ảnh trước chỉ gán lại ĐÚNG những cột nó đã chụp: lô nạp theo mẫu cũ chụp
+    # sáu cột đã bỏ (customer.TRACKED_CU) và không có cột mới; lô mẫu mới thì ngược
+    # lại. Gán NULL cho cột ảnh trước không chụp là xoá giá trị mà lô đó chưa từng đè.
+    # Tên cột lấy từ `cols` (danh sách của code), không bao giờ từ khoá JSON.
+    nhom: dict[tuple, list] = {}
+    for e in preimage:
+        cs = tuple(c for c in cols if c in e["values"])
+        nhom.setdefault(cs, []).append(e)
     with conn.cursor() as cur:
-        cur.executemany(
-            f"""UPDATE {table} SET {sets}, batch_id = %s
-                WHERE {key} = %s AND is_current AND batch_id = %s""",
-            [(*(e["values"][c] for c in cols), e["batch_id"], e["code"], batch_id)
-             for e in preimage],
-        )
+        for cs, ds in nhom.items():
+            sets = "".join(f"{c} = %s, " for c in cs)
+            cur.executemany(
+                f"""UPDATE {table} SET {sets}batch_id = %s
+                    WHERE {key} = %s AND is_current AND batch_id = %s""",
+                [(*(e["values"][c] for c in cs), e["batch_id"], e["code"], batch_id)
+                 for e in ds],
+            )
     conn.commit()
     return len(preimage)

@@ -82,7 +82,6 @@ export type HoSoApi = {
   lich: { ma: LichMa[]; so_tre: number; tong: number };
   du_bao: LichMa[];
   lan_mua_gan_day: { ngay: string; so_phieu: number; doanh_thu: number; lai_gop: number }[];
-  bac_gia: { ma: string; ten: string; gia: number; quy_cach: string; tu_ngay: string }[];
   diem_giao: { ma: string; ten: string; dia_chi: string }[];
   nhat_ky: LanTiepXuc[];
   kieu_tx: Record<string, [string, string]>;

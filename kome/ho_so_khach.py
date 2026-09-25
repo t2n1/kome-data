@@ -171,7 +171,7 @@ def cho_giao_dien(h: KH.HoSo) -> dict:
         "chua_mua_thang": h.chua_mua_thang, "goi_y": h.goi_y,
         "lich": {**lich, "ma": lich["ma"][:10]},
         "du_bao": [x for x in lich["ma"] if x["con"] <= DU_BAO_NGAY],
-        "lan_mua_gan_day": h.lan_mua_gan_day, "bac_gia": h.bac_gia, "diem_giao": h.diem_giao,
+        "lan_mua_gan_day": h.lan_mua_gan_day, "diem_giao": h.diem_giao,
         "nhat_ky": [{**asdict(n), "icon": n.icon, "nhan_kieu": n.nhan_kieu,
                      "nhan_ket_qua": n.nhan_ket_qua, "mau_ket_qua": n.mau_ket_qua,
                      "ngay": n.ngay} for n in h.nhat_ky],

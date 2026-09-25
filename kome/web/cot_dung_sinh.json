@@ -273,6 +273,7 @@
       "tong_quan"
      ],
      "view": [
+      "mart.ben_tra_cua_khach",
       "mart.cong_no_ben_tra",
       "mart.cong_no_phieu",
       "mart.dau_hieu_khach",
@@ -334,165 +335,6 @@
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
       "mart.uu_tien_lien_he"
-     ]
-    },
-    {
-     "core": "core.dim_customer.branch_name",
-     "he": "branch_name",
-     "ja": "支店名",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua mart.khach_360",
-     "ma": [
-      "kome/khach_hang.py"
-     ],
-     "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
-      "tong_quan"
-     ],
-     "view": [
-      "mart.khach_360"
-     ]
-    },
-    {
-     "core": "core.dim_customer.rank_code",
-     "he": "rank_code",
-     "ja": "ランクコード",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua mart.khach_360",
-     "ma": [
-      "kome/khach_hang.py"
-     ],
-     "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
-      "tong_quan"
-     ],
-     "view": [
-      "mart.khach_360"
-     ]
-    },
-    {
-     "core": "core.dim_customer.category_code",
-     "he": "category_code",
-     "ja": "業種・カテゴリーコード",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua mart.khach_360",
-     "ma": [
-      "kome/khach_hang.py"
-     ],
-     "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
-      "tong_quan"
-     ],
-     "view": [
-      "mart.khach_360"
-     ]
-    },
-    {
-     "core": "core.dim_customer.order_app_code",
-     "he": "order_app_code",
-     "ja": "注文アプリコード",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": "core.dim_customer.salesperson_code",
-     "he": "salesperson_code",
-     "ja": "売上主担当者コード",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua mart.cong_no_ben_tra, mart.cong_no_phieu, mart.khach_360 và 5 chỉ số khác",
-     "ma": [
-      "kome/ban_do.py",
-      "kome/cong_no.py",
-      "kome/khach_hang.py",
-      "kome/khach_thang.py",
-      "kome/khoi_tong_quan.py",
-      "kome/lien_he.py",
-      "kome/nhat_ky.py"
-     ],
-     "man": [
-      "ban_do",
-      "cong_no",
-      "ho_so",
-      "khach",
-      "lien_he",
-      "nhat_ky",
-      "tong_quan"
-     ],
-     "view": [
-      "mart.cong_no_ben_tra",
-      "mart.cong_no_phieu",
-      "mart.khach_360",
-      "mart.khach_thang_nay",
-      "mart.khach_theo_tinh",
-      "mart.tai_nhan_vien",
-      "mart.tinh_khoang",
-      "mart.uu_tien_lien_he"
-     ]
-    },
-    {
-     "core": "core.dim_customer.price_level_code",
-     "he": "price_level_code",
-     "ja": "売価No.コード",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua mart.khach_360",
-     "ma": [
-      "kome/khach_hang.py"
-     ],
-     "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
-      "tong_quan"
-     ],
-     "view": [
-      "mart.khach_360"
-     ]
-    },
-    {
-     "core": "core.dim_customer.closing_day_code",
-     "he": "closing_day_code",
-     "ja": "請求締日コード",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua mart.khach_360",
-     "ma": [
-      "kome/khach_hang.py"
-     ],
-     "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
-      "tong_quan"
-     ],
-     "view": [
-      "mart.khach_360"
-     ]
-    },
-    {
-     "core": "core.dim_customer.billing_customer_code",
-     "he": "billing_customer_code",
-     "ja": "請求先コード",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua mart.cong_no_ben_tra, mart.cong_no_phieu",
-     "ma": [
-      "kome/cong_no.py"
-     ],
-     "man": [
-      "cong_no",
-      "ho_so",
-      "tong_quan"
-     ],
-     "view": [
-      "mart.cong_no_ben_tra",
-      "mart.cong_no_phieu"
      ]
     },
     {
@@ -578,6 +420,23 @@
      ]
     },
     {
+     "core": "core.dim_customer.building",
+     "he": "building",
+     "ja": "ビル等",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ma": [
+      "kome/khach_hang.py"
+     ],
+     "man": [
+      "ban_do",
+      "ho_so",
+      "khach",
+      "tong_quan"
+     ],
+     "view": []
+    },
+    {
      "core": "core.dim_customer.phone",
      "he": "phone",
      "ja": "電話番号",
@@ -600,19 +459,9 @@
      ]
     },
     {
-     "core": "core.dim_customer.invoice_reg_no",
-     "he": "invoice_reg_no",
-     "ja": "インボイス登録番号",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": "core.dim_customer.spot_flag",
-     "he": "spot_flag",
-     "ja": "スポット区分コード",
+     "core": "core.dim_customer.rank_code",
+     "he": "rank_code",
+     "ja": "ランクコード",
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
@@ -627,6 +476,147 @@
      "view": [
       "mart.khach_360"
      ]
+    },
+    {
+     "core": "core.dim_customer.rank_name",
+     "he": "rank_name",
+     "ja": "ランク名",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ma": [
+      "kome/khach_hang.py"
+     ],
+     "man": [
+      "ban_do",
+      "ho_so",
+      "khach",
+      "tong_quan"
+     ],
+     "view": []
+    },
+    {
+     "core": "core.dim_customer.salesperson_code",
+     "he": "salesperson_code",
+     "ja": "売上主担当者コード",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.cong_no_ben_tra, mart.cong_no_phieu, mart.khach_360 và 5 chỉ số khác",
+     "ma": [
+      "kome/ban_do.py",
+      "kome/cong_no.py",
+      "kome/khach_hang.py",
+      "kome/khach_thang.py",
+      "kome/khoi_tong_quan.py",
+      "kome/lien_he.py",
+      "kome/nhat_ky.py"
+     ],
+     "man": [
+      "ban_do",
+      "cong_no",
+      "ho_so",
+      "khach",
+      "lien_he",
+      "nhat_ky",
+      "tong_quan"
+     ],
+     "view": [
+      "mart.cong_no_ben_tra",
+      "mart.cong_no_phieu",
+      "mart.khach_360",
+      "mart.khach_thang_nay",
+      "mart.khach_theo_tinh",
+      "mart.tai_nhan_vien",
+      "mart.tinh_khoang",
+      "mart.uu_tien_lien_he"
+     ]
+    },
+    {
+     "core": "core.dim_customer.salesperson_name",
+     "he": "salesperson_name",
+     "ja": "売上主担当者名",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ma": [
+      "kome/khach_hang.py"
+     ],
+     "man": [
+      "ban_do",
+      "ho_so",
+      "khach",
+      "tong_quan"
+     ],
+     "view": []
+    },
+    {
+     "core": "core.dim_customer.closing_day_code",
+     "he": "closing_day_code",
+     "ja": "請求締日コード",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.khach_360",
+     "ma": [
+      "kome/khach_hang.py"
+     ],
+     "man": [
+      "ban_do",
+      "ho_so",
+      "khach",
+      "tong_quan"
+     ],
+     "view": [
+      "mart.khach_360"
+     ]
+    },
+    {
+     "core": "core.dim_customer.closing_day_name",
+     "he": "closing_day_name",
+     "ja": "請求締日名",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ma": [
+      "kome/khach_hang.py"
+     ],
+     "man": [
+      "ban_do",
+      "ho_so",
+      "khach",
+      "tong_quan"
+     ],
+     "view": []
+    },
+    {
+     "core": "core.dim_customer.branch_name",
+     "he": "branch_name",
+     "ja": "支店名",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.khach_360",
+     "ma": [
+      "kome/khach_hang.py"
+     ],
+     "man": [
+      "ban_do",
+      "ho_so",
+      "khach",
+      "tong_quan"
+     ],
+     "view": [
+      "mart.khach_360"
+     ]
+    },
+    {
+     "core": "core.dim_customer.transfer_account",
+     "he": "transfer_account",
+     "ja": "振込専用口座番号１",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ma": [
+      "kome/khach_hang.py"
+     ],
+     "man": [
+      "ban_do",
+      "ho_so",
+      "khach",
+      "tong_quan"
+     ],
+     "view": []
     },
     {
      "core": null,
@@ -751,7 +741,7 @@
     {
      "core": null,
      "he": null,
-     "ja": "ビル等",
+     "ja": "インボイス登録番号",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
      "ma": [],
@@ -901,6 +891,16 @@
     {
      "core": null,
      "he": null,
+     "ja": "業種・カテゴリーコード",
+     "loai": "khong_nap",
+     "ly_do": "có trong file nhưng kho không nạp",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": null,
+     "he": null,
      "ja": "業種・カテゴリー名",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
@@ -931,16 +931,6 @@
     {
      "core": null,
      "he": null,
-     "ja": "ランク名",
-     "loai": "khong_nap",
-     "ly_do": "có trong file nhưng kho không nạp",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": null,
-     "he": null,
      "ja": "得意先区分４コード",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
@@ -961,7 +951,27 @@
     {
      "core": null,
      "he": null,
+     "ja": "注文アプリコード",
+     "loai": "khong_nap",
+     "ly_do": "có trong file nhưng kho không nạp",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": null,
+     "he": null,
      "ja": "注文アプリ名",
+     "loai": "khong_nap",
+     "ly_do": "có trong file nhưng kho không nạp",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": null,
+     "he": null,
+     "ja": "スポット区分コード",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
      "ma": [],
@@ -1012,16 +1022,6 @@
      "core": null,
      "he": null,
      "ja": "売上主部門名",
-     "loai": "khong_nap",
-     "ly_do": "có trong file nhưng kho không nạp",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": null,
-     "he": null,
-     "ja": "売上主担当者名",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
      "ma": [],
@@ -1092,6 +1092,16 @@
      "core": null,
      "he": null,
      "ja": "売上端数処理",
+     "loai": "khong_nap",
+     "ly_do": "có trong file nhưng kho không nạp",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": null,
+     "he": null,
+     "ja": "売価No.コード",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
      "ma": [],
@@ -1571,7 +1581,7 @@
     {
      "core": null,
      "he": null,
-     "ja": "請求先名",
+     "ja": "請求先コード",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
      "ma": [],
@@ -1581,7 +1591,7 @@
     {
      "core": null,
      "he": null,
-     "ja": "請求締日名",
+     "ja": "請求先名",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
      "ma": [],
@@ -3191,16 +3201,6 @@
     {
      "core": null,
      "he": null,
-     "ja": "振込専用口座番号１",
-     "loai": "khong_nap",
-     "ly_do": "có trong file nhưng kho không nạp",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": null,
-     "he": null,
      "ja": "振込専用口座番号２",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
@@ -3646,6 +3646,7 @@
       "kome/ban_do.py",
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
+      "kome/cong_no.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -3659,6 +3660,7 @@
       "ban_do",
       "bao_cao",
       "chung",
+      "cong_no",
       "du_bao",
       "ho_so",
       "khach",
@@ -3674,6 +3676,9 @@
       "mart.ban_theo_nhan_vien_thang",
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
+      "mart.ben_tra_cua_khach",
+      "mart.cong_no_ben_tra",
+      "mart.cong_no_phieu",
       "mart.dong_ban",
       "mart.hang_doanh_thu",
       "mart.khach_360",
@@ -3697,9 +3702,20 @@
      "ja": "明細行番号",
      "loai": "nap",
      "ly_do": "khoá của file",
-     "ma": [],
-     "man": [],
-     "view": []
+     "ma": [
+      "kome/cong_no.py"
+     ],
+     "man": [
+      "cong_no",
+      "ho_so",
+      "tong_quan"
+     ],
+     "view": [
+      "mart.ban_den_moc",
+      "mart.ben_tra_cua_khach",
+      "mart.cong_no_ben_tra",
+      "mart.cong_no_phieu"
+     ]
     },
     {
      "core": "core.fact_sales_line.sales_date",
@@ -3750,6 +3766,7 @@
       "mart.ban_theo_san_pham",
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
+      "mart.ben_tra_cua_khach",
       "mart.cong_no_ben_tra",
       "mart.cong_no_phieu",
       "mart.dong_ban",
@@ -3822,16 +3839,19 @@
      "he": "customer_code",
      "ja": "得意先コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_ngay, mart.ban_theo_nhan_vien và 30 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 50 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
+      "kome/cong_no.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
+      "kome/khoang_xem.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
+      "kome/ngan_sach.py",
       "kome/san_pham.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
@@ -3840,22 +3860,29 @@
       "ban_do",
       "bao_cao",
       "chung",
+      "cong_no",
       "du_bao",
       "ho_so",
       "khach",
       "kho_hang",
       "lien_he",
+      "ngan_sach",
       "san_pham",
       "tong_quan"
      ],
      "view": [
       "mart.ban_den_moc",
+      "mart.ban_theo_nganh_thang",
+      "mart.ban_theo_nganh_thang_so_sanh",
       "mart.ban_theo_ngay",
       "mart.ban_theo_nhan_vien",
       "mart.ban_theo_nhan_vien_thang",
       "mart.ban_theo_san_pham",
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
+      "mart.ben_tra_cua_khach",
+      "mart.cong_no_ben_tra",
+      "mart.cong_no_phieu",
       "mart.dong_ban",
       "mart.dong_ban_khoang",
       "mart.hang_doanh_thu",
@@ -3871,16 +3898,31 @@
       "mart.khoang_cach_mua",
       "mart.ky_cung_ky",
       "mart.lan_mua",
+      "mart.mat_hang_khoang",
+      "mart.moc_thoi_gian",
+      "mart.nganh_khoang",
+      "mart.nganh_ky_cung_ky",
+      "mart.nganh_so_sanh_khoang",
+      "mart.ngay_khoang",
+      "mart.ngay_kinh_doanh",
       "mart.nhip_mat_hang",
       "mart.nhip_mua",
+      "mart.sale_khoang",
       "mart.san_pham_360",
+      "mart.san_pham_theo_thang",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
       "mart.thang_den_hom_nay",
+      "mart.thang_khoang",
+      "mart.tien_do_cong_ty",
       "mart.tien_do_ngan_sach",
       "mart.tinh_khoang",
+      "mart.toc_do_ban",
+      "mart.ton_hien_tai",
+      "mart.ton_theo_lo",
       "mart.tong_theo_ky",
+      "mart.ty_suat_mat_hang",
       "mart.uu_tien_lien_he"
      ]
     },
@@ -3888,11 +3930,22 @@
      "core": "core.fact_sales_line.billing_customer_code",
      "he": "billing_customer_code",
      "ja": "請求先コード",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ben_tra_cua_khach, mart.cong_no_ben_tra và 1 chỉ số khác",
+     "ma": [
+      "kome/cong_no.py"
+     ],
+     "man": [
+      "cong_no",
+      "ho_so",
+      "tong_quan"
+     ],
+     "view": [
+      "mart.ban_den_moc",
+      "mart.ben_tra_cua_khach",
+      "mart.cong_no_ben_tra",
+      "mart.cong_no_phieu"
+     ]
     },
     {
      "core": "core.fact_sales_line.salesperson_code",
@@ -9281,13 +9334,9 @@
      "loai": "nap",
      "ly_do": "khoá của file",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9301,13 +9350,9 @@
      "loai": "nap",
      "ly_do": "khoá của file",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9329,15 +9374,11 @@
      "he": "price_ex_01",
      "ja": "売価No.１（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9359,15 +9400,11 @@
      "he": "price_ex_02",
      "ja": "売価No.２（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9389,15 +9426,11 @@
      "he": "price_ex_03",
      "ja": "売価No.３（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9419,15 +9452,11 @@
      "he": "price_ex_04",
      "ja": "売価No.４（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9449,15 +9478,11 @@
      "he": "price_ex_05",
      "ja": "売価No.５（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9479,15 +9504,11 @@
      "he": "price_ex_06",
      "ja": "売価No.６（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9509,15 +9530,11 @@
      "he": "price_ex_07",
      "ja": "売価No.７（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9539,15 +9556,11 @@
      "he": "price_ex_08",
      "ja": "売価No.８（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9569,15 +9582,11 @@
      "he": "price_ex_09",
      "ja": "売価No.９（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9599,15 +9608,11 @@
      "he": "price_ex_10",
      "ja": "売価No.10（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham.py",
      "ma": [
-      "kome/khach_hang.py",
       "kome/san_pham.py"
      ],
      "man": [
-      "ban_do",
-      "ho_so",
-      "khach",
       "kho_hang",
       "san_pham",
       "tong_quan"
@@ -9852,6 +9857,7 @@
       "kome/ban_do.py",
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
+      "kome/cong_no.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -9865,6 +9871,7 @@
       "ban_do",
       "bao_cao",
       "chung",
+      "cong_no",
       "du_bao",
       "ho_so",
       "khach",
@@ -9880,6 +9887,9 @@
       "mart.ban_theo_nhan_vien_thang",
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
+      "mart.ben_tra_cua_khach",
+      "mart.cong_no_ben_tra",
+      "mart.cong_no_phieu",
       "mart.dong_ban",
       "mart.hang_doanh_thu",
       "mart.khach_360",
@@ -9946,6 +9956,7 @@
       "mart.ban_theo_san_pham",
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
+      "mart.ben_tra_cua_khach",
       "mart.cong_no_ben_tra",
       "mart.cong_no_phieu",
       "mart.dong_ban",
@@ -10008,16 +10019,19 @@
      "he": "customer_code",
      "ja": "得意先コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_ngay, mart.ban_theo_nhan_vien và 30 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 50 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
+      "kome/cong_no.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
+      "kome/khoang_xem.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
+      "kome/ngan_sach.py",
       "kome/san_pham.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
@@ -10026,22 +10040,29 @@
       "ban_do",
       "bao_cao",
       "chung",
+      "cong_no",
       "du_bao",
       "ho_so",
       "khach",
       "kho_hang",
       "lien_he",
+      "ngan_sach",
       "san_pham",
       "tong_quan"
      ],
      "view": [
       "mart.ban_den_moc",
+      "mart.ban_theo_nganh_thang",
+      "mart.ban_theo_nganh_thang_so_sanh",
       "mart.ban_theo_ngay",
       "mart.ban_theo_nhan_vien",
       "mart.ban_theo_nhan_vien_thang",
       "mart.ban_theo_san_pham",
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
+      "mart.ben_tra_cua_khach",
+      "mart.cong_no_ben_tra",
+      "mart.cong_no_phieu",
       "mart.dong_ban",
       "mart.dong_ban_khoang",
       "mart.hang_doanh_thu",
@@ -10057,16 +10078,31 @@
       "mart.khoang_cach_mua",
       "mart.ky_cung_ky",
       "mart.lan_mua",
+      "mart.mat_hang_khoang",
+      "mart.moc_thoi_gian",
+      "mart.nganh_khoang",
+      "mart.nganh_ky_cung_ky",
+      "mart.nganh_so_sanh_khoang",
+      "mart.ngay_khoang",
+      "mart.ngay_kinh_doanh",
       "mart.nhip_mat_hang",
       "mart.nhip_mua",
+      "mart.sale_khoang",
       "mart.san_pham_360",
+      "mart.san_pham_theo_thang",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
       "mart.thang_den_hom_nay",
+      "mart.thang_khoang",
+      "mart.tien_do_cong_ty",
       "mart.tien_do_ngan_sach",
       "mart.tinh_khoang",
+      "mart.toc_do_ban",
+      "mart.ton_hien_tai",
+      "mart.ton_theo_lo",
       "mart.tong_theo_ky",
+      "mart.ty_suat_mat_hang",
       "mart.uu_tien_lien_he"
      ]
     },
@@ -10813,7 +10849,12 @@
      "phone",
      "invoice_reg_no",
      "spot_flag",
-     "batch_id"
+     "batch_id",
+     "building",
+     "rank_name",
+     "salesperson_name",
+     "closing_day_name",
+     "transfer_account"
     ],
     "khoa": [
      "customer_code"
@@ -11134,6 +11175,7 @@
    "ban_do",
    "bao_cao",
    "chung",
+   "cong_no",
    "du_bao",
    "ho_so",
    "khach",
@@ -11174,6 +11216,11 @@
   ],
   "mart.ban_theo_thang_so_sanh": [
    "bao_cao",
+   "tong_quan"
+  ],
+  "mart.ben_tra_cua_khach": [
+   "cong_no",
+   "ho_so",
    "tong_quan"
   ],
   "mart.cong_no_ben_tra": [
@@ -11309,7 +11356,9 @@
   "mart.lich_kinh_doanh": [
    "bao_cao",
    "chung",
+   "cong_no",
    "du_bao",
+   "ho_so",
    "kho_du_lieu",
    "kho_hang",
    "san_pham",

@@ -4,10 +4,21 @@ import pandas as pd
 import psycopg
 from psycopg.types.json import Jsonb
 
+# Cột theo dõi = đúng các cột của mẫu xuất 16 cột (files.yml, 2026-09-25). Sáu cột cũ
+# (category_code, order_app_code, price_level_code, billing_customer_code,
+# invoice_reg_no, spot_flag) vẫn nằm trong bảng cho lịch sử, nhưng không nằm ở đây:
+# phiên bản mới ghi NULL cho chúng, và đổi giá trị cũ không sinh phiên bản mới.
 TRACKED = [
-    "customer_name", "branch_name", "rank_code", "category_code", "order_app_code",
-    "salesperson_code", "price_level_code", "closing_day_code", "billing_customer_code",
-    "postcode", "prefecture", "city", "address", "phone", "invoice_reg_no", "spot_flag",
+    "customer_name", "branch_name", "rank_code", "rank_name",
+    "salesperson_code", "salesperson_name", "closing_day_code", "closing_day_name",
+    "postcode", "prefecture", "city", "address", "building", "phone", "transfer_account",
+]
+# Cột theo dõi của mẫu CŨ (trước 2026-09-25). Chỉ để hoàn tác một lô cũ: ảnh trước
+# (`scd2_preimage`) của lô đó mang các khoá này — kome.pipeline gán lại đúng những
+# khoá CÓ trong ảnh trước, không hơn.
+TRACKED_CU = [
+    "category_code", "order_app_code", "price_level_code", "billing_customer_code",
+    "invoice_reg_no", "spot_flag",
 ]
 
 # Ô trống của Excel (NaN của pandas) đã được kome.reader.read() chuẩn hoá thành

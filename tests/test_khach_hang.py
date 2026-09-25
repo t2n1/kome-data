@@ -77,24 +77,6 @@ def _hang_master(conn, batch, *cap):
     conn.commit()
 
 
-def _bang_gia(conn, batch, bac: str, ma_hang: str, gia: int,
-              quy_cach: str = "02", tu_ngay: str = "2026-01-01"):
-    """Một dòng core.fact_price_list.
-
-    `quy_cach` (荷姿区分) và `tu_ngay` để ngỏ vì khoá của bảng là
-    (product_code, pack_code, price_level, valid_from) — cùng một mã hàng có
-    nhiều dòng thật, và trang chỉ được hiện dòng MỚI NHẤT của TỪNG quy cách.
-    """
-    b = batch(abs(hash(("gia", bac, ma_hang, quy_cach, tu_ngay))) % 40_000 + 250_000)
-    conn.execute(
-        """INSERT INTO core.fact_price_list
-             (product_code, pack_code, price_level, valid_from, price_ex_tax,
-              price_in_tax, unit_cost, batch_id)
-           VALUES (%s, %s, %s, %s, %s, %s, 0, %s)""",
-        (ma_hang, quy_cach, bac, tu_ngay, gia, gia, b))
-    conn.commit()
-
-
 def _diem_giao(conn, batch, ma_khach: str, ma_diem: str, ten: str):
     b = batch(abs(hash(("giao", ma_diem))) % 40_000 + 300_000)
     conn.execute(
@@ -715,7 +697,7 @@ def test_ho_so_khong_qua_8_truy_van(conn, batch, monkeypatch):
 def test_ho_so_mang_bon_khoi_moi(conn, batch):
     """Bốn khối mới phải có DỮ LIỆU THẬT, không chỉ có mặt dưới dạng danh
     sách rỗng — một khối luôn rỗng thì không ai phát hiện nó hỏng."""
-    _ho_so_khach(conn, batch, "B0001", "Quán bốn khối", price_level_code="03")
+    _ho_so_khach(conn, batch, "B0001", "Quán bốn khối")
     # XT07: mua đều 7 ngày/lần, lần cuối 10 ngày trước -> dự kiến 3 ngày
     # trước, tức QUÁ HẠN 3 ngày, nhưng CHƯA tới hai lần nhịp (14 ngày) nên đây
     # KHÔNG phải "đã ngừng mua" — đúng khoảng trống mà khối "tháng này chưa
@@ -731,7 +713,6 @@ def test_ho_so_mang_bon_khoi_moi(conn, batch):
     # chưa từng mua nó.
     _mua(conn, batch, "000000000998", HOM_NAY - timedelta(days=5), hang="XT09")
     _hang_master(conn, batch, ("XT07", "Gạo Japonica"), ("XT09", "Nước mắm"))
-    _bang_gia(conn, batch, "03", "XT07", 5250)
     _diem_giao(conn, batch, "B0001", "SH01", "Kho Shibuya")
     _neo(conn, batch)
 
@@ -742,7 +723,6 @@ def test_ho_so_mang_bon_khoi_moi(conn, batch):
     # rời nhau của cùng một trục, không phải hai bộ lọc chồng nhau.
     assert "XT07" not in {m["ma"] for m in h.da_ngung_mua}
     assert "XT09" in {g["ma"] for g in h.goi_y}
-    assert [b["ma"] for b in h.bac_gia] == ["XT07"]
     assert [d["ma"] for d in h.diem_giao] == ["SH01"]
     # Mặt hàng còn trong hạn mua bình thường KHÔNG được coi là "chưa mua"
     assert "XT09" not in {m["ma"] for m in h.chua_mua_thang}
@@ -864,25 +844,29 @@ def test_loc_tinh_trong_tim_dung_khach_chua_co_ho_so(conn, batch):
         "con số trong khối phân tích và số dòng bộ lọc trả về phải khớp"
 
 
-def test_bang_gia_chi_hien_gia_MOI_NHAT_cua_TUNG_QUY_CACH(conn, batch):
-    """[IMPORTANT] kome/loaders/price.py ghi một dòng MỚI mỗi lần nạp master,
-    và khoá bảng có cả `pack_code`. Không lọc thì sau ba lần nạp trang hiện
-    cùng một tên hàng SÁU LẦN với sáu con số khác nhau (3 lần nạp × 2 quy
-    cách), dưới nhãn "giá đáng lẽ phải bán". Đây là màn hình người ta nhìn
-    TRƯỚC KHI báo giá cho khách."""
-    _ho_so_khach(conn, batch, "V0001", "Quán bảng giá", price_level_code="03")
+def test_ho_so_mang_cot_mau_16_cot_va_tim_duoc_theo_so_tai_khoan(conn, batch):
+    """043 (mẫu 16 cột): hồ sơ hiện toà nhà, hạng OBC (ランク名 — KHÁC hạng doanh
+    thu), TÊN điều kiện chốt, số tài khoản chuyển khoản riêng; mã phụ trách không
+    có trong danh sách phụ trách thì lấy 売上主担当者名 của file. Ô tìm của danh
+    sách khớp cả số tài khoản — sale có tiền về gõ số đó là ra khách."""
+    _ho_so_khach(conn, batch, "V0001", "Quán tài khoản", salesperson_code="0000")
+    conn.execute(
+        """UPDATE core.dim_customer
+              SET building = '橋下ビル101号', rank_name = 'Cランク', closing_day_code = '01',
+                  closing_day_name = '代引請求', transfer_account = '0001234567',
+                  salesperson_name = 'HA HUY LONG'
+            WHERE customer_code = 'V0001'""")
+    conn.commit()
     _mua(conn, batch, "V0001", HOM_NAY - timedelta(days=3))
-    _hang_master(conn, batch, ("XT07", "Gạo Japonica"))
-    _bang_gia(conn, batch, "03", "XT07", 1000, quy_cach="00", tu_ngay="2026-01-01")
-    _bang_gia(conn, batch, "03", "XT07", 1200, quy_cach="00", tu_ngay="2026-06-01")
-    _bang_gia(conn, batch, "03", "XT07", 5000, quy_cach="02", tu_ngay="2026-06-01")
+    _mua(conn, batch, "000000000998", HOM_NAY - timedelta(days=4))
     _neo(conn, batch)
 
-    bg = KH.ho_so(conn, "V0001").bac_gia
-    assert [b["gia"] for b in bg] == [1200, 5000], \
-        "giá cũ vẫn còn, hoặc hai quy cách bị trộn làm một"
-    assert [b["quy_cach"] for b in bg] == ["バラ (lẻ)", "ケース (thùng)"]
-    assert all(b["tu_ngay"] == "2026-06-01" for b in bg)
+    h = KH.ho_so(conn, "V0001")
+    assert (h.ho_so["toa_nha"], h.ho_so["hang_obc"], h.ho_so["ngay_chot"],
+            h.ho_so["tai_khoan_ck"], h.ho_so["ten_phu_trach"]) == \
+        ("橋下ビル101号", "Cランク", "代引請求", "0001234567", "HA HUY LONG")
+    assert not {"phan_loai", "bac_gia", "vang_lai"} & set(h.ho_so)
+    assert {k.ma for k in KH.danh_sach(conn, tim="1234567").khach} == {"V0001"}
 
 
 def test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket(conn, batch, test_db_url):

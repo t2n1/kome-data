@@ -3,8 +3,9 @@
 Như kome/bao_cao.py: KHÔNG định nghĩa chỉ số ở đây, không tự mở kết nối.
 Mọi công thức nằm ở schema `mart` (migration 015, 016).
 """
+import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 
 MOI_TRANG = 50
 
@@ -58,6 +59,25 @@ CO_TRANG = (50, 100, 200)
 # 荷姿区分 — hai mã thật sự có trong dữ liệu (xem CLAUDE.md). Mã lạ thì hiện
 # nguyên mã chứ không đoán: một nhãn đoán sai còn tệ hơn một mã khó đọc.
 QUY_CACH = {"00": "バラ (lẻ)", "02": "ケース (thùng)"}
+
+# Mã khách OBC từ 2023-08 = ngày đăng ký (YYYYMMDD) + số thứ tự 4 chữ số trong ngày
+# (202609240002 = khách mới thứ 2 đăng ký ngày 2026-09-24); mã trước đó dạng
+# 000000xxxxxx, không mang ngày. Chủ DN xác nhận 2026-09-25.
+MA_CU_TRUOC = "trước 8/2023"
+
+
+def ngay_dang_ky(ma: str | None) -> str | None:
+    """Ngày đăng ký đọc từ MÃ khách: 'YYYY-MM-DD', `MA_CU_TRUOC` cho mã cũ
+    000000…, None khi mã không theo mẫu nào (vd. ngày không có thật)."""
+    ma = ma or ""
+    if re.fullmatch(r"000000\d{6}", ma):
+        return MA_CU_TRUOC
+    if not re.fullmatch(r"20\d{10}", ma):
+        return None
+    try:
+        return datetime.strptime(ma[:8], "%Y%m%d").date().isoformat()
+    except ValueError:
+        return None
 
 # Cột được phép sắp xếp. Danh sách trắng, KHÔNG ghép thẳng tham số URL vào câu
 # SQL — đó là đường mở cho SQL injection, và trang này sắp nằm trên Internet.
@@ -185,12 +205,11 @@ class HoSo:
     mat_hang: list[dict]
     da_ngung_mua: list[dict]
     lan_mua_gan_day: list[dict]
-    # Bốn khối của đợt 4a, lấy trong ĐÚNG HAI truy vấn (xem ho_so()).
-    # `bac_gia` ở đây là BẢNG GIÁ của bậc giá khách đang hưởng — khác
-    # `ho_so["bac_gia"]`, vốn chỉ là MÃ bậc ('01'..'10') lấy từ dim_customer.
+    # Các khối của đợt 4a, lấy trong ĐÚNG HAI truy vấn (xem ho_so()). Khối
+    # "bảng giá của bậc" đã bỏ ở 043: bản xuất 得意先全情報 không còn 売価No.コード,
+    # nên không biết khách hưởng bậc giá nào.
     chua_mua_thang: list[dict] = field(default_factory=list)
     goi_y: list[dict] = field(default_factory=list)
-    bac_gia: list[dict] = field(default_factory=list)
     diem_giao: list[dict] = field(default_factory=list)
     # Đợt 7: khối "Nhật ký tiếp xúc" — lượt hỏi thứ 8, tức ĐÚNG chỗ trống đã
     # chừa sẵn ở vòng sửa cuối đợt 4a. Trần 8 giờ đã chạm; khối tiếp theo
@@ -214,8 +233,12 @@ _COT = """customer_code, ten, prefecture, city, phone, salesperson_code,
 # Khối "chi tiết" của hồ sơ 360°: tên tiếng Việt cho các cột lấy thêm trong
 # CÙNG câu lệnh với `_COT` (xem ho_so()). Thứ tự ở đây PHẢI khớp thứ tự cột
 # trong câu lệnh đó.
-_COT_CHI_TIET = ("chi_nhanh", "buu_chinh", "dia_chi", "hang", "phan_loai",
-                 "ngay_chot", "bac_gia", "vang_lai", "lan_dau", "so_lan_mua",
+# 043 (mẫu 16 cột): bỏ phan_loai / bac_gia / vang_lai (cột đã bỏ khỏi bản xuất);
+# thêm toa_nha (ビル等), hang_obc (ランク名 — 得意先ランク của OBC, KHÁC `hang_dt`
+# là hạng theo doanh thu 12 tháng), tai_khoan_ck (振込専用口座番号１); `ngay_chot`
+# là TÊN điều kiện chốt (請求締日名), rỗng thì rơi về mã.
+_COT_CHI_TIET = ("chi_nhanh", "buu_chinh", "dia_chi", "toa_nha", "hang", "hang_obc",
+                 "ngay_chot", "tai_khoan_ck", "lan_dau", "so_lan_mua",
                  "so_phieu", "gia_tri_tb", "hang_dt", "ten_phu_trach")
 
 
@@ -270,6 +293,10 @@ def danh_ba(conn) -> dict:
                    k.lan_cuoi, k.so_ngay_im_lang, k.nhip_ngay::float8 AS nhip_ngay,
                    k.ty_le_im_lang::float8 AS ty_le_im_lang, k.trang_thai, k.dau_hieu_obc,
                    k.address AS dia_chi, h.hang,
+                   -- 振込専用口座番号１ (043): sale có tiền về thì gõ số tài khoản
+                   -- vào ô tìm để ra khách. Đọc thẳng dòng hiện hành (chưa có trong
+                   -- khach_360); chỉ mục duy nhất theo is_current nên không nhân dòng.
+                   dc.transfer_account AS tai_khoan,
                    (CASE WHEN k.trang_thai = ANY(%s) THEN ARRAY['im'] ELSE ARRAY[]::text[] END)
                      || coalesce(v.nhom, ARRAY[]::text[]) AS nhom,
                    t.nhan AS nhan_thang, t.dt_thang_nay::bigint AS thang_nay,
@@ -280,7 +307,9 @@ def danh_ba(conn) -> dict:
               FROM k
               LEFT JOIN mart.hang_doanh_thu h ON h.customer_code = k.customer_code
               LEFT JOIN v ON v.customer_code = k.customer_code
-              LEFT JOIN mart.khach_thang_nay t ON t.customer_code = k.customer_code)
+              LEFT JOIN mart.khach_thang_nay t ON t.customer_code = k.customer_code
+              LEFT JOIN core.dim_customer dc ON dc.customer_code = k.customer_code
+                                            AND dc.is_current)
         SELECT (SELECT coalesce(json_agg(d ORDER BY d.doanh_thu DESC, d.ma), '[]') FROM d),
                (SELECT coalesce(json_agg(n ORDER BY n.doanh_thu DESC, n.ma), '[]') FROM (
                     SELECT salesperson_code AS ma, ten, so_khach,
@@ -315,7 +344,8 @@ def _khop(k: dict, *, tim: str = "", loc: str = "", sale: str | None = None,
     """Một khách (dòng của `danh_ba`) có khớp bộ lọc không. Ngữ nghĩa từng bộ
     lọc giữ ĐÚNG như bản SQL cũ:
       * tim — chứa (không phân biệt hoa thường) trong tên, mã, điện thoại,
-        địa chỉ hoặc thành phố: nhân viên không nhớ mình đang cầm mảnh nào.
+        địa chỉ, thành phố hoặc số tài khoản chuyển khoản riêng (043): nhân viên
+        không nhớ mình đang cầm mảnh nào.
       * sale — `PT_TRONG` = mã phụ trách không có trong core.dim_salesperson.
       * tinh — `TINH_TRONG` = tỉnh NULL/rỗng (nhãn "(không rõ)" chỉ là nhãn
         hiển thị, không nằm trong CSDL).
@@ -324,7 +354,8 @@ def _khop(k: dict, *, tim: str = "", loc: str = "", sale: str | None = None,
     if tim:
         t = tim.strip().casefold()
         if t and not any(t in (k.get(c) or "").casefold()
-                         for c in ("ten", "ma", "dien_thoai", "dia_chi", "thanh_pho")):
+                         for c in ("ten", "ma", "dien_thoai", "dia_chi", "thanh_pho",
+                                   "tai_khoan")):
             return False
     if loc in TRANG_THAI and k["trang_thai"] != loc:
         return False
@@ -444,15 +475,29 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # không phải phá bất biến mới thêm được.
     r = conn.execute(
         f"""SELECT {_COT},
-                   branch_name, postcode, address, rank_code, category_code,
-                   closing_day_code, price_level_code, spot_flag, lan_dau,
+                   branch_name, postcode, address, x.building, rank_code, x.rank_name,
+                   coalesce(nullif(x.closing_day_name, ''), closing_day_code),
+                   x.transfer_account, lan_dau,
                    so_lan_mua, so_phieu, gia_tri_tb_moi_lan,
                    -- Hạng theo doanh thu 12 tháng (KHÔNG phải rank_code OBC ở
                    -- trên) — cột cuối, cùng lượt hỏi (giai đoạn 2).
                    (SELECT hang FROM mart.hang_doanh_thu WHERE customer_code = %s),
-                   (SELECT ps.ten FROM core.dim_salesperson ps
-                     WHERE ps.salesperson_code = mart.khach_360.salesperson_code)
-            FROM mart.khach_360 WHERE customer_code = %s""", (ma, ma)).fetchone()
+                   -- Tên phụ trách: danh sách phụ trách trước; mã không có trong đó
+                   -- (vd. 0000) thì lấy 売上主担当者名 đi kèm trong 得意先全情報.
+                   coalesce((SELECT ps.ten FROM core.dim_salesperson ps
+                              WHERE ps.salesperson_code = mart.khach_360.salesperson_code),
+                            nullif(x.salesperson_name, ''))
+            FROM mart.khach_360
+            -- Năm cột mới của 043 chưa có trong khach_360 (view nặng — không dựng
+            -- lại chỉ để thêm cột hiển thị): đọc thẳng dòng hiện hành. LATERAL chỉ
+            -- chọn đúng các cột mới, nên tên cột của khach_360 không bị mơ hồ.
+            LEFT JOIN LATERAL (
+                SELECT dc.building, dc.rank_name, dc.closing_day_name,
+                       dc.transfer_account, dc.salesperson_name
+                  FROM core.dim_customer dc
+                 WHERE dc.customer_code = mart.khach_360.customer_code AND dc.is_current
+            ) x ON true
+            WHERE customer_code = %s""", (ma, ma)).fetchone()
     if r is None:
         return None
     # `_khach` đọc 15 cột ĐẦU theo vị trí, phần đuôi cắt từ CUỐI lên theo số
@@ -460,6 +505,7 @@ def ho_so(conn, ma: str) -> HoSo | None:
     # không làm lệch khối chi tiết (và ngược lại).
     k = _khach(r)
     ho = dict(zip(_COT_CHI_TIET, r[-len(_COT_CHI_TIET):]))
+    ho["ngay_dang_ky"] = ngay_dang_ky(ma)
 
     # Nhãn tháng (036/037) đi CHUNG câu này (LEFT JOIN một dòng) — trần 8
     # lượt hỏi đã chạm, khối mới phải gộp vào câu có sẵn.
@@ -651,46 +697,22 @@ def ho_so(conn, ma: str) -> HoSo | None:
             goi_y.append({"ma": ma_hang, "ten": ten_hang,
                           "ty_suat": float(so_a) if so_a is not None else None})
 
-    # Truy vấn B: bảng giá của bậc giá khách đang hưởng + điểm giao thẳng.
-    # `'gia'` xếp trước `'giao'` theo bảng chữ cái, nên ORDER BY khoi, ma, c2
-    # giữ đúng thứ tự hai khối mà không cần thêm cột nào.
-    #
-    # DISTINCT ON (product_code, pack_code) ... ORDER BY valid_from DESC:
-    # core.fact_price_list giữ LỊCH SỬ giá — kome/loaders/price.py ghi một
-    # dòng MỚI mỗi lần nạp master, và khoá bảng có cả `pack_code`. Không lọc
-    # thì sau ba lần nạp trang hiện cùng một tên hàng SÁU LẦN với sáu con số
-    # khác nhau (3 lần nạp × 2 quy cách 00/02), dưới nhãn "giá đáng lẽ phải
-    # bán" — trên đúng màn hình người ta nhìn TRƯỚC KHI báo giá cho khách.
+    # Truy vấn B: điểm giao thẳng. (Trước 043 câu này còn gộp bảng giá của bậc
+    # giá khách đang hưởng — bỏ cùng cột 売価No.コード; giá theo bậc của từng mã
+    # vẫn có ở hồ sơ mã, kome/san_pham.py.)
     hai = conn.execute("""
-        SELECT khoi, ma, ten, c1, c2, c3 FROM (
-            (SELECT DISTINCT ON (pl.product_code, pl.pack_code)
-                    'gia'::text AS khoi, pl.product_code AS ma,
-                    coalesce(nullif(p.product_name, ''), pl.product_code) AS ten,
-                    pl.price_ex_tax::text AS c1, pl.pack_code AS c2,
-                    pl.valid_from::text AS c3
-               FROM core.fact_price_list pl
-               JOIN mart.khach_360 k ON k.customer_code = %s
-                                    AND k.price_level_code = pl.price_level
-               LEFT JOIN core.dim_product p ON p.product_code = pl.product_code
-              ORDER BY pl.product_code, pl.pack_code, pl.valid_from DESC
-              LIMIT 20)
-            UNION ALL
-            (SELECT 'giao', shipto_code, coalesce(nullif(shipto_name, ''), shipto_code),
-                    coalesce(address, ''), '', ''
-               FROM core.dim_shipto WHERE customer_code = %s)
-        ) u ORDER BY khoi, ma, c2
-    """, (ma, ma)).fetchall()
+        SELECT shipto_code, coalesce(nullif(shipto_name, ''), shipto_code),
+               coalesce(address, '')
+          FROM core.dim_shipto WHERE customer_code = %s
+         ORDER BY shipto_code
+    """, (ma,)).fetchall()
 
-    bac_gia = [{"ma": r[1], "ten": r[2], "gia": int(r[3]),
-                "quy_cach": QUY_CACH.get(r[4], r[4]), "tu_ngay": r[5]}
-               for r in hai if r[0] == "gia"]
-    diem_giao = [{"ma": r[1], "ten": r[2], "dia_chi": r[3]}
-                 for r in hai if r[0] == "giao"]
+    diem_giao = [{"ma": r[0], "ten": r[1], "dia_chi": r[2]} for r in hai]
 
     from kome.lien_he import nhat_ky_khach
     return HoSo(khach=k, ho_so=ho, thang=thang, mat_hang=mat_hang,
                 da_ngung_mua=da_ngung, lan_mua_gan_day=gan_day,
-                chua_mua_thang=chua_mua, goi_y=goi_y, bac_gia=bac_gia,
+                chua_mua_thang=chua_mua, goi_y=goi_y,
                 diem_giao=diem_giao, nhat_ky=nhat_ky_khach(conn, ma),
                 tat_ca_mat_hang=tat_ca, ngay_mua=ngay_mua, thang_nay=thang_nay,
                 hom_nay=moc)
