@@ -707,6 +707,15 @@ gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hi�
   (+1 lượt `pham_vi`) chạy TRONG hàm tính. Khối Tổng quan theo khoảng: `KHOI[..][3] = True`,
   ngân sách lượt hỏi = cũ + 1 (`tests/test_api.py::NGAN_SACH_TRUY_VAN`). `/bao-cao` vẫn ≤ 11
   ở cả ba dạng (`tests/test_ban_khoang.py::test_bao_cao_thang_khong_qua_11_truy_van`).
+- **Kỳ so sánh tự chọn** (`?ss_thang=` · `?ss_ky=` · `?ss_tu=&ss_den=`, 2026-09-25) THAY cả
+  hai phép so mặc định bằng MỘT (`so_sanh = (SoSanh(ma='tu_chon'),)`, `KhoangXem.tu_chon`) — mọi
+  màn đọc `so_sanh[0]`/`_ss_phu` tự đi theo. Tháng↔Tháng dở dang cắt cùng dải ngày, Kỳ↔Kỳ cùng vị
+  trí trong kỳ (theo tháng có dữ liệu), tổ hợp khác nguyên văn + `mo_ta` in số ngày hai bên. Dải
+  so phải kết thúc ≤ ngày cuối khoảng xem (400) — `mart.dong_ban` chỉ thấy dòng ≤ mốc, KHÔNG nới
+  mốc. Màn không dùng phép so gọi `ThamSo.chinh()` (`api._ts(...).chinh()`) để đổi kỳ so sánh
+  không làm ảnh chụp của chúng trượt. `/bao-cao?ky=&ss_*=` đi nhánh khoảng (không `cung_ky`).
+  `datKhoang` giữ `ss_*`; chỉ `datSoSanh` đổi nó. Test: `tests/test_ky_so_sanh.py`. Đặc tả:
+  `docs/superpowers/specs/2026-09-25-ky-so-sanh-tu-chon-design.md`.
 Liên kết nội bộ giữ khoảng xem nhờ MỘT bộ viết lại `href` ở `document`
 (`khoang.ts::ganVietLaiLienKet`); mọi `history.pushState/replaceState` của từng màn đi
 qua `giuKhoang()` — thêm một màn có bộ lọc trên URL mà quên hàm đó là đổi bộ lọc xong mất

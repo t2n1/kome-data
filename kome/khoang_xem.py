@@ -23,6 +23,13 @@ Luật so sánh (có test canh, tests/test_khoang_xem.py):
     EXISTS-trong-tháng của `mart.thang_den_hom_nay`). Không có thì màn nói "không
     có dữ liệu để so", không bao giờ so với một dải thiếu dữ liệu mà im lặng.
 
+Kỳ so sánh tự chọn (đặc tả 2026-09-25-ky-so-sanh-tu-chon-design.md): `?ss_thang=` ·
+`?ss_ky=` · `?ss_tu=&ss_den=` THAY cả hai phép so mặc định bằng MỘT phép so
+(`ma='tu_chon'`). Tháng↔Tháng / Kỳ↔Kỳ cắt cho cân như luật mặc định; tổ hợp khác so
+nguyên văn và `mo_ta` in số ngày hai bên. Dải so phải kết thúc ≤ ngày cuối khoảng
+đang xem: `mart.dong_ban` chỉ thấy dòng ≤ mốc (040), nới mốc là dời cả hạng / trạng
+thái / tồn.
+
 `doc_tham_so` chỉ kiểm CÚ PHÁP (không hỏi CSDL) — khoá ảnh chụp dựng từ nó, nên
 "trúng ảnh chụp: một lượt hỏi" vẫn đúng. `giai` cần dải dữ liệu (`pham_vi`, một
 lượt hỏi) và chạy BÊN TRONG hàm tính của ảnh chụp.
@@ -31,7 +38,7 @@ from __future__ import annotations
 
 import calendar
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 
 import psycopg
@@ -51,6 +58,7 @@ class ThamSo:
     ky: int | None = None
     tu: date | None = None
     den: date | None = None
+    ss: "ThamSo | None" = None      # kỳ so sánh tự chọn (không lồng `ss`)
 
     @property
     def loai(self) -> str:
@@ -63,7 +71,13 @@ class ThamSo:
         return "mac_dinh"
 
     def khoa(self) -> dict[str, str]:
-        """Tham số đã chuẩn hoá — phần khoảng của khoá ảnh chụp."""
+        """Tham số đã chuẩn hoá — phần khoảng của khoá ảnh chụp (kèm `ss_*`)."""
+        k = self._khoa_chinh()
+        if self.ss is not None:
+            k.update({f"ss_{a}": b for a, b in self.ss._khoa_chinh().items()})
+        return k
+
+    def _khoa_chinh(self) -> dict[str, str]:
         if self.thang:
             return {"thang": self.thang}
         if self.ky is not None:
@@ -71,6 +85,11 @@ class ThamSo:
         if self.tu is not None:
             return {"tu": self.tu.isoformat(), "den": self.den.isoformat()}
         return {}
+
+    def chinh(self) -> "ThamSo":
+        """Bỏ kỳ so sánh — cho ảnh chụp không dùng phép so (danh bạ, kho, công nợ…):
+        đổi kỳ so sánh không được làm chúng trượt ảnh chụp."""
+        return ThamSo(self.thang, self.ky, self.tu, self.den)
 
     def moc(self) -> date | None:
         """Ngày cuối của khoảng, suy THEO CÚ PHÁP (không hỏi CSDL) — mốc thời gian
@@ -96,7 +115,18 @@ def _doc_ngay(s: str, ten: str) -> date:
 
 
 def doc_tham_so(thang: str | None = "", ky: str | int | None = "",
-                tu: str | None = "", den: str | None = "") -> ThamSo:
+                tu: str | None = "", den: str | None = "",
+                ss_thang: str | None = "", ss_ky: str | int | None = "",
+                ss_tu: str | None = "", ss_den: str | None = "") -> ThamSo:
+    try:
+        ss = _doc_mot(ss_thang, ss_ky, ss_tu, ss_den)
+    except LoiKhoang as e:
+        raise LoiKhoang(f"Kỳ so sánh: {e}") from None
+    ts = _doc_mot(thang, ky, tu, den)
+    return ts if ss.loai == "mac_dinh" else ThamSo(ts.thang, ts.ky, ts.tu, ts.den, ss)
+
+
+def _doc_mot(thang, ky, tu, den) -> ThamSo:
     thang = (thang or "").strip()
     ky = str(ky if ky is not None else "").strip()
     tu, den = (tu or "").strip(), (den or "").strip()
@@ -203,7 +233,7 @@ def pham_vi(conn, ts: "ThamSo | None" = None) -> PhamVi | None:
 class SoSanh:
     """Một phép so. `tu_nay`/`den_nay` = phần của khoảng đang xem được đem so
     (khác `tu`/`den` của khoảng chỉ ở dạng Kỳ, khi dữ liệu bắt đầu giữa chừng)."""
-    ma: str          # 'nam_truoc' | 'thang_truoc' | 'lien_truoc'
+    ma: str          # 'nam_truoc' | 'thang_truoc' | 'lien_truoc' | 'tu_chon'
     nhan: str
     tu: date
     den: date
@@ -231,6 +261,8 @@ class KhoangXem:
     # Đang xem LÙI (040): mọi chỉ số "tính đến hôm nay" là tính đến `hom_nay`, sớm
     # hơn ngày bán mới nhất thật — màn đổi nhãn "hôm nay" thành "đến <ngày>".
     dang_lui: bool = False
+    # Đang so với kỳ tự chọn (`ss_*`) — `so_sanh` khi đó chỉ một phần tử.
+    tu_chon: bool = False
 
     @property
     def so_ngay(self) -> int:
@@ -326,6 +358,12 @@ def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
                    _so("lien_truoc", "khoảng liền trước", tu - timedelta(days=so + 1),
                        tu - timedelta(days=1), tu, den, pv))
 
+    if ts.ss is not None:
+        return _voi_ss(pv, ts, KhoangXem(
+            loai=loai, tu=tu, den=den, nhan=nhan, mo_ta="", thang=thang,
+            company_fy=None, so_ky=None, mac_dinh=ts.loai == "mac_dinh", tron_thang=tron,
+            so_sanh=(), ghi_chu=tuple(ghi_chu), ngay_dau=pv.ngay_dau, hom_nay=pv.hom_nay))
+
     ky = pv.ky_chua(den)
     phan = []
     for s in so_sanh:
@@ -342,6 +380,64 @@ def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
                      so_sanh=so_sanh, ghi_chu=tuple(ghi_chu),
                      ngay_dau=pv.ngay_dau, hom_nay=pv.hom_nay,
                      dang_lui=pv.hom_nay_that is not None and pv.hom_nay < pv.hom_nay_that)
+
+
+def _doi_nam(d: date, n: int) -> date:
+    """d dời n năm; 29/2 → 28/2."""
+    try:
+        return d.replace(year=d.year + n)
+    except ValueError:
+        return d.replace(year=d.year + n, day=28)
+
+
+def _voi_ss(pv: PhamVi, ts: ThamSo, kx: KhoangXem) -> KhoangXem:
+    """Thay các phép so mặc định bằng MỘT phép so với kỳ tự chọn `ts.ss`."""
+    ss, tu, den = ts.ss, kx.tu, kx.den
+    tu_nay, den_nay = tu, den
+    if ss.thang:
+        y, m = int(ss.thang[:4]), int(ss.thang[5:])
+        cuoi = _cuoi_thang(y, m)
+        nhan = f"tháng {m}/{y}"
+        a = date(y, m, 1)
+        # Tháng ↔ Tháng dở dang: cùng dải ngày (luật mặc định của dạng Tháng).
+        b = date(y, m, min(den.day, cuoi.day)) if kx.loai == "thang" and not kx.tron_thang else cuoi
+    elif ss.ky is not None:
+        k2 = next((x for x in pv.ky if x.company_fy == ss.ky), None)
+        nhan = (f"kỳ {k2.so_ky} (8/{ss.ky - 1} → 7/{ss.ky})" if k2
+                else f"kỳ kết thúc 7/{ss.ky}")
+        a, b = (k2.tu, k2.den) if k2 else (date(ss.ky - 1, 8, 1), date(ss.ky, 7, 31))
+        if kx.loai == "ky" and k2 is not None:
+            # Kỳ ↔ Kỳ: cùng vị trí trong kỳ; chỉ so phần CẢ HAI phía có dữ liệu,
+            # theo tháng (cùng luật dạng Kỳ mặc định / `mart.ky_cung_ky`).
+            fy = pv.ky_chua(den).company_fy
+            n = ss.ky - fy
+            a, b = _doi_nam(tu, n), _doi_nam(den, n)
+            if a < k2.tu:
+                a = _dau_thang(k2.tu)
+                tu_nay = _doi_nam(a, -n)
+            if b > k2.den:
+                b = k2.den
+                den_nay = _doi_nam(b, -n)
+    else:
+        a, b = ss.tu, ss.den
+        nhan = _dai(a, b)
+    if b > den:
+        raise LoiKhoang(f"Kỳ so sánh ({_dai(a, b)}) phải nằm trước ngày cuối khoảng đang xem "
+                        f"({_n(den)}) — muốn so ngược thì đổi chỗ hai kỳ.")
+    s = _so("tu_chon", nhan, a, b, tu_nay, den_nay, pv)
+    if not s.co:
+        phan = f"{nhan}: không có dữ liệu để so"
+    else:
+        phan = f"{nhan}: " + (f"{_dai(tu_nay, den_nay)} với {_dai(a, b)}"
+                              if (tu_nay, den_nay) != (tu, den) else _dai(a, b))
+        n1, n2 = (den_nay - tu_nay).days + 1, (b - a).days + 1
+        if n1 != n2:
+            phan += f" ({n1} ngày với {n2} ngày)"
+    ky = pv.ky_chua(den)
+    return replace(kx, so_sanh=(s,), tu_chon=True,
+                   mo_ta=f"{kx.nhan} · {_dai(tu, den)} · so với {phan}",
+                   company_fy=ky.company_fy if ky else None, so_ky=ky.so_ky if ky else None,
+                   dang_lui=pv.hom_nay_that is not None and pv.hom_nay < pv.hom_nay_that)
 
 
 def giai_conn(conn, ts: ThamSo) -> KhoangXem | None:

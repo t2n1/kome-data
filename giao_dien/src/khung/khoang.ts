@@ -9,14 +9,20 @@ import { useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { lay } from "../api";
 
-export const THAM_SO = ["thang", "ky", "tu", "den"] as const;
+// Khoảng xem + kỳ so sánh tự chọn (đặc tả 2026-09-25-ky-so-sanh-tu-chon-design.md):
+// `ss_*` THAY cả hai phép so mặc định; máy chủ cắt dải, file này chỉ đọc / ghi URL.
+export const THAM_SO_CHINH = ["thang", "ky", "tu", "den"] as const;
+export const THAM_SO_SS = ["ss_thang", "ss_ky", "ss_tu", "ss_den"] as const;
+export const THAM_SO = [...THAM_SO_CHINH, ...THAM_SO_SS] as const;
 export type Khoang = Partial<Record<(typeof THAM_SO)[number], string>>;
+export type SoSanhChon = Partial<Record<(typeof THAM_SO_SS)[number], string>>;
 
 /** Object `khoang` máy chủ trả kèm mọi dữ liệu doanh số (kome/khoang_xem.py::KhoangXem). */
 export type KhoangMayChu = {
   loai: "thang" | "ky" | "khoang"; tu: string; den: string; nhan: string; mo_ta: string;
   thang: string | null; company_fy: number | null; so_ky: number | null; mac_dinh: boolean;
   tron_thang: boolean; ghi_chu: string[]; ngay_dau: string; hom_nay: string; so_ngay: number; dang_lui: boolean;
+  tu_chon: boolean;
   so_sanh: { ma: string; nhan: string; tu: string; den: string; tu_nay: string; den_nay: string; co: boolean }[];
 };
 export type PhamVi = { ngay_dau: string; hom_nay: string; ky: { company_fy: number; so_ky: number; tu: string; den: string }[] };
@@ -27,6 +33,7 @@ export function docKhoang(search: string = location.search): Khoang {
   for (const t of THAM_SO) { const v = q.get(t); if (v) k[t] = v; }
   // `thang` chỉ là khoảng xem khi đúng dạng YYYY-MM (phòng một bộ lọc cũ trùng tên).
   if (k.thang && !/^\d{4}-\d{2}$/.test(k.thang)) delete k.thang;
+  if (k.ss_thang && !/^\d{4}-\d{2}$/.test(k.ss_thang)) delete k.ss_thang;
   return k;
 }
 
@@ -57,15 +64,21 @@ export function voiKhoang(url: string): string {
   return url + (url.includes("?") ? "&" : "?") + hienTai;
 }
 
-/** Đổi khoảng: sửa URL tại chỗ (không tải lại trang) rồi báo mọi thành phần. */
-export function datKhoang(k: Khoang) {
+function ghi(nhom: readonly (typeof THAM_SO)[number][], k: Khoang) {
   const u = new URL(location.href);
-  for (const t of THAM_SO) u.searchParams.delete(t);
-  for (const t of THAM_SO) if (k[t]) u.searchParams.set(t, k[t]!);
+  for (const t of nhom) u.searchParams.delete(t);
+  for (const t of nhom) if (k[t]) u.searchParams.set(t, k[t]!);
   history.replaceState(history.state, "", u.pathname + u.search + u.hash);
-  hienTai = chuoiKhoang(k);
+  hienTai = chuoiKhoang(docKhoang(u.search));
   bao();
 }
+
+/** Đổi khoảng xem: sửa URL tại chỗ (không tải lại trang) rồi báo mọi thành
+ *  phần. GIỮ kỳ so sánh đang chọn (`ss_*`) — chỉ `datSoSanh` đổi nó. */
+export function datKhoang(k: Khoang) { ghi(THAM_SO_CHINH, k); }
+
+/** Đổi kỳ so sánh tự chọn; `{}` = về phép so mặc định (năm trước · tháng trước). */
+export function datSoSanh(k: SoSanhChon) { ghi(THAM_SO_SS, k); }
 
 export function useKhoang(): Khoang {
   const s = useSyncExternalStore(f => { nghe.add(f); return () => { nghe.delete(f); }; }, () => hienTai);

@@ -190,6 +190,15 @@ def _voi_moc(ts: "KX.ThamSo", tinh):
     return f
 
 
+def _ts(request: Request, thang: str, ky: str, tu: str, den: str) -> "KX.ThamSo":
+    """Khoảng xem + kỳ so sánh tự chọn (`?ss_thang=` · `?ss_ky=` · `?ss_tu=&ss_den=`,
+    đọc thẳng từ query — không thêm tham số vào mọi route). Màn không dùng phép so
+    gọi `.chinh()` để đổi kỳ so sánh không làm ảnh chụp của chúng trượt."""
+    q = request.query_params
+    return KX.doc_tham_so(thang, ky, tu, den, q.get("ss_thang", ""), q.get("ss_ky", ""),
+                          q.get("ss_tu", ""), q.get("ss_den", ""))
+
+
 def tao_api(open_app_conn) -> APIRouter:
     r = APIRouter(prefix="/api")
 
@@ -204,7 +213,7 @@ def tao_api(open_app_conn) -> APIRouter:
         ts = None
         if theo_khoang:
             try:
-                ts = KX.doc_tham_so(thang, ky, tu, den)
+                ts = _ts(request, thang, ky, tu, den)
             except KX.LoiKhoang as e:
                 return _loi(str(e), 400)
         khoa = _khoa(f"tong-quan/{khoi}", **({"sale": sale or "*"} if theo_sale else {}),
@@ -264,7 +273,7 @@ def tao_api(open_app_conn) -> APIRouter:
         # `nhan_thang` (nhãn mart.khach_thang_nay) — KHÔNG phải `thang`: `?thang=YYYY-MM`
         # là tháng của khoảng xem chung (kome/khoang_xem.py).
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den)
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         thang = nhan_thang
@@ -277,8 +286,8 @@ def tao_api(open_app_conn) -> APIRouter:
             with open_app_conn() as conn:
                 # Danh bạ (trạng thái, hạng, nhịp…) tính đến MỐC của khoảng (040) —
                 # khoá theo khoảng; mặc định vẫn đúng khoá `KHOA_DANH_BA` cũ.
-                db, pb = anh_chup.lay_du_lieu(conn, _khoa(anh_chup.KHOA_DANH_BA, **ts.khoa()),
-                                              _voi_moc(ts, KH.danh_ba), chi_nap=True)
+                db, pb = anh_chup.lay_du_lieu(conn, _khoa(anh_chup.KHOA_DANH_BA, **ts.chinh().khoa()),
+                                              _voi_moc(ts.chinh(), KH.danh_ba), chi_nap=True)
                 # Doanh số trong khoảng xem của MỌI khách (đợt B): ảnh chụp riêng
                 # theo khoảng — +1 lượt hỏi khi trượt (ngân sách màn danh sách ≤ 4).
                 kk, _ = anh_chup.lay_du_lieu(conn, _khoa(anh_chup.KHOA_DANH_BA_KHOANG, **ts.khoa()),
@@ -309,7 +318,7 @@ def tao_api(open_app_conn) -> APIRouter:
     def kh_ho_so(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         from kome import ho_so_khach as HSK
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         # Nhật ký tiếp xúc thuộc phiên bản dữ liệu (app.nhat_ky_tiep_xuc có
@@ -332,7 +341,7 @@ def tao_api(open_app_conn) -> APIRouter:
         mua. Endpoint RIÊNG: hồ sơ (`KH.ho_so`) đã chạm trần 8 lượt hỏi. 2 lượt."""
         from kome import ban_khoang as BK
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den)
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
 
@@ -410,7 +419,7 @@ def tao_api(open_app_conn) -> APIRouter:
         """Báo cáo theo khoảng xem (`?thang=` · `?ky=` · `?tu=&den=`; không tham
         số = tháng hiện tại). Đọc app.ngan_sach (tiến độ) -> phiên bản đầy đủ."""
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den)
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         return _chup(request, _khoa("bao-cao", **ts.khoa()), lambda c: du_lieu_bao_cao(c, ts),
@@ -420,7 +429,7 @@ def tao_api(open_app_conn) -> APIRouter:
     def du_bao(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         """Dự báo như tính vào MỐC của khoảng xem (040). Đọc app.ngan_sach -> phiên bản đầy đủ."""
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         return _chup(request, _khoa("du-bao", **ts.khoa()), _voi_moc(ts, du_lieu_du_bao),
@@ -434,7 +443,7 @@ def tao_api(open_app_conn) -> APIRouter:
         sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
         hom_nay = hom_nay_o_nhat()
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
 
@@ -469,7 +478,7 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import ban_do as BD
         sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
 
@@ -492,7 +501,7 @@ def tao_api(open_app_conn) -> APIRouter:
         độ / trạng thái tính đến MỐC của khoảng xem (040)."""
         from kome import san_pham as SP
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         return _chup(request, _khoa(KHOA_DANH_MUC, **ts.khoa()), _voi_moc(ts, SP.danh_muc),
@@ -505,7 +514,7 @@ def tao_api(open_app_conn) -> APIRouter:
         Khai báo TRƯỚC `/san-pham/{ma}` — không thì "khoang" bị đọc thành mã hàng."""
         from kome import ban_khoang as BK
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den)
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
 
@@ -520,7 +529,7 @@ def tao_api(open_app_conn) -> APIRouter:
         """Một mã trong khoảng xem (đợt C): tổng + so sánh, khách mua trong khoảng. 2 lượt."""
         from kome import ban_khoang as BK
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den)
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
 
@@ -536,7 +545,7 @@ def tao_api(open_app_conn) -> APIRouter:
         mốc khi có khoảng xem — 040)."""
         from kome import san_pham as SP
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
 
@@ -574,7 +583,7 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import san_pham as SP
         loc = loc if loc in SP.TRANG_THAI_TON else ""
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         # Tồn = ảnh chụp mới nhất ≤ MỐC (040); không có thì màn nói rõ là không có.
@@ -591,7 +600,7 @@ def tao_api(open_app_conn) -> APIRouter:
         Sổ = kỳ kết thúc muộn nhất ≤ MỐC của khoảng xem (040)."""
         from kome import cong_no as CN
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         return _chup(request, _khoa(KHOA_CONG_NO, **ts.khoa()), _voi_moc(ts, lambda c: thanh_json(CN.man_hinh(c))),
@@ -602,7 +611,7 @@ def tao_api(open_app_conn) -> APIRouter:
         """Tab Công nợ của hồ sơ khách (`CN.cua_khach`, ≤ 3 lượt hỏi; +1 mốc — 040)."""
         from kome import cong_no as CN
         try:
-            ts = KX.doc_tham_so(thang, ky, tu, den)
+            ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         return _chup(request, _khoa("cong-no/khach", ma=ma, **ts.khoa()),

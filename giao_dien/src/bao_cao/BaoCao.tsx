@@ -105,7 +105,8 @@ export default function BaoCao() {
   const kx = d.khoang;
   // Dạng Kỳ = màn Báo cáo cũ (so cùng kỳ trên các tháng đối chiếu); dạng Tháng /
   // Khoảng so theo `bc.so_sanh` (năm trước + tháng trước / khoảng liền trước).
-  const theoKy = !kx || kx.loai === "ky";
+  // Dạng Kỳ có kỳ so sánh tự chọn cũng đi `bc.so_sanh` (máy chủ đã đi nhánh khoảng).
+  const theoKy = !kx || (kx.loai === "ky" && !kx.tu_chon);
   const ss = bc.so_sanh ?? [];
   const chinh = ss[0];
   const theoNgay = bc.thang.length > 0 && bc.thang[0].thang.length === 10;

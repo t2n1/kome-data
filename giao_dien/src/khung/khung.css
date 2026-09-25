@@ -113,4 +113,8 @@ a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
   background:var(--nen-the);color:var(--chu);min-width:0}
 .kx-mo-ta{flex-basis:100%;margin:0;font-size:.74rem;line-height:1.45}
 .kx-ghi{color:var(--canh-chu)}
+/* Dòng "SO VỚI" (kỳ so sánh tự chọn) — xuống hàng riêng, dưới bộ chọn chính. */
+.kx-so-voi{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .6rem;margin:0}
+.kx-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.12rem .2rem .12rem .6rem;border-radius:999px;
+  border:1px solid var(--vien);background:var(--nen-phu)}
 @media (max-width: 640px){ .kx{padding:.5rem .6rem} .kx-o{max-width:100%} }

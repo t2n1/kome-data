@@ -7,7 +7,8 @@ tăng trưởng ngành đều tính trong `mart`; phép chia so sánh thừa k�
 `bao_cao._SoCungKy` (một công thức, một chỗ).
 
 Dạng Kỳ không đi qua module này: `tinh_bao_cao` gọi thẳng
-`kome.bao_cao.tinh_bao_cao` để màn Báo cáo theo kỳ ra ĐÚNG số như trước.
+`kome.bao_cao.tinh_bao_cao` để màn Báo cáo theo kỳ ra ĐÚNG số như trước — trừ khi
+có kỳ so sánh tự chọn (`KhoangXem.tu_chon`).
 """
 from __future__ import annotations
 
@@ -61,7 +62,10 @@ def chuoi(conn, kx: KhoangXem) -> tuple[str, list[BC.O]]:
     s = kx.so_sanh[0] if kx.so_sanh else None
     cau = f"SELECT 0 AS k, {nhan}, dt, lg, so_phieu, so_khach FROM {ham}(%s, %s)"
     ts = [kx.tu, kx.den]
-    if s is not None and s.co:
+    # Kỳ so sánh tự chọn có thể dài khác hẳn (25 ngày với cả kỳ): hai chuỗi khác
+    # độ hạt thì không xếp cạnh nhau theo thứ tự được — bỏ đường so, ô tổng vẫn so.
+    cung_hat = s is not None and (((s.den - s.tu).days + 1 <= NGAY_TOI_DA_THEO_NGAY) == (kieu == "ngay"))
+    if s is not None and s.co and cung_hat:
         cau += f" UNION ALL SELECT 1, {nhan}, dt, lg, so_phieu, so_khach FROM {ham}(%s, %s)"
         ts += [s.tu, s.den]
     rows = conn.execute(cau + " ORDER BY 1, 2", ts).fetchall()
@@ -136,9 +140,10 @@ def _so_thang(tu: date, den: date) -> int:
 
 def tinh_bao_cao(conn, kx: KhoangXem) -> BC.BaoCao:
     """Báo cáo của khoảng xem. Dạng Kỳ = `kome.bao_cao.tinh_bao_cao` nguyên vẹn
-    (7 lượt hỏi). Dạng Tháng / Khoảng: 7 lượt hỏi (tổng + so sánh · chuỗi · mặt
+    (7 lượt hỏi) — trừ khi có kỳ so sánh tự chọn: khi đó đi nhánh khoảng để so
+    đúng kỳ đã chọn. Dạng Tháng / Khoảng: 7 lượt hỏi (tổng + so sánh · chuỗi · mặt
     hàng · người phụ trách · ngành × tháng · ngành so sánh · Pareto)."""
-    if kx.loai == "ky":
+    if kx.loai == "ky" and not kx.tu_chon:
         return BC.tinh_bao_cao(conn, kx.company_fy)
     nay, ss = tong(conn, kx)
     ky = BC.Ky(company_fy=kx.company_fy or 0, so_ky=kx.so_ky or 0, nhan=kx.nhan,
