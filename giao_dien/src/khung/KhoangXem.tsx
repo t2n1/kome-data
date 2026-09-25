@@ -1,9 +1,11 @@
 // Bộ chọn khoảng xem chung (đặc tả khoảng xem §4): ‹ Tháng 7/2026 › · nút gạt
 // Tháng / Kỳ / Khoảng · dòng mô tả CỦA MÁY CHỦ (kome/khoang_xem.py — bộ chọn
 // không tự tính ngày so sánh). Chỉ tính toán ở đây là điều hướng: tháng trước /
-// sau, và mấy nút nhanh của dạng Khoảng.
+// sau, và mấy nút nhanh của dạng Khoảng. Dòng "SO VỚI" chọn kỳ so sánh tự chọn
+// (`ss_*`, đặc tả 2026-09-25-ky-so-sanh-tu-chon-design.md) — máy chủ cắt dải.
 import { useState } from "react";
-import { datKhoang, useKhoang, useKhoangMayChu, usePhamVi, type Khoang } from "./khoang";
+import { datKhoang, datSoSanh, useKhoang, useKhoangMayChu, usePhamVi, type Khoang, type KhoangMayChu,
+  type PhamVi } from "./khoang";
 
 const thangCua = (iso: string) => iso.slice(0, 7);
 const cong = (thang: string, n: number) => {
@@ -73,6 +75,8 @@ export function KhoangXem({ mo }: { mo?: string }) {
 
       {loai === "khoang" && <KhoangNgay k={k} pv={pv} mo={moKhoang} />}
 
+      <SoVoi k={k} pv={pv} kx={kx} />
+
       <div className="kx-mo-ta phu" aria-live="polite">
         {kx ? <>{kx.mo_ta}{kx.ghi_chu.map(g => <span key={g} className="kx-ghi"> · {g}</span>)}</>
           : loai === "thang" ? nhanThang(tDang) : "…"}
@@ -104,5 +108,58 @@ function KhoangNgay({ k, pv, mo }: { k: Khoang; pv: { ngay_dau: string; hom_nay:
       <button type="submit" className="nut-nho chinh" disabled={!tu || !den || tu > den}>Xem</button>
       {nhanh.map(([n, a, b]) => <button key={n} type="button" className="nut-nho" onClick={() => ap(a, b)}>{n}</button>)}
     </form>
+  );
+}
+
+/** Dòng "SO VỚI": mặc định (năm trước · tháng trước) hoặc MỘT kỳ tự chọn. Ô chọn
+ *  giới hạn tới ngày cuối khoảng đang xem — kỳ so phải nằm trước đó (mốc, 040). */
+function SoVoi({ k, pv, kx }: { k: Khoang; pv: PhamVi; kx: KhoangMayChu | null }) {
+  const coSs = !!(k.ss_thang || k.ss_ky || k.ss_tu);
+  const [mo, datMo] = useState(false);
+  const [loai, datLoai] = useState<"thang" | "ky" | "khoang">(k.ss_ky ? "ky" : k.ss_tu ? "khoang" : "thang");
+  const [tu, datTu] = useState(k.ss_tu ?? "");
+  const [den, datDen] = useState(k.ss_den ?? "");
+  const cuoi = kx?.den ?? pv.hom_nay;
+  const tDau = thangCua(pv.ngay_dau), tCuoi = thangCua(cuoi);
+  const nhanSs = kx?.tu_chon ? kx.so_sanh[0]?.nhan : null;
+  const ap = (x: Parameters<typeof datSoSanh>[0]) => { datSoSanh(x); datMo(false); };
+
+  return (
+    <div className="kx-so-voi" role="group" aria-label="So với">
+      <span className="kx-nhan">SO VỚI</span>
+      {coSs
+        ? <span className="kx-chip">So với <b>{nhanSs ?? "kỳ đã chọn"}</b>
+            <button type="button" className="nut-nho" aria-label="Bỏ kỳ so sánh, về mặc định"
+              onClick={() => ap({})}>✕</button></span>
+        : <span className="phu">Mặc định (năm trước · tháng trước)</span>}
+      <button type="button" className="nut-nho" aria-expanded={mo} onClick={() => datMo(!mo)}>
+        {coSs ? "Đổi kỳ so sánh…" : "Chọn kỳ để so…"}</button>
+
+      {mo && <div className="kx-dieu">
+        <div className="tab-pill" role="group" aria-label="Dạng kỳ so sánh">
+          {(["thang", "ky", "khoang"] as const).map(l => (
+            <button key={l} type="button" aria-pressed={loai === l} onClick={() => datLoai(l)}>
+              {l === "thang" ? "Tháng" : l === "ky" ? "Kỳ" : "Khoảng"}</button>))}
+        </div>
+        {loai === "thang" && <input type="month" className="kx-o" min={tDau} max={tCuoi}
+          defaultValue={k.ss_thang ?? ""} aria-label="Tháng để so"
+          onChange={e => e.target.value && ap({ ss_thang: e.target.value })} />}
+        {loai === "ky" && <select className="kx-o" aria-label="Kỳ để so" defaultValue={k.ss_ky ?? ""}
+          onChange={e => e.target.value && ap({ ss_ky: e.target.value })}>
+          <option value="" disabled>— chọn kỳ —</option>
+          {pv.ky.filter(x => x.tu <= cuoi).map(x =>
+            <option key={x.company_fy} value={x.company_fy}>Kỳ {x.so_ky} (8/{x.company_fy - 1} → 7/{x.company_fy})</option>)}
+        </select>}
+        {loai === "khoang" && <form className="kx-dieu" onSubmit={e => {
+          e.preventDefault(); if (tu && den && tu <= den) ap({ ss_tu: tu, ss_den: den }); }}>
+          <input type="date" className="kx-o" value={tu} min={pv.ngay_dau} max={cuoi} aria-label="So từ ngày"
+            onChange={e => datTu(e.target.value)} />
+          <span aria-hidden="true">→</span>
+          <input type="date" className="kx-o" value={den} min={pv.ngay_dau} max={cuoi} aria-label="So đến ngày"
+            onChange={e => datDen(e.target.value)} />
+          <button type="submit" className="nut-nho chinh" disabled={!tu || !den || tu > den}>So</button>
+        </form>}
+      </div>}
+    </div>
   );
 }
