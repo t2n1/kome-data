@@ -1,12 +1,10 @@
 # kome/web/app.py
-import os, shutil, sys, tempfile, traceback
-from datetime import date, timedelta
+import os, re, shutil, sys, tempfile, traceback
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from kome.coverage import tinh_bang_ngay, tinh_bang_phu
 from kome import khach_hang as KH
 from kome.db import connect
 from kome.env import nap_env
@@ -27,6 +25,7 @@ from kome.web import spa as SPA
 from kome.web import anh_chup
 from kome.web.api import tao_api
 from kome.khoi_tong_quan import CHUA_CO as KTQ_CHUA_CO
+from kome.nguon_dung import tinh_nang
 from ops.backup import backup_status
 
 # Đợt 4d (Task 2) — nút đổi giao diện sáng/tối, KHÔNG JS.
@@ -101,9 +100,6 @@ nap_env(bat_buoc=False)
 # như bản Jinja trước, nên ngân sách lượt hỏi và cổng quyền không đổi. Biểu mẫu
 # (nạp, hoàn tác, ngân sách, quyền, đăng nhập) vẫn là <form method="post"> thật.
 
-# Cửa sổ soát ngày thiếu trên /kho-du-lieu (tính lùi từ ngày bán gần nhất).
-SO_NGAY_SOAT = 30
-
 # Mọi đường dẫn thuộc màn Kho dữ liệu — màn DUY NHẤT có nút xoá dữ liệu.
 # Ba địa chỉ cũ ở cuối danh sách vẫn phải chặn dù chúng chỉ còn trả 301: để
 # hở chúng là để người không có quyền dò ra cấu trúc màn bị cấm.
@@ -150,47 +146,6 @@ def _gioi_han_tai_len() -> int | None:
     """Cỡ file tối đa trình duyệt được gửi (window.__KOME__.gioi_han_tai_len):
     chỉ trên Vercel; máy công ty không giới hạn (đối soát tháng 30–106 MB)."""
     return GIOI_HAN_WEB if bao_mat.tren_mang() else None
-
-
-def _ky_du_lieu(conn) -> dict:
-    """Kỳ dữ liệu bán hàng + các ngày LÀM VIỆC không có dòng nào.
-
-    Không có gì khác trong hệ thống phát hiện thiếu hẳn một ngày: nhân viên
-    nghỉ ốm, không ai kéo–thả, hôm sau nạp bình thường và /kho-du-lieu xanh hết.
-    Ba tháng sau báo cáo thiếu một ngày và không ai truy được ngày nào.
-
-    Ngày nghỉ (cuối tuần VÀ ngày lễ Nhật, từ 032) bỏ qua bằng
-    mart.lich_kinh_doanh — định nghĩa duy nhất của ngày làm việc. Ngày nghỉ
-    riêng của công ty (Obon, 年末年始) KHÔNG có trong đó nên vẫn bị liệt kê —
-    cảnh báo nhắc người đọc kiểm tra.
-    """
-    dau, cuoi = conn.execute(
-        "SELECT min(sales_date), max(sales_date) FROM core.fact_sales_line"
-    ).fetchone()
-    if cuoi is None:
-        return {"dau": None, "cuoi": None, "thieu": [], "thang_trong": []}
-    tu = max(dau, cuoi - timedelta(days=SO_NGAY_SOAT - 1))
-    # Cùng MỘT lượt hỏi: ngày thiếu trong SO_NGAY_SOAT ngày gần nhất, VÀ những
-    # THÁNG trọn vẹn không có dòng bán nào trên cả kỳ dữ liệu. Chỉ soát 30 ngày
-    # thì cả tháng 8/2026 thiếu (sự cố thật 2026-09-25) chỉ lộ ra thành "thiếu
-    # 3 ngày" ở đuôi, còn mọi màn lặng lẽ coi tháng đó là bán ¥0.
-    rows = conn.execute(
-        """WITH d AS (
-             SELECT l.ngay, to_char(l.ngay, 'YYYY-MM') AS thang,
-                    EXISTS (SELECT 1 FROM core.fact_sales_line f
-                             WHERE f.sales_date = l.ngay) AS co
-             FROM mart.lich_kinh_doanh l
-             WHERE l.la_ngay_kd AND l.ngay BETWEEN %s AND %s)
-           SELECT 'ngay', ngay::text FROM d WHERE NOT co AND ngay >= %s
-           UNION ALL
-           SELECT 'thang', thang FROM d GROUP BY thang HAVING NOT bool_or(co)
-           ORDER BY 1, 2""",
-        (dau, cuoi, tu),
-    ).fetchall()
-    thieu = [date.fromisoformat(r[1]) for r in rows if r[0] == "ngay"]
-    thang_trong = [r[1] for r in rows if r[0] == "thang"]
-    return {"dau": dau, "cuoi": cuoi, "thieu": thieu, "tu": tu, "thang_trong": thang_trong}
-
 
 
 def _in(thong_diep: str) -> None:
@@ -496,6 +451,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "sap_xep_duoc": nguoi is not None,
             "danh_muc": BC.danh_muc(),
             "chua_co": KTQ_CHUA_CO,
+            "tinh_nang": tinh_nang(),
         }
 
     def _spa(request: Request, tuoi: bool = False, man=None, thong_bao: dict | None = None,
@@ -827,7 +783,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             kq = IngestResult(ok=False, spec_name=spec.name, blockers=[G.Blocker(
                 1, f"File này là {spec.display_name} ({dich['nhan'] if dich else spec.name}), "
                    f"không phải ô {KDL.O_CUA[o]['nhan']} — "
-                   + ("thả vào đúng ô của nó." if dich and dich["ma"] in KDL.O_TREN_MAN_NAP
+                   + ("thả vào đúng ô của nó." if dich and dich["ma"] in KDL.MA_DUNG
                       else "loại file này không có ô riêng; thả vào ô \"Nạp nhiều file\"."))])
         else:
             kq = kiem(conn, duong)
@@ -914,38 +870,25 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             _in(f"[nhat-ky] không ghi được {cot} cho lô {batch_ids}: {e!r}")
 
     def _du_lieu_kho(conn, ngay_thang: str | None = None):
-        """Mọi thứ màn Kho dữ liệu cần, gom một chỗ.
-
-        Route GET và route POST /upload đều render cùng màn này, nên cùng
-        gọi hàm này — tách ra để hai chỗ không bao giờ trôi khỏi nhau.
-        """
+        """Mọi thứ màn Tổng quan độ phủ cần, gom một chỗ (đặc tả
+        2026-09-25-tong-quan-do-phu-luoi): lưới tháng × loại dữ liệu + tình
+        trạng từng nguồn + bảng lần nạp cuối. `ngay_thang` chỉ là tháng chọn sẵn
+        của khối chi tiết — mọi ngày của mọi tháng đã nằm trong `phu`."""
         from kome import coverage as COV, kho_du_lieu as KDL
         tuoi = tinh_tuoi(conn)
         status = trang_thai_nap(conn)
-        dau, cuoi, luoi = KDL.thang_luoi(ngay_thang, tuoi.hom_nay, COV.DAU_DU_LIEU)
-        nguon = KDL.nut_nguon(status, tuoi, tuoi.hom_nay)
-        # MỘT câu danh mục cho hai ô "Bảng trong kho" / "Tổng số dòng": reltuples
-        # (ước tính của Postgres sau ANALYZE) — đếm thật count(*) từng bảng là
-        # quét cả fact_sales_line mỗi lần mở màn.
-        danh_muc = conn.execute(
-            """SELECT n.nspname, c.relname, c.relkind::text, greatest(c.reltuples, 0)::bigint
-               FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-               WHERE n.nspname IN ('core', 'mart', 'meta') AND c.relkind IN ('r', 'v', 'm')
-               ORDER BY 1, 2""").fetchall()
-        return {"man": "tong_quan", "status": status,
-                "ky": _ky_du_lieu(conn),
-                "tuoi": tuoi,
-                "bang": tinh_bang_phu(conn),
-                "bang_ngay": tinh_bang_ngay(conn, hom_nay=cuoi, so_ngay=(cuoi - dau).days + 1),
-                "luoi": luoi, "nguon": nguon, "o_so": KDL.o_so(danh_muc, nguon)}
+        return {"man": "tong_quan", "status": status, "tuoi": tuoi,
+                "phu": COV.tinh_luoi_phu(conn, hom_nay=tuoi.hom_nay),
+                "ngay_thang": ngay_thang if ngay_thang and re.fullmatch(r"\d{4}-\d{2}", ngay_thang) else None,
+                "nguon": KDL.nut_nguon(status, tuoi, tuoi.hom_nay),
+                "thieu_bo_nap": COV.THIEU_BO_NAP}
 
     def _du_lieu_nap(conn):
         """Màn Nạp: các ô nạp (cùng danh sách với sơ đồ nguồn), file đang chờ
         xác nhận, lô gần nhất + hoàn tác."""
         from kome import kho_du_lieu as KDL, nap_cho
         tuoi = tinh_tuoi(conn)
-        nguon = [n for n in KDL.nut_nguon(trang_thai_nap(conn), tuoi, tuoi.hom_nay)
-                 if n["ma"] in KDL.O_TREN_MAN_NAP]
+        nguon = KDL.nut_nguon(trang_thai_nap(conn), tuoi, tuoi.hom_nay)
         return {"man": "nap", "tuoi": tuoi, "nguon": nguon,
                 "cho": [] if chi_doc else kho_cho.danh_sach(),
                 "lo": lo_nap_gan_nhat(conn)}
@@ -953,18 +896,9 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     def _man_kho(request: Request, ctx: dict) -> HTMLResponse:
         """Màn Kho dữ liệu React. Ô tuổi dữ liệu đi qua `window.__KOME__.tuoi`
         (cùng chỗ trang `/` đọc — một component DaiTuoi cho hai màn), lấy từ
-        ĐÚNG lượt tính của `_du_lieu_kho` (không hỏi CSDL thêm). Ô bảng phủ bỏ
-        bản chép `cot` trong từng ô — giao diện tra cột theo vị trí."""
+        ĐÚNG lượt tính của `_du_lieu_kho` (không hỏi CSDL thêm)."""
         t = ctx.pop("tuoi")
         man = _json_man(ctx)
-        # `BangPhu.database` (tên CSDL) CHỈ dành cho terminal — không bao giờ ra
-        # trình duyệt (có test: không lộ thông tin kết nối).
-        if "bang" in man:
-            man["bang"].pop("database", None)
-        for bang in ([*man["bang_ngay"]["ngay"], *[th for k in man["bang"]["ky"] for th in k["thang"]]]
-                     if "bang" in man else []):
-            for o in bang["o"]:
-                o.pop("cot", None)
         kd = _khoi_dau(request)
         kd["man"] = man
         kd["tuoi"] = {"hom_nay": t.hom_nay, "co_thieu": t.co_thieu,

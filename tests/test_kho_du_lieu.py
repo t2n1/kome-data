@@ -64,12 +64,13 @@ def test_cau_chu_khoi_hoan_tac_du_ba_dieu_bat_buoc():
 
 # Mỗi khối một dấu hiệu nhận biết ổn định (không phải chuỗi trang trí dễ đổi).
 DAU_HIEU_KHOI = {
-    "tuoi du lieu": "hom-nay",
-    "so do nguon": "<SoDoNguon",
+    "tom tat": 'id="hom-nay"',
+    "luoi thang": 'id="theo-thang"',
+    "tung ngay": 'id="theo-ngay"',
     "suc khoe": "Sức khoẻ dữ liệu",
-    "bang 7 loai": "在庫一覧",
-    "bang theo ngay": "theo-ngay",
-    "bang theo thang": 'id="theo-thang"',
+    "bang lan nap cuoi": "在庫一覧",
+    "loai chua vao kho": "Loại dữ liệu chưa vào kho",
+    "han che": "Hạn chế cần biết",
 }
 
 
@@ -84,7 +85,7 @@ def test_man_kho_du_lieu_co_du_cac_khoi(conn, test_db_url):
     for ten, dau_hieu in DAU_HIEU_KHOI.items():
         assert dau_hieu in src or dau_hieu in r.text, f"thiếu khối: {ten}"
     m = man(r.text)
-    for khoa in ("status", "ky", "bang", "bang_ngay", "backup", "nguon", "o_so", "luoi"):
+    for khoa in ("status", "phu", "backup", "nguon", "ngay_thang", "thieu_bo_nap"):
         assert khoa in m, f"thiếu dữ liệu khối {khoa}"
     assert kd(r.text)["tuoi"]["nguon"], "thiếu ô tuổi dữ liệu"
     # Đợt B: nạp + lô gần nhất + hoàn tác sang màn Nạp riêng (theo gói thiết kế).
@@ -100,7 +101,7 @@ def test_man_co_hai_neo_cho_dau_trang_cu(conn, test_db_url):
     src = nguon(*KDL)
     assert '<section id="nap">' in src        # màn Nạp (/nap cũ -> /kho-du-lieu/nap)
     assert '<section id="lo-nap">' in src     # hoàn tác xong quay về đúng khối này
-    assert '<section id="theo-thang">' in src
+    assert '<section id="theo-thang"' in src
 
 
 def test_ban_chi_doc_an_o_tha_file(conn, test_db_url, monkeypatch):
@@ -400,13 +401,13 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
     assert not loi, "code còn nhắc địa chỉ cũ như thể còn sống:\n" + "\n".join(loi)
 
 
-def test_man_nap_an_o_khong_dung_so_do_nguon_van_du(conn, test_db_url):
-    """Chủ DN (2026-09-24) chưa dùng công nợ / bảng giá / nhà cung cấp: màn Nạp
-    không có ô riêng cho chúng — nhưng sơ đồ nguồn của Tổng quan vẫn đủ 8 nhánh
-    (độ phủ nói thật: nguồn đó chưa nạp, không phải không tồn tại)."""
-    from kome import kho_du_lieu as K
+def test_man_nap_va_so_do_nguon_bo_nguon_chua_dung(conn, test_db_url):
+    """Chủ DN (2026-09-24) chưa dùng công nợ / bảng giá / nhà cung cấp
+    (kome/nguon_dung.py): cả màn Nạp lẫn sơ đồ nguồn + bảng phủ của Tổng quan
+    đều không có chúng."""
     client = TestClient(create_app(db_url=test_db_url))
-    o_nap = [n["ma"] for n in man(client.get("/kho-du-lieu/nap").text)["nguon"]]
-    assert o_nap == ["ban", "ton", "khach", "sp", "giao"]
-    assert not {"ncc", "gia", "no"} & set(o_nap)
-    assert [n["ma"] for n in man(client.get("/kho-du-lieu").text)["nguon"]] == [o["ma"] for o in K.O_NAP]
+    for url in ("/kho-du-lieu/nap", "/kho-du-lieu"):
+        assert [n["ma"] for n in man(client.get(url).text)["nguon"]] == ["ban", "ton", "khach", "sp", "giao"], url
+    cot = [d["khoa"] for d in man(client.get("/kho-du-lieu").text)["phu"]["dong"]]
+    assert not {"shiiresaki", "tanka", "seikyu_motocho"} & set(cot)
+    assert kd(client.get("/").text)["tinh_nang"]["cong_no"] is False
