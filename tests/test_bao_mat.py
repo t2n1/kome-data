@@ -439,7 +439,7 @@ def test_ban_chi_doc_an_han_muc_nap_du_lieu(khach):
     _vao(c)
     t = c.get("/kho-du-lieu").text
     assert kd(t)["chi_doc"] is True
-    assert "{KD.chi_doc ? <div className=\"ky\">Bản công khai không nạp được" in nguon("he_thong", "KhoDuLieu.tsx")
+    assert "{KD.chi_doc ? <div className=\"ky\">Bản này đang tắt nạp dữ liệu" in nguon("he_thong", "KhoDuLieu.tsx")
     assert 'ma !== "nap" || !KD.chi_doc' in nguon("he_thong", "TabKho.tsx")
     assert any(x["name"] == "在庫一覧" for x in man(t)["status"])
 

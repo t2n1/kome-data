@@ -146,6 +146,12 @@ def _chi_doc() -> bool:
 GIOI_HAN_WEB = 4_000_000
 
 
+def _gioi_han_tai_len() -> int | None:
+    """Cỡ file tối đa trình duyệt được gửi (window.__KOME__.gioi_han_tai_len):
+    chỉ trên Vercel; máy công ty không giới hạn (đối soát tháng 30–106 MB)."""
+    return GIOI_HAN_WEB if bao_mat.tren_mang() else None
+
+
 def _ky_du_lieu(conn) -> dict:
     """Kỳ dữ liệu bán hàng + các ngày LÀM VIỆC không có dòng nào.
 
@@ -474,6 +480,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 "duoc_sua_ngan_sach": nguoi.duoc_sua_ngan_sach,
                 "duoc_quan_tri": nguoi.duoc_quan_tri},
             "co_dang_nhap": bool(bi_mat), "chi_doc": chi_doc,
+            "gioi_han_tai_len": _gioi_han_tai_len(),
             "hien_kho": nguoi is None or nguoi.duoc_vao_kho_du_lieu,
             "hien_ngan_sach": nguoi is None or nguoi.duoc_sua_ngan_sach,
             "che_do_giao_dien": che_do,

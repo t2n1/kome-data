@@ -7,9 +7,10 @@
 //
 // Nạp HAI BƯỚC: thả file vào ô → POST /upload/kiem (5 cổng, KHÔNG ghi gì) → màn
 // hiện từng cổng → Xác nhận (POST /upload/xac-nhan, nạp đầy đủ, 5 cổng chạy lại)
-// hoặc Huỷ. Mọi nút là biểu mẫu POST THẬT; bản chỉ-đọc (Vercel) ẩn hẳn khối nạp và
+// hoặc Huỷ. Mọi nút là biểu mẫu POST THẬT; bản chỉ-đọc (KOME_CHI_DOC) ẩn hẳn khối nạp và
 // khối hoàn tác. Hoàn tác nằm sau <details>: người bấm phải đọc "xoá bao nhiêu
-// dòng, khỏi bảng nào" trước.
+// dòng, khỏi bảng nào" trước. Bản Vercel (045) nạp được file hằng ngày, nhưng trần
+// 4,5 MB mỗi yêu cầu: trình duyệt chặn file quá KD.gioi_han_tai_len trước khi gửi.
 import { useState } from "react";
 import { KD } from "../khoi_dau";
 import { so, yen } from "../dinh_dang";
@@ -149,7 +150,7 @@ export function NapDuLieu() {
       <p className="ghi-chu">Mỗi loại file OBC một ô. Thả file vào đúng ô của nó — kho chạy <strong>5 cổng kiểm trước khi ghi</strong> và cho xem kết quả;
         bấm <strong>Xác nhận</strong> mới ghi vào kho. Không sửa được số: chỉ nạp thêm, hoặc hoàn tác cả lô.</p>
       <section id="hom-nay"><DaiTuoi /></section>
-      {KD.chi_doc ? <div className="ky">Bản công khai không nạp được dữ liệu — nạp ở máy trong công ty.</div> : <>
+      {KD.chi_doc ? <div className="ky">Bản này đang tắt nạp dữ liệu — nạp ở máy trong công ty.</div> : <>
         <KhoiKiem ds={m.kiem} />
         <KhoiKet ket={m.results} />
         <Cho ds={m.cho} />
@@ -160,11 +161,24 @@ export function NapDuLieu() {
   );
 }
 
+const MB = (b: number) => (b / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+
+// Câu chặn khi tổng cỡ vượt trần của bản web, null nếu gửi được (hoặc không có trần).
+function quaCo(files: FileList | null): string | null {
+  const tran = KD.gioi_han_tai_len;
+  const tong = [...(files ?? [])].reduce((s, f) => s + f.size, 0);
+  if (!tran || tong <= tran) return null;
+  return `${files!.length > 1 ? `${files!.length} file cộng lại` : "File này"} ${MB(tong)} MB — quá lớn cho bản web `
+    + `(tối đa ${MB(tran)} MB). Thả từng file vào ô riêng của nó; file đối soát tháng / cả quý thì nạp ở máy trong công ty.`;
+}
+
 function Nap({ nguon, daNap, tong, thieu }: { nguon: Nut[]; daNap: number; tong: number; thieu: string[] }) {
   const [ten, datTen] = useState<string[]>([]);
   const [keo, datKeo] = useState(false);
+  const [chan, datChan] = useState<string | null>(null);
   return (
     <section id="nap">
+      {chan && <div className="ky" role="alert">{chan}</div>}
       <div className="kdl-tien-do">
         <div className="kdl-tien-do-chu"><b>{daNap}/{tong} file hằng ngày đã nạp hôm nay</b>
           <span className="khong-ap-dung">{thieu.length ? `còn: ${thieu.join(" · ")}` : "đủ nhịp 13:30"}</span></div>
@@ -184,11 +198,21 @@ function Nap({ nguon, daNap, tong, thieu }: { nguon: Nut[]; daNap: number; tong:
             <code className="kdl-o-bang">{n.bang}</code>
             {/* Chọn xong là gửi đi kiểm ngay — bước này KHÔNG ghi gì vào kho. */}
             <input className="chon-file" type="file" name="files" required accept=".xlsx" aria-label={`Chọn file ${n.nhan}`}
-              onChange={e => e.currentTarget.files?.length && e.currentTarget.form?.requestSubmit()} />
+              onChange={e => {
+                const c = quaCo(e.currentTarget.files);
+                datChan(c);
+                if (c) e.currentTarget.value = "";
+                else if (e.currentTarget.files?.length) e.currentTarget.form?.requestSubmit();
+              }} />
           </label>
         </form>))}</div>
       {/* MỘT ô nhận NHIỀU file: người làm việc 13:30 thả 3 file một lần. Kho tự nhận loại theo tên file. */}
-      <form method="post" action="/upload/kiem" encType="multipart/form-data" className="kdl-nhieu">
+      <form method="post" action="/upload/kiem" encType="multipart/form-data" className="kdl-nhieu"
+        onSubmit={e => {
+          const c = quaCo((e.currentTarget.elements.namedItem("files") as HTMLInputElement).files);
+          datChan(c);
+          if (c) e.preventDefault();
+        }}>
         <input type="hidden" name="o" value="" />
         <label className={"drop" + (keo ? " keo" : "")} onDragOver={() => datKeo(true)} onDragLeave={() => datKeo(false)} onDrop={() => datKeo(false)}>
           <b>Nạp nhiều file cùng lúc</b> — kéo thả cả 3 file 13:30 (hay mọi loại) vào đây, kho tự nhận loại theo tên file<br />

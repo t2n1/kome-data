@@ -149,3 +149,27 @@ def test_vercel_nap_duoc_tru_khi_KOME_CHI_DOC(conn, test_db_url, tmp_path, monke
     assert not A._chi_doc()
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     assert A._chi_doc()
+
+
+# ---- Task 3: giới hạn cỡ ở trình duyệt -----------------------------------
+
+from tests.spa_kd import nguon
+
+
+def test_gioi_han_tai_len_chi_bao_tren_vercel(conn, test_db_url, tmp_path, monkeypatch):
+    monkeypatch.setattr(nap_cho, "THU_MUC_TAM", tmp_path / "tam")
+    monkeypatch.delenv("KOME_CHI_DOC", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
+    t = TestClient(create_app(db_url=test_db_url)).get("/kho-du-lieu/nap").text
+    assert kd(t)["gioi_han_tai_len"] is None          # máy công ty: đối soát file 100 MB vẫn nạp được
+    import kome.web.app as A
+    monkeypatch.setattr(A.bao_mat, "tren_mang", lambda: True)
+    # Dựng app "trên mạng" thật đòi cổng đăng nhập — kiểm hàm quyết định trực tiếp.
+    assert A._gioi_han_tai_len() == A.GIOI_HAN_WEB == 4_000_000
+
+
+def test_trinh_duyet_chan_file_qua_co_truoc_khi_gui():
+    src = nguon("he_thong", "KhoDuLieu.tsx")
+    assert "KD.gioi_han_tai_len" in src and "quá lớn cho bản web" in src
+    # Ô từng loại kiểm trước requestSubmit; ô nhiều file kiểm TỔNG trong onSubmit.
+    assert "quaCo(e.currentTarget.files)" in src and "onSubmit" in src

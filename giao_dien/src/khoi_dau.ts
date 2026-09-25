@@ -18,6 +18,8 @@ export type KhoiDau = {
   nguoi: NguoiDung | null;
   co_dang_nhap: boolean;
   chi_doc: boolean;
+  // Cỡ file tối đa (byte) được gửi lên — chỉ bản Vercel (trần 4,5 MB mỗi yêu cầu), 045.
+  gioi_han_tai_len?: number | null;
   hien_kho: boolean;
   hien_ngan_sach: boolean;
   che_do_giao_dien: "sang" | "toi" | "he-thong" | "theo-gio";

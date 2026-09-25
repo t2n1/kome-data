@@ -104,13 +104,13 @@ def test_man_co_hai_neo_cho_dau_trang_cu(conn, test_db_url):
 
 
 def test_ban_chi_doc_an_o_tha_file(conn, test_db_url, monkeypatch):
-    """Bản công khai không nạp được. Hiện ô thả file ở đó là mời người ta
+    """Bản chỉ-đọc (KOME_CHI_DOC) không nạp được. Hiện ô thả file ở đó là mời người ta
     kéo một file 100 MB vào một endpoint luôn trả 403."""
     monkeypatch.setenv("KOME_CHI_DOC", "1")
     client = TestClient(create_app(db_url=test_db_url))
     html = client.get("/kho-du-lieu").text
     assert kd(html)["chi_doc"] is True
-    assert "{KD.chi_doc ? <div className=\"ky\">Bản công khai không nạp được" in nguon(*KDL)
+    assert "{KD.chi_doc ? <div className=\"ky\">Bản này đang tắt nạp dữ liệu" in nguon(*KDL)
     assert any(x["name"] == "在庫一覧" for x in man(html)["status"]), "khối chỉ-đọc khác vẫn phải hiện"
     assert man(client.get("/kho-du-lieu/nap").text)["cho"] == [], "bản chỉ-đọc không đọc thư mục chờ"
 
