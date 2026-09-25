@@ -446,6 +446,15 @@ này KHÁC nhóm `'im'` (nhịp riêng) — không gộp, mỗi khối in `khach
 Có test canh: `tests/test_khach_thang.py::test_ba_cho_doc_tra_CUNG_MOT_tap_khach`.
 Đặc tả: `docs/superpowers/specs/2026-09-23-nhin-theo-thang-design.md`.
 
+**Bất biến (044, khách mới đăng ký):** ngày đăng ký đọc từ MÃ KHÁCH (`YYYYMMDD` + 4 số,
+`202607150003`) bằng ĐÚNG MỘT hàm, `mart.ngay_dang_ky(mã)`; mã không mang ngày (`000000…`,
+mã ngắn, `009…`/`999…` — ~1.700/2.980 mã) → NULL, KHÔNG BAO GIỜ là khách mới. Khối Tổng quan
+`khach_moi` đọc `mart.khach_moi_khoang(tu, den)` (đơn đầu qua `mart.lan_mua` ← `ban_den_moc`, nên
+"chưa có đơn" là tính đến mốc). Khác nhóm `'moi'` của `mart.khach_nhom_viec` (đơn ĐẦU trong 90
+ngày mà đã im) — hai khái niệm, hai tên, khối in `CACH_TINH_KHACH_MOI`. Khoảng đã qua: đếm đăng
+ký tới `ThamSo.moc()` chứ không tới `kx.den` (ngày BÁN cuối — tháng kết thúc Chủ nhật dừng ở
+thứ Sáu). Có test canh: `tests/test_khach_moi.py`. **Migration 044 phải chạy TRƯỚC khi triển khai.**
+
 **Bất biến:** khách OBC đã đánh dấu `※廃業※` / `※取引停止※` trong TÊN (281/2.077
 khách) không bao giờ vào danh sách gọi lại. Doanh nghiệp đã phá sản thì im lặng
 là đúng, không phải bất thường — xem `db/migrations/016_*.sql`.

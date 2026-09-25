@@ -35,6 +35,9 @@ KHOI = (
     # Ngoài 21 khối của gói thiết kế — thêm 2026-09-23 theo yêu cầu chủ DN
     # ("công ty chạy doanh thu theo tháng"), nguồn: mart.khach_thang_nay (036).
     ("thang_nay_chua_mua", "Tháng này chưa mua", 1, 3, "khach_hang", "Khách mua đều hằng tháng mà tháng này chưa có đơn"),
+    # Ngoài gói thiết kế — thêm 2026-09-26 theo yêu cầu chủ DN: khách mới theo
+    # ngày đăng ký đọc từ mã khách (mart.khach_moi_khoang, 044).
+    ("khach_moi", "Khách mới đăng ký", 2, 3, "khach_hang", "Khách đăng ký trong khoảng xem, ai đã có đơn, ai chưa"),
     ("cong_no", "Tuổi nợ phải thu", 1, 2, "tien", "Chia 0–30 / 30–60 / trên 60 ngày và ai nợ lâu nhất"),
     ("xu_huong", "Xu hướng doanh thu", 2, 2, "tien", "Doanh thu ngày, có đường so sánh kỳ trước"),
     ("dong_tien", "Dòng tiền 8 tuần", 1, 2, "tien", "Tiền vào trừ tiền ra theo tuần và số dư dự kiến"),
@@ -59,8 +62,9 @@ NHOM = (("tat_ca", "Tất cả"), ("tong_quan", "Tổng quan"), ("tien", "Tiền
 # ÁP vào bố cục của chính mình — vẫn kéo/ẩn tiếp được, không phải phân quyền.
 VAI_TRO = (
     ("giamdoc", "Giám đốc", ("kpi", "ns_thang", "theo_thang", "cong_no", "dong_tien", "xu_huong",
-                             "bien_loi_nhuan", "hieu_suat_nganh", "so_sanh_sale", "mua_hang", "tang_truong")),
-    ("kinhdoanh", "Trưởng phòng KD", ("kpi", "viec_hom_nay", "thang_nay_chua_mua", "ns_thang", "theo_thang", "danh_sach_khach",
+                             "bien_loi_nhuan", "hieu_suat_nganh", "so_sanh_sale", "mua_hang", "tang_truong",
+                             "khach_moi")),
+    ("kinhdoanh", "Trưởng phòng KD", ("kpi", "viec_hom_nay", "thang_nay_chua_mua", "khach_moi", "ns_thang", "theo_thang", "danh_sach_khach",
                                       "suc_khoe_khach", "nhip_mua", "tuong_quan", "so_sanh_sale",
                                       "xu_huong", "thoi_tiet")),
     ("ketoan", "Kế toán", ("kpi", "cong_no", "dong_tien", "theo_thang", "bien_loi_nhuan", "khieu_nai",

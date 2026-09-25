@@ -517,6 +517,62 @@ export function KhoiTangTruong() {
   );
 }
 
+// ---- Khách mới đăng ký (044) ------------------------------------------------
+// Nguồn DUY NHẤT: mart.khach_moi_khoang (ngày đăng ký đọc từ mã khách). Số tổng
+// toàn công ty; câu cách tính (máy chủ) in dưới khối.
+type KhachMoi = { ma: string; ten: string; sale: string | null; ten_sale: string | null; ngay_dang_ky: string;
+  lan_dau: string | null; so_ngay_mua: number; doanh_thu: number; da_mua: boolean; da_ngung: boolean };
+type KhachMoiKhoi = { khoang: KhoangMayChu | null; so_khach: number; da_mua: number; chua_mua: number;
+  so_sanh: { ma: string; nhan: string; co: boolean; so_khach: number | null; so_khach_nay: number }[];
+  thang: { thang: string; so_khach: number; da_mua: number }[]; khach: KhachMoi[]; cach_tinh: string };
+
+export function KhoiKhachMoi() {
+  const { data: d, isLoading, error } = useKhoi<KhachMoiKhoi>("khach_moi");
+  const [chiChuaMua, datChiChuaMua] = useState(false);
+  const t = d?.thang ?? [];
+  const ds = (d?.khach ?? []).filter(k => !chiChuaMua || !k.da_mua);
+  return (
+    <Khoi tieu_de="Khách mới đăng ký" phu={d?.khoang ? `${d.khoang.nhan} · theo ngày trong mã khách` : undefined}
+      dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}>
+      {d && <>
+        <div className="tn-dau">
+          <div><b>{so(d.so_khach)}</b><span>khách mới đăng ký</span></div>
+          <div className="phu">Đã có đơn: <b>{so(d.da_mua)}</b> · chưa có đơn: <b className={d.chua_mua ? "canh-chu" : ""}>{so(d.chua_mua)}</b></div>
+          <div className="phu">{d.so_sanh.map(s => (
+            <span key={s.ma} style={{ marginRight: ".8rem" }}>{s.nhan}: {s.co && s.so_khach != null
+              ? <>{so(s.so_khach)}{s.so_khach > 0 && <> <span className={s.so_khach_nay >= s.so_khach ? "tang" : "giam"}>({thay_doi(s.so_khach_nay / s.so_khach - 1, 0)})</span></>}</>
+              : "không có dữ liệu để so"}</span>))}</div>
+        </div>
+        <BieuDo nhan={t.map(x => thang_nhan(x.thang))} nhan_day_du={t.map(x => `Tháng ${thang_nhan(x.thang)}`)} cao={130}
+          mo_ta="Số khách mới đăng ký từng tháng, 12 tháng gần nhất, và số đã có đơn"
+          chuoi={[
+            { ten: "Đăng ký", kieu: "cot_nen", gia_tri: t.map(x => x.so_khach), mau: "var(--vien-dam)" },
+            { ten: "Đã có đơn", kieu: "cot", gia_tri: t.map(x => x.da_mua), mau: "var(--lien-ket)",
+              mau_tung_cot: t.map(x => trongKhoang(d.khoang, x.thang) ? "var(--lien-ket)" : MO) },
+          ]}
+          dinh_dang={v => `${so(v)} khách`} dinh_dang_truc={v => so(v)} />
+        <div style={{ margin: ".4rem 0" }}>
+          <button type="button" className="chip" aria-pressed={chiChuaMua} onClick={() => datChiChuaMua(c => !c)}>
+            Chỉ khách chưa có đơn ({so(d.chua_mua)})</button></div>
+        <div className="bang-cuon" style={{ maxHeight: 300 }}><table className="bang">
+          <thead><tr><th>Khách hàng</th><th>Đăng ký</th><th>Đơn đầu</th><th className="so">Doanh thu</th><th>Phụ trách</th></tr></thead>
+          <tbody>{ds.map(k => (
+            <tr key={k.ma}>
+              <td className="ten-jp"><a href={`/khach-hang/${k.ma}`}>{k.ten}</a><div className="ma-nho">{k.ma}{k.da_ngung ? " · OBC đánh dấu ngừng" : ""}</div></td>
+              <td className="so">{ngay(k.ngay_dang_ky)}</td>
+              <td className="so">{k.lan_dau ? ngay(k.lan_dau) : <span className="nhan-vien canh">Chưa có đơn</span>}</td>
+              <td className="so">{k.da_mua ? yen(k.doanh_thu) : "—"}</td>
+              <td>{k.sale ? tenNguoi(k.ten_sale, k.sale) : "—"}</td>
+            </tr>))}</tbody></table>
+          {!ds.length && <div className="trong">{d.so_khach ? "Mọi khách mới đều đã có đơn." : "Không có khách mới đăng ký trong khoảng này."}</div>}
+          {d.so_khach > d.khach.length && <div className="phu">Hiện {so(d.khach.length)}/{so(d.so_khach)} khách mới nhất.</div>}
+        </div>
+        <div className="phu" style={{ marginTop: ".4rem" }}>{d.cach_tinh}</div>
+      </>}
+    </Khoi>
+  );
+}
+
 // ---- Biên lợi nhuận theo quý ------------------------------------------------
 export function KhoiBien() {
   const { data: d, isLoading, error } = useKhoi<{ thang_chon: string | null; quy: { company_fy: number; quy: number; tu: string; den: string; so_thang: number; doanh_thu: number; lai_gop: number; bien_gop: number | null }[] }>("bien_loi_nhuan");
@@ -639,7 +695,7 @@ export const VE: Record<string, () => React.ReactElement> = {
   danh_sach_khach: () => <KhoiDanhSachKhach />, han_su_dung: () => <KhoiHanSuDung />, hieu_suat_nganh: () => <KhoiNganh />,
   so_sanh_sale: () => <KhoiSale />, tuong_quan: () => <KhoiTuongQuan />, tang_truong: () => <KhoiTangTruong />,
   bien_loi_nhuan: () => <KhoiBien />, don_hang: () => <KhoiNap />,
-  thang_nay_chua_mua: () => <KhoiThangNay />, cong_no: () => <KhoiCongNo />,
+  thang_nay_chua_mua: () => <KhoiThangNay />, cong_no: () => <KhoiCongNo />, khach_moi: () => <KhoiKhachMoi />,
 };
 
 export function veKhoi(id: string, nhan: string) {

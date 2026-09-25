@@ -407,6 +407,60 @@ def tang_truong(conn, sale=None, ts=None) -> dict:
                     "doanh_thu": int(r[4] or 0)} for r in rows]}
 
 
+# ---- Khách mới đăng ký (044) ------------------------------------------------
+
+CACH_TINH_KHACH_MOI = ("Ngày đăng ký đọc từ mã khách (YYYYMMDD + 4 số). Mã cũ không mang ngày "
+                       "(000000…, mã ngắn) không tính. \"Đã mua\" = có phiếu tính đến ngày cuối khoảng. "
+                       "Khác nhóm \"khách mới im lặng\" của Cần gọi (đọc theo ngày mua đầu).")
+KHACH_MOI_TOI_DA = 100
+
+
+def khach_moi(conn, sale=None, ts=None) -> dict:
+    """Khách ĐĂNG KÝ trong khoảng xem (`mart.khach_moi_khoang`), so hai phép so
+    của khoảng, 12 tháng tới tháng của ngày cuối khoảng. Toàn công ty — số tổng
+    của dashboard không lọc theo người đăng nhập. 2 lượt hỏi: giải khoảng + MỘT
+    câu trên dải rộng nhất cần dùng, đếm ở đây."""
+    kx = _kx(conn, ts)
+    if kx is None:
+        return {"khoang": None, "so_khach": 0, "da_mua": 0, "chua_mua": 0, "so_sanh": [],
+                "thang": [], "khach": [], "cach_tinh": CACH_TINH_KHACH_MOI}
+    # Khoảng ĐÃ QUA (đang xem lùi): `kx.den` là ngày BÁN cuối ≤ cuối khoảng — tháng
+    # kết thúc vào Chủ nhật thì dừng ở thứ Sáu, và khách đăng ký thứ Bảy/Chủ nhật
+    # rơi khỏi cả tháng đó lẫn tháng sau. Đăng ký không cần ngày có bán: đếm tới
+    # đúng ngày cuối khoảng (`ThamSo.moc`). Khoảng đang chạy thì vẫn `kx.den`.
+    moc = ts.moc() if ts is not None else None
+    den = moc if moc and kx.dang_lui and moc > kx.den else kx.den
+    d12 = date(den.year - (den.month <= 11), (den.month - 12) % 12 + 1, 1)
+    tu_min = min([kx.tu, d12] + [s.tu for s in kx.so_sanh if s.co])
+    rows = conn.execute(
+        """SELECT k.customer_code, k.ten, k.salesperson_code, s.ten, k.ngay_dang_ky, lan_dau,
+                  so_ngay_mua, doanh_thu, da_mua, da_ngung
+             FROM mart.khach_moi_khoang(%s, %s) k
+             LEFT JOIN core.dim_salesperson s USING (salesperson_code)
+            ORDER BY k.ngay_dang_ky DESC, k.customer_code DESC""", (tu_min, den)).fetchall()
+    dem = lambda a, b: sum(1 for r in rows if a <= r[4] <= b)  # noqa: E731
+    nay = [r for r in rows if kx.tu <= r[4] <= den]
+    thang = []
+    y, m = d12.year, d12.month
+    for _ in range(12):
+        ma = f"{y}-{m:02d}"
+        o = [r for r in rows if r[4].strftime("%Y-%m") == ma]
+        thang.append({"thang": ma, "so_khach": len(o), "da_mua": sum(1 for r in o if r[8])})
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return {
+        "khoang": kx, "so_khach": len(nay), "da_mua": sum(1 for r in nay if r[8]),
+        "chua_mua": sum(1 for r in nay if not r[8]),
+        "so_sanh": [{"ma": s.ma, "nhan": s.nhan, "co": s.co, "tu": s.tu, "den": s.den,
+                     "so_khach": dem(s.tu, s.den) if s.co else None,
+                     "so_khach_nay": dem(s.tu_nay, den if s.den_nay == kx.den else s.den_nay)} for s in kx.so_sanh],
+        "thang": thang,
+        "khach": [{"ma": r[0], "ten": r[1], "sale": r[2], "ten_sale": r[3], "ngay_dang_ky": r[4],
+                   "lan_dau": r[5], "so_ngay_mua": r[6], "doanh_thu": int(r[7] or 0),
+                   "da_mua": r[8], "da_ngung": r[9]} for r in nay[:KHACH_MOI_TOI_DA]],
+        "cach_tinh": CACH_TINH_KHACH_MOI,
+    }
+
+
 # ---- Biên lợi nhuận GỘP theo quý (biên ròng: chưa có chi phí) ---------------
 
 def bien_loi_nhuan(conn, sale=None, ts=None) -> dict:
@@ -494,5 +548,6 @@ KHOI = {
     "hieu_suat_nganh": (hieu_suat_nganh, False, False, True),
     "tuong_quan": (tuong_quan, False, False, True),
     "tang_truong": (tang_truong, False, False, True),
+    "khach_moi": (khach_moi, False, False, True),
     "bien_loi_nhuan": (bien_loi_nhuan, False, False, True),
 }
