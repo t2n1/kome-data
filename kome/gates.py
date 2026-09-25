@@ -90,6 +90,11 @@ def check(
     # Cổng 5 — khử trùng (dedup_on_keys) đã gộp các dòng trùng khoá mà GIÁ TRỊ
     # khác nhau (tiền/số lượng) -> cảnh báo, không tự biết dòng nào đúng nên
     # không chặn. df.attrs được reader.dedup_on_keys() gắn vào khi so sánh.
+    # Cổng 2 — sheet không đúng tên khai báo nhưng file chỉ có một sheet và đủ cột
+    # (reader.chon_sheet): đọc được, nhưng mẫu xuất OBC có thể đã bị đổi.
+    if df.attrs.get("canh_bao_sheet"):
+        warnings.append(Warning_(2, df.attrs["canh_bao_sheet"]))
+
     dedup_conflicts = df.attrs.get("dedup_conflicts", 0)
     if dedup_conflicts:
         warnings.append(Warning_(

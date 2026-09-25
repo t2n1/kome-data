@@ -1,4 +1,5 @@
 # kome/reader.py
+from dataclasses import replace
 from pathlib import Path
 import pandas as pd
 from kome.config import FileSpec
@@ -35,11 +36,33 @@ def dedup_on_keys(
     return result
 
 
+def chon_sheet(path: Path, spec: FileSpec) -> tuple[str, str | None]:
+    """Sheet sẽ đọc + câu cảnh báo (None nếu đúng tên khai báo).
+
+    Tên sheet do mẫu xuất của OBC đặt, không phải dữ liệu: 2026-09-25 file
+    得意先全情報 xuất ra sheet `得意先情報` thay vì `得意先データ作成` với đúng 16
+    cột. CỘT mới là hợp đồng (cổng 2 vẫn soát đủ), nên: file chỉ có MỘT sheet
+    thì đọc sheet đó và cảnh báo; nhiều sheet mà không sheet nào đúng tên thì
+    KHÔNG đoán — chặn ở cổng 2, nêu tên các sheet có trong file."""
+    from python_calamine import CalamineWorkbook
+    co = CalamineWorkbook.from_path(str(path)).sheet_names
+    if spec.sheet in co:
+        return spec.sheet, None
+    if len(co) == 1:
+        return co[0], (f"Sheet tên '{co[0]}', không phải '{spec.sheet}' như mẫu — vẫn đọc vì "
+                       "file chỉ có một sheet và đủ cột. Mẫu xuất trong OBC có bị đổi không?")
+    raise ColumnMismatch(f"{spec.display_name}: không có sheet '{spec.sheet}' — file có "
+                         f"{len(co)} sheet: {co}. Xuất lại đúng mẫu.")
+
+
 def read(path: Path, spec: FileSpec) -> pd.DataFrame:
     """Đọc file Excel theo khai báo. Mọi mã giữ nguyên dạng chuỗi."""
+    ten_sheet, canh_bao_sheet = chon_sheet(path, spec)
+    if ten_sheet != spec.sheet:
+        spec = replace(spec, sheet=ten_sheet)       # so_cai.chuan_bi đọc lại đúng sheet này
     df = pd.read_excel(
         path,
-        sheet_name=spec.sheet,
+        sheet_name=ten_sheet,
         header=spec.header_row - 1,
         engine="calamine",
         dtype=str,              # đọc TẤT CẢ dạng chuỗi trước, ép kiểu sau
@@ -94,6 +117,9 @@ def read(path: Path, spec: FileSpec) -> pd.DataFrame:
     # Sổ cái (元帳): kỳ, đối chiếu 【合計】, bỏ dòng tổng phụ — kome/so_cai.py.
     if spec.so_cai_truc:
         from kome import so_cai
-        return so_cai.chuan_bi(path, spec, df.reset_index(drop=True))
-
-    return df.reset_index(drop=True)
+        df = so_cai.chuan_bi(path, spec, df.reset_index(drop=True))
+    else:
+        df = df.reset_index(drop=True)
+    # Gắn SAU cùng: các bước trên dựng DataFrame mới và không giữ attrs.
+    df.attrs["canh_bao_sheet"] = canh_bao_sheet
+    return df

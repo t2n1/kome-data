@@ -107,3 +107,42 @@ def test_cong_4_nguong_doc_tu_spec():
     # Với ngưỡng nới rộng, dữ liệu này KHÔNG cảnh báo
     _, warnings_loose = check(Path("在庫一覽_20260916.xlsx"), loose_spec, df, prev)
     assert not any(w.gate == 4 for w in warnings_loose)
+
+
+# ---- Sheet sai tên (2026-09-25: 得意先全情報_20260925.xlsx xuất ra sheet 得意先情報
+# thay vì 得意先データ作成 — trước đây nổ ValueError thành trang "hệ thống gặp lỗi").
+
+def _doi_ten_sheet(tmp_path, ten: str, them_sheet: bool = False) -> Path:
+    import openpyxl
+    wb = openpyxl.load_workbook(OK)
+    wb.active.title = ten
+    if them_sheet:
+        wb.create_sheet("Sheet2")
+    p = tmp_path / "在庫一覧_20260916.xlsx"
+    wb.save(p)
+    return p
+
+
+def test_sheet_sai_ten_ma_chi_mot_sheet_van_doc_va_canh_bao(tmp_path):
+    """Cột mới là hợp đồng: một sheet duy nhất, đủ cột → đọc, kèm cảnh báo vàng."""
+    p = _doi_ten_sheet(tmp_path, "在庫情報")
+    df = read(p, SPECS["zaiko"])
+    assert len(df) == len(read(OK, SPECS["zaiko"]))
+    blockers, warnings = check(p, SPECS["zaiko"], df, None)
+    assert blockers == []
+    w = [x for x in warnings if x.gate == 2]
+    assert w and "在庫情報" in w[0].message and SPECS["zaiko"].sheet in w[0].message
+
+
+def test_sheet_sai_ten_va_nhieu_sheet_bi_cong_2_chan(tmp_path):
+    """Nhiều sheet mà không sheet nào đúng tên: không đoán — cổng 2 chặn, nêu tên các sheet."""
+    p = _doi_ten_sheet(tmp_path, "在庫情報", them_sheet=True)
+    with pytest.raises(ColumnMismatch) as e:
+        read(p, SPECS["zaiko"])
+    assert "在庫情報" in str(e.value) and "Sheet2" in str(e.value)
+
+
+def test_sheet_dung_ten_khong_canh_bao():
+    df = read(OK, SPECS["zaiko"])
+    _, warnings = check(Path("在庫一覧_20260916.xlsx"), SPECS["zaiko"], df, None)
+    assert not [w for w in warnings if w.gate == 2]
