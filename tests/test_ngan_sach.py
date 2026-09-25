@@ -243,3 +243,56 @@ def test_bang_nhap_khong_qua_4_truy_van(conn, batch, monkeypatch):
     monkeypatch.setattr(conn, "execute", demo)
     bang_nhap(conn)
     assert dem["n"] <= 4, f"bang_nhap() chạy {dem['n']} truy vấn"
+
+
+# ---- người phụ trách không còn bán (thiết kế lại 2026-09-25) ----------------
+
+def _hien(b):
+    return {n.ma: n.hien for n in b.nguoi}
+
+
+def test_nguoi_khong_ban_90_ngay_bi_AN_nguoi_dang_ban_van_hien(conn, batch):
+    """Suy từ DOANH SỐ, không từ khách được giao: OBC vẫn giao khách cho người đã nghỉ."""
+    _ban(conn, batch, date(2026, 9, 10), "0104")
+    _ban(conn, batch, date(2026, 5, 1), "0102")      # 132 ngày trước mốc
+    b = bang_nhap(conn, 2027)
+    h = _hien(b)
+    assert h["0104"] is True
+    assert h["0102"] is False, "không bán trong 90 ngày tới mốc thì ẩn"
+    assert h["0002"] is False, "chưa từng bán thì ẩn"
+    n = {x.ma: x for x in b.nguoi}
+    assert n["0102"].ban_cuoi == date(2026, 5, 1) and n["0102"].con_ban is False
+    assert n["0002"].ban_cuoi is None
+
+
+def test_nguoi_da_nghi_nhung_CO_CHI_TIEU_trong_ky_van_hien(conn, batch):
+    """[CRITICAL] Không bao giờ giấu số đã lưu: ẩn người có chỉ tiêu là màn nói "chưa đặt"
+    trong khi Báo cáo vẫn tính số đó."""
+    _ban(conn, batch, date(2026, 9, 10), "0104")
+    luu(conn, {("0002", "lai_gop", "2026-10"): 500_000}, None)
+    conn.commit()
+    b = bang_nhap(conn, 2027)
+    assert _hien(b)["0002"] is True
+    assert _hien(b)["0102"] is False
+
+
+def test_xem_KY_CU_thi_nguoi_con_ban_trong_ky_do_van_hien(conn, batch):
+    """Kỳ 2026 (8/2025–7/2026): người bán trong kỳ đó hiện dù nay đã nghỉ."""
+    _ban(conn, batch, date(2026, 9, 10), "0104")
+    _ban(conn, batch, date(2026, 3, 2), "0102")
+    assert _hien(bang_nhap(conn, 2026))["0102"] is True
+    assert _hien(bang_nhap(conn, 2027))["0102"] is False
+
+
+def test_thuc_te_la_doanh_thu_thuan_theo_thang_cong_ty_bang_tong_cac_nguoi(conn, batch):
+    """Thực tế tham khảo = `mart.ban_theo_nhan_vien_thang` (doanh thu THUẦN = amount − thuế);
+    dòng công ty = cộng mọi người, bằng đúng `mart.ban_theo_thang`."""
+    from kome.ngan_sach import CONG_TY
+    _ban(conn, batch, date(2025, 10, 6), "0104")
+    _ban(conn, batch, date(2025, 10, 7), "0105")
+    b = bang_nhap(conn, 2027)          # kỳ trước = 2026 (8/2025–7/2026) cũng phải có
+    assert b.thuc_te[("0104", "doanh_thu", "2025-10")] == 100_000
+    assert b.thuc_te[("0104", "lai_gop", "2025-10")] == 30_000
+    assert b.thuc_te[(CONG_TY, "doanh_thu", "2025-10")] == 200_000
+    mart = conn.execute("SELECT doanh_thu_thuan FROM mart.ban_theo_thang WHERE thang = '2025-10'").fetchone()[0]
+    assert b.thuc_te[(CONG_TY, "doanh_thu", "2025-10")] == mart

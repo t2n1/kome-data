@@ -166,7 +166,7 @@ def test_luu_roi_tai_lai_thi_thay_dung_so_vua_nhap(khach, conn, batch):
     # Ô gõ lại in dấu CHẤM ngăn nghìn (quy ước Việt khi GÕ LẠI): cham() = de-DE.
     ns = (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
     assert 'const cham = (n: number) => n.toLocaleString("de-DE");' in ns
-    assert "cham(v)" in ns and "const v = o(doi, cs, th);" in ns
+    assert '= v != null ? cham(v) : "";' in ns
 
 
 def test_mot_o_sai_thi_KHONG_ghi_o_nao(khach, conn, batch):
@@ -184,8 +184,8 @@ def test_mot_o_sai_thi_KHONG_ghi_o_nao(khach, conn, batch):
     assert m["da_go"]["0105-2026-05"] == "chin trieu", "phải hiện lại đúng chữ người ta vừa gõ"
     assert m["da_go"]["0104-2026-05"] == "9000000"
     assert m["loi"] == ["0105-2026-05"]
-    # Giao diện ưu tiên đúng những gì vừa gõ, rồi mới tới giá trị đang lưu.
-    assert "coGo && k in m.da_go ? m.da_go[k]" in (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
+    # Giao diện ưu tiên đúng những gì vừa gõ (đè lên giá trị đang lưu), rồi mới tới giá trị đang lưu.
+    assert "if (coGo) for (const [k, v] of Object.entries(m.da_go))" in (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
 
 
 def test_o_dan_tu_excel_kem_NBSP_khong_lam_trang_500(khach, conn, batch):
@@ -240,7 +240,7 @@ def test_o_chua_dat_hien_TRONG_khong_hien_0(khach, conn, batch):
     _ban(conn, batch)
     m = _khoi_dau(khach().get("/ngan-sach?ky=2026").text)["man"]
     assert not any(k.endswith("2026-05") for k in m["o_txt"]), "ô chưa đặt không được có giá trị (không phải 0)"
-    assert ': v != null ? cham(v) : "";' in (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
+    assert '= v != null ? cham(v) : "";' in (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
 
 
 def test_o_tong_dung_dau_CHAM_khop_bao_cao(khach, conn, batch):
@@ -257,8 +257,9 @@ def test_o_tong_dung_dau_CHAM_khop_bao_cao(khach, conn, batch):
     assert m["o_txt"]["0104-doanh_thu-2026-05"] == 9_000_000
     ns = (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
     # Ô TỔNG in bằng CHÍNH yen() của /bao-cao (dấu chấm) và "—" khi không ô nào đứng sau.
-    assert 'import { yen } from "../dinh_dang";' in ns
-    assert 'const tong = (ds: number[]) => ds.length ? yen(ds.reduce((s, v) => s + v, 0)) : "—";' in ns
+    assert re.search(r'import \{[^}]*\byen\b[^}]*\} from "\.\./dinh_dang";', ns)
+    assert 'const cong = (ds: number[]) => ds.reduce((s, v) => s + v, 0);' in ns
+    assert 'const tong = (ds: number[]) => ds.length ? yen(cong(ds)) : "—";' in ns
     nguon = Path("giao_dien/src/dinh_dang.ts").read_text(encoding="utf-8")
     assert 'new Intl.NumberFormat("de-DE"' in nguon, "yen() của React không còn dùng dấu chấm ngăn nghìn"
     assert 'import { gon, ngay, so, yen } from "../dinh_dang"' in Path(

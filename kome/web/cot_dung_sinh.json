@@ -3957,7 +3957,8 @@
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/du_bao.py",
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/ngan_sach.py"
      ],
      "man": [
       "ban_do",
@@ -3965,6 +3966,7 @@
       "du_bao",
       "ho_so",
       "khach",
+      "ngan_sach",
       "san_pham",
       "tong_quan"
      ],
@@ -4138,6 +4140,7 @@
       "kome/khach_thang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
+      "kome/ngan_sach.py",
       "kome/san_pham.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
@@ -4152,6 +4155,7 @@
       "kho_du_lieu",
       "kho_hang",
       "lien_he",
+      "ngan_sach",
       "san_pham",
       "tong_quan"
      ],
@@ -4206,6 +4210,7 @@
       "kome/khach_thang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
+      "kome/ngan_sach.py",
       "kome/san_pham.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
@@ -4220,6 +4225,7 @@
       "kho_du_lieu",
       "kho_hang",
       "lien_he",
+      "ngan_sach",
       "san_pham",
       "tong_quan"
      ],
@@ -4283,6 +4289,7 @@
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
+      "kome/ngan_sach.py",
       "kome/san_pham.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
@@ -4297,6 +4304,7 @@
       "kho_du_lieu",
       "kho_hang",
       "lien_he",
+      "ngan_sach",
       "san_pham",
       "tong_quan"
      ],
@@ -10106,7 +10114,8 @@
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/du_bao.py",
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/ngan_sach.py"
      ],
      "man": [
       "ban_do",
@@ -10114,6 +10123,7 @@
       "du_bao",
       "ho_so",
       "khach",
+      "ngan_sach",
       "san_pham",
       "tong_quan"
      ],
@@ -10247,6 +10257,7 @@
       "kome/khach_thang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
+      "kome/ngan_sach.py",
       "kome/san_pham.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
@@ -10261,6 +10272,7 @@
       "kho_du_lieu",
       "kho_hang",
       "lien_he",
+      "ngan_sach",
       "san_pham",
       "tong_quan"
      ],
@@ -10314,6 +10326,7 @@
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
+      "kome/ngan_sach.py",
       "kome/san_pham.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
@@ -10328,6 +10341,7 @@
       "kho_du_lieu",
       "kho_hang",
       "lien_he",
+      "ngan_sach",
       "san_pham",
       "tong_quan"
      ],
@@ -11076,6 +11090,7 @@
   "mart.ban_theo_nhan_vien_thang": [
    "bao_cao",
    "du_bao",
+   "ngan_sach",
    "tong_quan"
   ],
   "mart.ban_theo_san_pham": [
@@ -11123,6 +11138,7 @@
    "ho_so",
    "khach",
    "kho_hang",
+   "ngan_sach",
    "san_pham",
    "tong_quan"
   ],

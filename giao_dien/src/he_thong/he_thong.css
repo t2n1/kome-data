@@ -49,25 +49,69 @@
 .kdl .backup-bad code{display:block;margin-top:.4rem;white-space:pre-wrap;word-break:break-all}
 
 /* Ngân sách */
-.ns .chon-ky{display:flex;flex-wrap:wrap;gap:.4rem;margin:.5rem 0 1rem}
-.ns .chon-ky a{padding:.3rem .8rem;border:1px solid var(--vien);border-radius:999px;text-decoration:none;font-size:.9rem;color:var(--chu)}
-.ns .chon-ky a.dang-xem{background:var(--nen-the);border-color:var(--do);color:var(--do-chu);font-weight:600}
-.ns-bang th.thang{font-variant-numeric:tabular-nums;white-space:nowrap}
-.ns-bang td input{width:7.5rem;text-align:right;font-family:var(--font-so);font-variant-numeric:tabular-nums;padding:.25rem .4rem;
-  border:1px solid var(--vien);border-radius:6px;background:var(--nen-the);color:var(--chu);font-size:.85rem}
+/* Ngân sách (thiết kế lại 2026-09-25): ô số + biểu đồ + lưới xoay (tháng là dòng) + thanh Lưu dính. */
+.ns{padding-bottom:4.5rem}
+.ns-ky{display:flex;flex-wrap:wrap;gap:.3rem;justify-content:flex-end;max-width:34rem}
+.ns-ky .nut-nho{text-decoration:none;color:var(--chu-thuong)}
+.ns-len{color:var(--ok-chu)}
+.ns-bieu-do{margin-bottom:.9rem}
+.ns-thanh-tab{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .8rem;margin:0 0 .55rem}
+.ns-thanh-tab .tab-pill button{font-size:.8rem;padding:.3rem .8rem}
+.ns-meo{font-size:.74rem;margin-left:auto;color:var(--chu-nhat)}
+.ns-the[hidden]{display:none}
+.ns-bang{width:auto;min-width:100%;border-collapse:collapse}
+.ns-bang th,.ns-bang td{padding:.28rem .45rem;vertical-align:middle}
+.ns-bang thead th{font-size:.76rem;font-weight:600;color:var(--chu-thuong);text-align:right;white-space:nowrap;
+  border-bottom:1px solid var(--vien);background:var(--nen-the)}
+.ns-bang thead th:first-child,.ns-bang th.ns-thang,.ns-bang tfoot th{text-align:left}
+.ns-bang th.ns-thang{font-weight:600;font-size:.82rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ns-bang tbody tr:nth-child(12n+6) td,.ns-bang tbody tr:nth-child(12n+6) th{border-top:1px dashed var(--vien-dam)} /* ranh giới năm dương lịch (T1) */
+.ns-bang tbody tr:hover{background:var(--nen-phu)}
+.ns-bang td.so{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-so);font-size:.82rem;white-space:nowrap}
+.ns-bang .ns-tk{color:var(--chu-nhat)}
+.ns-bang td input{width:8.2rem;box-sizing:border-box;text-align:right;font-family:var(--font-so);font-variant-numeric:tabular-nums;
+  padding:.3rem .45rem;border:1px solid var(--vien);border-radius:6px;background:var(--nen);color:var(--chu);font-size:.85rem}
+.ns-bang td input:focus{outline:2px solid var(--do);outline-offset:-1px;border-color:var(--do);background:var(--nen-the)}
+.ns-bang td input.da-sua{background:var(--canh-nen);border-color:var(--canh-vien)}
 .ns-bang td input.sai{border-color:var(--loi-vien);background:var(--loi-nen)}
-.ns-bang .tong,.ns-bang tr.tong td{font-weight:600;background:var(--nen-phu)}
-.ns-luu{margin:1rem 0;padding:.5rem 1.4rem}
+.ns-bang td small.ns-nt{display:block;text-align:right;font-size:.66rem;color:var(--chu-mo);margin-top:.1rem;font-variant-numeric:tabular-nums}
+.ns-bang tfoot tr.tong td,.ns-bang tfoot tr.tong th{font-weight:700;background:var(--nen-phu);border-top:1px solid var(--vien-dam)}
+.ns-cot{position:relative}
+.ns-cot-dau{display:flex;align-items:center;justify-content:flex-end;gap:.25rem}
+.ns-cot-dau small{display:block;font-weight:400;font-size:.68rem}
+.ns-cot-dau > span{text-align:right;line-height:1.25}
+.ns-nut-menu{font:inherit;font-size:.9rem;line-height:1;padding:.1rem .35rem;border-radius:6px;border:1px solid var(--vien);
+  background:var(--nen-the);color:var(--chu-thuong);cursor:pointer}
+.ns-nut-menu:hover,.ns-nut-menu[aria-expanded="true"]{border-color:var(--do);color:var(--do-chu)}
+.ns-menu{position:absolute;right:0;top:100%;z-index:5;min-width:15.5rem;display:flex;flex-direction:column;gap:.1rem;padding:.35rem;
+  text-align:left;font-weight:400;white-space:normal;background:var(--nen-the);border:1px solid var(--vien-dam);border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.14)}
+.ns-bang thead th.ns-cot:nth-child(2) .ns-menu{left:0;right:auto} /* cột đầu: mở sang phải, không bị khung cuộn cắt */
+.ns-menu > button{font:inherit;font-size:.8rem;text-align:left;padding:.4rem .55rem;border-radius:7px;border:0;background:none;color:var(--chu);cursor:pointer}
+.ns-menu > button:hover:not(:disabled){background:var(--nen-phu)}
+.ns-menu > button:disabled{opacity:.45;cursor:not-allowed}
+.ns-menu > button.giam{color:var(--loi-chu)}
+.ns-menu p{margin:.35rem .3rem .1rem;font-size:.72rem;line-height:1.4}
+.ns-menu-so{display:flex;align-items:flex-end;gap:.4rem;padding:.2rem .3rem}
+.ns-menu-so label{display:flex;flex-direction:column;gap:.2rem;font-size:.74rem;color:var(--chu-thuong);flex:1}
+.ns-menu-so input{font:inherit;font-size:.85rem;padding:.3rem .45rem;border:1px solid var(--vien-dam);border-radius:6px;
+  background:var(--nen);color:var(--chu);text-align:right;font-family:var(--font-so)}
+.ns-an{font-size:.8rem;margin:.6rem 0;color:var(--chu-thuong)}
+.ns-an .nut-nho{margin-left:.3rem}
+.ns-luu-thanh{position:fixed;left:50%;bottom:1rem;transform:translate(-50%,150%);z-index:20;display:flex;align-items:center;gap:.7rem;
+  padding:.55rem .6rem .55rem 1rem;border-radius:12px;background:var(--nen-the);border:1px solid var(--vien-dam);
+  box-shadow:0 10px 30px rgba(0,0,0,.18);font-size:.84rem;opacity:0;pointer-events:none;transition:transform .18s ease,opacity .18s ease;
+  max-width:calc(100vw - 2rem);flex-wrap:wrap}
+.ns-luu-thanh.hien{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+.ns-luu-thanh .nut-chinh{padding:.45rem 1.3rem}
+@media (prefers-reduced-motion:reduce){.ns-luu-thanh{transition:none}}
+@media (max-width:760px){.ns-meo{margin-left:0}.ns-ky{justify-content:flex-start}.ns-bang td input{width:6.6rem}}
 
 /* Màn hẹp: lưới 1fr = minmax(auto,1fr) nở theo min-content của bảng / mã dài —
    ép 0 để nội dung tự xuống dòng hoặc cuộn trong khung của nó (375px không tràn). */
 .ht .noi-dung-cd,.ht .tai-lieu > *{min-width:0}
 @media (max-width:900px){.ht .cai-dat{grid-template-columns:minmax(0,1fr)}}
 .ht p code,.ht li code,.ht .ghi-chu code,.ht .the-tl code{white-space:normal;overflow-wrap:anywhere}
-.ns .ns-muc{font-size:1.02rem;margin:1.4rem 0 .2rem}
-.ns-bang td.ns-cs{white-space:nowrap;color:var(--chu-nhat);font-size:.82rem}
-.ns-bang tr.ns-dong-2 td{border-top:0}
-.ns-bang tr.ns-bien td,.ns-bang tr.ns-lech td{color:var(--chu-nhat);font-size:.82rem;font-variant-numeric:tabular-nums}
 
 /* Kho dữ liệu → Dữ liệu đi đâu (2026-09-24). */
 .dd .dd-loai{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:.6rem;margin:.8rem 0 1.2rem}

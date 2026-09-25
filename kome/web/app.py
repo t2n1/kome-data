@@ -1071,13 +1071,17 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         """
         # 041: khoá ô = `<đối tượng>-<chi_so>-<tháng>` (đối tượng = mã phụ trách hoặc
         # `CONG_TY`), đúng tên ô biểu mẫu `o-<khoá>`.
-        from kome.ngan_sach import CONG_TY
+        from kome.ngan_sach import CONG_TY, NGAY_CON_BAN
         o = {f"{ma}-doanh_thu-{th}": v for (ma, th), v in b.o.items()}
         o.update({f"{ma}-lai_gop-{th}": v for (ma, th), v in b.o_lg.items()})
         o.update({f"{CONG_TY}-{cs}-{th}": v for (cs, th), v in b.cong_ty.items()})
+        # Thực tế: cùng dạng khoá với `o_txt` — giao diện tra "năm trước" bằng đúng khoá ô.
+        tt = {f"{doi}-{cs}-{th}": v for (doi, cs, th), v in b.thuc_te.items()}
         return {"ky": b.company_fy, "moi_ky": b.moi_ky, "thang": b.thang,
-                "nguoi": [{"ma": n.ma, "ten": n.ten} for n in b.nguoi],
-                "cong_ty": CONG_TY, "o_txt": o}
+                "nguoi": [{"ma": n.ma, "ten": n.ten, "hien": n.hien, "con_ban": n.con_ban,
+                           "ban_cuoi": n.ban_cuoi.isoformat() if n.ban_cuoi else None}
+                          for n in b.nguoi],
+                "ngay_con_ban": NGAY_CON_BAN, "cong_ty": CONG_TY, "o_txt": o, "thuc_te": tt}
 
     @app.get("/ngan-sach", response_class=HTMLResponse)
     def ngan_sach(request: Request, ky: int | None = None):

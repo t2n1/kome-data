@@ -46,6 +46,13 @@ _NHOM = re.compile(rf"^[0-9]{{1,3}}(?:[{_LOP_KY_TU_PHAN_CACH}][0-9]{{3}})*$")
 CONG_TY = "__cong_ty"
 CHI_SO = ("doanh_thu", "lai_gop")
 
+# Người phụ trách "còn bán" = có ít nhất một dòng bán trong NGAY_CON_BAN ngày tính tới mốc dữ
+# liệu (`mart.moc_thoi_gian`). CHỈ dùng để ẩn bớt dòng ở màn nhập ngân sách — không phải chỉ số,
+# không vào báo cáo nào. Suy từ DOANH SỐ chứ không từ khách được giao: đo thật 2026-09-25, OBC
+# vẫn giao 43 / 140 khách cho hai người đã nghỉ (西村 巧 bán lần cuối 2026-06-19, NGUYEN
+# PHUONG DUNG 2025-12-30), nên "còn khách" nói sai.
+NGAY_CON_BAN = 90
+
 
 class LoiSo(ValueError):
     """Một ô không đọc được thành số nguyên yên."""
@@ -92,6 +99,9 @@ def doc_so(chuoi: str | None) -> int | None:
 class Nguoi:
     ma: str
     ten: str
+    ban_cuoi: date | None = None   # ngày bán mới nhất ≤ mốc; None = chưa từng bán
+    con_ban: bool = True           # có bán trong NGAY_CON_BAN ngày tới mốc
+    hien: bool = True              # hiện mặc định ở màn nhập (xem `bang_nhap`)
 
 
 @dataclass(frozen=True)
@@ -108,6 +118,9 @@ class BangNhap:
     o: dict[tuple[str, str], int]   # (salesperson_code, 'YYYY-MM') -> chỉ tiêu doanh thu
     o_lg: dict[tuple[str, str], int] = field(default_factory=dict)     # -> chỉ tiêu lãi gộp
     cong_ty: dict[tuple[str, str], int] = field(default_factory=dict)  # (chi_so, 'YYYY-MM') -> ngân sách công ty
+    # Thực tế từ `mart.ban_theo_nhan_vien_thang`, 24 tháng (kỳ trước + kỳ này):
+    # (mã phụ trách hoặc CONG_TY, chi_so, 'YYYY-MM') -> số. Chỉ để THAM KHẢO khi đặt số.
+    thuc_te: dict[tuple[str, str, str], int] = field(default_factory=dict)
 
 
 def thang_cua_ky(company_fy: int) -> list[str]:
@@ -143,23 +156,36 @@ def bang_nhap(conn, company_fy: int | None = None) -> BangNhap:
     thẳng ra ngoài, mất cả biểu mẫu. `HAVING count(DISTINCT company_fy_month)
     = 12` loại đúng hai kỳ cụt đó mà không cần biết ranh giới dải lịch.
     """
-    moi_ky = [r[0] for r in conn.execute(
-        """SELECT company_fy FROM core.dim_date
-           GROUP BY company_fy
-           HAVING count(DISTINCT company_fy_month) = 12
-           ORDER BY 1""").fetchall()]
+    # MỘT câu: dải kỳ + mốc dữ liệu + kỳ của mốc (CTE vật hoá — `moc_thoi_gian` là max()
+    # trên bảng bán, không đánh giá hai lần).
+    dong = conn.execute(
+        """WITH m AS MATERIALIZED (
+             SELECT m.hom_nay, d.company_fy FROM mart.moc_thoi_gian m
+             LEFT JOIN core.dim_date d ON d.date_key = m.hom_nay)
+           SELECT k.company_fy, m.hom_nay, m.company_fy
+           FROM (SELECT company_fy FROM core.dim_date
+                 GROUP BY company_fy
+                 HAVING count(DISTINCT company_fy_month) = 12) k
+           LEFT JOIN m ON true
+           ORDER BY 1""").fetchall()
+    moi_ky = [r[0] for r in dong]
+    hom_nay = dong[0][1] if dong else None
 
     # hom_nay có thể NULL (kho chưa có dòng bán nào) — khi đó rơi về kỳ giữa
     # dải lịch thay vì nổ, để màn nhập vẫn dùng được trước khi nạp dữ liệu.
-    r = conn.execute(
-        """SELECT d.company_fy FROM mart.moc_thoi_gian m
-           JOIN core.dim_date d ON d.date_key = m.hom_nay""").fetchone()
-    mac_dinh = r[0] if r else moi_ky[len(moi_ky) // 2]
+    mac_dinh = dong[0][2] if dong and dong[0][2] is not None else moi_ky[len(moi_ky) // 2]
     ky = company_fy if company_fy in moi_ky else mac_dinh
 
-    nguoi = [Nguoi(ma=r[0], ten=r[1]) for r in conn.execute(
-        "SELECT salesperson_code, ten FROM core.dim_salesperson "
-        "ORDER BY salesperson_code").fetchall()]
+    # Ngày bán cuối ≤ mốc của từng người: đọc `mart.ban_den_moc` (bất biến 040), không
+    # đọc thẳng bảng bán. GROUP BY một lượt quét, không truy vấn con tương quan: bảng bán
+    # không có chỉ mục theo người phụ trách, nên mỗi người một truy vấn con là mỗi người
+    # một lượt quét.
+    ds_nguoi = conn.execute(
+        """SELECT s.salesperson_code, s.ten, b.ban_cuoi
+           FROM core.dim_salesperson s
+           LEFT JOIN (SELECT salesperson_code, max(sales_date) AS ban_cuoi
+                        FROM mart.ban_den_moc GROUP BY 1) b USING (salesperson_code)
+           ORDER BY 1""").fetchall()
 
     thang = thang_cua_ky(ky)
     # MỘT câu cho cả hai bảng (UNION ALL, cột đầu NULL = công ty) — không thêm lượt hỏi.
@@ -182,8 +208,37 @@ def bang_nhap(conn, company_fy: int | None = None) -> BangNhap:
             if r[3] is not None:
                 o_lg[(r[0], r[1])] = int(r[3])
 
+    # Thực tế kỳ trước + kỳ này. Công ty = cộng mọi dòng của view (kể cả mã phụ trách
+    # rỗng / ngoài danh sách) — phép cộng trên một phân hoạch, bằng đúng
+    # `mart.ban_theo_thang`; không có tỷ số nào ở đây để lấy trung bình sai.
+    truoc = thang_cua_ky(ky - 1)
+    thuc_te: dict[tuple[str, str, str], int] = {}
+    for th, ma, dt, lg in conn.execute(
+            """SELECT thang, salesperson_code, doanh_thu_thuan, lai_gop
+                 FROM mart.ban_theo_nhan_vien_thang
+                WHERE thang >= %s AND thang <= %s""", (truoc[0], thang[-1])).fetchall():
+        for cs, v in (("doanh_thu", dt), ("lai_gop", lg)):
+            if v is None:
+                continue
+            k = (CONG_TY, cs, th)
+            thuc_te[k] = thuc_te.get(k, 0) + int(v)
+            if ma is not None:
+                thuc_te[(ma, cs, th)] = thuc_te.get((ma, cs, th), 0) + int(v)
+
+    # Hiện mặc định = còn bán, HOẶC đã có chỉ tiêu trong kỳ này (không giấu số đã lưu),
+    # HOẶC có bán trong chính kỳ này (xem lại kỳ cũ thì người khi đó còn làm vẫn hiện).
+    tt = set(thang)
+    nguoi = []
+    for ma, ten, ban_cuoi in ds_nguoi:
+        con_ban = (ban_cuoi is not None and hom_nay is not None
+                   and (hom_nay - ban_cuoi).days < NGAY_CON_BAN)
+        co_so = any(k[0] == ma for k in o) or any(k[0] == ma for k in o_lg)
+        ban_ky = any(k[0] == ma and k[2] in tt and v != 0 for k, v in thuc_te.items())
+        nguoi.append(Nguoi(ma=ma, ten=ten, ban_cuoi=ban_cuoi, con_ban=con_ban,
+                           hien=con_ban or co_so or ban_ky))
+
     return BangNhap(company_fy=ky, moi_ky=moi_ky, thang=thang, nguoi=nguoi, o=o,
-                    o_lg=o_lg, cong_ty=cong_ty)
+                    o_lg=o_lg, cong_ty=cong_ty, thuc_te=thuc_te)
 
 
 def luu(conn, gia_tri: dict[tuple, int | None], nguoi_id: int | None) -> int:
