@@ -127,10 +127,10 @@ def test_health_liet_ke_ngay_lam_viec_bi_thieu(conn, test_db_url, batch):
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/health")
     assert r.status_code == 200
-    ban = next(d for d in man(r.text)["phu"]["dong"] if d["khoa"] == "ban")
-    assert ban["dau"] == "2026-05-11" and ban["cuoi"] == "2026-05-13"   # kỳ dữ liệu
-    assert ban["thieu"] == ["2026-05-12"]
-    assert "xuất\n      lại {d.ten_obc} của đúng những ngày đó" in nguon("he_thong", "KhoDuLieu.tsx")
+    ky = man(r.text)["ky"]
+    assert ky["dau"] == "2026-05-11" and ky["cuoi"] == "2026-05-13"   # kỳ dữ liệu
+    assert ky["thieu"] == ["2026-05-12"]
+    assert "ngày làm việc</strong>" in nguon("he_thong", "KhoDuLieu.tsx")
     # cuối tuần 2026-05-09 (Bảy) / 2026-05-10 (CN) nằm ngoài kỳ, không được kể
 
 
@@ -154,14 +154,9 @@ def test_health_liet_ke_THANG_trong_tren_ca_ky_du_lieu(conn, test_db_url, batch)
     sales.load(conn, pd.DataFrame(rows), date(2026, 5, 1), b)
 
     client = TestClient(create_app(db_url=test_db_url))
-    p = man(client.get("/health").text)["phu"]
-    ban = next(d for d in p["dong"] if d["khoa"] == "ban")
-    tt = {t["thang"]: o["trang_thai"] for t, o in zip(p["thang"], ban["o"])}
-    assert (tt["2026-03"], tt["2026-04"], tt["2026-05"]) == ("thieu", "khong", "thieu")  # 4 trống hẳn
-    assert (ban["dau"], ban["cuoi"]) == ("2026-03-31", "2026-05-01")
-    assert all(x.startswith("2026-04") for x in ban["thieu"]) and len(ban["thieu"]) == 21
-    # Ô tóm tắt gọi đích danh tháng trống nằm giữa ngày đầu và ngày cuối.
-    assert "cả tháng không có dòng nào" in nguon("he_thong", "KhoDuLieu.tsx")
+    ky = man(client.get("/health").text)["ky"]
+    assert ky["thang_trong"] == ["2026-04"]       # 3 và 5 có dòng, 4 trống hẳn
+    assert "thang_trong" in nguon("he_thong", "KhoDuLieu.tsx")
 
 
 def test_loi_ngoai_du_kien_hien_tieng_viet_khong_lo_chuoi_ngoai_le(
@@ -192,45 +187,54 @@ def test_loi_ngoai_du_kien_hien_tieng_viet_khong_lo_chuoi_ngoai_le(
 
 
 def test_trang_phu_du_lieu_mo_duoc_va_nhom_theo_ky_cong_ty(conn, test_db_url):
-    """Trang /phu-du-lieu (301 sang /kho-du-lieu#theo-thang): dải trên đầu lưới
-    là kỳ kế toán CỦA CÔNG TY (1/8 → 31/7), tháng chốt kỳ đánh dấu.
+    """Trang /phu-du-lieu: nhóm theo kỳ kế toán CỦA CÔNG TY (1/8 → 31/7).
+
+    Đợt 2a (Task 4): /phu-du-lieu chỉ 301 sang /kho-du-lieu#theo-thang, và
+    tiêu đề trang giờ là "Kho dữ liệu" (dùng chung cho cả ba khối cũ) —
+    không còn tiêu đề riêng "Bảng phủ dữ liệu". Mọi nội dung khác (kỳ kế
+    toán, cột, tổng kết) vẫn nguyên vẹn, chỉ nằm trong màn gộp.
 
     KHÔNG kiểm "Kho dữ liệu": chuỗi đó nằm trong sidebar của MỌI trang, nên
     vẫn xanh kể cả khi redirect đi lạc sang "/" hay "/bao-cao". Kiểm neo
-    `id="theo-thang"` — chỉ có trên đúng khối lưới tháng của màn này."""
+    `id="theo-thang"` — chỉ có trên đúng khối bảng tháng của màn này."""
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/phu-du-lieu")
     assert r.status_code == 200
-    p = man(r.text)["phu"]
+    b = man(r.text)["bang"]
     src = nguon("he_thong", "KhoDuLieu.tsx")
     assert 'id="theo-thang"' in src
     # Trang phải gọi kỳ theo SỐ mà công ty tự dùng (Kỳ 7), không phải năm kết thúc
-    thang = {t["thang"]: t for t in p["thang"]}
-    assert thang["2025-08"]["ky"] == thang["2026-07"]["ky"] == "Kỳ 7 (2025-08 → 2026-07)"
-    assert thang["2026-07"]["chot"] and not thang["2026-06"]["chot"] and "tháng chốt kỳ" in src
+    assert "Kỳ 7 (2025-08 → 2026-07)" in [k["nhan"] for k in b["ky"]]
     assert "1/8 → 31/7" in src
-    assert {"在庫一覧", "売上伝票データ"} <= {d["ten_obc"] for d in p["dong"]}
+    assert {"在庫一覧", "売上伝票データ"} <= {c["ten_obc"] for c in b["cot"]}
+    # Tổng kết kỳ
+    assert "Doanh thu thuần" in src and "Lãi gộp" in src
+    # Tháng chốt kỳ phải được đánh dấu
+    assert any(t["la_thang_chot_ky"] for k in b["ky"] for t in k["thang"]) and "chốt kỳ" in src
     # Ràng buộc §2.2.1 và hạn chế của dấu "không có" phải viết ra rõ ràng
-    assert p["dau_du_lieu"] == "2025-03-03" and p["thang"][0]["thang"] == "2025-03"
-    assert "không tồn tại" in src
+    assert b["dau_du_lieu"] == "2025-03-03"
+    assert "ngoài phạm vi" in src
     assert "cổng kiểm tra" in src and "chặn <strong>trước khi</strong>" in src
 
 
 def test_phu_du_lieu_phan_biet_bang_MAU_NEN_khong_chi_bang_ky_tu(conn, test_db_url):
-    """[IMPORTANT] Trang này để LIẾC MẮT là thấy. Nếu "đủ", "thiếu" và "không"
-    chỉ khác nhau ở một ký tự nhỏ thì người đọc phải dò từng ô — đúng lúc cần
-    thấy ngay thì lại không thấy. Ba lớp `o-co`/`o-khong`/`o-ngoai` của
-    /static/kome.css (màn cũ) vẫn giữ màu nền; lưới mới tô ở he_thong.css."""
+    """[IMPORTANT] Trang này để LIẾC MẮT là thấy. Nếu "có" và "không" chỉ khác
+    nhau ở một ký tự nhỏ thì người đọc phải dò từng ô — đúng lúc cần thấy
+    ngay thì lại không thấy.
+
+    phu_du_lieu.html (đã xoá ở Task 4) mang theo một khối <style> RIÊNG định
+    nghĩa lại ba lớp này — trùng với kome.css nhưng vô hại vì cùng giá trị.
+    Xoá template đó bỏ luôn bản trùng, chỉ còn định nghĩa DUY NHẤT ở
+    /static/kome.css (nơi _bang_ngay.html / _bang_thang.html của màn gộp đã
+    dùng từ trước) — kiểm màu nền ở đúng chỗ nó còn được định nghĩa."""
     client = TestClient(create_app(db_url=test_db_url))
     css = client.get("/static/kome.css").text.replace(" ", "")
     for lop in ("o-co", "o-khong", "o-ngoai"):
         assert f"{lop}{{background:" in css, f"thiếu màu nền cho .{lop}"
-    dong = nguon("he_thong", "he_thong.css").splitlines()
-    for lop in ("o-du", "o-thieu", "o-khong", "o-nghi"):
-        assert any(f".kdl-l-o.{lop}" in l and "background:" in l for l in dong), f"lưới thiếu màu nền cho .{lop}"
     html = client.get("/phu-du-lieu").text
-    assert all(o["trang_thai"] in ("khong", "trong") for d in man(html)["phu"]["dong"] for o in d["o"])
-    assert '`kdl-l-o o-${o.trang_thai}`' in nguon("he_thong", "KhoDuLieu.tsx")
+    # tháng trước 2025-03 phải là "ngoài phạm vi"; giao diện gắn lớp "o o-" + trạng thái
+    assert any(o["trang_thai"] == "ngoai" for k in man(html)["bang"]["ky"] for t in k["thang"] for o in t["o"])
+    assert '"o o-" + o.trang_thai' in nguon("he_thong", "KhoDuLieu.tsx")
 
 
 def test_phu_du_lieu_ton_trong_db_url_va_khong_lo_thong_tin_ket_noi(
@@ -366,8 +370,7 @@ def test_trang_chu_khong_bao_dong_truoc_gio_chot(conn, test_db_url, monkeypatch)
 
 
 def test_trang_phu_du_lieu_co_bang_theo_tung_ngay(conn, test_db_url, monkeypatch):
-    """Ô tháng không trả lời được "hôm qua có sót ngày nào không" — khối từng
-    ngày thì có: mọi ngày của tháng mới nhất tới HÔM NAY (giờ Tokyo)."""
+    """Bảng tháng không trả lời được "hôm qua có sót ngày nào không"."""
     from datetime import datetime
     from kome.tuoi_du_lieu import MUI_GIO
     monkeypatch.setattr("kome.tuoi_du_lieu._bay_gio",
@@ -375,9 +378,10 @@ def test_trang_phu_du_lieu_co_bang_theo_tung_ngay(conn, test_db_url, monkeypatch
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/phu-du-lieu")
     assert r.status_code == 200
-    assert "<h2>Từng ngày — tháng {nhanThang(t.thang)}</h2>" in nguon("he_thong", "KhoDuLieu.tsx")
-    p = man(r.text)["phu"]
-    cuoi = p["thang"][-1]
-    assert cuoi["thang"] == "2026-09" and len(cuoi["lich"]) == 17   # 1/9 → hôm nay 17/9
-    assert all(len(d["o"][-1]["ngay"]) == 17 for d in p["dong"])
-    assert len(p["thang"][-4]["lich"]) == 30                         # tháng 6 trọn 30 ngày
+    # Đợt B (gói thiết kế): lưới THEO THÁNG, mặc định tháng hiện tại, ‹ › lùi tháng.
+    assert "<h2>Theo ngày — tháng {nhanThang(luoi.thang)}</h2>" in nguon("he_thong", "KhoDuLieu.tsx")
+    ngay = [n["ngay"] for n in man(r.text)["bang_ngay"]["ngay"]]
+    assert ngay[0] == "2026-09-17"          # dòng đầu là hôm nay
+    assert ngay[-1] == "2026-09-01"         # dòng cuối là mùng 1 của tháng
+    ngay = [n["ngay"] for n in man(client.get("/kho-du-lieu?ngay_thang=2026-06").text)["bang_ngay"]["ngay"]]
+    assert (ngay[0], ngay[-1], len(ngay)) == ("2026-06-30", "2026-06-01", 30)

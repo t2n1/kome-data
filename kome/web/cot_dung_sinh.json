@@ -3738,7 +3738,8 @@
       "kome/ngan_sach.py",
       "kome/san_pham.py",
       "kome/tong_quan.py",
-      "kome/web/api.py"
+      "kome/web/api.py",
+      "kome/web/app.py"
      ],
      "man": [
       "ban_do",
@@ -9938,7 +9939,8 @@
       "kome/ngan_sach.py",
       "kome/san_pham.py",
       "kome/tong_quan.py",
-      "kome/web/api.py"
+      "kome/web/api.py",
+      "kome/web/app.py"
      ],
      "man": [
       "ban_do",
