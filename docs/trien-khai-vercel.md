@@ -7,21 +7,23 @@ mật khẩu, không còn mật khẩu chung).
 
 ---
 
-## 1. Vì sao chỉ đưa phần XEM lên, không đưa phần NẠP
+## 1. Nạp gì được trên Vercel, nạp gì phải ở máy công ty
 
-Không phải lựa chọn cho gọn. Đây là ba giới hạn cứng của Vercel:
+Từ 2026-09-25 (migration 045, đặc tả
+`docs/superpowers/specs/2026-09-25-nap-tren-vercel-design.md`) bản Vercel **nạp được
+file hằng ngày**. Ba giới hạn của Vercel và cách xử lý:
 
-| Giới hạn của Vercel | Số thật của KOME | Kết quả |
+| Giới hạn của Vercel | Số thật của KOME | Xử lý |
 |---|---|---|
-| Mỗi yêu cầu tối đa **4,5 MB** | file `売上伝票データ` nặng **~100 MB** | gấp **22 lần** — trả lỗi `413` |
-| Ổ đĩa của hàm là **tạm**, ghi xong mất | hệ thống phải giữ **nguyên file Excel gốc** (lớp `raw`) | không giữ được |
-| Hàm có **giới hạn thời gian chạy** | nạp một quý bán hàng mất **~88 giây** | đứt giữa chừng |
+| Mỗi yêu cầu tối đa **4,5 MB** | file hằng ngày ≤ ~2,5 MB; `売上伝票データ` **cả quý** 63–106 MB | trình duyệt chặn file > 4 MB, nhắc nạp ở máy công ty |
+| Ổ đĩa của hàm là **tạm** | file chờ xác nhận; file gốc (lớp `raw`) | file chờ nằm trong `meta.nap_cho`; file gốc **không lưu** (`archived_to` trống) |
+| Hàm có **giới hạn thời gian chạy** | nạp một quý ~88 giây | file hằng ngày nhỏ; nạp cả quý vẫn ở máy công ty |
 
-Vì vậy bản trên Vercel **luôn ở chế độ chỉ đọc**, do chính biến `VERCEL` của
-Vercel quyết định (`kome/web/app.py::_chi_doc`). Không có công tắc nào bật lại
-được — một nút nạp luôn hỏng còn tệ hơn không có nút nào.
+**Migration `045_nap_cho.sql` phải chạy (bằng `postgres`) TRƯỚC khi triển khai** — thiếu
+bảng `meta.nap_cho` thì bước Kiểm nổ lỗi.
 
-**Nạp dữ liệu vẫn làm ở máy trong công ty như hiện nay**, xem `docs/runbook.md`.
+**Đối soát đầu tháng / nạp lại cả quý vẫn làm ở máy trong công ty**, xem
+`docs/runbook.md`. Muốn một bản chỉ để xem thì đặt `KOME_CHI_DOC=1`.
 
 ---
 
@@ -126,15 +128,13 @@ Mở địa chỉ Vercel bằng **cửa sổ ẩn danh** (Ctrl+Shift+N) rồi so
       Kho dữ liệu — đích mặc định sau đăng nhập là `/`, và không phải tài
       khoản nào cũng vào được Kho dữ liệu (xem dòng dưới).
 - [ ] Đăng nhập bằng một tài khoản **có** quyền `--kho-du-lieu`, mở
-      `/kho-du-lieu` → **không** thấy ô kéo–thả file, và **không** thấy nút
-      **Hoàn tác** nào trong bảng "Lô nạp gần nhất". (Đây là cổng kiểm TAY duy
-      nhất cho bất biến chỉ-đọc. Ô kiểm cũ soát mục menu "Nạp dữ liệu" — mục
-      đó nay đã biến mất khỏi **cả hai** bản, nên ô kiểm ấy xanh kể cả khi bất
-      biến vỡ hoàn toàn.)
+      `/kho-du-lieu/nap` → thấy các ô thả file. Thả một file master nhỏ
+      (vd `仕入先`) → Kiểm → Xác nhận → lô mới hiện trong "Lô nạp gần nhất" →
+      Hoàn tác lô đó. Chọn một file > 4 MB → bị chặn ngay ở trình duyệt với câu
+      "quá lớn cho bản web".
 - [ ] Đăng nhập bằng một tài khoản **không** có quyền `--kho-du-lieu`, gõ
       thẳng `/kho-du-lieu` → nhận trang giải thích **403**, không phải trang
-      trắng hay lỗi khó hiểu — quyền này tách rời khỏi chế độ chỉ-đọc của
-      Vercel, nên phải kiểm cả hai.
+      trắng hay lỗi khó hiểu.
 - [ ] Không có dải đỏ "Chưa sao lưu" (sao lưu chạy ở máy công ty, trang này
       không nhìn thấy nên cố ý im lặng).
 - [ ] Bấm **Thoát** → quay về trang đăng nhập.

@@ -9,9 +9,10 @@ dẫn về ứng dụng này.
 thấy ứng dụng nữa, và triệu chứng là trang trả về 404 ở mọi đường dẫn — trông
 giống hệt như code bị hỏng, chứ không giống một file bị đổi tên.
 
-Bản chạy trên Vercel LUÔN ở chế độ chỉ đọc (kome/web/app.py::_chi_doc) và LUÔN
-đòi mật khẩu (kome/web/bao_mat.py). Cả hai do biến môi trường `VERCEL` quyết
-định chứ không phải file này, nên không thể lỡ tay tắt đi.
+Bản chạy trên Vercel LUÔN đòi mật khẩu (kome/web/bao_mat.py) — do biến môi trường
+`VERCEL` quyết định chứ không phải file này, nên không thể lỡ tay tắt đi. Từ
+migration 045 nó nạp được file hằng ngày (≤ 4 MB); đặt `KOME_CHI_DOC=1` nếu muốn
+một bản chỉ để xem.
 """
 from kome.web.app import app
 

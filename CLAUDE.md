@@ -108,7 +108,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/kho-hang` | **React** (giai đoạn 4, bám Kho hàng.dc.html; `/api/kho-hang?kho=&loc=`, 2 lượt): tab Tồn hiện tại (5 ô · bảng tồn theo dòng + tìm + chip ngành (`?nganh=`, lọc ở trình duyệt) + CSV · quá hạn / sắp chuyển lô / không kịp bán trước hạn / cận hạn / giá trị theo ngành / theo lô) · Hàng đang về (chưa có dữ liệu) · Cần đặt (hết + sắp thiếu, KHÔNG đề xuất số lượng). "Kho" hiện là LÔ (bẫy #6, 042) | `mart.ton_hien_tai`, `mart.ton_theo_lo`, `san_pham_360`, `core.dim_warehouse`, `core.dim_product` (ngành), `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/cong-no` | **Công nợ & thu tiền — React** (đợt 6, bám Công nợ.dc.html; `/api/cong-no`, MỘT ảnh chụp 2 lượt hỏi, lọc ở trình duyệt): 6 ô tổng · tuổi nợ (bấm để lọc) · phiếu còn nợ (tab quá hạn / sắp đến hạn / không suy được hạn / theo bên nhận hoá đơn) · lịch thu 7 ngày sau mốc · việc nên làm. Mốc = cuối kỳ sổ mới nhất. Tab Công nợ của hồ sơ khách: `/api/cong-no/khach/{mã}` | `mart.cong_no_ben_tra`, `mart.cong_no_phieu` (← `core.fact_ar_ledger`, sổ `請求先元帳`) |
 | `/kho-du-lieu` | **Tổng quan độ phủ — React** (đợt B 2026-09-24, bám Kho dữ liệu.dc.html; thanh trái chung `TabKho.tsx::KhungKho`; máy chủ tính sẵn vào `window.__KOME__.man`, vai trò NẠP): sơ đồ 8 nguồn (màu theo nhịp — `kome/kho_du_lieu.py`) · 4 ô số (danh mục `pg_class`) · lưới theo ngày của MỘT tháng (`?ngay_thang=YYYY-MM`, KHÔNG `?thang=` — đó là khoảng xem chung) · sức khoẻ · bảng tháng | `meta.ingest_batch`, `core.*` |
-| `/kho-du-lieu/nap` | **Nạp hai bước — React** (đợt B): mỗi loại file một ô (`kho_du_lieu.O_NAP`, cùng danh sách với sơ đồ nguồn; thả nhầm ô → chặn) · `POST /upload/kiem` (5 cổng qua `pipeline.kiem`, **không ghi gì**, file vào `<ARCHIVE_DIR>/_cho_xac_nhan/`) → `POST /upload/xac-nhan` (`ingest` đầy đủ, 5 cổng chạy lại) / `POST /upload/huy` · file chờ quá 24 giờ bị dọn · lô gần nhất + hoàn tác (`POST /undo/{lô}` → về `#lo-nap`). `POST /upload` một bước vẫn còn | `meta.ingest_batch`, `core.*` |
+| `/kho-du-lieu/nap` | **Nạp hai bước — React** (đợt B): mỗi loại file một ô (`kho_du_lieu.O_NAP`, cùng danh sách với sơ đồ nguồn; thả nhầm ô → chặn) · `POST /upload/kiem` (5 cổng qua `pipeline.kiem`, **không ghi gì**, file vào `<ARCHIVE_DIR>/_cho_xac_nhan/` — trên Vercel vào `meta.nap_cho`, 045) → `POST /upload/xac-nhan` (`ingest` đầy đủ, 5 cổng chạy lại) / `POST /upload/huy` · file chờ quá 24 giờ bị dọn · lô gần nhất + hoàn tác (`POST /undo/{lô}` → về `#lo-nap`). `POST /upload` một bước vẫn còn | `meta.ingest_batch`, `meta.nap_cho`, `core.*` |
 | `/kho-du-lieu/luong` | Tài liệu sống (đợt 2b): bốn tầng · các nguồn OBC · 5 cổng + ngưỡng từng file · cạm bẫy OBC · lộ trình. **0 truy vấn** | `config/files.yml`, `kome/web/tai_lieu_sinh.json` |
 | `/kho-du-lieu/cot-noi` | Tài liệu sống: ma trận khoá · file nối đi đâu · cột trong từng file (`?file=<spec>`). **0 truy vấn** | `config/files.yml` |
 | `/kho-du-lieu/bang/{schema.bảng}` | **Xem một bảng — React** (đợt C 2026-09-24): Dữ liệu (tìm trên cả dòng, 50 dòng/trang, "Tháng gần nhất" / "Lô mới nhất", CSV ≤ 50.000 dòng) · Cột & khoá · Lần nạp. Thanh trái "Duyệt bảng" (`/api/kho-du-lieu/bang`). CHỈ ĐỌC bằng `kome_app` trong giao dịch `READ ONLY` (+ `statement_timeout` 20 s); tên bảng phải là quan hệ có thật của `core`/`mart`/`meta` mà vai trò đó SELECT được (`has_table_privilege`) rồi mới vào SQL qua `sql.Identifier` — schema `app` KHÔNG BAO GIỜ (băm mật khẩu). `/api/kho-du-lieu/*` nằm trong `DUONG_KHO_DU_LIEU` (cùng cổng quyền màn có nút xoá). Bảng: trang theo khoá chính + `count(*)` riêng (2 lượt); view: MỘT câu `count(*) OVER ()` (bất biến CTE-trùng) | danh mục `pg_class` + chính bảng đó (`kome/bang_kho.py`) |
@@ -165,6 +165,23 @@ thứ tự 4 chữ số trong ngày (`202609240002` = khách mới thứ 2 ngày
 `000000xxxxxx` không mang ngày ("trước 8/2023"). Đọc ở `kome.khach_hang.ngay_dang_ky`, hiện ở
 tab Hồ sơ. "Khách mới" của các màn vẫn theo LẦN MUA ĐẦU, không theo ngày đăng ký.
 **Migration 044 phải chạy TRƯỚC khi triển khai.**
+
+**Bất biến (045, nạp trên Vercel — chủ DN chốt 2026-09-25):** bản Vercel nạp / kiểm /
+xác nhận / huỷ / hoàn tác được file HẰNG NGÀY; đối soát tháng / nạp lại cả quý (30–106
+MB) vẫn ở máy công ty. File CHỜ xác nhận đi qua MỘT lớp kho (mô-đun `kome.nap_cho`):
+`KhoDia` (thư mục `_cho_xac_nhan/`, máy công ty) hay `KhoCsdl` (bảng `meta.nap_cho`,
+Vercel — bước Xác nhận có thể chạy ở phiên bản hàm khác bước Kiểm), chọn bằng
+`KOME_KHO_NAP` (mặc định `csdl` khi `VERCEL`). Kho CSDL KHÔNG lưu file gốc:
+`meta.ingest_batch.archived_to` NULL = "nạp ở nơi không lưu file gốc" — mã băm vẫn ghi
+nên chặn nạp trùng không đổi. `kome_ingest` có DELETE trên ĐÚNG `meta.nap_cho` (sổ
+`meta.ingest_batch` vẫn không xoá được); `kome_app` / `kome_report` không có quyền gì trên
+bảng đó (dữ liệu thô chưa qua cổng). Trình duyệt chặn file / tổng file >
+`app.GIOI_HAN_WEB` (4 MB, trần Vercel 4,5 MB) khi `window.__KOME__.gioi_han_tai_len` có
+giá trị (chỉ Vercel). Làm nóng ảnh chụp bỏ qua trên Vercel (luồng nền bị đóng băng sau
+khi trả lời). Có test canh: `tests/test_nap_vercel.py`,
+`tests/test_bao_mat.py::test_tren_vercel_nap_duoc_nhung_van_sau_co_kho_du_lieu`. Đặc tả:
+`docs/superpowers/specs/2026-09-25-nap-tren-vercel-design.md`.
+**Migration 045 phải chạy TRƯỚC khi triển khai.**
 
 **Bất biến:** `kome/khach_hang.py::ho_so()` chạy **không quá 8 truy vấn** (giai
 đoạn 2 gộp "đã ngừng mua" vào câu mặt hàng nên nay là 7 — chỗ trống là cố ý), và
@@ -583,12 +600,10 @@ các ngày đó là "thiếu" (câu nhắc trên màn đã nói rõ). Đừng "s
 nghĩa thứ hai (ví dụ "ngày có phiếu bán") — hai định nghĩa cùng tên là hai con số
 nói hai điều.
 
-**Bất biến:** `POST /ngan-sach` KHÔNG bị chế độ chỉ-đọc (`_chi_doc`) chặn, nên
-bản Vercel công khai SỬA ĐƯỢC ngân sách — và đó là chủ ý, không phải sót. Lý
-do: `_chi_doc` tồn tại vì **giới hạn nền tảng của luồng NẠP OBC** (mỗi yêu cầu
-bị chặn ở 4,5 MB trong khi `売上伝票データ` nặng ~100 MB; nạp một quý mất ~88
-giây, vượt giới hạn thời gian chạy), **không phải vì phân quyền**. Ghi 60 số
-nguyên nằm thừa trong giới hạn đó. Và bản Vercel là bản chạy **duy nhất bắt
+**Bất biến:** `POST /ngan-sach` KHÔNG bị chế độ chỉ-đọc (`_chi_doc`) chặn —
+chủ ý, không phải sót. Lý do: `_chi_doc` (nay chỉ theo `KOME_CHI_DOC`; trước 045
+nó luôn bật trên Vercel) là công tắc của **luồng NẠP OBC**, **không phải phân
+quyền**. Ghi 60 số nguyên không dính gì tới giới hạn của luồng nạp. Và bản Vercel là bản chạy **duy nhất bắt
 buộc** có `KOME_SESSION_SECRET`, tức là nơi cờ quyền LUÔN được thi hành — máy
 trong công ty mới là nơi có thể không có cổng nào. Chặn màn nhập ở Vercel là
 lấy nó đi đúng ở chỗ nó an toàn nhất.
@@ -882,21 +897,23 @@ lần, đúng lớp lỗi của bất biến CTE-trùng đã ghi ở trên. Có 
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |
 |---|---|---|
-| Nạp / Hoàn tác | có | **không** |
+| Nạp / Hoàn tác | có (mọi cỡ file) | có — file ≤ 4 MB (hằng ngày); file chờ trong `meta.nap_cho`, **không** lưu file gốc (045) |
 | Đăng nhập | tài khoản riêng (bật khi có `KOME_SESSION_SECRET`) | **bắt buộc** (`KOME_SESSION_SECRET`) |
 | Cổng CSDL | 5432 (session pooler) | **6543** (transaction pooler) |
-| Gói cài | `pip install -e .` (có pandas) | `requirements.txt` (**không** pandas) |
+| Gói cài | `pip install -e .` | `requirements.txt` (có pandas từ 045) |
 | Điểm vào | `uvicorn kome.web.app:app` | `server.py` ở gốc (Vercel tự tìm) |
 
-Chế độ chỉ-đọc do biến `VERCEL` quyết định (`kome/web/app.py::_chi_doc`), không
-có công tắc tắt. Lý do là giới hạn nền tảng, không phải sở thích: mỗi yêu cầu
-bị chặn ở **4,5 MB** trong khi `売上伝票データ` nặng ~100 MB; ổ đĩa là tạm nên lớp
-`raw` không tồn tại được; nạp một quý mất ~88 giây, vượt giới hạn thời gian chạy.
+Chế độ chỉ-đọc do `KOME_CHI_DOC=1` quyết định (`kome/web/app.py::_chi_doc`), hoặc tự
+bật khi không có kết nối nạp (`DATABASE_URL`). Trước 045 nó LUÔN bật trên Vercel; nay
+bản Vercel nạp được file hằng ngày — xem bất biến 045. Giới hạn nền tảng vẫn còn: mỗi
+yêu cầu **4,5 MB** (`売上伝票データ` cả quý 63–106 MB), ổ đĩa tạm, giới hạn thời gian
+chạy — nên đối soát tháng vẫn ở máy công ty.
 
 **Bất biến:** `kome/web/app.py` KHÔNG được nhập `kome.pipeline` (hay pandas,
 python-calamine) ở mức ngoài cùng — chỉ nhập bên trong thân route. `ingest`/
-`undo_batch` kéo theo ~120 MB, mà `requirements.txt` của Vercel cố ý không có
-chúng, nên nhập ở đầu file sẽ làm trang chết ngay khi khởi động. Có test canh:
+`undo_batch` kéo theo ~120 MB; nhập ở đầu file là MỌI trang đọc (và mỗi lần khởi động
+nguội trên Vercel) trả giá cho thứ chỉ luồng nạp cần. Từ 045 `requirements.txt` CÓ
+pandas, nên lỗi này không còn làm trang chết — nó chỉ làm mọi trang chậm đi. Có test canh:
 `tests/test_bao_mat.py::test_trang_chi_doc_khong_phu_thuoc_pandas`.
 
 **Bất biến:** qua cổng 6543 phải tắt câu lệnh chuẩn bị sẵn (`prepare_threshold
@@ -944,8 +961,8 @@ không được hỏng vì không ghi được tên người bấm. Có test can
 **CẠM BẪY — cổng chỉ tồn tại khi có khoá ký.** Để trống `KOME_SESSION_SECRET`
 ở máy trong công ty là **không có đăng nhập và không có phân quyền**: ai mở
 được trang cũng bấm được nút Hoàn tác — nút xoá được cả một tháng doanh thu.
-Bản Vercel không dính (nó từ chối khởi động nếu thiếu khoá), nhưng bản Vercel
-cũng không nạp/hoàn tác được gì. Nói cách khác: **hai cờ quyền
+Bản Vercel không dính (nó từ chối khởi động nếu thiếu khoá — từ 045 nó cũng nạp và
+hoàn tác được, luôn sau cổng đăng nhập). Nói cách khác: **hai cờ quyền
 (`duoc_vao_kho_du_lieu` và `duoc_sua_ngan_sach`) chỉ bảo vệ được nút Hoàn tác
 và màn Ngân sách khi máy trong công ty CŨNG đặt `KOME_SESSION_SECRET`.**
 
