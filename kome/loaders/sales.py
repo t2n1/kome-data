@@ -50,11 +50,18 @@ def load(conn: psycopg.Connection, df: pd.DataFrame,
 
 def load_meisai(conn: psycopg.Connection, df: pd.DataFrame,
                  data_date: date, batch_id: int) -> int:
-    """売上明細表 (nguồn dự phòng) -- chỉ khác `load()` ở source="meisai".
+    """売上明細表 -- khác `load()` ở source="meisai" và hai cột đặt sẵn.
 
     Meisai không mang dữ liệu thanh toán (paid_amount không có trong file gốc),
     nhưng core.fact_sales_line yêu cầu NOT NULL. Đặt về 0 (= chưa ghi nhận
-    biên lai), phù hợp với DEFAULT của cột."""
+    biên lai), phù hợp với DEFAULT của cột.
+
+    `amount` của meisai là 税抜純売上高 (CHƯA thuế) nên `tax_amount` LUÔN = 0 --
+    ép ở đây chứ không "điền nếu thiếu": một tax_amount khác 0 đi kèm amount
+    chưa thuế là trừ thuế HAI lần khỏi doanh thu thuần (migration 046). Cột
+    không có trong file (case_qty, unit_cost, cost…) để NULL -- `load()` tự
+    điền None."""
     df = df.copy()
     df["paid_amount"] = 0
+    df["tax_amount"] = 0
     return load(conn, df, data_date, batch_id, source="meisai")

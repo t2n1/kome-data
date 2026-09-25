@@ -10005,16 +10005,6 @@
      ]
     },
     {
-     "core": "core.fact_sales_line.slip_type",
-     "he": "slip_type",
-     "ja": "伝票区分",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
      "core": "core.fact_sales_line.customer_code",
      "he": "customer_code",
      "ja": "得意先コード",
@@ -10138,16 +10128,6 @@
      ]
     },
     {
-     "core": "core.fact_sales_line.department_code",
-     "he": "department_code",
-     "ja": "部門コード",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
      "core": "core.fact_sales_line.product_code",
      "he": "product_code",
      "ja": "商品コード",
@@ -10211,16 +10191,6 @@
      ]
     },
     {
-     "core": "core.fact_sales_line.case_qty",
-     "he": "case_qty",
-     "ja": "入数",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
      "core": "core.fact_sales_line.qty",
      "he": "qty",
      "ja": "純売上数量",
@@ -10262,19 +10232,9 @@
      "view": []
     },
     {
-     "core": "core.fact_sales_line.unit_cost",
-     "he": "unit_cost",
-     "ja": "単位原価",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
      "core": "core.fact_sales_line.amount",
      "he": "amount",
-     "ja": "税込純売上高",
+     "ja": "税抜純売上高",
      "loai": "nap",
      "ly_do": "cột tổng tiền — cổng 4/5 đối chiếu",
      "ma": [
@@ -10338,84 +10298,6 @@
       "mart.ty_suat_mat_hang",
       "mart.uu_tien_lien_he"
      ]
-    },
-    {
-     "core": "core.fact_sales_line.tax_amount",
-     "he": "tax_amount",
-     "ja": "消費税額",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 29 chỉ số khác",
-     "ma": [
-      "kome/ban_do.py",
-      "kome/ban_khoang.py",
-      "kome/bao_cao.py",
-      "kome/coverage.py",
-      "kome/du_bao.py",
-      "kome/khach_hang.py",
-      "kome/khach_thang.py",
-      "kome/khoi_tong_quan.py",
-      "kome/lien_he.py",
-      "kome/san_pham.py",
-      "kome/tong_quan.py",
-      "kome/web/api.py"
-     ],
-     "man": [
-      "ban_do",
-      "bao_cao",
-      "chung",
-      "du_bao",
-      "ho_so",
-      "khach",
-      "kho_du_lieu",
-      "kho_hang",
-      "lien_he",
-      "san_pham",
-      "tong_quan"
-     ],
-     "view": [
-      "mart.ban_den_moc",
-      "mart.ban_theo_nganh_thang",
-      "mart.ban_theo_nganh_thang_so_sanh",
-      "mart.ban_theo_ngay",
-      "mart.ban_theo_nhan_vien",
-      "mart.ban_theo_nhan_vien_thang",
-      "mart.ban_theo_san_pham",
-      "mart.ban_theo_thang",
-      "mart.ban_theo_thang_so_sanh",
-      "mart.dong_ban",
-      "mart.hang_doanh_thu",
-      "mart.khach_360",
-      "mart.khach_mat_hang",
-      "mart.khach_nhom_viec",
-      "mart.khach_thang_nay",
-      "mart.khach_theo_thang",
-      "mart.khach_theo_tinh",
-      "mart.ky_cung_ky",
-      "mart.lan_mua",
-      "mart.nganh_ky_cung_ky",
-      "mart.san_pham_360",
-      "mart.san_pham_theo_thang",
-      "mart.tai_nhan_vien",
-      "mart.tap_trung_khach",
-      "mart.thang_den_hom_nay",
-      "mart.tien_do_cong_ty",
-      "mart.tien_do_ngan_sach",
-      "mart.toc_do_ban",
-      "mart.ton_theo_lo",
-      "mart.tong_theo_ky",
-      "mart.ty_suat_mat_hang",
-      "mart.uu_tien_lien_he"
-     ]
-    },
-    {
-     "core": "core.fact_sales_line.cost",
-     "he": "cost",
-     "ja": "売上原価",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
     },
     {
      "core": "core.fact_sales_line.gross_profit",
@@ -10484,16 +10366,6 @@
      "core": "core.fact_sales_line.gross_margin",
      "he": "gross_margin",
      "ja": "粗利益率",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": "core.fact_sales_line.tax_rate",
-     "he": "tax_rate",
-     "ja": "消費税率",
      "loai": "luu",
      "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
      "ma": [],

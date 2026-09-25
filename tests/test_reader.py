@@ -95,40 +95,65 @@ def test_o_trong_vao_csdl_la_null_that(conn, batch):
     assert n_null >= 1          # ô trống thật -> NULL thật
 
 
-def test_meisai_tu_sinh_line_seq_va_lay_dung_cot_trung_ten(tmp_path):
-    """売上明細表 không có 明細行番号, và có 2 cột CÙNG TÊN 荷姿区分コード (một
-    bản luôn có giá trị, một bản tra theo danh mục sản phẩm nên rỗng ở dòng
-    phụ phí/coupon không phải sản phẩm thật -- đã kiểm chứng trên dữ liệu
-    thật 2026-08-03: 0 lệch giữa 2 bản khi cả hai đều có dữ liệu).
+# Tiêu đề THẬT của bản xuất hằng ngày 売上明細表 (đo 2026-09-25): 20 cột, có hai
+# cặp trùng tên (売上日付, 売上区分).
+MEISAI_20_COT = [
+    "売上日付", "売上区分", "伝票No.", "売上日付", "売上区分コード", "売上区分",
+    "得意先コード", "得意先名", "担当者コード", "担当者名", "荷姿区分コード",
+    "荷姿区分名", "商品名", "商品コード", "日本語", "単価", "税抜純売上高",
+    "粗利益", "粗利益率", "純売上数量",
+]
 
-    pandas tự thêm hậu tố ".1" cho cột trùng thứ hai khi đọc -- khai tên
-    KHÔNG hậu tố trong config/files.yml là lấy đúng bản luôn có giá trị.
-    """
+
+def _dong_meisai(slip, ma, pack, don_gia, net, lai, sl):
+    return ["2026-09-25", "売上", slip, "2026-09-25", " 0", "売上",
+            "000000000106", "QUAN CO AN", "0104", "TRAN THI LAN THANH", pack,
+            "ケース（大：段ボール）", "Bot gao", ma, "米粉", don_gia, net, lai,
+            0.1, sl]
+
+
+def test_meisai_doc_duoc_mau_xuat_HANG_NGAY_20_cot(tmp_path):
+    """Bản xuất hằng ngày chỉ có 20 cột (không 税込純売上高 / 消費税額 / 入数 /
+    単位原価 / 売上原価 / 伝票区分 / 部門コード / 消費税率). Trước bản sửa 046 cổng
+    2 chặn cả file vì 8 cột đó. amount của meisai = 税抜純売上高."""
     import pandas as pd
-    cols = ["伝票No.", "得意先コード", "商品コード", "荷姿区分コード", "荷姿区分名",
-            "売上日付", "伝票区分", "担当者コード", "部門コード",
-            "入数", "純売上数量", "単価", "単位原価",
-            "税込純売上高", "消費税額", "売上原価", "粗利益", "粗利益率", "消費税率",
-            "荷姿区分コード", "荷姿区分名"]     # 2 cột cuối là bản trùng tên, để trống
     rows = [
-        # 2 dòng cùng 伝票No. 090001 -> phải được sinh line_seq 1, 2
-        ["090001", "000000009292", "XT07", "02", "ケース（大：段ボール）",
-         "2026-08-03", "債権計上", "0004", "0020", 1, 6, 5250, 3210,
-         31500, 2333, 19260, 9907, 0.3145, 0.08, "02", "ケース（大：段ボール）"],
-        ["090001", "000000009292", "XT08", "00", "バ　ラ（小：単品）",
-         "2026-08-03", "債権計上", "0004", "0020", 1, 2, 1000, 600,
-         2000, 148, 1200, 652, 0.326, 0.08, "00", "バ　ラ（小：単品）"],
-        # dòng phụ phí COD: mã không phải sản phẩm thật -> bản tra danh mục rỗng
-        ["090001", "000000009292", "000000000001", "00", "荷姿区分なし",
-         "2026-08-03", "債権計上", "0004", "0020", 1, 1, 300, 0,
-         300, 22, 0, 273, 1.0, 0.08, "", ""],
+        _dong_meisai("095805", "TK04", "02", 7680, 14222, 1502, 2),
+        _dong_meisai("095805", "DK17", "02", 7164, 6633, 2529, 1),
+        _dong_meisai("095806", "000000000001", "00", 300, -300, -300, 1),  # 赤伝: ÂM
     ]
-    df_out = pd.DataFrame(rows, columns=cols)
-    p = tmp_path / "売上明細表_20260803.xlsx"
-    df_out.to_excel(p, sheet_name="売上明細表", index=False)
+    p = tmp_path / "売上明細表_20260925.xlsx"
+    pd.DataFrame(rows, columns=MEISAI_20_COT).to_excel(p, sheet_name="売上明細表", index=False)
 
     doc = read(p, SPECS["meisai"])
 
-    assert list(doc["line_seq"]) == [1, 2, 3]
-    assert doc["pack_code"].tolist() == ["02", "00", "00"]   # bản LUÔN có giá trị
-    assert doc["amount"].sum() == 33_800
+    assert list(doc["line_seq"]) == [1, 2, 1]
+    assert doc["slip_no"].tolist() == ["095805", "095805", "095806"]
+    assert doc["customer_code"].tolist() == ["000000000106"] * 3   # giữ số 0 đầu
+    assert doc["amount"].tolist() == [14222, 6633, -300]          # 税抜, ÂM giữ nguyên
+    assert doc["qty"].tolist() == [2.0, 1.0, 1.0]
+    assert "tax_amount" not in doc.columns
+
+
+def test_meisai_ban_117_cot_cu_van_doc_duoc_va_lay_ban_DAU_cua_cot_trung_ten(tmp_path):
+    """Bản xuất cũ (2026-08-03) có 117 cột mà 20 cột ĐẦU giống hệt bản hằng ngày,
+    và lặp lại 荷姿区分コード ở phần sau (bản tra danh mục — RỖNG ở dòng phụ phí/
+    coupon). pandas thêm ".1" cho bản trùng thứ hai, nên khai tên không hậu tố
+    là lấy bản đầu, luôn có giá trị. amount vẫn là 税抜 dù file có 税込."""
+    import pandas as pd
+    cot = MEISAI_20_COT + ["消費税額", "伝票区分", "荷姿区分コード", "入数", "単位原価",
+                          "税込純売上高", "売上原価", "消費税率"]
+    rows = [
+        _dong_meisai("090001", "XT07", "02", 5250, 29167, 9907, 6)
+        + [2333, "債権計上", "02", 1, 3210, 31500, 19260, 0.08],
+        _dong_meisai("090001", "000000000001", "00", 300, 278, 278, 1)
+        + [22, "債権計上", "", 1, 0, 300, 0, 0.08],
+    ]
+    p = tmp_path / "売上明細表_20260803.xlsx"
+    pd.DataFrame(rows, columns=cot).to_excel(p, sheet_name="売上明細表", index=False)
+
+    doc = read(p, SPECS["meisai"])
+
+    assert list(doc["line_seq"]) == [1, 2]
+    assert doc["pack_code"].tolist() == ["02", "00"]   # bản LUÔN có giá trị
+    assert doc["amount"].tolist() == [29167, 278]      # 税抜, KHÔNG phải 税込

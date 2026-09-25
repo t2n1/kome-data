@@ -236,42 +236,39 @@ def test_uriage_va_meisai_khong_dung_do_khoa_ba_phan(conn, batch):
     assert r == [("meisai", 31500), ("uriage", 29167)]
 
 
-def test_meisai_tu_file_thuc_teu_khong_co_paid_amount(conn, batch, tmp_path):
-    """Hồi quy: meisai không mang paid_amount trong file gốc. Nếu không đặt
-    về 0 trong load_meisai(), INSERT sẽ bị NULL constraint violation vì
-    paid_amount là NOT NULL DEFAULT 0 -- DEFAULT chỉ áp khi cột OMIT, không
-    khi NULL được truyền rõ ràng.
-
-    Test này đi hết đường thật: file .xlsx -> read() -> load_meisai(),
-    không như test_load_meisai_ghi_source_dung dùng hand-built dataframe.
-    """
+def test_meisai_tu_file_that_20_cot_vao_csdl(conn, batch, tmp_path):
+    """Đi hết đường thật: file .xlsx mẫu xuất hằng ngày (20 cột) -> read() ->
+    load_meisai(). Hồi quy hai lỗi NOT NULL: paid_amount không có trong file
+    (DEFAULT chỉ áp khi OMIT cột, không khi truyền NULL), và từ 046 case_qty/
+    unit_cost/cost vắng mặt thì là NULL chứ không 0."""
     from kome.reader import read
+    from tests.test_reader import MEISAI_20_COT, _dong_meisai
 
-    # Tạo meisai-shaped .xlsx với dữ liệu thực (không có paid_amount column)
-    cols = ["伝票No.", "得意先コード", "商品コード", "荷姿区分コード", "荷姿区分名",
-            "売上日付", "伝票区分", "担当者コード", "部門コード",
-            "入数", "純売上数量", "単価", "単位原価",
-            "税込純売上高", "消費税額", "売上原価", "粗利益", "粗利益率", "消費税率",
-            "荷姿区分コード", "荷姿区分名"]
-    rows = [
-        ["090001", "000000009292", "XT07", "02", "ケース（大：段ボール）",
-         "2026-08-03", "債権計上", "0004", "0020", 1, 6, 5250, 3210,
-         31500, 2333, 19260, 9907, 0.3145, 0.08, "02", "ケース（大：段ボール）"],
-    ]
-    df_xlsx = pd.DataFrame(rows, columns=cols)
-    p = tmp_path / "売上明細表_20260803.xlsx"
-    df_xlsx.to_excel(p, sheet_name="売上明細表", index=False)
-
-    # Đọc qua reader (sẽ ko có cột paid_amount)
+    p = tmp_path / "売上明細表_20260925.xlsx"
+    pd.DataFrame([_dong_meisai("095805", "XT07", "02", 5250, 29167, 9907, 6)],
+                 columns=MEISAI_20_COT).to_excel(p, sheet_name="売上明細表", index=False)
     doc = read(p, SPECS["meisai"])
-    assert "paid_amount" not in doc.columns   # Xác nhận: real meisai ko có cột này
+    assert "paid_amount" not in doc.columns
 
-    # Load qua load_meisai (phải xử lý thêm paid_amount=0)
     b = batch(1)
-    assert sales.load_meisai(conn, doc, date(2026, 8, 3), b) == 1
+    assert sales.load_meisai(conn, doc, date(2026, 9, 25), b) == 1
 
-    # Kiểm chứng: dữ liệu lạch vào CSDL với source='meisai' và paid_amount=0
     r = conn.execute(
-        "SELECT slip_no, source, amount, paid_amount FROM core.fact_sales_line"
+        """SELECT slip_no, source, amount, tax_amount, paid_amount,
+                  case_qty, unit_cost, cost, slip_type
+             FROM core.fact_sales_line"""
     ).fetchone()
-    assert r == ("090001", "meisai", 31500, 0)
+    assert r == ("095805", "meisai", 29167, 0, 0, None, None, None, None)
+
+
+def test_meisai_doanh_thu_thuan_la_TAX_KHONG_bi_tru_hai_lan(conn, batch):
+    """amount của meisai đã là số CHƯA thuế -- load_meisai ÉP tax_amount = 0 kể
+    cả khi DataFrame lỡ mang theo một số thuế, không thì doanh thu thuần của
+    mọi view (amount - tax_amount) bị trừ thuế hai lần."""
+    b = batch(1)
+    sales.load_meisai(conn, pd.DataFrame([_meisai_line(amount=29167, batch_id=b)]),
+                      date(2026, 8, 3), b)
+    thuan = conn.execute(
+        "SELECT sum(doanh_thu_thuan) FROM mart.dong_ban"
+    ).fetchone()[0]
+    assert thuan == 29167

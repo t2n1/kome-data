@@ -55,6 +55,13 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
    `::test_hau_to_dung_voi_tung_ma_jis_ca_47_dong` (khẳng định hậu tố theo ĐÚNG
    `ma_jis` — `01`→道, `13`→都, `26`/`27`→府, 43 mã còn lại→県; một điều kiện
    "hậu tố nằm trong 都/道/府/県" cho `大阪県` lọt qua).
+8. `売上明細表` hằng ngày chỉ có **20 cột** (đo 2026-09-25; bản 2026-08-03 có 117,
+   20 cột đầu giống hệt) — KHÔNG có 税込純売上高 / 消費税額 / 売上原価 / 単位原価 /
+   入数 / 伝票区分 / 部門コード / 消費税率. Nên với `source = 'meisai'`,
+   `core.fact_sales_line.amount` = **税抜純売上高 (chưa thuế)** và `tax_amount = 0`
+   (ép trong `load_meisai`, migration `046`); các cột vắng là NULL. Doanh thu thuần
+   `amount - tax_amount` vẫn đúng ở cả hai nguồn, nhưng `amount` THÔ thì KHÔNG cùng
+   nghĩa — đừng bao giờ cộng thẳng `amount` qua `uriage` và `meisai`.
 
 ## Bốn vai trò CSDL (Task 13, `db/migrations/009_roles.sql`)
 Luật số một ("OBC chỉ đọc") không chỉ là quy ước trong code — nó là ràng

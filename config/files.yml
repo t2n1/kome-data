@@ -282,39 +282,43 @@ meisai:
   warn_total_spike: 5.0
   warn_total_drop: 0.2
   date_columns: [sales_date]
+  # MẪU XUẤT HẰNG NGÀY (đo thật 2026-09-25, `売上明細表_20260925.xlsx`): 20 cột,
+  # header dòng 1. Bản xuất cũ (2026-08-03) có 117 cột mà 20 cột ĐẦU giống hệt
+  # bản này -- nên chỉ khai đúng các cột CÓ trong bản 20 cột là nhận được cả
+  # hai. Tám cột bản cũ có mà bản mới không (伝票区分, 部門コード, 入数, 単位原価,
+  # 税込純売上高, 消費税額, 売上原価, 消費税率) chưa màn nào đọc; loader để
+  # NULL (xem migration 046), không ghi 0.
+  #
+  # DOANH THU: file chỉ có 税抜純売上高 (chưa thuế) -- `amount` của nguồn
+  # meisai là số CHƯA THUẾ và loader đặt `tax_amount = 0`, nên
+  # `amount - tax_amount` (định nghĩa doanh thu thuần của mọi view mart) vẫn
+  # đúng. Đo thật trên bản 117 cột: 税抜純売上高 = 税込純売上高 − 消費税額 ở
+  # 926/926 dòng. `amount` của nguồn uriage vẫn là số CÓ thuế -- đừng cộng
+  # thẳng `amount` qua hai nguồn.
   columns:
     伝票No.: slip_no
     売上日付: sales_date
-    伝票区分: slip_type
     得意先コード: customer_code
     担当者コード: salesperson_code
-    部門コード: department_code
     商品コード: product_code
     荷姿区分コード: pack_code
-    入数: case_qty
     純売上数量: qty
     単価: unit_price
-    単位原価: unit_cost
-    税込純売上高: amount
-    消費税額: tax_amount
-    売上原価: cost
+    税抜純売上高: amount
     粗利益: gross_profit
     粗利益率: gross_margin
-    消費税率: tax_rate
-  # 荷姿区分コード/名 xuất hiện HAI LẦN trong file gốc, CÙNG TÊN CỘT: một bản đi
-  # kèm ngay 商品名/商品コード ở đầu file (LUÔN có giá trị), một bản tra theo
-  # danh mục sản phẩm (RỖNG ở dòng phụ phí/coupon như 代引手数料, 値引きクーポン --
-  # không phải sản phẩm thật, ~24% số dòng trong mẫu đã kiểm). pandas tự
-  # thêm hậu tố ".1" cho cột trùng THỨ HAI khi đọc, nên khai tên KHÔNG hậu
-  # tố ở trên là lấy đúng bản luôn có giá trị -- đã kiểm chứng trên dữ liệu
-  # thật: 0/926 dòng lệch nhau giữa 2 bản khi cả hai đều có dữ liệu.
+  # 売上日付 / 売上区分 xuất hiện HAI LẦN (cột nhóm 集計軸 ở đầu + cột chi tiết),
+  # cùng giá trị. Ở bản 117 cột cũ, 荷姿区分コード/得意先コード/担当者コード cũng
+  # lặp lại ở phần sau (bản tra danh mục, RỖNG ở dòng phụ phí/coupon). pandas
+  # thêm hậu tố ".1" cho cột trùng THỨ HAI, nên khai tên KHÔNG hậu tố là lấy
+  # bản đầu -- bản luôn có giá trị.
   # Không có 請求先コード/請求日付/請求締日コード/入金額１/入金伝票No.１ trong file
   # gốc -- loader để các cột CSDL tương ứng là NULL/0 (xem kome/loaders/sales.py).
-  code_columns: [slip_no, customer_code, salesperson_code, department_code, product_code, pack_code]
-  money_columns: [unit_price, unit_cost, amount, tax_amount, cost, gross_profit]
+  code_columns: [slip_no, customer_code, salesperson_code, product_code, pack_code]
+  money_columns: [unit_price, amount, gross_profit]
   total_column: amount
-  qty_columns: [case_qty, qty]
-  rate_columns: [gross_margin, tax_rate]
+  qty_columns: [qty]
+  rate_columns: [gross_margin]
   required_date_columns: [sales_date]
 
 # 請求先元帳 — sổ công nợ theo BÊN NHẬN HOÁ ĐƠN (đợt 6, migration 038). Đo thật

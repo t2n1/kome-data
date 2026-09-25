@@ -71,6 +71,21 @@ CHÍNH vì có `明細行番号` (khoá dòng thật) và `入金額１`/`入金
 thu). `売上明細表` chỉ dùng khi KHÔNG lấy được `売上伝票データ` — xem
 `db/migrations/017_nguon_ban_hang_thay_the.sql` và `kome/loaders/sales.py`.
 
+## Mẫu xuất hằng ngày 20 cột (2026-09-25, migration 046)
+
+Bản xuất 売上明細表 hằng ngày hiện chỉ có **20 cột** (bản 2026-08-03 có 117 cột;
+20 cột đầu giống hệt). Tám cột bị cắt: 伝票区分, 部門コード, 入数, 単位原価,
+税込純売上高, 消費税額, 売上原価, 消費税率. `config/files.yml` mục `meisai` nay chỉ
+khai cột có trong bản 20 cột, nên nhận được cả bản mới lẫn bản cũ.
+
+- `amount` của nguồn meisai = **税抜純売上高** (chưa thuế), `tax_amount` = 0 (ép
+  trong `load_meisai`). Doanh thu thuần `amount - tax_amount` không đổi nghĩa —
+  đo trên bản 117 cột: 税抜純売上高 = 税込 − 消費税額 ở 926/926 dòng. `amount` THÔ
+  và tổng tiền lô (`meta.ingest_batch.total_amount`) của meisai là số CHƯA thuế,
+  còn của uriage là số CÓ thuế.
+- `case_qty`, `unit_cost`, `cost`, `slip_type`, `department_code`, `tax_rate`
+  của dòng meisai là NULL (không có trong file) — không phải 0.
+
 **Tên file khi xuất `売上明細表` để nạp qua `/nap`:** phải đặt tên đúng mẫu
 `売上明細表_YYYYMMDD.xlsx` (giống mọi loại file khác) — bản test gửi trong
 phiên này tên là `売上明細表.xlsx` (không có ngày), cổng 1 sẽ chặn nếu nạp
