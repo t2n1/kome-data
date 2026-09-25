@@ -263,7 +263,11 @@ meisai:
   display_name: 売上明細表
   core_table: core.fact_sales_line
   references: {customer_code: tokuisaki, product_code: shohin}
-  filename_pattern: '^売上明細表_(?P<date>\d{8})\.xlsx$'
+  # Nhận cả bản xuất NHIỀU NGÀY mà OBC đặt tên `売上明細表_20260901~24.xlsx`
+  # (ngày đầu 8 số, ngày cuối 2 số, cùng tháng; `~` hoặc `～`) — ngày dữ liệu
+  # của lô = ngày CUỐI, cùng nếp 請求先元帳. Lưới độ phủ đọc `sales_date` từng
+  # dòng nên mọi ngày trong khoảng vẫn được đánh dấu.
+  filename_pattern: '^売上明細表_(?:(?P<date>\d{8})|(?P<y>\d{4})(?P<m>\d{2})\d{2}[~～](?P<d>\d{2}))\.xlsx$'
   sheet: 売上明細表
   header_row: 1
   min_rows: 50

@@ -195,3 +195,16 @@ def test_lo_ghi_ngay_du_lieu_tu_ten_file(conn, tmp_path):
         (r.batch_id,),
     ).fetchone()[0]
     assert ngay == date(2026, 9, 16)
+
+
+def test_meisai_nhan_ten_co_khoang_ngay_ngay_du_lieu_la_ngay_CUOI():
+    """OBC xuất nhiều ngày một lần đặt tên `売上明細表_20260901~24.xlsx`
+    (ngày đầu đủ 8 số, ngày cuối chỉ 2 số, cùng tháng) — trước đây cổng 1
+    chặn vì mẫu chỉ nhận đúng 8 chữ số."""
+    from kome.pipeline import identify
+    for ten in ("売上明細表_20260901~24.xlsx", "売上明細表_20260901～24.xlsx"):
+        spec, d = identify(Path(ten))
+        assert spec is not None and spec.name == "meisai", ten
+        assert d == date(2026, 9, 24)
+    assert identify(Path("売上明細表_20260925.xlsx"))[1] == date(2026, 9, 25)
+    assert identify(Path("売上明細表_20260901~.xlsx")) == (None, None)
