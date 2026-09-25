@@ -59,11 +59,13 @@ kèm chú thích "không lưu file gốc (nạp trên web)".
   ở ô, câu: "File này X MB — quá lớn cho bản web (tối đa 4 MB). Nạp ở máy trong công ty."
   Giới hạn chỉ áp khi máy chủ báo `gioi_han_tai_len` trong `window.__KOME__` (Vercel);
   máy công ty không có giới hạn này.
-- **Ô "Nạp nhiều file"** gửi TỪNG FILE một yêu cầu `POST /upload/kiem` khi có giới hạn,
-  gộp kết quả ở trình duyệt, để tổng một yêu cầu không vượt trần. Xác nhận gửi danh sách
-  mã (nhỏ) như hiện nay.
-- Máy chủ vẫn phải chịu được yêu cầu vượt trần mà trình duyệt lọt: Vercel trả 413 trước
-  khi tới ứng dụng — màn nạp hiện câu tiếng Việt cho mã 413 thay vì trang lỗi trần.
+- **Ô "Nạp nhiều file"** kiểm TỔNG cỡ các file đã chọn; quá giới hạn thì không gửi và nhắc
+  thả từng file vào ô riêng của nó (mỗi ô loại file là một yêu cầu riêng). Chọn cách này
+  thay cho "gửi từng file bằng JavaScript" vì mọi biểu mẫu nạp là `<form method="post">`
+  thật và kết quả Kiểm do máy chủ vẽ — tách yêu cầu ở trình duyệt thì phải ghép kết quả
+  của nhiều trang, phức tạp mà ô riêng từng loại đã giải quyết.
+- Yêu cầu vượt trần mà trình duyệt lọt (không JS) thì Vercel trả trang 413 của nó trước khi
+  tới ứng dụng — chấp nhận, vì trình duyệt đã chặn ở ca thường.
 - **Quyền:** không đổi — `/upload*` và `/undo/*` vẫn sau `duoc_vao_kho_du_lieu`
   (middleware), và Vercel luôn bắt đăng nhập (`KOME_SESSION_SECRET` bắt buộc), nên cổng
   quyền ở Vercel chặt hơn máy công ty. Vercel cần thêm biến `DATABASE_URL`
