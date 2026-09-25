@@ -134,6 +134,31 @@ def test_health_liet_ke_ngay_lam_viec_bi_thieu(conn, test_db_url, batch):
     # cuối tuần 2026-05-09 (Bảy) / 2026-05-10 (CN) nằm ngoài kỳ, không được kể
 
 
+def test_health_liet_ke_THANG_trong_tren_ca_ky_du_lieu(conn, test_db_url, batch):
+    """Sự cố thật 2026-09-25: cả tháng 8/2026 không có dòng bán nào (7 từ
+    売上伝票データ, 9 từ 売上明細表). Soát 30 ngày chỉ thấy "thiếu 3 ngày" ở
+    đuôi tháng 8, còn mọi màn coi tháng đó là bán ¥0. Tháng trọn vẹn không có
+    dòng nào phải được nêu đích danh — dù nằm ngoài cửa sổ 30 ngày."""
+    from datetime import date
+    import pandas as pd
+    from kome.loaders import sales
+
+    b = batch(1)
+    rows = [{
+        "slip_no": f"0800{i}", "line_seq": 1, "sales_date": d,
+        "customer_code": "000000009292", "product_code": "XT07",
+        "pack_code": "02", "case_qty": 1, "qty": 6, "unit_price": 5250,
+        "unit_cost": 3210, "amount": 29167, "tax_amount": 2333,
+        "cost": 19260, "gross_profit": 9907, "paid_amount": 0, "batch_id": b,
+    } for i, d in enumerate((date(2026, 3, 31), date(2026, 5, 1)))]
+    sales.load(conn, pd.DataFrame(rows), date(2026, 5, 1), b)
+
+    client = TestClient(create_app(db_url=test_db_url))
+    ky = man(client.get("/health").text)["ky"]
+    assert ky["thang_trong"] == ["2026-04"]       # 3 và 5 có dòng, 4 trống hẳn
+    assert "thang_trong" in nguon("he_thong", "KhoDuLieu.tsx")
+
+
 def test_loi_ngoai_du_kien_hien_tieng_viet_khong_lo_chuoi_ngoai_le(
         conn, test_db_url, monkeypatch):
     """Nửa NHÌN THẤY ĐƯỢC của lỗi lô mồ côi: người dùng gặp trang 500 tiếng Anh
@@ -324,7 +349,7 @@ def test_trang_chu_canh_bao_hom_nay_chua_co_du_lieu(conn, test_db_url, monkeypat
     assert r.status_code == 200
     t = _tuoi_khoi_dau(r.text)
     assert t["co_thieu"] is True
-    assert {n["ten"] for n in t["nguon"] if n["trang_thai"] == "do"} >= {"在庫一覧", "得意先全情報", "売上伝票データ"}
+    assert {n["ten"] for n in t["nguon"] if n["trang_thai"] == "do"} >= {"在庫一覧", "得意先全情報", "売上明細表"}   # file bán hằng ngày từ 2026-09-24
     from pathlib import Path
     ve = (Path(__file__).resolve().parents[1] / "giao_dien/src/tong_quan/DaiTuoi.tsx").read_text(encoding="utf-8")
     assert "Chưa có dữ liệu hôm nay" in ve and "Chưa tới giờ xuất file" in ve

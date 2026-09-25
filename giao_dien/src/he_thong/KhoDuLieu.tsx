@@ -13,7 +13,7 @@
 // 4,5 MB mỗi yêu cầu: trình duyệt chặn file quá KD.gioi_han_tai_len trước khi gửi.
 import { useState } from "react";
 import { KD } from "../khoi_dau";
-import { so, yen } from "../dinh_dang";
+import { gio_tokyo, so, yen } from "../dinh_dang";
 import { DaiTuoi } from "../tong_quan/DaiTuoi";
 import { KhungKho } from "./TabKho";
 import "./he_thong.css";
@@ -33,7 +33,7 @@ type Kiem = { ma: string | null; ten_file: string; o: string; spec_name: string 
   cong: { so: number; ten: string; trang_thai: "dat" | "chan" | "canh" | "khong_chay"; loi: string[] }[] };
 type Man = {
   status: { name: string; spec: string; last: string | null; rows: number; total: number; co_tien: boolean }[];
-  ky: { dau: string | null; cuoi: string | null; thieu: string[]; tu?: string };
+  ky: { dau: string | null; cuoi: string | null; thieu: string[]; tu?: string; thang_trong?: string[] };
   backup: { stale: boolean; last: string | null } | null;
   nguon: Nut[];
   o_so: { nhan: string; gia: number; phu: string; mau: string }[];
@@ -46,7 +46,8 @@ type Man = {
 };
 type ManNap = { nguon: Nut[]; lo: Lo[]; cho: { ma: string; ten_file: string; o: string; luc: string }[]; kiem?: Kiem[]; results?: Ket[] };
 
-const gio = (iso: string | null) => iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)}` : "";
+// Giờ Tokyo, không cắt chuỗi ISO (sẽ ra giờ UTC) — dinh_dang.gio_tokyo.
+const gio = (iso: string | null) => gio_tokyo(iso);
 const nhanThang = (t: string) => `${+t.slice(5)}/${t.slice(0, 4)}`;
 
 // ---------------------------------------------------------------------------
@@ -303,10 +304,14 @@ function SucKhoe({ m }: { m: Man }) {
         : <div className="backup-ok">✅ Sao lưu gần nhất: {gio(b.last)}</div>}
       {k.cuoi ? <>
         <div className="ky">📅 Kỳ dữ liệu bán hàng: <strong>{k.dau}</strong> → <strong>{k.cuoi}</strong></div>
+        {(k.thang_trong ?? []).length > 0 && <div className="ngay-thieu">⚠️ <strong>Cả tháng không có dòng bán nào:</strong>{" "}
+          {k.thang_trong!.map((t, i) => <span key={t}><strong>{t}</strong>{i < k.thang_trong!.length - 1 ? " · " : ""}</span>)}
+          <br />Mọi màn đang coi các tháng này là bán ¥0 — "tháng trước", nhịp mua, tốc độ bán, dự báo đều lệch theo. Xuất
+          売上明細表 của trọn tháng đó từ OBC rồi kéo–thả vào trang nạp.</div>}
         {k.thieu.length > 0 && <div className="ngay-thieu">⚠️ <strong>Thiếu {k.thieu.length} ngày làm việc</strong> trong khoảng {k.tu} → {k.cuoi}:{" "}
           {k.thieu.map((d, i) => <span key={d}><strong>{d}</strong>{i < k.thieu.length - 1 ? " · " : ""}</span>)}
           <br />Ngày lễ quốc gia đã được bỏ qua — kiểm tra xem hôm đó công ty có nghỉ riêng (Obon, cuối năm) không. Nếu không, xuất lại
-          売上伝票データ của đúng ngày đó từ OBC rồi kéo–thả vào trang nạp.</div>}
+          売上明細表 của đúng ngày đó từ OBC rồi kéo–thả vào trang nạp.</div>}
       </> : <div className="ky">📅 Chưa có dòng bán hàng nào — chưa xác định được kỳ dữ liệu.</div>}
       <div className="bang-cuon"><table>
         <thead><tr><th>Loại file</th><th>Nạp lần cuối</th><th>Số dòng</th><th>Tổng tiền</th></tr></thead>

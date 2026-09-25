@@ -1,6 +1,6 @@
 # kome/web/app.py
 import os, shutil, sys, tempfile, traceback
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, Form, UploadFile, Request
@@ -168,20 +168,28 @@ def _ky_du_lieu(conn) -> dict:
         "SELECT min(sales_date), max(sales_date) FROM core.fact_sales_line"
     ).fetchone()
     if cuoi is None:
-        return {"dau": None, "cuoi": None, "thieu": []}
+        return {"dau": None, "cuoi": None, "thieu": [], "thang_trong": []}
     tu = max(dau, cuoi - timedelta(days=SO_NGAY_SOAT - 1))
-    thieu = [
-        r[0] for r in conn.execute(
-            """SELECT d.ngay FROM mart.lich_kinh_doanh d
-               WHERE d.la_ngay_kd
-                 AND d.ngay BETWEEN %s AND %s
-                 AND NOT EXISTS (SELECT 1 FROM core.fact_sales_line f
-                                 WHERE f.sales_date = d.ngay)
-               ORDER BY d.ngay""",
-            (tu, cuoi),
-        ).fetchall()
-    ]
-    return {"dau": dau, "cuoi": cuoi, "thieu": thieu, "tu": tu}
+    # Cùng MỘT lượt hỏi: ngày thiếu trong SO_NGAY_SOAT ngày gần nhất, VÀ những
+    # THÁNG trọn vẹn không có dòng bán nào trên cả kỳ dữ liệu. Chỉ soát 30 ngày
+    # thì cả tháng 8/2026 thiếu (sự cố thật 2026-09-25) chỉ lộ ra thành "thiếu
+    # 3 ngày" ở đuôi, còn mọi màn lặng lẽ coi tháng đó là bán ¥0.
+    rows = conn.execute(
+        """WITH d AS (
+             SELECT l.ngay, to_char(l.ngay, 'YYYY-MM') AS thang,
+                    EXISTS (SELECT 1 FROM core.fact_sales_line f
+                             WHERE f.sales_date = l.ngay) AS co
+             FROM mart.lich_kinh_doanh l
+             WHERE l.la_ngay_kd AND l.ngay BETWEEN %s AND %s)
+           SELECT 'ngay', ngay::text FROM d WHERE NOT co AND ngay >= %s
+           UNION ALL
+           SELECT 'thang', thang FROM d GROUP BY thang HAVING NOT bool_or(co)
+           ORDER BY 1, 2""",
+        (dau, cuoi, tu),
+    ).fetchall()
+    thieu = [date.fromisoformat(r[1]) for r in rows if r[0] == "ngay"]
+    thang_trong = [r[1] for r in rows if r[0] == "thang"]
+    return {"dau": dau, "cuoi": cuoi, "thieu": thieu, "tu": tu, "thang_trong": thang_trong}
 
 
 

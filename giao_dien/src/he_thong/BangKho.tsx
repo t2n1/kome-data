@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { KD } from "../khoi_dau";
 import { lay } from "../api";
-import { so, yen } from "../dinh_dang";
+import { gio_tokyo, so, yen } from "../dinh_dang";
 import { KhungKho } from "./TabKho";
 import "./he_thong.css";
 
@@ -22,7 +22,8 @@ const TAB = [["du-lieu", "Dữ liệu"], ["cot", "Cột & khoá"], ["nap", "Lầ
 const SO = /^(integer|bigint|smallint|numeric.*|double precision|real)$/;
 // Tách hàng nghìn CHỈ cho cột tiền / lượng (bigint, numeric…) — integer là năm, tháng, số thứ tự: "2.024" là sai.
 const SO_NHOM = /^(bigint|numeric.*|double precision|real)$/;
-const gio = (iso: string | null) => iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)}` : "";
+// Giờ Tokyo, không cắt chuỗi ISO (sẽ ra giờ UTC) — dinh_dang.gio_tokyo.
+const gio = (iso: string | null) => gio_tokyo(iso);
 
 function oGia(v: unknown, kieu: string) {
   if (v === null || v === undefined) return <span className="khong-ap-dung">∅</span>;

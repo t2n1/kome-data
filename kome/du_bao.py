@@ -91,6 +91,12 @@ def _day_du(ngay_thang: list[Ngay], tu: date) -> bool:
     đó không có dòng nào để đọc cờ.)"""
     if any(n.dt is None for n in ngay_thang):
         return False
+    # Tháng KHÔNG có đồng nào = tháng chưa nạp, không phải tháng bán ¥0:
+    # `mart.ban_theo_ngay` điền 0 cho mọi ngày không có dòng, nên thiếu hẳn
+    # tháng 8/2026 (sự cố thật 2026-09-25) từng lọt vào làm tháng đối chiếu —
+    # hệ số cơ sở ×0,96 thay vì ~×1,11, và "thận trọng" (tỷ số nhỏ nhất) = 0.
+    if not any(n.dt for n in ngay_thang):
+        return False
     dau = ngay_thang[0].ngay.replace(day=1)
     if dau < tu <= ngay_thang[-1].ngay:
         d = dau

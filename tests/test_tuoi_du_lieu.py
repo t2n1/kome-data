@@ -106,3 +106,24 @@ def test_co_du_lieu_hom_nay_thi_tre_bang_khong(conn):
 def test_chua_nap_bao_gio_thi_khong_tinh_duoc_so_ngay_tre(conn):
     t = tinh_tuoi(conn, _luc(2026, 9, 17, 14, 0))
     assert t.nguon[0].tre is None
+
+
+def test_o_ban_hang_nhan_ca_meisai_lan_uriage(conn):
+    """Từ 2026-09-24 file bán hằng ngày là 売上明細表 (meisai); 売上伝票データ
+    (uriage) chỉ còn xuất theo quý. Sự cố thật 2026-09-25: đã nạp 売上明細表 hôm
+    nay mà ô vẫn đỏ "売上伝票データ trễ 36 ngày" vì ô chỉ đọc uriage."""
+    _lo(conn, "uriage", date(2026, 7, 31))
+    for spec in ("zaiko", "tokuisaki", "meisai"):
+        _lo(conn, spec, THU_NAM)
+    t = tinh_tuoi(conn, _luc(2026, 9, 17, 14, 0))
+    ban = t.nguon[2]
+    assert ban.spec == "meisai" and ban.trang_thai == "xanh" and ban.ngay == THU_NAM
+    assert t.co_thieu is False
+
+
+def test_o_ban_hang_lay_ngay_MOI_NHAT_cua_hai_loai(conn):
+    _lo(conn, "meisai", date(2026, 9, 10))
+    _lo(conn, "uriage", date(2026, 9, 14))
+    t = tinh_tuoi(conn, _luc(2026, 9, 17, 14, 0))
+    assert t.nguon[2].ngay == date(2026, 9, 14)
+    assert t.nguon[0].ngay is None      # zaiko không mượn ngày của ô khác
