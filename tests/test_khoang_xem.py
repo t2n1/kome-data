@@ -131,3 +131,42 @@ def test_pham_vi_tu_csdl(conn, batch):
     assert [(k.company_fy, k.so_ky, k.tu, k.den) for k in pv.ky] == [
         (2025, 6, date(2025, 7, 30), date(2025, 7, 31)),
         (2026, 7, date(2025, 8, 1), date(2025, 8, 2))]
+
+
+# ---- Khoảng ĐÃ QUA mà ngày cuối không có phiếu bán (2026-09-26) ------------
+# Xem ?thang=2026-07 khi kho đã có dữ liệu tới 10/8: mốc = 31/7, nhưng ngày bán
+# cuối ≤ mốc là thứ Sáu 29/7 (30–31/7 là cuối tuần). Tháng 7 đã hết — nó phải là
+# tháng TRỌN, so với TRỌN tháng 7 năm trước và trọn tháng 6; trước bản sửa nó
+# dừng ở 29/7, `tron_thang` False, và phép so cắt mất 30–31/7/2025 và 30/6.
+PV_LUI = KX.PhamVi(ngay_dau=date(2025, 3, 3), hom_nay=date(2026, 7, 29), ky=(
+    KX.KyDl(2025, 6, date(2025, 3, 3), date(2025, 7, 31)),
+    KX.KyDl(2026, 7, date(2025, 8, 1), date(2026, 7, 29))), hom_nay_that=date(2026, 8, 10))
+
+
+def test_thang_da_qua_ket_thuc_cuoi_tuan_van_la_thang_tron():
+    k = KX.giai(PV_LUI, KX.ThamSo(thang="2026-07"))
+    assert (k.tu, k.den, k.tron_thang) == (date(2026, 7, 1), date(2026, 7, 31), True)
+    nt, tt = k.so_sanh
+    assert (nt.tu, nt.den) == (date(2025, 7, 1), date(2025, 7, 31))
+    assert (tt.tu, tt.den) == (date(2026, 6, 1), date(2026, 6, 30))
+    assert k.hom_nay == date(2026, 7, 29) and k.dang_lui   # "tính đến" vẫn là ngày bán cuối
+
+
+def test_ky_da_qua_ket_thuc_cuoi_tuan_so_tron_ky():
+    k = KX.giai(PV_LUI, KX.ThamSo(ky=2026))
+    assert (k.tu, k.den) == (date(2025, 8, 1), date(2026, 7, 31))
+    (nt,) = k.so_sanh
+    assert nt.den == date(2025, 7, 31)
+
+
+def test_khoang_tu_chon_da_qua_khong_bi_cat_o_ngay_ban_cuoi():
+    k = KX.giai(PV_LUI, KX.ThamSo(tu=date(2026, 7, 20), den=date(2026, 7, 31)))
+    assert (k.tu, k.den) == (date(2026, 7, 20), date(2026, 7, 31))
+    assert not k.ghi_chu
+
+
+def test_thang_dang_chay_van_dung_o_ngay_ban_cuoi():
+    """Không có dữ liệu sau mốc (đang xem tháng hiện tại) — giữ luật cũ."""
+    pv = KX.PhamVi(PV_LUI.ngay_dau, date(2026, 7, 29), PV_LUI.ky, hom_nay_that=date(2026, 7, 29))
+    k = KX.giai(pv, KX.ThamSo(thang="2026-07"))
+    assert (k.den, k.tron_thang) == (date(2026, 7, 29), False)

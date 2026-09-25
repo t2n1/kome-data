@@ -73,6 +73,8 @@ tokuisaki:
   # 郵便番号 (postcode) PHẢI là TEXT: mã bưu chính Nhật có số 0 đầu (vùng Hokkaido
   # bắt đầu bằng 0) — OBC đã có sẵn lỗi mất số 0 đầu ở một số dòng, ép kiểu số sẽ
   # làm hỏng thêm. code_columns đảm bảo strip + không bị coerce sang số.
+  # Mã phụ trách luôn 4 chữ số — ô số trong Excel mất số 0 đầu (xem config.py::code_width).
+  code_width: {salesperson_code: 4}
   code_columns: [customer_code, rank_code, salesperson_code, closing_day_code, postcode,
                  transfer_account]
   money_columns: []
@@ -131,6 +133,8 @@ uriage:
   # phiếu, không phải mã nghiệp vụ tra cứu chéo hệ thống, nên không có bẫy
   # mất số 0 đầu — cột CSDL tương ứng vẫn là integer (xem 007_fact_sales.sql),
   # Postgres tự ép "1" -> 1 khi insert.
+  # Mã phụ trách luôn 4 chữ số — ô số trong Excel mất số 0 đầu (xem config.py::code_width).
+  code_width: {salesperson_code: 4}
   code_columns: [slip_no, line_seq, slip_type, customer_code, billing_customer_code,
                  salesperson_code, department_code, shipto_code, product_code, pack_code,
                  payment_slip_no, closing_day_code]
@@ -318,6 +322,8 @@ meisai:
   # bản đầu -- bản luôn có giá trị.
   # Không có 請求先コード/請求日付/請求締日コード/入金額１/入金伝票No.１ trong file
   # gốc -- loader để các cột CSDL tương ứng là NULL/0 (xem kome/loaders/sales.py).
+  # Mã phụ trách luôn 4 chữ số — ô số trong Excel mất số 0 đầu (xem config.py::code_width).
+  code_width: {salesperson_code: 4}
   code_columns: [slip_no, customer_code, salesperson_code, product_code, pack_code]
   money_columns: [unit_price, amount, gross_profit]
   total_column: amount

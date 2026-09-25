@@ -113,6 +113,8 @@ def read(path: Path, spec: FileSpec) -> pd.DataFrame:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0).astype("float64")
     for col in spec.code_columns:
         df[col] = df[col].fillna("").astype("object").str.strip()
+    for col, rong in spec.code_width.items():
+        df[col] = df[col].map(lambda v: v.zfill(rong) if v.isdigit() and len(v) < rong else v)
 
     # Sổ cái (元帳): kỳ, đối chiếu 【合計】, bỏ dòng tổng phụ — kome/so_cai.py.
     if spec.so_cai_truc:

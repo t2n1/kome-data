@@ -308,17 +308,25 @@ def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
     ghi_chu: list[str] = []
     thang = None
     tron = False
+    # Chân trời cắt khoảng. `pv.hom_nay` = ngày BÁN cuối ≤ mốc; khi kho đã có dữ
+    # liệu SAU mốc (xem lùi) thì khoảng đã qua hẳn — nó kết thúc ở CHÍNH mốc, không
+    # ở ngày bán cuối: tháng kết thúc Chủ nhật mà dừng ở thứ Sáu là tháng "dở
+    # dang", và phép so cắt mất hai ngày cuối của tháng đối chiếu (sự cố 2026-09-26).
+    # `hom_nay` của khoảng (nhãn "tính đến") vẫn là ngày bán cuối.
+    moc = ts.moc()
+    bien = moc if (moc is not None and pv.hom_nay_that is not None
+                   and pv.hom_nay_that > moc > pv.hom_nay) else pv.hom_nay
     if ts.loai in ("mac_dinh", "thang"):
         if ts.thang:
             y, m = int(ts.thang[:4]), int(ts.thang[5:])
         else:
             y, m = pv.hom_nay.year, pv.hom_nay.month
         tu = date(y, m, 1)
-        if tu < _dau_thang(pv.ngay_dau) or tu > pv.hom_nay:
+        if tu < _dau_thang(pv.ngay_dau) or tu > bien:
             raise LoiKhoang(f"Tháng {m}/{y} không có trong kho dữ liệu "
                             f"({_n(pv.ngay_dau)} → {_n(pv.hom_nay)}).")
         cuoi = _cuoi_thang(y, m)
-        den = min(cuoi, pv.hom_nay)
+        den = min(cuoi, bien)
         tron = den == cuoi
         thang = f"{y:04d}-{m:02d}"
         loai, nhan = "thang", f"Tháng {m}/{y}"
@@ -335,7 +343,7 @@ def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
         k = next((x for x in pv.ky if x.company_fy == ts.ky), None)
         if k is None:
             raise LoiKhoang(f"Kỳ kết thúc 7/{ts.ky} không có trong kho dữ liệu.")
-        tu, den = k.tu, k.den
+        tu, den = k.tu, max(k.den, min(bien, date(k.company_fy, 7, 31)))
         loai = "ky"
         nhan = f"Kỳ {k.so_ky} (8/{k.company_fy - 1} → 7/{k.company_fy})"
         tu_ss, tu_nay = _tru_nam(tu), tu
@@ -346,7 +354,7 @@ def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
         if tu > date(k.company_fy - 1, 8, 1) or den < date(k.company_fy, 7, 31):
             ghi_chu.append(f"Kỳ này mới có dữ liệu {_dai(tu, den)}.")
     else:
-        tu, den = max(ts.tu, pv.ngay_dau), min(ts.den, pv.hom_nay)
+        tu, den = max(ts.tu, pv.ngay_dau), min(ts.den, bien)
         if tu > den:
             raise LoiKhoang(f"Khoảng ngày nằm ngoài kho dữ liệu "
                             f"({_n(pv.ngay_dau)} → {_n(pv.hom_nay)}).")

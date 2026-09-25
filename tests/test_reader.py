@@ -157,3 +157,32 @@ def test_meisai_ban_117_cot_cu_van_doc_duoc_va_lay_ban_DAU_cua_cot_trung_ten(tmp
     assert list(doc["line_seq"]) == [1, 2]
     assert doc["pack_code"].tolist() == ["02", "00"]   # bản LUÔN có giá trị
     assert doc["amount"].tolist() == [29167, 278]      # 税抜, KHÔNG phải 税込
+
+
+# ---- Mã phụ trách mất số 0 đầu (2026-09-26) ---------------------------------
+# `得意先全情報_20260925.xlsx` có 40 khách mà ô 売上主担当者コード là Ô SỐ trong
+# Excel: đọc dtype=str ra "104" chứ không "0104", khách đó không khớp người phụ
+# trách nào. Mã phụ trách luôn 4 chữ số (core.dim_salesperson) — `code_width`
+# trong files.yml thêm số 0 bên trái cho mã TOÀN CHỮ SỐ ngắn hơn.
+
+def test_ma_phu_trach_o_so_duoc_them_so_0_ben_trai(tmp_path):
+    import pandas as pd
+    spec = SPECS["tokuisaki"]
+    cot = list(spec.columns)
+    rows = []
+    for ma, sale in (("202609240002", 104), ("202609240001", 4), ("000000000106", "0104"),
+                     ("202609250009", ""), ("202609250010", "A12")):
+        r = {c: "" for c in cot}
+        r.update({"得意先コード": ma, "得意先名": "X", "売上主担当者コード": sale})
+        rows.append(r)
+    p = tmp_path / "得意先全情報_20260925.xlsx"
+    pd.DataFrame(rows, columns=cot).to_excel(p, sheet_name=spec.sheet, index=False)
+    doc = read(p, spec)
+    assert doc["salesperson_code"].tolist() == ["0104", "0004", "0104", "", "A12"]
+
+
+def test_moi_spec_co_ma_phu_trach_deu_khai_do_rong_4():
+    for ten, s in SPECS.items():
+        if "salesperson_code" in s.code_columns:
+            assert s.code_width.get("salesperson_code") == 4, ten
+    assert all(set(s.code_width) <= set(s.code_columns) for s in SPECS.values())

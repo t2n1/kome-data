@@ -451,9 +451,8 @@ Có test canh: `tests/test_khach_thang.py::test_ba_cho_doc_tra_CUNG_MOT_tap_khac
 mã ngắn, `009…`/`999…` — ~1.700/2.980 mã) → NULL, KHÔNG BAO GIỜ là khách mới. Khối Tổng quan
 `khach_moi` đọc `mart.khach_moi_khoang(tu, den)` (đơn đầu qua `mart.lan_mua` ← `ban_den_moc`, nên
 "chưa có đơn" là tính đến mốc). Khác nhóm `'moi'` của `mart.khach_nhom_viec` (đơn ĐẦU trong 90
-ngày mà đã im) — hai khái niệm, hai tên, khối in `CACH_TINH_KHACH_MOI`. Khoảng đã qua: đếm đăng
-ký tới `ThamSo.moc()` chứ không tới `kx.den` (ngày BÁN cuối — tháng kết thúc Chủ nhật dừng ở
-thứ Sáu). Có test canh: `tests/test_khach_moi.py`. **Migration 044 phải chạy TRƯỚC khi triển khai.**
+ngày mà đã im) — hai khái niệm, hai tên, khối in `CACH_TINH_KHACH_MOI`. Khoảng đã qua kết thúc ở
+chính mốc (xem bất biến Khoảng xem), nên khách đăng ký cuối tuần cuối tháng không rơi mất. Có test canh: `tests/test_khach_moi.py`. **Migration 044 phải chạy TRƯỚC khi triển khai.**
 
 **Bất biến:** khách OBC đã đánh dấu `※廃業※` / `※取引停止※` trong TÊN (281/2.077
 khách) không bao giờ vào danh sách gọi lại. Doanh nghiệp đã phá sản thì im lặng
@@ -783,7 +782,11 @@ gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hi�
   liền trước. Tháng dở dang so CÙNG DẢI NGÀY (29/2 → 28/2, đúng `mart.thang_den_hom_nay`),
   tháng trọn so trọn tháng; Kỳ so trên các tháng CẢ HAI phía có dữ liệu (đúng
   `mart.ky_cung_ky`). Phép so vào trước dải dữ liệu → `co = false`, màn in "không có dữ liệu
-  để so". Giao diện KHÔNG tự tính ngày so sánh (`giao_dien/src/khung/khoang.ts` chỉ đọc/ghi
+  để so". Khoảng ĐÃ QUA (kho có dữ liệu sau mốc) kết thúc ở CHÍNH mốc, không ở ngày bán
+  cuối ≤ mốc (`giai`, biến `bien`): tháng kết thúc Chủ nhật mà dừng ở thứ Sáu là tháng "dở
+  dang" và phép so cắt mất ngày cuối của tháng đối chiếu (sửa 2026-09-26, test canh
+  `tests/test_khoang_xem.py::test_thang_da_qua_ket_thuc_cuoi_tuan_van_la_thang_tron`).
+  Giao diện KHÔNG tự tính ngày so sánh (`giao_dien/src/khung/khoang.ts` chỉ đọc/ghi
   URL và in `mo_ta` của máy chủ).
 - **Chỉ số theo khoảng vẫn ở `mart`**: hàm `mart.*_khoang(tu, den)` (`LANGUAGE sql STABLE`,
   gộp thẳng vào câu gọi). `kome/ban_khoang.py` chỉ hỏi chúng và dựng lại hình dạng của

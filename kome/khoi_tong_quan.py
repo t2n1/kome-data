@@ -424,12 +424,9 @@ def khach_moi(conn, sale=None, ts=None) -> dict:
     if kx is None:
         return {"khoang": None, "so_khach": 0, "da_mua": 0, "chua_mua": 0, "so_sanh": [],
                 "thang": [], "khach": [], "cach_tinh": CACH_TINH_KHACH_MOI}
-    # Khoảng ĐÃ QUA (đang xem lùi): `kx.den` là ngày BÁN cuối ≤ cuối khoảng — tháng
-    # kết thúc vào Chủ nhật thì dừng ở thứ Sáu, và khách đăng ký thứ Bảy/Chủ nhật
-    # rơi khỏi cả tháng đó lẫn tháng sau. Đăng ký không cần ngày có bán: đếm tới
-    # đúng ngày cuối khoảng (`ThamSo.moc`). Khoảng đang chạy thì vẫn `kx.den`.
-    moc = ts.moc() if ts is not None else None
-    den = moc if moc and kx.dang_lui and moc > kx.den else kx.den
+    # Khoảng đã qua kết thúc ở chính mốc (khoang_xem.giai), nên khách đăng ký
+    # cuối tuần cuối tháng vẫn nằm trong tháng đó.
+    den = kx.den
     d12 = date(den.year - (den.month <= 11), (den.month - 12) % 12 + 1, 1)
     tu_min = min([kx.tu, d12] + [s.tu for s in kx.so_sanh if s.co])
     rows = conn.execute(
@@ -452,7 +449,7 @@ def khach_moi(conn, sale=None, ts=None) -> dict:
         "chua_mua": sum(1 for r in nay if not r[8]),
         "so_sanh": [{"ma": s.ma, "nhan": s.nhan, "co": s.co, "tu": s.tu, "den": s.den,
                      "so_khach": dem(s.tu, s.den) if s.co else None,
-                     "so_khach_nay": dem(s.tu_nay, den if s.den_nay == kx.den else s.den_nay)} for s in kx.so_sanh],
+                     "so_khach_nay": dem(s.tu_nay, s.den_nay)} for s in kx.so_sanh],
         "thang": thang,
         "khach": [{"ma": r[0], "ten": r[1], "sale": r[2], "ten_sale": r[3], "ngay_dang_ky": r[4],
                    "lan_dau": r[5], "so_ngay_mua": r[6], "doanh_thu": int(r[7] or 0),

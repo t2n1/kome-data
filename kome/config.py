@@ -58,6 +58,12 @@ class FileSpec:
     # hay '得意先'). Khác None thì reader giao file cho kome/so_cai.py: đọc kỳ,
     # đối chiếu tổng, bỏ dòng tổng phụ. Hai loại sổ dùng CHUNG tên sheet.
     so_cai_truc: str | None = None
+    # Độ rộng CỐ ĐỊNH của cột mã: {cột: số ký tự}. Reader thêm số 0 bên trái cho
+    # giá trị TOÀN CHỮ SỐ ngắn hơn — ô Excel kiểu SỐ đọc dtype=str ra "104" chứ
+    # không "0104" (bẫy #1; 40 khách của 得意先全情報_20260925). Chỉ khai cho mã có
+    # độ rộng thật sự cố định (mã phụ trách = 4); mã khách thì KHÔNG (có mã ngắn
+    # hợp lệ như '9996').
+    code_width: dict[str, int] = field(default_factory=dict)
 
 def load_specs(path: Path) -> dict[str, FileSpec]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
