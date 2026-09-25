@@ -3,12 +3,14 @@
 // dữ liệu, lộ trình §4.1): hiện mờ, không bấm được — không giả vờ có. Bốn màn
 // bị cắt khỏi phạm vi (lộ trình §4.2: web đặt hàng khách, mẫu chứng từ, thị
 // trường & đối thủ, sale mobile) KHÔNG hiện.
-import { KD } from "../khoi_dau";
+import { KD, TN } from "../khoi_dau";
 
 export type Muc = { ma: string; nhan: string; url: string | null; icon: string; ly_do?: string };
 export type Nhom = { ma: string; ten: string; muc: Muc[] };
 
 const CHUA = "chưa có dữ liệu";
+// Màn có sẵn nhưng công ty chưa dùng nguồn của nó (kome/nguon_dung.py): mờ như màn chưa có.
+const CHUA_DUNG = "công ty chưa dùng nguồn này";
 
 export function nhomDieuHuong(): Nhom[] {
   const nhom: Nhom[] = [
@@ -30,7 +32,7 @@ export function nhomDieuHuong(): Nhom[] {
     ] },
     { ma: "giaothu", ten: "GIAO & THU TIỀN", muc: [
       { ma: "giaohang", nhan: "Giao hàng & điều phối", url: null, icon: "truck", ly_do: CHUA },
-      { ma: "congno", nhan: "Công nợ & thu tiền", url: "/cong-no", icon: "yen" },
+      { ma: "congno", nhan: "Công nợ & thu tiền", url: TN.cong_no ? "/cong-no" : null, icon: "yen", ...(TN.cong_no ? {} : { ly_do: CHUA_DUNG }) },
       { ma: "trahang", nhan: "Trả hàng & khiếu nại", url: null, icon: "back", ly_do: CHUA },
       { ma: "dongtien", nhan: "Dòng tiền & phải trả", url: null, icon: "yen", ly_do: CHUA },
     ] },

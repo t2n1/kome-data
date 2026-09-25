@@ -11,6 +11,7 @@ import { gon, so, thay_doi, yen } from "../dinh_dang";
 import type { BoLoc } from "./loc";
 import { nhoDanhSach, thamSoDs } from "./loc";
 import type { DsApi, KhachDong } from "./kieu";
+import { TN } from "../khoi_dau";
 
 // Công nợ ghi theo BÊN NHẬN HOÁ ĐƠN (請求先), không theo từng khách — nên danh sách
 // khách không lọc / đếm được theo nợ; số nằm ở màn Công nợ (đợt 6).
@@ -62,7 +63,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       so: tq.tong, bat: !b.nhom && !b.thang && !b.co_mua && b.nv !== d.pt_trong, ap: { nhom: "", thang: "", co_mua: false, nv: b.nv === d.pt_trong ? "" : b.nv } },
     { ma: "co_mua", ten: `Có mua · ${kxNhan}`, mo: "có ít nhất một phiếu trong khoảng đang xem", so: tq.co_mua, bat: b.co_mua,
       ap: { co_mua: !b.co_mua, nhom: "", thang: "" } },
-    { ma: "no", ten: "Nợ quá hạn", mo: "cần thu trước khi giao đơn mới", so: null, bat: false, ap: null },
+    ...(TN.cong_no ? [{ ma: "no", ten: "Nợ quá hạn", mo: "cần thu trước khi giao đơn mới", so: null, bat: false, ap: null }] : []),
     { ma: "im", ten: "Im lặng ≥ 2× nhịp", mo: `đã quá chu kỳ mua thường lệ · ${nm}`, so: tq.nhom.im, bat: b.nhom === "im", ap: { nhom: "im", thang: "", co_mua: false } },
     { ma: "tut", ten: "Hạng S·A đang tụt", mo: "30 ngày < 80% TB ba kỳ 30 ngày trước", so: tq.nhom.tut, bat: b.nhom === "tut", ap: { nhom: "tut", thang: "", co_mua: false } },
     { ma: "moi", ten: "Khách mới chưa quay lại", mo: "đơn đầu trong 90 ngày, đã im ≥ 1,2× nhịp", so: tq.nhom.moi, bat: b.nhom === "moi", ap: { nhom: "moi", thang: "", co_mua: false } },
@@ -106,9 +107,9 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
             {!ssp?.co ? `${ssp?.nhan ?? "so sánh"}: không có dữ liệu để so` : tang == null ? `${ssp.nhan}: chưa có đơn` : `${thay_doi(tang)} so ${ssp.nhan}`}</div></div>
         <div className="o-kpi"><div className="nhan">Im lặng ≥ 2× nhịp · {nm}</div><div className="gia">{so(t.so_can_xu_ly)}</div>
           <div className="dong-phu nhat-chu">đã quá chu kỳ mua thường lệ</div></div>
-        <a className="o-kpi" href="/cong-no?tab=qua_han" title={CHUA_CO_NO}><div className="nhan">Công nợ quá hạn</div>
+        {TN.cong_no && <a className="o-kpi" href="/cong-no?tab=qua_han" title={CHUA_CO_NO}><div className="nhan">Công nợ quá hạn</div>
           <div className="gia" style={{ fontSize: "1rem" }}>xem màn Công nợ →</div>
-          <div className="dong-phu nhat-chu">ghi theo bên nhận hoá đơn</div></a>
+          <div className="dong-phu nhat-chu">ghi theo bên nhận hoá đơn</div></a>}
       </div>
 
       <div className="kh-muc"><h2>Danh sách làm việc</h2><span className="phu">chọn một nhóm để lọc danh bạ · số đếm theo người phụ trách đang xem</span></div>

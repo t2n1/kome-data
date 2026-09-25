@@ -11,29 +11,30 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from kome.config import SPECS
+from kome.nguon_dung import dung
 from kome.tuoi_du_lieu import MUI_GIO, spec_cua_o
 
 # Các ô của màn Nạp = các nhánh của sơ đồ nguồn — MỘT danh sách. `specs`: loại
 # file ô đó nhận (Bán hàng nhận cả 売上伝票データ lẫn nguồn dự phòng 売上明細表 —
 # cùng đổ vào core.fact_sales_line). `nhip`: 'ngay' = nhịp 13:30 hằng ngày (cùng
 # bộ với kome/tuoi_du_lieu.NGUON_HANG_NGAY), 'nen' = dữ liệu nền ít đổi, 'ky' =
-# sổ theo kỳ. `an_khoi_nap`: loại file công ty CHƯA dùng (quyết định chủ DN
-# 2026-09-24: chưa cần công nợ, bảng giá, nhà cung cấp) — không có ô riêng trên
-# màn Nạp, nhưng vẫn ở sơ đồ nguồn của Tổng quan (độ phủ nói thật) và vẫn nạp
-# được qua ô "Nạp nhiều file" (kho tự nhận loại theo tên file).
+# sổ theo kỳ. Ô của nguồn công ty CHƯA dùng (`kome.nguon_dung.CHUA_DUNG`) không
+# lên màn Nạp lẫn sơ đồ nguồn (`O_DUNG`), nhưng file loại đó vẫn nạp được qua ô
+# "Nạp nhiều file" (kho tự nhận loại theo tên file).
 O_NAP = [
     {"ma": "ban", "nhan": "Bán hàng", "specs": ["uriage", "meisai"], "nhip": "ngay"},
     {"ma": "ton", "nhan": "Tồn kho", "specs": ["zaiko"], "nhip": "ngay"},
     {"ma": "khach", "nhan": "Khách hàng", "specs": ["tokuisaki"], "nhip": "ngay"},
     {"ma": "sp", "nhan": "Sản phẩm", "specs": ["shohin"], "nhip": "nen"},
-    {"ma": "ncc", "nhan": "Nhà cung cấp", "specs": ["shiiresaki"], "nhip": "nen", "an_khoi_nap": True},
+    {"ma": "ncc", "nhan": "Nhà cung cấp", "specs": ["shiiresaki"], "nhip": "nen"},
     {"ma": "giao", "nhan": "Giao thẳng", "specs": ["chokusousaki"], "nhip": "nen"},
-    {"ma": "gia", "nhan": "Bảng giá", "specs": ["tanka"], "nhip": "nen", "an_khoi_nap": True},
-    {"ma": "no", "nhan": "Công nợ", "specs": ["seikyu_motocho"], "nhip": "ky", "an_khoi_nap": True},
+    {"ma": "gia", "nhan": "Bảng giá", "specs": ["tanka"], "nhip": "nen"},
+    {"ma": "no", "nhan": "Công nợ", "specs": ["seikyu_motocho"], "nhip": "ky"},
 ]
 O_CUA = {o["ma"]: o for o in O_NAP}
 O_CUA_SPEC = {s: o for o in O_NAP for s in o["specs"]}
-O_TREN_MAN_NAP = {o["ma"] for o in O_NAP if not o.get("an_khoi_nap")}
+O_DUNG = [o for o in O_NAP if any(dung(s) for s in o["specs"])]
+MA_DUNG = {o["ma"] for o in O_DUNG}
 
 
 def _ngay(x) -> date | None:
@@ -57,7 +58,7 @@ def nut_nguon(status: list[dict], tuoi, hom_nay: date) -> list[dict]:
     theo_spec = {s["spec"]: s for s in status}
     tuoi_spec = {n.spec: n for n in tuoi.nguon}
     ra = []
-    for o in O_NAP:
+    for o in O_DUNG:
         lo = [theo_spec[s] for s in o["specs"] if s in theo_spec and theo_spec[s]["last"]]
         moi = max(lo, key=lambda s: s["last"]) if lo else None
         nap_luc = _ngay(moi["last"]) if moi else None

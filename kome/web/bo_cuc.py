@@ -20,6 +20,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from kome.nguon_dung import tinh_nang
+
 RONG_TOI_DA = 3   # số cột của lưới — đổi là đổi cả giao_dien/src/tong_quan/Luoi.tsx (RONG) và CSS .luoi-tq
 CAO_TOI_DA = 4
 
@@ -27,7 +29,7 @@ CAO_TOI_DA = 4
 # kích thước `BO_CUC_MAC_DINH` của Dashboard.dc.html (21 khối) + khối tháng (036). Khối không có
 # nguồn dữ liệu vẫn có mặt (khung "chưa có dữ liệu", kome/khoi_tong_quan.py
 # ::CHUA_CO) — lựa chọn của chủ doanh nghiệp, đặc tả giao diện React §2.
-KHOI = (
+_KHOI_DAY_DU = (
     ("kpi", "Chỉ số hôm nay", 3, 1, "tong_quan", "Sáu con số mở đầu ngày, mỗi ô dẫn thẳng tới màn hình của nó"),
     ("ns_thang", "Tiến độ ngân sách tháng", 3, 1, "tong_quan", "Từng sale so với mốc đáng lẽ đạt tới hôm nay"),
     ("theo_thang", "Kết quả theo từng tháng", 3, 3, "tong_quan", "12 tháng của kỳ kế toán so ngân sách và cùng kỳ"),
@@ -56,6 +58,13 @@ KHOI = (
     ("thoi_tiet", "Thời tiết 7 ngày tới", 2, 2, "thi_truong", "Nắng nóng đẩy bia và nước, mưa to ảnh hưởng lịch xe"),
     ("don_hang", "Nạp dữ liệu / phiếu gần nhất", 3, 2, "tong_quan", "Nhật ký nạp và các phiếu bán mới nhất"),
 )
+# Khối sống nhờ một tính năng mà công ty chưa dùng (kome/nguon_dung.py) không
+# vào danh mục: không hiện, không có trong "Xem theo vai trò", bố cục đã lưu
+# có nó thì `chuan_hoa` bỏ qua — bật lại nguồn là khối tự nối vào cuối.
+KHOI_CAN = {"cong_no": "cong_no"}
+_TN = tinh_nang()
+KHOI = tuple(k for k in _KHOI_DAY_DU if _TN.get(KHOI_CAN.get(k[0], ""), True))
+_CO = {k[0] for k in KHOI}
 NHOM = (("tat_ca", "Tất cả"), ("tong_quan", "Tổng quan"), ("tien", "Tiền"),
         ("khach_hang", "Khách hàng"), ("hang_hoa", "Hàng hóa"), ("thi_truong", "Thị trường"))
 # "Xem theo vai trò" = một bộ khối hiện sẵn (VAI_TRO của gói thiết kế). Bấm là
@@ -72,6 +81,7 @@ VAI_TRO = (
     ("kho", "Kho & giao hàng", ("kpi", "viec_hom_nay", "hang_sap_ve", "han_su_dung", "mua_hang",
                                 "khieu_nai", "thoi_tiet")),
 )
+VAI_TRO = tuple((a, b, tuple(x for x in c if x in _CO)) for a, b, c in VAI_TRO)
 # Mã khối của bản Jinja (034, 6 khối) -> mã mới: bố cục đã lưu trước ngày đổi
 # giao diện vẫn đọc được, không vứt đi.
 MA_CU = {"chi_so": "kpi", "ngan_sach": "ns_thang", "suc_khoe": "suc_khoe_khach",

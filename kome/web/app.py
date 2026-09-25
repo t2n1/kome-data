@@ -25,6 +25,7 @@ from kome.web import spa as SPA
 from kome.web import anh_chup
 from kome.web.api import tao_api
 from kome.khoi_tong_quan import CHUA_CO as KTQ_CHUA_CO
+from kome.nguon_dung import tinh_nang
 from ops.backup import backup_status
 
 # Đợt 4d (Task 2) — nút đổi giao diện sáng/tối, KHÔNG JS.
@@ -450,6 +451,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "sap_xep_duoc": nguoi is not None,
             "danh_muc": BC.danh_muc(),
             "chua_co": KTQ_CHUA_CO,
+            "tinh_nang": tinh_nang(),
         }
 
     def _spa(request: Request, tuoi: bool = False, man=None, thong_bao: dict | None = None,
@@ -781,7 +783,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             kq = IngestResult(ok=False, spec_name=spec.name, blockers=[G.Blocker(
                 1, f"File này là {spec.display_name} ({dich['nhan'] if dich else spec.name}), "
                    f"không phải ô {KDL.O_CUA[o]['nhan']} — "
-                   + ("thả vào đúng ô của nó." if dich and dich["ma"] in KDL.O_TREN_MAN_NAP
+                   + ("thả vào đúng ô của nó." if dich and dich["ma"] in KDL.MA_DUNG
                       else "loại file này không có ô riêng; thả vào ô \"Nạp nhiều file\"."))])
         else:
             kq = kiem(conn, duong)
@@ -886,8 +888,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         xác nhận, lô gần nhất + hoàn tác."""
         from kome import kho_du_lieu as KDL, nap_cho
         tuoi = tinh_tuoi(conn)
-        nguon = [n for n in KDL.nut_nguon(trang_thai_nap(conn), tuoi, tuoi.hom_nay)
-                 if n["ma"] in KDL.O_TREN_MAN_NAP]
+        nguon = KDL.nut_nguon(trang_thai_nap(conn), tuoi, tuoi.hom_nay)
         return {"man": "nap", "tuoi": tuoi, "nguon": nguon,
                 "cho": [] if chi_doc else kho_cho.danh_sach(),
                 "lo": lo_nap_gan_nhat(conn)}

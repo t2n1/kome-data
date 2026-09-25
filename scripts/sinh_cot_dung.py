@@ -42,7 +42,7 @@ MA_NAP = ["kome/pipeline.py", "kome/reader.py", "kome/gates.py", "kome/so_cai.py
 
 # Mô-đun không ĐỌC dữ liệu (cấu hình, tài liệu, loader) — có nhắc tên bảng
 # nhưng không hiện số nào lên màn.
-BO_QUA = {"kome/config.py": "cấu hình", "kome/tai_lieu.py": "tài liệu sống (chỉ in tên bảng)"}
+BO_QUA = {"kome/config.py": "cấu hình", "kome/nguon_dung.py": "tên bảng để ẩn khỏi giao diện (không đọc cột)", "kome/tai_lieu.py": "tài liệu sống (chỉ in tên bảng)"}
 
 # Màn hình: (tên, đường dẫn).
 MAN_HINH = {

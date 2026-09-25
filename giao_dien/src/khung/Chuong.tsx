@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { lay } from "../api";
 import { Icon } from "./icon";
+import { TN } from "../khoi_dau";
 
 type TB = { ma: string; muc: "gap" | "canh" | "thuong" | "ok"; loai: string; tieu_de: string; noi_dung: string; lien_ket: string };
 const KHOA = "kome_tb_da_doc_v1";
@@ -49,7 +50,7 @@ export function Chuong({ mo, datMo }: { mo: boolean; datMo: (m: boolean) => void
             ))}
             {!tb.length && <li className="trong">Không có thông báo nào.</li>}
           </ul>
-          <p className="tb-chu-thich">Chưa có thông báo công nợ, giao hàng, khiếu nại, đơn hàng — chưa có nguồn dữ liệu.</p>
+          <p className="tb-chu-thich">Chưa có thông báo {TN.cong_no ? "công nợ, " : ""}giao hàng, khiếu nại, đơn hàng — chưa có nguồn dữ liệu.</p>
         </aside>
       </>}
     </>

@@ -184,14 +184,14 @@ def test_lo_da_hoan_tac_khong_tinh_la_co_du_lieu(conn):
         """INSERT INTO meta.ingest_batch
              (spec_name, source_file, digest, archived_to, row_count, undone_at,
               data_date)
-           VALUES ('shiiresaki', '仕入先_20260710.xlsx', 'ncc', '/tmp/x', 1, now(),
+           VALUES ('chokusousaki', '直送先_20260710.xlsx', 'giao', '/tmp/x', 1, now(),
                    DATE '2026-07-10')"""
     )
     conn.commit()
 
     bang = tinh_bang_phu(conn, hom_nay=date(2026, 9, 16))
     assert _o(bang, "2026-06", "shohin").trang_thai == CO
-    assert _o(bang, "2026-07", "shiiresaki").trang_thai == KHONG
+    assert _o(bang, "2026-07", "chokusousaki").trang_thai == KHONG
 
 
 def test_module_khong_tu_mo_ket_noi(conn):
@@ -379,10 +379,9 @@ def test_luoi_du_lieu_nen_theo_data_date_bo_lo_hoan_tac(conn):
 
 
 def test_luoi_chi_co_nguon_dang_dung_va_bang_dich(conn):
-    from kome.coverage import COT, tinh_luoi_phu
+    from kome.coverage import COT_DUNG, tinh_luoi_phu
     luoi = tinh_luoi_phu(conn, hom_nay=date(2026, 5, 13))
-    assert [d.khoa for d in luoi.dong] == [c.khoa for c in COT]
-    assert _dong(luoi, "seikyu_motocho").nhom == "lich_su" and _dong(luoi, "tanka").nhom == "nen"
+    assert [d.khoa for d in luoi.dong] == [c.khoa for c in COT_DUNG]
     assert _dong(luoi, "ban").bang == "core.fact_sales_line" and _dong(luoi, "ban").spec == "uriage"
     assert _dong(luoi, "ban").nhan == "Bán hàng"
     assert all(len(o.ngay) == len(t.lich) for d in luoi.dong for o, t in zip(d.o, luoi.thang))

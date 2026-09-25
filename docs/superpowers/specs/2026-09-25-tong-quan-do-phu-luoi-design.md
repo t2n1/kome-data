@@ -14,7 +14,7 @@ dõi". Đã duyệt phác thảo "lưới toàn cảnh" + gọn các khối cũ,
 1. **Tóm tắt** (`#hom-nay`): mỗi nguồn LỊCH SỬ một ô — "có từ A → B", "thiếu n ngày làm việc" (giữa
    ngày đầu và ngày cuối CÓ dữ liệu; ngày chưa tới lượt nạp là việc của cột tình trạng) — cộng ô
    "Hôm nay: x/3 file 13:30 đã nạp" (từ `nguon`, nhịp `ngay`).
-2. **Lưới** (`#theo-thang`): dòng = 8 loại file OBC (`coverage.COT`; nguồn chưa nạp hiện "không có", không biến mất), cột = tháng từ
+2. **Lưới** (`#theo-thang`): dòng = loại dữ liệu ĐANG DÙNG (`coverage.COT_DUNG`), cột = tháng từ
    tháng của `DAU_DU_LIEU` tới tháng hiện tại, dải kỳ kế toán trên đầu (`core.dim_date.company_fy_label`,
    tháng chốt kỳ đánh dấu). Hai nhóm dòng, vì trả lời hai câu khác nhau:
    - **Lịch sử** (bán hàng, tồn kho, công nợ nếu dùng) — ô = ngày LÀM VIỆC có dữ liệu / ngày làm việc

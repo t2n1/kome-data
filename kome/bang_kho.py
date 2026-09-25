@@ -19,6 +19,7 @@ from decimal import Decimal
 from psycopg import sql
 
 from kome.config import SPECS
+from kome.nguon_dung import bang_an
 
 SCHEMA = ("core", "mart", "meta")
 MOI_TRANG = 50
@@ -50,6 +51,10 @@ def danh_sach(conn) -> list[dict]:
            ORDER BY array_position(%s, n.nspname::text), c.relname""",
         (list(SCHEMA), list(SCHEMA))).fetchall()
     conn.rollback()
+    # Bảng/view của nguồn công ty chưa dùng không lên danh sách (kome/nguon_dung.py);
+    # gõ thẳng /kho-du-lieu/bang/<tên> vẫn xem được — ẩn, không phải khoá.
+    an = bang_an(SPECS)
+    rows = [r for r in rows if f"{r[0]}.{r[1]}" not in an]
     return [{"schema": s, "ten": f"{s}.{t}", "ngan": t, "loai": "bang" if k == "r" else "view",
              "so_dong": n if k == "r" else None, "mo_ta": " ".join((m or "").split()) or None}
             for s, t, k, n, m in rows]

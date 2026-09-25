@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from datetime import date
 import re
 
+from kome.nguon_dung import dung
+
 # --- trạng thái một ô ---------------------------------------------------
 CO = "co"        # có dữ liệu trong kho
 KHONG = "khong"  # không có dữ liệu (xem lưu ý ở đầu file)
@@ -80,6 +82,10 @@ COT = [
     CotLoaiFile("Gia", "tanka", "取引単価データ", "bảng giá"),
     CotLoaiFile("No", "seikyu_motocho", "請求先元帳", "sổ công nợ, ô có khi tháng nằm trong kỳ của một lô"),
 ]
+
+# Cột của bảng phủ trên màn Kho dữ liệu: bỏ nguồn công ty chưa dùng
+# (kome/nguon_dung.py). `COT` đủ 8 vẫn là mô tả cho tài liệu sống.
+COT_DUNG = [c for c in COT if dung({"ban": "uriage", "ton": "zaiko"}.get(c.khoa, c.khoa))]
 
 THIEU_BO_NAP = [
     LoaiChuaCo("入金伝票データ", "phiếu thu", "1 quý (2026-05→07), chưa có bộ nạp"),
@@ -262,7 +268,7 @@ def tinh_bang_phu(conn, hom_nay: date | None = None,
         # Tháng 2025-03 chứa chính ngày 3/3 nên vẫn trong phạm vi.
         ngoai = (y, m) < (DAU_DU_LIEU.year, DAU_DU_LIEU.month)
         o = []
-        for c in COT:
+        for c in COT_DUNG:
             if c.khoa == "ban":
                 co = bool(ban.get(thang))
             elif c.khoa == "ton":
@@ -285,7 +291,7 @@ def tinh_bang_phu(conn, hom_nay: date | None = None,
         dt, lg = tien.get(fy, (0, 0))
         ky.append(Ky(fy, nhan, dau, cuoi, theo_ky[fy], dt, lg))
 
-    return BangPhu(database, COT, ky, DAU_DU_LIEU, THIEU_BO_NAP)
+    return BangPhu(database, COT_DUNG, ky, DAU_DU_LIEU, THIEU_BO_NAP)
 
 
 # --- Bảng theo NGÀY ------------------------------------------------------
@@ -439,7 +445,7 @@ class LuoiPhu:
 
 
 def tinh_luoi_phu(conn, hom_nay: date | None = None) -> LuoiPhu:
-    """Lưới tháng × loại dữ liệu (`COT`), từ tháng của
+    """Lưới tháng × loại dữ liệu ĐANG DÙNG (`COT_DUNG`), từ tháng của
     `DAU_DU_LIEU` tới tháng của `hom_nay`. Không tự mở kết nối.
 
     "Ngày làm việc" đọc `mart.lich_kinh_doanh` (định nghĩa DUY NHẤT). Khách
@@ -457,7 +463,7 @@ def tinh_luoi_phu(conn, hom_nay: date | None = None) -> LuoiPhu:
            FROM mart.lich_kinh_doanh l JOIN core.dim_date d ON d.date_key = l.ngay
            WHERE l.ngay BETWEEN %s AND %s ORDER BY l.ngay""", (tu, hom_nay)).fetchall()
 
-    khoa = {c.khoa for c in COT}
+    khoa = {c.khoa for c in COT_DUNG}
     co: dict[str, set[date]] = {k: set() for k in khoa}
     meisai: set[date] = set()
     if "ban" in khoa:
@@ -495,7 +501,7 @@ def tinh_luoi_phu(conn, hom_nay: date | None = None) -> LuoiPhu:
              for t, n in theo_thang.items()]
 
     dong = []
-    for c in COT:
+    for c in COT_DUNG:
         s, lich_su = co[c.khoa], c.khoa in KHOA_LICH_SU
         o = []
         for n in theo_thang.values():

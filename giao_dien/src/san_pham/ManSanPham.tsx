@@ -14,6 +14,7 @@ import type { DanhMucApi, DanhMucKhoangApi, MaHang } from "./kieu";
 import { chuoiLocSp, docLocSp, locDanhMuc, SAP } from "./loc";
 import type { LocSp } from "./loc";
 import "./san_pham.css";
+import { TN } from "../khoi_dau";
 
 export function useDanhMuc() {
   const kx = chuoiKhoang(useKhoang());
@@ -176,7 +177,7 @@ export default function ManSanPham() {
 
       <div ref={hoSo} className="sp-ho-so-neo">
         {ma ? <HoSoSanPham ma={ma} dong={dong} onDong={() => chon(null, false)} />
-          : <div className="sp-chua-chon">Chọn một mã trong danh mục (hoặc ô "chọn nhanh" ở trên) để xem hồ sơ 360°: bán theo ngày, khách đang mua / đã bỏ, tồn theo kho, giá theo bậc.</div>}
+          : <div className="sp-chua-chon">Chọn một mã trong danh mục (hoặc ô "chọn nhanh" ở trên) để xem hồ sơ 360°: bán theo ngày, khách đang mua / đã bỏ, tồn theo kho{TN.bang_gia ? ", giá theo bậc" : ""}.</div>}
       </div>
     </div>
   );

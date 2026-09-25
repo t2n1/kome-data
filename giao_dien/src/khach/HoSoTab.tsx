@@ -11,6 +11,7 @@ import type { DongBan, HoSoApi, LichMa, MatHang } from "./kieu";
 import { GhiTiepXuc } from "./GhiTiepXuc";
 import { OCongNo } from "../cong_no/CongNoKhach";
 import { chuoiKhoang, useKhoang, useNhanMoc, voiKhoang, type KhoangMayChu } from "../khung/khoang";
+import { TN } from "../khoi_dau";
 
 /** Số trong KHOẢNG XEM của một khách (/api/khach-hang/{mã}/khoang — đợt B;
  *  endpoint riêng vì hồ sơ đã chạm trần 8 lượt hỏi). Nhiều khối gọi chung —
@@ -84,7 +85,7 @@ export function TabTongQuan({ h }: { h: HoSoApi }) {
         <div className={"dong-phu " + (o.so_ma_ngung ? "giam" : "nhat-chu")}>{o.so_ma_ngung ? `${o.so_ma_ngung} mã đã ngừng` : "không mã nào ngừng"}</div></div>
       <div className="o-kpi"><div className="nhan">Biên lãi gộp giỏ hàng</div><div className="gia">{pc(k.ty_suat)}</div>
         <div className="dong-phu nhat-chu">lãi gộp ÷ doanh thu thuần, luỹ kế</div></div>
-      <OCongNo ma={k.ma} />
+      {TN.cong_no && <OCongNo ma={k.ma} />}
     </div>
 
     <div className="hs-hang hai-mot">
@@ -350,16 +351,16 @@ export function TabSanPham({ h }: { h: HoSoApi }) {
       </The>
     </div>
 
-    <div className="hs-hang hai">
+    <div className={TN.bang_gia ? "hs-hang hai" : "hs-hang"}>
       <The tieu_de="Gợi ý hàng chưa từng mua" phu="mã khách chưa mua bao giờ, xếp theo tỷ suất lãi gộp (tỷ số của các tổng — toàn công ty)">
         {!h.goi_y.length ? <p className="phu">Không có gợi ý.</p> :
         <div className="bang-cuon"><table className="bang"><thead><tr><th>#</th><th>Mặt hàng</th><th className="so">Tỷ suất lãi gộp</th></tr></thead>
           <tbody>{h.goi_y.map((g, i) => (
             <tr key={g.ma}><td className="nhat-chu">{i + 1}</td><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(g.ma)}`}>{g.ten}</a>
               <div className="ma-nho"><code>{g.ma}</code></div></td><td className="so">{pc(g.ty_suat)}</td></tr>))}</tbody></table></div>}
-        <p className="phu">Giá để báo cho khách: xem giá theo bậc ở hồ sơ từng mã (bấm tên mã).</p>
+        {TN.bang_gia && <p className="phu">Giá để báo cho khách: xem giá theo bậc ở hồ sơ từng mã (bấm tên mã).</p>}
       </The>
-      <ChuaCo tieu_de="Bảng giá của bậc (売価No.)" ly_do="Bản xuất 得意先全情報 không còn cột 売価No.コード, nên không biết khách hưởng bậc giá nào. Giá theo từng bậc vẫn có ở hồ sơ mỗi mã hàng." />
+      {TN.bang_gia && <ChuaCo tieu_de="Bảng giá của bậc (売価No.)" ly_do="Bản xuất 得意先全情報 không còn cột 売価No.コード, nên không biết khách hưởng bậc giá nào. Giá theo từng bậc vẫn có ở hồ sơ mỗi mã hàng." />}
     </div>
 
     <The tieu_de={`Tất cả mặt hàng (${h.mat_hang.length})`} phu="mọi mã khách từng mua · 3 cột tháng gần nhất để thấy ngay tháng nào vắng"

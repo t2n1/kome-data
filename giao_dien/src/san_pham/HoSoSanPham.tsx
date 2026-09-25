@@ -12,6 +12,7 @@ import { ChuaCoDuLieu } from "../chung/Khoi";
 import { gon, ngay, pc, so, so_luong as soLuong, thang_nhan, thay_doi, yen } from "../dinh_dang";
 import type { HoSoSpApi, MaHang, NgayApi } from "./kieu";
 import { chuoiKhoang, useKhoang, voiKhoang, type KhoangMayChu } from "../khung/khoang";
+import { TN } from "../khoi_dau";
 
 /** Một mã trong KHOẢNG XEM (/api/san-pham/{mã}/khoang — đợt C). */
 type MaKhoang = {
@@ -145,14 +146,14 @@ export function HoSoSanPham({ ma, dong, onDong }: { ma: string; dong: MaHang | n
           <div className="sp-hang-ve"><span className="nhan-vien nhat">hàng về · chưa có dữ liệu</span>
             <span className="phu">OBC chưa xuất đơn mua / lịch container (仕入・発注) — chưa biết lô nào sắp về.</span></div>
         </section>
-        <section className="kh-the">
+        {TN.bang_gia && <section className="kh-the">
           <div className="kh-the-dau"><h2>Giá theo bậc (売価No.)</h2><span className="kh-the-goc nhat-chu">giá chưa thuế</span></div>
           <p className="phu">Giá <b>đáng lẽ phải bán</b> của từng bậc giá OBC, dòng mới nhất của mỗi cặp (bậc, 荷姿). Bậc giá OBC KHÔNG phải hạng khách theo doanh thu 12 tháng.</p>
           {h.bac_gia.length ? <div className="sp-bac">{h.bac_gia.map((g, i) => (
             <div key={i} className="sp-bac-dong"><span className="nhan-vien lam">Bậc {g.bac}</span><span className="ten-jp">{g.quy_cach}</span>
               <b>{yen(g.gia)}</b><span className="phu">từ {ngay(g.tu_ngay)}</span></div>))}</div>
             : <p className="trong-nho">Mã này chưa có dòng nào trong 取引単価データ.</p>}
-        </section>
+        </section>}
       </div>
 
       <XuHuong h={h} chon={thangXem} datThang={t => { datThang(t); document.getElementById("sp-ngay")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />

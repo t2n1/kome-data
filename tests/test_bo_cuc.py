@@ -79,13 +79,16 @@ def test_ma_khoi_cua_ban_jinja_van_doc_duoc():
 
 def test_danh_muc_bam_goi_thiet_ke():
     """21 khối của Dashboard.dc.html + khối tháng (036) + khách mới (044), 6 nhóm, 4 vai trò; mọi khối của vai trò
-    đều có trong danh mục; mọi khối KHÔNG có hàm dữ liệu thì có câu "chưa có"."""
-    from kome import khoi_tong_quan as KTQ
+    đều có trong danh mục; mọi khối KHÔNG có hàm dữ liệu thì có câu "chưa có". Khối của tính
+    năng công ty chưa dùng (kome/nguon_dung.py, BC.KHOI_CAN) rời danh mục nhưng vẫn có hàm."""
+    from kome import khoi_tong_quan as KTQ, nguon_dung as ND
     dm = BC.danh_muc()
     ma = {k["id"] for k in dm["khoi"]}
-    assert len(ma) == 23 and len(dm["nhom"]) == 6 and len(dm["vai_tro"]) == 4
+    du = {k[0] for k in BC._KHOI_DAY_DU}
+    an = {k for k, tn in BC.KHOI_CAN.items() if not ND.tinh_nang()[tn]}
+    assert len(du) == 23 and ma == du - an and len(dm["nhom"]) == 6 and len(dm["vai_tro"]) == 4
     assert all(set(v["khoi"]) <= ma for v in dm["vai_tro"])
-    assert ma == set(KTQ.KHOI) | set(KTQ.CHUA_CO)
+    assert du == set(KTQ.KHOI) | set(KTQ.CHUA_CO)
     assert not set(KTQ.KHOI) & set(KTQ.CHUA_CO)
 
 

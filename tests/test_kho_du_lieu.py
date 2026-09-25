@@ -401,15 +401,13 @@ def test_bon_cho_code_khong_con_khang_dinh_dieu_da_sai():
     assert not loi, "code còn nhắc địa chỉ cũ như thể còn sống:\n" + "\n".join(loi)
 
 
-def test_man_nap_an_o_khong_dung_so_do_nguon_van_du(conn, test_db_url):
-    """Chủ DN (2026-09-24) chưa dùng công nợ / bảng giá / nhà cung cấp: màn Nạp
-    không có ô riêng cho chúng — nhưng sơ đồ nguồn của Tổng quan vẫn đủ 8 nhánh
-    (độ phủ nói thật: nguồn đó chưa nạp, không phải không tồn tại)."""
-    from kome import kho_du_lieu as K
+def test_man_nap_va_so_do_nguon_bo_nguon_chua_dung(conn, test_db_url):
+    """Chủ DN (2026-09-24) chưa dùng công nợ / bảng giá / nhà cung cấp
+    (kome/nguon_dung.py): cả màn Nạp lẫn sơ đồ nguồn + bảng phủ của Tổng quan
+    đều không có chúng."""
     client = TestClient(create_app(db_url=test_db_url))
-    o_nap = [n["ma"] for n in man(client.get("/kho-du-lieu/nap").text)["nguon"]]
-    assert o_nap == ["ban", "ton", "khach", "sp", "giao"]
-    assert not {"ncc", "gia", "no"} & set(o_nap)
-    assert [n["ma"] for n in man(client.get("/kho-du-lieu").text)["nguon"]] == [o["ma"] for o in K.O_NAP]
-    # Lưới độ phủ cũng đủ 8 dòng — nguồn chưa nạp hiện "không có", không biến mất.
-    assert len(man(client.get("/kho-du-lieu").text)["phu"]["dong"]) == len(K.O_NAP)
+    for url in ("/kho-du-lieu/nap", "/kho-du-lieu"):
+        assert [n["ma"] for n in man(client.get(url).text)["nguon"]] == ["ban", "ton", "khach", "sp", "giao"], url
+    cot = [d["khoa"] for d in man(client.get("/kho-du-lieu").text)["phu"]["dong"]]
+    assert not {"shiiresaki", "tanka", "seikyu_motocho"} & set(cot)
+    assert kd(client.get("/").text)["tinh_nang"]["cong_no"] is False

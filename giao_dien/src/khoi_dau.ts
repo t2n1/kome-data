@@ -31,6 +31,8 @@ export type KhoiDau = {
     vai_tro: { id: string; nhan: string; khoi: string[] }[];
   };
   chua_co: Record<string, string>;
+  // Tính năng sống nhờ một nguồn OBC công ty chưa dùng (kome/nguon_dung.py) — false = ẩn.
+  tinh_nang?: { cong_no: boolean; bang_gia: boolean; nha_cung_cap: boolean };
   // Giai đoạn 5 — màn do máy chủ tính sẵn (route cũ giữ nguyên truy vấn, chỉ đổi
   // cách vẽ): dữ liệu của màn đang mở, trang thông báo (lỗi / không có quyền /
   // bản chỉ-đọc), và cờ "vừa đăng nhập sai".
@@ -48,3 +50,6 @@ export const KD: KhoiDau = window.__KOME__ ?? {
   che_do_giao_dien: "he-thong", bo_cuc: [], sap_xep_duoc: false,
   danh_muc: { khoi: [], nhom: [], vai_tro: [] }, chua_co: {},
 };
+
+/** Cờ tính năng — MỘT nguồn: máy chủ (kome/nguon_dung.py::tinh_nang). */
+export const TN = { cong_no: true, bang_gia: true, nha_cung_cap: true, ...KD.tinh_nang };

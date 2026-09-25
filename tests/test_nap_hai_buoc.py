@@ -119,7 +119,7 @@ def test_man_nap_va_duong_dan_cu(c):
     r = c.get("/kho-du-lieu/nap")
     assert r.status_code == 200
     m = man(r.text)
-    assert [n["ma"] for n in m["nguon"]] == [o["ma"] for o in KDL.O_NAP if o["ma"] in KDL.O_TREN_MAN_NAP]
+    assert [n["ma"] for n in m["nguon"]] == [o["ma"] for o in KDL.O_NAP if o["ma"] in KDL.MA_DUNG]
     assert "lo" in m and m["cho"] == []
     assert c.get("/nap", follow_redirects=False).headers["location"] == "/kho-du-lieu/nap"
     src = nguon("he_thong", "KhoDuLieu.tsx")
@@ -145,7 +145,8 @@ def test_nut_nguon_file_nen_khong_bao_gio_do():
     nut = {n["ma"]: n for n in KDL.nut_nguon(status, _Tuoi(_T("zaiko", "do", date(2026, 9, 18), 4)), hom_nay)}
     assert nut["sp"]["mau"] == "nen" and "23 ngày trước" in nut["sp"]["cau"]
     assert nut["ton"]["mau"] == "do" and "trễ 4 ngày làm việc" in nut["ton"]["cau"]
-    assert nut["ncc"]["mau"] == "nen" and nut["ncc"]["cau"] == "chưa nạp lần nào"
+    assert nut["giao"]["mau"] == "nen" and nut["giao"]["cau"] == "chưa nạp lần nào"
+    assert not {"ncc", "gia", "no"} & set(nut), "nguồn chưa dùng (kome/nguon_dung.py) không có nút"
 
 
 def test_nap_hom_nay_tinh_theo_gio_tokyo():
@@ -161,6 +162,6 @@ def test_tong_quan_co_du_khoi(c):
     m = man(c.get("/kho-du-lieu?ngay_thang=2026-08").text)
     assert m["ngay_thang"] == "2026-08"
     assert "2026-08" in [t["thang"] for t in m["phu"]["thang"]]
-    assert len(m["nguon"]) == len(KDL.O_NAP)
+    assert len(m["nguon"]) == len(KDL.O_DUNG)
     assert man(c.get("/kho-du-lieu?ngay_thang=rac").text)["ngay_thang"] is None
     assert kd(c.get("/kho-du-lieu").text)["tuoi"]["nguon"]

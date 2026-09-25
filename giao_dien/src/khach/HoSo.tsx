@@ -12,10 +12,12 @@ import type { DsApi, HoSoApi } from "./kieu";
 import { MAU_THANG, MAU_TT } from "./DanhSach";
 import { TabCongNo, TabDonHang, TabHoSo, TabSanPham, TabTongQuan } from "./HoSoTab";
 import "./khach.css";
+import { TN } from "../khoi_dau";
 
-const TAB = [["tong_quan", "Tổng quan"], ["san_pham", "Sản phẩm"], ["don_hang", "Đơn hàng"],
+const TAB_DU = [["tong_quan", "Tổng quan"], ["san_pham", "Sản phẩm"], ["don_hang", "Đơn hàng"],
   ["cong_no", "Công nợ"], ["ho_so", "Hồ sơ & liên hệ"]] as const;
-type MaTab = typeof TAB[number][0];
+type MaTab = typeof TAB_DU[number][0];
+const TAB = TAB_DU.filter(([m]) => m !== "cong_no" || TN.cong_no);
 
 export default function HoSo({ ma }: { ma: string }) {
   const { data: h, error } = useQuery<HoSoApi>({

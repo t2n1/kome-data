@@ -6,7 +6,7 @@ import { giuKhoang } from "../khung/khoang";
 import { BieuDo, type Chuoi } from "../chung/BieuDo";
 import { ChuaCoDuLieu, Khoi, Spark, ThanhMoc, mauTienDo } from "../chung/Khoi";
 import { gio_tokyo, gon, ngay, ngay_ngan, pc, so, thang_nhan, thay_doi, yen } from "../dinh_dang";
-import { KD } from "../khoi_dau";
+import { KD, TN } from "../khoi_dau";
 import { useNhanMoc, type KhoangMayChu } from "../khung/khoang";
 
 const LUC = { ok: "var(--ok-vien)", canh: "var(--lien-ket)", do: "var(--do)", nhat: "var(--chu-mo)", nen: "var(--vien)" };
@@ -56,7 +56,7 @@ export function KhoiKpi() {
           </> : <><div className="gia nhat-chu" style={{ fontSize: "1rem" }}>Chưa đặt chỉ tiêu</div>
             <div className="dong-phu nhat-chu">đặt ở màn Ngân sách</div></>}
         </a>
-        <OKpiCongNo />
+        {TN.cong_no && <OKpiCongNo />}
         <div className="o-kpi chua" title={KD.chua_co.dong_tien}>
           <div className="nhan">Phải trả 7 ngày tới</div><div className="gia">chưa có dữ liệu</div>
           <div className="dong-phu nhat-chu">cần sổ phải trả</div></div>
