@@ -6,6 +6,7 @@ thứ đó nếu không đăng nhập**, và **không ai nạp/xoá dữ liệu 
 khai**.
 """
 import re
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,8 +32,10 @@ def khach(monkeypatch, test_db_url, conn):
 
     def _tao(bi_mat: str | None = BI_MAT, vercel: bool = False,
              tai_khoan: bool = True, kho_du_lieu: bool = True,
-             sale: str | None = None):
+             sale: str | None = None, chi_doc: bool = False):
         monkeypatch.delenv("KOME_CHI_DOC", raising=False)
+        if chi_doc:
+            monkeypatch.setenv("KOME_CHI_DOC", "1")
         if bi_mat is None:
             monkeypatch.delenv("KOME_SESSION_SECRET", raising=False)
         else:
@@ -399,11 +402,12 @@ def test_trang_chi_doc_khong_duoc_dung_ket_noi_nap_du_lieu():
 
 # ---- Chế độ chỉ-đọc ----------------------------------------------------
 
-def test_tren_vercel_khong_nap_va_khong_hoan_tac_duoc(khach):
-    """[CRITICAL] Vercel chặn mỗi yêu cầu ở 4,5 MB còn file bán hàng nặng
-    ~100 MB, và ổ đĩa ở đó là tạm nên lớp `raw` không tồn tại. Để nút nạp
-    sống trên bản công khai là mời người ta nạp nửa chừng rồi hỏng."""
-    c = khach(vercel=True)
+def test_ban_chi_doc_khong_nap_va_khong_hoan_tac_duoc(khach):
+    """[CRITICAL] Bản chỉ-đọc (`KOME_CHI_DOC=1`) chặn nạp VÀ hoàn tác ở máy chủ,
+    không chỉ ẩn nút. Từ 045 bản Vercel nạp được file hằng ngày (đặc tả
+    2026-09-25-nap-tren-vercel-design.md) — chỉ-đọc là lựa chọn, không còn
+    gắn với VERCEL; test Vercel nạp được nằm ở tests/test_nap_vercel.py."""
+    c = khach(vercel=True, chi_doc=True)
     _vao(c)
 
     r = c.post("/upload", files={"files": ("在庫一覧_20260916.xlsx", b"x")})
@@ -431,7 +435,7 @@ def test_ban_chi_doc_an_han_muc_nap_du_lieu(khach):
     Đợt 2a (Task 4): /health chỉ 301 sang /kho-du-lieu, và mục nạp riêng
     trong sidebar biến mất — thay bằng một mục "Kho dữ liệu" duy nhất, còn
     khối nạp bên TRONG màn đó tự ẩn ở bản chỉ-đọc (id="nap")."""
-    c = khach(vercel=True)
+    c = khach(vercel=True, chi_doc=True)
     _vao(c)
     t = c.get("/kho-du-lieu").text
     assert kd(t)["chi_doc"] is True
@@ -760,3 +764,27 @@ def test_canh_bao_khoi_dong_khong_giet_app_tren_console_cp1252(monkeypatch):
     ra.flush()
     chu = ra.buffer.getvalue().decode("cp1252")
     assert "DATABASE_URL_APP" in chu, "cảnh báo bị nuốt"
+
+
+def test_tren_vercel_nap_duoc_nhung_van_sau_co_kho_du_lieu(khach, monkeypatch, tmp_path):
+    """[CRITICAL] 045: bản Vercel nạp được file hằng ngày — nhưng cổng quyền không đổi:
+    người KHÔNG có `duoc_vao_kho_du_lieu` vẫn bị chặn ở /upload/kiem."""
+    from kome import nap_cho
+    monkeypatch.setattr(nap_cho, "THU_MUC_TAM", tmp_path / "tam")
+    monkeypatch.delenv("KOME_KHO_NAP", raising=False)      # Vercel ⇒ file chờ trong CSDL
+    f = Path("tests/fixtures/zaiko_ok.xlsx")
+
+    c = khach(vercel=True)
+    _vao(c)
+    assert kd(c.get("/kho-du-lieu/nap").text)["chi_doc"] is False
+    with f.open("rb") as fh:
+        r = c.post("/upload/kiem", data={"o": "ton"}, files={"files": ("在庫一覧_20260916.xlsx", fh)})
+    assert r.status_code == 200 and man(r.text)["kiem"][0]["ok"]
+
+
+def test_tren_vercel_khong_co_co_kho_du_lieu_bi_chan(khach):
+    c = khach(vercel=True, kho_du_lieu=False)
+    _vao(c)
+    r = c.post("/upload/kiem", data={"o": "ton"},
+               files={"files": ("在庫一覧_20260916.xlsx", b"x")})
+    assert r.status_code == 403

@@ -129,20 +129,21 @@ def _thuoc_ngan_sach(duong: str) -> bool:
 
 
 def _chi_doc() -> bool:
-    """Trang có ở chế độ CHỈ ĐỌC không (ẩn hẳn phần nạp dữ liệu)?
+    """Trang có ở chế độ CHỈ ĐỌC không (ẩn hẳn phần nạp dữ liệu)? — `KOME_CHI_DOC=1`.
 
-    Trên Vercel thì LUÔN chỉ đọc, và đây không phải lựa chọn:
-      * mỗi yêu cầu bị chặn ở 4,5 MB, còn một file 売上伝票データ nặng ~100 MB;
-      * ổ đĩa của hàm serverless là tạm — ghi xong là mất, nên lớp `raw`
-        (lưu nguyên file Excel gốc) không tồn tại được ở đó;
-      * nạp một quý bán hàng mất ~88 giây, vượt giới hạn thời gian chạy.
-    Ba thứ đó là giới hạn nền tảng. Cho phép bật nạp dữ liệu trên Vercel chỉ
-    tạo ra một nút bấm luôn báo lỗi khó hiểu giữa chừng.
-
-    Ngoài Vercel thì đặt KOME_CHI_DOC=1 nếu muốn dựng thêm một bản chỉ để xem.
-    """
-    return bao_mat.tren_mang() or os.environ.get("KOME_CHI_DOC", "").strip().lower() in (
+    Từ 2026-09-25 (migration 045, đặc tả 2026-09-25-nap-tren-vercel-design.md) bản
+    Vercel NẠP ĐƯỢC file hằng ngày: file 13:30 nhỏ (bán hàng một ngày ~1 MB, lớn nhất
+    là 得意先全情報 ~2,5 MB) nên lọt trần 4,5 MB mỗi yêu cầu; file chờ xác nhận nằm
+    trong `meta.nap_cho` thay cho ổ đĩa tạm; file gốc không lưu. Đối soát tháng /
+    nạp lại cả quý (file 30–106 MB) vẫn ở máy trong công ty — trình duyệt chặn file
+    quá `GIOI_HAN_WEB` trên Vercel. `create_app` còn tự bật chỉ-đọc khi không có
+    kết nối nạp (`DATABASE_URL`)."""
+    return os.environ.get("KOME_CHI_DOC", "").strip().lower() in (
         "1", "true", "yes", "co", "có")
+
+
+# Trần yêu cầu của Vercel là 4,5 MB; chừa phần đầu biểu mẫu multipart.
+GIOI_HAN_WEB = 4_000_000
 
 
 def _ky_du_lieu(conn) -> dict:
@@ -209,7 +210,14 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
               name="assets")
     archive_dir = Path(os.environ.get("ARCHIVE_DIR", "./raw_archive"))
     open_conn = lambda: connect(db_url)
-    chi_doc = _chi_doc()
+    # Không có kết nối nạp (vd bản Vercel chưa đặt DATABASE_URL) = chỉ-đọc, không
+    # phải nút bấm nổ KeyError giữa chừng.
+    chi_doc = _chi_doc() or (db_url is None and not os.environ.get("DATABASE_URL"))
+    from kome import nap_cho as _nap_cho
+    # File chờ xác nhận: ổ đĩa (máy công ty) hay meta.nap_cho (Vercel) — 045.
+    kho_cho = _nap_cho.tao_kho(_nap_cho.kieu_mac_dinh(), archive_dir, open_conn)
+    # Nơi lưu file gốc sau khi nạp; None = không lưu (kho trong CSDL — bản Vercel).
+    archive_luu = archive_dir if kho_cho.luu_file_goc else None
 
     # Hai kết nối, hai vai trò CSDL (đặc tả đợt 3 §6.3):
     #   open_conn     -> DATABASE_URL     (kome_ingest_user): NẠP và HOÀN TÁC,
@@ -774,7 +782,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                         staged = Path(tmp) / f.filename
                         with staged.open("wb") as out:
                             shutil.copyfileobj(f.file, out)
-                        results.append(ingest(conn, staged, archive_dir))
+                        results.append(ingest(conn, staged, archive_luu))
                 _ghi_ai(conn, "nap_boi", [r.batch_id for r in results if r.batch_id],
                         getattr(request.state, "nguoi", None))
             if any(r.batch_id for r in results):
@@ -811,7 +819,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         conn.rollback()                  # kiem chỉ đọc; không để giao dịch đọc treo
         cho = kq.ok and not kq.skipped
         if not cho:
-            nap_cho.xoa(archive_dir, ma)
+            kho_cho.xoa(ma)
         sp = SPECS.get(kq.spec_name) if kq.spec_name else None
         return {"ma": ma if cho else None, "ten_file": duong.name, "o": o, "spec_name": kq.spec_name,
                 "ja": sp.display_name if sp else None, "bang": sp.core_table if sp else None,
@@ -825,12 +833,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         if chi_doc:
             return _cam(request)
         try:
-            from kome import nap_cho
-            nap_cho.don_cu(archive_dir)
+            kho_cho.don_cu()
             ket = []
             with open_conn() as conn:
                 for f in files:
-                    ma, duong = nap_cho.luu(archive_dir, f.file, f.filename, o)
+                    ma, duong = kho_cho.luu(f.file, f.filename, o)
                     ket.append(_ket_kiem(conn, ma, duong, o))
                 ctx = _du_lieu_nap(conn)
             return _man_kho(request, {**ctx, "kiem": ket})
@@ -848,14 +855,14 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             results = []
             with open_conn() as conn:
                 for m_ in ma:
-                    x = nap_cho.doc(archive_dir, m_)
+                    x = kho_cho.doc(m_)
                     if x is None:
                         results.append(IngestResult(ok=False, blockers=[G.Blocker(
                             1, "File chờ không còn (đã xác nhận, đã huỷ, hay quá "
                                f"{nap_cho.GIU_GIO} giờ) — thả lại file để kiểm lại.")]))
                         continue
-                    results.append(ingest(conn, x[0], archive_dir))
-                    nap_cho.xoa(archive_dir, m_)
+                    results.append(ingest(conn, x[0], archive_luu))
+                    kho_cho.xoa(m_)
                 _ghi_ai(conn, "nap_boi", [r.batch_id for r in results if r.batch_id],
                         getattr(request.state, "nguoi", None))
             if any(r.batch_id for r in results):
@@ -870,9 +877,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     def upload_huy(request: Request, ma: list[str] = Form([])):
         if chi_doc:
             return _cam(request)
-        from kome import nap_cho
         for m_ in ma:
-            nap_cho.xoa(archive_dir, m_)
+            kho_cho.xoa(m_)
         return RedirectResponse("/kho-du-lieu/nap", status_code=303)
 
     def _ghi_ai(conn, cot: str, batch_ids: list[int], nguoi) -> None:
@@ -926,7 +932,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         nguon = [n for n in KDL.nut_nguon(trang_thai_nap(conn), tuoi, tuoi.hom_nay)
                  if n["ma"] in KDL.O_TREN_MAN_NAP]
         return {"man": "nap", "tuoi": tuoi, "nguon": nguon,
-                "cho": [] if chi_doc else nap_cho.danh_sach(archive_dir),
+                "cho": [] if chi_doc else kho_cho.danh_sach(),
                 "lo": lo_nap_gan_nhat(conn)}
 
     def _man_kho(request: Request, ctx: dict) -> HTMLResponse:
@@ -972,7 +978,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             # bộ, máy chủ công khai không nhìn thấy thư mục .zip đó nên sẽ
             # luôn kết luận "chưa sao lưu" — một dải đỏ vĩnh viễn dạy người
             # đọc bỏ qua dải đỏ.
-            ctx["backup"] = None if chi_doc else backup_status(backup_dir)
+            # Máy chủ công khai không thấy thư mục sao lưu — kể cả khi nạp được (045).
+            ctx["backup"] = None if chi_doc or bao_mat.tren_mang() else backup_status(backup_dir)
             return _man_kho(request, ctx)
         except Exception as e:
             return _loi(request, "mở màn kho dữ liệu", e)

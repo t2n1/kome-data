@@ -231,5 +231,9 @@ def lam_nong(open_conn) -> None:
         except Exception as e:         # noqa: BLE001
             print(f"[anh-chup] không làm nóng được công nợ: {e!r}")
 
-    if bat():
+    # Trên Vercel luồng nền bị đóng băng ngay khi trả lời xong (045 cho Vercel nạp
+    # được): bỏ qua làm nóng — người mở trang đầu tiên sau nạp chờ lâu hơn một lần.
+    # Đúng đắn không phụ thuộc bước này: phiên bản ảnh chụp đổi theo lô nạp.
+    from kome.web.bao_mat import tren_mang
+    if bat() and not tren_mang():
         threading.Thread(target=chay, name="lam-nong-anh-chup", daemon=True).start()
