@@ -4170,6 +4170,7 @@
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
       "mart.dong_ban",
+      "mart.dong_ban_khoang",
       "mart.hang_doanh_thu",
       "mart.khach_360",
       "mart.khach_mat_hang",
@@ -4199,7 +4200,7 @@
      "he": "tax_amount",
      "ja": "消費税額",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 29 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 30 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -4240,6 +4241,7 @@
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
       "mart.dong_ban",
+      "mart.dong_ban_khoang",
       "mart.hang_doanh_thu",
       "mart.khach_360",
       "mart.khach_mat_hang",
@@ -4279,7 +4281,7 @@
      "he": "gross_profit",
      "ja": "粗利益",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 25 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 26 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -4319,6 +4321,7 @@
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
       "mart.dong_ban",
+      "mart.dong_ban_khoang",
       "mart.hang_doanh_thu",
       "mart.khach_360",
       "mart.khach_mat_hang",
@@ -10287,6 +10290,7 @@
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
       "mart.dong_ban",
+      "mart.dong_ban_khoang",
       "mart.hang_doanh_thu",
       "mart.khach_360",
       "mart.khach_mat_hang",
@@ -10316,7 +10320,7 @@
      "he": "gross_profit",
      "ja": "粗利益",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 25 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 26 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -10356,6 +10360,7 @@
       "mart.ban_theo_thang",
       "mart.ban_theo_thang_so_sanh",
       "mart.dong_ban",
+      "mart.dong_ban_khoang",
       "mart.hang_doanh_thu",
       "mart.khach_360",
       "mart.khach_mat_hang",
@@ -11090,7 +11095,6 @@
   "mart.ban_theo_nhan_vien_thang": [
    "bao_cao",
    "du_bao",
-   "ngan_sach",
    "tong_quan"
   ],
   "mart.ban_theo_san_pham": [
@@ -11146,6 +11150,7 @@
    "ban_do",
    "bao_cao",
    "khach",
+   "ngan_sach",
    "san_pham",
    "tong_quan"
   ],

@@ -15,6 +15,7 @@ ghi vào CSDL THẬT trong khi test tưởng mình đang dùng CSDL thử nghi�
 Mọi công thức ("tiến độ", "mốc đến hôm nay") nằm trong view của `mart`, không
 nằm ở đây — xem db/migrations/026_ngan_sach.sql.
 """
+import calendar
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -118,7 +119,7 @@ class BangNhap:
     o: dict[tuple[str, str], int]   # (salesperson_code, 'YYYY-MM') -> chỉ tiêu doanh thu
     o_lg: dict[tuple[str, str], int] = field(default_factory=dict)     # -> chỉ tiêu lãi gộp
     cong_ty: dict[tuple[str, str], int] = field(default_factory=dict)  # (chi_so, 'YYYY-MM') -> ngân sách công ty
-    # Thực tế từ `mart.ban_theo_nhan_vien_thang`, 24 tháng (kỳ trước + kỳ này):
+    # Thực tế theo người × tháng (`mart.dong_ban_khoang`), 24 tháng (kỳ trước + kỳ này):
     # (mã phụ trách hoặc CONG_TY, chi_so, 'YYYY-MM') -> số. Chỉ để THAM KHẢO khi đặt số.
     thuc_te: dict[tuple[str, str, str], int] = field(default_factory=dict)
 
@@ -208,15 +209,20 @@ def bang_nhap(conn, company_fy: int | None = None) -> BangNhap:
             if r[3] is not None:
                 o_lg[(r[0], r[1])] = int(r[3])
 
-    # Thực tế kỳ trước + kỳ này. Công ty = cộng mọi dòng của view (kể cả mã phụ trách
-    # rỗng / ngoài danh sách) — phép cộng trên một phân hoạch, bằng đúng
-    # `mart.ban_theo_thang`; không có tỷ số nào ở đây để lấy trung bình sai.
+    # Thực tế kỳ trước + kỳ này — cùng số với `mart.ban_theo_nhan_vien_thang` (có test
+    # canh), nhưng đọc `mart.dong_ban_khoang` (039): view kia lọc theo `thang` (cột tính
+    # ra) nên dựng lại TOÀN BỘ bảng bán rồi mới lọc, kèm hai `count(DISTINCT)` màn này
+    # không cần — đo thật 2026-09-25: 1,17 s; lọc theo `sales_date` còn 0,38 s.
+    # Công ty = cộng mọi dòng (kể cả mã phụ trách rỗng / ngoài danh sách) — phép cộng
+    # trên một phân hoạch, bằng đúng `mart.ban_theo_thang`; không có tỷ số nào ở đây.
     truoc = thang_cua_ky(ky - 1)
+    nam, t = map(int, thang[-1].split("-"))
+    den = date(nam, t, calendar.monthrange(nam, t)[1])
     thuc_te: dict[tuple[str, str, str], int] = {}
     for th, ma, dt, lg in conn.execute(
-            """SELECT thang, salesperson_code, doanh_thu_thuan, lai_gop
-                 FROM mart.ban_theo_nhan_vien_thang
-                WHERE thang >= %s AND thang <= %s""", (truoc[0], thang[-1])).fetchall():
+            """SELECT thang, salesperson_code, sum(doanh_thu_thuan), sum(gross_profit)
+                 FROM mart.dong_ban_khoang(%s, %s)
+                GROUP BY 1, 2""", (_mung_1(truoc[0]), den)).fetchall():
         for cs, v in (("doanh_thu", dt), ("lai_gop", lg)):
             if v is None:
                 continue

@@ -285,14 +285,24 @@ def test_xem_KY_CU_thi_nguoi_con_ban_trong_ky_do_van_hien(conn, batch):
 
 
 def test_thuc_te_la_doanh_thu_thuan_theo_thang_cong_ty_bang_tong_cac_nguoi(conn, batch):
-    """Thực tế tham khảo = `mart.ban_theo_nhan_vien_thang` (doanh thu THUẦN = amount − thuế);
-    dòng công ty = cộng mọi người, bằng đúng `mart.ban_theo_thang`."""
+    """Thực tế tham khảo (doanh thu THUẦN = amount − thuế) — đọc `mart.dong_ban_khoang` cho
+    nhanh, nhưng PHẢI ra đúng số của `mart.ban_theo_nhan_vien_thang`; dòng công ty = cộng
+    mọi người, bằng đúng `mart.ban_theo_thang`. Dòng ở hai đầu kỳ (1/8 và 31/7) vẫn vào."""
     from kome.ngan_sach import CONG_TY
     _ban(conn, batch, date(2025, 10, 6), "0104")
     _ban(conn, batch, date(2025, 10, 7), "0105")
+    _ban(conn, batch, date(2025, 8, 1), "0104")      # ngày đầu kỳ trước
+    _ban(conn, batch, date(2027, 7, 31), "0105")     # ngày cuối kỳ này
     b = bang_nhap(conn, 2027)          # kỳ trước = 2026 (8/2025–7/2026) cũng phải có
     assert b.thuc_te[("0104", "doanh_thu", "2025-10")] == 100_000
     assert b.thuc_te[("0104", "lai_gop", "2025-10")] == 30_000
     assert b.thuc_te[(CONG_TY, "doanh_thu", "2025-10")] == 200_000
     mart = conn.execute("SELECT doanh_thu_thuan FROM mart.ban_theo_thang WHERE thang = '2025-10'").fetchone()[0]
     assert b.thuc_te[(CONG_TY, "doanh_thu", "2025-10")] == mart
+    assert b.thuc_te[("0104", "doanh_thu", "2025-08")] == 100_000
+    assert b.thuc_te[("0105", "doanh_thu", "2027-07")] == 100_000
+    view = {(ma, cs, th): int(v) for th, ma, dt, lg in conn.execute(
+        """SELECT thang, salesperson_code, doanh_thu_thuan, lai_gop
+             FROM mart.ban_theo_nhan_vien_thang""").fetchall()
+        for cs, v in (("doanh_thu", dt), ("lai_gop", lg))}
+    assert {k: v for k, v in b.thuc_te.items() if k[0] != CONG_TY} == view

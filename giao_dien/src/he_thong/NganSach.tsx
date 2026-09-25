@@ -13,7 +13,7 @@
 // và phần chưa chia, không bao giờ tự cộng thay. `inputMode="numeric"` chứ KHÔNG
 // `type="number"`: cuộn chuột trên ô number là đổi số. Ô chưa đặt TRỐNG, không 0 — "chưa đặt"
 // khác "bằng không". Tổng in "—" khi không ô nào đứng sau nó. Tiền dấu CHẤM — khớp /bao-cao.
-// "Năm trước" = thực tế cùng tháng kỳ trước (`mart.ban_theo_nhan_vien_thang`), chỉ để tham khảo.
+// "Năm trước" = thực tế cùng tháng kỳ trước (`mart.dong_ban_khoang`), chỉ để tham khảo.
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import { KD } from "../khoi_dau";
