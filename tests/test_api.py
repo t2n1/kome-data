@@ -200,7 +200,7 @@ def test_du_lieu_khoi_dau_khong_the_dong_the_script():
 
 def test_du_lieu_khoi_dau_du_danh_muc_va_quyen(test_db_url):
     kd = _khoi_dau(TestClient(create_app(db_url=test_db_url)).get("/").text)
-    assert len(kd["danh_muc"]["khoi"]) == 22 and kd["chua_co"]["dong_tien"] and "cong_no" not in kd["chua_co"]
+    assert len(kd["danh_muc"]["khoi"]) == 23 and kd["chua_co"]["dong_tien"] and "cong_no" not in kd["chua_co"]
     assert kd["nguoi"] is None and kd["hien_kho"] is True
 
 
