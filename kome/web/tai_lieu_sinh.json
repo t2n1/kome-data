@@ -68,6 +68,7 @@
    "tien_do_ngan_sach",
    "toc_do_ban",
    "ton_hien_tai",
+   "ton_theo_lo",
    "tong_theo_ky",
    "ty_suat_mat_hang",
    "uu_tien_lien_he"
@@ -82,7 +83,7 @@
   "Có bản xuất `得意先全情報` chỉ 201 dòng (xuất một phần — **cổng 3** chặn vì dưới `min_rows`) và bản chỉ 5 cột (sai mẫu — **cổng 2** chặn trước, `ColumnMismatch`, vì thiếu cột khai báo).",
   "File `元帳` có 5 dòng thông tin trước header — ĐÃ đo thật 2026-09-24 trên `請求先元帳` / `得意先元帳` (header ở dòng 6; sheet tên `得意先元帳` ở CẢ HAI loại sổ, phân biệt bằng dòng 集計軸項目 — `kome/so_cai.py`). `売上明細表` đã đo thật (2026-09-17): header ở dòng 1, KHÔNG có dòng rác — có thể do OBC đổi mẫu xuất, hoặc quan sát cũ chỉ đúng cho một cấu hình xuất khác. File master và `在庫一覧` thì header ở dòng 1.",
   "`担当者` của OBC (5 người) KHÁC người nhập đơn trên web (7 tài khoản, gồm 2 arubaito).",
-  "Tên kho của OBC là **tên nghiệp vụ**, không phải địa điểm: `1002 新・賞味期限用` nghĩa là \"ngăn dùng cho hạn sử dụng\", không phải một địa chỉ kho. Gói thiết kế đợt 4b có viết cứng ba tên `Osaka` / `Nagoya` / `Kho lạnh Osaka` — **không có thật**. Thực tế công ty chỉ có HAI kho: `0001 茨城第１倉庫（出荷専用）` và `1002 新・賞味期限用`. Đặt tên kho cứng ở đâu đó (thay vì đọc từ `core.dim_warehouse`) là thêm một kho ảo vào mọi bộ lọc.",
+  "Tên kho của OBC là **tên nghiệp vụ**, không phải địa điểm: `1002 新・賞味期限用` nghĩa là \"ngăn dùng cho hạn sử dụng\", không phải một địa chỉ kho. Gói thiết kế đợt 4b có viết cứng ba tên `Osaka` / `Nagoya` / `Kho lạnh Osaka` — **không có thật**. Thực tế công ty có **MỘT kho vật lý** (Ibaraki); hai \"kho\" của OBC (`0001 茨城第１倉庫（出荷専用）`, `1002 新・賞味期限用`) là hai **LÔ theo hạn sử dụng** của cùng hàng trong kho đó (chủ DN xác nhận 2026-09-25): `0001` = lô ĐANG XUẤT, `1002` = lô hạn MỚI hơn đang chờ; `0001` của mã nào hết thì tồn `1002` của mã đó được chuyển lên `0001`. Đo trên ảnh chụp 2026-09-24: mọi `売上出荷数量` nằm ở `0001` (1002 = 0), 40 mã có ở cả hai, 0 mã chỉ có ở `1002`, không mã nào có hạn ở `1002` sớm hơn `0001`. Nên: \"kho\" trên màn là lô chứ không phải địa điểm; tồn / trạng thái của một mã là tổng HAI lô; so hai \"kho\" với nhau như hai chi nhánh là vô nghĩa. Đặt tên kho cứng ở đâu đó (thay vì đọc từ `core.dim_warehouse`) là thêm một kho ảo vào mọi bộ lọc.",
   "`prefecture` của OBC là tên tỉnh chuẩn có hậu tố 都/道/府/県, đủ cả 47 tỉnh, và chỉ **1 trên 1.710 khách** bỏ trống — cột sạch nhất đã gặp, nên khoá nối (`core.dim_prefecture.ten` ↔ `core.dim_customer.prefecture`) là chính chuỗi tên, không cần lớp chuẩn hoá. Đổi một ký tự trong `core.dim_prefecture.ten` là tỉnh đó rỗng vĩnh viễn trên bản đồ khách hàng (`/ban-do`) mà không lỗi nào nổ ra — phép nối chỉ lặng lẽ không khớp dòng nào. Có test canh: `tests/test_ban_do.py::test_ten_tinh_khop_chuoi_OBC_that`, `::test_hau_to_dung_voi_tung_ma_jis_ca_47_dong` (khẳng định hậu tố theo ĐÚNG `ma_jis` — `01`→道, `13`→都, `26`/`27`→府, 43 mã còn lại→県; một điều kiện \"hậu tố nằm trong 都/道/府/県\" cho `大阪県` lọt qua)."
  ],
  "chu_thich": {

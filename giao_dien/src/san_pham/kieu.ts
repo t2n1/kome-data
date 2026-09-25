@@ -33,6 +33,9 @@ export type TonDong = {
   kho: string; ten_kho: string | null; so_luong: number | null; gia_tri: number;
   best_before: string | null; loai_han: string | null; nhan_han: string; mau_han: string;
   han_con_lai: number | null;
+  /** 042 (mart.ton_theo_lo): hai "kho" OBC là hai LÔ của một kho vật lý — lô đang xuất bán trước. */
+  vai_tro_lo: "dang_xuat" | "cho";
+  bat_dau_ban_sau: number | null; ban_het_sau: number | null; khong_kip_ban: boolean | null;
 };
 
 export type HoSoSpApi = {
@@ -50,6 +53,10 @@ export type NgayApi = { thang: string; hom_nay: string | null; nay: NgayBan[]; t
 export type DongKho = TonDong & {
   ma: string; ten: string; trang_thai: string | null; nhan_trang_thai: string; mau: string;
   nhom: string | null; du_ban_ngay: number | null; toc_do: number | null;
+  /** 食品分類名 của 商品データ qua mart.ten_nganh — rỗng thành "(chưa phân loại)". */
+  nganh: string;
+  sl_khong_kip: number | null; gia_tri_khong_kip: number | null;
+  lo_xuat_du_ban: number | null; ton_lo_cho: number | null; sap_chuyen_lo: boolean;
 };
 
 export type KhoApi = {
@@ -58,6 +65,7 @@ export type KhoApi = {
     theo_kho: { ma: string; ten: string; gia_tri: number; so_dong: number }[];
     can_han: DongKho[]; qua_han: DongKho[]; ds_kho: [string, string][];
     kho: string; loc: string; gia_tri_ton: number;
+    khong_kip: DongKho[]; chuyen_lo: DongKho[]; kho_dang_xuat: string;
   };
   trang_thai: Record<string, [string, string]>;
   loai_han: Record<string, [string, string]>;

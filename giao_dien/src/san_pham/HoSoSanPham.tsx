@@ -63,7 +63,7 @@ export function HoSoSanPham({ ma, dong, onDong }: { ma: string; dong: MaHang | n
           </div>
           <div className="sp-hs-o">
             <div className="o-kpi"><div className="nhan">Tồn hiện tại</div><div className="gia">{tonTong == null ? "—" : soLuong(tonTong)}</div>
-              <div className="dong-phu nhat-chu">{tonTong == null ? "chưa rõ tồn — không phải 0" : "tổng mọi kho"}</div></div>
+              <div className="dong-phu nhat-chu">{tonTong == null ? "chưa rõ tồn — không phải 0" : "tổng cả hai lô (đang xuất + chờ)"}</div></div>
             <div className="o-kpi"><div className="nhan">Bán/ngày (theo tuổi mã)</div><div className="gia">{soLuong(sp.toc_do_ngay_theo_tuoi)}</div>
               <div className="dong-phu nhat-chu">90 ngày, chia cho số ngày mã có mặt</div></div>
             <div className="o-kpi"><div className="nhan">Còn đủ bán</div>
@@ -128,16 +128,19 @@ export function HoSoSanPham({ ma, dong, onDong }: { ma: string; dong: MaHang | n
 
       <div className="sp-luoi-2">
         <section className="kh-the">
-          <div className="kh-the-dau"><h2>Tồn kho &amp; hàng về</h2>
+          <div className="kh-the-dau"><h2>Tồn theo lô &amp; hàng về</h2>
             <a className="kh-the-goc" href={`/kho-hang?tim=${encodeURIComponent(sp.ma)}`}>Xem ở Kho hàng →</a></div>
-          <p className="phu">Ảnh chụp 在庫一覧 mới nhất. "Còn lại" đếm từ mốc dữ liệu (ngày bán mới nhất), có thể lệch vài ngày so với ngày chụp tồn.</p>
-          {h.ton.length ? <div className="bang-cuon"><table className="bang"><thead><tr><th>Kho</th><th className="so">Số lượng</th><th className="so">Giá trị</th><th>Hạn sử dụng</th><th className="so">Còn lại</th></tr></thead>
+          <p className="phu">Ảnh chụp 在庫一覧 mới nhất. Hai "kho" của OBC là hai <b>lô</b> trong cùng một kho: lô đang xuất bán trước, lô chờ (hạn mới hơn) được chuyển lên khi lô kia hết — xếp đúng thứ tự bán.
+            "Còn hạn" và "Bán hết" đếm từ mốc dữ liệu (ngày bán mới nhất); "Bán hết" = tồn cộng dồn tới lô đó ÷ tốc độ bán (cùng tốc độ xếp trạng thái).</p>
+          {h.ton.length ? <div className="bang-cuon"><table className="bang"><thead><tr><th>Lô</th><th className="so">Số lượng</th><th className="so">Giá trị</th><th>Hạn sử dụng</th><th className="so">Còn hạn</th><th className="so">Bán hết sau</th></tr></thead>
             <tbody>{h.ton.map((t, i) => (
-              <tr key={i}><td className="ten-jp">{t.ten_kho ? `${t.kho} ${t.ten_kho}` : t.kho}</td>
+              <tr key={i}><td><b>{t.vai_tro_lo === "dang_xuat" ? "Lô đang xuất" : "Lô chờ"}</b><div className="ma-nho ten-jp">{t.ten_kho ? `${t.kho} ${t.ten_kho}` : t.kho}</div></td>
                 <td className="so">{soLuong(t.so_luong)}</td><td className="so">{yen(t.gia_tri)}</td>
                 <td><span className={"nhan-vien " + t.mau_han}>{t.nhan_han}</span>{t.best_before && <div className="ma-nho ten-jp">{t.best_before}</div>}</td>
                 <td className={"so " + (t.han_con_lai != null && t.han_con_lai < 0 ? "giam" : t.han_con_lai != null && t.han_con_lai <= 90 ? "canh-chu" : "")}>
-                  {t.han_con_lai == null ? "—" : t.han_con_lai < 0 ? `quá ${-t.han_con_lai} ngày` : `${t.han_con_lai} ngày`}</td></tr>))}</tbody></table></div>
+                  {t.han_con_lai == null ? "—" : t.han_con_lai < 0 ? `quá ${-t.han_con_lai} ngày` : `${t.han_con_lai} ngày`}</td>
+                <td className={"so " + (t.khong_kip_ban ? "giam" : "")} title={t.khong_kip_ban ? "Dự kiến bán hết SAU hạn sử dụng — không kịp bán" : undefined}>
+                  {t.ban_het_sau == null ? "—" : `${Math.round(t.ban_het_sau)} ngày`}{t.khong_kip_ban ? " ⚠" : ""}</td></tr>))}</tbody></table></div>
             : <p className="trong-nho">Không có dòng nào trong 在庫一覧 gần nhất — <b>chưa rõ tồn</b>, không phải tồn bằng 0.</p>}
           <div className="sp-hang-ve"><span className="nhan-vien nhat">hàng về · chưa có dữ liệu</span>
             <span className="phu">OBC chưa xuất đơn mua / lịch container (仕入・発注) — chưa biết lô nào sắp về.</span></div>

@@ -171,6 +171,33 @@ class Kho:
     # Ảnh chụp tồn sớm nhất trong kho (040) — `ngay_chup` None mà cột này có giá
     # trị nghĩa là đang xem lùi về TRƯỚC ảnh chụp đầu tiên.
     ngay_chup_dau: date | None = None
+    # Theo LÔ (042): lô dự kiến còn hàng lúc hết hạn, và mã sắp phải chuyển lô
+    # chờ lên lô đang xuất. `kho_dang_xuat` = mart.kho_dang_xuat() — giao diện
+    # đọc nó để gọi tên lô, không tự viết cứng mã kho.
+    khong_kip: list[dict] = field(default_factory=list)
+    chuyen_lo: list[dict] = field(default_factory=list)
+    kho_dang_xuat: str = ""
+
+
+# Bộ cột CHUNG của mọi nhánh lượt hỏi 2 của kho_hang() (UNION ALL đòi cùng cột):
+# `_COT_LO` trong nhánh (bí danh t = mart.ton_theo_lo, s = mart.san_pham_360,
+# p = core.dim_product), `_COT_LO_NGOAI` ở lớp ngoài — cùng thứ tự với `_dong`.
+_COT_LO = """t.product_code AS ma, coalesce(s.ten_hang, t.product_code) AS ten,
+             t.warehouse_code AS kho, t.ten_kho, t.so_luong, t.gia_tri,
+             t.best_before, t.loai_han, t.han_con_lai, s.trang_thai, s.nhom,
+             s.du_ban_ngay, s.toc_do_ngay_theo_tuoi AS toc_do,
+             mart.ten_nganh(p.food_category_name) AS nganh,
+             t.vai_tro_lo, t.bat_dau_ban_sau, t.ban_het_sau, t.khong_kip_ban,
+             t.sl_khong_kip, t.gia_tri_khong_kip, t.lo_xuat_du_ban, t.ton_lo_cho,
+             t.sap_chuyen_lo"""
+_COT_LO_NGOAI = """ma, ten, kho, ten_kho, so_luong, gia_tri, best_before, loai_han,
+             han_con_lai, trang_thai, nhom, du_ban_ngay, toc_do, nganh,
+             vai_tro_lo, bat_dau_ban_sau, ban_het_sau, khong_kip_ban,
+             sl_khong_kip, gia_tri_khong_kip, lo_xuat_du_ban, ton_lo_cho,
+             sap_chuyen_lo"""
+_TU_LO = """FROM t
+               LEFT JOIN s ON s.product_code = t.product_code
+               LEFT JOIN core.dim_product p ON p.product_code = t.product_code"""
 
 
 _COT = """product_code, ten_hang, nhom, doanh_thu_thuan, lai_gop, ty_suat,
@@ -413,12 +440,17 @@ def ho_so(conn, ma: str) -> HoSoSanPham | None:
             "gia_tri": int(t[3] or 0), "best_before": t[4], "loai_han": t[5],
             "nhan_han": LOAI_HAN.get(t[5], (t[5] or "—", "nhat"))[0],
             "mau_han": LOAI_HAN.get(t[5], (t[5] or "—", "nhat"))[1],
-            "han_con_lai": t[6]}
+            "han_con_lai": t[6], "vai_tro_lo": t[7],
+            "bat_dau_ban_sau": _so(t[8]), "ban_het_sau": _so(t[9]),
+            "khong_kip_ban": t[10]}
+           # 042: đọc mart.ton_theo_lo (lô đang xuất / lô chờ — CLAUDE.md bẫy #6),
+           # xếp theo THỨ TỰ BÁN của các lô, không theo mã kho.
            for t in conn.execute(
         """SELECT warehouse_code, ten_kho, so_luong, gia_tri, best_before,
-                  loai_han, han_con_lai
-           FROM mart.ton_hien_tai WHERE product_code = %s
-           ORDER BY warehouse_code, han_con_lai NULLS LAST""", (ma,)).fetchall()]
+                  loai_han, han_con_lai, vai_tro_lo, bat_dau_ban_sau,
+                  ban_het_sau, khong_kip_ban
+           FROM mart.ton_theo_lo WHERE product_code = %s
+           ORDER BY thu_tu_lo""", (ma,)).fetchall()]
 
     # DISTINCT ON (price_level, pack_code) … ORDER BY valid_from DESC:
     # core.fact_price_list giữ LỊCH SỬ giá — kome/loaders/price.py ghi một dòng
@@ -551,6 +583,8 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
             UNION ALL
             SELECT 'ngay_dau', '', '', 0, 0, min(snapshot_date)
               FROM core.fact_inventory_daily
+            UNION ALL
+            SELECT 'kdx', mart.kho_dang_xuat(), '', 0, 0, NULL
         ) u ORDER BY khoi, khoa
     """, [CAN_HAN_NGAY] + p_kho + p_loc + p_kho + p_loc + p_loc).fetchall()
 
@@ -562,6 +596,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     # Ảnh chụp tồn SỚM NHẤT trong kho — để màn nói "chưa có ảnh chụp tồn tại mốc
     # này, ảnh chụp sớm nhất là …" khi xem lùi về trước nó (040).
     ngay_chup_dau = next((r[5] for r in tq if r[0] == "ngay_dau"), None)
+    kho_dang_xuat = next((r[1] for r in tq if r[0] == "kdx"), "")
 
     # Lượt hỏi 2: bảng tồn + khối cận hạn + khối quá hạn, cả ba đều theo CẢ
     # HAI bộ lọc (chúng là khối nội dung, không điều khiển gì). Cùng một view,
@@ -575,53 +610,52 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     # mâu thuẫn mà ô tổng quan sinh ra để tránh — ô nói "12 lô cận hạn" còn
     # bảng ngay dưới nó chỉ liệt kê 10.
     #
-    # LEFT JOIN san_pham_360: một mã có trong bản xuất tồn kho nhưng chưa có
+    # LEFT JOIN san_pham_360 (và core.dim_product để lấy ngành): một mã có trong bản xuất tồn kho nhưng chưa có
     # trong 商品マスタ vẫn phải hiện ở bảng tồn. INNER JOIN làm nó biến mất khỏi
     # đúng màn hình lẽ ra phải phát hiện ra nó.
     #
     # Lại HAI CTE `AS MATERIALIZED` như lượt hỏi 1, và vì đúng lý do đó: ba
     # nhánh dưới đây tham chiếu mart.ton_hien_tai 3 lần và mart.san_pham_360 3
     # lần, tức 3 lần dựng lại mỗi view nếu để nguyên.
+    #
+    # Từ 042, CTE `t` của lượt này là mart.ton_theo_lo (= ton_hien_tai + các cột
+    # theo LÔ): hai "kho" của OBC là lô đang xuất / lô chờ của cùng một kho vật
+    # lý (CLAUDE.md bẫy #6). Thêm hai nhánh — 'kkb' (không kịp bán trước hạn) và
+    # 'chuyen' (sắp chuyển lô) — vẫn trong CÙNG lượt hỏi, cùng bộ cột `_COT_LO`.
+    # 'chuyen' là thuộc tính của MÃ nên KHÔNG theo bộ lọc kho (lọc kho 1002 thì
+    # dòng lô đang xuất bị lọc mất, mà chính nó mang cờ); vẫn theo trạng thái.
     rows = conn.execute(f"""
         WITH s AS MATERIALIZED (SELECT * FROM mart.san_pham_360),
-             t AS MATERIALIZED (SELECT * FROM mart.ton_hien_tai)
-        SELECT khoi, ma, ten, kho, ten_kho, so_luong, gia_tri, best_before,
-               loai_han, han_con_lai, trang_thai, nhom, du_ban_ngay, toc_do
+             t AS MATERIALIZED (SELECT * FROM mart.ton_theo_lo)
+        SELECT khoi, {_COT_LO_NGOAI}
         FROM (
-            (SELECT 'dong'::text AS khoi, t.product_code AS ma,
-                    coalesce(s.ten_hang, t.product_code) AS ten,
-                    t.warehouse_code AS kho, t.ten_kho, t.so_luong, t.gia_tri,
-                    t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
-                    s.nhom, s.du_ban_ngay, s.toc_do_ngay_theo_tuoi AS toc_do,
+            (SELECT 'dong'::text AS khoi, {_COT_LO},
                     row_number() OVER (ORDER BY t.gia_tri DESC NULLS LAST) AS xep
-               FROM t
-               LEFT JOIN s ON s.product_code = t.product_code
+               {_TU_LO}
               WHERE true {dk_kho} {dk_loc})
             UNION ALL
-            (SELECT 'han', t.product_code,
-                    coalesce(s.ten_hang, t.product_code),
-                    t.warehouse_code, t.ten_kho, t.so_luong, t.gia_tri,
-                    t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
-                    s.nhom, s.du_ban_ngay, s.toc_do_ngay_theo_tuoi,
-                    row_number() OVER (ORDER BY t.han_con_lai)
-               FROM t
-               LEFT JOIN s ON s.product_code = t.product_code
+            (SELECT 'han', {_COT_LO}, row_number() OVER (ORDER BY t.han_con_lai)
+               {_TU_LO}
               WHERE {VI_TU_CAN_HAN}
                     {dk_kho} {dk_loc})
             UNION ALL
-            (SELECT 'qua', t.product_code,
-                    coalesce(s.ten_hang, t.product_code),
-                    t.warehouse_code, t.ten_kho, t.so_luong, t.gia_tri,
-                    t.best_before, t.loai_han, t.han_con_lai, s.trang_thai,
-                    s.nhom, s.du_ban_ngay, s.toc_do_ngay_theo_tuoi,
-                    row_number() OVER (ORDER BY t.han_con_lai)
-               FROM t
-               LEFT JOIN s ON s.product_code = t.product_code
+            (SELECT 'qua', {_COT_LO}, row_number() OVER (ORDER BY t.han_con_lai)
+               {_TU_LO}
               WHERE {VI_TU_QUA_HAN}
                     {dk_kho} {dk_loc})
+            UNION ALL
+            (SELECT 'kkb', {_COT_LO},
+                    row_number() OVER (ORDER BY t.gia_tri_khong_kip DESC, t.han_con_lai)
+               {_TU_LO}
+              WHERE t.khong_kip_ban {dk_kho} {dk_loc})
+            UNION ALL
+            (SELECT 'chuyen', {_COT_LO},
+                    row_number() OVER (ORDER BY t.lo_xuat_du_ban NULLS FIRST, t.product_code)
+               {_TU_LO}
+              WHERE t.sap_chuyen_lo {dk_loc})
         ) u ORDER BY khoi, xep
     """, p_kho + p_loc + [CAN_HAN_NGAY] + p_kho + p_loc
-         + p_kho + p_loc).fetchall()
+         + p_kho + p_loc + p_kho + p_loc + p_loc).fetchall()
 
     def _dong(r):
         # `nhan_*`/`mau_*` là CHUỖI, không phải tuple — cùng hình dạng với
@@ -638,7 +672,20 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                 "nhan_trang_thai": nhan_tt, "mau": mau_tt,
                 # Ba cột của CẢ MÃ (mọi kho, san_pham_360) — giao diện React ghi
                 # rõ "của cả mã": không có "đủ bán" riêng từng kho ở mart.
-                "nhom": r[11], "du_ban_ngay": _so(r[12]), "toc_do": _so(r[13])}
+                "nhom": r[11], "du_ban_ngay": _so(r[12]), "toc_do": _so(r[13]),
+                # Ngành hàng = 食品分類名 của 商品データ (core.dim_product), qua
+                # ĐÚNG hàm mart.ten_nganh — cùng nhãn "(chưa phân loại)" với Báo
+                # cáo / Sản phẩm. KHÔNG đọc 食品分類 của chính file 在庫一覧 (từ
+                # 2026-09-24 bản xuất có kèm hai cột đó): một khái niệm một
+                # nguồn — mã chưa phân loại thì sửa ở 商品データ trong OBC.
+                "nganh": r[14],
+                # Theo LÔ (042, mart.ton_theo_lo). `vai_tro_lo`: 'dang_xuat' | 'cho'.
+                "vai_tro_lo": r[15], "bat_dau_ban_sau": _so(r[16]),
+                "ban_het_sau": _so(r[17]), "khong_kip_ban": r[18],
+                "sl_khong_kip": _so(r[19]),
+                "gia_tri_khong_kip": None if r[20] is None else int(r[20]),
+                "lo_xuat_du_ban": _so(r[21]), "ton_lo_cho": _so(r[22]),
+                "sap_chuyen_lo": bool(r[23])}
 
     dong = [_dong(r) for r in rows if r[0] == "dong"]
     return Kho(ngay_chup=ngay_chup, o_tong_quan=o_tong_quan,
@@ -646,6 +693,9 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                theo_kho=theo_kho,
                can_han=[_dong(r) for r in rows if r[0] == "han"],
                qua_han=[_dong(r) for r in rows if r[0] == "qua"],
+               khong_kip=[_dong(r) for r in rows if r[0] == "kkb"],
+               chuyen_lo=[_dong(r) for r in rows if r[0] == "chuyen"],
+               kho_dang_xuat=kho_dang_xuat,
                ds_kho=ds_kho, kho=kho, loc=loc, ngay_chup_dau=ngay_chup_dau)
 
 

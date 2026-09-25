@@ -35,7 +35,14 @@ Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE tro
 6. Tên kho của OBC là **tên nghiệp vụ**, không phải địa điểm: `1002 新・賞味期限用`
    nghĩa là "ngăn dùng cho hạn sử dụng", không phải một địa chỉ kho. Gói thiết kế đợt
    4b có viết cứng ba tên `Osaka` / `Nagoya` / `Kho lạnh Osaka` — **không có thật**.
-   Thực tế công ty chỉ có HAI kho: `0001 茨城第１倉庫（出荷専用）` và `1002 新・賞味期限用`.
+   Thực tế công ty có **MỘT kho vật lý** (Ibaraki); hai "kho" của OBC
+   (`0001 茨城第１倉庫（出荷専用）`, `1002 新・賞味期限用`) là hai **LÔ theo hạn sử dụng**
+   của cùng hàng trong kho đó (chủ DN xác nhận 2026-09-25): `0001` = lô ĐANG XUẤT,
+   `1002` = lô hạn MỚI hơn đang chờ; `0001` của mã nào hết thì tồn `1002` của mã đó
+   được chuyển lên `0001`. Đo trên ảnh chụp 2026-09-24: mọi `売上出荷数量` nằm ở `0001`
+   (1002 = 0), 40 mã có ở cả hai, 0 mã chỉ có ở `1002`, không mã nào có hạn ở `1002`
+   sớm hơn `0001`. Nên: "kho" trên màn là lô chứ không phải địa điểm; tồn / trạng thái
+   của một mã là tổng HAI lô; so hai "kho" với nhau như hai chi nhánh là vô nghĩa.
    Đặt tên kho cứng ở đâu đó (thay vì đọc từ `core.dim_warehouse`) là thêm một kho ảo
    vào mọi bộ lọc.
 7. `prefecture` của OBC là tên tỉnh chuẩn có hậu tố 都/道/府/県, đủ cả 47 tỉnh, và chỉ
@@ -98,7 +105,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/ngan-sach` | Ngân sách theo tháng (041): khối **công ty** (12 tháng × doanh thu + lãi gộp, nhập thẳng) rồi khối **từng người phụ trách** (doanh thu + lãi gộp, không bắt buộc) + tổng từng người + phần lệch so với công ty. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach_cong_ty`, `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date` |
 | `/san-pham` | **React** (giai đoạn 4, bám Sản phẩm.dc.html; khoảng xem: cột doanh thu / SL / khách trong khoảng từ `/api/san-pham/khoang`, ghép ở trình duyệt): MỘT trang — ô tổng quan · danh mục cả 232 mã (chip ngành / trạng thái, tìm, sắp — lọc ở trình duyệt trên MỘT ảnh chụp `/api/san-pham`, 1 lượt hỏi) · hồ sơ mã đang chọn ngay bên dưới | `mart.san_pham_360`, `mart.dong_ban`, `mart.moc_thoi_gian`, `core.dim_product` |
 | `/san-pham/{mã}` | Cùng màn Sản phẩm với một mã được chọn (`pushState`): khách mua trong khoảng xem (`/api/san-pham/{mã}/khoang`, 2 lượt), biểu đồ theo ngày mở đúng tháng đang xem · hồ sơ (`/api/san-pham/{mã}`, ≤ 5 lượt) · bán theo ngày + cùng ngày tháng trước (`/ngay?thang=`, 1 lượt) · khách đang mua / đã bỏ · tồn theo kho · giá theo bậc · xu hướng theo tháng | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list`, `mart.dong_ban`, `mart.lich_kinh_doanh` |
-| `/kho-hang` | **React** (giai đoạn 4, bám Kho hàng.dc.html; `/api/kho-hang?kho=&loc=`, 2 lượt): tab Tồn hiện tại (5 ô · bảng tồn theo dòng + tìm + CSV · quá hạn / cận hạn / giá trị theo kho) · Hàng đang về (chưa có dữ liệu) · Cần đặt (hết + sắp thiếu, KHÔNG đề xuất số lượng) | `mart.ton_hien_tai`, `san_pham_360`, `core.dim_warehouse`, `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
+| `/kho-hang` | **React** (giai đoạn 4, bám Kho hàng.dc.html; `/api/kho-hang?kho=&loc=`, 2 lượt): tab Tồn hiện tại (5 ô · bảng tồn theo dòng + tìm + chip ngành (`?nganh=`, lọc ở trình duyệt) + CSV · quá hạn / sắp chuyển lô / không kịp bán trước hạn / cận hạn / giá trị theo ngành / theo lô) · Hàng đang về (chưa có dữ liệu) · Cần đặt (hết + sắp thiếu, KHÔNG đề xuất số lượng). "Kho" hiện là LÔ (bẫy #6, 042) | `mart.ton_hien_tai`, `mart.ton_theo_lo`, `san_pham_360`, `core.dim_warehouse`, `core.dim_product` (ngành), `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/cong-no` | **Công nợ & thu tiền — React** (đợt 6, bám Công nợ.dc.html; `/api/cong-no`, MỘT ảnh chụp 2 lượt hỏi, lọc ở trình duyệt): 6 ô tổng · tuổi nợ (bấm để lọc) · phiếu còn nợ (tab quá hạn / sắp đến hạn / không suy được hạn / theo bên nhận hoá đơn) · lịch thu 7 ngày sau mốc · việc nên làm. Mốc = cuối kỳ sổ mới nhất. Tab Công nợ của hồ sơ khách: `/api/cong-no/khach/{mã}` | `mart.cong_no_ben_tra`, `mart.cong_no_phieu` (← `core.fact_ar_ledger`, sổ `請求先元帳`) |
 | `/kho-du-lieu` | **Tổng quan độ phủ — React** (đợt B 2026-09-24, bám Kho dữ liệu.dc.html; thanh trái chung `TabKho.tsx::KhungKho`; máy chủ tính sẵn vào `window.__KOME__.man`, vai trò NẠP): sơ đồ 8 nguồn (màu theo nhịp — `kome/kho_du_lieu.py`) · 4 ô số (danh mục `pg_class`) · lưới theo ngày của MỘT tháng (`?ngay_thang=YYYY-MM`, KHÔNG `?thang=` — đó là khoảng xem chung) · sức khoẻ · bảng tháng | `meta.ingest_batch`, `core.*` |
 | `/kho-du-lieu/nap` | **Nạp hai bước — React** (đợt B): mỗi loại file một ô (`kho_du_lieu.O_NAP`, cùng danh sách với sơ đồ nguồn; thả nhầm ô → chặn) · `POST /upload/kiem` (5 cổng qua `pipeline.kiem`, **không ghi gì**, file vào `<ARCHIVE_DIR>/_cho_xac_nhan/`) → `POST /upload/xac-nhan` (`ingest` đầy đủ, 5 cổng chạy lại) / `POST /upload/huy` · file chờ quá 24 giờ bị dọn · lô gần nhất + hoàn tác (`POST /undo/{lô}` → về `#lo-nap`). `POST /upload` một bước vẫn còn | `meta.ingest_batch`, `core.*` |
@@ -407,6 +414,20 @@ hạn dùng").
 **Bất biến:** `mart.san_pham_360.ton` là **NULL** khi mã không có dòng tồn nào, không
 phải `0`. 90/232 mã chưa từng có dòng trong `在庫一覧`. "Không biết" khác "bằng không" —
 hiện `0` là nói kho đã hết, và người đọc sẽ đi đặt hàng.
+
+**Bất biến (042, tồn theo LÔ):** hai "kho" OBC là hai lô của MỘT kho vật lý (bẫy #6).
+Vai trò lô theo **MÃ KHO**, viết ĐÚNG MỘT LẦN: `mart.kho_dang_xuat()` (= `0001`); thứ tự
+bán = lô đang xuất trước, rồi lô chờ theo hạn tăng dần — KHÔNG suy vai trò từ hạn (hàng chỉ
+đi ra từ `0001`). `mart.ton_theo_lo` tính bán từ / bán hết (tồn cộng dồn ÷
+`toc_do_ngay_theo_tuoi` — đúng tốc độ xếp trạng thái, nên "bán hết" của lô CUỐI = 
+`san_pham_360.du_ban_ngay`, đo thật 134/134), `khong_kip_ban` (bán hết SAU hạn; chưa quá
+hạn; không tốc độ ⇒ NULL, không phải true) và `sap_chuyen_lo` (thuộc tính của MÃ, ở dòng
+`thu_tu_lo = 1`: lô chờ còn hàng và lô đang xuất đã hết / < 14 ngày — cùng ngưỡng
+`sap_thieu`). Khối "Sắp chuyển lô" KHÔNG theo bộ lọc lô (lọc lô chờ thì dòng mang cờ bị
+lọc mất). Ngành hàng của `/kho-hang` = `core.dim_product` qua `mart.ten_nganh`, KHÔNG đọc
+hai cột `食品分類` mà `在庫一覧` kèm từ 2026-09-24 (một khái niệm một nguồn). Có test canh:
+`tests/test_ton_theo_lo.py`. **Migration 042 phải chạy TRƯỚC khi triển khai** (`/kho-hang`
+và `/san-pham/{mã}` đọc view đó).
 
 **Bất biến:** hai ô đếm trạng thái ở đầu `/kho-hang` KHÔNG co theo bộ lọc kho và
 KHÔNG co theo bộ lọc trạng thái, còn ô "Giá trị tồn chết" thì co theo **cả hai**.

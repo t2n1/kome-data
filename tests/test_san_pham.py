@@ -815,12 +815,14 @@ def test_kho_hang_noi_ro_con_so_nao_la_cua_MOI_KHO():
     bộ lọc kho — màn phải nói ra, ngay trên chính các ô đó. "Không tự lọc theo
     kho" KHÁC "luôn liệt kê mọi kho": khối đó vẫn co theo bộ lọc trạng thái, và
     khi có lọc trạng thái nó phải nói kho không khớp sẽ vắng mặt."""
+    # Từ 042 hai "kho" OBC gọi là hai LÔ của một kho vật lý (CLAUDE.md bẫy #6):
+    # cùng luật, từ vựng "cả hai lô" / "theo lô".
     src = _nguon("KhoHang.tsx")
     o = src.split('className="o-kpi-luoi kho-kpi"', 1)[1].split("</p>", 1)[0]
-    assert o.count("mọi kho") >= 3, "hai ô đếm + lời chú thích phải nói 'mọi kho'"
-    kho = src.split("<h2>Giá trị tồn theo kho</h2>", 1)[1].split("</p>", 1)[0]
-    assert "Không tự lọc theo kho" in kho and "vắng mặt" in kho
-    assert "luôn liệt kê mọi kho" not in src
+    assert o.count("cả hai lô") >= 3, "hai ô đếm + lời chú thích phải nói 'cả hai lô'"
+    kho = src.split("<h2>Giá trị tồn theo lô</h2>", 1)[1].split("</p>", 1)[0]
+    assert "Không tự lọc theo lô" in kho and "vắng mặt" in kho
+    assert "luôn liệt kê mọi lô" not in src and "luôn liệt kê mọi kho" not in src
 
 
 def test_bo_loc_la_tren_URL_khong_lam_do_trang(conn, batch, test_db_url):
@@ -836,7 +838,7 @@ def test_bo_loc_la_tren_URL_khong_lam_do_trang(conn, batch, test_db_url):
     assert r.status_code == 200 and r.json()["k"]["loc"] == "" and r.json()["k"]["dong"]
     r = c.get("/api/kho-hang?kho=khong-co-that")
     assert r.status_code == 200 and r.json()["k"]["kho"] == "khong-co-that" and r.json()["k"]["dong"] == []
-    assert "(không có trong danh sách kho)" in _nguon("KhoHang.tsx")
+    assert "(không có trong danh sách kho OBC)" in _nguon("KhoHang.tsx")
     # `loc` lạ ở danh mục: khopLoc coi như không lọc — cùng luật `_dk_loc`.
     assert "!(loc in hop_le)" in _nguon("loc.ts")
 
@@ -927,3 +929,20 @@ def test_o_gia_tri_ton_chet_di_theo_CA_bo_loc_kho(conn, batch):
                        loc="ton_chet").o_tong_quan["gia_tri_ton_chet"] == 10_000
     assert SP.kho_hang(conn, kho="0001",
                        loc="du").o_tong_quan["gia_tri_ton_chet"] == 0
+
+
+def test_bang_ton_mang_NGANH_cua_dim_product_qua_ten_nganh(conn, batch):
+    """Ngành của bảng tồn `/kho-hang` = 食品分類名 của 商品データ qua ĐÚNG hàm
+    `mart.ten_nganh` — cùng nhãn "(chưa phân loại)" với Báo cáo / Sản phẩm, kể
+    cả mã có tồn mà không có trong 商品データ (LEFT JOIN, không mất dòng)."""
+    from kome.bao_cao import NGANH_TRONG
+    _san_pham(conn, batch, "P300")
+    _san_pham(conn, batch, "P301")
+    conn.execute("UPDATE core.dim_product SET food_category_name = '調味料_VNM' WHERE product_code = 'P300'")
+    conn.execute("UPDATE core.dim_product SET food_category_name = '' WHERE product_code = 'P301'")
+    for ma in ("P300", "P301", "P302"):   # P302 CỐ Ý không có trong dim_product
+        _ton(conn, batch, ma)
+    _neo(conn, batch)
+
+    nganh = {d["ma"]: d["nganh"] for d in SP.kho_hang(conn).dong}
+    assert nganh == {"P300": "調味料_VNM", "P301": NGANH_TRONG, "P302": NGANH_TRONG}
