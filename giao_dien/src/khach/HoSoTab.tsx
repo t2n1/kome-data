@@ -4,14 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { lay } from "../api";
 import { BieuDo } from "../chung/BieuDo";
-import { ChuaCoDuLieu } from "../chung/Khoi";
 
 import { gon, ngay, pc, so, thay_doi, yen } from "../dinh_dang";
 import type { DongBan, HoSoApi, LichMa, MatHang } from "./kieu";
 import { GhiTiepXuc } from "./GhiTiepXuc";
-import { OCongNo } from "../cong_no/CongNoKhach";
 import { chuoiKhoang, useKhoang, useNhanMoc, voiKhoang, type KhoangMayChu } from "../khung/khoang";
-import { TN } from "../khoi_dau";
+import { KhoiSapCo } from "./KhoiSapCo";
 
 /** Số trong KHOẢNG XEM của một khách (/api/khach-hang/{mã}/khoang — đợt B;
  *  endpoint riêng vì hồ sơ đã chạm trần 8 lượt hỏi). Nhiều khối gọi chung —
@@ -33,11 +31,6 @@ function useKhoangKhach(ma: string) {
 }
 const trongKhoang = (k: KhoangMayChu | undefined, thang: string) =>
   !!k && thang >= k.tu.slice(0, 7) && thang <= k.den.slice(0, 7);
-
-/** Khung "chưa có dữ liệu" trong một thẻ (ChuaCoDuLieu trả fragment — không bọc là vỡ lưới). */
-function ChuaCo(p: { tieu_de: string; ly_do: string }) {
-  return <section className="kh-the kh-chua-co"><ChuaCoDuLieu {...p} /></section>;
-}
 
 const MAU_NGANH = ["var(--do)", "var(--ok-vien)", "var(--lien-ket)", "var(--lam-chu)", "var(--duong-ck)",
   "var(--canh-vien)", "var(--map-3)", "var(--chu-mo)"];
@@ -67,15 +60,15 @@ const cuoiThang = (t: string) => { const [y, m] = t.split("-").map(Number); retu
 const tNhan = (t: string) => `${+t.slice(5, 7)}/${t.slice(2, 4)}`;
 const tiLe = (a: number | null | undefined, b: number | null | undefined) => (a != null && b) ? a / b - 1 : null;
 
-// ============================================================ Tổng quan
-export function TabTongQuan({ h }: { h: HoSoApi }) {
+// ============================================================ Ô sổ sức khoẻ
+export function OSoSucKhoe({ h }: { h: HoSoApi }) {
   const k = h.khach, o = h.o_so;
   const ss30 = tiLe(o.dt_30, o.dt_30_truoc);
-  const lan_cuoi = h.nhat_ky[0];
   const { data: kh } = useKhoangKhach(k.ma);
   const nm = useNhanMoc();
-  return (<>
-    <div className="o-kpi-luoi hs-o">
+  const im = k.ty_le_im_lang ?? 0;
+  return (
+    <div className="o-kpi-luoi hs2-o">
       <div className="o-kpi"><div className="nhan">DT · {kh?.khoang.nhan ?? "…"}</div>
         <div className="gia">{kh ? gon(kh.tong.dt) : "…"}</div>
         {kh?.so_sanh.map(s => <div key={s.ma} className={"dong-phu " + (!s.co || s.tang_dt == null ? "nhat-chu" : s.tang_dt >= 0 ? "tang" : "giam")}
@@ -83,72 +76,16 @@ export function TabTongQuan({ h }: { h: HoSoApi }) {
           {!s.co ? `${s.nhan}: không có dữ liệu` : s.tang_dt == null ? `${s.nhan}: ${s.dt_ck ? "—" : "chưa mua"}` : `${thay_doi(s.tang_dt, 0)} so ${s.nhan}`}</div>)}</div>
       <div className="o-kpi"><div className="nhan">DT 30 ngày · {nm}</div><div className="gia">{gon(o.dt_30)}</div>
         <div className={"dong-phu " + (ss30 == null ? "nhat-chu" : ss30 >= 0 ? "tang" : "giam")}>{ss30 == null ? "30 ngày trước chưa mua" : `${thay_doi(ss30, 0)} so 30 ngày trước`}</div></div>
-      <div className="o-kpi"><div className="nhan">Chu kỳ mua</div><div className="gia">{k.nhip_ngay == null ? "—" : `${Math.round(k.nhip_ngay)} ngày`}</div>
-        <div className="dong-phu nhat-chu">{k.nhip_ngay == null ? "chưa đủ 3 lần mua" : `im ${k.so_ngay_im_lang} ngày · ${(k.ty_le_im_lang ?? 0).toFixed(1).replace(".", ",")}× nhịp`}</div></div>
-      <div className="o-kpi"><div className="nhan">Số mã đang lấy</div><div className="gia">{so(o.so_ma_dang_mua)}</div>
-        <div className={"dong-phu " + (o.so_ma_ngung ? "giam" : "nhat-chu")}>{o.so_ma_ngung ? `${o.so_ma_ngung} mã đã ngừng` : "không mã nào ngừng"}</div></div>
-      <div className="o-kpi"><div className="nhan">Biên lãi gộp giỏ hàng</div><div className="gia">{pc(k.ty_suat)}</div>
+      <div className="o-kpi" title="số ngày im lặng ÷ nhịp mua riêng của khách (trung vị khoảng cách giữa các lần mua)">
+        <div className="nhan">Nhịp mua</div><div className="gia">{k.nhip_ngay == null ? "—" : `${Math.round(k.nhip_ngay)} ngày`}</div>
+        <div className={"dong-phu " + (k.ty_le_im_lang == null ? "nhat-chu" : im >= 2 ? "giam" : im >= 1 ? "canh-chu" : "tang")}>
+          {k.nhip_ngay == null ? "chưa đủ 3 lần mua" : `im ${k.so_ngay_im_lang} ngày · ${im.toFixed(1).replace(".", ",")}× nhịp`}</div></div>
+      <div className="o-kpi"><div className="nhan">Biên lãi gộp</div><div className="gia">{pc(k.ty_suat)}</div>
         <div className="dong-phu nhat-chu">lãi gộp ÷ doanh thu thuần, luỹ kế</div></div>
-      {TN.cong_no && <OCongNo ma={k.ma} />}
-    </div>
-
-    <div className="hs-hang hai-mot">
-      <The tieu_de="Nhịp mua" phu="số ngày im lặng ÷ nhịp mua riêng của khách (trung vị khoảng cách giữa các lần mua)">
-        <DongHo ty_le={k.ty_le_im_lang} />
-        <p className="phu">{k.ty_le_im_lang == null ? "Chưa đủ 3 lần mua để có nhịp — không đoán." :
-          k.ty_le_im_lang < 1 ? "Vẫn trong nhịp mua thường lệ." : k.ty_le_im_lang < 2 ? "Đã quá ngày mua thường lệ — gọi trước khi trễ hẳn." :
-          k.ty_le_im_lang < 4 ? "Im lặng 2–4× nhịp: quá hạn mua lại." : "Im lặng ≥ 4× nhịp: đang mất khách."}</p>
-      </The>
-      <BieuDo12Thang h={h} />
-    </div>
-
-    <Tuan26 h={h} />
-
-    <div className="hs-hang hai">
-      <GioNganh h={h} />
-      <PhanTan h={h} />
-    </div>
-
-    <LichMua h={h} />
-
-    <div className="hs-hang ba">
-      <The tieu_de="Thẻ khách hàng" phu="thẻ tự động — mỗi thẻ suy ra từ dữ liệu bán thật">
-        <div className="hs-the-ds">{h.the.length ? h.the.map(t => (
-          <span key={t.chu} className={"nhan-vien " + (t.mau ?? "nhat")} title={t.vi}>{t.chu}</span>))
-          : <span className="phu">Không có thẻ nào.</span>}</div>
-        <p className="phu">Thẻ tay (nhân viên tự gắn) chưa có nơi lưu.</p>
-      </The>
-      <ChuaCo tieu_de="Gợi ý tiếp khách" ly_do="Chưa có công thức gợi ý dựa trên dữ liệu thật — không in câu gõ tay." />
-      <The tieu_de="Ghi chú" phu="lần tiếp xúc gần nhất (nhật ký chỉ thêm)">
-        {lan_cuoi ? <div className="hs-ghi">{lan_cuoi.icon} <b>{ngay(lan_cuoi.ngay)}</b> · <span className={"nhan-vien " + lan_cuoi.mau_ket_qua}>{lan_cuoi.nhan_ket_qua}</span>
-          <p>{lan_cuoi.noi_dung}</p>{lan_cuoi.nguoi && <span className="phu">— {lan_cuoi.nguoi}</span>}</div>
-          : <p className="phu">Chưa ghi lần tiếp xúc nào — ghi ở tab Hồ sơ & liên hệ.</p>}
-      </The>
-    </div>
-  </>);
-}
-
-function DongHo({ ty_le }: { ty_le: number | null }) {
-  const r = 54, cx = 66, cy = 70, MAX = 3;
-  const v = ty_le == null ? 0 : Math.min(MAX, Math.max(0, ty_le));
-  const diem = (x: number) => { const g = Math.PI * (1 - x / MAX); return [cx + r * Math.cos(g), cy - r * Math.sin(g)]; };
-  const cung = (a: number, b: number) => { const [x1, y1] = diem(a), [x2, y2] = diem(b); return `M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 0 1 ${x2.toFixed(1)},${y2.toFixed(1)}`; };
-  const mau = ty_le == null ? "var(--chu-mo)" : v < 1 ? "var(--ok-vien)" : v < 2 ? "var(--lien-ket)" : "var(--do)";
-  return (
-    <div className="hs-dong-ho">
-      <svg viewBox="0 0 132 84" role="img" aria-label={ty_le == null ? "chưa có nhịp" : `${ty_le.toFixed(1)} lần nhịp mua`}>
-        <path d={cung(0, MAX)} stroke="var(--nen-phu)" strokeWidth={13} fill="none" strokeLinecap="round" />
-        {[1, 2].map(x => { const [a, b] = diem(x); return <circle key={x} cx={a} cy={b} r={2} fill="var(--vien-dam)" />; })}
-        {ty_le != null && v > 0.02 && <path d={cung(0, v)} stroke={mau} strokeWidth={13} fill="none" strokeLinecap="round" />}
-        <text x={cx} y={cy - 8} textAnchor="middle" fontSize={22} fontWeight={700} fill="var(--chu)">
-          {ty_le == null ? "—" : ty_le.toFixed(1).replace(".", ",") + "×"}</text>
-        <text x={cx} y={cy + 8} textAnchor="middle" fontSize={9} fill="var(--chu-nhat)">nhịp mua riêng</text>
-        <text x={10} y={82} fontSize={8} fill="var(--chu-mo)">0</text><text x={116} y={82} fontSize={8} fill="var(--chu-mo)">≥3×</text>
-      </svg>
     </div>);
 }
 
-function BieuDo12Thang({ h }: { h: HoSoApi }) {
+export function BieuDo12Thang({ h }: { h: HoSoApi }) {
   const thang = dsThang(h.hom_nay);
   const kx = useKhoangKhach(h.khach.ma).data?.khoang;
   const theo = Object.fromEntries(h.thang.map(t => [t.thang, t]));
@@ -160,7 +97,7 @@ function BieuDo12Thang({ h }: { h: HoSoApi }) {
   return (
     <The tieu_de="Doanh thu 12 tháng" className="rong2"
       goc={ss != null ? <span className={ss >= 0 ? "tang" : "giam"}>{thay_doi(ss, 0)} tháng này so tháng trước cùng ngày</span> : null}
-      phu={<>cột = tháng{kx ? <> · cột đậm = thuộc {kx.nhan}</> : null} · nét đứt = trung bình 12 tháng · <b>bấm một tháng</b> để xem mặt hàng tháng đó{tb3 != null && <> · TB 3 tháng trước {gon(tb3)}</>}</>}>
+      cach_tinh={<>cột = tháng{kx ? <> · cột đậm = thuộc {kx.nhan}</> : null} · nét đứt = trung bình 12 tháng · <b>bấm một tháng</b> để xem mặt hàng tháng đó{tb3 != null && <> · TB 3 tháng trước {gon(tb3)}</>}</>}>
       <BieuDo nhan={thang.map(tNhan)} nhan_day_du={thang.map(t => `Tháng ${+t.slice(5)}/${t.slice(0, 4)}`)} cao={170}
         chuoi={[{ ten: "Doanh thu", kieu: "cot", gia_tri: gt, mau: "var(--ok-vien)",
                   mau_tung_cot: gt.map((v, i) => kx && !trongKhoang(kx, thang[i]) ? "color-mix(in srgb, var(--ok-vien) 30%, var(--nen-the))"
@@ -243,51 +180,7 @@ function GioNganh({ h }: { h: HoSoApi }) {
     </The>);
 }
 
-function PhanTan({ h }: { h: HoSoApi }) {
-  const ds = h.nganh.nganh.filter(x => x.bien != null);
-  const W = 320, H = 176, L = 34, B = 22;
-  const mxX = Math.max(1, ...ds.map(x => x.doanh_thu));
-  const b = ds.map(x => x.bien!), mn = Math.min(0, ...b), mx = Math.max(0.05, ...b);
-  const X = (v: number) => L + Math.sqrt(v / mxX) * (W - L - 12);
-  const Y = (v: number) => H - B - (v - mn) / ((mx - mn) || 1) * (H - B - 12);
-  const vach = [mn, (mn + mx) / 2, mx];
-  return (
-    <The tieu_de="Doanh thu × biên lãi gộp" phu="mỗi chấm một ngành · phải = doanh thu lớn (thang căn bậc hai) · trên = biên cao · ngành phải-trên là ngành đáng đẩy">
-      {!ds.length ? <p className="phu">Chưa có ngành nào có doanh thu dương.</p> :
-      <svg viewBox={`0 0 ${W} ${H}`} className="hs-phan-tan" role="img" aria-label="Doanh thu và biên lãi gộp theo ngành">
-        {vach.map(v => <g key={v}><line x1={L} x2={W - 6} y1={Y(v)} y2={Y(v)} className="bd-luoi" />
-          <text x={L - 4} y={Y(v) + 3} textAnchor="end" className="bd-truc">{pc(v, 0)}</text></g>)}
-        {ds.map((x, i) => <circle key={x.nganh} cx={X(x.doanh_thu)} cy={Y(x.bien!)} r={4 + Math.sqrt(x.ty_trong) * 12}
-          fill={MAU_NGANH[i % MAU_NGANH.length]} opacity={0.78}><title>{x.nganh}: {yen(x.doanh_thu)} · biên {pc(x.bien)}</title></circle>)}
-        <text x={W - 6} y={H - 6} textAnchor="end" className="bd-truc">doanh thu →</text>
-      </svg>}
-      <ul className="hs-chu-giai ngang">{ds.map((x, i) => (
-        <li key={x.nganh}><i style={{ background: MAU_NGANH[i % MAU_NGANH.length] }} /><span className="ten-jp">{x.nganh}</span> <span className="phu">biên {pc(x.bien, 0)}</span></li>))}</ul>
-    </The>);
-}
-
-function LichMua({ h }: { h: HoSoApi }) {
-  const N = 45, ds = h.lich.ma;
-  const mau = h.lich.so_tre >= 4 ? "giam" : h.lich.so_tre > 0 ? "canh-chu" : "tang";
-  return (
-    <The tieu_de="Lịch mua dự kiến từng mã" goc={<span className={mau}>{h.lich.so_tre}/{h.lich.tong} mã đã quá ngày mua lại</span>}
-      phu="ngày dự kiến = lần mua cuối + nhịp mua riêng của cặp khách–mã · 10 mã gần ngày nhất · mã đã ngừng mua ở tab Sản phẩm">
-      {!ds.length ? <p className="phu">Chưa mã nào đủ 3 lần mua để có nhịp riêng.</p> : <>
-      <div className="hs-lich">{ds.map(x => {
-        const w = Math.min(1, Math.abs(x.con) / N) * 50;
-        return (
-          <div key={x.ma} className="hs-lich-dong" title={`dự kiến ${ngay(x.du_kien)} · nhịp ${x.nhip ? Math.round(x.nhip) : "—"} ngày · mua cuối ${ngay(x.lan_cuoi)}`}>
-            <span className="ten-jp hs-lich-ten">{x.ten}</span>
-            <span className="hs-lich-truc"><i className="giua" />
-              <i className={x.con < 0 ? (x.con < -14 ? "do" : "canh") : "ok"} style={{ width: `${w}%`, [x.con < 0 ? "right" : "left"]: "50%" } as React.CSSProperties} /></span>
-            <b className={x.con < 0 ? "giam" : "tang"}>{x.con > 0 ? "+" : ""}{x.con}n</b>
-          </div>);
-      })}</div>
-      <div className="hs-lich-truc-chu phu"><span>quá hạn {N} ngày</span><span>hôm nay</span><span>còn {N} ngày</span></div></>}
-    </The>);
-}
-
-// ============================================================ Sản phẩm
+// ============================================================ Mặt hàng
 function badgeDeXuat(l: LichMa | undefined) {
   if (!l) return <span className="nhan-vien nhat">△ Chưa đủ nhịp</span>;
   if (l.con <= 0) return <span className="nhan-vien ok">◎ Đề xuất</span>;
@@ -295,7 +188,7 @@ function badgeDeXuat(l: LichMa | undefined) {
   return <span className="nhan-vien nhat">△ Còn sớm</span>;
 }
 
-export function TabSanPham({ h }: { h: HoSoApi }) {
+export function TabMatHang({ h }: { h: HoSoApi }) {
   const lich = Object.fromEntries(h.lich.ma.map(x => [x.ma, x]));
   const mhTheoMa = Object.fromEntries(h.mat_hang.map(x => [x.ma, x]));
   const top = h.mat_hang.filter(m => m.trang_thai_cap !== "ngung").slice(0, 10);
@@ -312,6 +205,7 @@ export function TabSanPham({ h }: { h: HoSoApi }) {
                nhip: m.nhip, lan_cuoi: m.lan_cuoi, doanh_thu: m.doanh_thu, tb_moi_lan: null }]));
   }, [h]); // eslint-disable-line react-hooks/exhaustive-deps
   return (<>
+    <p className="phu hs2-tom">{so(h.o_so.so_ma_dang_mua)} mã đang lấy · {h.o_so.so_ma_ngung ? `${h.o_so.so_ma_ngung} mã đã ngừng` : "không mã nào ngừng"}</p>
     {kh && (() => {
       // 048: phí thu hộ / phí gửi / giảm giá / làm tròn không phải mặt hàng — tách ra
       // dòng riêng, nhưng vẫn hiện (danh sách cộng lại vẫn bằng tổng khoảng).
@@ -353,7 +247,8 @@ export function TabSanPham({ h }: { h: HoSoApi }) {
     </The>
 
     <div className="hs-hang hai">
-      <The tieu_de="Sản phẩm đã ngừng mua" phu="từng mua đều (≥ 3 lần) nhưng im lặng ≥ 2× nhịp riêng của cặp khách–mã">
+      <div id="da-ngung-mua">
+      <The tieu_de="Sản phẩm đã ngừng mua" cach_tinh="từng mua đều (≥ 3 lần) nhưng im lặng ≥ 2× nhịp riêng của cặp khách–mã">
         {!h.da_ngung_mua.length ? <p className="phu">Không có sản phẩm nào bị bỏ quên.</p> :
         <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th><th className="so">Trễ</th><th className="so">Nhịp</th><th className="so">Mua cuối</th><th className="so">Doanh thu</th></tr></thead>
           <tbody>{h.da_ngung_mua.map(m => (
@@ -361,6 +256,7 @@ export function TabSanPham({ h }: { h: HoSoApi }) {
               <td className="so giam">{m.tre != null ? `${m.tre} ngày` : "—"}</td><td className="so">{m.nhip ? Math.round(m.nhip) + " ngày" : "—"}</td>
               <td className="so">{ngay(m.lan_cuoi)}</td><td className="so">{yen(m.doanh_thu)}</td></tr>))}</tbody></table></div>}
       </The>
+      </div>
       <The tieu_de="Tháng này chưa mua" phu="đã quá ngày mua lại theo nhịp của mã nhưng chưa tới mức 'ngừng' — một cuộc gọi nhắc là đủ">
         {!h.chua_mua_thang.length ? <p className="phu">Không có mã nào đang trễ.</p> :
         <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th>{thang.map((t, i) =>
@@ -373,17 +269,18 @@ export function TabSanPham({ h }: { h: HoSoApi }) {
       </The>
     </div>
 
-    <div className={TN.bang_gia ? "hs-hang hai" : "hs-hang"}>
-      <The tieu_de="Gợi ý hàng chưa từng mua" phu="mã khách chưa mua bao giờ, xếp theo tỷ suất lãi gộp (tỷ số của các tổng — toàn công ty)">
-        {!h.goi_y.length ? <p className="phu">Không có gợi ý.</p> :
-        <div className="bang-cuon"><table className="bang"><thead><tr><th>#</th><th>Mặt hàng</th><th className="so">Tỷ suất lãi gộp</th></tr></thead>
-          <tbody>{h.goi_y.map((g, i) => (
-            <tr key={g.ma}><td className="nhat-chu">{i + 1}</td><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(g.ma)}`}>{g.ten}</a>
-              <div className="ma-nho"><code>{g.ma}</code></div></td><td className="so">{pc(g.ty_suat)}</td></tr>))}</tbody></table></div>}
-        {TN.bang_gia && <p className="phu">Giá để báo cho khách: xem giá theo bậc ở hồ sơ từng mã (bấm tên mã).</p>}
-      </The>
-      {TN.bang_gia && <ChuaCo tieu_de="Bảng giá của bậc (売価No.)" ly_do="Bản xuất 得意先全情報 không còn cột 売価No.コード, nên không biết khách hưởng bậc giá nào. Giá theo từng bậc vẫn có ở hồ sơ mỗi mã hàng." />}
+    <div className="hs-hang hai">
+      <GioNganh h={h} />
+      <Tuan26 h={h} />
     </div>
+
+    <The tieu_de="Gợi ý hàng chưa từng mua" cach_tinh="mã khách chưa mua bao giờ, xếp theo tỷ suất lãi gộp (tỷ số của các tổng — toàn công ty)">
+      {!h.goi_y.length ? <p className="phu">Không có gợi ý.</p> :
+      <div className="bang-cuon"><table className="bang"><thead><tr><th>#</th><th>Mặt hàng</th><th className="so">Tỷ suất lãi gộp</th></tr></thead>
+        <tbody>{h.goi_y.map((g, i) => (
+          <tr key={g.ma}><td className="nhat-chu">{i + 1}</td><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(g.ma)}`}>{g.ten}</a>
+            <div className="ma-nho"><code>{g.ma}</code></div></td><td className="so">{pc(g.ty_suat)}</td></tr>))}</tbody></table></div>}
+    </The>
 
     <The tieu_de={`Tất cả mặt hàng (${h.mat_hang.length})`} phu="mọi mã khách từng mua · 3 cột tháng gần nhất để thấy ngay tháng nào vắng"
       goc={<button type="button" className="nut-nho" onClick={() => datTatCa(x => !x)}>{tatCa ? "Thu gọn" : "Hiện bảng"}</button>}>
@@ -433,8 +330,7 @@ export function TabDonHang({ h }: { h: HoSoApi }) {
           <tbody>{h.du_bao.map(x => (
             <tr key={x.ma}><td className="ten-jp">{x.ten}<div className="ma-nho"><code>{x.ma}</code> · nhịp {x.nhip ? Math.round(x.nhip) : "—"} ngày</div></td>
               <td className={"so " + (x.con < 0 ? "giam" : x.con <= 7 ? "canh-chu" : "")}>{ngay(x.du_kien)}<div className="ma-nho">{x.con < 0 ? `quá ${-x.con} ngày` : x.con === 0 ? "hôm nay" : `còn ${x.con} ngày`}</div></td>
-              <td className="so">{x.tb_moi_lan == null ? "—" : so(x.tb_moi_lan)}</td></tr>))}</tbody></table></div>
-        <button type="button" className="nut-chinh" disabled title="Chưa có hệ thống lên đơn — màn 'Lên đơn hàng' chưa có.">Tạo đơn nháp</button></>}
+              <td className="so">{x.tb_moi_lan == null ? "—" : so(x.tb_moi_lan)}</td></tr>))}</tbody></table></div></>}
       </The>
     </div>);
 }
@@ -482,8 +378,11 @@ export function TabHoSo({ h }: { h: HoSoApi }) {
     </div>
     <NhatKy h={h} />
     <div className="hs-hang hai">
-      <ChuaCo tieu_de="Hình ảnh cửa hàng" ly_do="Chưa có nơi lưu ảnh theo khách." />
-      <ChuaCo tieu_de="Chat Facebook" ly_do="Chưa tích hợp Messenger — không có nguồn tin nhắn." />
+      <KhoiSapCo tieu_de="Ảnh cửa hàng" icon="🖼" hinh="anh" cong_dung="Ảnh cửa hàng của khách."
+        can="nơi lưu ảnh theo mã khách." />
+      <KhoiSapCo tieu_de="Chat Facebook" icon="💬" hinh="chat"
+        cong_dung="Tin nhắn gần nhất với khách trên Messenger — xem khách vừa hỏi gì trước khi gọi."
+        can="kết nối Messenger của trang KOME." />
     </div>
   </>);
 }
