@@ -32,6 +32,21 @@ export function OCongNo({ ma }: { ma: string }) {
       <div className="dong-phu nhat-chu">dư nợ {gon(d.ben.so_du)} · đến {ngay(d.ben.ky_den)}</div></a>);
 }
 
+/** Công nợ ở cột trái hồ sơ 360° (2026-09-26) — cùng hook, cùng ba câu trạng thái với OCongNo. */
+export function OCongNoGon({ ma }: { ma: string }) {
+  const { data: d } = useCongNoKhach(ma);
+  const tieu_de = <h2>Công nợ{d?.ben && !d.la_chinh ? " (bên nhận HĐ)" : ""}</h2>;
+  if (!d) return <section className="kh-the hs2-viec">{tieu_de}<p className="phu">…</p></section>;
+  if (!d.co_so) return <section className="kh-the hs2-viec">{tieu_de}<p className="phu">Chưa nạp sổ công nợ.</p></section>;
+  if (!d.ben || !d.tq) return <section className="kh-the hs2-viec">{tieu_de}<p className="phu">Bên nhận hoá đơn không có trong sổ.</p></section>;
+  return (
+    <section className="kh-the hs2-viec">{tieu_de}
+      <a className="hs2-dong" href={`/cong-no?tim=${encodeURIComponent(d.ben_ma)}`}>
+        <span>Quá hạn</span><b className={d.tq.qua_han ? "giam" : ""}>{gon(d.tq.qua_han)}</b></a>
+      <div className="hs2-dong phu"><span>Dư nợ {gon(d.ben.so_du)} · đến {ngay(d.ben.ky_den)}</span></div>
+    </section>);
+}
+
 export function TabCongNo({ ma }: { ma: string }) {
   const { data: d, isLoading, error } = useCongNoKhach(ma);
   if (isLoading) return <div className="khoi-cho" aria-busy="true"><span /><span /></div>;

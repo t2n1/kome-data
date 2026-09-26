@@ -220,3 +220,19 @@ td.trong{text-align:center;padding:1.6rem}
 .hs2-hinh-rong.chat i.phai{margin-left:auto;width:44%}
 .hs2-cong-dung{font-size:.8rem;margin:0;line-height:1.5;color:var(--chu-nhat)}
 .hs2-can{font-size:.72rem;margin:.6rem 0 0;padding-top:.5rem;border-top:1px solid var(--vien-phu);color:var(--chu-nhat)}
+.hs2-trai{display:flex;flex-direction:column;gap:.75rem;min-width:0}
+.hs2-trai .kh-the > h2{margin:0 0 .45rem;font-size:.8rem;font-weight:600;color:var(--chu-nhat)}
+.hs2-ly-do{border-left:3px solid var(--vien-dam);border-radius:0 12px 12px 0}
+.hs2-ly-do.canh{border-left-color:var(--canh-vien)} .hs2-ly-do.do{border-left-color:var(--do)}
+.hs2-ly-do.ok{border-left-color:var(--ok-vien)}
+.hs2-ly-do p{margin:0 0 .35rem;font-size:.86rem;line-height:1.5}
+.hs2-ds{list-style:none;margin:0;padding:0}
+.hs2-dong{display:flex;justify-content:space-between;gap:.6rem;font-size:.8rem;padding:.3rem 0;border-top:1px solid var(--vien-phu);
+  color:var(--chu);text-decoration:none;font-variant-numeric:tabular-nums}
+.hs2-dong:first-child{border-top:0}
+.hs2-dong > a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs2-dong b{flex-shrink:0;font-weight:600}
+.hs2-lien-ket{font:inherit;font-size:.76rem;background:none;border:0;padding:.35rem 0 0;color:var(--lien-ket);cursor:pointer;text-align:left}
+.hs2-rong{width:100%;margin-top:.6rem}
+.hs2-lan-truoc{font-size:.8rem}
+.hs2-lan-truoc p{margin:.3rem 0;line-height:1.5}
