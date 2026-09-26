@@ -71,13 +71,24 @@ Người dùng là **cả sale lẫn quản lý, ngang nhau**. Sale hỏi "gọi
   8. Tất cả mặt hàng (vẫn thu gọn).
 - **Đơn hàng**: dòng thời gian cùng dự báo 14 ngày. Bỏ nút "Tạo đơn nháp" đang bị vô hiệu.
 - **Công nợ**: `TabCongNo` giữ nguyên (ẩn khi `TN.cong_no` tắt).
-- **Hồ sơ và nhật ký**: thông tin khách, điểm giao 直送先, nhật ký tiếp xúc đầy đủ kèm form ghi.
+- **Hồ sơ và nhật ký**: thông tin khách, điểm giao 直送先, nhật ký tiếp xúc đầy đủ kèm form ghi,
+  và cuối tab là hai khối **"sắp có"** cạnh nhau (xếp chồng trên điện thoại):
+  - **Ảnh cửa hàng**: hình rỗng 3 ô ảnh nét đứt · "Ảnh cửa hàng của khách." · "Cần để bật: nơi
+    lưu ảnh theo mã khách."
+  - **Chat Facebook**: hình rỗng 3 bong bóng chat nét đứt · "Tin nhắn gần nhất với khách trên
+    Messenger — xem khách vừa hỏi gì trước khi gọi." · "Cần để bật: kết nối Messenger của trang KOME."
+
+  Hai khối dùng chung thành phần `KhoiSapCo` (icon, tiêu đề, nhãn "Chưa có nguồn", hình rỗng,
+  câu công dụng, điều kiện bật). Không có ảnh mẫu hay tin nhắn mẫu, cũng không có nút bị vô
+  hiệu, để không ai tưởng là dữ liệu thật. Hai khối không lên cột trái, vì khung rỗng ở chỗ sale
+  nhìn khi gọi là nhiễu. Khi có nguồn, chỉ thay nội dung khối.
 
 **Hash cũ**: `#tong_quan` rơi về `#mat_hang`, `#san_pham` về `#mat_hang`, `#ho_so` giữ nguyên. Hash lạ về `#mat_hang`.
 
 **Bỏ hẳn** (không có nguồn hoặc gây nhiễu):
 - `PhanTan` (biểu đồ phân tán) và `DongHo`.
-- Ba khung `ChuaCo`: Gợi ý tiếp khách, Hình ảnh cửa hàng, Chat Facebook.
+- Khung `ChuaCo` "Gợi ý tiếp khách". Ảnh cửa hàng và Chat Facebook KHÔNG bỏ: chúng được thiết kế
+  lại thành khối "sắp có" (xem tab Hồ sơ và nhật ký).
 - Khung "Bảng giá của bậc", câu nhắc giá theo bậc cũng bỏ.
 - Nút "Tạo đơn nháp".
 - Khối "Ghi chú" (trùng với "Lần liên hệ trước").
@@ -95,6 +106,7 @@ Người dùng là **cả sale lẫn quản lý, ngang nhau**. Sale hỏi "gọi
 - `giao_dien/src/khach/HoSo.tsx`: khung hai cột, đầu trang, 4 tab, ánh xạ hash cũ.
 - `giao_dien/src/khach/HoSoViec.tsx` (mới): bốn khối cột trái.
 - `giao_dien/src/khach/HoSoTab.tsx`: bỏ `TabTongQuan`, `PhanTan`, `DongHo` và các `ChuaCo`, gộp nội dung vào `TabMatHang`, thêm nút "Cách tính" vào `The`.
+- `giao_dien/src/khach/KhoiSapCo.tsx` (mới): khối "sắp có" dùng cho Ảnh cửa hàng và Chat Facebook.
 - `giao_dien/src/khach/kich_ban.ts` (mới): `kichBan` dùng chung. `lien_he/LienHe.tsx` nhập từ đây, chữ không đổi.
 - `giao_dien/src/cong_no/CongNoKhach.tsx`: thêm dạng hiển thị cột trái (`OCongNoGon`), dùng chung `useCongNoKhach`.
 - `giao_dien/src/khach/khach.css`: kiểu `.hs2-*`.
