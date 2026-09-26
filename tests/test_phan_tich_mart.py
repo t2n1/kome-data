@@ -68,8 +68,13 @@ def test_tong_cac_nganh_bang_tong_thang_ke_ca_dong_ma_hang_rong(conn, batch):
     chua_phan_loai = conn.execute(
         "SELECT doanh_thu_thuan FROM mart.ban_theo_nganh_thang "
         "WHERE thang = '2026-05' AND nganh = '(chưa phân loại)'").fetchone()[0]
-    assert chua_phan_loai == (11_000 - 1_000) + (22_000 - 2_000), \
-        "mã rỗng và mã chưa có trong danh mục phải cùng rơi vào '(chưa phân loại)'"
+    assert chua_phan_loai == 22_000 - 2_000, \
+        "mã chưa có trong danh mục phải rơi vào '(chưa phân loại)'"
+    # 048: dòng mã hàng rỗng (端数) là phí & điều chỉnh — vẫn giữ tiền, khác nhãn.
+    phi = conn.execute(
+        "SELECT doanh_thu_thuan FROM mart.ban_theo_nganh_thang "
+        "WHERE thang = '2026-05' AND nganh = 'Phí & điều chỉnh'").fetchone()[0]
+    assert phi == 11_000 - 1_000
 
 
 # ---------------------------------------------------------------------------

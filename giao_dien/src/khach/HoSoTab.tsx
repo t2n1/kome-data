@@ -21,7 +21,7 @@ type SoSanhKh = { ma: string; nhan: string; co: boolean; tu: string; den: string
 type KhoangKhach = {
   khoang: KhoangMayChu; tong: { dt: number; lg: number; so_phieu: number; so_ngay: number; ty_suat: number | null };
   so_sanh: SoSanhKh[];
-  mat_hang: { ma: string; ten: string; doanh_thu: number; lai_gop: number; so_luong: number; so_ngay: number; lan_cuoi: string }[];
+  mat_hang: { ma: string; ten: string; doanh_thu: number; lai_gop: number; so_luong: number; so_ngay: number; lan_cuoi: string; la_phi: boolean }[];
   ngay: { ngay: string; so_phieu: number; doanh_thu: number }[];
 } | null;
 function useKhoangKhach(ma: string) {
@@ -308,15 +308,26 @@ export function TabSanPham({ h }: { h: HoSoApi }) {
                nhip: m.nhip, lan_cuoi: m.lan_cuoi, doanh_thu: m.doanh_thu, tb_moi_lan: null }]));
   }, [h]); // eslint-disable-line react-hooks/exhaustive-deps
   return (<>
-    {kh && <The tieu_de={`Mặt hàng mua · ${kh.khoang.nhan}`} phu={`${kh.mat_hang.length} mã · ${yen(kh.tong.dt)} · ${kh.tong.so_ngay} ngày có mua (${ngay(kh.khoang.tu)} → ${ngay(kh.khoang.den)})`}>
+    {kh && (() => {
+      // 048: phí thu hộ / phí gửi / giảm giá / làm tròn không phải mặt hàng — tách ra
+      // dòng riêng, nhưng vẫn hiện (danh sách cộng lại vẫn bằng tổng khoảng).
+      const hang = kh.mat_hang.filter(m => !m.la_phi), phi = kh.mat_hang.filter(m => m.la_phi);
+      const tongPhi = phi.reduce((a, m) => a + (m.doanh_thu || 0), 0);
+      return <The tieu_de={`Mặt hàng mua · ${kh.khoang.nhan}`} phu={`${hang.length} mã · ${yen(kh.tong.dt)}${phi.length ? ` (gồm ${yen(tongPhi)} phí & điều chỉnh)` : ""} · ${kh.tong.so_ngay} ngày có mua (${ngay(kh.khoang.tu)} → ${ngay(kh.khoang.den)})`}>
       {!kh.mat_hang.length ? <p className="phu">Không mua mã nào trong khoảng này.</p> :
       <div className="bang-cuon" style={{ maxHeight: 320 }}><table className="bang"><thead><tr><th>Mặt hàng</th><th className="so">Doanh thu</th>
         <th className="so">Lãi gộp</th><th className="so">Số lượng</th><th className="so">Số ngày mua</th><th className="so">Mua cuối</th></tr></thead>
-        <tbody>{kh.mat_hang.map(m => (
+        <tbody>{hang.map(m => (
           <tr key={m.ma}><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></td>
             <td className="so">{yen(m.doanh_thu)}</td><td className="so">{yen(m.lai_gop)}</td><td className="so">{so(m.so_luong)}</td>
+            <td className="so">{so(m.so_ngay)}</td><td className="so">{ngay(m.lan_cuoi)}</td></tr>))}
+          {phi.length > 0 && <tr><th colSpan={6} scope="rowgroup" className="phu">Phí &amp; điều chỉnh — không phải hàng</th></tr>}
+          {phi.map(m => (
+          <tr key={m.ma || "(khong-ma)"}><td className="ten-jp">{m.ten}{m.ma && <div className="ma-nho"><code>{m.ma}</code></div>}</td>
+            <td className="so">{yen(m.doanh_thu)}</td><td className="so">{yen(m.lai_gop)}</td><td className="so">—</td>
             <td className="so">{so(m.so_ngay)}</td><td className="so">{ngay(m.lan_cuoi)}</td></tr>))}</tbody></table></div>}
-    </The>}
+    </The>;
+    })()}
     <The tieu_de="Top 10 sản phẩm hay mua" phu={<>xếp theo doanh thu luỹ kế · <span className="nhan-vien ok">◎ Đề xuất</span> đã tới ngày mua lại ·{" "}
       <span className="nhan-vien canh">○ Sắp tới</span> ≤ 7 ngày · <span className="nhan-vien nhat">△ Còn sớm</span></>}>
       <div className="hs-top">{top.map((m, i) => (

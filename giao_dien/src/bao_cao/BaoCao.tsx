@@ -40,7 +40,8 @@ type BaoCaoApi = {
   khoang: KhoangMayChu | null;
   bc: { ky: Ky; moi_ky: Ky[]; thang: O[]; hang: { ma: string; ten: string; nhom: string; doanh_thu: number | null; lai_gop: number | null; ty_suat: number | null; so_khach: number }[];
     nhan_vien: { ma: string | null; doanh_thu: number; lai_gop: number; ty_suat: number | null; so_khach: number; so_phieu: number }[];
-    khong_co_du_lieu: boolean; canh_bao: string[]; cung_ky: CungKy | null; so_sanh: SoSanhSo[]; tap_trung: { dong: KhTT[]; so_khach: number; luy_ke_top10: number | null } | null };
+    khong_co_du_lieu: boolean; canh_bao: string[]; cung_ky: CungKy | null; so_sanh: SoSanhSo[]; tap_trung: { dong: KhTT[]; so_khach: number; luy_ke_top10: number | null } | null;
+    phi: { doanh_thu: number; lai_gop: number; dong: { ma: string; ten: string; doanh_thu: number | null; lai_gop: number | null; so_khach: number }[] } };
   td: Td | null;
   td_phu: { ngay_kd_con_lai: number; can_ban_moi_ngay: number | null; nhip_chuan: number | null; thieu_moc: number | null } | null;
   so_nho: Record<"dt" | "lg" | "ts" | "kh", Spark>;
@@ -221,6 +222,7 @@ export default function BaoCao() {
             })}
           </svg> : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
           {d.co.khong_ve !== 0 && <p className="phu">Không vẽ: {yen(d.co.khong_ve)} của {d.co.so_ma_khong_ve} mã (doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)</p>}
+          {bc.phi.dong.length > 0 && <p className="phu">Không gồm phí &amp; điều chỉnh ({yen(bc.phi.doanh_thu)}) — không phải hàng, xem khối riêng bên dưới.</p>}
         </section>
       </div>
 
@@ -288,6 +290,19 @@ export default function BaoCao() {
           </table></div>
         </section>
       </div>
+
+      {bc.phi.dong.length > 0 && <section className="kh-the bc-khoi">
+        <div className="kh-the-dau"><h2>Phí &amp; điều chỉnh — không phải hàng</h2></div>
+        <p className="phu">Phí thu hộ (代引手数料), phí gửi (配送料), giảm giá / phiếu giảm giá (値引き・クーポン) — mã OBC đánh dấu 無形 — và dòng làm tròn không mã hàng.
+          Tiền của chúng VẪN nằm trong tổng doanh thu và lãi gộp ở trên (khớp sổ OBC), nhưng không tính vào ngành hàng hay xếp hạng mặt hàng.</p>
+        <div className="bang-cuon"><table className="bang">
+          <thead><tr><th>Khoản</th><th className="so">Doanh thu thuần</th><th className="so">Lãi gộp</th><th className="so">Khách</th></tr></thead>
+          <tbody>{bc.phi.dong.map(h => <tr key={h.ma || "(khong-ma)"}><td className="ten-jp">{h.ten}</td>
+            <td className="so">{h.doanh_thu != null ? yen(h.doanh_thu) : "—"}</td><td className="so">{h.lai_gop != null ? yen(h.lai_gop) : "—"}</td>
+            <td className="so">{so(h.so_khach)}</td></tr>)}
+            <tr><th scope="row">Cộng</th><td className="so"><b>{yen(bc.phi.doanh_thu)}</b></td><td className="so"><b>{yen(bc.phi.lai_gop)}</b></td><td /></tr></tbody>
+        </table></div>
+      </section>}
 
       <details className="kh-the bc-khoi">
         <summary>Bảng số chi tiết theo {theoNgay ? "ngày" : "tháng"} ({bc.thang.length} {theoNgay ? "ngày" : "tháng"})</summary>

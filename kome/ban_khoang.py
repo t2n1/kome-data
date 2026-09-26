@@ -101,9 +101,11 @@ def nganh(conn, kx: KhoangXem) -> list[BC.NganhKy]:
 def mat_hang(conn, kx: KhoangXem) -> list[dict]:
     """Mọi mã hàng của khoảng — cùng hình dạng `BaoCao.hang_theo_nganh`."""
     return [{"ma": r[0], "ten": r[1], "nhom": r[2], "doanh_thu": _i(r[3]), "lai_gop": _i(r[4]),
-             "ty_suat": float(r[5]) if r[5] is not None else None, "so_khach": r[7]}
+             "ty_suat": float(r[5]) if r[5] is not None else None, "so_khach": r[7],
+             "la_phi": r[8]}
             for r in conn.execute(
-                """SELECT product_code, ten_hang, food_category_name, dt, lg, ty_suat, so_luong, so_khach
+                """SELECT product_code, ten_hang, food_category_name, dt, lg, ty_suat, so_luong, so_khach,
+                          la_phi
                      FROM mart.mat_hang_khoang(%s, %s)""", (kx.tu, kx.den)).fetchall()]
 
 
@@ -151,13 +153,14 @@ def tinh_bao_cao(conn, kx: KhoangXem) -> BC.BaoCao:
                so_khach=nay["so_khach"], so_phieu=nay["so_phieu"],
                so_thang=_so_thang(kx.tu, kx.den), ngay_dau=kx.tu, ngay_cuoi=kx.den)
     _, thang = chuoi(conn, kx)
-    hang_theo_nganh = mat_hang(conn, kx)
+    hang_theo_nganh, nganh_ky, nganh_thang, phi = BC.tach_phi(
+        mat_hang(conn, kx), nganh(conn, kx),
+        BC.doc_nganh_thang(conn, kx.company_fy) if kx.company_fy else [])
     return BC.BaoCao(
         ky=ky, moi_ky=[], thang=thang, hang=BC.top_lai_gop(hang_theo_nganh),
         nhan_vien=sale(conn, kx), canh_bao=list(kx.ghi_chu), cung_ky=None,
-        nganh_thang=BC.doc_nganh_thang(conn, kx.company_fy) if kx.company_fy else [],
-        nganh_ky=nganh(conn, kx), tap_trung=tap_trung(conn, kx),
-        hang_theo_nganh=hang_theo_nganh, so_sanh=ss)
+        nganh_thang=nganh_thang, nganh_ky=nganh_ky, tap_trung=tap_trung(conn, kx),
+        hang_theo_nganh=hang_theo_nganh, so_sanh=ss, phi=phi)
 
 
 # ---- Đợt B: Khách hàng -------------------------------------------------------
@@ -202,7 +205,8 @@ def cua_khach(conn, kx: KhoangXem, ma: str) -> dict:
                                      WHERE k.customer_code = %s) t ON true),
               (SELECT coalesce(json_agg(json_build_object('ma', m.product_code, 'ten', m.ten_hang,
                                   'doanh_thu', m.dt, 'lai_gop', m.lg, 'so_luong', m.so_luong,
-                                  'so_ngay', m.so_ngay_mua, 'lan_cuoi', m.lan_cuoi)
+                                  'so_ngay', m.so_ngay_mua, 'lan_cuoi', m.lan_cuoi,
+                                  'la_phi', m.la_phi)
                                   ORDER BY m.dt DESC NULLS LAST, m.product_code), '[]')
                  FROM mart.khach_mat_hang_khoang(%s, %s) m WHERE m.customer_code = %s),
               (SELECT coalesce(json_agg(json_build_object('ngay', l.sales_date, 'so_phieu', l.n,

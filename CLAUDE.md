@@ -161,6 +161,18 @@ nhân viên mua (đo thật: 15 mã, ¥388.667 ≈ 0,02%) — đối soát thán
 `core.fact_sales_line` là vừa không quay về theo mốc vừa lọt nhân viên. Có test canh:
 `tests/test_ma_noi_bo.py`.
 
+**Bất biến (048, phí & điều chỉnh — chủ DN chốt 2026-09-26, phương án A):** mã OBC đánh dấu
+`無形` (`kind_code = '1'`: 代引手数料, 配送料, 値引き, 値引きクーポン) và dòng KHÔNG mã hàng (端数)
+là **phí & điều chỉnh, không phải sản phẩm**. Định nghĩa ĐÚNG MỘT LẦN:
+`mart.la_phi_dieu_chinh(product_code, kind_code)`. Tiền của chúng VẪN trong mọi tổng doanh thu /
+lãi gộp (khớp sổ OBC — khác mã nội bộ 044); chỉ ra khỏi phần sản phẩm: `mart.san_pham_360`
+(danh mục /san-pham), `mart.khach_mat_hang` (mặt hàng / nhịp / "đã ngừng mua" của khách), gợi ý
+hàng chưa mua. Ngành: nhãn riêng `'Phí & điều chỉnh'` (`mart.ten_nganh` 3 tham số;
+`kome.bao_cao.NGANH_PHI` là bản chép bắt buộc) — Σ ngành ở mart vẫn = tổng; `bao_cao.tach_phi`
+đưa nhóm đó ra `BaoCao.phi` (khối riêng ở /bao-cao). `ban_theo_san_pham`, `mat_hang_khoang`,
+`khach_mat_hang_khoang` GIỮ dòng phí (danh sách phải cộng bằng tổng) kèm cột `la_phi`. Có test
+canh: `tests/test_phi_dieu_chinh.py`. **Migration 048 phải chạy TRƯỚC khi triển khai.**
+
 **Bất biến (044, hạn trả):** `その都度請求` = trả trong **5 ngày làm việc sau ngày xuất
 hàng** (ngày phiếu), ngày làm việc = `mart.lich_kinh_doanh.la_ngay_kd` (chưa trừ ngày nghỉ
 riêng của công ty — cùng hạn chế đã ghi). Ba mẫu suy được hạn: `末締/翌月末日`,

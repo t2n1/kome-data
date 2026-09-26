@@ -73,13 +73,14 @@ def test_thang_khoang_cat_theo_dai(conn, batch):
 
 
 def test_ten_nganh_khop_NGANH_TRONG_va_view(conn, batch):
-    from kome.bao_cao import NGANH_TRONG
+    from kome.bao_cao import NGANH_PHI, NGANH_TRONG
     _gieo(conn, batch)
     assert conn.execute("SELECT mart.ten_nganh(''), mart.ten_nganh(NULL), mart.ten_nganh('X')").fetchone() \
         == (NGANH_TRONG, NGANH_TRONG, "X")
     v = {r[0] for r in conn.execute("SELECT nganh FROM mart.ban_theo_nganh_thang").fetchall()}
     h = {r[0] for r in conn.execute("SELECT nganh FROM mart.nganh_khoang('2025-01-01', '2026-12-31')").fetchall()}
-    assert v == h == {"Ngành A", NGANH_TRONG}
+    # 048: dòng không mã hàng (端数) là phí & điều chỉnh, không còn "(chưa phân loại)".
+    assert v == h == {"Ngành A", NGANH_PHI}
 
 
 def test_nganh_so_sanh_giu_nganh_chi_ban_ky_so_sanh(conn, batch):
