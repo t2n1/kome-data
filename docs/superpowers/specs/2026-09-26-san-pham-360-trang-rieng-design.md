@@ -89,7 +89,6 @@ in MỘT câu cách tính ngay dưới khối (hằng trong Python, như `khach_
 
 Ghi chú:
 - `mart.ban_den_moc` = `f.*` của `core.fact_sales_line` nên đã có `slip_no`, `pack_code`, `qty` (đã kiểm: 044). Số lượng là cột `qty`, cùng cột `san_pham_theo_thang.so_luong` dùng.
-  thay view đó bằng bản có cột (giữ nguyên mọi vị từ) — kiểm trước khi viết hàm.
 - Hàm nào tham chiếu một view `mart` hơn một lần → CTE `AS MATERIALIZED` ghi tường minh, vị từ
   `product_code` nằm TRONG CTE.
 - Không phần trăm xác suất nào.
