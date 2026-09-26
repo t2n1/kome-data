@@ -42,12 +42,16 @@ function ChuaCo(p: { tieu_de: string; ly_do: string }) {
 const MAU_NGANH = ["var(--do)", "var(--ok-vien)", "var(--lien-ket)", "var(--lam-chu)", "var(--duong-ck)",
   "var(--canh-vien)", "var(--map-3)", "var(--chu-mo)"];
 
-function The({ tieu_de, phu, goc, children, className = "" }: { tieu_de: string; phu?: React.ReactNode;
-  goc?: React.ReactNode; children: React.ReactNode; className?: string }) {
+export function The({ tieu_de, phu, cach_tinh, goc, children, className = "" }: { tieu_de: string; phu?: React.ReactNode;
+  cach_tinh?: React.ReactNode; goc?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  const [mo, datMo] = useState(false);
   return (
     <section className={"kh-the " + className}>
-      <div className="kh-the-dau"><h2>{tieu_de}</h2>{goc && <span className="kh-the-goc">{goc}</span>}</div>
+      <div className="kh-the-dau"><h2>{tieu_de}</h2>
+        {(goc || cach_tinh) && <span className="kh-the-goc">{goc}
+          {cach_tinh && <button type="button" className="hs2-cach-tinh" aria-expanded={mo} onClick={() => datMo(x => !x)}>Cách tính</button>}</span>}</div>
       {phu && <p className="phu kh-the-phu">{phu}</p>}
+      {cach_tinh && mo && <p className="phu kh-the-phu hs2-cach-tinh-noi">{cach_tinh}</p>}
       {children}
     </section>);
 }

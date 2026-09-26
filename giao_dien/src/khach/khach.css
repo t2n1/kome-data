@@ -206,3 +206,17 @@ td.trong{text-align:center;padding:1.6rem}
 .hs-nk-dau{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem}
 .hs-nk-dau .nhan-vien{margin-left:auto}
 .hs-nk p{margin:.3rem 0 .15rem;line-height:1.45}
+/* ===== Hồ sơ 360° thiết kế lại (2026-09-26) — tiền tố .hs2- ===== */
+.hs2-cach-tinh{font:inherit;font-size:.7rem;font-weight:500;margin-left:.5rem;padding:.1rem .45rem;border:1px solid var(--vien);
+  border-radius:6px;background:transparent;color:var(--chu-nhat);cursor:pointer}
+.hs2-cach-tinh[aria-expanded="true"]{background:var(--nen-phu);color:var(--chu)}
+.hs2-cach-tinh-noi{background:var(--nen-phu);border-radius:8px;padding:.45rem .6rem}
+.hs2-sap-co .kh-the-dau{margin-bottom:.6rem}
+.hs2-nhan-sap-co{margin-left:auto;font-size:.7rem;padding:.1rem .5rem;border-radius:6px;background:var(--nen-phu);color:var(--chu-nhat)}
+.hs2-hinh-rong{border:1px dashed var(--vien-dam);border-radius:8px;padding:.75rem;margin-bottom:.6rem;display:grid;gap:.4rem}
+.hs2-hinh-rong.anh{grid-template-columns:repeat(3,minmax(0,1fr))}
+.hs2-hinh-rong.anh i{display:block;aspect-ratio:1;border:1px dashed var(--vien-dam);border-radius:6px}
+.hs2-hinh-rong.chat i{display:block;height:.7rem;width:58%;border:1px dashed var(--vien-dam);border-radius:6px}
+.hs2-hinh-rong.chat i.phai{margin-left:auto;width:44%}
+.hs2-cong-dung{font-size:.8rem;margin:0;line-height:1.5;color:var(--chu-nhat)}
+.hs2-can{font-size:.72rem;margin:.6rem 0 0;padding-top:.5rem;border-top:1px solid var(--vien-phu);color:var(--chu-nhat)}
