@@ -65,6 +65,10 @@
    --canh-nen:#FFF9E8;--canh-vien:#E6D08A;--canh-chu:#8A5E06;
    /* Xanh lam của gói thiết kế (tầng core, kiểu nạp "snapshot" — Kho dữ liệu.dc.html). */
    --lam-nen:#E8F0F7; --lam-chu:#1B5E8C;
+   /* Màu theo lý do của /lien-he — mỗi cột đặt lại ba biến này (lien_he.css,
+      .lh-m-<lý do>); đây là giá trị khi phần tử không thuộc cột nào. Chỉ
+      tham chiếu token; khối tối chép lại y hệt cho test canh bảng tối. */
+   --lh-mau:var(--vien); --lh-mau-chu:var(--chu-nhat); --lh-mau-nen:var(--nen-phu);
    --ngoai-nen:#F0EDE6;--ngoai-chu:#8E8A82;
    /* Thang màu bản đồ khách hàng (đợt 4c): MỘT TÔNG (hổ phách, cùng họ với
       --lien-ket) đậm dần theo bậc, KHÔNG đỏ-xanh — khoảng 1/12 nam giới
@@ -176,6 +180,7 @@
    --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
    --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
    --lam-nen:#172633; --lam-chu:#7FB3D9;
+   --lh-mau:var(--vien); --lh-mau-chu:var(--chu-nhat); --lh-mau-nen:var(--nen-phu);
    --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
    /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
       đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —
@@ -219,6 +224,7 @@
    --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
    --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
    --lam-nen:#172633; --lam-chu:#7FB3D9;
+   --lh-mau:var(--vien); --lh-mau-chu:var(--chu-nhat); --lh-mau-nen:var(--nen-phu);
    --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
    /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
       đảo lại so với bản sáng (bậc 5 SÁNG nhất, không phải tối nhất) —

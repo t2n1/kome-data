@@ -452,8 +452,11 @@ def tao_api(open_app_conn) -> APIRouter:
             # lại vẫn theo đồng hồ thật (`hom_nay`).
             KX.dat_moc(c, ts)
             ds = LH.danh_sach(c, hom_nay, sale=sale, ly_do=ly_do or None)
+            # Gợi ý chỉ cho thẻ ĐANG HIỆN (≤ 12/cột, hoặc trọn một cột khi ?ly_do=).
+            gy = LH.goi_y_va_nhan_vien(c, [t.ma for cot in ds.cot for t in cot.the])
             return thanh_json({
-                "ds": ds, "hoat_dong": LH.hoat_dong_gan_day(c, sale=sale),
+                "ds": ds, "goi_y": gy["goi_y"], "nhan_vien": gy["nhan_vien"],
+                "cach_tinh_goi_y": LH.CACH_TINH_GOI_Y, "hoat_dong": LH.hoat_dong_gan_day(c, sale=sale),
                 "hen": LH.hen_goi_lai(c, hom_nay, sale=sale), "hom_nay": hom_nay,
                 "sale": sale, "ten_sale": ten_sale, "cot_thang": LH.COT_THANG,
                 "an_ngay": LH.AN_KHI_KHONG_HEN, "ly_do_ds": {k: list(v) for k, v in LH.LY_DO.items()},

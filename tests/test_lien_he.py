@@ -115,7 +115,7 @@ def test_nhat_ky_chi_them_kome_app_khong_sua_khong_xoa_duoc(conn):
     assert r == (True, True, False, False, True, True)
 
 
-def test_trang_lien_he_dung_3_truy_van(conn, batch, monkeypatch):
+def test_trang_lien_he_dung_4_truy_van(conn, batch, monkeypatch):
     _nen(conn, batch)
     dem = {"n": 0}
     that = conn.execute
@@ -125,10 +125,34 @@ def test_trang_lien_he_dung_3_truy_van(conn, batch, monkeypatch):
         return that(*a, **k)
     monkeypatch.setattr(conn, "execute", demo)
     hn = hom_nay_o_nhat()
-    LH.danh_sach(conn, hn)
+    ds = LH.danh_sach(conn, hn)
     LH.hoat_dong_gan_day(conn)
     LH.hen_goi_lai(conn, hn)
-    assert dem["n"] == 3
+    LH.goi_y_va_nhan_vien(conn, [t.ma for c in ds.cot for t in c.the])
+    assert dem["n"] == 4
+
+
+def test_goi_y_la_hang_khach_da_mua_deu_xep_theo_so_lan(conn, batch):
+    """"Nên chào" = mã CHÍNH khách đó mua ≥ 3 lần, nhiều lần nhất trước; mã mua
+    < 3 lần (chưa có nhịp) không được gợi ý."""
+    from tests.test_khach_hang import HOM_NAY, _mua
+    _nen(conn, batch)
+    for ngay_truoc in (60, 50):   # chỉ 2 lần -> không có nhịp
+        _mua(conn, batch, "L0011", HOM_NAY - timedelta(days=ngay_truoc), hang="PIT01")
+    gy = LH.goi_y_va_nhan_vien(conn, ["L0011", "Q0012", "X0015"])
+    ma_l = [g["ma"] for g in gy["goi_y"]["L0011"]]
+    assert ma_l == ["XT07"]
+    assert all(g["so_lan"] >= 3 for g in gy["goi_y"]["L0011"])
+    # Khách ※廃業※ không bao giờ được gợi ý.
+    assert "X0015" not in gy["goi_y"]
+    assert {n["ma"] for n in gy["nhan_vien"]} >= {"0104", "0102"}
+
+
+def test_goi_y_toi_da_ba_ma_moi_khach(conn, batch):
+    _nen(conn, batch)
+    gy = LH.goi_y_va_nhan_vien(conn, ["L0011", "Q0012", "S0013"], so_ma=1)
+    assert all(len(v) == 1 for v in gy["goi_y"].values())
+    assert set(gy["goi_y"]) == {"L0011", "Q0012", "S0013"}
 
 
 def test_ho_so_mang_nhat_ky(conn, batch):

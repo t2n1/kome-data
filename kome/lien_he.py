@@ -11,8 +11,8 @@ Hai nguồn, hai loại "hôm nay" — KHÔNG gộp:
 Cột thứ tư (036) nhìn theo THÁNG: khách mua đều mà tháng này chưa có đơn
 (`kome.khach_thang`) — đi chung câu danh sách, không thêm lượt hỏi.
 
-Ngân sách truy vấn của `/lien-he`: đúng 3 lượt hỏi (danh sách, hoạt động gần
-đây, hẹn gọi lại) — có test đếm.
+Ngân sách truy vấn của `/lien-he`: đúng 4 lượt hỏi (danh sách, hoạt động gần
+đây, hẹn gọi lại, gợi ý "Nên chào" + danh sách người phụ trách) — có test đếm.
 """
 from __future__ import annotations
 
@@ -226,6 +226,58 @@ def danh_sach(conn, hom_nay: date, sale: str | None = None,
         cot = [c for c in cot if c.ly_do == ly_do]
     return DanhSach(cot=cot, da_lien_he=an, hom_nay=hom_nay, ly_do=ly_do,
                     dem={k: len(v) for k, v in theo.items()})
+
+
+# Số mã "Nên chào" trên mỗi thẻ.
+SO_MA_GOI_Y = 3
+
+# In ngay dưới dòng gợi ý — người đọc phải biết gợi ý dựa trên cái gì. Không có
+# "% chắc chắn": không đo được (cùng lý lẽ đợt 8, /du-bao).
+CACH_TINH_GOI_Y = ("Mã chính khách này đã mua đều (≥ 3 lần, có nhịp mua riêng), "
+                   "xếp theo số lần mua rồi lần mua gần nhất — không gồm phí/điều chỉnh "
+                   "và hàng tặng POSM.")
+
+
+def goi_y_va_nhan_vien(conn, ma_khach: list[str], so_ma: int = SO_MA_GOI_Y) -> dict:
+    """MỘT lượt hỏi: (1) tối đa `so_ma` mã "Nên chào" cho mỗi khách trong
+    `ma_khach`, (2) danh sách người phụ trách cho ô chọn 担当者.
+
+    Gợi ý ĐỌC `mart.khach_mat_hang` (view đó đã bỏ phí/điều chỉnh 048 và hàng
+    tặng 049, đã quay về theo mốc 040) — không tự định nghĩa lại "mặt hàng".
+    `nhip_ngay IS NOT NULL` = ≥ 3 lần mua (định nghĩa của chính view đó); cặp
+    'khong_goi' (khách ※廃業※) không bao giờ được gợi ý. Cặp 'ngung' VẪN được
+    gợi ý: khách ở cột "Lâu không mua" thì hầu hết mặt hàng quen đều đã quá 2×
+    nhịp — bỏ chúng là đúng khách cần gọi nhất không có gợi ý nào; thẻ in số
+    ngày từ lần cuối để sale tự thấy."""
+    r = conn.execute(
+        # LATERAL với `customer_code = k.ma` chứ KHÔNG `= ANY(%s)`: đo thật
+        # 2026-09-26, vị từ `= ANY` không đẩy xuống được qua mart.nhip_mat_hang
+        # (percentile_cont) nên view dựng lại cho MỌI cặp (~1,3 s); vị từ bằng
+        # một mã thì đẩy xuống (~20 ms/khách).
+        """WITH g AS (
+               SELECT k.ma AS khach, h.*
+                 FROM unnest(%s::text[]) k(ma)
+                 CROSS JOIN LATERAL (
+                     SELECT h.product_code AS ma, h.ten_hang AS ten, h.so_lan,
+                            h.nhip_ngay::float8 AS nhip_ngay,
+                            (m.hom_nay - h.lan_cuoi) AS so_ngay, h.trang_thai_cap AS trang_thai
+                       FROM mart.khach_mat_hang h
+                       CROSS JOIN mart.moc_thoi_gian m
+                      WHERE h.customer_code = k.ma
+                        AND h.nhip_ngay IS NOT NULL
+                        AND h.trang_thai_cap <> 'khong_goi'
+                      ORDER BY h.so_lan DESC, h.lan_cuoi DESC, h.product_code
+                      LIMIT %s) h)
+           SELECT (SELECT coalesce(json_agg(g ORDER BY g.khach, g.so_lan DESC, g.so_ngay, g.ma), '[]')
+                     FROM g),
+                  (SELECT coalesce(json_agg(json_build_object('ma', salesperson_code, 'ten', ten)
+                                            ORDER BY salesperson_code), '[]')
+                     FROM core.dim_salesperson)""",
+        [list(ma_khach), so_ma]).fetchone()
+    goi_y: dict[str, list] = {}
+    for x in r[0]:
+        goi_y.setdefault(x.pop("khach"), []).append(x)
+    return {"goi_y": goi_y, "nhan_vien": r[1]}
 
 
 _COT_LTX = """n.kieu, n.ket_qua, n.noi_dung, n.thoi_diem, n.hen_lai,
