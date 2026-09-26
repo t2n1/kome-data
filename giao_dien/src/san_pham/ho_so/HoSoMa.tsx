@@ -2,13 +2,14 @@
 // như hồ sơ khách 360 (khach/HoSo.tsx): thanh trên · đầu trang · HAI CỘT (hs2-luoi): cột trái dính
 // "Việc với mã này" (ViecVoiMa.tsx), cột phải = 4 ô số + 24 tháng + 4 tab tải lười.
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { lay } from "../../api";
 import { BieuDo } from "../../chung/BieuDo";
 import { The } from "../../khach/HoSoTab";
 import { chuoiKhoang, giuKhoang, useKhoang, useNhanMoc, voiKhoang } from "../../khung/khoang";
 import { ngay, pc, so, so_luong as soLuong, thay_doi, yen } from "../../dinh_dang";
-import { docDanhMuc } from "../loc";
+import { docDanhMuc, docLocSp, khopTim, locDanhMuc } from "../loc";
+import { useDanhMucGhep } from "../ManSanPham";
 import type { KhoangMaApi } from "../kieu";
 import type { HoSoMaApi } from "./kieu";
 import { ViecVoiMa } from "./ViecVoiMa";
@@ -38,12 +39,18 @@ export default function HoSoMa({ ma }: { ma: string }) {
   const chonTab = (t: string) => { datTab(t as MaTab); history.replaceState(null, "", giuKhoang(location.pathname + location.search) + "#" + t); };
   useEffect(() => { if (data) document.title = `KOME — ${data.h.sp.ten}`; }, [data]);
 
-  const ds = docDanhMuc();
+  // ‹ n/N ›: thứ tự danh mục vừa xem (sessionStorage); không có thì thứ tự MẶC ĐỊNH của danh mục
+  // (bộ lọc rỗng, sắp mặc định) trên CÙNG ảnh chụp /api/san-pham mà màn danh mục đọc.
+  const { d: dm } = useDanhMucGhep();
+  const nho = useMemo(() => docDanhMuc(), []);
+  const ds = useMemo(() => nho ?? (dm ? { ma: locDanhMuc(dm.ma, docLocSp(""), dm.trang_thai).hang.map(m => m.ma), url: "/san-pham" } : null),
+    [nho, dm]);
   const vi = ds ? ds.ma.indexOf(ma) : -1;
   const di = (m: string) => { location.href = giuKhoang(`/san-pham/${encodeURIComponent(m)}`); };
   const thanhTren = (
     <div className="hs-tren">
       <a className="nut-nho" href={giuKhoang(ds?.url ?? "/san-pham")}>← Danh mục sản phẩm</a>
+      <ChuyenMa ds={dm?.ma ?? null} />
       {vi >= 0 && ds && <span className="hs-tt">
         <button type="button" className="nut-nho" disabled={vi <= 0} onClick={() => di(ds.ma[vi - 1])} aria-label="Mã trước">‹</button>
         <span className="phu">{vi + 1}/{ds.ma.length}</span>
@@ -82,7 +89,7 @@ export default function HoSoMa({ ma }: { ma: string }) {
               <div className="gia">{sp.toc_do_ngay_theo_tuoi == null ? "—" : soLuong(sp.toc_do_ngay_theo_tuoi)}</div>
               <div className="dong-phu nhat-chu">90 ngày, chia cho số ngày mã có mặt</div></div>
             <div className="o-kpi"><div className="nhan">Biên lãi gộp 12 tháng</div>
-              <div className="gia">{h.dt_12t > 0 ? pc(h.lg_12t / h.dt_12t) : "—"}</div>
+              <div className="gia">{pc(h.bien_12t)}</div>
               <div className="dong-phu nhat-chu">DT 12 tháng {yen(h.dt_12t)}</div></div>
             <div className="o-kpi"><div className="nhan">Khách đang mua / đã ngừng</div>
               <div className="gia">{so(h.so_dang_mua)} / {so(h.so_da_ngung)}</div>
@@ -113,4 +120,33 @@ export default function HoSoMa({ ma }: { ma: string }) {
         </div>
       </div>
     </div>);
+}
+
+/** Ô "Chuyển sang mã khác": tìm mã / tên / ngành trên ảnh chụp danh mục (lọc ở trình duyệt,
+ *  cùng `khopTim` của màn danh mục — không hỏi thêm máy chủ). */
+function ChuyenMa({ ds }: { ds: { ma: string; ten: string; nganh: string; nhan_trang_thai: string }[] | null }) {
+  const [q, datQ] = useState("");
+  const [mo, datMo] = useState(false);
+  const o = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const f = (e: MouseEvent) => { if (o.current && !o.current.contains(e.target as Node)) datMo(false); };
+    document.addEventListener("mousedown", f); return () => document.removeEventListener("mousedown", f);
+  }, []);
+  const tim = q.trim();
+  const khop = useMemo(() => (tim && ds ? ds.filter(m => khopTim(m, tim)) : []), [ds, tim]);
+  const kq = khop.slice(0, 8);
+  const di = (m: string) => { location.href = giuKhoang(`/san-pham/${encodeURIComponent(m)}`); };
+  return (
+    <div className="hs-tim" ref={o}>
+      <input type="search" placeholder="Chuyển sang mã khác — gõ mã, tên hoặc ngành…" value={q} aria-label="Chuyển sang mã khác"
+        onChange={e => { datQ(e.target.value); datMo(true); }} onFocus={() => datMo(true)}
+        onKeyDown={e => { if (e.key === "Enter" && kq[0]) di(kq[0].ma); if (e.key === "Escape") datMo(false); }} />
+      {mo && tim && <div className="hs-tim-kq" role="listbox">
+        <div className="phu">{ds ? `${so(khop.length)} mã khớp "${tim}"` : "Đang tải danh mục…"}</div>
+        {kq.map(m => (
+          <a key={m.ma} href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)} role="option">
+            <span className="ten-jp">{m.ten}</span><span className="phu">{m.ma} · {m.nganh}</span></a>))}
+      </div>}
+    </div>
+  );
 }

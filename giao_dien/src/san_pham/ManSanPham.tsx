@@ -25,7 +25,9 @@ function useDanhMucKhoang() {
     queryFn: () => lay<DanhMucKhoangApi>(voiKhoang("/api/san-pham/khoang")) });
 }
 
-export default function ManSanPham() {
+/** Danh mục đã ghép số theo khoảng — CÙNG hai truy vấn (cùng queryKey) với màn danh mục, nên
+ *  trang 360 (ô tìm, thứ tự ‹ n/N › mặc định) đọc đúng thứ danh mục đang hiện. */
+export function useDanhMucGhep() {
   const { data: d0, error } = useDanhMuc();
   const { data: kh } = useDanhMucKhoang();
   // Ghép số theo khoảng vào từng mã — chỉ gắn số của máy chủ, không tính gì.
@@ -34,6 +36,11 @@ export default function ManSanPham() {
     return { ...m, dt_khoang: x?.[0] ?? 0, sl_khoang: x?.[2] ?? null, kh_khoang: x?.[3] ?? 0,
              dt_ss: kh?.so_sanh.co ? (x?.[4] ?? 0) : null };
   }) }, [d0, kh]);
+  return { d, kh, error };
+}
+
+export default function ManSanPham() {
+  const { d, kh, error } = useDanhMucGhep();
   const [b, datB] = useState<LocSp>(() => docLocSp(location.search));
   const [tim, datTim] = useState(b.tim);
 

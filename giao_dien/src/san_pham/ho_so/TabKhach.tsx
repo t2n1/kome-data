@@ -38,24 +38,24 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
     <div className="sp3-luoi-2">
       <The tieu_de="Theo người phụ trách" cach_tinh={ct.nguoi}>
         {!t.nguoi.length ? <p className="phu">Chưa bán trong 12 tháng.</p> :
-          <table className="bang"><thead><tr><th>Người phụ trách</th><th className="so">Doanh thu</th><th className="so">Biên</th><th className="so">Khách</th></tr></thead>
+          <div className="bang-cuon"><table className="bang"><thead><tr><th>Người phụ trách</th><th className="so">Doanh thu</th><th className="so">Biên</th><th className="so">Khách</th></tr></thead>
             <tbody>{t.nguoi.map(n => (<tr key={n.ma}>
               <td>{n.ten ?? `(mã ${n.ma || "trống"} không có trong danh sách phụ trách)`}</td>
               <td className="so">{yen(n.doanh_thu)}</td><td className="so">{pc(n.bien)}</td>
-              <td className="so">{so(n.so_khach)}</td></tr>))}</tbody></table>}
+              <td className="so">{so(n.so_khach)}</td></tr>))}</tbody></table></div>}
       </The>
       <The tieu_de="Khách mới / quay lại theo tháng" cach_tinh={ct.khach_moi}>
         <BieuDo nhan={t.khach_moi.map(x => `${+x.thang.slice(5)}/${x.thang.slice(2, 4)}`)} cao={180}
           chuoi={[{ ten: "Quay lại", kieu: "cot", gia_tri: t.khach_moi.map(x => x.quay_lai), mau: "var(--chu-mo)" },
                   { ten: "Mới", kieu: "cot", gia_tri: t.khach_moi.map(x => x.moi), mau: "var(--ok-vien)" }]}
-          dinh_dang={v => so(v)} mo_ta="Số khách mới và khách quay lại mua mã này theo tháng" />
+          dinh_dang={v => so(v)} dinh_dang_truc={v => so(v)} mo_ta="Số khách mới và khách quay lại mua mã này theo tháng" />
       </The>
     </div>
     {khoang && <The tieu_de="Khách mua trong khoảng xem" cach_tinh={ct.khoang}>
       {!khoang.khach.length ? <p className="phu">Không khách nào mua mã này trong khoảng xem.</p> :
-        <table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">SL</th><th className="so">Ngày mua</th><th>Lần cuối</th></tr></thead>
+        <div className="bang-cuon"><table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">SL</th><th className="so">Ngày mua</th><th>Lần cuối</th></tr></thead>
           <tbody>{khoang.khach.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>
-            <td className="so">{yen(k.doanh_thu)}</td><td className="so">{soLuong(k.so_luong)}</td><td className="so">{so(k.so_ngay)}</td><td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table>}
+            <td className="so">{yen(k.doanh_thu)}</td><td className="so">{soLuong(k.so_luong)}</td><td className="so">{so(k.so_ngay)}</td><td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table></div>}
     </The>}
     <div className="sp3-luoi-2">
       <BangKhach tieu_de="Khách đang mua" ds={t.dang_mua} rong="Chưa khách nào đang mua đều." ct={ct.khach_cap} />
@@ -67,9 +67,9 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
 function BangKhach({ tieu_de, ds, rong, ct }: { tieu_de: string; ds: KhachDong[]; rong: string; ct: string }) {
   return (<The tieu_de={tieu_de} cach_tinh={ct}>
     {!ds.length ? <p className="phu">{rong}</p> :
-      <table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">Nhịp</th><th>Lần cuối</th></tr></thead>
+      <div className="bang-cuon"><table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">Nhịp</th><th>Lần cuối</th></tr></thead>
         <tbody>{ds.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>
           <td className="so">{yen(k.doanh_thu)}</td><td className="so">{k.nhip == null ? "—" : `${Math.round(k.nhip)} ngày`}</td>
-          <td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table>}
+          <td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table></div>}
   </The>);
 }

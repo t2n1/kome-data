@@ -37,7 +37,10 @@ materialized view (nút thắt là số lượt hỏi, và MV không quay về t
     - tồn + còn đủ bán n ngày (`du_ban_ngay`, theo tuổi) + tốc độ `toc_do_ngay_theo_tuoi`;
     - cảnh báo: sắp thiếu / hết hàng / sắp chuyển lô / không kịp bán trước hạn / chưa rõ tồn;
     - **khách đến ngày mua lại** (tối đa 10);
-    - **khách nên chào** (top 5, link "xem hết" mở tab Tồn & bán thêm).
+    - **khách nên chào** (top 5, link "xem hết" mở tab Tồn & bán thêm) — đọc endpoint RIÊNG
+      `/nen-chao` (soát cuối 2026-09-27: hàm đo ~8,7 s, không được nằm trên đường mở trang); khối
+      có khung chờ và báo lỗi riêng, phần còn lại của trang không chờ nó. Cột trái và tab Tồn &
+      bán thêm đọc CHUNG một truy vấn TanStack (cùng `queryKey` → một lượt tải).
     Mọi tên khách link `/khach-hang/{mã}`.
   - **Cột phải**:
     - 4 ô số: DT trong khoảng xem + so sánh (`/khoang`) · bán/ngày (theo tuổi) · biên lãi gộp 12
@@ -54,7 +57,7 @@ materialized view (nút thắt là số lượt hỏi, và MV không quay về t
 | Khách hàng | Pareto tập trung khách · lưới 47 tỉnh của mã · theo người phụ trách · khách mới vs quay lại theo tháng · bảng khách mua trong khoảng / đang mua / đã ngừng |
 | Thời gian | bán theo ngày (khối hiện có, `/ngay`) · lưới 26 tuần · phân bố nhịp mua lại · cỡ đơn theo quy cách |
 | Giá & lãi | đơn giá thực bán theo tháng × quy cách, cạnh giá bảng bậc mới nhất · biên lãi gộp theo tháng · khách giá thấp nhất / biên thấp nhất · bảng giá theo bậc (dời từ hồ sơ cũ) |
-| Tồn & bán thêm | tồn theo lô (link `/kho-hang?tim=`) · mua kèm cùng phiếu · khách nên chào đầy đủ |
+| Tồn & bán thêm | tồn theo lô (link `/kho-hang?tim=`) · mua kèm cùng phiếu · khách nên chào đầy đủ (≤ 50, từ `/nen-chao`) |
 
 ### 3.2 Liên kết hai chiều
 
@@ -107,13 +110,14 @@ Tất cả dùng ảnh chụp `chi_nap=True`, khoá = đường dẫn + `ThamSo.
 
 | Endpoint | Tải khi | Trả | Trần |
 |---|---|---|---|
-| `GET /api/san-pham/{mã}` | mở trang | đầu trang · ô số (phần theo mốc) · 24 tháng · cột trái (tồn theo lô + cảnh báo · khách đến ngày mua lại + khách nên chào top 5 trong MỘT câu UNION) | **≤ 5** |
+| `GET /api/san-pham/{mã}` | mở trang | đầu trang · ô số (phần theo mốc, gồm `bien_12t`) · 24 tháng (mỗi tháng kèm `bien`, tính ở máy chủ) · cột trái (tồn theo lô + cảnh báo · khách đến ngày mua lại + hai số đếm trong MỘT câu) — **không** còn khách nên chào | **≤ 5** |
+| `GET /api/san-pham/{mã}/nen-chao` | mở trang (song song, không chặn) | khách nên chào ≤ 50 (xếp DT ngành giảm, rồi mã khách) + tổng số; cột trái lấy 5 đầu, tab Tồn & bán thêm hiện cả danh sách | **1** (+1 đặt mốc khi có khoảng xem) |
 | `GET /api/san-pham/{mã}/khoang` | mở trang | có sẵn | ≤ 2 |
 | `GET /api/san-pham/{mã}/ngay?thang=` | tab Thời gian | có sẵn | 1 |
 | `GET /api/san-pham/{mã}/khach` | tab Khách hàng | Pareto · 47 tỉnh · người phụ trách · mới/quay lại · đang mua / đã ngừng | **≤ 3** |
 | `GET /api/san-pham/{mã}/thoi-gian` | tab Thời gian | 26 tuần · nhịp mua lại · cỡ đơn | **≤ 2** |
 | `GET /api/san-pham/{mã}/gia` | tab Giá & lãi | đơn giá × quy cách · giá bảng bậc · biên theo tháng · khách giá/biên thấp | **≤ 2** |
-| `GET /api/san-pham/{mã}/ban-them` | tab Tồn & bán thêm | tồn theo lô · mua kèm · khách nên chào đầy đủ | **≤ 2** |
+| `GET /api/san-pham/{mã}/ban-them` | tab Tồn & bán thêm | tồn theo lô · mua kèm (khách nên chào đọc `/nen-chao`) | **≤ 2** |
 
 Route cụ thể (`/khach`, `/gia`…) khai TRƯỚC `/{mã}` hoặc dùng đường dẫn con để không đụng nhau
 (nếp `/san-pham/khoang`). Hàm Python ở `kome/san_pham_360.py` (mô-đun mới; `kome/san_pham.py` giữ
@@ -141,6 +145,10 @@ nhất trong `mart.san_pham_360`):
   ở đây LATERAL lặp qua CẢ NGÀNH (ở HAL04 là 26 mã), nên chi phí một-mã (~0,1–0,3 s ước theo tỷ lệ)
   nhân lên theo cỡ ngành. **Báo lại: chưa tự đổi thiết kế** — xem mục "Mối quan tâm" của
   `task-8-report.md`.
+- **Cách xử lý tạm (soát cuối 2026-09-27):** hàm KHÔNG đổi; nó ra khỏi đường mở trang (`ho_so`) và
+  khỏi `tab_ban_them`, sang endpoint riêng `/nen-chao` (`tab_nen_chao`, 1 lượt). Trang mở không chờ
+  nó; chỉ khối "Khách nên chào" chờ. Sửa gốc (viết lại để không lặp LATERAL qua cả ngành) để dành
+  một migration sau.
 
 ## 6. Lỗi và trạng thái rỗng
 

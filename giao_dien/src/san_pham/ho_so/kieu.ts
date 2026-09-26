@@ -9,17 +9,18 @@ export type LoTon = { kho: string; ten_kho: string; so_luong: number | null; gia
 // (kho chưa có dòng bán nào). KHÔNG `?? 0`: 0 nghĩa là "đúng hôm nay".
 export type KhachMuaLai = { ma: string; ten: string; du_kien: string; con: number | null; nhip: number | null; lan_cuoi: string; doanh_thu: number };
 export type KhachNenChao = { ma: string; ten: string; lan_cuoi: string | null; doanh_thu_nganh: number; so_ma_nganh: number };
-export type ThangMa = { thang: string; so_luong: number; doanh_thu: number; lai_gop: number; dt_nam_truoc: number };
+// `bien` = lãi gộp ÷ DT thuần của tháng, tính ở MÁY CHỦ; null khi DT thuần ≤ 0.
+export type ThangMa = { thang: string; so_luong: number; doanh_thu: number; lai_gop: number; bien: number | null; dt_nam_truoc: number };
 export type CachTinh = Record<string, string>;
 
 export type HoSoMaApi = { h: {
   sp: SanPhamApi; nganh: string; hom_nay: string | null; thang: ThangMa[]; ton: LoTon[];
-  mua_lai: KhachMuaLai[]; mua_lai_tong: number; nen_chao: KhachNenChao[]; nen_chao_tong: number;
+  mua_lai: KhachMuaLai[]; mua_lai_tong: number;
   so_dang_mua: number; so_da_ngung: number; ngung_ban: boolean; cach_tinh: CachTinh;
   // Doanh thu / lãi gộp 12 tháng — ĐÚNG cửa sổ `sales_date > hom_nay - 365` của
   // kome/san_pham.py::danh_muc (mart.dong_ban), tính ở MÁY CHỦ — không suy lại
   // từ 24 tháng LỊCH ở trình duyệt (hai cửa sổ khác nhau).
-  dt_12t: number; lg_12t: number;
+  dt_12t: number; lg_12t: number; bien_12t: number | null;
 }; quy_cach: Record<string, string> };
 
 export type KhachDong = { ma: string; ten: string; doanh_thu: number; so_luong: number | null; so_lan: number;
@@ -47,5 +48,8 @@ export type TabGiaApi = { t: {
 }; cach_tinh: CachTinh };
 export type TabBanThemApi = { t: {
   mua_kem: { ma: string; ten: string; so_phieu: number; ty_le: number | null }[]; tong_phieu: number;
-  nen_chao: KhachNenChao[]; ton: LoTon[];
+  ton: LoTon[];
 }; cach_tinh: CachTinh };
+// /api/san-pham/{mã}/nen-chao — ≤ 50 khách (xếp DT ngành giảm) + tổng. Cột trái và tab Tồn & bán
+// thêm đọc CHUNG (useNenChao).
+export type NenChaoApi = { t: { nen_chao: KhachNenChao[]; tong: number }; cach_tinh: CachTinh };

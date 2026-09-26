@@ -405,14 +405,12 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -454,14 +452,12 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -475,14 +471,12 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -494,16 +488,14 @@
      "he": "building",
      "ja": "ビル等",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": []
@@ -516,15 +508,13 @@
      "ly_do": "màn hình đọc qua mart.khach_360, mart.uu_tien_lien_he",
      "ma": [
       "kome/khach_hang.py",
-      "kome/lien_he.py",
-      "kome/san_pham_360.py"
+      "kome/lien_he.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
       "lien_he",
-      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -559,16 +549,14 @@
      "he": "rank_name",
      "ja": "ランク名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": []
@@ -586,8 +574,7 @@
       "kome/khach_thang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/nhat_ky.py",
-      "kome/san_pham_360.py"
+      "kome/nhat_ky.py"
      ],
      "man": [
       "ban_do",
@@ -596,7 +583,6 @@
       "khach",
       "lien_he",
       "nhat_ky",
-      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -616,16 +602,14 @@
      "he": "salesperson_name",
      "ja": "売上主担当者名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": []
@@ -637,14 +621,12 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -656,16 +638,14 @@
      "he": "closing_day_name",
      "ja": "請求締日名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": []
@@ -677,14 +657,12 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -696,16 +674,14 @@
      "he": "transfer_account",
      "ja": "振込専用口座番号１",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py",
      "ma": [
-      "kome/khach_hang.py",
-      "kome/san_pham_360.py"
+      "kome/khach_hang.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
-      "san_pham",
       "tong_quan"
      ],
      "view": []

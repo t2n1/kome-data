@@ -35,7 +35,10 @@ function BanTheoNgay({ ma, thangDau, dsThang, chuaTungBan }: { ma: string; thang
   const ngayCoBan = n.filter(d => d.so_luong !== 0).length;
   const fmt = (v: number | null) => v == null ? "—" : cs === "so_luong" ? soLuong(v) : yen(v);
   const tmoi = +thang.slice(5), ttruoc = tmoi === 1 ? 12 : tmoi - 1;
-  const iThang = dsThang.indexOf(thang);
+  // Tháng bấm từ biểu đồ 24 tháng có thể là tháng KHÔNG bán (không nằm trong dsThang) — thêm nó
+  // vào danh sách chọn để <select> hiện đúng và ‹ › vẫn đi được (iThang ≠ -1).
+  const cacThang = dsThang.includes(thang) ? dsThang : [...dsThang, thang].sort();
+  const iThang = cacThang.indexOf(thang);
   // Cột nhạt = CÙNG NGÀY của tháng trước (ngày 31 không có ở tháng trước thì trống).
   const theoNgay = new Map(t.map(d => [+d.ngay.slice(8, 10), d]));
 
@@ -45,10 +48,10 @@ function BanTheoNgay({ ma, thangDau, dsThang, chuaTungBan }: { ma: string; thang
         <h2>Lượng bán theo ngày</h2>
         <span className="phu">tháng {tmoi}/{thang.slice(0, 4)}{mocNgay ? ` · đến ngày ${mocNgay}` : ""} · cột nhạt là cùng ngày tháng {ttruoc}</span>
         <span className="sp-thang-chon">
-          <button type="button" className="nut-nho" disabled={iThang <= 0} onClick={() => datThang(dsThang[iThang - 1])} aria-label="Tháng trước">‹</button>
+          <button type="button" className="nut-nho" disabled={iThang <= 0} onClick={() => datThang(cacThang[iThang - 1])} aria-label="Tháng trước">‹</button>
           <select value={thang} onChange={e => datThang(e.target.value)} aria-label="Chọn tháng">
-            {[...dsThang].reverse().map(x => <option key={x} value={x}>Tháng {+x.slice(5)}/{x.slice(0, 4)}</option>)}</select>
-          <button type="button" className="nut-nho" disabled={iThang < 0 || iThang >= dsThang.length - 1} onClick={() => datThang(dsThang[iThang + 1])} aria-label="Tháng sau">›</button>
+            {[...cacThang].reverse().map(x => <option key={x} value={x}>Tháng {+x.slice(5)}/{x.slice(0, 4)}</option>)}</select>
+          <button type="button" className="nut-nho" disabled={iThang < 0 || iThang >= cacThang.length - 1} onClick={() => datThang(cacThang[iThang + 1])} aria-label="Tháng sau">›</button>
         </span>
         <span className="tab-pill" role="group" aria-label="Chỉ số">
           {CHI_SO.map(([k, nhan]) => <button key={k} type="button" aria-pressed={cs === k} onClick={() => datCs(k)}>{nhan}</button>)}</span>
@@ -94,19 +97,20 @@ export function TabThoiGian({ ma, thang, dsThang, chuaTungBan }: { ma: string; t
         <BieuDo nhan={data.t.tuan.map(x => x.tuan.slice(5).split("-").reverse().join("/"))} cao={180} moi_nhan={2}
           chuoi={[{ ten: "Số lượng", kieu: "cot", gia_tri: data.t.tuan.map(x => x.so_luong), mau: "var(--ok-vien)" },
                   { ten: "Doanh thu", kieu: "duong", gia_tri: data.t.tuan.map(x => x.doanh_thu), mau: "var(--lien-ket)", truc_phai: true, an_mac_dinh: true }]}
-          dinh_dang={(v, c) => c.truc_phai ? yen(v) : soLuong(v)} mo_ta="Số lượng bán theo tuần, 26 tuần gần nhất" />
+          dinh_dang={(v, c) => c.truc_phai ? yen(v) : soLuong(v)} dinh_dang_truc={v => soLuong(v, 0)}
+          mo_ta="Số lượng bán theo tuần, 26 tuần gần nhất" />
       </The>
       <div className="sp3-luoi-2">
         <The tieu_de="Nhịp mua lại của khách" cach_tinh={data.cach_tinh.nhip}>
           <BieuDo nhan={data.t.nhip.map(x => NHAN_NHIP[x.nhom] ?? x.nhom)} cao={170}
             chuoi={[{ ten: "Số cặp khách–mã", kieu: "cot", gia_tri: data.t.nhip.map(x => x.so_cap), mau: "var(--ok-vien)" }]}
-            dinh_dang={v => so(v)} mo_ta="Phân bố nhịp mua lại (ngày) của các khách mua mã này" />
+            dinh_dang={v => so(v)} dinh_dang_truc={v => so(v)} mo_ta="Phân bố nhịp mua lại (ngày) của các khách mua mã này" />
         </The>
         <The tieu_de="Cỡ đơn mỗi lần mua" cach_tinh={data.cach_tinh.co_don}>
           {!data.t.co_don.length ? <p className="phu">Chưa bán trong 12 tháng.</p> :
-            <table className="bang"><thead><tr><th>Quy cách</th><th>Số lượng / dòng</th><th className="so">Số dòng</th><th className="so">Tổng SL</th></tr></thead>
+            <div className="bang-cuon"><table className="bang"><thead><tr><th>Quy cách</th><th>Số lượng / dòng</th><th className="so">Số dòng</th><th className="so">Tổng SL</th></tr></thead>
               <tbody>{data.t.co_don.map(x => (<tr key={x.pack_code + "|" + x.nhom}>
-                <td>{x.quy_cach}</td><td>{NHAN_CO[x.nhom] ?? x.nhom}</td><td className="so">{so(x.so_dong)}</td><td className="so">{soLuong(x.so_luong)}</td></tr>))}</tbody></table>}
+                <td>{x.quy_cach}</td><td>{NHAN_CO[x.nhom] ?? x.nhom}</td><td className="so">{so(x.so_dong)}</td><td className="so">{soLuong(x.so_luong)}</td></tr>))}</tbody></table></div>}
         </The>
       </div></>}
   </>);

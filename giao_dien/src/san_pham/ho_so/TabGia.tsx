@@ -31,21 +31,22 @@ export function TabGia({ ma, thang }: { ma: string; thang: ThangMa[] }) {
         <BieuDo nhan={cacThang.map(x => `${+x.slice(5)}/${x.slice(2, 4)}`)} cao={200}
           chuoi={cacQc.map((q, i) => ({ ten: t.don_gia.find(x => x.pack_code === q)!.quy_cach, kieu: "duong" as const,
             gia_tri: cacThang.map(th => t.don_gia.find(x => x.thang === th && x.pack_code === q)?.don_gia ?? null), mau: MAU[i % MAU.length] }))}
-          dinh_dang={v => yen(v == null ? null : Math.round(v))} mo_ta="Đơn giá thực bán theo tháng, mỗi quy cách một đường" />}
+          dinh_dang={v => yen(v == null ? null : Math.round(v))} dinh_dang_truc={v => yen(Math.round(v))}
+          mo_ta="Đơn giá thực bán theo tháng, mỗi quy cách một đường" />}
     </The>
     <The tieu_de="Biên lãi gộp theo tháng" cach_tinh={ct.bien}>
       {!t12.some(x => x.doanh_thu > 0) ? <p className="phu">Chưa bán trong 12 tháng.</p> :
         <BieuDo nhan={t12.map(x => `${+x.thang.slice(5)}/${x.thang.slice(2, 4)}`)} cao={170}
-          chuoi={[{ ten: "Biên", kieu: "duong", gia_tri: t12.map(x => x.doanh_thu > 0 ? x.lai_gop / x.doanh_thu * 100 : null), mau: "var(--ok-vien)" }]}
-          dinh_dang={v => v == null ? "—" : `${v.toFixed(1)}%`} mo_ta="Biên lãi gộp của mã theo tháng, 12 tháng" />}
+          chuoi={[{ ten: "Biên", kieu: "duong", gia_tri: t12.map(x => x.bien == null ? null : x.bien * 100), mau: "var(--ok-vien)" }]}
+          dinh_dang={v => v == null ? "—" : `${v.toFixed(1)}%`} dinh_dang_truc={v => `${v.toFixed(0)}%`} mo_ta="Biên lãi gộp của mã theo tháng, 12 tháng" />}
     </The>
     <div className="sp3-luoi-2">
       <BangGia tieu_de="Khách mua giá thấp nhất" ds={theoGia} ct={ct.khach_gia} />
       <BangGia tieu_de="Khách biên thấp nhất" ds={theoBien} ct={ct.khach_gia} />
     </div>
     {TN.bang_gia && t.bac_gia.length > 0 && <The tieu_de="Giá theo bậc (売価No.)" cach_tinh={ct.bac_gia}>
-      <table className="bang"><thead><tr><th>Bậc</th><th>Quy cách</th><th className="so">Giá (chưa thuế)</th><th>Từ ngày</th></tr></thead>
-        <tbody>{t.bac_gia.map(g => (<tr key={g.bac + "|" + g.pack_code}><td>{g.bac}</td><td>{g.quy_cach}</td><td className="so">{yen(g.gia)}</td><td>{ngay(g.tu_ngay)}</td></tr>))}</tbody></table>
+      <div className="bang-cuon"><table className="bang"><thead><tr><th>Bậc</th><th>Quy cách</th><th className="so">Giá (chưa thuế)</th><th>Từ ngày</th></tr></thead>
+        <tbody>{t.bac_gia.map(g => (<tr key={g.bac + "|" + g.pack_code}><td>{g.bac}</td><td>{g.quy_cach}</td><td className="so">{yen(g.gia)}</td><td>{ngay(g.tu_ngay)}</td></tr>))}</tbody></table></div>
     </The>}
   </>);
 }
@@ -53,9 +54,9 @@ export function TabGia({ ma, thang }: { ma: string; thang: ThangMa[] }) {
 function BangGia({ tieu_de, ds, ct }: { tieu_de: string; ds: TabGiaApi["t"]["khach_gia"]; ct: string }) {
   return (<The tieu_de={tieu_de} cach_tinh={ct}>
     {!ds.length ? <p className="phu">Chưa khách nào mua ≥ 2 ngày trong 12 tháng.</p> :
-      <table className="bang"><thead><tr><th>Khách</th><th className="so">Đơn giá</th><th className="so">Biên</th><th className="so">Doanh thu</th><th className="so">Ngày mua</th></tr></thead>
+      <div className="bang-cuon"><table className="bang"><thead><tr><th>Khách</th><th className="so">Đơn giá</th><th className="so">Biên</th><th className="so">Doanh thu</th><th className="so">Ngày mua</th></tr></thead>
         <tbody>{ds.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>
           <td className="so">{k.don_gia == null ? "—" : yen(Math.round(k.don_gia))}</td><td className="so">{pc(k.bien)}</td>
-          <td className="so">{yen(k.doanh_thu)}</td><td className="so">{so(k.so_lan)}</td></tr>))}</tbody></table>}
+          <td className="so">{yen(k.doanh_thu)}</td><td className="so">{so(k.so_lan)}</td></tr>))}</tbody></table></div>}
   </The>);
 }
