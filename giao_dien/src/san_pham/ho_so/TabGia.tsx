@@ -34,17 +34,18 @@ export function TabGia({ ma, thang }: { ma: string; thang: ThangMa[] }) {
           dinh_dang={v => yen(v == null ? null : Math.round(v))} mo_ta="Đơn giá thực bán theo tháng, mỗi quy cách một đường" />}
     </The>
     <The tieu_de="Biên lãi gộp theo tháng" cach_tinh={ct.bien}>
-      <BieuDo nhan={t12.map(x => `${+x.thang.slice(5)}/${x.thang.slice(2, 4)}`)} cao={170}
-        chuoi={[{ ten: "Biên", kieu: "duong", gia_tri: t12.map(x => x.doanh_thu > 0 ? x.lai_gop / x.doanh_thu * 100 : null), mau: "var(--ok-vien)" }]}
-        dinh_dang={v => v == null ? "—" : `${v.toFixed(1)}%`} mo_ta="Biên lãi gộp của mã theo tháng, 12 tháng" />
+      {!t12.some(x => x.doanh_thu > 0) ? <p className="phu">Chưa bán trong 12 tháng.</p> :
+        <BieuDo nhan={t12.map(x => `${+x.thang.slice(5)}/${x.thang.slice(2, 4)}`)} cao={170}
+          chuoi={[{ ten: "Biên", kieu: "duong", gia_tri: t12.map(x => x.doanh_thu > 0 ? x.lai_gop / x.doanh_thu * 100 : null), mau: "var(--ok-vien)" }]}
+          dinh_dang={v => v == null ? "—" : `${v.toFixed(1)}%`} mo_ta="Biên lãi gộp của mã theo tháng, 12 tháng" />}
     </The>
     <div className="sp3-luoi-2">
       <BangGia tieu_de="Khách mua giá thấp nhất" ds={theoGia} ct={ct.khach_gia} />
       <BangGia tieu_de="Khách biên thấp nhất" ds={theoBien} ct={ct.khach_gia} />
     </div>
-    {TN.bang_gia && t.bac_gia.length > 0 && <The tieu_de="Giá theo bậc (売価No.)">
+    {TN.bang_gia && t.bac_gia.length > 0 && <The tieu_de="Giá theo bậc (売価No.)" cach_tinh={ct.bac_gia}>
       <table className="bang"><thead><tr><th>Bậc</th><th>Quy cách</th><th className="so">Giá (chưa thuế)</th><th>Từ ngày</th></tr></thead>
-        <tbody>{t.bac_gia.map(g => (<tr key={g.bac + g.pack_code}><td>{g.bac}</td><td>{g.quy_cach}</td><td className="so">{yen(g.gia)}</td><td>{ngay(g.tu_ngay)}</td></tr>))}</tbody></table>
+        <tbody>{t.bac_gia.map(g => (<tr key={g.bac + "|" + g.pack_code}><td>{g.bac}</td><td>{g.quy_cach}</td><td className="so">{yen(g.gia)}</td><td>{ngay(g.tu_ngay)}</td></tr>))}</tbody></table>
     </The>}
   </>);
 }

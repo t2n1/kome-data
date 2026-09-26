@@ -54,6 +54,10 @@ export default function HoSoMa({ ma }: { ma: string }) {
   if (error) return <div className="kh">{thanhTren}<div className="khoi-loi">{(error as Error).message}</div></div>;
   if (!data) return <div className="kh">{thanhTren}<div className="khoi-cho" aria-busy="true"><span /><span /><span /></div></div>;
   const h = data.h, sp = h.sp;
+  // Danh sách tháng cho bộ chọn "Lượng bán theo ngày" — chỉ tháng CÓ bán, trừ khi
+  // không tháng nào có (mã chưa từng bán) thì cho chọn cả 24 tháng.
+  const coBan = h.thang.filter(x => x.so_luong !== 0 || x.doanh_thu !== 0).map(x => x.thang);
+  const dsThang = coBan.length ? coBan : h.thang.map(x => x.thang);
 
   return (
     <div className="kh hs hs2 sp3">
@@ -101,7 +105,8 @@ export default function HoSoMa({ ma }: { ma: string }) {
           </div>
           <div role="tabpanel">
             {tab === "khach" && <TabKhach ma={ma} khoang={kh ?? null} />}
-            {tab === "thoi_gian" && <TabThoiGian ma={ma} thang={thangNgay ?? h.hom_nay?.slice(0, 7) ?? null} />}
+            {tab === "thoi_gian" && <TabThoiGian ma={ma} thang={thangNgay ?? h.hom_nay?.slice(0, 7) ?? null}
+              dsThang={dsThang} chuaTungBan={!sp.lan_cuoi} />}
             {tab === "gia" && <TabGia ma={ma} thang={h.thang} />}
             {tab === "ban_them" && <TabBanThem ma={ma} ngungBan={h.ngung_ban} nganh={h.nganh} />}
           </div>

@@ -1,4 +1,4 @@
-// Tab Thời gian — bán theo ngày (khối cũ, /ngay) · 26 tuần · nhịp mua lại · cỡ đơn.
+// Tab Thời gian — bán theo ngày (khối cũ, /ngay, có bộ chọn tháng) · 26 tuần · nhịp mua lại · cỡ đơn.
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { lay } from "../../api";
@@ -15,14 +15,16 @@ type ChiSo = typeof CHI_SO[number][0];
 const NHAN_NHIP: Record<string, string> = { "≤7": "≤ 7 ngày", "8–14": "8–14", "15–30": "15–30", "31–60": "31–60", ">60": "> 60", chua_du: "chưa đủ 3 lần" };
 const NHAN_CO: Record<string, string> = { tra_lai: "trả lại (赤伝)", khong_sl: "không số lượng" };
 
-function BanTheoNgay({ ma, thangDau }: { ma: string; thangDau: string }) {
-  const [thang, datThang] = useState(thangDau);
-  useEffect(() => { datThang(thangDau); }, [thangDau]);
+function BanTheoNgay({ ma, thangDau, dsThang, chuaTungBan }: { ma: string; thangDau: string | null; dsThang: string[]; chuaTungBan: boolean }) {
+  const [thang, datThang] = useState(thangDau ?? dsThang[dsThang.length - 1] ?? "");
+  useEffect(() => { if (thangDau) datThang(thangDau); }, [thangDau]);
   const [cs, datCs] = useState<ChiSo>("so_luong");
   const { data, error, isFetching } = useQuery<NgayApi>({
-    queryKey: ["sp-ngay", ma, thang], placeholderData: keepPreviousData,
+    queryKey: ["sp-ngay", ma, thang], enabled: !!thang, placeholderData: keepPreviousData,
     queryFn: () => lay<NgayApi>(`/api/san-pham/${encodeURIComponent(ma)}/ngay?thang=${thang}`),
   });
+  if (chuaTungBan || !thang) return <section className="kh-the sp-ngay" id="sp-ngay"><div className="kh-the-dau"><h2>Lượng bán theo ngày</h2></div>
+    <p className="trong-nho">Mã này chưa từng có dòng bán.</p></section>;
   const n = data?.nay ?? [], t = data?.truoc ?? [];
   const mocNgay = data?.hom_nay && data.hom_nay.slice(0, 7) === thang ? +data.hom_nay.slice(8, 10) : null;
   const trongMoc = (d: { ngay: string }) => mocNgay == null || +d.ngay.slice(8, 10) <= mocNgay;
@@ -33,6 +35,7 @@ function BanTheoNgay({ ma, thangDau }: { ma: string; thangDau: string }) {
   const ngayCoBan = n.filter(d => d.so_luong !== 0).length;
   const fmt = (v: number | null) => v == null ? "—" : cs === "so_luong" ? soLuong(v) : yen(v);
   const tmoi = +thang.slice(5), ttruoc = tmoi === 1 ? 12 : tmoi - 1;
+  const iThang = dsThang.indexOf(thang);
   // Cột nhạt = CÙNG NGÀY của tháng trước (ngày 31 không có ở tháng trước thì trống).
   const theoNgay = new Map(t.map(d => [+d.ngay.slice(8, 10), d]));
 
@@ -41,6 +44,12 @@ function BanTheoNgay({ ma, thangDau }: { ma: string; thangDau: string }) {
       <div className="kh-the-dau">
         <h2>Lượng bán theo ngày</h2>
         <span className="phu">tháng {tmoi}/{thang.slice(0, 4)}{mocNgay ? ` · đến ngày ${mocNgay}` : ""} · cột nhạt là cùng ngày tháng {ttruoc}</span>
+        <span className="sp-thang-chon">
+          <button type="button" className="nut-nho" disabled={iThang <= 0} onClick={() => datThang(dsThang[iThang - 1])} aria-label="Tháng trước">‹</button>
+          <select value={thang} onChange={e => datThang(e.target.value)} aria-label="Chọn tháng">
+            {[...dsThang].reverse().map(x => <option key={x} value={x}>Tháng {+x.slice(5)}/{x.slice(0, 4)}</option>)}</select>
+          <button type="button" className="nut-nho" disabled={iThang < 0 || iThang >= dsThang.length - 1} onClick={() => datThang(dsThang[iThang + 1])} aria-label="Tháng sau">›</button>
+        </span>
         <span className="tab-pill" role="group" aria-label="Chỉ số">
           {CHI_SO.map(([k, nhan]) => <button key={k} type="button" aria-pressed={cs === k} onClick={() => datCs(k)}>{nhan}</button>)}</span>
       </div>
@@ -67,18 +76,18 @@ function BanTheoNgay({ ma, thangDau }: { ma: string; thangDau: string }) {
           ]}
           dinh_dang={v => fmt(v)} dinh_dang_truc={v => cs === "so_luong" ? soLuong(v, 0) : gon(v)}
           vach={mocNgay ? { i: mocNgay - 1, chu: "mốc dữ liệu" } : null} />
-        <p className="phu sp-ghi">Cột xám = ngày nghỉ (thứ Bảy, Chủ nhật, ngày lễ — <code>mart.lich_kinh_doanh</code>). Ngày không có phiếu là 0.</p>
+        <p className="phu sp-ghi">Cột xám = ngày nghỉ (thứ Bảy, Chủ nhật, ngày lễ — <code>mart.lich_kinh_doanh</code>). Ngày không có phiếu là 0. Hoặc bấm một tháng ở biểu đồ 24 tháng phía trên để xem tháng đó.</p>
       </>}
     </section>
   );
 }
 
-export function TabThoiGian({ ma, thang }: { ma: string; thang: string | null }) {
+export function TabThoiGian({ ma, thang, dsThang, chuaTungBan }: { ma: string; thang: string | null; dsThang: string[]; chuaTungBan: boolean }) {
   const kx = chuoiKhoang(useKhoang());
   const { data, error } = useQuery<TabThoiGianApi>({ queryKey: ["sp360-tg", ma, kx],
     queryFn: () => lay<TabThoiGianApi>(voiKhoang(`/api/san-pham/${encodeURIComponent(ma)}/thoi-gian`)) });
   return (<>
-    {thang && <BanTheoNgay ma={ma} thangDau={thang} />}
+    <BanTheoNgay ma={ma} thangDau={thang} dsThang={dsThang} chuaTungBan={chuaTungBan} />
     {error ? <div className="khoi-loi">Không tải được tab Thời gian: {(error as Error).message}</div> :
      !data ? <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div> : <>
       <The tieu_de="26 tuần" cach_tinh={data.cach_tinh.tuan}>
@@ -96,7 +105,7 @@ export function TabThoiGian({ ma, thang }: { ma: string; thang: string | null })
         <The tieu_de="Cỡ đơn mỗi lần mua" cach_tinh={data.cach_tinh.co_don}>
           {!data.t.co_don.length ? <p className="phu">Chưa bán trong 12 tháng.</p> :
             <table className="bang"><thead><tr><th>Quy cách</th><th>Số lượng / dòng</th><th className="so">Số dòng</th><th className="so">Tổng SL</th></tr></thead>
-              <tbody>{data.t.co_don.map(x => (<tr key={x.pack_code + x.nhom}>
+              <tbody>{data.t.co_don.map(x => (<tr key={x.pack_code + "|" + x.nhom}>
                 <td>{x.quy_cach}</td><td>{NHAN_CO[x.nhom] ?? x.nhom}</td><td className="so">{so(x.so_dong)}</td><td className="so">{soLuong(x.so_luong)}</td></tr>))}</tbody></table>}
         </The>
       </div></>}

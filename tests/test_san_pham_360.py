@@ -99,6 +99,19 @@ def test_tab_khach_khong_qua_3_luot(conn, batch, monkeypatch):
     assert dem["n"] <= 3, dem["n"]
 
 
+def test_tab_khach_bien_theo_nguoi_TU_MAY_CHU(conn, batch):
+    """[Fix round 1] `bien` của mỗi người phụ trách phải tính SẴN ở máy chủ (tỷ số
+    của các tổng), không để trình duyệt tự chia lai_gop/doanh_thu. Seed `_gieo_mot_ma`
+    dùng `_mua` mặc định: gp=30.000, DT thuần = 110.000 - 10.000 = 100.000 mỗi dòng,
+    4 dòng cùng người phụ trách → 120.000 / 400.000 = 0,3 đúng."""
+    _gieo_mot_ma(conn, batch)
+    nguoi = SP360.tab_khach(conn, "Q1")["nguoi"]
+    assert nguoi, "gieo hỏng: phải có ít nhất một người phụ trách"
+    assert nguoi[0]["doanh_thu"] == 400_000 and nguoi[0]["lai_gop"] == 120_000, \
+        "seed không còn khớp giả định 4 dòng × (DT thuần 100.000, gp 30.000)"
+    assert nguoi[0]["bien"] == pytest.approx(0.3)
+
+
 def test_tab_khach_tinh_bac_0_la_DUNG_BANG_0(conn, batch):
     _gieo_mot_ma(conn, batch)
     o = {x["ten"]: x for x in SP360.tab_khach(conn, "Q1")["tinh"]["o"]}

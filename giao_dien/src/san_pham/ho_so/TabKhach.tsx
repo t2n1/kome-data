@@ -25,7 +25,7 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
         {top.length > 0 && <BieuDo nhan={top.map((_, i) => String(i + 1))} nhan_day_du={top.map(k => k.ten)} cao={200}
           chuoi={[{ ten: "Doanh thu", kieu: "cot", gia_tri: top.map(k => k.doanh_thu), mau: "var(--ok-vien)" },
                   { ten: "Luỹ kế %", kieu: "duong", gia_tri: top.map(k => k.luy_ke == null ? null : k.luy_ke * 100), mau: "var(--lien-ket)", truc_phai: true }]}
-          dinh_dang={(v, c) => c.truc_phai ? `${(v ?? 0).toFixed(1)}%` : yen(v)} dinh_dang_truc={v => gon(v)}
+          dinh_dang={(v, c) => c.truc_phai ? (v == null ? "—" : `${v.toFixed(1)}%`) : yen(v)} dinh_dang_truc={v => gon(v)}
           onBam={i => { location.href = lk(top[i].ma); }} mo_ta="Doanh thu 12 tháng theo khách xếp giảm dần, đường luỹ kế phần trăm" />}
       </The>
       <The tieu_de="Theo tỉnh" cach_tinh={ct.tinh}
@@ -41,7 +41,7 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
           <table className="bang"><thead><tr><th>Người phụ trách</th><th className="so">Doanh thu</th><th className="so">Biên</th><th className="so">Khách</th></tr></thead>
             <tbody>{t.nguoi.map(n => (<tr key={n.ma}>
               <td>{n.ten ?? `(mã ${n.ma || "trống"} không có trong danh sách phụ trách)`}</td>
-              <td className="so">{yen(n.doanh_thu)}</td><td className="so">{n.doanh_thu > 0 ? pc(n.lai_gop / n.doanh_thu) : "—"}</td>
+              <td className="so">{yen(n.doanh_thu)}</td><td className="so">{pc(n.bien)}</td>
               <td className="so">{so(n.so_khach)}</td></tr>))}</tbody></table>}
       </The>
       <The tieu_de="Khách mới / quay lại theo tháng" cach_tinh={ct.khach_moi}>
@@ -51,20 +51,21 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
           dinh_dang={v => so(v)} mo_ta="Số khách mới và khách quay lại mua mã này theo tháng" />
       </The>
     </div>
-    {khoang?.khach && khoang.khach.length > 0 && <The tieu_de="Khách mua trong khoảng xem">
-      <table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">SL</th><th className="so">Ngày mua</th><th>Lần cuối</th></tr></thead>
-        <tbody>{khoang.khach.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>
-          <td className="so">{yen(k.doanh_thu)}</td><td className="so">{soLuong(k.so_luong)}</td><td className="so">{so(k.so_ngay)}</td><td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table>
+    {khoang && <The tieu_de="Khách mua trong khoảng xem" cach_tinh={ct.khoang}>
+      {!khoang.khach.length ? <p className="phu">Không khách nào mua mã này trong khoảng xem.</p> :
+        <table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">SL</th><th className="so">Ngày mua</th><th>Lần cuối</th></tr></thead>
+          <tbody>{khoang.khach.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>
+            <td className="so">{yen(k.doanh_thu)}</td><td className="so">{soLuong(k.so_luong)}</td><td className="so">{so(k.so_ngay)}</td><td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table>}
     </The>}
     <div className="sp3-luoi-2">
-      <BangKhach tieu_de="Khách đang mua" ds={t.dang_mua} rong="Chưa khách nào đang mua đều." />
-      <BangKhach tieu_de="Khách đã ngừng mua mã này" ds={t.da_ngung} rong="Không khách nào ngừng mua (im lặng ≥ 2× nhịp riêng)." />
+      <BangKhach tieu_de="Khách đang mua" ds={t.dang_mua} rong="Chưa khách nào đang mua đều." ct={ct.khach_cap} />
+      <BangKhach tieu_de="Khách đã ngừng mua mã này" ds={t.da_ngung} rong="Không khách nào ngừng mua (im lặng ≥ 2× nhịp riêng)." ct={ct.khach_cap} />
     </div>
   </>);
 }
 
-function BangKhach({ tieu_de, ds, rong }: { tieu_de: string; ds: KhachDong[]; rong: string }) {
-  return (<The tieu_de={tieu_de}>
+function BangKhach({ tieu_de, ds, rong, ct }: { tieu_de: string; ds: KhachDong[]; rong: string; ct: string }) {
+  return (<The tieu_de={tieu_de} cach_tinh={ct}>
     {!ds.length ? <p className="phu">{rong}</p> :
       <table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">Nhịp</th><th>Lần cuối</th></tr></thead>
         <tbody>{ds.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>

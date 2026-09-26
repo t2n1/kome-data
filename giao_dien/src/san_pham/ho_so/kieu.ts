@@ -30,7 +30,7 @@ export type TabKhachApi = { t: {
   tap_trung: { ma: string; ten: string; doanh_thu: number; ty_trong: number | null; luy_ke: number | null }[];
   top10_ty_trong: number | null;
   tinh: { o: OTinhMa[]; rong: number; cao: number; o_rong: number; o_cao: number; khong_ro: number };
-  nguoi: { ma: string; ten: string | null; doanh_thu: number; lai_gop: number; so_khach: number }[];
+  nguoi: { ma: string; ten: string | null; doanh_thu: number; lai_gop: number; so_khach: number; bien: number | null }[];
   khach_moi: { thang: string; moi: number; quay_lai: number }[];
   dang_mua: KhachDong[]; da_ngung: KhachDong[];
 }; cach_tinh: CachTinh };

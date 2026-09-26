@@ -14,7 +14,7 @@ export function TabBanThem({ ma, ngungBan, nganh }: { ma: string; ngungBan: bool
   if (!data) return <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div>;
   const t = data.t, ct = data.cach_tinh;
   return (<>
-    <The tieu_de="Tồn theo lô" goc={<a className="nut-nho" href={giuKhoang(`/kho-hang?tim=${encodeURIComponent(ma)}`)}>Mở Kho hàng ›</a>}>
+    <The tieu_de="Tồn theo lô" cach_tinh={ct.ton_lo} goc={<a className="nut-nho" href={giuKhoang(`/kho-hang?tim=${encodeURIComponent(ma)}`)}>Mở Kho hàng ›</a>}>
       {!t.ton.length ? <p className="phu">Chưa có ảnh chụp tồn của mã này tới thời điểm này.</p> :
         <table className="bang"><thead><tr><th>Lô</th><th className="so">Số lượng</th><th>Hạn</th><th className="so">Bán từ / hết sau</th></tr></thead>
           <tbody>{t.ton.map(l => (<tr key={l.kho + (l.best_before ?? "")}>

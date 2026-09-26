@@ -26,6 +26,12 @@ CACH_TINH = {
                  "bán nhiều nhất của mã",
     "mua_kem": "trong các phiếu 12 tháng có mã này: mã khác xuất hiện trên bao nhiêu % số phiếu đó · "
                "bỏ phí, hàng tặng, hàng ngừng kinh doanh đã hết tồn",
+    "ton_lo": "tồn theo LÔ của cùng một kho, xếp theo thứ tự bán: lô đang xuất trước, rồi lô chờ "
+              "theo hạn · mốc là ảnh chụp tồn ≤ mốc dữ liệu",
+    "khach_cap": "đang mua / đã ngừng theo nhãn trạng thái cặp khách–mã: đã ngừng = im lặng ≥ 2× "
+                 "nhịp mua riêng của cặp đó · bỏ khách ※廃業※/※取引停止※",
+    "khoang": "doanh thu thuần của mã trong khoảng xem đang chọn",
+    "bac_gia": "giá bảng mới nhất của mỗi bậc × quy cách, chưa thuế",
 }
 
 
@@ -279,6 +285,11 @@ def tab_khach(conn, ma: str) -> dict | None:
     tap_trung = r[1]
     tong = sum(x["doanh_thu"] or 0 for x in tap_trung)
     top10 = (sum(x["doanh_thu"] or 0 for x in tap_trung[:10]) / tong) if tong else None
+    # Biên lãi gộp per người phụ trách phải tính ở MÁY CHỦ (bất biến "tỷ suất là tỷ số
+    # của các tổng") — không để trình duyệt tự chia lai_gop/doanh_thu.
+    nguoi = [x | {"bien": (float(x["lai_gop"]) / float(x["doanh_thu"]))
+                  if x["doanh_thu"] and float(x["doanh_thu"]) > 0 else None}
+             for x in r[2]]
 
     rows = conn.execute(
         """SELECT ma_jis, ten, ten_ngan, vung, hang_luoi, cot_luoi, doanh_thu, so_khach
@@ -297,7 +308,7 @@ def tab_khach(conn, ma: str) -> dict | None:
 
     dang_mua, da_ngung = _khach_dang_ngung(conn, ma)
     return {"tap_trung": tap_trung, "top10_ty_trong": top10, "tinh": tinh,
-            "nguoi": r[2], "khach_moi": r[3], "dang_mua": dang_mua, "da_ngung": da_ngung}
+            "nguoi": nguoi, "khach_moi": r[3], "dang_mua": dang_mua, "da_ngung": da_ngung}
 
 
 _NHOM_NHIP = (("≤7", 7), ("8–14", 14), ("15–30", 30), ("31–60", 60), (">60", None))
