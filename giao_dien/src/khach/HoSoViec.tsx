@@ -58,8 +58,8 @@ function MaMuaLai({ h }: { h: HoSoApi }) {
         <ul className="hs2-ds">{ds.map(d => (
           <li key={d.ma} className="hs2-dong"><a className="ten-jp" href={`/san-pham/${encodeURIComponent(d.ma)}`}>{d.ten}</a>
             <b className={d.muc === "qua" ? "giam" : d.muc === "sap" ? "canh-chu" : "nhat-chu"}>{d.nhan}</b></li>))}</ul>}
-      {h.da_ngung_mua.length > 0 && <button type="button" className="hs2-lien-ket" onClick={moNgung}>
-        + {h.da_ngung_mua.length} mã đã ngừng mua — xem ›</button>}
+      {h.o_so.so_ma_ngung > 0 && <button type="button" className="hs2-lien-ket" onClick={moNgung}>
+        + {h.o_so.so_ma_ngung} mã đã ngừng mua — xem ›</button>}
       <button type="button" className="nut-nho hs2-rong" onClick={chep}>{daChep ? "✓ Đã chép" : "📋 Chép kịch bản gọi"}</button>
     </The>);
 }

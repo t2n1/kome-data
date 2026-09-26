@@ -20,6 +20,15 @@ def test_khoi_ma_cot_trai_KHONG_mang_ten_Nen_chao_cua_lien_he():
 def test_khach_ngung_giao_dich_khong_co_khoi_ma_hay_kich_ban():
     v = _doc("HoSoViec.tsx")
     assert '"ngung_giao_dich"' in v
+    assert "{!ngung && <MaMuaLai" in v
+
+
+def test_dem_ma_da_ngung_dung_so_ma_ngung_khong_dung_danh_sach_cat_10():
+    """Máy chủ cắt da_ngung_mua ở 10 dòng (kome/ho_so_khach.py: da_ngung_mua[:10]) nên
+    số hiện ra phải đọc o_so.so_ma_ngung (đếm đầy đủ), không phải length của danh sách đã cắt."""
+    v = _doc("HoSoViec.tsx")
+    assert "so_ma_ngung" in v
+    assert "da_ngung_mua.length" not in v
 
 
 def test_khoi_khong_nguon_da_bo_va_hai_khoi_sap_co_con():

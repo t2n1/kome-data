@@ -15,24 +15,8 @@ export function useCongNoKhach(ma: string) {
   });
 }
 
-/** Ô "Công nợ quá hạn" của tab Tổng quan. */
-export function OCongNo({ ma }: { ma: string }) {
-  const { data: d } = useCongNoKhach(ma);
-  if (!d) return <div className="o-kpi"><div className="nhan">Công nợ quá hạn</div><div className="gia nhat-chu">…</div></div>;
-  if (!d.co_so) return (
-    <div className="o-kpi chua" title="Chưa nạp sổ 請求先元帳 nào."><div className="nhan">Công nợ quá hạn</div>
-      <div className="gia">chưa có dữ liệu</div><div className="dong-phu nhat-chu">chưa nạp sổ công nợ</div></div>);
-  if (!d.ben || !d.tq) return (
-    <div className="o-kpi"><div className="nhan">Công nợ quá hạn</div><div className="gia">—</div>
-      <div className="dong-phu nhat-chu">bên nhận hoá đơn không có trong sổ</div></div>);
-  return (
-    <a className="o-kpi" href={`/cong-no?tim=${encodeURIComponent(d.ben_ma)}`}>
-      <div className="nhan">Công nợ quá hạn{d.la_chinh ? "" : " (bên nhận HĐ)"}</div>
-      <div className={"gia" + (d.tq.qua_han ? " giam" : "")}>{gon(d.tq.qua_han)}</div>
-      <div className="dong-phu nhat-chu">dư nợ {gon(d.ben.so_du)} · đến {ngay(d.ben.ky_den)}</div></a>);
-}
-
-/** Công nợ ở cột trái hồ sơ 360° (2026-09-26) — cùng hook, cùng ba câu trạng thái với OCongNo. */
+/** Công nợ ở cột trái hồ sơ 360° (2026-09-26) — cùng hook; giữ đúng BA câu trạng thái
+ *  (đang tải · chưa nạp sổ · bên không có trong sổ) mà ô KPI cũ của tab Tổng quan từng có. */
 export function OCongNoGon({ ma }: { ma: string }) {
   const { data: d } = useCongNoKhach(ma);
   const tieu_de = <h2>Công nợ{d?.ben && !d.la_chinh ? " (bên nhận HĐ)" : ""}</h2>;

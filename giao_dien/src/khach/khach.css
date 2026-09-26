@@ -221,7 +221,9 @@ td.trong{text-align:center;padding:1.6rem}
 .hs2-cong-dung{font-size:.8rem;margin:0;line-height:1.5;color:var(--chu-nhat)}
 .hs2-can{font-size:.72rem;margin:.6rem 0 0;padding-top:.5rem;border-top:1px solid var(--vien-phu);color:var(--chu-nhat)}
 .hs2-trai{display:flex;flex-direction:column;gap:.75rem;min-width:0}
-.hs2-trai .kh-the > h2{margin:0 0 .45rem;font-size:.8rem;font-weight:600;color:var(--chu-nhat)}
+.hs2-trai .kh-the > h2,.hs2-trai .kh-the-dau h2{margin:0 0 .45rem;font-size:.8rem;font-weight:600;color:var(--chu-nhat)}
+.hs2-trai .kh-the-dau{margin-bottom:.45rem}
+.hs2-trai .kh-the-dau h2{margin:0}
 .hs2-ly-do{border-left:3px solid var(--vien-dam);border-radius:0 12px 12px 0}
 .hs2-ly-do.canh{border-left-color:var(--canh-vien)} .hs2-ly-do.do{border-left-color:var(--do)}
 .hs2-ly-do.ok{border-left-color:var(--ok-vien)}

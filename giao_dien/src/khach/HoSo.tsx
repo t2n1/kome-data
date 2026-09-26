@@ -1,8 +1,9 @@
 // Hồ sơ 360° (thiết kế lại 2026-09-26): thanh trên (← danh sách, ô chuyển
-// khách, ‹ n/N ›) · đầu hồ sơ hai cột · cột trái "Việc với khách này" · cột
-// phải sổ sức khoẻ + biểu đồ 12 tháng + 4 tab. Số THẬT từ
-// /api/khach-hang/{mã} (kome/ho_so_khach.py). Khối không có nguồn: khung
-// "chưa có dữ liệu" nói rõ thiếu gì.
+// khách, ‹ n/N ›) · đầu hồ sơ · bố cục HAI CỘT (hs2-luoi): cột trái cố định
+// "Việc với khách này" (HoSoViec.tsx), cột phải cuộn riêng gồm sổ sức khoẻ +
+// biểu đồ 12 tháng + 4 tab (Mặt hàng/Đơn hàng/Công nợ/Hồ sơ). Số THẬT từ
+// /api/khach-hang/{mã} (kome/ho_so_khach.py). Khối chưa có nguồn thật dùng
+// KhoiSapCo (khung "sắp có", không giả vờ có dữ liệu).
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { lay } from "../api";

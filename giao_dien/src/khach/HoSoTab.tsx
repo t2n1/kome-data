@@ -1,5 +1,7 @@
-// Nội dung 5 tab của hồ sơ 360° — bố cục Customer 360.dc.html. Biểu đồ SVG tự
-// vẽ như gói thiết kế (không thư viện). Mọi số từ /api/khach-hang/{mã}.
+// Nội dung 4 tab (Mặt hàng/Đơn hàng/Công nợ/Hồ sơ) + ô KPI sổ sức khoẻ + biểu
+// đồ 12 tháng của hồ sơ 360° — bố cục Customer 360.dc.html thiết kế lại
+// 2026-09-26. Biểu đồ SVG tự vẽ như gói thiết kế (không thư viện). Mọi số từ
+// /api/khach-hang/{mã}.
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { lay } from "../api";
@@ -196,7 +198,7 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
   const thang = dsThang(h.hom_nay, 3);
   const [tatCa, datTatCa] = useState(false);
   const { data: kh } = useKhoangKhach(h.khach.ma);
-  // Lịch đầy đủ (không chỉ 10 mã của tab Tổng quan) cho nhãn đề xuất.
+  // Lịch đầy đủ (không chỉ 10 mã của cột trái) cho nhãn đề xuất.
   const lichDu = useMemo(() => {
     if (!h.hom_nay) return lich;
     const moc = new Date(h.hom_nay).getTime();
