@@ -4083,8 +4083,9 @@
      "he": "qty",
      "ja": "数量",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.khach_mat_hang và 4 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 5 chỉ số khác",
      "ma": [
+      "kome/bao_cao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/san_pham.py",
@@ -4092,6 +4093,7 @@
      ],
      "man": [
       "ban_do",
+      "bao_cao",
       "chung",
       "ho_so",
       "khach",
@@ -4101,6 +4103,7 @@
      ],
      "view": [
       "mart.ban_den_moc",
+      "mart.ban_theo_san_pham",
       "mart.dong_ban",
       "mart.khach_mat_hang",
       "mart.san_pham_360",
@@ -7027,7 +7030,7 @@
      "he": "food_category_name",
      "ja": "食品分類名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 2 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 5 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -7048,8 +7051,11 @@
       "mart.ban_theo_nganh_thang",
       "mart.ban_theo_nganh_thang_so_sanh",
       "mart.ban_theo_san_pham",
+      "mart.khach_mat_hang",
+      "mart.khach_mat_hang_khoang",
       "mart.mat_hang_khoang",
-      "mart.nganh_ky_cung_ky"
+      "mart.nganh_ky_cung_ky",
+      "mart.san_pham_360"
      ]
     },
     {
@@ -10233,8 +10239,9 @@
      "he": "qty",
      "ja": "純売上数量",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.khach_mat_hang và 4 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 5 chỉ số khác",
      "ma": [
+      "kome/bao_cao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/san_pham.py",
@@ -10242,6 +10249,7 @@
      ],
      "man": [
       "ban_do",
+      "bao_cao",
       "chung",
       "ho_so",
       "khach",
@@ -10251,6 +10259,7 @@
      ],
      "view": [
       "mart.ban_den_moc",
+      "mart.ban_theo_san_pham",
       "mart.dong_ban",
       "mart.khach_mat_hang",
       "mart.san_pham_360",

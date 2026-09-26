@@ -15,6 +15,10 @@ import { gon, ngay, so, yen } from "../dinh_dang";
 import { KD } from "../khoi_dau";
 import "./bao_cao.css";
 
+// 048 / 049: nhóm KHÔNG phải hàng (phí & điều chỉnh, hàng tặng POSM) — tổng do mart cộng.
+type NhomRieng = { doanh_thu: number; lai_gop: number;
+  dong: { ma: string; ten: string; doanh_thu: number | null; lai_gop: number | null; so_khach: number; so_luong: number | null }[] };
+
 type O = { thang: string; doanh_thu: number; lai_gop: number; ty_suat: number | null; co_cung_ky: boolean;
   tang_truong: number | null; la_thang_chot: boolean; so_phieu: number; so_khach: number; dt_cung_ky: number | null };
 type Ky = { company_fy: number; so_ky: number; nhan: string; doanh_thu: number; lai_gop: number; ty_suat: number | null;
@@ -41,7 +45,7 @@ type BaoCaoApi = {
   bc: { ky: Ky; moi_ky: Ky[]; thang: O[]; hang: { ma: string; ten: string; nhom: string; doanh_thu: number | null; lai_gop: number | null; ty_suat: number | null; so_khach: number }[];
     nhan_vien: { ma: string | null; doanh_thu: number; lai_gop: number; ty_suat: number | null; so_khach: number; so_phieu: number }[];
     khong_co_du_lieu: boolean; canh_bao: string[]; cung_ky: CungKy | null; so_sanh: SoSanhSo[]; tap_trung: { dong: KhTT[]; so_khach: number; luy_ke_top10: number | null } | null;
-    phi: { doanh_thu: number; lai_gop: number; dong: { ma: string; ten: string; doanh_thu: number | null; lai_gop: number | null; so_khach: number }[] } };
+    phi: NhomRieng; hang_tang: NhomRieng };
   td: Td | null;
   td_phu: { ngay_kd_con_lai: number; can_ban_moi_ngay: number | null; nhip_chuan: number | null; thieu_moc: number | null } | null;
   so_nho: Record<"dt" | "lg" | "ts" | "kh", Spark>;
@@ -223,6 +227,7 @@ export default function BaoCao() {
           </svg> : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
           {d.co.khong_ve !== 0 && <p className="phu">Không vẽ: {yen(d.co.khong_ve)} của {d.co.so_ma_khong_ve} mã (doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)</p>}
           {bc.phi.dong.length > 0 && <p className="phu">Không gồm phí &amp; điều chỉnh ({yen(bc.phi.doanh_thu)}) — không phải hàng, xem khối riêng bên dưới.</p>}
+          {bc.hang_tang.dong.length > 0 && <p className="phu">Không gồm hàng tặng POSM ({bc.hang_tang.dong.length} mã, lãi gộp {yen(bc.hang_tang.lai_gop)}) — xem khối riêng bên dưới.</p>}
         </section>
       </div>
 
@@ -301,6 +306,19 @@ export default function BaoCao() {
             <td className="so">{h.doanh_thu != null ? yen(h.doanh_thu) : "—"}</td><td className="so">{h.lai_gop != null ? yen(h.lai_gop) : "—"}</td>
             <td className="so">{so(h.so_khach)}</td></tr>)}
             <tr><th scope="row">Cộng</th><td className="so"><b>{yen(bc.phi.doanh_thu)}</b></td><td className="so"><b>{yen(bc.phi.lai_gop)}</b></td><td /></tr></tbody>
+        </table></div>
+      </section>}
+
+      {bc.hang_tang.dong.length > 0 && <section className="kh-the bc-khoi">
+        <div className="kh-the-dau"><h2>Hàng tặng (POSM) — không phải hàng bán</h2></div>
+        <p className="phu">Ngành OBC 雑貨_VNM: poster, túi, ly, wobbler… đi tặng khách, doanh thu ¥0. Giá vốn của chúng (lãi gộp âm) VẪN nằm trong lãi gộp ở trên
+          (khớp sổ OBC), nhưng không tính vào ngành hàng hay xếp hạng mặt hàng.</p>
+        <div className="bang-cuon"><table className="bang">
+          <thead><tr><th>Mã</th><th className="so">Số lượng tặng</th><th className="so">Khách nhận</th><th className="so">Doanh thu thuần</th><th className="so">Lãi gộp</th></tr></thead>
+          <tbody>{bc.hang_tang.dong.map(h => <tr key={h.ma}><td className="ten-jp">{h.ten}<div className="ma-nho"><code>{h.ma}</code></div></td>
+            <td className="so">{h.so_luong != null ? so(h.so_luong) : "—"}</td><td className="so">{so(h.so_khach)}</td>
+            <td className="so">{h.doanh_thu != null ? yen(h.doanh_thu) : "—"}</td><td className="so">{h.lai_gop != null ? yen(h.lai_gop) : "—"}</td></tr>)}
+            <tr><th scope="row">Cộng</th><td /><td /><td className="so"><b>{yen(bc.hang_tang.doanh_thu)}</b></td><td className="so"><b>{yen(bc.hang_tang.lai_gop)}</b></td></tr></tbody>
         </table></div>
       </section>}
 

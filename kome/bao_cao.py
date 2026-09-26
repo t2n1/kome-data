@@ -42,6 +42,11 @@ NGANH_TRONG = "(chưa phân loại)"
 # nhưng KHÔNG phải một ngành hàng: `tach_phi` đưa nó ra khối riêng.
 NGANH_PHI = "Phí & điều chỉnh"
 
+# Nhãn nhóm "hàng tặng POSM" (ngành OBC 雑貨_VNM — poster, túi, ly… tặng khách, doanh
+# thu ¥0) — PHẢI khớp TỪNG CHỮ với mart.ten_nganh 3 tham số (migration 049). Cùng
+# phương án A: vẫn trong mọi tổng, nhưng `tach_phi` đưa nó ra khối riêng.
+NGANH_HANG_TANG = "Hàng tặng (POSM)"
+
 
 @dataclass
 class O:
@@ -217,13 +222,17 @@ class TapTrung:
 
 
 @dataclass
-class PhiDieuChinh:
-    """Phí & điều chỉnh của kỳ/khoảng — từng mã (cùng hình dạng `hang_theo_nganh`)
-    và tổng. Tổng lấy từ dòng ngành `NGANH_PHI` mà mart đã cộng (không cộng lại ở
-    Python). Σ ngành của báo cáo + `doanh_thu` = tổng doanh thu (phương án A)."""
+class NhomRieng:
+    """Một nhóm KHÔNG phải hàng của kỳ/khoảng (phí & điều chỉnh — 048; hàng tặng
+    POSM — 049) — từng mã (cùng hình dạng `hang_theo_nganh`) và tổng. Tổng lấy từ
+    dòng ngành (`NGANH_PHI` / `NGANH_HANG_TANG`) mà mart đã cộng (không cộng lại ở
+    Python). Σ ngành của báo cáo + tổng các nhóm riêng = tổng doanh thu (phương án A)."""
     dong: list[dict] = field(default_factory=list)
     doanh_thu: int = 0
     lai_gop: int = 0
+
+
+PhiDieuChinh = NhomRieng
 
 
 @dataclass
@@ -245,7 +254,8 @@ class BaoCao:
     # Khoảng xem dạng Tháng / Khoảng (kome/ban_khoang.py): các phép so của
     # khoảng. Dạng Kỳ để rỗng và dùng `cung_ky` như trước.
     so_sanh: list[SoSanhSo] = field(default_factory=list)
-    phi: PhiDieuChinh = field(default_factory=PhiDieuChinh)
+    phi: NhomRieng = field(default_factory=NhomRieng)
+    hang_tang: NhomRieng = field(default_factory=NhomRieng)
 
 
 def _ky_tu_dong(r) -> Ky:
@@ -357,10 +367,11 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
          "doanh_thu": int(r[3]) if r[3] is not None else None,
          "lai_gop": int(r[4]) if r[4] is not None else None,
          "ty_suat": float(r[5]) if r[5] is not None else None,
-         "so_khach": r[6], "la_phi": r[7]}
+         "so_khach": r[6], "la_phi": r[7], "la_hang_tang": r[8],
+         "so_luong": float(r[9]) if r[9] is not None else None}
         for r in conn.execute(
             """SELECT product_code, ten_hang, food_category_name, doanh_thu_thuan,
-                      lai_gop, ty_suat, so_khach_mua, la_phi
+                      lai_gop, ty_suat, so_khach_mua, la_phi, la_hang_tang, so_luong
                FROM mart.ban_theo_san_pham WHERE company_fy = %s""",
             (ky.company_fy,)).fetchall()]
     # `lai_gop` không nên bao giờ NULL (SUM trên ít nhất một dòng bán), nhưng
@@ -408,25 +419,31 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
             f"{len(thieu)} tháng KHÔNG có dữ liệu cùng kỳ năm trước "
             f"({thieu[0]}…{thieu[-1]}) — công ty không còn lưu dữ liệu bán trước "
             f"2025-03-03. Cột 'So cùng kỳ' để trống là đúng, không phải lỗi.")
-    hang_theo_nganh, nganh_ky, nganh_thang, phi = tach_phi(hang_theo_nganh, nganh_ky, nganh_thang)
+    hang_theo_nganh, nganh_ky, nganh_thang, phi, hang_tang = tach_phi(
+        hang_theo_nganh, nganh_ky, nganh_thang)
     return BaoCao(ky=ky, moi_ky=moi_ky, thang=thang, hang=top_lai_gop(hang_theo_nganh),
                   nhan_vien=nhan_vien, canh_bao=canh_bao, cung_ky=cung_ky,
                   nganh_thang=nganh_thang, nganh_ky=nganh_ky, tap_trung=tap_trung,
-                  hang_theo_nganh=hang_theo_nganh, phi=phi)
+                  hang_theo_nganh=hang_theo_nganh, phi=phi, hang_tang=hang_tang)
 
 
 def tach_phi(hang_theo_nganh: list[dict], nganh_ky: list, nganh_thang: list):
-    """Đưa phí & điều chỉnh ra khỏi phần SẢN PHẨM / NGÀNH của báo cáo (048).
-    Mã: theo cột `la_phi` của mart; ngành: theo nhãn `NGANH_PHI`. Tiền không mất —
-    nó sang `PhiDieuChinh` để màn hình hiện khối riêng."""
-    phi = sorted((h for h in hang_theo_nganh if h.get("la_phi")),
-                 key=lambda h: abs(h["doanh_thu"] or 0), reverse=True)
-    tong = next((n for n in nganh_ky if n.nganh == NGANH_PHI), None)
-    return ([h for h in hang_theo_nganh if not h.get("la_phi")],
-            [n for n in nganh_ky if n.nganh != NGANH_PHI],
-            [n for n in nganh_thang if n.nganh != NGANH_PHI],
-            PhiDieuChinh(dong=phi, doanh_thu=tong.doanh_thu if tong else 0,
-                         lai_gop=tong.lai_gop if tong else 0))
+    """Đưa phí & điều chỉnh (048) và hàng tặng POSM (049) ra khỏi phần SẢN PHẨM /
+    NGÀNH của báo cáo. Mã: theo cột `la_phi` / `la_hang_tang` của mart; ngành: theo
+    nhãn `NGANH_PHI` / `NGANH_HANG_TANG`. Tiền không mất — nó sang hai `NhomRieng`
+    để màn hình hiện khối riêng."""
+    def nhom(cot: str, nhan: str) -> NhomRieng:
+        dong = sorted((h for h in hang_theo_nganh if h.get(cot)),
+                      key=lambda h: (abs(h["doanh_thu"] or 0), abs(h["lai_gop"] or 0)),
+                      reverse=True)
+        tong = next((n for n in nganh_ky if n.nganh == nhan), None)
+        return NhomRieng(dong=dong, doanh_thu=tong.doanh_thu if tong else 0,
+                         lai_gop=tong.lai_gop if tong else 0)
+    rieng = (NGANH_PHI, NGANH_HANG_TANG)
+    return ([h for h in hang_theo_nganh if not (h.get("la_phi") or h.get("la_hang_tang"))],
+            [n for n in nganh_ky if n.nganh not in rieng],
+            [n for n in nganh_thang if n.nganh not in rieng],
+            nhom("la_phi", NGANH_PHI), nhom("la_hang_tang", NGANH_HANG_TANG))
 
 
 def top_lai_gop(hang_theo_nganh: list[dict]) -> list[dict]:

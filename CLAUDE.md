@@ -173,6 +173,17 @@ hàng chưa mua. Ngành: nhãn riêng `'Phí & điều chỉnh'` (`mart.ten_ngan
 `khach_mat_hang_khoang` GIỮ dòng phí (danh sách phải cộng bằng tổng) kèm cột `la_phi`. Có test
 canh: `tests/test_phi_dieu_chinh.py`. **Migration 048 phải chạy TRƯỚC khi triển khai.**
 
+**Bất biến (049, hàng tặng POSM — chủ DN chốt 2026-09-26):** ngành OBC `雑貨_VNM` (23 mã
+MKT…: poster, túi, ly, wobbler — tặng khách, doanh thu ¥0, giá vốn poster làm lãi gộp âm) là
+**hàng tặng, không phải sản phẩm**, và là nhóm RIÊNG — không gộp vào "Phí & điều chỉnh" (phí thu
+tiền khách; POSM là chi phí marketing). Định nghĩa ĐÚNG MỘT LẦN, theo NGÀNH chứ không theo tiền tố
+mã: `mart.la_hang_tang(food_category_name)`; vị từ lọc phần sản phẩm là
+`mart.khong_phai_hang(...)` (= phí HOẶC tặng) — dùng ở `san_pham_360`, `khach_mat_hang`, gợi ý.
+Phí xét TRƯỚC (`mart.la_dong_hang_tang`: một dòng không vừa phí vừa tặng). Nhãn ngành
+`'Hàng tặng (POSM)'` (`kome.bao_cao.NGANH_HANG_TANG` là bản chép bắt buộc); `tach_phi` đưa nó ra
+`BaoCao.hang_tang`. Ba danh sách giữ dòng kèm cột `la_hang_tang`. Có test canh:
+`tests/test_hang_tang.py`. **Migration 049 phải chạy TRƯỚC khi triển khai.**
+
 **Bất biến (044, hạn trả):** `その都度請求` = trả trong **5 ngày làm việc sau ngày xuất
 hàng** (ngày phiếu), ngày làm việc = `mart.lich_kinh_doanh.la_ngay_kd` (chưa trừ ngày nghỉ
 riêng của công ty — cùng hạn chế đã ghi). Ba mẫu suy được hạn: `末締/翌月末日`,

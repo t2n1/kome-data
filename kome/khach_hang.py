@@ -684,7 +684,8 @@ def ho_so(conn, ma: str) -> HoSo | None:
                                  WHERE h.product_code = p.product_code)
                 AND t.ty_suat IS NOT NULL
                 -- 048: phí gửi / phí thu hộ có ty_suat gần 1 — không phải hàng để gợi ý.
-                AND NOT mart.la_phi_dieu_chinh(p.product_code, p.kind_code)
+                -- 049: hàng tặng POSM cũng không.
+                AND NOT mart.khong_phai_hang(p.product_code, p.kind_code, p.food_category_name)
               ORDER BY t.ty_suat DESC
               LIMIT 8)
         ) u ORDER BY khoi, xep DESC
