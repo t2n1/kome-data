@@ -5,7 +5,9 @@ import type { SanPhamApi } from "../kieu";   // kiểu `sp` của hồ sơ cũ (
 export type LoTon = { kho: string; ten_kho: string; so_luong: number | null; gia_tri: number; best_before: string | null;
   loai_han: string; nhan_han: string; mau_han: string; han_con_lai: number | null; vai_tro_lo: string;
   bat_dau_ban_sau: number | null; ban_het_sau: number | null; khong_kip_ban: boolean | null; sap_chuyen_lo: boolean | null };
-export type KhachMuaLai = { ma: string; ten: string; du_kien: string; con: number; nhip: number | null; lan_cuoi: string; doanh_thu: number };
+// `con` = số ngày tới ngày dự kiến mua lại — NULL khi `hom_nay` (mốc dữ liệu) là NULL
+// (kho chưa có dòng bán nào). KHÔNG `?? 0`: 0 nghĩa là "đúng hôm nay".
+export type KhachMuaLai = { ma: string; ten: string; du_kien: string; con: number | null; nhip: number | null; lan_cuoi: string; doanh_thu: number };
 export type KhachNenChao = { ma: string; ten: string; lan_cuoi: string | null; doanh_thu_nganh: number; so_ma_nganh: number };
 export type ThangMa = { thang: string; so_luong: number; doanh_thu: number; lai_gop: number; dt_nam_truoc: number };
 export type CachTinh = Record<string, string>;
@@ -14,6 +16,10 @@ export type HoSoMaApi = { h: {
   sp: SanPhamApi; nganh: string; hom_nay: string | null; thang: ThangMa[]; ton: LoTon[];
   mua_lai: KhachMuaLai[]; mua_lai_tong: number; nen_chao: KhachNenChao[]; nen_chao_tong: number;
   so_dang_mua: number; so_da_ngung: number; ngung_ban: boolean; cach_tinh: CachTinh;
+  // Doanh thu / lãi gộp 12 tháng — ĐÚNG cửa sổ `sales_date > hom_nay - 365` của
+  // kome/san_pham.py::danh_muc (mart.dong_ban), tính ở MÁY CHỦ — không suy lại
+  // từ 24 tháng LỊCH ở trình duyệt (hai cửa sổ khác nhau).
+  dt_12t: number; lg_12t: number;
 }; quy_cach: Record<string, string> };
 
 export type KhachDong = { ma: string; ten: string; doanh_thu: number; so_luong: number | null; so_lan: number;

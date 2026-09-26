@@ -5,6 +5,7 @@ import pytest
 
 from kome import khach_hang as KH
 from kome import ho_so_khach as HSK
+from kome import san_pham as SP
 from kome import san_pham_360 as SP360
 from tests.test_khach_hang import _ho_so_khach, _mua, _neo, HOM_NAY
 from tests.test_mart_san_pham import _san_pham, _ton
@@ -32,6 +33,25 @@ def test_ho_so_khong_qua_5_truy_van_va_khong_rong(conn, batch, monkeypatch):
     h = SP360.ho_so(conn, "Q1")
     assert h is not None and h["sp"].ma == "Q1"
     assert dem["n"] <= 5, f"ho_so() chạy {dem['n']} truy vấn"
+
+
+def test_ho_so_dt_12t_KHOP_voi_danh_muc(conn, batch):
+    """[CRITICAL — soát vòng 1] `ho_so()["dt_12t"]` phải đúng BẰNG cửa sổ 12
+    tháng của danh mục (`SP.danh_muc`, `sales_date > hom_nay - 365`), không
+    phải một tổng 12 THÁNG LỊCH tính lại từ `h["thang"]` ở trình duyệt — hai
+    cửa sổ khác nhau (lịch vs. ngày) sẽ cho hai con số cho CÙNG một mã trên
+    hai màn."""
+    _gieo_mot_ma(conn, batch)
+    ngay_nam_truoc = HOM_NAY - timedelta(days=365)
+    _ho_so_khach(conn, batch, "KQ03", "Khách năm trước 2")
+    _mua(conn, batch, "KQ03", ngay_nam_truoc, hang="Q1")
+    _neo(conn, batch)
+
+    h = SP360.ho_so(conn, "Q1")
+    dm = next(m for m in SP.danh_muc(conn)["ma"] if m["ma"] == "Q1")
+    assert h["dt_12t"] == dm["dt_12t"]
+    assert h["lg_12t"] == dm["lg_12t"]
+    assert h["dt_12t"] > 0, "gieo hỏng: phải có doanh thu 12 tháng thật để so"
 
 
 def test_ho_so_24_thang_co_cot_nam_truoc(conn, batch):

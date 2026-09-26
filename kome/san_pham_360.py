@@ -173,20 +173,33 @@ def _bac_gia(conn, ma: str) -> list[dict]:
 def ho_so(conn, ma: str) -> dict | None:
     """Phần mở trang của Sản phẩm 360. None nếu mã không có trong san_pham_360.
 
-    NGÂN SÁCH: 4 lượt hỏi (trần 5, có test đếm). 1) san_pham_360 + ngành + mốc;
+    NGÂN SÁCH: 4 lượt hỏi (trần 5, có test đếm). 1) san_pham_360 + ngành + mốc
+    + doanh thu/lãi gộp 12 tháng (ĐÚNG cửa sổ của `kome.san_pham.danh_muc`:
+    `sales_date > hom_nay - 365` trên `mart.dong_ban` — MỘT định nghĩa "12
+    tháng" cho cả /san-pham và /san-pham/{mã}, không tính lại ở trình duyệt
+    từ 24 tháng LỊCH, thứ có thể lệch cửa sổ ngày thật);
     2) 24 tháng; 3) tồn theo lô; 4) cột trái: khách đến ngày mua lại + khách nên chào
     + hai số đếm, gộp MỘT câu.
     """
     r = conn.execute(
-        f"""SELECT {', '.join('s.' + c.strip() for c in _COT.split(','))},
-                   mart.ten_nganh(p.food_category_name, p.product_code, p.kind_code),
-                   (SELECT hom_nay FROM mart.moc_thoi_gian)
-              FROM mart.san_pham_360 s
+        f"""WITH m AS (SELECT hom_nay FROM mart.moc_thoi_gian),
+                 s AS MATERIALIZED (
+                     SELECT {_COT} FROM mart.san_pham_360 WHERE product_code = %s
+                 ),
+                 d12 AS (
+                     SELECT sum(doanh_thu_thuan) AS dt, sum(gross_profit) AS lg
+                       FROM mart.dong_ban, m
+                      WHERE product_code = %s AND sales_date > m.hom_nay - 365
+                 )
+            SELECT s.*, mart.ten_nganh(p.food_category_name, s.product_code, p.kind_code),
+                   m.hom_nay, d12.dt, d12.lg
+              FROM s CROSS JOIN m
               LEFT JOIN core.dim_product p ON p.product_code = s.product_code
-             WHERE s.product_code = %s""", (ma,)).fetchone()
+              LEFT JOIN d12 ON true""", (ma, ma)).fetchone()
     if r is None:
         return None
     sp, nganh, hom_nay = _sp(r[:16]), r[16], r[17]
+    dt_12t, lg_12t = int(r[18] or 0), int(r[19] or 0)
 
     cuoi = f"{hom_nay:%Y-%m}" if hom_nay else None
     theo = {t[0]: t for t in conn.execute(
@@ -241,7 +254,8 @@ def ho_so(conn, ma: str) -> dict | None:
             "mua_lai": mua_lai[:10], "mua_lai_tong": len(mua_lai),
             "nen_chao": nen_chao, "nen_chao_tong": int(dem[7] or 0),
             "so_dang_mua": int(dem[4] or 0), "so_da_ngung": int(dem[6] or 0),
-            "ngung_ban": sp.ngung_ban, "cach_tinh": CACH_TINH}
+            "ngung_ban": sp.ngung_ban, "cach_tinh": CACH_TINH,
+            "dt_12t": dt_12t, "lg_12t": lg_12t}
 
 
 def tab_khach(conn, ma: str) -> dict | None:

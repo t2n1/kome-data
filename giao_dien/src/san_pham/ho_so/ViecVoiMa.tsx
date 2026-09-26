@@ -7,7 +7,8 @@ import type { HoSoMaApi } from "./kieu";
 
 const lk = (ma: string) => giuKhoang(`/khach-hang/${encodeURIComponent(ma)}`);
 
-function nhanCon(con: number) {
+function nhanCon(con: number | null) {
+  if (con == null) return { chu: "—", lop: "nhat-chu" };
   if (con < 0) return { chu: `quá ${-con} ngày`, lop: "giam" };
   if (con === 0) return { chu: "hôm nay", lop: "canh-chu" };
   if (con <= 7) return { chu: `còn ${con} ngày`, lop: "canh-chu" };

@@ -54,8 +54,6 @@ export default function HoSoMa({ ma }: { ma: string }) {
   if (error) return <div className="kh">{thanhTren}<div className="khoi-loi">{(error as Error).message}</div></div>;
   if (!data) return <div className="kh">{thanhTren}<div className="khoi-cho" aria-busy="true"><span /><span /><span /></div></div>;
   const h = data.h, sp = h.sp;
-  const t12 = h.thang.slice(-12);
-  const dt12 = t12.reduce((a, x) => a + x.doanh_thu, 0), lg12 = t12.reduce((a, x) => a + x.lai_gop, 0);
 
   return (
     <div className="kh hs hs2 sp3">
@@ -72,15 +70,16 @@ export default function HoSoMa({ ma }: { ma: string }) {
         <div className="hs2-phai">
           <div className="o-kpi-luoi hs2-o">
             <div className="o-kpi"><div className="nhan">Doanh thu · {kh?.khoang.nhan ?? "khoảng xem"}</div>
-              <div className="gia">{kh ? yen(kh.tong.dt) : "…"}</div>
-              <div className={"dong-phu " + (kh?.tang == null ? "nhat-chu" : kh.tang >= 0 ? "tang" : "giam")}>
-                {kh?.tang != null ? `${thay_doi(kh.tang)} so ${kh.so_sanh?.nhan ?? ""}` : "…"}</div></div>
+              <div className="gia">{kh === undefined ? "…" : kh === null ? "—" : yen(kh.tong.dt)}</div>
+              <div className={"dong-phu " + (kh && kh.so_sanh.co && kh.tang != null ? (kh.tang >= 0 ? "tang" : "giam") : "nhat-chu")}>
+                {kh === undefined ? "…" : kh === null ? "—"
+                  : kh.so_sanh.co && kh.tang != null ? `${thay_doi(kh.tang)} so ${kh.so_sanh.nhan}` : "không có dữ liệu để so"}</div></div>
             <div className="o-kpi"><div className="nhan">Bán / ngày (theo tuổi)</div>
               <div className="gia">{sp.toc_do_ngay_theo_tuoi == null ? "—" : soLuong(sp.toc_do_ngay_theo_tuoi)}</div>
               <div className="dong-phu nhat-chu">90 ngày, chia cho số ngày mã có mặt</div></div>
             <div className="o-kpi"><div className="nhan">Biên lãi gộp 12 tháng</div>
-              <div className="gia">{dt12 > 0 ? pc(lg12 / dt12) : "—"}</div>
-              <div className="dong-phu nhat-chu">luỹ kế {yen(dt12)}</div></div>
+              <div className="gia">{h.dt_12t > 0 ? pc(h.lg_12t / h.dt_12t) : "—"}</div>
+              <div className="dong-phu nhat-chu">DT 12 tháng {yen(h.dt_12t)}</div></div>
             <div className="o-kpi"><div className="nhan">Khách đang mua / đã ngừng</div>
               <div className="gia">{so(h.so_dang_mua)} / {so(h.so_da_ngung)}</div>
               <div className="dong-phu nhat-chu">theo cặp khách–mã này</div></div>
