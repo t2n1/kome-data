@@ -549,8 +549,8 @@ def tao_api(open_app_conn) -> APIRouter:
 
     @r.get("/san-pham/{ma}")
     def sp_ho_so(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
-        """Hồ sơ một mã: `SP.ho_so` (trần 5 lượt hỏi, bất biến đặc tả 4b §5.5; +1 đặt
-        mốc khi có khoảng xem — 040)."""
+        """Phần mở trang của Sản phẩm 360 (`SP360.ho_so`, 4 lượt hỏi, trần 5;
+        +1 đặt mốc khi có khoảng xem — 040)."""
         from kome import san_pham as SP
         try:
             ts = _ts(request, thang, ky, tu, den).chinh()
@@ -558,7 +558,8 @@ def tao_api(open_app_conn) -> APIRouter:
             return _loi(str(e), 400)
 
         def tinh_(c):
-            h = SP.ho_so(c, ma)
+            from kome import san_pham_360 as SP360
+            h = SP360.ho_so(c, ma)
             if h is None:
                 # 050: hàng ※終売※ hết tồn không phân tích — nói rõ, không "không có mã".
                 return NGUNG_BAN if SP.la_ma_ngung_ban_an(c, ma) else None

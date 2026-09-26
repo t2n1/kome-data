@@ -11,6 +11,7 @@ from kome import bao_cao as BC
 from kome import khach_hang as KH
 from kome import khoang_xem as KX
 from kome import san_pham as SP
+from kome import san_pham_360 as SP360
 from kome.web.app import create_app
 from tests.test_khach_hang import HOM_NAY, _ho_so_khach, _mua, _neo
 from tests.test_san_pham import _ton_ngay
@@ -147,7 +148,7 @@ def test_mat_hang_theo_khoang_cua_khach_danh_dau_het_ton(conn, batch):
 
 def test_mo_thang_ho_so_ma_het_ton_noi_da_ngung_kinh_doanh(conn, batch, test_db_url):
     _du_lieu(conn, batch)
-    assert SP.ho_so(conn, NGUNG) is None and SP.la_ma_ngung_ban_an(conn, NGUNG)
+    assert SP360.ho_so(conn, NGUNG) is None and SP.la_ma_ngung_ban_an(conn, NGUNG)
     c = TestClient(create_app(db_url=test_db_url))
     r = c.get(f"/api/san-pham/{NGUNG}")
     assert r.status_code == 404 and "終売" in r.json()["loi"]

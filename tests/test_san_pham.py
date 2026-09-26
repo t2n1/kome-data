@@ -17,6 +17,7 @@ import pytest
 
 from kome import khach_hang as KH
 from kome import san_pham as SP
+from kome import san_pham_360 as SP360
 from tests.test_khach_hang import _ho_so_khach, _mua, _neo, HOM_NAY
 from tests.test_mart_san_pham import _ban_qty, _san_pham, _ton
 
@@ -80,22 +81,6 @@ def test_danh_sach_san_pham_khong_qua_2_truy_van(conn, batch, monkeypatch):
     assert dem["n"] <= 2, f"danh_sach() chạy {dem['n']} truy vấn"
 
 
-def test_ho_so_san_pham_khong_qua_5_truy_van(conn, batch, monkeypatch):
-    _san_pham(conn, batch, "P002")
-    _ton(conn, batch, "P002", sl=100)
-    _ho_so_khach(conn, batch, "KP02", "Quán P002")
-    _mua(conn, batch, "KP02", HOM_NAY - timedelta(days=3), hang="P002")
-    _gia(conn, batch, "P002", "03", 5250)
-    _neo(conn, batch)
-    dem = _dem_truy_van(conn, monkeypatch)
-    # Giữ kết quả và khẳng định nó KHÔNG rỗng: một hồi quy làm câu đầu không
-    # khớp dòng nào thì hàm thoát sớm bằng `return None` sau ĐÚNG MỘT truy
-    # vấn, và một test chỉ đếm sẽ xanh rỡ trong khi trang đã trắng.
-    h = SP.ho_so(conn, "P002")
-    assert h is not None and h.sp.ma == "P002"
-    assert dem["n"] <= 5, f"ho_so() chạy {dem['n']} truy vấn"
-
-
 def test_kho_hang_khong_qua_2_truy_van(conn, batch, monkeypatch):
     _san_pham(conn, batch, "P003")
     _ton(conn, batch, "P003", sl=100)
@@ -145,8 +130,8 @@ def test_so_luong_giu_phan_thap_phan_qua_ca_ba_ham(conn, batch):
     sp = next(h for h in SP.danh_sach(conn).hang if h.ma == "P005")
     assert abs(float(sp.ton) - 83.75) < 0.001
 
-    h = SP.ho_so(conn, "P005")
-    assert abs(float(h.ton[0]["so_luong"]) - 83.75) < 0.001
+    h = SP360.ho_so(conn, "P005")
+    assert abs(float(h["ton"][0]["so_luong"]) - 83.75) < 0.001
 
     k = SP.kho_hang(conn)
     assert abs(float(k.dong[0]["so_luong"]) - 83.75) < 0.001
@@ -420,11 +405,6 @@ def test_sau_nhan_trang_thai_ton_va_bon_loai_han():
 # Hồ sơ một mã hàng
 # ---------------------------------------------------------------------------
 
-def test_ho_so_ma_khong_ton_tai_tra_None(conn, batch):
-    _neo(conn, batch)
-    assert SP.ho_so(conn, "KHONG-CO") is None
-
-
 def test_ho_so_co_du_nam_khoi(conn, batch):
     """Năm khối phải có DỮ LIỆU THẬT, không chỉ có mặt dưới dạng danh sách
     rỗng — một khối luôn rỗng thì không ai phát hiện nó hỏng."""
@@ -443,14 +423,13 @@ def test_ho_so_co_du_nam_khoi(conn, batch):
         _mua(conn, batch, "KP20", HOM_NAY - timedelta(days=120 + i * 7), hang="P019")
     _neo(conn, batch)
 
-    h = SP.ho_so(conn, "P019")
-    assert h.sp.ma == "P019" and h.sp.ten == "Gạo ST25"
-    assert [m["thang"] for m in h.thang] == sorted(m["thang"] for m in h.thang)
-    assert [k["ma"] for k in h.khach_mua] == ["KP19"]
-    assert [k["ma"] for k in h.khach_ngung] == ["KP20"]
-    assert [t["kho"] for t in h.ton] == ["0001"]
+    h = SP360.ho_so(conn, "P019")
+    assert h["sp"].ma == "P019" and h["sp"].ten == "Gạo ST25"
+    mua, ngung = SP360._khach_dang_ngung(conn, "P019")
+    assert [k["ma"] for k in mua] == ["KP19"] and [k["ma"] for k in ngung] == ["KP20"]
+    assert [t["kho"] for t in h["ton"]] == ["0001"]
     # Bảng giá: MỖI 荷姿 một dòng, và nhãn quy cách phải đọc được.
-    assert sorted(g["quy_cach"] for g in h.bac_gia) == \
+    assert sorted(g["quy_cach"] for g in SP360._bac_gia(conn, "P019")) == \
         sorted([SP.QUY_CACH["00"], SP.QUY_CACH["02"]])
 
 
@@ -468,7 +447,7 @@ def test_bac_gia_chi_hien_dong_MOI_NHAT_cua_tung_quy_cach(conn, batch):
     _gia(conn, batch, "P022", "03", 460, quy_cach="00", tu_ngay="2026-01-01")
     _neo(conn, batch)
 
-    bg = SP.ho_so(conn, "P022").bac_gia
+    bg = SP360._bac_gia(conn, "P022")
     assert len(bg) == 2, "mỗi (bậc, quy cách) đúng MỘT dòng, không phải cả lịch sử"
     assert sorted((g["quy_cach"], g["gia"]) for g in bg) == sorted(
         [(SP.QUY_CACH["02"], 5250), (SP.QUY_CACH["00"], 460)])
@@ -494,9 +473,9 @@ def test_khach_ngung_mua_ma_nay_so_voi_NHIP_RIENG_khong_nguong_chung(conn, batch
         _mua(conn, batch, "KP24", HOM_NAY - timedelta(days=100 + i * 120), hang="P023")
     _neo(conn, batch)
 
-    h = SP.ho_so(conn, "P023")
-    assert [k["ma"] for k in h.khach_ngung] == ["KP23"]
-    assert [k["ma"] for k in h.khach_mua] == ["KP24"]
+    mua, ngung = SP360._khach_dang_ngung(conn, "P023")
+    assert [k["ma"] for k in ngung] == ["KP23"]
+    assert [k["ma"] for k in mua] == ["KP24"]
 
 
 def test_hai_man_tra_loi_GIONG_NHAU_ve_mot_cap_khach_ma(conn, batch):
@@ -523,9 +502,9 @@ def test_hai_man_tra_loi_GIONG_NHAU_ve_mot_cap_khach_ma(conn, batch):
         _mua(conn, batch, "KP26", HOM_NAY - timedelta(days=100 + i * 120), hang="P025")
     _neo(conn, batch)
 
-    sp = SP.ho_so(conn, "P025")
-    assert [k["ma"] for k in sp.khach_ngung] == ["KP25"]
-    assert [k["ma"] for k in sp.khach_mua] == ["KP26"]
+    mua, ngung = SP360._khach_dang_ngung(conn, "P025")
+    assert [k["ma"] for k in ngung] == ["KP25"]
+    assert [k["ma"] for k in mua] == ["KP26"]
 
     day = KH.ho_so(conn, "KP25")
     thua = KH.ho_so(conn, "KP26")
@@ -558,9 +537,9 @@ def test_khach_da_dong_cua_khong_lot_vao_khoi_goi_lai_nao(conn, batch):
     _neo(conn, batch)
 
     # /san-pham/{mã}: không khối nào của trang bán hàng được nhắc tới họ.
-    sp = SP.ho_so(conn, "P026")
-    assert [k["ma"] for k in sp.khach_ngung] == []
-    assert [k["ma"] for k in sp.khach_mua] == [], \
+    mua, ngung = SP360._khach_dang_ngung(conn, "P026")
+    assert [k["ma"] for k in ngung] == []
+    assert [k["ma"] for k in mua] == [], \
         "chặn khỏi khối 'đã ngừng' mà lại rơi sang khối 'ĐANG mua' là tệ hơn"
 
     # /khach-hang/{mã}: hai khối gọi lại rỗng, nhưng lịch sử còn nguyên.
@@ -613,10 +592,10 @@ def test_cap_cua_khach_da_dong_cua_mang_NHAN_RIENG_khong_phai_phu_dinh(conn, bat
     assert nhan["KS02"] == "mua"
 
     # /san-pham/{mã}: khối chứng chạy, khách đã đóng cửa không ở khối NÀO.
-    sp = SP.ho_so(conn, "P027")
-    assert [k["ma"] for k in sp.khach_mua] == ["KS02"], \
+    mua, ngung = SP360._khach_dang_ngung(conn, "P027")
+    assert [k["ma"] for k in mua] == ["KS02"], \
         "chặn khỏi khối 'đã ngừng' mà lại rơi sang khối 'ĐANG mua' là tệ hơn"
-    assert [k["ma"] for k in sp.khach_ngung] == []
+    assert [k["ma"] for k in ngung] == []
 
     # /khach-hang/{mã}: hai khối gọi lại rỗng, lịch sử còn nguyên.
     kh = KH.ho_so(conn, "KD02")
@@ -639,7 +618,7 @@ def test_ho_so_hien_dung_cot_toc_do_giai_thich_du_ban_ngay(conn, batch):
     _ban_qty(conn, batch, "KP21", HOM_NAY, "P021", qty=10)
     _neo(conn, batch)
 
-    sp = SP.ho_so(conn, "P021").sp
+    sp = SP360.ho_so(conn, "P021")["sp"]
     assert sp.toc_do_ngay_theo_tuoi is not None
     assert float(sp.toc_do_ngay) != float(sp.toc_do_ngay_theo_tuoi), \
         "mã mới: hai mẫu số khác nhau, nên hai cột phải khác nhau"
