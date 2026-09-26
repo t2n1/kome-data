@@ -19,7 +19,7 @@ Ngoài phạm vi: số lượng đề xuất đặt hàng, hàng đang về, m�
 
 **Tab tải lười, mỗi tab một endpoint.** Mở trang chỉ gọi hồ sơ (≤ 5 lượt) + khoảng (≤ 2 lượt); mỗi
 tab gọi endpoint riêng khi được bấm. Chỉ số mới là hàm `mart.*` `LANGUAGE sql STABLE` trong
-migration `051`, đọc `mart.ban_den_moc`.
+migration `051`–`053` (một migration mỗi nhóm), đọc `mart.ban_den_moc`.
 
 Đã loại: một endpoint lớn (phá trần 5 lượt, bắt chờ cả khối mua kèm dù không ai mở tab);
 materialized view (nút thắt là số lượt hỏi, và MV không quay về theo mốc).
@@ -63,7 +63,7 @@ materialized view (nút thắt là số lượt hỏi, và MV không quay về t
   tới trang riêng, không cần sửa đích.
 - Các link ngoài (`BaoCao.tsx`, `LienHe.tsx`, `tong_quan/khoi.tsx`) giữ nguyên đường dẫn.
 
-## 4. Định nghĩa chỉ số (migration `051`)
+## 4. Định nghĩa chỉ số (migration `051`–`053`)
 
 Mọi hàm đọc `mart.ban_den_moc` (bỏ mã nội bộ 044, quay về theo mốc 040). Cửa sổ mặc định = **12
 tháng kết thúc ở mốc** (`sales_date > hom_nay - 365`, cùng cửa sổ `mart.hang_doanh_thu`). "DT thuần"
@@ -84,11 +84,11 @@ in MỘT câu cách tính ngay dưới khối (hằng trong Python, như `khach_
 | Biên theo tháng | — | từ `san_pham_theo_thang`: `lai_gop / doanh_thu_thuan`, DT ≤ 0 → NULL | tỷ số các tổng |
 | Khách giá / biên thấp | `mart.sp_khach_gia(ma)` | theo khách, 12 tháng, chỉ khách DT thuần > 0 và ≥ 2 lần mua; đơn giá = tỷ số các tổng theo quy cách phổ biến nhất của mã; biên = `Σ LG / Σ DT thuần` | bài học `021` (mẫu số tí hon do 赤伝) |
 | Mua kèm | `mart.sp_mua_kem(ma)` | trong các phiếu (`slip_no`) 12 tháng có mã này: mỗi mã khác → số phiếu có cả hai và % trên số phiếu có mã này; bỏ `mart.khong_phai_hang(...)` và `mart.ma_ngung_ban_an`; top 15 | 048 / 049 / 050 |
-| Khách đến ngày mua lại | — | `mart.khach_mat_hang` của mã: `trang_thai_cap = 'mua' AND tre_ngay IS NOT NULL`, xếp `tre_ngay` giảm — CÙNG vị từ khối "Mã đến ngày mua lại" của khách 360, chỉ đảo chiều | so bằng nhãn, không `NOT` (024) |
+| Khách đến ngày mua lại | — | `mart.khach_mat_hang` của mã: `trang_thai_cap = 'mua' AND du_kien_lan_toi IS NOT NULL`, `con = du_kien_lan_toi − mốc`, xếp `con` tăng rồi DT giảm, 10 dòng — CÙNG vị từ và thứ tự của `kome/ho_so_khach.py::lich_mua` (khối "Mã đến ngày mua lại" của khách 360), chỉ đảo chiều | so bằng nhãn, không `NOT` (024) |
 | Khách nên chào | `mart.sp_khach_nen_chao(ma)` | khách có ≥ 1 cặp `trang_thai_cap = 'mua'` với mã **cùng ngành** (`mart.ten_nganh`), chưa từng có dòng với mã này; xếp theo DT thuần ngành đó 12 tháng; khách `'khong_goi'` tự bị loại vì không có cặp `'mua'`. Mã `la_ngung_ban` → rỗng, màn in "không chào hàng đã ngừng kinh doanh". Ngành "(chưa phân loại)" → rỗng kèm câu nói rõ | 016 / 024 / 050 |
 
 Ghi chú:
-- `mart.ban_den_moc` phải có `slip_no`, `pack_code`, `quantity`; nếu thiếu cột nào, migration `051`
+- `mart.ban_den_moc` = `f.*` của `core.fact_sales_line` nên đã có `slip_no`, `pack_code`, `qty` (đã kiểm: 044). Số lượng là cột `qty`, cùng cột `san_pham_theo_thang.so_luong` dùng.
   thay view đó bằng bản có cột (giữ nguyên mọi vị từ) — kiểm trước khi viết hàm.
 - Hàm nào tham chiếu một view `mart` hơn một lần → CTE `AS MATERIALIZED` ghi tường minh, vị từ
   `product_code` nằm TRONG CTE.
@@ -160,5 +160,5 @@ Sửa test cũ phụ thuộc `HoSoSanPham` / `test_ho_so_co_du_nam_khoi`. Chạy
 ## 9. Tài liệu
 
 - CLAUDE.md: sửa dòng `/san-pham` và `/san-pham/{mã}` trong bảng các trang; thêm mục bất biến ngắn
-  cho `051` (hàm `mart.sp_*`, "khách đến ngày mua lại" dùng chung vị từ với khách 360, "Migration
-  051 phải chạy TRƯỚC khi triển khai").
+  cho `051`–`053` (hàm `mart.sp_*`, "khách đến ngày mua lại" dùng chung vị từ với khách 360, "Migration
+  051–053 phải chạy TRƯỚC khi triển khai").
