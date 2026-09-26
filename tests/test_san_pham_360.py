@@ -118,7 +118,8 @@ def test_tab_khach_tinh_bac_0_la_DUNG_BANG_0(conn, batch):
     assert o["東京都"]["bac"] > 0 and o["和歌山県"]["bac"] == 0
 
 
-@pytest.mark.parametrize("ham, tran", [("tab_thoi_gian", 2), ("tab_gia", 2), ("tab_ban_them", 2)])
+@pytest.mark.parametrize("ham, tran", [("tab_thoi_gian", 2), ("tab_gia", 2), ("tab_ban_them", 2),
+                                       ("tab_nen_chao", 1)])
 def test_tab_con_lai_trong_tran(conn, batch, monkeypatch, ham, tran):
     _gieo_mot_ma(conn, batch)
     dem = _dem_truy_van(conn, monkeypatch)
@@ -134,7 +135,8 @@ def test_tab_thoi_gian_nhip_dem_cap_chua_du_rieng(conn, batch):
     assert nhip.get("chua_du") == 0     # khách neo 000000000999 mua XT07, không phải Q1
 
 
-@pytest.mark.parametrize("duoi, tran", [("khach", 3), ("thoi-gian", 2), ("gia", 2), ("ban-them", 2), ("", 5)])
+@pytest.mark.parametrize("duoi, tran", [("khach", 3), ("thoi-gian", 2), ("gia", 2), ("ban-them", 2),
+                                        ("nen-chao", 1), ("", 5)])
 def test_ngan_sach_luot_hoi_api_360(conn, batch, test_db_url, monkeypatch, duoi, tran):
     import psycopg
     _gieo_mot_ma(conn, batch)
@@ -154,5 +156,88 @@ def test_ngan_sach_luot_hoi_api_360(conn, batch, test_db_url, monkeypatch, duoi,
 def test_api_tab_ma_khong_co_tra_404(conn, batch, test_db_url):
     _neo(conn, batch)
     c = _khach_web(test_db_url)
-    for duoi in ("khach", "thoi-gian", "gia", "ban-them"):
+    for duoi in ("khach", "thoi-gian", "gia", "ban-them", "nen-chao"):
         assert c.get(f"/api/san-pham/KHONG-CO/{duoi}").status_code == 404, duoi
+
+
+def test_ho_so_KHONG_goi_khach_nen_chao(conn, batch, monkeypatch):
+    """[Soát cuối, Important 1] sp_khach_nen_chao đo thật ~8,7 s — không được nằm trên đường
+    mở trang (ho_so) hay trong tab_ban_them; chỉ /nen-chao (tab_nen_chao) gọi nó."""
+    _gieo_mot_ma(conn, batch)
+    cau = []
+    that = conn.execute
+
+    def ghi(q, *a, **k):
+        cau.append(str(q))
+        return that(q, *a, **k)
+    monkeypatch.setattr(conn, "execute", ghi)
+    h = SP360.ho_so(conn, "Q1")
+    SP360.tab_ban_them(conn, "Q1")
+    assert not any("sp_khach_nen_chao" in c for c in cau)
+    assert "nen_chao" not in h and "nen_chao_tong" not in h
+    cau.clear()
+    SP360.tab_nen_chao(conn, "Q1")
+    assert any("sp_khach_nen_chao" in c for c in cau)
+
+
+def test_tab_nen_chao_sap_theo_doanh_thu_nganh_va_dem_tong(conn, batch):
+    """Danh sách ≤ 50, xếp doanh_thu_nganh giảm rồi mã khách; `tong` đếm cả phần ngoài 50."""
+    from tests.test_mart_sp360 import _dong, _sp_du
+    _sp_du(conn, batch, "NC1", nganh="米_VNM")
+    _sp_du(conn, batch, "NC2", nganh="米_VNM")
+    for k, tien in (("KNC1", 55_000), ("KNC2", 220_000), ("KNC3", 110_000)):
+        _ho_so_khach(conn, batch, k, f"Quán {k}")
+        for i in range(3):
+            _dong(conn, batch, k, HOM_NAY - timedelta(days=i * 7), "NC2", tien=tien, tax=tien // 11)
+    _neo(conn, batch)
+    t = SP360.tab_nen_chao(conn, "NC1")
+    assert [x["ma"] for x in t["nen_chao"]] == ["KNC2", "KNC3", "KNC1"]
+    assert t["tong"] == 3
+    assert SP360.tab_nen_chao(conn, "KHONG-CO") is None
+
+
+def test_bien_theo_thang_va_12_thang_TINH_O_MAY_CHU(conn, batch):
+    """[Soát cuối, Minor 5] Biên lãi gộp tháng và 12 tháng là tỷ số của các tổng, tính sẵn ở máy
+    chủ; tháng DT thuần ≤ 0 -> None (giao diện không tự chia)."""
+    _gieo_mot_ma(conn, batch)
+    h = SP360.ho_so(conn, "Q1")
+    cuoi = h["thang"][-1]
+    assert cuoi["doanh_thu"] > 0
+    assert cuoi["bien"] == pytest.approx(cuoi["lai_gop"] / cuoi["doanh_thu"])
+    assert h["bien_12t"] == pytest.approx(h["lg_12t"] / h["dt_12t"])
+    trong = next(x for x in h["thang"] if x["doanh_thu"] == 0)
+    assert trong["bien"] is None
+
+
+def test_tab_khach_tinh_doanh_thu_AM_khong_roi_vao_bac_0(conn, batch):
+    """Cùng bất biến tests/test_ban_do.py::test_doanh_thu_AM_khong_roi_vao_bac_TRONG: bậc 0 là
+    ĐÚNG BẰNG 0; tỉnh chỉ có 赤伝 (DT âm) của mã này vẫn có màu."""
+    _gieo_mot_ma(conn, batch)
+    _ho_so_khach(conn, batch, "KQAM", "Quán trả hàng", prefecture="大阪府")
+    _mua(conn, batch, "KQAM", HOM_NAY - timedelta(days=5), tien=-110_000, tax=-10_000, gp=-30_000,
+         hang="Q1")
+    o = {x["ten"]: x for x in SP360.tab_khach(conn, "Q1")["tinh"]["o"]}
+    assert o["大阪府"]["doanh_thu"] < 0, "gieo hỏng: 赤伝 phải cho ra số âm"
+    assert o["大阪府"]["bac"] != 0
+    assert o["北海道"]["doanh_thu"] == 0 and o["北海道"]["bac"] == 0
+
+
+def test_tab_thoi_gian_nhip_so_BANG_nhan(conn, batch):
+    """[Soát cuối, Important 2] nhãn trang_thai_cap so bằng — không `<>` / NOT."""
+    import inspect
+    src = inspect.getsource(SP360.tab_thoi_gian)
+    assert "<> 'khong_goi'" not in src and "trang_thai_cap IN ('mua', 'ngung')" in src
+
+
+def test_giao_dien_khong_tu_chia_bien_va_nen_chao_MOT_truy_van():
+    """[Soát cuối] Biên đọc từ máy chủ (`bien`, `bien_12t`); cột trái và tab Tồn & bán thêm đọc
+    CHUNG một hook `useNenChao` (một queryKey -> một lượt tải /nen-chao)."""
+    from pathlib import Path
+    g = Path(__file__).resolve().parents[1] / "giao_dien" / "src" / "san_pham" / "ho_so"
+    doc = {f: (g / f).read_text(encoding="utf-8") for f in
+           ("HoSoMa.tsx", "TabGia.tsx", "ViecVoiMa.tsx", "TabBanThem.tsx")}
+    assert "lg_12t / h.dt_12t" not in doc["HoSoMa.tsx"] and "h.bien_12t" in doc["HoSoMa.tsx"]
+    assert "lai_gop / x.doanh_thu" not in doc["TabGia.tsx"] and "x.bien" in doc["TabGia.tsx"]
+    assert doc["ViecVoiMa.tsx"].count('"sp360-nen-chao"') == 1
+    assert "sp360-nen-chao" not in doc["TabBanThem.tsx"] and "useNenChao(ma)" in doc["TabBanThem.tsx"]
+    assert "/nen-chao" in doc["ViecVoiMa.tsx"]

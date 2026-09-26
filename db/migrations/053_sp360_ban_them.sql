@@ -48,13 +48,19 @@ RETURNS TABLE (customer_code text, ten text, nganh text, doanh_thu_nganh numeric
 LANGUAGE sql STABLE AS $$
     -- Khách đang mua đều (trang_thai_cap = 'mua', so BẰNG — 024) ≥ 1 mã CÙNG NGÀNH, chưa từng có
     -- dòng với mã này (≤ mốc). ※廃業※ mang 'khong_goi' nên tự rơi ra. Mã ※終売※ (kể cả còn tồn),
-    -- ngành chưa phân loại / phí / POSM -> rỗng. Xếp theo DT thuần ngành đó 12 tháng.
+    -- ngành chưa phân loại / phí / POSM (xem `sp.bo`) -> rỗng. Xếp theo DT thuần ngành đó 12 tháng.
     -- LATERAL `= mã` cho khach_mat_hang: `= ANY`/JOIN không đẩy vị từ qua nhip_mat_hang (đo thật ở
     -- /lien-he: 2 s -> 0,1 s).
     WITH m AS (SELECT hom_nay FROM mart.moc_thoi_gian),
+    -- Mã đích không phải "hàng" (phí / POSM — ĐÚNG vị từ mart.khong_phai_hang, 049) hoặc chưa
+    -- phân loại ngành (nullif(food_category_name, '') IS NULL — cùng điều kiện mà mart.ten_nganh
+    -- đổi thành '(chưa phân loại)') -> `bo` = true -> rỗng. KHÔNG so với chuỗi nhãn ngành: nhãn là
+    -- của mart.ten_nganh, chép lại ở đây là một bản thứ hai sẽ trôi.
     sp AS (
         SELECT mart.ten_nganh(d.food_category_name, d.product_code, d.kind_code) AS nganh,
-               mart.la_ngung_ban(d.rank_code, d.product_name) AS ngung
+               mart.la_ngung_ban(d.rank_code, d.product_name)
+               OR mart.khong_phai_hang(d.product_code, d.kind_code, d.food_category_name)
+               OR nullif(d.food_category_name, '') IS NULL AS bo
           FROM core.dim_product d WHERE d.product_code = p_ma
     ),
     cung AS (
@@ -62,10 +68,10 @@ LANGUAGE sql STABLE AS $$
           FROM core.dim_product d CROSS JOIN sp
          WHERE d.product_code <> p_ma
            AND mart.ten_nganh(d.food_category_name, d.product_code, d.kind_code) = sp.nganh
-           AND NOT sp.ngung
-           AND sp.nganh NOT IN ('(chưa phân loại)', 'Phí & điều chỉnh', 'Hàng tặng (POSM)')
+           AND NOT sp.bo
     ),
-    k AS (
+    -- `k` được tham chiếu hai lần (câu cuối + lọc ở `dt`) -> AS MATERIALIZED tường minh.
+    k AS MATERIALIZED (
         SELECT h.customer_code, count(*) AS so_ma, max(h.lan_cuoi) AS lan_cuoi
           FROM cung
           CROSS JOIN LATERAL (

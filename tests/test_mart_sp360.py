@@ -3,6 +3,8 @@
 Mỗi test khoá một bất biến đã ghi trong CLAUDE.md, không chỉ "chạy được"."""
 from datetime import timedelta
 
+import pytest
+
 import pandas as pd
 
 from tests.test_khach_hang import _ho_so_khach, _mua, _neo, HOM_NAY
@@ -211,3 +213,137 @@ def test_khach_nen_chao_RONG_voi_ma_ngung_kinh_doanh(conn, batch):
         _dong(conn, batch, "KN01", HOM_NAY - timedelta(days=i * 7), "N2")
     _neo(conn, batch)
     assert conn.execute("SELECT count(*) FROM mart.sp_khach_nen_chao('N1')").fetchone()[0] == 0
+
+
+# ------------------------------------------------------------------ cả 051–053
+
+# (hàm, hậu tố mã đích, biểu thức "có gì không") — đủ MƯỜI hàm mart.sp_*. Khách nên chào nhắm
+# một mã CÙNG NGÀNH mà khách chưa mua (hậu tố 3), chín hàm còn lại nhắm mã khách đã mua (1).
+HAM_SP = [
+    ("sp_tap_trung_khach", "1", "count(*)"),
+    ("sp_theo_tinh", "1", "coalesce(sum(so_khach), 0)"),
+    ("sp_theo_nguoi", "1", "count(*)"),
+    ("sp_khach_moi_thang", "1", "coalesce(sum(khach_moi + khach_quay_lai), 0)"),
+    ("sp_theo_tuan", "1", "coalesce(sum(abs(so_luong)), 0)"),
+    ("sp_co_don", "1", "count(*)"),
+    ("sp_don_gia_thang", "1", "count(*)"),
+    ("sp_khach_gia", "1", "count(*)"),
+    ("sp_mua_kem", "1", "count(*)"),
+    ("sp_khach_nen_chao", "3", "count(*)"),
+]
+
+
+def _gieo_hai_khach(conn, batch):
+    """Hai khách mua GIỐNG HỆT nhau trên hai bộ mã khác ngành: khách thường (KNB01, mã J*,
+    ngành 麺) và NHÂN VIÊN (009000000001, mã I*, ngành 米). Mỗi tuần một phiếu có cả mã 1 và 2."""
+    import pandas as pd
+    from kome.loaders import sales
+    for tien_to, nganh in (("I", "米_VNM"), ("J", "麺_VNM")):
+        for h in "123":
+            _sp_du(conn, batch, f"{tien_to}{h}", nganh=nganh)
+    dong = []
+    for ma_khach, tien_to in (("009000000001", "I"), ("KNB01", "J")):
+        _ho_so_khach(conn, batch, ma_khach, f"Khách {ma_khach}")
+        for i in range(6):
+            ngay = HOM_NAY - timedelta(days=i * 7)
+            for j in (1, 2):
+                dong.append({"slip_no": f"NB{tien_to}{i}", "line_seq": j, "sales_date": ngay,
+                             "customer_code": ma_khach, "product_code": f"{tien_to}{j}",
+                             "salesperson_code": "0104", "pack_code": "02", "case_qty": 2, "qty": 2,
+                             "unit_price": 0, "unit_cost": 0, "amount": 110_000, "tax_amount": 10_000,
+                             "cost": 70_000, "gross_profit": 30_000, "paid_amount": 0})
+    b = batch(88_123)
+    df = pd.DataFrame(dong)
+    df["batch_id"] = b
+    sales.load(conn, df, HOM_NAY, b)
+    conn.commit()
+    _neo(conn, batch)
+
+
+@pytest.mark.parametrize("ham, hau_to, bieu_thuc", HAM_SP, ids=[h[0] for h in HAM_SP])
+def test_ma_noi_bo_khong_vao_ham_sp_NAO(conn, batch, ham, hau_to, bieu_thuc):
+    """044: 0090…/0099… là nhân viên mua — ra khỏi MỌI khối của Sản phẩm 360. Đối chứng dương:
+    khách thường mua y hệt thì hàm đó CÓ ra dòng (không thì test pass rỗng)."""
+    _gieo_hai_khach(conn, batch)
+    def _do(ma):
+        return conn.execute(f"SELECT {bieu_thuc} FROM mart.{ham}(%s)", (ma,)).fetchone()[0]
+    assert _do(f"J{hau_to}") > 0, f"{ham}: đối chứng khách thường phải có dữ liệu"
+    assert _do(f"I{hau_to}") == 0, f"{ham}: nhân viên mua lọt vào"
+
+
+D_LUI = HOM_NAY - timedelta(days=70)
+
+
+def _gieo_lich_su(conn, batch):
+    """Ba khách mua đều hai mã cùng ngành (thỉnh thoảng cùng phiếu) từ ~13 tháng trước tới
+    HOM_NAY — MỘT lô nạp. Có dòng đúng ngày D_LUI."""
+    import pandas as pd
+    from kome.loaders import sales
+    for h in "123":
+        _sp_du(conn, batch, f"L{h}", nganh="米_VNM")
+    dong = []
+    for k, (ma, nhip) in enumerate((("KL01", 7), ("KL02", 10), ("KL03", 14))):
+        _ho_so_khach(conn, batch, ma, f"Quán {ma}", prefecture=("東京都", "大阪府", "北海道")[k])
+        i, ngay = 0, HOM_NAY   # KL01 nhịp 7 từ HOM_NAY: rơi đúng D_LUI (70 = 10 × 7)
+        while ngay > HOM_NAY - timedelta(days=400):
+            if not (ma == "KL02" and ngay > HOM_NAY - timedelta(days=30)):
+                for j, sp in enumerate(("L1", "L2") if i % 2 == 0 else ("L1",), start=1):
+                    tien = 11_000 * (1 + i % 3) * (-1 if i % 11 == 5 else 1)
+                    dong.append({"slip_no": f"H{ma}{ngay:%Y%m%d}", "line_seq": j, "sales_date": ngay,
+                                 "customer_code": ma, "product_code": sp, "salesperson_code": "0104",
+                                 "pack_code": ("02", "00")[i % 2], "case_qty": 1 + i % 4,
+                                 "qty": (1 + i % 4) * (-1 if tien < 0 else 1),
+                                 "unit_price": 0, "unit_cost": 0, "amount": tien,
+                                 "tax_amount": tien // 11, "cost": tien - tien // 11 - 3_000,
+                                 "gross_profit": 3_000, "paid_amount": 0})
+            ngay -= timedelta(days=nhip)
+            i += 1
+    assert any(x["sales_date"] == D_LUI for x in dong), "gieo hỏng: phải có dòng đúng D_LUI"
+    b = batch(88_321)
+    df = pd.DataFrame(dong)
+    df["batch_id"] = b
+    sales.load(conn, df, HOM_NAY, b)
+    conn.commit()
+
+
+def _chup_sp(conn):
+    return {h: conn.execute(f"SELECT * FROM mart.{h}(%s) ORDER BY 1, 2", (f"L{t}",)).fetchall()
+            for h, t, _ in HAM_SP}
+
+
+def test_moc_D_cua_ham_sp_BANG_kho_chi_co_du_lieu_toi_D(conn, batch):
+    """040 — đẳng thức vàng cho mười hàm mart.sp_*: đặt mốc D trong MỘT giao dịch ≡ như thể kho
+    chỉ có dữ liệu bán tới D (cùng mẫu tests/test_moc_lui.py)."""
+    _gieo_lich_su(conn, batch)
+    conn.execute("SELECT set_config('kome.moc', %s, true)", (D_LUI.isoformat(),))
+    co_moc = _chup_sp(conn)
+    conn.rollback()
+    assert conn.execute("SELECT hom_nay FROM mart.moc_thoi_gian").fetchone()[0] > D_LUI
+    khong_moc = _chup_sp(conn)
+    conn.execute("DELETE FROM core.fact_sales_line WHERE sales_date > %s", (D_LUI,))
+    conn.commit()
+    that = _chup_sp(conn)
+    for h, _, _ in HAM_SP:
+        assert co_moc[h] == that[h], f"{h} lệch khi đặt mốc {D_LUI}"
+    # Không pass rỗng: bốn hàm chính có dữ liệu, và dữ liệu sau D thật sự đổi kết quả.
+    for h in ("sp_tap_trung_khach", "sp_theo_tuan", "sp_don_gia_thang", "sp_mua_kem"):
+        assert co_moc[h], f"{h}: phải có dữ liệu để so"
+        assert co_moc[h] != khong_moc[h], f"{h}: dữ liệu sau mốc phải làm kết quả khác"
+
+
+@pytest.mark.parametrize("nganh, kind", [("", "0"), ("雑貨_VNM", "0"), ("米_VNM", "1")],
+                         ids=["chua_phan_loai", "hang_tang", "phi"])
+def test_khach_nen_chao_RONG_voi_ma_khong_phai_hang_hoac_chua_phan_loai(conn, batch, nganh, kind):
+    """Vị từ đọc mart.khong_phai_hang + nullif(ngành) — không so chuỗi nhãn ngành. Đối chứng:
+    cùng khách, mã đích thường cùng ngành thì CÓ ra khách."""
+    _sp_du(conn, batch, "R1", nganh=nganh, kind=kind)
+    _sp_du(conn, batch, "R2", nganh=nganh, kind=kind)
+    _sp_du(conn, batch, "R3", nganh="米_VNM")
+    _sp_du(conn, batch, "R4", nganh="米_VNM")
+    _ho_so_khach(conn, batch, "KR01", "Quán J")
+    for i in range(3):
+        _dong(conn, batch, "KR01", HOM_NAY - timedelta(days=i * 7), "R2")
+        _dong(conn, batch, "KR01", HOM_NAY - timedelta(days=i * 7), "R4")
+    _neo(conn, batch)
+    assert conn.execute("SELECT count(*) FROM mart.sp_khach_nen_chao('R3')").fetchone()[0] == 1
+    assert conn.execute("SELECT count(*) FROM mart.sp_khach_nen_chao('R1')").fetchone()[0] == 0

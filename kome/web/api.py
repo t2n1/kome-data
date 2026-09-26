@@ -596,7 +596,8 @@ def tao_api(open_app_conn) -> APIRouter:
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         ham = {"khach": SP360.tab_khach, "thoi-gian": SP360.tab_thoi_gian,
-               "gia": SP360.tab_gia, "ban-them": SP360.tab_ban_them}[ten]
+               "gia": SP360.tab_gia, "ban-them": SP360.tab_ban_them,
+               "nen-chao": SP360.tab_nen_chao}[ten]
 
         def tinh_(c):
             t = ham(c, ma)
@@ -631,6 +632,13 @@ def tao_api(open_app_conn) -> APIRouter:
     def sp_tab_ban_them(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         """Tab Tồn & bán thêm của Sản phẩm 360. ≤ 2 lượt hỏi."""
         return _tab_sp(request, ma, "ban-them", thang, ky, tu, den)
+
+    @r.get("/san-pham/{ma}/nen-chao")
+    def sp_nen_chao(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Khách nên chào mã này (≤ 50 + tổng) — cột trái "Việc với mã này" và tab Tồn & bán
+        thêm đọc CHUNG endpoint này. Tách khỏi `/san-pham/{ma}` vì `sp_khach_nen_chao` chậm
+        (~8,7 s đo thật): trang mở không chờ nó. 1 lượt hỏi."""
+        return _tab_sp(request, ma, "nen-chao", thang, ky, tu, den)
 
     @r.get("/kho-hang")
     def kho_hang(request: Request, kho: str = "", loc: str = "",

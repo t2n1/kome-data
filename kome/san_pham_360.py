@@ -32,7 +32,16 @@ CACH_TINH = {
                  "nhịp mua riêng của cặp đó · bỏ khách ※廃業※/※取引停止※",
     "khoang": "doanh thu thuần của mã trong khoảng xem đang chọn",
     "bac_gia": "giá bảng mới nhất của mỗi bậc × quy cách, chưa thuế",
+    "ton_toc_do": "tồn = tổng hai lô (lô đang xuất + lô chờ) của ảnh chụp tồn ≤ mốc dữ liệu · "
+                  "tốc độ = lượng bán 90 ngày chia cho số ngày mã thực sự có mặt (tối đa 90) · "
+                  "đủ bán = tồn ÷ tốc độ",
 }
+
+
+def _bien(lai_gop, doanh_thu) -> float | None:
+    """Biên lãi gộp = tổng lãi gộp ÷ tổng DT thuần (tỷ số của các tổng) — tính ở MÁY CHỦ;
+    None khi DT thuần ≤ 0 (chia cho số âm/0 không có nghĩa)."""
+    return float(lai_gop) / float(doanh_thu) if doanh_thu and float(doanh_thu) > 0 else None
 
 
 def _thang_lui(t: str, n: int) -> str:
@@ -184,8 +193,11 @@ def ho_so(conn, ma: str) -> dict | None:
     `sales_date > hom_nay - 365` trên `mart.dong_ban` — MỘT định nghĩa "12
     tháng" cho cả /san-pham và /san-pham/{mã}, không tính lại ở trình duyệt
     từ 24 tháng LỊCH, thứ có thể lệch cửa sổ ngày thật);
-    2) 24 tháng; 3) tồn theo lô; 4) cột trái: khách đến ngày mua lại + khách nên chào
-    + hai số đếm, gộp MỘT câu.
+    2) 24 tháng; 3) tồn theo lô; 4) cột trái: khách đến ngày mua lại + hai số đếm, gộp
+    MỘT câu. "Khách nên chào" KHÔNG ở đây: `mart.sp_khach_nen_chao` đo thật ~8,7 s trên CSDL
+    thật — nằm trên đường mở trang là cả trang chờ nó. Nó đi endpoint riêng
+    `/api/san-pham/{mã}/nen-chao` (`tab_nen_chao`), cột trái và tab Tồn & bán thêm đọc CHUNG
+    một truy vấn TanStack.
     """
     r = conn.execute(
         f"""WITH m AS (SELECT hom_nay FROM mart.moc_thoi_gian),
@@ -218,34 +230,30 @@ def ho_so(conn, ma: str) -> dict | None:
         for i in range(23, -1, -1):
             t = _thang_lui(cuoi, i)
             x, y = theo.get(t), theo.get(_thang_lui(t, 12))
+            dt, lg = (int(x[2] or 0), int(x[3] or 0)) if x else (0, 0)
             thang.append({"thang": t, "so_luong": _so(x[1]) if x else 0.0,
-                          "doanh_thu": int(x[2] or 0) if x else 0,
-                          "lai_gop": int(x[3] or 0) if x else 0,
+                          "doanh_thu": dt, "lai_gop": lg, "bien": _bien(lg, dt),
                           "dt_nam_truoc": int(y[2] or 0) if y else 0})
 
     ton = _ton_lo(conn, ma)
 
     # Cột trái — MỘT câu. `h` vật hoá khach_mat_hang của ĐÚNG mã này (vị từ trong CTE, đẩy
-    # xuống được) vì ba nhánh cùng đọc nó. Vị từ "đến ngày mua lại" = của
+    # xuống được) vì hai nhánh cùng đọc nó. Vị từ "đến ngày mua lại" = của
     # kome/ho_so_khach.py::lich_mua: trang_thai_cap = 'mua' AND du_kien_lan_toi IS NOT NULL.
     trai = conn.execute("""
         WITH h AS MATERIALIZED (
             SELECT customer_code, du_kien_lan_toi, nhip_ngay, lan_cuoi, doanh_thu_thuan, trang_thai_cap
               FROM mart.khach_mat_hang WHERE product_code = %s
-        ), c AS MATERIALIZED (SELECT * FROM mart.sp_khach_nen_chao(%s))
+        )
         SELECT 'lai'::text, h.customer_code, coalesce(nullif(d.customer_name, ''), h.customer_code),
-               h.du_kien_lan_toi, h.nhip_ngay::numeric, h.lan_cuoi, h.doanh_thu_thuan::numeric, NULL::bigint
+               h.du_kien_lan_toi, h.nhip_ngay::numeric, h.lan_cuoi, h.doanh_thu_thuan::numeric
           FROM h LEFT JOIN core.dim_customer d ON d.customer_code = h.customer_code AND d.is_current
          WHERE h.trang_thai_cap = 'mua' AND h.du_kien_lan_toi IS NOT NULL
         UNION ALL
-        (SELECT 'chao', c.customer_code, c.ten, NULL::date, NULL::numeric, c.lan_cuoi,
-                c.doanh_thu_nganh, c.so_ma_nganh FROM c
-          ORDER BY c.doanh_thu_nganh DESC, c.customer_code LIMIT 5)
-        UNION ALL
         SELECT 'dem', NULL, NULL, NULL, count(*) FILTER (WHERE trang_thai_cap = 'mua'), NULL,
-               count(*) FILTER (WHERE trang_thai_cap = 'ngung'), (SELECT count(*) FROM c)
+               count(*) FILTER (WHERE trang_thai_cap = 'ngung')
           FROM h
-    """, (ma, ma)).fetchall()
+    """, (ma,)).fetchall()
 
     mua_lai = sorted(
         ({"ma": x[1], "ten": x[2], "du_kien": x[3],
@@ -253,15 +261,12 @@ def ho_so(conn, ma: str) -> dict | None:
           "nhip": _so(x[4]), "lan_cuoi": x[5], "doanh_thu": int(x[6] or 0)}
          for x in trai if x[0] == "lai"),
         key=lambda d: (d["con"], -d["doanh_thu"]))
-    nen_chao = [{"ma": x[1], "ten": x[2], "lan_cuoi": x[5], "doanh_thu_nganh": int(x[6] or 0),
-                 "so_ma_nganh": int(x[7] or 0)} for x in trai if x[0] == "chao"]
     dem = next(x for x in trai if x[0] == "dem")
     return {"sp": sp, "nganh": nganh, "hom_nay": hom_nay, "thang": thang, "ton": ton,
             "mua_lai": mua_lai[:10], "mua_lai_tong": len(mua_lai),
-            "nen_chao": nen_chao, "nen_chao_tong": int(dem[7] or 0),
             "so_dang_mua": int(dem[4] or 0), "so_da_ngung": int(dem[6] or 0),
             "ngung_ban": sp.ngung_ban, "cach_tinh": CACH_TINH,
-            "dt_12t": dt_12t, "lg_12t": lg_12t}
+            "dt_12t": dt_12t, "lg_12t": lg_12t, "bien_12t": _bien(lg_12t, dt_12t)}
 
 
 def tab_khach(conn, ma: str) -> dict | None:
@@ -287,9 +292,7 @@ def tab_khach(conn, ma: str) -> dict | None:
     top10 = (sum(x["doanh_thu"] or 0 for x in tap_trung[:10]) / tong) if tong else None
     # Biên lãi gộp per người phụ trách phải tính ở MÁY CHỦ (bất biến "tỷ suất là tỷ số
     # của các tổng") — không để trình duyệt tự chia lai_gop/doanh_thu.
-    nguoi = [x | {"bien": (float(x["lai_gop"]) / float(x["doanh_thu"]))
-                  if x["doanh_thu"] and float(x["doanh_thu"]) > 0 else None}
-             for x in r[2]]
+    nguoi = [x | {"bien": _bien(x["lai_gop"], x["doanh_thu"])} for x in r[2]]
 
     rows = conn.execute(
         """SELECT ma_jis, ten, ten_ngan, vung, hang_luoi, cot_luoi, doanh_thu, so_khach
@@ -326,7 +329,8 @@ def tab_thoi_gian(conn, ma: str) -> dict | None:
         return None
     r2 = conn.execute("""
         SELECT (SELECT coalesce(json_agg(nhip_ngay), '[]')
-                  FROM mart.khach_mat_hang WHERE product_code = %s AND trang_thai_cap <> 'khong_goi'),
+                  FROM mart.khach_mat_hang WHERE product_code = %s
+                   AND trang_thai_cap IN ('mua', 'ngung')),
                (SELECT coalesce(json_agg(json_build_object('pack_code', pack_code, 'nhom', nhom,
                         'thu_tu', thu_tu, 'so_dong', so_dong, 'so_luong', so_luong)
                         ORDER BY pack_code, thu_tu), '[]') FROM mart.sp_co_don(%s))
@@ -364,18 +368,40 @@ def tab_gia(conn, ma: str) -> dict | None:
 
 
 def tab_ban_them(conn, ma: str) -> dict | None:
-    """Tab Tồn & bán thêm. 2 lượt: 1) mua kèm + khách nên chào + tồn tại mã; 2) tồn theo lô."""
+    """Tab Tồn & bán thêm. 2 lượt: 1) mua kèm + tồn tại mã; 2) tồn theo lô. Danh sách "khách
+    nên chào" của tab đọc `/nen-chao` (`tab_nen_chao`) — chung truy vấn với cột trái."""
     # sp_mua_kem đọc hai lần -> CTE AS MATERIALIZED (bất biến CTE-trùng).
     r = conn.execute("""
         WITH k AS MATERIALIZED (SELECT * FROM mart.sp_mua_kem(%s))
         SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
                (SELECT coalesce(json_agg(json_build_object('ma', product_code, 'ten', ten_hang,
                         'so_phieu', so_phieu, 'ty_le', ty_le) ORDER BY so_phieu DESC, product_code), '[]') FROM k),
-               (SELECT coalesce(max(tong_phieu), 0) FROM k),
-               (SELECT coalesce(json_agg(x), '[]') FROM (
-                    SELECT customer_code AS ma, ten, doanh_thu_nganh, so_ma_nganh, lan_cuoi
-                      FROM mart.sp_khach_nen_chao(%s) LIMIT 50) x)
-    """, (ma, ma, ma)).fetchone()
+               (SELECT coalesce(max(tong_phieu), 0) FROM k)
+    """, (ma, ma)).fetchone()
     if not r[0]:
         return None
-    return {"mua_kem": r[1], "tong_phieu": int(r[2]), "nen_chao": r[3], "ton": _ton_lo(conn, ma)}
+    return {"mua_kem": r[1], "tong_phieu": int(r[2]), "ton": _ton_lo(conn, ma)}
+
+
+NEN_CHAO_TOI_DA = 50
+
+
+def tab_nen_chao(conn, ma: str) -> dict | None:
+    """Khách nên chào mã này (`mart.sp_khach_nen_chao`) — endpoint riêng, KHÔNG trên đường mở
+    trang (hàm đo thật ~8,7 s). 1 lượt: tồn tại mã + ≤ 50 dòng + tổng số.
+
+    `c` vật hoá hàm (đọc hai lần: danh sách + đếm). Thứ tự: `json_agg(... ORDER BY ...)` trên
+    một truy vấn con ĐÃ SẮP + LIMIT — LIMIT chọn đúng top-50, ORDER BY trong json_agg giữ thứ tự
+    (thứ tự dòng của truy vấn con không được bảo đảm qua lớp gộp).
+    """
+    r = conn.execute("""
+        WITH c AS MATERIALIZED (SELECT * FROM mart.sp_khach_nen_chao(%s))
+        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+               (SELECT coalesce(json_agg(x ORDER BY x.doanh_thu_nganh DESC, x.ma), '[]') FROM (
+                    SELECT customer_code AS ma, ten, doanh_thu_nganh, so_ma_nganh, lan_cuoi
+                      FROM c ORDER BY doanh_thu_nganh DESC, customer_code LIMIT %s) x),
+               (SELECT count(*) FROM c)
+    """, (ma, ma, NEN_CHAO_TOI_DA)).fetchone()
+    if not r[0]:
+        return None
+    return {"nen_chao": r[1], "tong": int(r[2])}
