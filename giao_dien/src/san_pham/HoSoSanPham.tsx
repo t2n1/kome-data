@@ -76,6 +76,7 @@ export function HoSoSanPham({ ma, dong, onDong }: { ma: string; dong: MaHang | n
               <div className="dong-phu nhat-chu">{so(h.khach_ngung.length)}{h.khach_ngung.length >= 10 ? "+" : ""} khách đã bỏ</div></div>
           </div>
         </div>
+        {sp.ngung_ban && <div className="sp-canh">⚠️ <b>Đã ngừng kinh doanh (※終売※).</b> Mã chỉ còn hiện vì kho còn tồn — bán nốt cho khách cũ, không đặt thêm. Hết tồn là mã tự biến khỏi mọi màn.</div>}
         {sp.trang_thai === "chua_ro_ton" && <div className="sp-canh">⚠️ <b>Chưa rõ tồn.</b> Mã này không có dòng nào trong 在庫一覧 gần nhất — ta <b>không biết</b> kho còn bao nhiêu (khác hẳn "đã hết"). Tra OBC trước khi đặt hàng.</div>}
         {sp.trang_thai === "het_hang" && <div className="sp-canh do">⚠️ <b>Hết hàng.</b> Tồn bằng 0 mà 90 ngày qua vẫn có đơn — cần đặt hàng.</div>}
         {sp.trang_thai === "sap_thieu" && <div className="sp-canh">⚠️ <b>Sắp thiếu.</b> Với nhịp bán hiện tại, tồn còn đủ chưa tới 14 ngày.</div>}

@@ -8,6 +8,8 @@ export type MaHang = {
   ton: number | null; toc_do_ngay: number | null; toc_do_ngay_theo_tuoi: number | null;
   du_ban_ngay: number | null; trang_thai: string; nhan_trang_thai: string; mau: string;
   so_khach: number; lan_dau: string | null; lan_cuoi: string | null;
+  // 050: mã ※終売※ còn tồn (hết tồn thì máy chủ đã bỏ khỏi danh mục) — bán nốt.
+  ngung_ban: boolean;
   dt_12t: number; lg_12t: number; ts_12t: number | null; thang_dt: number[]; thang_sl: (number | null)[];
   // Khoảng xem (đợt C) — ghép ở trình duyệt từ /api/san-pham/khoang (số của máy chủ).
   dt_khoang?: number; sl_khoang?: number | null; kh_khoang?: number; dt_ss?: number | null;

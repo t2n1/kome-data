@@ -184,6 +184,21 @@ Phí xét TRƯỚC (`mart.la_dong_hang_tang`: một dòng không vừa phí vừ
 `BaoCao.hang_tang`. Ba danh sách giữ dòng kèm cột `la_hang_tang`. Có test canh:
 `tests/test_hang_tang.py`. **Migration 049 phải chạy TRƯỚC khi triển khai.**
 
+**Bất biến (050, hàng ※終売※ — chủ DN chốt 2026-09-26):** mã ngừng kinh doanh (hạng sản phẩm OBC
+`0999` HOẶC tên chứa `※終売※` — đo thật 29/232 mã, hai dấu khớp 29/29) **không phân tích, không
+hiện ở đâu — TRỪ khi còn tồn**. Định nghĩa ĐÚNG MỘT LẦN: `mart.la_ngung_ban(rank_code, product_name)`;
+tập bị ẨN = `mart.ma_ngung_ban_an` (ngừng kinh doanh VÀ tổng `mart.ton_hien_tai` ≤ 0 / không dòng,
+tính đến MỐC — xem lùi về lúc còn hàng thì mã hiện lại). Bị ẩn khỏi `mart.san_pham_360` (danh mục,
+hồ sơ `/san-pham/{mã}` trả 404 "đã ngừng kinh doanh") và `mart.khach_mat_hang` (mặt hàng / nhịp /
+"đã ngừng mua" / mã đến ngày mua lại / Nên chào); gợi ý hàng chưa mua bỏ MỌI mã ※終売※ kể cả còn
+tồn. Tiền VẪN trong mọi tổng và trong NGÀNH THẬT của nó (không phải phí, không tách ngành). Ba danh
+sách phải cộng bằng tổng mang cột `la_ngung_ban_het_ton`; `bao_cao.gop_ngung_ban` gộp thành MỘT dòng
+mỗi ngành (`ma` rỗng, `top_lai_gop` bỏ dòng đó), hồ sơ khách gộp một dòng. Mã ※終売※ còn tồn: hiện
+như hàng thường với `san_pham_360.ngung_ban = true` (nhãn "bán nốt tồn") và **không bao giờ**
+`'sap_thieu'` — không ai đặt thêm hàng đã ngừng kinh doanh. Tab Đơn hàng (phiếu thật), công nợ, Kho
+dữ liệu KHÔNG lọc. Có test canh: `tests/test_ngung_ban.py`. **Migration 050 phải chạy TRƯỚC khi
+triển khai.**
+
 **Bất biến (044, hạn trả):** `その都度請求` = trả trong **5 ngày làm việc sau ngày xuất
 hàng** (ngày phiếu), ngày làm việc = `mart.lich_kinh_doanh.la_ngay_kd` (chưa trừ ngày nghỉ
 riêng của công ty — cùng hạn chế đã ghi). Ba mẫu suy được hạn: `末締/翌月末日`,

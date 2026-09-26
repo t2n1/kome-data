@@ -118,6 +118,9 @@ class SanPham:
     so_khach: int
     lan_dau: date | None
     lan_cuoi: date | None
+    # 050: mã ※終売※ (ngừng kinh doanh). Mã ※終売※ đã hết tồn không bao giờ tới
+    # đây (mart.san_pham_360 lọc bỏ), nên True = "còn tồn, bán nốt".
+    ngung_ban: bool = False
 
     @property
     def nhan_trang_thai(self) -> str:
@@ -202,7 +205,7 @@ _TU_LO = """FROM t
 
 _COT = """product_code, ten_hang, nhom, doanh_thu_thuan, lai_gop, ty_suat,
           so_luong_ban, ton, toc_do_ngay, toc_do_ngay_theo_tuoi, du_ban_ngay,
-          trang_thai, so_khach, lan_dau, lan_cuoi"""
+          trang_thai, so_khach, lan_dau, lan_cuoi, ngung_ban"""
 
 
 def _so(x) -> float | None:
@@ -224,7 +227,7 @@ def _sp(r) -> SanPham:
         so_luong_ban=_so(r[6]), ton=_so(r[7]),
         toc_do_ngay=_so(r[8]), toc_do_ngay_theo_tuoi=_so(r[9]),
         du_ban_ngay=_so(r[10]), trang_thai=r[11], so_khach=int(r[12] or 0),
-        lan_dau=r[13], lan_cuoi=r[14])
+        lan_dau=r[13], lan_cuoi=r[14], ngung_ban=bool(r[15]))
 
 
 def _dk_tim(tim: str = "") -> tuple[str, list]:
@@ -322,6 +325,14 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
         hang=[_sp(r) for r in hang], tong=tong, trang=trang,
         so_trang=max(1, -(-tong // MOI_TRANG)), tim=tim, loc=loc, sap=sap,
         dem_trang_thai=dem)
+
+
+def la_ma_ngung_ban_an(conn, ma: str) -> bool:
+    """Mã ※終売※ đã hết tồn tính đến mốc (050, `mart.ma_ngung_ban_an`) — để màn nói
+    "đã ngừng kinh doanh" thay vì "không có mã này". Chỉ chạy khi `ho_so` trả None,
+    nên không tính vào trần 5 lượt hỏi của hồ sơ."""
+    return conn.execute("SELECT EXISTS (SELECT 1 FROM mart.ma_ngung_ban_an WHERE product_code = %s)",
+                        (ma,)).fetchone()[0]
 
 
 def ho_so(conn, ma: str) -> HoSoSanPham | None:
@@ -820,18 +831,18 @@ def danh_muc(conn) -> dict:
             thang.append(f"{y + yy:04d}-{mm + 1:02d}")
     ma = []
     for r in rows:
-        sp = _sp(r[:15])
-        chuoi = {t[0]: t for t in (r[17] or [])}
+        sp = _sp(r[:16])
+        chuoi = {t[0]: t for t in (r[18] or [])}
         ma.append({**sp.__dict__, "nhan_trang_thai": sp.nhan_trang_thai, "mau": sp.mau,
                    # NGÀNH hàng — cùng khái niệm "ngành" của /bao-cao. Rỗng -> ĐÚNG
                    # hằng NGANH_TRONG (bản chép bắt buộc ở tầng Python của biểu thức
                    # coalesce trong mart.ban_theo_nganh_thang — CLAUDE.md). `nhom`
                    # (kind_name) của san_pham_360 chỉ có 有形/無形, không lọc được.
-                   "nganh": r[18] or NGANH_TRONG,
-                   "dt_12t": int(r[15] or 0), "lg_12t": int(r[16] or 0),
+                   "nganh": r[19] or NGANH_TRONG,
+                   "dt_12t": int(r[16] or 0), "lg_12t": int(r[17] or 0),
                    # Tỷ số của các TỔNG (bất biến tỷ suất), NULL khi mẫu số 0 —
                    # cùng `nullif(sum(...), 0)` của mart.
-                   "ts_12t": (float(r[16] or 0) / float(r[15])) if r[15] else None,
+                   "ts_12t": (float(r[17] or 0) / float(r[16])) if r[16] else None,
                    # Tháng không có dòng bán = 0 yên ĐÃ BIẾT (không có phiếu), cùng
                    # ngoại lệ tiền của `_sp`.
                    "thang_dt": [int(chuoi[t][1] or 0) if t in chuoi else 0 for t in thang],
