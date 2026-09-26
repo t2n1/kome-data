@@ -206,3 +206,60 @@ td.trong{text-align:center;padding:1.6rem}
 .hs-nk-dau{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem}
 .hs-nk-dau .nhan-vien{margin-left:auto}
 .hs-nk p{margin:.3rem 0 .15rem;line-height:1.45}
+/* ===== Hồ sơ 360° thiết kế lại (2026-09-26) — tiền tố .hs2- ===== */
+.hs2-cach-tinh{font:inherit;font-size:.7rem;font-weight:500;margin-left:.5rem;padding:.1rem .45rem;border:1px solid var(--vien);
+  border-radius:6px;background:transparent;color:var(--chu-nhat);cursor:pointer}
+.hs2-cach-tinh[aria-expanded="true"]{background:var(--nen-phu);color:var(--chu)}
+.hs2-cach-tinh-noi{background:var(--nen-phu);border-radius:8px;padding:.45rem .6rem}
+.hs2-sap-co .kh-the-dau{margin-bottom:.6rem}
+.hs2-nhan-sap-co{margin-left:auto;font-size:.7rem;padding:.1rem .5rem;border-radius:6px;background:var(--nen-phu);color:var(--chu-nhat)}
+.hs2-hinh-rong{border:1px dashed var(--vien-dam);border-radius:8px;padding:.75rem;margin-bottom:.6rem;display:grid;gap:.4rem}
+.hs2-hinh-rong.anh{grid-template-columns:repeat(3,minmax(0,1fr))}
+.hs2-hinh-rong.anh i{display:block;aspect-ratio:1;border:1px dashed var(--vien-dam);border-radius:6px}
+.hs2-hinh-rong.chat i{display:block;height:.7rem;width:58%;border:1px dashed var(--vien-dam);border-radius:6px}
+.hs2-hinh-rong.chat i.phai{margin-left:auto;width:44%}
+.hs2-cong-dung{font-size:.8rem;margin:0;line-height:1.5;color:var(--chu-nhat)}
+.hs2-can{font-size:.72rem;margin:.6rem 0 0;padding-top:.5rem;border-top:1px solid var(--vien-phu);color:var(--chu-nhat)}
+.hs2-trai{display:flex;flex-direction:column;gap:.75rem;min-width:0}
+.hs2-trai .kh-the > h2,.hs2-trai .kh-the-dau h2{margin:0 0 .45rem;font-size:.8rem;font-weight:600;color:var(--chu-nhat)}
+.hs2-trai .kh-the-dau{margin-bottom:.45rem}
+.hs2-trai .kh-the-dau h2{margin:0}
+.hs2-ly-do{border-left:3px solid var(--vien-dam);border-radius:0 12px 12px 0}
+.hs2-ly-do.canh{border-left-color:var(--canh-vien)} .hs2-ly-do.do{border-left-color:var(--do)}
+.hs2-ly-do.ok{border-left-color:var(--ok-vien)}
+.hs2-ly-do p{margin:0 0 .35rem;font-size:.86rem;line-height:1.5}
+.hs2-ds{list-style:none;margin:0;padding:0}
+.hs2-dong{display:flex;justify-content:space-between;gap:.6rem;font-size:.8rem;padding:.3rem 0;border-top:1px solid var(--vien-phu);
+  color:var(--chu);text-decoration:none;font-variant-numeric:tabular-nums}
+.hs2-dong:first-child{border-top:0}
+.hs2-dong > a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs2-dong b{flex-shrink:0;font-weight:600}
+.hs2-lien-ket{font:inherit;font-size:.76rem;background:none;border:0;padding:.35rem 0 0;color:var(--lien-ket);cursor:pointer;text-align:left}
+.hs2-rong{width:100%;margin-top:.6rem}
+.hs2-lan-truoc{font-size:.8rem}
+.hs2-lan-truoc p{margin:.3rem 0;line-height:1.5}
+.hs2-dau{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;background:var(--nen-the);
+  border:1px solid var(--vien);border-radius:12px;padding:1rem 1.1rem;margin-bottom:1rem}
+.hs2-dau h1{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:0 0 .3rem;font-size:1.25rem}
+.hs2-dau h1 .nhan-vien{font-size:.72rem}
+.hs2-dau .phu code{font-size:.78rem;background:none;padding:0}
+.hs2-dau-chu{min-width:0}
+.hs2-the{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
+.hs2-the .nhan-vien{font-size:.68rem}
+.hs2-luoi{display:grid;grid-template-columns:320px minmax(0,1fr);gap:1rem;align-items:start}
+.hs2-trai{position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow-y:auto}
+.hs2-phai{min-width:0;display:flex;flex-direction:column;gap:.75rem}
+.hs2-phai > .kh-the,.hs2-phai [role="tabpanel"] > .kh-the{margin-bottom:0}
+.hs2-phai [role="tabpanel"]{display:flex;flex-direction:column;gap:.75rem}
+.hs2-phai [role="tabpanel"] > .hs-hang{margin-bottom:0}
+.hs2-phai .hs-hang.hai{grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))}
+.hs2-o{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0}
+.hs2 .o-kpi .gia,.hs2 .bang td.so{font-variant-numeric:tabular-nums}
+.hs2-tom{margin:0}
+@media (max-width:1023px){
+  .hs2-luoi{grid-template-columns:minmax(0,1fr)}
+  .hs2-trai{position:static;max-height:none;overflow:visible}
+  .hs2-o{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:560px){ .hs2-dau{flex-direction:column} .hs2-dau .nut-chinh{width:100%} }
+.hs2 .hs-dl{grid-template-columns:minmax(0,2fr) minmax(0,3fr)}

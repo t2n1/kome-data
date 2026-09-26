@@ -1,7 +1,9 @@
-// Hồ sơ 360° (Customer 360.dc.html — màn chi_tiet): thanh trên (← danh sách,
-// ô chuyển khách, ‹ n/N ›) · đầu hồ sơ · câu diễn giải · 5 tab. Số THẬT từ
-// /api/khach-hang/{mã} (kome/ho_so_khach.py). Khối không có nguồn: khung
-// "chưa có dữ liệu" nói rõ thiếu gì.
+// Hồ sơ 360° (thiết kế lại 2026-09-26): thanh trên (← danh sách, ô chuyển
+// khách, ‹ n/N ›) · đầu hồ sơ · bố cục HAI CỘT (hs2-luoi): cột trái cố định
+// "Việc với khách này" (HoSoViec.tsx), cột phải cuộn riêng gồm sổ sức khoẻ +
+// biểu đồ 12 tháng + 4 tab (Mặt hàng/Đơn hàng/Công nợ/Hồ sơ). Số THẬT từ
+// /api/khach-hang/{mã} (kome/ho_so_khach.py). Khối chưa có nguồn thật dùng
+// KhoiSapCo (khung "sắp có", không giả vờ có dữ liệu).
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { lay } from "../api";
@@ -10,27 +12,28 @@ import { so } from "../dinh_dang";
 import { docDanhSach } from "./loc";
 import type { DsApi, HoSoApi } from "./kieu";
 import { MAU_THANG, MAU_TT } from "./DanhSach";
-import { TabCongNo, TabDonHang, TabHoSo, TabSanPham, TabTongQuan } from "./HoSoTab";
+import { BieuDo12Thang, OSoSucKhoe, TabCongNo, TabDonHang, TabHoSo, TabMatHang } from "./HoSoTab";
+import { HoSoViec, ID_GHI_NHANH } from "./HoSoViec";
+import { TAB_HO_SO, tabTuHash, type MaTabHoSo } from "./ho_so_logic";
 import "./khach.css";
 import { TN } from "../khoi_dau";
 
-const TAB_DU = [["tong_quan", "Tổng quan"], ["san_pham", "Sản phẩm"], ["don_hang", "Đơn hàng"],
-  ["cong_no", "Công nợ"], ["ho_so", "Hồ sơ & liên hệ"]] as const;
-type MaTab = typeof TAB_DU[number][0];
-const TAB = TAB_DU.filter(([m]) => m !== "cong_no" || TN.cong_no);
+const TAB = TAB_HO_SO.filter(([m]) => m !== "cong_no" || TN.cong_no);
 
 export default function HoSo({ ma }: { ma: string }) {
   const { data: h, error } = useQuery<HoSoApi>({
     queryKey: ["kh-ho-so", ma, chuoiKhoang(useKhoang())], queryFn: () => lay<HoSoApi>(voiKhoang(`/api/khach-hang/${encodeURIComponent(ma)}`)),
   });
-  const [tab, datTab] = useState<MaTab>(() => {
-    const t = location.hash.slice(1) as MaTab;
-    return TAB.some(x => x[0] === t) ? t : "tong_quan";
-  });
+  const [tab, datTab] = useState<MaTabHoSo>(() => tabTuHash(location.hash, TN.cong_no));
+  const [moGhi, datMoGhi] = useState(false);
+  useEffect(() => {
+    const f = () => datTab(tabTuHash(location.hash, TN.cong_no));
+    window.addEventListener("hashchange", f); return () => window.removeEventListener("hashchange", f);
+  }, []);
+  const chonTab = (t: MaTabHoSo) => { datTab(t); history.replaceState(null, "", "#" + t); };
   // Form ghi tiếp xúc của trang Jinja (/lien-he) gặp lỗi thì máy chủ quay về
   // đây kèm ?loi_tx=<câu lỗi> (POST /khach-hang/{mã}/tiep-xuc) — phải hiện ra.
   const loiTx = new URLSearchParams(location.search).get("loi_tx");
-  const chonTab = (t: MaTab) => { datTab(t); history.replaceState(null, "", "#" + t); };
   const ds = docDanhSach();
   const vi = ds ? ds.ma.indexOf(ma) : -1;
   const di = (m: string) => { location.href = giuKhoang(`/khach-hang/${encodeURIComponent(m)}`); };
@@ -52,10 +55,10 @@ export default function HoSo({ ma }: { ma: string }) {
   const k = h.khach, tn = h.thang_nay;
 
   return (
-    <div className="kh hs">
+    <div className="kh hs hs2">
       {thanhTren}
-      <div className="tieu-de-trang hs-dau">
-        <div>
+      <header className="hs2-dau">
+        <div className="hs2-dau-chu">
           <h1><span className="ten-jp">{k.ten}</span>
             {h.hang && <span className={"kh-hang-nhan lon h" + h.hang} title="hạng theo doanh thu 12 tháng">Hạng {h.hang}</span>}
             <span className={"nhan-vien " + (MAU_TT[k.trang_thai] ?? "nhat")}>{h.nhan_trang_thai[k.trang_thai] ?? k.trang_thai}</span>
@@ -67,25 +70,32 @@ export default function HoSo({ ma }: { ma: string }) {
             {k.dien_thoai && <> · ☎ <a href={`tel:${k.dien_thoai}`}>{k.dien_thoai}</a></>}
             {k.dau_hieu_obc && <> · <span className="nhan-vien nhat">※{k.dau_hieu_obc}※</span></>}
             {h.hom_nay && <> · dữ liệu đến {h.hom_nay.split("-").reverse().join("/")}</>}</div>
+          {h.the.length > 0 && <div className="hs2-the">{h.the.map(t => (
+            <span key={t.chu} className={"nhan-vien " + (t.mau ?? "nhat")} title={t.vi}>{t.chu}</span>))}</div>}
         </div>
-        <button type="button" className="nut-chinh" onClick={() => { chonTab("ho_so"); setTimeout(() => document.getElementById("ghi-tx")?.focus(), 50); }}>✏️ Ghi liên hệ</button>
-      </div>
+        <button type="button" className="nut-chinh" onClick={() => { datMoGhi(true);
+          setTimeout(() => { const o = document.getElementById(ID_GHI_NHANH); o?.scrollIntoView({ behavior: "smooth", block: "center" }); o?.focus(); }, 50); }}>
+          ✏️ Ghi liên hệ</button>
+      </header>
       {loiTx && <p className="khoi-loi" role="alert">Chưa ghi được lần tiếp xúc: {loiTx}</p>}
-      {h.dien_giai && <div className="hs-dien-giai">{h.dien_giai}</div>}
-
-      <div className="hs-tab" role="tablist">
-        {TAB.map(([m, nhan]) => (
-          <button key={m} type="button" role="tab" aria-selected={tab === m} onClick={() => chonTab(m)}>
-            {nhan}
-            {m === "san_pham" && h.o_so.so_ma_ngung > 0 && <span className="hs-cham" title={`${h.o_so.so_ma_ngung} mã đã ngừng mua`} />}
-          </button>))}
-      </div>
-      <div role="tabpanel">
-        {tab === "tong_quan" && <TabTongQuan h={h} />}
-        {tab === "san_pham" && <TabSanPham h={h} />}
-        {tab === "don_hang" && <TabDonHang h={h} />}
-        {tab === "cong_no" && <TabCongNo ma={k.ma} />}
-        {tab === "ho_so" && <TabHoSo h={h} />}
+      <div className="hs2-luoi">
+        <HoSoViec h={h} moGhi={moGhi} datMoGhi={datMoGhi} />
+        <div className="hs2-phai">
+          <OSoSucKhoe h={h} />
+          <BieuDo12Thang h={h} />
+          <div className="hs-tab" role="tablist">
+            {TAB.map(([m, nhan]) => (
+              <button key={m} type="button" role="tab" aria-selected={tab === m} onClick={() => chonTab(m)}>
+                {nhan}{m === "mat_hang" && h.o_so.so_ma_ngung > 0 && <span className="hs-cham" title={`${h.o_so.so_ma_ngung} mã đã ngừng mua`} />}
+              </button>))}
+          </div>
+          <div role="tabpanel">
+            {tab === "mat_hang" && <TabMatHang h={h} />}
+            {tab === "don_hang" && <TabDonHang h={h} />}
+            {tab === "cong_no" && <TabCongNo ma={k.ma} />}
+            {tab === "ho_so" && <TabHoSo h={h} />}
+          </div>
+        </div>
       </div>
     </div>
   );

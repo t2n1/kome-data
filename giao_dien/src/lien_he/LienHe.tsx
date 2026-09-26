@@ -11,6 +11,7 @@ import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { ngay, so, yen } from "../dinh_dang";
 import { KD } from "../khoi_dau";
 import { GhiTiepXuc } from "../khach/GhiTiepXuc";
+import { dauKichBan, kichBanGoi } from "../khach/kich_ban";
 import "../khach/khach.css";
 import "./lien_he.css";
 
@@ -153,14 +154,14 @@ export default function LienHe() {
 
 const nhip = (g: GoiY) => `${g.so_lan} lần · nhịp ${Math.round(g.nhip_ngay)} ngày · lần cuối ${g.so_ngay} ngày trước`;
 
-// Kịch bản gọi — văn bản thuần để dán vào LINE / Zalo / ghi chú.
+// Kịch bản gọi — văn bản thuần để dán vào LINE / Zalo / ghi chú (khach/kich_ban.ts).
 function kichBan(t: The, gy: GoiY[], laThang: boolean): string {
-  const dong = [`${t.ten} (${t.ma})${t.dien_thoai ? " ☎ " + t.dien_thoai : ""}`,
-    laThang ? `Mua đều (${t.so_thang}/3 tháng trước), tháng này chưa có đơn.`
-      : `Lý do gọi: ${t.nhan_ly_do} — im ${t.so_ngay_im_lang} ngày${t.nhip_ngay ? ` (nhịp thường ${Math.round(t.nhip_ngay)} ngày)` : ""}.`];
-  if (gy.length) dong.push("Nên chào:", ...gy.map(g => `- ${g.ten} (${nhip(g)})`));
-  if (t.cuoi) dong.push(`Lần liên hệ trước (${t.cuoi.ngay}): ${t.cuoi.noi_dung}`);
-  return dong.join("\n");
+  return kichBanGoi({
+    dau: dauKichBan(t.ten, t.ma, t.dien_thoai),
+    ly_do: laThang ? `Mua đều (${t.so_thang}/3 tháng trước), tháng này chưa có đơn.`
+      : `Lý do gọi: ${t.nhan_ly_do} — im ${t.so_ngay_im_lang} ngày${t.nhip_ngay ? ` (nhịp thường ${Math.round(t.nhip_ngay)} ngày)` : ""}.`,
+    tieu_de_ma: "Nên chào:", ma: gy.map(g => ({ ten: g.ten, chi_tiet: nhip(g) })), cuoi: t.cuoi,
+  });
 }
 
 function The({ t, d, gy, laThang, mo, datMo }: { t: The; d: LienHeApi; gy: GoiY[]; laThang: boolean; mo: boolean; datMo: (v: boolean) => void }) {
