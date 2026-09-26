@@ -150,7 +150,7 @@ function Tuan26({ h }: { h: HoSoApi }) {
   const mau = co >= 16 ? "tang" : co >= 9 ? "canh-chu" : "giam";
   return (
     <The tieu_de="Nhịp đặt hàng 26 tuần" goc={<span className={mau}>{co}/26 tuần có đơn{h.khach.nhip_ngay ? ` · nhịp ${Math.round(h.khach.nhip_ngay)} ngày` : ""}</span>}
-      phu="ô đậm = tuần có đơn lớn · ô trắng = tuần không đặt · tuần tính lùi từ ngày dữ liệu mới nhất">
+      cach_tinh="ô đậm = tuần có đơn lớn · ô trắng = tuần không đặt · tuần tính lùi từ ngày dữ liệu mới nhất">
       <div className="hs-26">{h.tuan.map(t => (
         <i key={t.den} className={t.so_ngay ? "co" : ""} style={t.so_ngay ? { opacity: 0.22 + Math.max(0, t.doanh_thu) / mx * 0.78 } : undefined}
           title={`${ngay(t.tu)} – ${ngay(t.den)}: ${t.so_ngay ? `${t.so_ngay} ngày có đơn · ${yen(t.doanh_thu)}` : "không đặt"}`} />))}</div>
@@ -162,7 +162,7 @@ function GioNganh({ h }: { h: HoSoApi }) {
   const ds = h.nganh.nganh, r = 40, C = 2 * Math.PI * r;
   let luy = 0;
   return (
-    <The tieu_de="Giỏ hàng theo ngành" phu="tỷ trọng doanh thu luỹ kế theo ngành hàng (food_category của OBC)">
+    <The tieu_de="Giỏ hàng theo ngành" cach_tinh="tỷ trọng doanh thu luỹ kế theo ngành hàng (food_category của OBC)">
       {!ds.length ? <p className="phu">Chưa có doanh thu dương để vẽ.</p> :
       <div className="hs-donut">
         <svg viewBox="0 0 108 108" role="img" aria-label="Tỷ trọng doanh thu theo ngành">
@@ -233,7 +233,7 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
             <td className="so">{so(m.so_ngay)}</td><td className="so">{ngay(m.lan_cuoi)}</td></tr>))}</tbody></table></div>}
     </The>;
     })()}
-    <The tieu_de="Top 10 sản phẩm hay mua" phu={<>xếp theo doanh thu luỹ kế · <span className="nhan-vien ok">◎ Đề xuất</span> đã tới ngày mua lại ·{" "}
+    <The tieu_de="Top 10 sản phẩm hay mua" cach_tinh={<>xếp theo doanh thu luỹ kế · <span className="nhan-vien ok">◎ Đề xuất</span> đã tới ngày mua lại ·{" "}
       <span className="nhan-vien canh">○ Sắp tới</span> ≤ 7 ngày · <span className="nhan-vien nhat">△ Còn sớm</span></>}>
       <div className="hs-top">{top.map((m, i) => (
         <div key={m.ma} className="hs-top-dong">
@@ -282,7 +282,7 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
             <div className="ma-nho"><code>{g.ma}</code></div></td><td className="so">{pc(g.ty_suat)}</td></tr>))}</tbody></table></div>}
     </The>
 
-    <The tieu_de={`Tất cả mặt hàng (${h.mat_hang.length})`} phu="mọi mã khách từng mua · 3 cột tháng gần nhất để thấy ngay tháng nào vắng"
+    <The tieu_de={`Tất cả mặt hàng (${h.mat_hang.length})`} cach_tinh="mọi mã khách từng mua · 3 cột tháng gần nhất để thấy ngay tháng nào vắng"
       goc={<button type="button" className="nut-nho" onClick={() => datTatCa(x => !x)}>{tatCa ? "Thu gọn" : "Hiện bảng"}</button>}>
       {tatCa && <BangMatHang ds={h.mat_hang} thang={thang} />}
     </The>

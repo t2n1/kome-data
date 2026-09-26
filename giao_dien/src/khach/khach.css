@@ -245,17 +245,18 @@ td.trong{text-align:center;padding:1.6rem}
 .hs2-the{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
 .hs2-the .nhan-vien{font-size:.68rem}
 .hs2-luoi{display:grid;grid-template-columns:320px minmax(0,1fr);gap:1rem;align-items:start}
-.hs2-trai{position:sticky;top:1rem}
+.hs2-trai{position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow-y:auto}
 .hs2-phai{min-width:0;display:flex;flex-direction:column;gap:.75rem}
 .hs2-phai > .kh-the,.hs2-phai [role="tabpanel"] > .kh-the{margin-bottom:0}
 .hs2-phai [role="tabpanel"]{display:flex;flex-direction:column;gap:.75rem}
 .hs2-phai [role="tabpanel"] > .hs-hang{margin-bottom:0}
+.hs2-phai .hs-hang.hai{grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))}
 .hs2-o{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0}
 .hs2 .o-kpi .gia,.hs2 .bang td.so{font-variant-numeric:tabular-nums}
 .hs2-tom{margin:0}
 @media (max-width:1023px){
   .hs2-luoi{grid-template-columns:minmax(0,1fr)}
-  .hs2-trai{position:static}
+  .hs2-trai{position:static;max-height:none;overflow:visible}
   .hs2-o{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:560px){ .hs2-dau{flex-direction:column} .hs2-dau .nut-chinh{width:100%} }
