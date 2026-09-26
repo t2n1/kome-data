@@ -260,3 +260,4 @@ td.trong{text-align:center;padding:1.6rem}
   .hs2-o{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:560px){ .hs2-dau{flex-direction:column} .hs2-dau .nut-chinh{width:100%} }
+.hs2 .hs-dl{grid-template-columns:minmax(0,2fr) minmax(0,3fr)}
