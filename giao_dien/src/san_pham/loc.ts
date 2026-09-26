@@ -83,3 +83,12 @@ export function locDanhMuc(ds: MaHang[], b: LocSp, trang_thai: Record<string, un
   return { hang, dem_trang_thai, dem_nganh: [...dem_nganh.entries()].sort((a, b) => b[1] - a[1]),
     tong_theo_tim: theoTim.length };
 }
+
+// Danh mục vừa xem (để trang 360 có ‹ n/N ›) — tiện nghi riêng máy này, cùng nếp khach/loc.ts.
+const KHOA_DM = "kome_sp_dm_v1";
+export function nhoDanhMuc(ma: string[], url: string) {
+  try { sessionStorage.setItem(KHOA_DM, JSON.stringify({ ma, url })); } catch { /* */ }
+}
+export function docDanhMuc(): { ma: string[]; url: string } | null {
+  try { return JSON.parse(sessionStorage.getItem(KHOA_DM) || "null"); } catch { return null; }
+}

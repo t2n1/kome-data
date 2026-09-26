@@ -13,9 +13,7 @@ import type { BoLoc, Tab } from "./loc";
 import { thamSoBanDo } from "./loc";
 import type { BanDoApi, ONhanh } from "./kieu";
 import { useDs } from "./DanhSach";
-
-const MAU_O = ["var(--map-0)", "var(--map-1)", "var(--map-2)", "var(--map-3)", "var(--map-4)", "var(--map-5)"];
-const MAU_CHU = ["var(--chu-nhat)", "var(--chu)", "var(--chu)", "var(--map-chu-alt)", "var(--map-chu-alt)", "var(--map-chu-alt)"];
+import { MAU_CHU, MAU_O } from "../chung/LuoiTinh";
 
 export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: Tab }, day?: boolean) => void }) {
   const q = thamSoBanDo(b);

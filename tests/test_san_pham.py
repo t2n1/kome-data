@@ -723,7 +723,8 @@ def test_ton_chua_ro_la_NULL_tren_api_va_giao_dien_in_gach_ngang(conn, batch, te
     src = _nguon("ManSanPham.tsx")
     assert "m.ton == null ?" in src
     for sai in ("m.ton ?? 0", "m.ton || 0", "sp.ton ?? 0", "sp.ton || 0"):
-        assert sai not in src + _nguon("HoSoSanPham.tsx"), sai
+        assert sai not in src + (_SRC / "ho_so" / "HoSoMa.tsx").read_text(encoding="utf-8") \
+            + (_SRC / "ho_so" / "ViecVoiMa.tsx").read_text(encoding="utf-8"), sai
 
 
 def test_api_mang_du_SAU_nhan_trang_thai(conn, batch, test_db_url):
@@ -746,7 +747,7 @@ def test_giao_dien_hien_toc_do_THEO_TUOI_khong_phai_toc_do_ngay(conn, batch, tes
     _neo(conn, batch)
     sp = _khach_web(test_db_url).get("/api/san-pham/P102").json()["h"]["sp"]
     assert sp["toc_do_ngay"] != sp["toc_do_ngay_theo_tuoi"], "gieo hỏng"
-    for ten in ("ManSanPham.tsx", "HoSoSanPham.tsx", "KhoHang.tsx"):
+    for ten in ("ManSanPham.tsx", "ho_so/HoSoMa.tsx", "ho_so/ViecVoiMa.tsx", "KhoHang.tsx"):
         src = _nguon(ten)
         assert not re.search(r"\.toc_do_ngay\b(?!_theo_tuoi)", src), f"{ten} hiện cột tốc độ KHÔNG quyết định trạng thái"
     assert "toc_do_ngay_theo_tuoi" in _nguon("ManSanPham.tsx")
@@ -926,3 +927,15 @@ def test_bang_ton_mang_NGANH_cua_dim_product_qua_ten_nganh(conn, batch):
 
     nganh = {d["ma"]: d["nganh"] for d in SP.kho_hang(conn).dong}
     assert nganh == {"P300": "調味料_VNM", "P301": NGANH_TRONG, "P302": NGANH_TRONG}
+
+
+def test_trang_rieng_360_co_khung_hai_cot_va_lien_ket_khach():
+    """Trang riêng dùng bố cục hs2 của khách 360 và link mọi khách sang /khach-hang/{mã}."""
+    ho = _SRC / "ho_so"
+    src = "".join((ho / f).read_text(encoding="utf-8") for f in ("HoSoMa.tsx", "ViecVoiMa.tsx"))
+    assert "hs2-luoi" in src and "hs2-trai" in src
+    assert "/khach-hang/${encodeURIComponent(" in src
+    assert "giuKhoang(" in src
+    assert not (_SRC / "HoSoSanPham.tsx").exists(), "hồ sơ dưới bảng phải bỏ"
+    man = _nguon("ManSanPham.tsx")
+    assert "HoSoSanPham" not in man and "location.href = giuKhoang(" in man
