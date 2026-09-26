@@ -144,3 +144,70 @@ def test_khach_gia_chi_khach_DT_duong_va_it_nhat_2_lan(conn, batch):
     r = conn.execute("SELECT customer_code, so_lan, bien FROM mart.sp_khach_gia('T10')").fetchall()
     assert [x[0] for x in r] == ["KT11"]
     assert r[0][1] == 2 and abs(float(r[0][2]) - 0.3) < 1e-9
+
+
+# ------------------------------------------------------------------ 053
+
+def _sp_du(conn, batch, ma, ten="Hàng", nganh="米_VNM", kind="0", rank=None):
+    """dim_product có ngành / loại / hạng — cần cho mua kèm và khách nên chào."""
+    b = batch(abs(hash(("spd", ma))) % 60_000 + 1)
+    conn.execute(
+        """INSERT INTO core.dim_product (product_code, product_name, kind_code, kind_name,
+                                         food_category_name, rank_code, batch_id)
+           VALUES (%s, %s, %s, 'x', %s, %s, %s) ON CONFLICT (product_code) DO NOTHING""",
+        (ma, ten, kind, nganh, rank, b))
+    conn.commit()
+
+
+def test_mua_kem_bo_phi_POSM_va_hang_ngung_ban_het_ton(conn, batch):
+    _sp_du(conn, batch, "M1")
+    _sp_du(conn, batch, "M2", ten="Bánh")
+    _sp_du(conn, batch, "PHI", ten="配送料", kind="1")
+    _sp_du(conn, batch, "MKT1", ten="Poster", nganh="雑貨_VNM")
+    _sp_du(conn, batch, "OLD", ten="※終売※ cũ", rank="0999")
+    _ho_so_khach(conn, batch, "KM01", "Quán H")
+    ngay = HOM_NAY - timedelta(days=3)
+    for i, ma in enumerate(["M1", "M2", "PHI", "MKT1", "OLD"], start=1):
+        _dong(conn, batch, "KM01", ngay, ma, phieu="P-KEM-1", dong=i)
+    _dong(conn, batch, "KM01", ngay - timedelta(days=7), "M1", phieu="P-KEM-2", dong=1)
+    _neo(conn, batch)
+    r = conn.execute("SELECT product_code, so_phieu, ty_le, tong_phieu FROM mart.sp_mua_kem('M1')").fetchall()
+    assert [x[0] for x in r] == ["M2"]
+    assert r[0][1] == 1 and r[0][3] == 2 and abs(float(r[0][2]) - 0.5) < 1e-9
+
+
+def test_khach_nen_chao_cung_nganh_chua_mua_khong_co_khach_dong_cua(conn, batch):
+    _sp_du(conn, batch, "C1", nganh="米_VNM")
+    _sp_du(conn, batch, "C2", nganh="米_VNM")
+    _sp_du(conn, batch, "X9", nganh="麺_VNM")
+    # KC01: mua đều C2 (cùng ngành), chưa mua C1 -> NÊN CHÀO
+    _ho_so_khach(conn, batch, "KC01", "Quán mua gạo")
+    for i in range(3):
+        _dong(conn, batch, "KC01", HOM_NAY - timedelta(days=i * 7), "C2")
+    # KC02: đã mua C1 -> không chào
+    _ho_so_khach(conn, batch, "KC02", "Quán đã mua")
+    for i in range(3):
+        _dong(conn, batch, "KC02", HOM_NAY - timedelta(days=i * 7), "C2")
+    _dong(conn, batch, "KC02", HOM_NAY - timedelta(days=1), "C1")
+    # KC03: ※廃業※ -> nhãn 'khong_goi', không chào
+    _ho_so_khach(conn, batch, "KC03", "※廃業※ Quán đóng cửa")
+    for i in range(3):
+        _dong(conn, batch, "KC03", HOM_NAY - timedelta(days=i * 7), "C2")
+    # KC04: chỉ mua ngành khác -> không chào
+    _ho_so_khach(conn, batch, "KC04", "Quán mì")
+    for i in range(3):
+        _dong(conn, batch, "KC04", HOM_NAY - timedelta(days=i * 7), "X9")
+    _neo(conn, batch)
+    r = conn.execute("SELECT customer_code, so_ma_nganh FROM mart.sp_khach_nen_chao('C1')").fetchall()
+    assert r == [("KC01", 1)]
+
+
+def test_khach_nen_chao_RONG_voi_ma_ngung_kinh_doanh(conn, batch):
+    """050: không chào hàng đã ngừng kinh doanh — kể cả còn tồn."""
+    _sp_du(conn, batch, "N1", ten="※終売※ gạo", nganh="米_VNM", rank="0999")
+    _sp_du(conn, batch, "N2", nganh="米_VNM")
+    _ho_so_khach(conn, batch, "KN01", "Quán I")
+    for i in range(3):
+        _dong(conn, batch, "KN01", HOM_NAY - timedelta(days=i * 7), "N2")
+    _neo(conn, batch)
+    assert conn.execute("SELECT count(*) FROM mart.sp_khach_nen_chao('N1')").fetchone()[0] == 0
