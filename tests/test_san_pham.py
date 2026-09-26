@@ -939,3 +939,18 @@ def test_trang_rieng_360_co_khung_hai_cot_va_lien_ket_khach():
     assert not (_SRC / "HoSoSanPham.tsx").exists(), "hồ sơ dưới bảng phải bỏ"
     man = _nguon("ManSanPham.tsx")
     assert "HoSoSanPham" not in man and "location.href = giuKhoang(" in man
+
+
+def test_bon_tab_360_tai_luoi_va_link_khach_san_pham():
+    ho = _SRC / "ho_so"
+    tabs = {f: (ho / f).read_text(encoding="utf-8") for f in
+            ("TabKhach.tsx", "TabThoiGian.tsx", "TabGia.tsx", "TabBanThem.tsx")}
+    assert "/api/san-pham/${encodeURIComponent(ma)}/khach" in tabs["TabKhach.tsx"]
+    assert "/thoi-gian" in tabs["TabThoiGian.tsx"] and "/ngay?thang=" in tabs["TabThoiGian.tsx"]
+    assert "/gia" in tabs["TabGia.tsx"] and "TN.bang_gia" in tabs["TabGia.tsx"]
+    assert "/ban-them" in tabs["TabBanThem.tsx"]
+    assert "/khach-hang/${encodeURIComponent(" in tabs["TabKhach.tsx"] + tabs["TabGia.tsx"] + tabs["TabBanThem.tsx"]
+    assert "/san-pham/${encodeURIComponent(" in tabs["TabBanThem.tsx"], "mua kèm phải link sang mã kia"
+    assert "Đang dựng" not in "".join(tabs.values())
+    for sai in ("ton ?? 0", "ton || 0"):
+        assert sai not in "".join(tabs.values())
