@@ -119,6 +119,29 @@ Route cụ thể (`/khach`, `/gia`…) khai TRƯỚC `/{mã}` hoặc dùng đư�
 (nếp `/san-pham/khoang`). Hàm Python ở `kome/san_pham_360.py` (mô-đun mới; `kome/san_pham.py` giữ
 danh mục / kho hàng) — khai vào `MAN` của `scripts/sinh_cot_dung.py`.
 
+**Đo thật 2026-09-27** (CSDL thật, CHỈ ĐỌC qua `kome_app`/`DATABASE_URL_APP`, `BEGIN READ ONLY` +
+`EXPLAIN (ANALYZE, BUFFERS)`, thân hai hàm 053 thay `p_ma` bằng literal — migration 051–053 CHƯA
+chạy trên CSDL thật nên không gọi được hàm; mã dùng để đo là `HAL04`, mã có `doanh_thu_thuan` cao
+nhất trong `mart.san_pham_360`):
+- `mart.sp_mua_kem`: **0,77 ms** (Planning 2,08 ms). Trong lần đo này `HAL04` không có dòng SL > 0
+  nào trong 12 tháng nên CTE `p` rỗng và toàn câu ngắn mạch — số đo là chi phí "không tìm thấy
+  phiếu nào", không phải chi phí trên một tập phiếu đầy; cần đo lại với một mã có `so_phieu` thật
+  sự lớn trước khi kết luận trần cho đường vòng đầy đủ, nhưng kế hoạch quét (chỉ mục
+  `product_code, sales_date`) không đổi theo `p_ma` nên không có lý do để lệch xa 0,77 ms.
+- `mart.sp_khach_nen_chao`: **8.736 ms** (Planning 37 ms) — **vượt trần 500 ms hơn 17 lần**.
+  Nút thắt: CTE `cung` (mọi mã CÙNG NGÀNH với `p_ma`, ở đây 26 mã) rồi CTE `k` dùng
+  `CROSS JOIN LATERAL (SELECT … FROM mart.khach_mat_hang x WHERE x.product_code = cung.product_code
+  AND x.trang_thai_cap = 'mua')` — LATERAL này chạy MỘT LẦN cho MỖI mã trong `cung` (26 lần), và
+  mỗi lần Postgres không đẩy được vị từ `product_code = …` xuống trước bước tính
+  `khoang_cach_mat_hang` (window `LAG` theo `customer_code, product_code, sales_date` trên TOÀN
+  BỘ `fact_sales_line` quét theo mốc) — plan cho thấy vòng lặp 26 lần của một nested loop ~163 ms/
+  lần (~4,5 s) cộng một `WindowAgg` + `external sort` (đĩa 10 MB) chạy trước đó ~2 s. Đây là ĐÚNG
+  lớp lỗi mà chú thích trong hàm đã cảnh báo ("LATERAL `= mã` cho khach_mat_hang: `= ANY`/JOIN
+  không đẩy vị từ qua nhip_mat_hang") — khác là ở `/lien-he` mỗi lượt gọi có ĐÚNG MỘT mã, còn
+  ở đây LATERAL lặp qua CẢ NGÀNH (ở HAL04 là 26 mã), nên chi phí một-mã (~0,1–0,3 s ước theo tỷ lệ)
+  nhân lên theo cỡ ngành. **Báo lại: chưa tự đổi thiết kế** — xem mục "Mối quan tâm" của
+  `task-8-report.md`.
+
 ## 6. Lỗi và trạng thái rỗng
 
 - Mã không có → 404; mã ※終売※ hết tồn → 404 với thông điệp `NGUNG_BAN` hiện có; trang vẽ

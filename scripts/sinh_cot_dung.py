@@ -67,6 +67,7 @@ MAN = {
     "kome/khoi_tong_quan.py": ["tong_quan"], "kome/lien_he.py": ["lien_he"],
     "kome/ngan_sach.py": ["ngan_sach"], "kome/nhat_ky.py": ["nhat_ky"],
     "kome/nhat_ky_nap.py": ["kho_du_lieu"], "kome/san_pham.py": ["san_pham", "kho_hang", "tong_quan"],
+    "kome/san_pham_360.py": ["san_pham"],
     "kome/tong_quan.py": ["tong_quan"], "kome/tuoi_du_lieu.py": ["tong_quan", "kho_du_lieu"],
     "kome/ve_phan_tich.py": ["bao_cao"], "kome/web/api.py": ["chung"], "kome/web/app.py": ["chung"],
     "kome/web/bo_cuc.py": ["tong_quan"], "kome/web/nguoi_dung.py": ["cai_dat"],

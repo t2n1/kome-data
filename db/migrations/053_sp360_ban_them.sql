@@ -1,4 +1,18 @@
 -- 053 — Sản phẩm 360, nhóm "Bán thêm" (đặc tả §4). Đọc mart.ban_den_moc / mart.khach_mat_hang.
+--
+-- mart.ban_den_moc được tham chiếu HAI LẦN trong sp_mua_kem (CTE p và CTE k) mà KHÔNG bọc
+-- MATERIALIZED: nó là một view MỎNG, chỉ lọc theo mốc trên một bảng ĐÃ CÓ CHỈ MỤC
+-- (core.fact_sales_line) — Postgres NỐI TRỰC TIẾP (inline) view đó vào từng câu tham chiếu rồi
+-- dùng chỉ mục riêng cho vị từ của lần tham chiếu đó (product_code = p_ma ở CTE p,
+-- slip_no IN (...) ở CTE k). Bọc AS MATERIALIZED ở đây sẽ ép Postgres SAO CHÉP TOÀN BỘ kết quả
+-- lọc-theo-mốc của cả bảng bán hàng vào bộ nhớ trước khi lọc tiếp — đắt hơn, không rẻ hơn. Bất
+-- biến CTE-trùng (ghi ở CLAUDE.md) áp cho VIEW NẶNG bị tính lại nhiều lần (vd. san_pham_360); nó
+-- không áp cho một view mỏng như ban_den_moc.
+--
+-- sp_khach_nen_chao.lan_cuoi: đây là lần mua GẦN NHẤT của khách với BẤT KỲ mã nào CÙNG NGÀNH với
+-- p_ma (max(h.lan_cuoi) qua mọi mã trong CTE cung), KHÔNG PHẢI lần mua p_ma — khách trong danh
+-- sách này chưa từng mua p_ma (lọc ở WHERE NOT EXISTS cuối câu), nên "lần mua p_ma gần nhất" vô
+-- nghĩa với chính họ.
 
 CREATE OR REPLACE FUNCTION mart.sp_mua_kem(p_ma text)
 RETURNS TABLE (product_code text, ten_hang text, so_phieu bigint, ty_le numeric, tong_phieu bigint)

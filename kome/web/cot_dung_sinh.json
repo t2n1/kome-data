@@ -15,7 +15,8 @@
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -34,6 +35,8 @@
       "mart.ma_ngung_ban_an",
       "mart.mat_hang_khoang",
       "mart.san_pham_360",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
       "mart.ton_hien_tai",
       "mart.ton_theo_lo"
      ]
@@ -92,7 +95,8 @@
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -111,6 +115,8 @@
       "mart.ma_ngung_ban_an",
       "mart.mat_hang_khoang",
       "mart.san_pham_360",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
       "mart.ton_hien_tai",
       "mart.ton_theo_lo"
      ]
@@ -123,7 +129,8 @@
      "ly_do": "màn hình đọc qua mart.ton_hien_tai, mart.ton_theo_lo",
      "ma": [
       "kome/khoi_tong_quan.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "kho_hang",
@@ -175,7 +182,8 @@
      "ly_do": "màn hình đọc qua mart.ton_hien_tai, mart.ton_theo_lo",
      "ma": [
       "kome/khoi_tong_quan.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "kho_hang",
@@ -215,7 +223,8 @@
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -234,6 +243,8 @@
       "mart.ma_ngung_ban_an",
       "mart.mat_hang_khoang",
       "mart.san_pham_360",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
       "mart.ton_hien_tai",
       "mart.ton_theo_lo"
      ]
@@ -262,7 +273,8 @@
      "ly_do": "cột tổng tiền — cổng 4/5 đối chiếu",
      "ma": [
       "kome/khoi_tong_quan.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "kho_hang",
@@ -299,7 +311,7 @@
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
       "kome/nhat_ky.py",
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -308,7 +320,6 @@
       "du_bao",
       "ho_so",
       "khach",
-      "kho_hang",
       "lien_he",
       "nhat_ky",
       "san_pham",
@@ -326,6 +337,10 @@
       "mart.khach_nhom_viec",
       "mart.khach_thang_nay",
       "mart.khach_theo_tinh",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_tinh",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -338,7 +353,7 @@
      "he": "customer_name",
      "ja": "得意先名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.cong_no_ben_tra, mart.cong_no_phieu, mart.dau_hieu_khach và 10 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.cong_no_ben_tra, mart.cong_no_phieu, mart.dau_hieu_khach và 13 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -350,7 +365,7 @@
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
       "kome/nhat_ky.py",
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -359,7 +374,6 @@
       "du_bao",
       "ho_so",
       "khach",
-      "kho_hang",
       "lien_he",
       "nhat_ky",
       "san_pham",
@@ -375,6 +389,9 @@
       "mart.khach_nhom_viec",
       "mart.khach_thang_nay",
       "mart.khach_theo_tinh",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_tap_trung_khach",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -388,12 +405,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -405,22 +424,25 @@
      "he": "prefecture",
      "ja": "都道府県",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.khach_360, mart.khach_theo_tinh, mart.tinh_khoang và 1 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.khach_360, mart.khach_theo_tinh, mart.sp_theo_tinh và 2 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/khach_hang.py",
-      "kome/lien_he.py"
+      "kome/lien_he.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
       "lien_he",
+      "san_pham",
       "tong_quan"
      ],
      "view": [
       "mart.khach_360",
       "mart.khach_theo_tinh",
+      "mart.sp_theo_tinh",
       "mart.tinh_khoang",
       "mart.uu_tien_lien_he"
      ]
@@ -432,12 +454,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -451,12 +475,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -468,14 +494,16 @@
      "he": "building",
      "ja": "ビル等",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": []
@@ -488,13 +516,15 @@
      "ly_do": "màn hình đọc qua mart.khach_360, mart.uu_tien_lien_he",
      "ma": [
       "kome/khach_hang.py",
-      "kome/lien_he.py"
+      "kome/lien_he.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
       "lien_he",
+      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -507,18 +537,21 @@
      "he": "rank_code",
      "ja": "ランクコード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.khach_360",
+     "ly_do": "màn hình đọc qua mart.khach_360, mart.sp_khach_nen_chao",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": [
-      "mart.khach_360"
+      "mart.khach_360",
+      "mart.sp_khach_nen_chao"
      ]
     },
     {
@@ -526,14 +559,16 @@
      "he": "rank_name",
      "ja": "ランク名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": []
@@ -551,7 +586,8 @@
       "kome/khach_thang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/nhat_ky.py"
+      "kome/nhat_ky.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -560,6 +596,7 @@
       "khach",
       "lien_he",
       "nhat_ky",
+      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -579,14 +616,16 @@
      "he": "salesperson_name",
      "ja": "売上主担当者名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": []
@@ -598,12 +637,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -615,14 +656,16 @@
      "he": "closing_day_name",
      "ja": "請求締日名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": []
@@ -634,12 +677,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.khach_360",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": [
@@ -651,14 +696,16 @@
      "he": "transfer_account",
      "ja": "振込専用口座番号１",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khach_hang.py",
+     "ly_do": "màn hình đọc qua kome/khach_hang.py, kome/san_pham_360.py",
      "ma": [
-      "kome/khach_hang.py"
+      "kome/khach_hang.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
       "ho_so",
       "khach",
+      "san_pham",
       "tong_quan"
      ],
      "view": []
@@ -3697,7 +3744,7 @@
       "kome/khach_thang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -3709,7 +3756,6 @@
       "du_bao",
       "ho_so",
       "khach",
-      "kho_hang",
       "lien_he",
       "san_pham",
       "tong_quan"
@@ -3735,6 +3781,7 @@
       "mart.khoang_cach_mua",
       "mart.lan_mua",
       "mart.nhip_mua",
+      "mart.sp_mua_kem",
       "mart.tai_nhan_vien",
       "mart.thang_den_hom_nay",
       "mart.tien_do_ngan_sach",
@@ -3783,6 +3830,7 @@
       "kome/lien_he.py",
       "kome/ngan_sach.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -3845,6 +3893,16 @@
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
       "mart.so_cong_no_moi_nhat",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_moi_thang",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_nguoi",
+      "mart.sp_theo_tinh",
+      "mart.sp_theo_tuan",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -3886,7 +3944,7 @@
      "he": "customer_code",
      "ja": "得意先コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 51 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 61 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -3900,6 +3958,7 @@
       "kome/lien_he.py",
       "kome/ngan_sach.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -3958,6 +4017,16 @@
       "mart.sale_khoang",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_moi_thang",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_nguoi",
+      "mart.sp_theo_tinh",
+      "mart.sp_theo_tuan",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -4000,13 +4069,14 @@
      "he": "salesperson_code",
      "ja": "担当者コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nhan_vien, mart.ban_theo_nhan_vien_thang và 4 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nhan_vien, mart.ban_theo_nhan_vien_thang và 5 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
-      "kome/ngan_sach.py"
+      "kome/ngan_sach.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -4025,6 +4095,7 @@
       "mart.dong_ban",
       "mart.dong_ban_khoang",
       "mart.sale_khoang",
+      "mart.sp_theo_nguoi",
       "mart.tien_do_ngan_sach"
      ]
     },
@@ -4053,7 +4124,7 @@
      "he": "product_code",
      "ja": "商品コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 16 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 26 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -4061,6 +4132,7 @@
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
@@ -4091,6 +4163,16 @@
       "mart.nhip_mat_hang",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_moi_thang",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_nguoi",
+      "mart.sp_theo_tinh",
+      "mart.sp_theo_tuan",
       "mart.toc_do_ban",
       "mart.ton_theo_lo",
       "mart.ty_suat_mat_hang"
@@ -4101,16 +4183,21 @@
      "he": "pack_code",
      "ja": "荷姿コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.sp_co_don và 2 chỉ số khác",
      "ma": [
+      "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
-      "chung"
+      "chung",
+      "san_pham"
      ],
      "view": [
       "mart.ban_den_moc",
-      "mart.dong_ban"
+      "mart.dong_ban",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia"
      ]
     },
     {
@@ -4128,13 +4215,14 @@
      "he": "qty",
      "ja": "数量",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 5 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 11 chỉ số khác",
      "ma": [
       "kome/bao_cao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
@@ -4155,6 +4243,12 @@
       "mart.khach_mat_hang",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
+      "mart.sp_theo_tuan",
       "mart.toc_do_ban",
       "mart.ton_theo_lo"
      ]
@@ -4163,11 +4257,18 @@
      "core": "core.fact_sales_line.unit_price",
      "he": "unit_price",
      "ja": "単価",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.sp_don_gia_thang",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
+     "view": [
+      "mart.ban_den_moc",
+      "mart.sp_don_gia_thang"
+     ]
     },
     {
      "core": "core.fact_sales_line.unit_cost",
@@ -4197,6 +4298,7 @@
       "kome/lien_he.py",
       "kome/ngan_sach.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -4239,6 +4341,14 @@
       "mart.nganh_ky_cung_ky",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_moi_thang",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_nguoi",
+      "mart.sp_theo_tinh",
+      "mart.sp_theo_tuan",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.thang_den_hom_nay",
@@ -4256,7 +4366,7 @@
      "he": "tax_amount",
      "ja": "消費税額",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 31 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 39 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -4269,6 +4379,7 @@
       "kome/lien_he.py",
       "kome/ngan_sach.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -4311,6 +4422,14 @@
       "mart.nganh_ky_cung_ky",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_moi_thang",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_nguoi",
+      "mart.sp_theo_tinh",
+      "mart.sp_theo_tuan",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.thang_den_hom_nay",
@@ -4338,7 +4457,7 @@
      "he": "gross_profit",
      "ja": "粗利益",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 26 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 29 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -4350,6 +4469,7 @@
       "kome/lien_he.py",
       "kome/ngan_sach.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -4390,6 +4510,9 @@
       "mart.nganh_ky_cung_ky",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_theo_nguoi",
       "mart.tai_nhan_vien",
       "mart.thang_den_hom_nay",
       "mart.tien_do_cong_ty",
@@ -6930,6 +7053,7 @@
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
@@ -6954,7 +7078,9 @@
       "mart.nganh_khoang",
       "mart.nganh_ky_cung_ky",
       "mart.nganh_so_sanh_khoang",
-      "mart.san_pham_360"
+      "mart.san_pham_360",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem"
      ]
     },
     {
@@ -6962,7 +7088,7 @@
      "he": "product_name",
      "ja": "商品名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_khoang và 3 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_khoang và 5 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -6970,6 +7096,7 @@
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
@@ -6989,7 +7116,9 @@
       "mart.khach_mat_hang_khoang",
       "mart.ma_ngung_ban_an",
       "mart.mat_hang_khoang",
-      "mart.san_pham_360"
+      "mart.san_pham_360",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem"
      ]
     },
     {
@@ -7014,14 +7143,15 @@
      "he": "kind_code",
      "ja": "種別コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 5 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 7 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -7041,7 +7171,9 @@
       "mart.khach_mat_hang_khoang",
       "mart.mat_hang_khoang",
       "mart.nganh_ky_cung_ky",
-      "mart.san_pham_360"
+      "mart.san_pham_360",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem"
      ]
     },
     {
@@ -7052,7 +7184,8 @@
      "ly_do": "màn hình đọc qua mart.san_pham_360",
      "ma": [
       "kome/khoi_tong_quan.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "kho_hang",
@@ -7085,14 +7218,15 @@
      "he": "food_category_name",
      "ja": "食品分類名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 5 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 7 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -7112,7 +7246,9 @@
       "mart.khach_mat_hang_khoang",
       "mart.mat_hang_khoang",
       "mart.nganh_ky_cung_ky",
-      "mart.san_pham_360"
+      "mart.san_pham_360",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem"
      ]
     },
     {
@@ -7120,14 +7256,15 @@
      "he": "rank_code",
      "ja": "商品ランク（年間）コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_khoang và 3 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_khoang và 5 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/san_pham.py"
+      "kome/san_pham.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -7145,7 +7282,9 @@
       "mart.khach_mat_hang_khoang",
       "mart.ma_ngung_ban_an",
       "mart.mat_hang_khoang",
-      "mart.san_pham_360"
+      "mart.san_pham_360",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem"
      ]
     },
     {
@@ -9447,12 +9586,10 @@
      "loai": "nap",
      "ly_do": "khoá của file",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9463,12 +9600,10 @@
      "loai": "nap",
      "ly_do": "khoá của file",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9487,14 +9622,12 @@
      "he": "price_ex_01",
      "ja": "売価No.１（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9513,14 +9646,12 @@
      "he": "price_ex_02",
      "ja": "売価No.２（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9539,14 +9670,12 @@
      "he": "price_ex_03",
      "ja": "売価No.３（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9565,14 +9694,12 @@
      "he": "price_ex_04",
      "ja": "売価No.４（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9591,14 +9718,12 @@
      "he": "price_ex_05",
      "ja": "売価No.５（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9617,14 +9742,12 @@
      "he": "price_ex_06",
      "ja": "売価No.６（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9643,14 +9766,12 @@
      "he": "price_ex_07",
      "ja": "売価No.７（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9669,14 +9790,12 @@
      "he": "price_ex_08",
      "ja": "売価No.８（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9695,14 +9814,12 @@
      "he": "price_ex_09",
      "ja": "売価No.９（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9721,14 +9838,12 @@
      "he": "price_ex_10",
      "ja": "売価No.10（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/san_pham.py",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
      "ma": [
-      "kome/san_pham.py"
+      "kome/san_pham_360.py"
      ],
      "man": [
-      "kho_hang",
-      "san_pham",
-      "tong_quan"
+      "san_pham"
      ],
      "view": []
     },
@@ -9976,7 +10091,7 @@
       "kome/khach_thang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
-      "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -9988,7 +10103,6 @@
       "du_bao",
       "ho_so",
       "khach",
-      "kho_hang",
       "lien_he",
       "san_pham",
       "tong_quan"
@@ -10014,6 +10128,7 @@
       "mart.khoang_cach_mua",
       "mart.lan_mua",
       "mart.nhip_mua",
+      "mart.sp_mua_kem",
       "mart.tai_nhan_vien",
       "mart.thang_den_hom_nay",
       "mart.tien_do_ngan_sach",
@@ -10041,6 +10156,7 @@
       "kome/lien_he.py",
       "kome/ngan_sach.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -10103,6 +10219,16 @@
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
       "mart.so_cong_no_moi_nhat",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_moi_thang",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_nguoi",
+      "mart.sp_theo_tinh",
+      "mart.sp_theo_tuan",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -10124,7 +10250,7 @@
      "he": "customer_code",
      "ja": "得意先コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 51 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 61 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -10138,6 +10264,7 @@
       "kome/lien_he.py",
       "kome/ngan_sach.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -10196,6 +10323,16 @@
       "mart.sale_khoang",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_moi_thang",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_nguoi",
+      "mart.sp_theo_tinh",
+      "mart.sp_theo_tuan",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -10217,13 +10354,14 @@
      "he": "salesperson_code",
      "ja": "担当者コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nhan_vien, mart.ban_theo_nhan_vien_thang và 4 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nhan_vien, mart.ban_theo_nhan_vien_thang và 5 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
-      "kome/ngan_sach.py"
+      "kome/ngan_sach.py",
+      "kome/san_pham_360.py"
      ],
      "man": [
       "ban_do",
@@ -10242,6 +10380,7 @@
       "mart.dong_ban",
       "mart.dong_ban_khoang",
       "mart.sale_khoang",
+      "mart.sp_theo_nguoi",
       "mart.tien_do_ngan_sach"
      ]
     },
@@ -10250,7 +10389,7 @@
      "he": "product_code",
      "ja": "商品コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 16 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 26 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -10258,6 +10397,7 @@
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
@@ -10288,6 +10428,16 @@
       "mart.nhip_mat_hang",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_moi_thang",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_nguoi",
+      "mart.sp_theo_tinh",
+      "mart.sp_theo_tuan",
       "mart.toc_do_ban",
       "mart.ton_theo_lo",
       "mart.ty_suat_mat_hang"
@@ -10298,16 +10448,21 @@
      "he": "pack_code",
      "ja": "荷姿区分コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.sp_co_don và 2 chỉ số khác",
      "ma": [
+      "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
-      "chung"
+      "chung",
+      "san_pham"
      ],
      "view": [
       "mart.ban_den_moc",
-      "mart.dong_ban"
+      "mart.dong_ban",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia"
      ]
     },
     {
@@ -10315,13 +10470,14 @@
      "he": "qty",
      "ja": "純売上数量",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 5 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 11 chỉ số khác",
      "ma": [
       "kome/bao_cao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
@@ -10342,6 +10498,12 @@
       "mart.khach_mat_hang",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_co_don",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_mua_kem",
+      "mart.sp_theo_tuan",
       "mart.toc_do_ban",
       "mart.ton_theo_lo"
      ]
@@ -10350,11 +10512,18 @@
      "core": "core.fact_sales_line.unit_price",
      "he": "unit_price",
      "ja": "単価",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.sp_don_gia_thang",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
+     "view": [
+      "mart.ban_den_moc",
+      "mart.sp_don_gia_thang"
+     ]
     },
     {
      "core": "core.fact_sales_line.amount",
@@ -10374,6 +10543,7 @@
       "kome/lien_he.py",
       "kome/ngan_sach.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -10416,6 +10586,14 @@
       "mart.nganh_ky_cung_ky",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_don_gia_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_moi_thang",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_tap_trung_khach",
+      "mart.sp_theo_nguoi",
+      "mart.sp_theo_tinh",
+      "mart.sp_theo_tuan",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.thang_den_hom_nay",
@@ -10433,7 +10611,7 @@
      "he": "gross_profit",
      "ja": "粗利益",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 26 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 29 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -10445,6 +10623,7 @@
       "kome/lien_he.py",
       "kome/ngan_sach.py",
       "kome/san_pham.py",
+      "kome/san_pham_360.py",
       "kome/tong_quan.py",
       "kome/web/api.py"
      ],
@@ -10485,6 +10664,9 @@
       "mart.nganh_ky_cung_ky",
       "mart.san_pham_360",
       "mart.san_pham_theo_thang",
+      "mart.sp_khach_gia",
+      "mart.sp_khach_nen_chao",
+      "mart.sp_theo_nguoi",
       "mart.tai_nhan_vien",
       "mart.thang_den_hom_nay",
       "mart.tien_do_cong_ty",
@@ -11242,7 +11424,6 @@
    "du_bao",
    "ho_so",
    "khach",
-   "kho_hang",
    "lien_he",
    "san_pham",
    "tong_quan"
@@ -11278,7 +11459,6 @@
    "du_bao",
    "ho_so",
    "khach",
-   "kho_hang",
    "lien_he",
    "san_pham",
    "tong_quan"
@@ -11294,7 +11474,6 @@
    "ban_do",
    "ho_so",
    "khach",
-   "kho_hang",
    "lien_he",
    "san_pham",
    "tong_quan"
@@ -11334,7 +11513,6 @@
    "ban_do",
    "ho_so",
    "khach",
-   "kho_hang",
    "lien_he",
    "san_pham",
    "tong_quan"
@@ -11344,7 +11522,6 @@
    "du_bao",
    "ho_so",
    "khach",
-   "kho_hang",
    "lien_he",
    "san_pham",
    "tong_quan"
@@ -11359,7 +11536,6 @@
    "du_bao",
    "ho_so",
    "khach",
-   "kho_hang",
    "lien_he",
    "san_pham",
    "tong_quan"
@@ -11459,7 +11635,6 @@
    "ban_do",
    "ho_so",
    "khach",
-   "kho_hang",
    "lien_he",
    "san_pham",
    "tong_quan"
@@ -11469,7 +11644,6 @@
    "du_bao",
    "ho_so",
    "khach",
-   "kho_hang",
    "lien_he",
    "san_pham",
    "tong_quan"
@@ -11486,14 +11660,42 @@
    "tong_quan"
   ],
   "mart.san_pham_theo_thang": [
-   "kho_hang",
-   "san_pham",
-   "tong_quan"
+   "san_pham"
   ],
   "mart.so_cong_no_moi_nhat": [
    "cong_no",
    "ho_so",
    "tong_quan"
+  ],
+  "mart.sp_co_don": [
+   "san_pham"
+  ],
+  "mart.sp_don_gia_thang": [
+   "san_pham"
+  ],
+  "mart.sp_khach_gia": [
+   "san_pham"
+  ],
+  "mart.sp_khach_moi_thang": [
+   "san_pham"
+  ],
+  "mart.sp_khach_nen_chao": [
+   "san_pham"
+  ],
+  "mart.sp_mua_kem": [
+   "san_pham"
+  ],
+  "mart.sp_tap_trung_khach": [
+   "san_pham"
+  ],
+  "mart.sp_theo_nguoi": [
+   "san_pham"
+  ],
+  "mart.sp_theo_tinh": [
+   "san_pham"
+  ],
+  "mart.sp_theo_tuan": [
+   "san_pham"
   ],
   "mart.tai_nhan_vien": [
    "ban_do",
@@ -11503,6 +11705,7 @@
   ],
   "mart.tap_trung_khach": [
    "bao_cao",
+   "san_pham",
    "tong_quan"
   ],
   "mart.tap_trung_khoang": [

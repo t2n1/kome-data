@@ -44,6 +44,12 @@ RETURNS TABLE (thang text, pack_code text, so_luong numeric, doanh_thu numeric, 
 LANGUAGE sql STABLE AS $$
     -- Đơn giá thực = Σ DT thuần / Σ qty theo (tháng, quy cách) — TỶ SỐ CÁC TỔNG, không
     -- trung bình unit_price. Σ qty ≤ 0 (tháng toàn trả lại) -> NULL. 12 tháng lịch tới mốc.
+    -- Cửa sổ ở đây là 12 THÁNG LỊCH theo bucket tháng (date_trunc('month', mốc) - 11 tháng ->
+    -- mốc), KHÁC cửa sổ "12 tháng" = sales_date > hom_nay - 365 dùng ở phần lớn mart (san_pham_360,
+    -- sp_khach_gia…): một cửa sổ chia theo THÁNG TRÒN để vẽ 12 cột đều nhau trên biểu đồ, một
+    -- cửa sổ chia theo 365 NGÀY LIÊN TỤC để tính tổng trượt đúng nghĩa "12 tháng gần nhất". Đừng
+    -- "thống nhất" hai cách — chúng trả lời hai câu hỏi khác nhau (biểu đồ theo tháng vs. tổng
+    -- cửa sổ trượt).
     WITH m AS (SELECT hom_nay FROM mart.moc_thoi_gian)
     SELECT to_char(f.sales_date, 'YYYY-MM'), f.pack_code,
            sum(f.qty)::numeric, sum(f.amount - f.tax_amount)::numeric,
