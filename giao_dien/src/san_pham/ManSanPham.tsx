@@ -188,7 +188,8 @@ function Dong({ m, chon, onChon }: { m: MaHang; chon: boolean; onChon: () => voi
     <tr className={"sp-dong" + (chon ? " chon" : "")} onClick={e => { if (!(e.target as HTMLElement).closest("a")) onChon(); }}
       aria-selected={chon}>
       <td className="sp-ten"><a href={`/san-pham/${encodeURIComponent(m.ma)}`} className="ten-jp"
-        onClick={e => { e.preventDefault(); onChon(); }}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></td>
+        onClick={e => { e.preventDefault(); onChon(); }}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code>
+        {m.ngung_ban && <> · <span className="nhan-vien canh" title="Đã ngừng kinh doanh (※終売※) — chỉ còn bán nốt tồn, không đặt thêm">bán nốt tồn</span></>}</div></td>
       <td className="sp-nhom ten-jp" title={m.nganh}>{m.nganh}</td>
       <td><span className={"nhan-vien " + m.mau}>{m.nhan_trang_thai}</span></td>
       <td className="so">{m.ton == null ? <span className="nhat-chu" title="chưa rõ tồn — không có dòng nào trong 在庫一覧">—</span> : soLuong(m.ton)}</td>

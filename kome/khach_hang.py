@@ -686,6 +686,9 @@ def ho_so(conn, ma: str) -> HoSo | None:
                 -- 048: phí gửi / phí thu hộ có ty_suat gần 1 — không phải hàng để gợi ý.
                 -- 049: hàng tặng POSM cũng không.
                 AND NOT mart.khong_phai_hang(p.product_code, p.kind_code, p.food_category_name)
+                -- 050: hàng ※終売※ — kể cả còn tồn: gợi ý là chào mã MỚI cho khách,
+                -- không phải chào một mã đã ngừng kinh doanh.
+                AND NOT mart.la_ngung_ban(p.rank_code, p.product_name)
               ORDER BY t.ty_suat DESC
               LIMIT 8)
         ) u ORDER BY khoi, xep DESC

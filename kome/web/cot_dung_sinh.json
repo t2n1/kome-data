@@ -10,15 +10,29 @@
      "loai": "nap",
      "ly_do": "khoá của file",
      "ma": [
+      "kome/ban_khoang.py",
+      "kome/bao_cao.py",
+      "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
+      "kome/lien_he.py",
       "kome/san_pham.py"
      ],
      "man": [
+      "ban_do",
+      "bao_cao",
+      "ho_so",
+      "khach",
       "kho_hang",
+      "lien_he",
       "san_pham",
       "tong_quan"
      ],
      "view": [
+      "mart.ban_theo_san_pham",
+      "mart.khach_mat_hang",
+      "mart.khach_mat_hang_khoang",
+      "mart.ma_ngung_ban_an",
+      "mart.mat_hang_khoang",
       "mart.san_pham_360",
       "mart.ton_hien_tai",
       "mart.ton_theo_lo"
@@ -73,15 +87,29 @@
      "loai": "nap",
      "ly_do": "khoá của file",
      "ma": [
+      "kome/ban_khoang.py",
+      "kome/bao_cao.py",
+      "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
+      "kome/lien_he.py",
       "kome/san_pham.py"
      ],
      "man": [
+      "ban_do",
+      "bao_cao",
+      "ho_so",
+      "khach",
       "kho_hang",
+      "lien_he",
       "san_pham",
       "tong_quan"
      ],
      "view": [
+      "mart.ban_theo_san_pham",
+      "mart.khach_mat_hang",
+      "mart.khach_mat_hang_khoang",
+      "mart.ma_ngung_ban_an",
+      "mart.mat_hang_khoang",
       "mart.san_pham_360",
       "mart.ton_hien_tai",
       "mart.ton_theo_lo"
@@ -182,15 +210,29 @@
      "loai": "nap",
      "ly_do": "cột kiểm số lượng × đơn giá = tiền (cổng 3)",
      "ma": [
+      "kome/ban_khoang.py",
+      "kome/bao_cao.py",
+      "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
+      "kome/lien_he.py",
       "kome/san_pham.py"
      ],
      "man": [
+      "ban_do",
+      "bao_cao",
+      "ho_so",
+      "khach",
       "kho_hang",
+      "lien_he",
       "san_pham",
       "tong_quan"
      ],
      "view": [
+      "mart.ban_theo_san_pham",
+      "mart.khach_mat_hang",
+      "mart.khach_mat_hang_khoang",
+      "mart.ma_ngung_ban_an",
+      "mart.mat_hang_khoang",
       "mart.san_pham_360",
       "mart.ton_hien_tai",
       "mart.ton_theo_lo"
@@ -3788,6 +3830,7 @@
       "mart.khoang_cach_mua",
       "mart.ky_cung_ky",
       "mart.lan_mua",
+      "mart.ma_ngung_ban_an",
       "mart.mat_hang_khoang",
       "mart.moc_lui",
       "mart.moc_thoi_gian",
@@ -6906,6 +6949,7 @@
       "mart.ban_theo_san_pham",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_khoang",
+      "mart.ma_ngung_ban_an",
       "mart.mat_hang_khoang",
       "mart.nganh_khoang",
       "mart.nganh_ky_cung_ky",
@@ -6918,7 +6962,7 @@
      "he": "product_name",
      "ja": "商品名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_khoang và 2 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_khoang và 3 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -6943,6 +6987,7 @@
       "mart.ban_theo_san_pham",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_khoang",
+      "mart.ma_ngung_ban_an",
       "mart.mat_hang_khoang",
       "mart.san_pham_360"
      ]
@@ -7075,17 +7120,33 @@
      "he": "rank_code",
      "ja": "商品ランク（年間）コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/khoi_tong_quan.py, kome/san_pham.py",
+     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_khoang và 3 chỉ số khác",
      "ma": [
+      "kome/ban_khoang.py",
+      "kome/bao_cao.py",
+      "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
+      "kome/lien_he.py",
       "kome/san_pham.py"
      ],
      "man": [
+      "ban_do",
+      "bao_cao",
+      "ho_so",
+      "khach",
       "kho_hang",
+      "lien_he",
       "san_pham",
       "tong_quan"
      ],
-     "view": []
+     "view": [
+      "mart.ban_theo_san_pham",
+      "mart.khach_mat_hang",
+      "mart.khach_mat_hang_khoang",
+      "mart.ma_ngung_ban_an",
+      "mart.mat_hang_khoang",
+      "mart.san_pham_360"
+     ]
     },
     {
      "core": "core.dim_product.rank_name",
@@ -10027,6 +10088,7 @@
       "mart.khoang_cach_mua",
       "mart.ky_cung_ky",
       "mart.lan_mua",
+      "mart.ma_ngung_ban_an",
       "mart.mat_hang_khoang",
       "mart.moc_lui",
       "mart.moc_thoi_gian",
@@ -11313,6 +11375,16 @@
    "san_pham",
    "tong_quan"
   ],
+  "mart.ma_ngung_ban_an": [
+   "ban_do",
+   "bao_cao",
+   "ho_so",
+   "khach",
+   "kho_hang",
+   "lien_he",
+   "san_pham",
+   "tong_quan"
+  ],
   "mart.mat_hang_khoang": [
    "bao_cao",
    "khach",
@@ -11466,7 +11538,12 @@
    "tong_quan"
   ],
   "mart.ton_hien_tai": [
+   "ban_do",
+   "bao_cao",
+   "ho_so",
+   "khach",
    "kho_hang",
+   "lien_he",
    "san_pham",
    "tong_quan"
   ],

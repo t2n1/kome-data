@@ -9,6 +9,7 @@ JSON thay vì chuyển hướng). Kết quả đi qua ảnh chụp theo phiên b
 from __future__ import annotations
 
 import hashlib
+import json
 import traceback
 from datetime import date
 from urllib.parse import urlencode
@@ -170,6 +171,10 @@ def du_lieu_kho_hang(c, kho: str = "", loc: str = "") -> dict:
                        "loai_han": {a: list(b) for a, b in SP.LOAI_HAN.items()},
                        "can_han_ngay": SP.CAN_HAN_NGAY})
 
+
+# 050: dấu của hồ sơ mã ※終売※ đã hết tồn (ảnh chụp lưu chuỗi JSON, nên cần một giá trị
+# không trùng hình dạng hồ sơ thật).
+NGUNG_BAN = "ngung_ban_het_ton"
 
 # Khoá ảnh chụp danh mục sản phẩm — `anh_chup.lam_nong` làm nóng đúng khoá này.
 KHOA_DANH_MUC = "san-pham/danh-muc"
@@ -554,7 +559,10 @@ def tao_api(open_app_conn) -> APIRouter:
 
         def tinh_(c):
             h = SP.ho_so(c, ma)
-            return None if h is None else thanh_json({"h": h, "quy_cach": SP.QUY_CACH})
+            if h is None:
+                # 050: hàng ※終売※ hết tồn không phân tích — nói rõ, không "không có mã".
+                return NGUNG_BAN if SP.la_ma_ngung_ban_an(c, ma) else None
+            return thanh_json({"h": h, "quy_cach": SP.QUY_CACH})
         try:
             with open_app_conn() as conn:
                 du_lieu, pb = anh_chup.lay(conn, _khoa("san-pham/ho-so", ma=ma, **ts.khoa()),
@@ -564,6 +572,8 @@ def tao_api(open_app_conn) -> APIRouter:
             return _loi("Không đọc được hồ sơ mã hàng.")
         if du_lieu == "null":
             return _loi(f"Không có mã hàng {ma}.", 404)
+        if du_lieu == json.dumps(NGUNG_BAN):
+            return _loi(f"Mã {ma} đã ngừng kinh doanh (※終売※) và hết tồn — không còn phân tích.", 404)
         return _json(request, du_lieu, pb)
 
     @r.get("/san-pham/{ma}/ngay")
