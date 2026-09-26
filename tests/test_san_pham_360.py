@@ -35,11 +35,22 @@ def test_ho_so_khong_qua_5_truy_van_va_khong_rong(conn, batch, monkeypatch):
 
 
 def test_ho_so_24_thang_co_cot_nam_truoc(conn, batch):
+    """`_gieo_mot_ma` chỉ mua trong 4 tuần gần đây, không có gì đúng 12 tháng
+    trước — nếu chỉ so `dt_nam_truoc == doanh_thu`, test PASS RỖNG (0 == 0).
+    Seed thêm một phiếu ở đúng tháng cách HOM_NAY 365 ngày (khách mới, không
+    đụng _gieo_mot_ma) để có giá trị THẬT cần so khớp."""
     _gieo_mot_ma(conn, batch)
+    ngay_nam_truoc = HOM_NAY - timedelta(days=365)
+    _ho_so_khach(conn, batch, "KQ02", "Khách năm trước")
+    _mua(conn, batch, "KQ02", ngay_nam_truoc, hang="Q1")
+    _neo(conn, batch)
+
     t = SP360.ho_so(conn, "Q1")["thang"]
+    assert t[-13]["thang"] == f"{ngay_nam_truoc:%Y-%m}", "seed sai tháng: không nằm đúng 12 tháng trước"
     assert len(t) == 24 and t[-1]["thang"] == f"{HOM_NAY:%Y-%m}"
     assert t[-1]["doanh_thu"] > 0
     assert t[-1]["dt_nam_truoc"] == t[-13]["doanh_thu"]
+    assert t[-1]["dt_nam_truoc"] > 0
 
 
 def test_mua_lai_TRUNG_TAP_voi_lich_mua_cua_ho_so_khach(conn, batch):
@@ -53,3 +64,62 @@ def test_mua_lai_TRUNG_TAP_voi_lich_mua_cua_ho_so_khach(conn, batch):
     co_q1 = any(m["ma"] == "Q1" for m in lich["ma"])
     assert ("KQ01" in ma_khach) == co_q1
     assert co_q1, "gieo hỏng: KQ01 mua 4 lần nhịp 7 ngày phải có ngày dự kiến"
+
+
+# ---------------------------------------------------------------------------
+# Bốn tab: tab_khach, tab_thoi_gian, tab_gia, tab_ban_them
+# ---------------------------------------------------------------------------
+
+def test_tab_khach_khong_qua_3_luot(conn, batch, monkeypatch):
+    _gieo_mot_ma(conn, batch)
+    dem = _dem_truy_van(conn, monkeypatch)
+    t = SP360.tab_khach(conn, "Q1")
+    assert t["tap_trung"] and len(t["tinh"]["o"]) == 47
+    assert [k["ma"] for k in t["dang_mua"]] == ["KQ01"]
+    assert dem["n"] <= 3, dem["n"]
+
+
+def test_tab_khach_tinh_bac_0_la_DUNG_BANG_0(conn, batch):
+    _gieo_mot_ma(conn, batch)
+    o = {x["ten"]: x for x in SP360.tab_khach(conn, "Q1")["tinh"]["o"]}
+    assert o["東京都"]["bac"] > 0 and o["和歌山県"]["bac"] == 0
+
+
+@pytest.mark.parametrize("ham, tran", [("tab_thoi_gian", 2), ("tab_gia", 2), ("tab_ban_them", 2)])
+def test_tab_con_lai_trong_tran(conn, batch, monkeypatch, ham, tran):
+    _gieo_mot_ma(conn, batch)
+    dem = _dem_truy_van(conn, monkeypatch)
+    t = getattr(SP360, ham)(conn, "Q1")
+    assert t, "đếm một hàm trả rỗng thì không đếm gì"
+    assert dem["n"] <= tran, f"{ham} chạy {dem['n']} lượt"
+
+
+def test_tab_thoi_gian_nhip_dem_cap_chua_du_rieng(conn, batch):
+    _gieo_mot_ma(conn, batch)
+    nhip = {x["nhom"]: x["so_cap"] for x in SP360.tab_thoi_gian(conn, "Q1")["nhip"]}
+    assert nhip.get("≤7") == 1          # KQ01 nhịp 7 ngày
+    assert nhip.get("chua_du") == 0     # khách neo 000000000999 mua XT07, không phải Q1
+
+
+@pytest.mark.parametrize("duoi, tran", [("khach", 3), ("thoi-gian", 2), ("gia", 2), ("ban-them", 2), ("", 5)])
+def test_ngan_sach_luot_hoi_api_360(conn, batch, test_db_url, monkeypatch, duoi, tran):
+    import psycopg
+    _gieo_mot_ma(conn, batch)
+    dem = {"n": 0}
+    that = psycopg.Connection.execute
+
+    def demo(self, *a, **k):
+        dem["n"] += 1
+        return that(self, *a, **k)
+    monkeypatch.setattr(psycopg.Connection, "execute", demo)
+    url = "/api/san-pham/Q1" + (f"/{duoi}" if duoi else "")
+    r = _khach_web(test_db_url).get(url)
+    assert r.status_code == 200, r.text
+    assert dem["n"] <= tran, f"{url} chạy {dem['n']} lượt, trần {tran}"
+
+
+def test_api_tab_ma_khong_co_tra_404(conn, batch, test_db_url):
+    _neo(conn, batch)
+    c = _khach_web(test_db_url)
+    for duoi in ("khach", "thoi-gian", "gia", "ban-them"):
+        assert c.get(f"/api/san-pham/KHONG-CO/{duoi}").status_code == 404, duoi

@@ -701,6 +701,7 @@ def test_ngan_sach_luot_hoi_tung_endpoint(conn, batch, test_db_url, monkeypatch,
 
 
 @pytest.mark.parametrize("url", ["/api/san-pham", "/api/san-pham/P1", "/api/san-pham/P1/ngay?thang=2026-07",
+                                 "/api/san-pham/P1/khach", "/api/san-pham/P1/gia",
                                  "/api/kho-hang"])
 def test_chua_dang_nhap_thi_401_json(test_db_url, monkeypatch, url):
     from fastapi.testclient import TestClient

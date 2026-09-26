@@ -39,6 +39,7 @@ def _thang_lui(t: str, n: int) -> str:
 
 def _ton_lo(conn, ma: str) -> list[dict]:
     """Tồn theo LÔ (042, bẫy #6), xếp theo thứ tự bán. 1 lượt hỏi."""
+    # `nhan_han`/`mau_han` là CHUỖI ở cả hai màn — xem ghi chú ở kho_hang::_dong.
     return [{"kho": t[0], "ten_kho": t[1], "so_luong": _so(t[2]),
              "gia_tri": int(t[3] or 0), "best_before": t[4], "loai_han": t[5],
              "nhan_han": LOAI_HAN.get(t[5], (t[5] or "—", "nhat"))[0],
@@ -46,7 +47,9 @@ def _ton_lo(conn, ma: str) -> list[dict]:
              "han_con_lai": t[6], "vai_tro_lo": t[7],
              "bat_dau_ban_sau": _so(t[8]), "ban_het_sau": _so(t[9]),
              "khong_kip_ban": t[10], "sap_chuyen_lo": t[11]}
-            for t in conn.execute(
+           # 042: đọc mart.ton_theo_lo (lô đang xuất / lô chờ — CLAUDE.md bẫy #6),
+           # xếp theo THỨ TỰ BÁN của các lô, không theo mã kho.
+           for t in conn.execute(
         """SELECT warehouse_code, ten_kho, so_luong, gia_tri, best_before,
                   loai_han, han_con_lai, vai_tro_lo, bat_dau_ban_sau,
                   ban_het_sau, khong_kip_ban, sap_chuyen_lo
@@ -153,7 +156,11 @@ def _khach_dang_ngung(conn, ma: str) -> tuple[list[dict], list[dict]]:
 
 def _bac_gia(conn, ma: str) -> list[dict]:
     """Giá theo bậc — dòng MỚI NHẤT mỗi (bậc, quy cách). 1 lượt hỏi. (Chuyển từ SP.ho_so cũ.)"""
-    # DISTINCT ON … ORDER BY valid_from DESC: fact_price_list giữ LỊCH SỬ giá.
+    # DISTINCT ON (price_level, pack_code) … ORDER BY valid_from DESC:
+    # core.fact_price_list giữ LỊCH SỬ giá — kome/loaders/price.py ghi một dòng
+    # MỚI mỗi lần nạp master. Không lọc thì sau ba lần nạp, một bậc giá hiện ba
+    # con số khác nhau dưới nhãn "giá đáng lẽ phải bán", trên đúng màn hình
+    # người ta nhìn TRƯỚC KHI báo giá cho khách.
     return [{"bac": g[0], "quy_cach": QUY_CACH.get(g[1], g[1]), "pack_code": g[1],
              "gia": int(g[2]), "tu_ngay": g[3]}
             for g in conn.execute(
@@ -235,3 +242,115 @@ def ho_so(conn, ma: str) -> dict | None:
             "nen_chao": nen_chao, "nen_chao_tong": int(dem[7] or 0),
             "so_dang_mua": int(dem[4] or 0), "so_da_ngung": int(dem[6] or 0),
             "ngung_ban": sp.ngung_ban, "cach_tinh": CACH_TINH}
+
+
+def tab_khach(conn, ma: str) -> dict | None:
+    """Tab Khách hàng. 3 lượt: 1) tập trung + người phụ trách + mới/quay lại + tồn tại mã;
+    2) 47 tỉnh; 3) khách đang mua / đã ngừng."""
+    from kome import ban_do as BD
+    r = conn.execute("""
+        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+               (SELECT coalesce(json_agg(json_build_object('ma', customer_code, 'ten', ten,
+                        'doanh_thu', doanh_thu, 'ty_trong', ty_trong, 'luy_ke', luy_ke)), '[]')
+                  FROM mart.sp_tap_trung_khach(%s)),
+               (SELECT coalesce(json_agg(json_build_object('ma', salesperson_code, 'ten', ten,
+                        'doanh_thu', doanh_thu, 'lai_gop', lai_gop, 'so_khach', so_khach)), '[]')
+                  FROM mart.sp_theo_nguoi(%s)),
+               (SELECT coalesce(json_agg(json_build_object('thang', thang, 'moi', khach_moi,
+                        'quay_lai', khach_quay_lai) ORDER BY thang), '[]')
+                  FROM mart.sp_khach_moi_thang(%s))
+    """, (ma, ma, ma, ma)).fetchone()
+    if not r[0]:
+        return None
+    tap_trung = r[1]
+    tong = sum(x["doanh_thu"] or 0 for x in tap_trung)
+    top10 = (sum(x["doanh_thu"] or 0 for x in tap_trung[:10]) / tong) if tong else None
+
+    rows = conn.execute(
+        """SELECT ma_jis, ten, ten_ngan, vung, hang_luoi, cot_luoi, doanh_thu, so_khach
+             FROM mart.sp_theo_tinh(%s)""", (ma,)).fetchall()
+    bac = BD._tinh_bac([int(x[6]) for x in rows])
+    max_hang = max(x[4] for x in rows)
+    max_cot = max(x[5] for x in rows)
+    o = [{"ma_jis": x[0], "ten": x[1], "ten_ngan": x[2], "vung": x[3],
+          "x": (x[5] - 1) * (BD.O_RONG + BD.KHE), "y": (x[4] - 1) * (BD.O_CAO + BD.KHE),
+          "doanh_thu": int(x[6]), "so_khach": int(x[7]), "bac": b}
+         for x, b in zip(rows, bac)]
+    tinh = {"o": o, "o_rong": BD.O_RONG, "o_cao": BD.O_CAO,
+            "rong": max_cot * BD.O_RONG + (max_cot - 1) * BD.KHE,
+            "cao": max_hang * BD.O_CAO + (max_hang - 1) * BD.KHE,
+            "khong_ro": int(tong - sum(x["doanh_thu"] for x in o))}
+
+    dang_mua, da_ngung = _khach_dang_ngung(conn, ma)
+    return {"tap_trung": tap_trung, "top10_ty_trong": top10, "tinh": tinh,
+            "nguoi": r[2], "khach_moi": r[3], "dang_mua": dang_mua, "da_ngung": da_ngung}
+
+
+_NHOM_NHIP = (("≤7", 7), ("8–14", 14), ("15–30", 30), ("31–60", 60), (">60", None))
+
+
+def tab_thoi_gian(conn, ma: str) -> dict | None:
+    """Tab Thời gian. 2 lượt: 1) 26 tuần + tồn tại mã; 2) nhịp + cỡ đơn.
+    (Bán theo ngày vẫn là /ngay, 1 lượt riêng.)"""
+    r = conn.execute("""
+        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+               (SELECT coalesce(json_agg(json_build_object('tuan', tuan, 'so_luong', so_luong,
+                        'doanh_thu', doanh_thu) ORDER BY tuan), '[]') FROM mart.sp_theo_tuan(%s))
+    """, (ma, ma)).fetchone()
+    if not r[0]:
+        return None
+    r2 = conn.execute("""
+        SELECT (SELECT coalesce(json_agg(nhip_ngay), '[]')
+                  FROM mart.khach_mat_hang WHERE product_code = %s AND trang_thai_cap <> 'khong_goi'),
+               (SELECT coalesce(json_agg(json_build_object('pack_code', pack_code, 'nhom', nhom,
+                        'thu_tu', thu_tu, 'so_dong', so_dong, 'so_luong', so_luong)
+                        ORDER BY pack_code, thu_tu), '[]') FROM mart.sp_co_don(%s))
+    """, (ma, ma)).fetchone()
+    dem = {n: 0 for n, _ in _NHOM_NHIP} | {"chua_du": 0}
+    for v in r2[0]:
+        if v is None:
+            dem["chua_du"] += 1
+            continue
+        for n, tran in _NHOM_NHIP:
+            if tran is None or v <= tran:
+                dem[n] += 1
+                break
+    nhip = [{"nhom": n, "so_cap": c} for n, c in dem.items()]
+    co_don = [x | {"quy_cach": QUY_CACH.get(x["pack_code"], x["pack_code"])} for x in r2[1]]
+    return {"tuan": r[1], "nhip": nhip, "co_don": co_don}
+
+
+def tab_gia(conn, ma: str) -> dict | None:
+    """Tab Giá & lãi. 2 lượt: 1) đơn giá theo tháng + khách giá/biên + tồn tại mã; 2) bảng giá bậc."""
+    r = conn.execute("""
+        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+               (SELECT coalesce(json_agg(json_build_object('thang', thang, 'pack_code', pack_code,
+                        'so_luong', so_luong, 'doanh_thu', doanh_thu, 'don_gia', don_gia)
+                        ORDER BY thang, pack_code), '[]') FROM mart.sp_don_gia_thang(%s)),
+               (SELECT coalesce(json_agg(json_build_object('ma', customer_code, 'ten', ten,
+                        'pack_code', pack_code, 'so_lan', so_lan, 'so_luong', so_luong,
+                        'doanh_thu', doanh_thu, 'lai_gop', lai_gop, 'don_gia', don_gia, 'bien', bien)), '[]')
+                  FROM mart.sp_khach_gia(%s))
+    """, (ma, ma, ma)).fetchone()
+    if not r[0]:
+        return None
+    don_gia = [x | {"quy_cach": QUY_CACH.get(x["pack_code"], x["pack_code"])} for x in r[1]]
+    return {"don_gia": don_gia, "khach_gia": r[2], "bac_gia": _bac_gia(conn, ma)}
+
+
+def tab_ban_them(conn, ma: str) -> dict | None:
+    """Tab Tồn & bán thêm. 2 lượt: 1) mua kèm + khách nên chào + tồn tại mã; 2) tồn theo lô."""
+    # sp_mua_kem đọc hai lần -> CTE AS MATERIALIZED (bất biến CTE-trùng).
+    r = conn.execute("""
+        WITH k AS MATERIALIZED (SELECT * FROM mart.sp_mua_kem(%s))
+        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+               (SELECT coalesce(json_agg(json_build_object('ma', product_code, 'ten', ten_hang,
+                        'so_phieu', so_phieu, 'ty_le', ty_le) ORDER BY so_phieu DESC, product_code), '[]') FROM k),
+               (SELECT coalesce(max(tong_phieu), 0) FROM k),
+               (SELECT coalesce(json_agg(x), '[]') FROM (
+                    SELECT customer_code AS ma, ten, doanh_thu_nganh, so_ma_nganh, lan_cuoi
+                      FROM mart.sp_khach_nen_chao(%s) LIMIT 50) x)
+    """, (ma, ma, ma)).fetchone()
+    if not r[0]:
+        return None
+    return {"mua_kem": r[1], "tong_phieu": int(r[2]), "nen_chao": r[3], "ton": _ton_lo(conn, ma)}

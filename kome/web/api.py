@@ -588,6 +588,50 @@ def tao_api(open_app_conn) -> APIRouter:
                      lambda c: SP.ban_theo_ngay(c, ma, thang),
                      "Không đọc được lượng bán theo ngày.", chi_nap=True)
 
+    def _tab_sp(request: Request, ma: str, ten: str, thang: str, ky: str, tu: str, den: str):
+        """Một tab của Sản phẩm 360 — ảnh chụp riêng, tính đến MỐC của khoảng xem (040)."""
+        from kome import san_pham_360 as SP360
+        try:
+            ts = _ts(request, thang, ky, tu, den).chinh()
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        ham = {"khach": SP360.tab_khach, "thoi-gian": SP360.tab_thoi_gian,
+               "gia": SP360.tab_gia, "ban-them": SP360.tab_ban_them}[ten]
+
+        def tinh_(c):
+            t = ham(c, ma)
+            return None if t is None else thanh_json({"t": t, "cach_tinh": SP360.CACH_TINH})
+        try:
+            with open_app_conn() as conn:
+                du_lieu, pb = anh_chup.lay(conn, _khoa(f"san-pham/tab-{ten}", ma=ma, **ts.khoa()),
+                                           _voi_moc(ts, tinh_), chi_nap=True)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được dữ liệu tab này.")
+        if du_lieu == "null":
+            return _loi(f"Không có mã hàng {ma}.", 404)
+        return _json(request, du_lieu, pb)
+
+    @r.get("/san-pham/{ma}/khach")
+    def sp_tab_khach(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Khách hàng của Sản phẩm 360. ≤ 3 lượt hỏi."""
+        return _tab_sp(request, ma, "khach", thang, ky, tu, den)
+
+    @r.get("/san-pham/{ma}/thoi-gian")
+    def sp_tab_thoi_gian(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Thời gian của Sản phẩm 360. ≤ 2 lượt hỏi."""
+        return _tab_sp(request, ma, "thoi-gian", thang, ky, tu, den)
+
+    @r.get("/san-pham/{ma}/gia")
+    def sp_tab_gia(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Giá & lãi của Sản phẩm 360. ≤ 2 lượt hỏi."""
+        return _tab_sp(request, ma, "gia", thang, ky, tu, den)
+
+    @r.get("/san-pham/{ma}/ban-them")
+    def sp_tab_ban_them(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Tồn & bán thêm của Sản phẩm 360. ≤ 2 lượt hỏi."""
+        return _tab_sp(request, ma, "ban-them", thang, ky, tu, den)
+
     @r.get("/kho-hang")
     def kho_hang(request: Request, kho: str = "", loc: str = "",
                  thang: str = "", ky: str = "", tu: str = "", den: str = ""):
