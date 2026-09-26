@@ -41,6 +41,10 @@ describe("dongMuaLai", () => {
     expect(r.map(x => x.muc)).toEqual(["qua", "sap", "sap", "xa"]);
     expect(r.map(x => x.nhan)).toEqual(["quá 12 ngày", "hôm nay", "còn 7 ngày", "còn 20 ngày"]);
   });
+  it("đến hạn = đã quá HOẶC đúng hôm nay (con ≤ 0) — cùng ngưỡng '◎ Đề xuất' của Top 10", () => {
+    const r = dongMuaLai([lm("a", -1), lm("b", 0), lm("c", 1)]);
+    expect(r.map(x => x.den_han)).toEqual([true, true, false]);
+  });
   it("giữ thứ tự máy chủ gửi (lich đã sắp theo ngày)", () => {
     expect(dongMuaLai([lm("x", 3), lm("y", -1)]).map(d => d.ma)).toEqual(["x", "y"]);
   });

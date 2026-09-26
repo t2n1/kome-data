@@ -42,7 +42,7 @@ function MaMuaLai({ h }: { h: HoSoApi }) {
     dau: dauKichBan(h.khach.ten, h.khach.ma, h.khach.dien_thoai),
     ly_do: h.dien_giai || "Đang mua đều.",
     tieu_de_ma: "Mã đến ngày mua lại:",
-    ma: ds.filter(d => d.muc === "qua").map(d => ({ ten: d.ten, chi_tiet: d.nhan })),
+    ma: ds.filter(d => d.den_han).map(d => ({ ten: d.ten, chi_tiet: d.nhan })),
     cuoi: h.nhat_ky[0] ? { ngay: h.nhat_ky[0].ngay, noi_dung: h.nhat_ky[0].noi_dung } : null,
   });
   const chep = async () => {

@@ -25,12 +25,15 @@ export function cauNhip(ty_le: number | null): string {
   return "Im lặng ≥ 4× nhịp: đang mất khách.";
 }
 
-export type DongMuaLai = { ma: string; ten: string; con: number; muc: "qua" | "sap" | "xa"; nhan: string };
+export type DongMuaLai = { ma: string; ten: string; con: number; muc: "qua" | "sap" | "xa"; nhan: string;
+  den_han: boolean };
 
-/** Dòng của khối "Mã đến ngày mua lại" — đọc h.lich.ma (máy chủ đã tính `con`). */
+/** Dòng của khối "Mã đến ngày mua lại" — đọc h.lich.ma (máy chủ đã tính `con`).
+ *  `den_han` (con ≤ 0: đã quá hoặc đúng hôm nay) = mã vào kịch bản gọi — cùng ngưỡng
+ *  nhãn "◎ Đề xuất" của Top 10 (chủ DN chốt 2026-09-26). */
 export function dongMuaLai(lich: LichMa[]): DongMuaLai[] {
   return lich.map(x => ({
-    ma: x.ma, ten: x.ten, con: x.con,
+    ma: x.ma, ten: x.ten, con: x.con, den_han: x.con <= 0,
     muc: x.con < 0 ? "qua" : x.con <= 7 ? "sap" : "xa",
     nhan: x.con < 0 ? `quá ${-x.con} ngày` : x.con === 0 ? "hôm nay" : `còn ${x.con} ngày`,
   }));
