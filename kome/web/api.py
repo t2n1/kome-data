@@ -636,8 +636,8 @@ def tao_api(open_app_conn) -> APIRouter:
     @r.get("/san-pham/{ma}/nen-chao")
     def sp_nen_chao(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         """Khách nên chào mã này (≤ 50 + tổng) — cột trái "Việc với mã này" và tab Tồn & bán
-        thêm đọc CHUNG endpoint này. Tách khỏi `/san-pham/{ma}` vì `sp_khach_nen_chao` chậm
-        (~8,7 s đo thật): trang mở không chờ nó. 1 lượt hỏi."""
+        thêm đọc CHUNG endpoint này. Tách khỏi `/san-pham/{ma}` vì `sp_khach_nen_chao` là câu nặng nhất
+        (~0,3 s sau 054; trước đó 8,7 s): trang mở không chờ nó. 1 lượt hỏi."""
         return _tab_sp(request, ma, "nen-chao", thang, ky, tu, den)
 
     @r.get("/kho-hang")

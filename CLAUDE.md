@@ -217,7 +217,12 @@ thêm bản thứ hai. Cần nhãn của NHIỀU mã một lúc thì gọi `mart
 danh sách là HẰNG khi lập kế hoạch (tham số hay cột LATERAL = Postgres quét cả bảng bán): vì thế
 `mart.sp_khach_nen_chao` là PL/pgSQL dùng `EXECUTE format(%L)` — đo thật HAL04 8,7 s → ~0,3 s. Có test
 canh: `tests/test_mart_sp360.py::test_khach_mat_hang_cua_BANG_view_loc_theo_ma`,
-`::test_khach_nen_chao_054_GIONG_dinh_nghia_053`. **Migration 054 phải chạy TRƯỚC khi triển khai.**
+`::test_khach_nen_chao_054_GIONG_dinh_nghia_053`. Giá phải trả: THÊM CỘT vào một trong ba view nay phải
+`DROP VIEW` → `DROP FUNCTION …_cua` → tạo lại cả hai (chữ ký `RETURNS TABLE` không đổi được bằng
+`CREATE OR REPLACE`), và thân hàm SQL không được theo dõi phụ thuộc — xoá `ban_den_moc` /
+`dau_hieu_khach` / `ma_ngung_ban_an` sẽ không bị chặn mà chỉ nổ lúc chạy (cùng nếp các hàm `*_khoang`).
+`/lien-he` vẫn dùng LATERAL `= mã` trên view (≤ 3 mã mỗi khách, đã nhanh); cần nhiều mã thì dùng
+`khach_mat_hang_cua(danh sách)`. **Migration 054 phải chạy TRƯỚC khi triển khai.**
 
 **Bất biến (044, hạn trả):** `その都度請求` = trả trong **5 ngày làm việc sau ngày xuất
 hàng** (ngày phiếu), ngày làm việc = `mart.lich_kinh_doanh.la_ngay_kd` (chưa trừ ngày nghỉ

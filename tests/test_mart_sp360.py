@@ -326,7 +326,7 @@ def test_moc_D_cua_ham_sp_BANG_kho_chi_co_du_lieu_toi_D(conn, batch):
     for h, _, _ in HAM_SP:
         assert co_moc[h] == that[h], f"{h} lệch khi đặt mốc {D_LUI}"
     # Không pass rỗng: bốn hàm chính có dữ liệu, và dữ liệu sau D thật sự đổi kết quả.
-    for h in ("sp_tap_trung_khach", "sp_theo_tuan", "sp_don_gia_thang", "sp_mua_kem"):
+    for h in ("sp_tap_trung_khach", "sp_theo_tuan", "sp_don_gia_thang", "sp_mua_kem", "sp_khach_nen_chao"):
         assert co_moc[h], f"{h}: phải có dữ liệu để so"
         assert co_moc[h] != khong_moc[h], f"{h}: dữ liệu sau mốc phải làm kết quả khác"
 
@@ -396,7 +396,15 @@ def test_khach_nen_chao_054_GIONG_dinh_nghia_053(conn, batch):
     trực tiếp trên view (LATERAL từng mã). Chỉ đổi CÁCH đọc, không đổi định nghĩa."""
     _gieo_nhieu_cap(conn, batch)
     _sp_du(conn, batch, "Z4")          # mã đích: cùng ngành, chưa ai mua
-    moi = conn.execute("SELECT customer_code, so_ma_nganh, lan_cuoi FROM mart.sp_khach_nen_chao('Z4')").fetchall()
+    moi_du = conn.execute("SELECT * FROM mart.sp_khach_nen_chao('Z4')").fetchall()
+    moi = [(r[0], r[4], r[5]) for r in moi_du]
+    # Thứ tự: DT thuần NGÀNH 12 tháng giảm dần, hoà theo mã khách — tính lại thẳng từ bảng bán.
+    dt = dict(conn.execute("""SELECT customer_code, sum(amount - tax_amount) FROM mart.ban_den_moc
+                               WHERE product_code IN ('Z1', 'Z2', 'Z3')
+                                 AND sales_date > (SELECT hom_nay FROM mart.moc_thoi_gian) - 365
+                               GROUP BY 1""").fetchall())
+    assert [r[3] for r in moi_du] == [dt.get(r[0], 0) for r in moi_du]
+    assert [r[0] for r in moi_du] == sorted((r[0] for r in moi_du), key=lambda k: (-dt.get(k, 0), k))
     cu = conn.execute("""
         SELECT h.customer_code, count(*), max(h.lan_cuoi)
           FROM core.dim_product d

@@ -194,8 +194,8 @@ def ho_so(conn, ma: str) -> dict | None:
     tháng" cho cả /san-pham và /san-pham/{mã}, không tính lại ở trình duyệt
     từ 24 tháng LỊCH, thứ có thể lệch cửa sổ ngày thật);
     2) 24 tháng; 3) tồn theo lô; 4) cột trái: khách đến ngày mua lại + hai số đếm, gộp
-    MỘT câu. "Khách nên chào" KHÔNG ở đây: `mart.sp_khach_nen_chao` đo thật ~8,7 s trên CSDL
-    thật — nằm trên đường mở trang là cả trang chờ nó. Nó đi endpoint riêng
+    MỘT câu. "Khách nên chào" KHÔNG ở đây: `mart.sp_khach_nen_chao` là câu nặng nhất của trang (trước 054 đo thật
+    8,7 s; sau 054 ~0,3 s) — để trên đường mở trang là cả trang chờ nó. Nó đi endpoint riêng
     `/api/san-pham/{mã}/nen-chao` (`tab_nen_chao`), cột trái và tab Tồn & bán thêm đọc CHUNG
     một truy vấn TanStack.
     """
@@ -388,7 +388,7 @@ NEN_CHAO_TOI_DA = 50
 
 def tab_nen_chao(conn, ma: str) -> dict | None:
     """Khách nên chào mã này (`mart.sp_khach_nen_chao`) — endpoint riêng, KHÔNG trên đường mở
-    trang (hàm đo thật ~8,7 s). 1 lượt: tồn tại mã + ≤ 50 dòng + tổng số.
+    trang (câu nặng nhất: ~0,3 s sau 054, trước đó 8,7 s). 1 lượt: tồn tại mã + ≤ 50 dòng + tổng số.
 
     `c` vật hoá hàm (đọc hai lần: danh sách + đếm). Thứ tự: `json_agg(... ORDER BY ...)` trên
     một truy vấn con ĐÃ SẮP + LIMIT — LIMIT chọn đúng top-50, ORDER BY trong json_agg giữ thứ tự
