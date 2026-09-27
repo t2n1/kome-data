@@ -209,6 +209,16 @@ từng mua mã này, rỗng với mã ※終売※. "Khách đến ngày mua l�
 `tests/test_san_pham_360.py::test_mua_lai_TRUNG_TAP_voi_lich_mua_cua_ho_so_khach`). Có test canh:
 `tests/test_mart_sp360.py`. **Migration 051–053 phải chạy TRƯỚC khi triển khai.**
 
+**Bất biến (054, nhãn cặp khách–mã lọc theo danh sách mã — 2026-09-27):** `mart.khoang_cach_mat_hang`,
+`mart.nhip_mat_hang`, `mart.khach_mat_hang` nay là `SELECT * FROM mart.<tên>_cua(NULL)`; THÂN định
+nghĩa nằm trong ba hàm `…_cua(p_mas text[])` (`LANGUAGE sql STABLE`, gộp vào câu gọi; NULL = mọi mã,
+kế hoạch y như view cũ — đo thật cùng chi phí). **Sửa công thức nhịp / nhãn thì sửa trong HÀM**, không
+thêm bản thứ hai. Cần nhãn của NHIỀU mã một lúc thì gọi `mart.khach_mat_hang_cua(danh sách)` với
+danh sách là HẰNG khi lập kế hoạch (tham số hay cột LATERAL = Postgres quét cả bảng bán): vì thế
+`mart.sp_khach_nen_chao` là PL/pgSQL dùng `EXECUTE format(%L)` — đo thật HAL04 8,7 s → ~0,3 s. Có test
+canh: `tests/test_mart_sp360.py::test_khach_mat_hang_cua_BANG_view_loc_theo_ma`,
+`::test_khach_nen_chao_054_GIONG_dinh_nghia_053`. **Migration 054 phải chạy TRƯỚC khi triển khai.**
+
 **Bất biến (044, hạn trả):** `その都度請求` = trả trong **5 ngày làm việc sau ngày xuất
 hàng** (ngày phiếu), ngày làm việc = `mart.lich_kinh_doanh.la_ngay_kd` (chưa trừ ngày nghỉ
 riêng của công ty — cùng hạn chế đã ghi). Ba mẫu suy được hạn: `末締/翌月末日`,

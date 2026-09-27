@@ -347,3 +347,62 @@ def test_khach_nen_chao_RONG_voi_ma_khong_phai_hang_hoac_chua_phan_loai(conn, ba
     _neo(conn, batch)
     assert conn.execute("SELECT count(*) FROM mart.sp_khach_nen_chao('R3')").fetchone()[0] == 1
     assert conn.execute("SELECT count(*) FROM mart.sp_khach_nen_chao('R1')").fetchone()[0] == 0
+
+
+# ------------------------------------------------------------------ 054
+
+def _gieo_nhieu_cap(conn, batch):
+    """Ba khách × ba mã, nhịp khác nhau, có một khách ※廃業※ và một cặp đã ngừng — đủ để mọi nhánh
+    của trang_thai_cap ('mua' / 'ngung' / 'khong_goi') và nhip_ngay NULL đều có mặt."""
+    for ma in ("Z1", "Z2", "Z3"):
+        _sp_du(conn, batch, ma)
+    _ho_so_khach(conn, batch, "KZ01", "Quán đều")
+    _ho_so_khach(conn, batch, "KZ02", "Quán đã bỏ Z2")
+    _ho_so_khach(conn, batch, "KZ03", "※廃業※ Quán đóng")
+    for i in range(4):
+        _dong(conn, batch, "KZ01", HOM_NAY - timedelta(days=i * 7), "Z1")
+        _dong(conn, batch, "KZ01", HOM_NAY - timedelta(days=i * 10), "Z2")
+        _dong(conn, batch, "KZ02", HOM_NAY - timedelta(days=90 + i * 7), "Z2")
+        _dong(conn, batch, "KZ03", HOM_NAY - timedelta(days=i * 7), "Z3")
+    _dong(conn, batch, "KZ02", HOM_NAY - timedelta(days=3), "Z3")
+    _neo(conn, batch)
+
+
+def test_khach_mat_hang_cua_BANG_view_loc_theo_ma(conn, batch):
+    """[CRITICAL] 054: view chỉ còn là `…_cua(NULL)`, và hàm với danh sách mã phải trả ĐÚNG các dòng
+    của view cho những mã đó — lọc theo mã không được đổi cửa sổ LAG / nhịp của một cặp."""
+    _gieo_nhieu_cap(conn, batch)
+    view = conn.execute("""SELECT * FROM mart.khach_mat_hang
+                            WHERE product_code IN ('Z1', 'Z2') ORDER BY 1, 2""").fetchall()
+    ham = conn.execute("""SELECT * FROM mart.khach_mat_hang_cua(ARRAY['Z1', 'Z2']) ORDER BY 1, 2""").fetchall()
+    assert view and ham == view
+    nhan = {(r[0], r[1]): r[-1] for r in conn.execute("SELECT * FROM mart.khach_mat_hang_cua(NULL)")}
+    assert nhan[("KZ01", "Z1")] == "mua" and nhan[("KZ02", "Z2")] == "ngung" \
+        and nhan[("KZ03", "Z3")] == "khong_goi", "gieo hỏng: phải có đủ ba nhãn"
+    assert conn.execute("SELECT count(*) FROM mart.khach_mat_hang").fetchone()[0] == \
+        conn.execute("SELECT count(*) FROM mart.khach_mat_hang_cua(NULL)").fetchone()[0]
+
+
+def test_nhip_va_khoang_cach_cua_BANG_view_loc_theo_ma(conn, batch):
+    _gieo_nhieu_cap(conn, batch)
+    for v in ("nhip_mat_hang", "khoang_cach_mat_hang"):
+        view = conn.execute(f"SELECT * FROM mart.{v} WHERE product_code = 'Z2' ORDER BY 1, 2, 3").fetchall()
+        ham = conn.execute(f"SELECT * FROM mart.{v}_cua(ARRAY['Z2']) ORDER BY 1, 2, 3").fetchall()
+        assert view and ham == view, v
+
+
+def test_khach_nen_chao_054_GIONG_dinh_nghia_053(conn, batch):
+    """Cùng dữ liệu, kết quả của sp_khach_nen_chao (054, một lượt hàm) = định nghĩa 053 viết lại
+    trực tiếp trên view (LATERAL từng mã). Chỉ đổi CÁCH đọc, không đổi định nghĩa."""
+    _gieo_nhieu_cap(conn, batch)
+    _sp_du(conn, batch, "Z4")          # mã đích: cùng ngành, chưa ai mua
+    moi = conn.execute("SELECT customer_code, so_ma_nganh, lan_cuoi FROM mart.sp_khach_nen_chao('Z4')").fetchall()
+    cu = conn.execute("""
+        SELECT h.customer_code, count(*), max(h.lan_cuoi)
+          FROM core.dim_product d
+          CROSS JOIN LATERAL (SELECT x.customer_code, x.lan_cuoi FROM mart.khach_mat_hang x
+                               WHERE x.product_code = d.product_code AND x.trang_thai_cap = 'mua') h
+         WHERE d.product_code IN ('Z1', 'Z2', 'Z3')
+         GROUP BY h.customer_code""").fetchall()
+    assert moi and sorted(moi) == sorted(cu)
+    assert "KZ03" not in {r[0] for r in moi}, "khách ※廃業※ không bao giờ vào danh sách chào"

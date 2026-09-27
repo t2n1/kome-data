@@ -147,8 +147,16 @@ nhất trong `mart.san_pham_360`):
   `task-8-report.md`.
 - **Cách xử lý tạm (soát cuối 2026-09-27):** hàm KHÔNG đổi; nó ra khỏi đường mở trang (`ho_so`) và
   khỏi `tab_ban_them`, sang endpoint riêng `/nen-chao` (`tab_nen_chao`, 1 lượt). Trang mở không chờ
-  nó; chỉ khối "Khách nên chào" chờ. Sửa gốc (viết lại để không lặp LATERAL qua cả ngành) để dành
-  một migration sau.
+  nó; chỉ khối "Khách nên chào" chờ.
+- **Sửa gốc — migration 054 (2026-09-27):** thân ba view `khoang_cach_mat_hang` → `nhip_mat_hang` →
+  `khach_mat_hang` chuyển NGUYÊN VĂN vào ba hàm `…_cua(p_mas text[])` (thêm đúng một vị từ danh sách
+  mã ở chỗ đọc `ban_den_moc`); ba view còn `SELECT * FROM …_cua(NULL)` — một định nghĩa. Đo trên CSDL
+  thật (hàm tạm trong `pg_temp`, giao dịch huỷ): kết quả view cũ = hàm(NULL) = hàm(danh sách) ở cả
+  ba cách đọc (theo khách, theo mã, cả bảng); chi phí kế hoạch của view không đổi một đơn vị (theo
+  khách 1715,50..3203,20 cả hai). `sp_khach_nen_chao` viết lại bằng PL/pgSQL: tính danh sách mã
+  cùng ngành trước, rồi `EXECUTE format(%L)` để danh sách là HẰNG lúc lập kế hoạch (thuần SQL hay
+  `EXECUTE … USING` vẫn quét cả bảng bán: 1–2 s). Kết quả: **HAL04 8.736 ms → ~300 ms**
+  (0,3–0,5 s mọi mã đã thử, tính cả mạng). Endpoint `/nen-chao` giữ nguyên.
 
 ## 6. Lỗi và trạng thái rỗng
 
