@@ -186,3 +186,35 @@ def test_moi_spec_co_ma_phu_trach_deu_khai_do_rong_4():
         if "salesperson_code" in s.code_columns:
             assert s.code_width.get("salesperson_code") == 4, ten
     assert all(set(s.code_width) <= set(s.code_columns) for s in SPECS.values())
+
+
+# ---- Mã khách / mã hạng mất số 0 đầu (2026-09-27) ---------------------------
+# Cùng lô `得意先全情報_20260925` còn làm mất số 0 của CẢ mã khách (855/2.125 dòng:
+# `179` thay vì `000000000179`) lẫn mã hạng (`8` thay vì `0008`) — lô đó đẻ 902
+# "khách mới" giả và bỏ 857 khách thật đứng ở phiên bản cũ không có tên hạng.
+# Đo thật: mọi bản xuất OBC khác (得意先全情報 5/6, 13/8; dòng bán; 直送先) có mã
+# khách ĐÚNG 12 chữ số và mã hạng 4 — mã ngắn chỉ có trong chính lô hỏng.
+
+def test_ma_khach_va_ma_hang_o_so_duoc_them_so_0_ben_trai(tmp_path):
+    import pandas as pd
+    spec = SPECS["tokuisaki"]
+    cot = list(spec.columns)
+    rows = []
+    for ma, hang in ((179, 8), ("000000000106", "0004"), (9000000001, 999), ("202609240002", "")):
+        r = {c: "" for c in cot}
+        r.update({"得意先コード": ma, "得意先名": "X", "ランクコード": hang})
+        rows.append(r)
+    p = tmp_path / "得意先全情報_20260925.xlsx"
+    pd.DataFrame(rows, columns=cot).to_excel(p, sheet_name=spec.sheet, index=False)
+    doc = read(p, spec)
+    assert doc["customer_code"].tolist() == ["000000000179", "000000000106",
+                                             "009000000001", "202609240002"]
+    assert doc["rank_code"].tolist() == ["0008", "0004", "0999", ""]
+
+
+def test_moi_spec_co_ma_khach_deu_khai_do_rong_12():
+    for ten, s in SPECS.items():
+        for cot in ("customer_code", "billing_customer_code"):
+            if cot in s.code_columns:
+                assert s.code_width.get(cot) == 12, (ten, cot)
+    assert SPECS["tokuisaki"].code_width.get("rank_code") == 4

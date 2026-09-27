@@ -60,9 +60,10 @@ class FileSpec:
     so_cai_truc: str | None = None
     # Độ rộng CỐ ĐỊNH của cột mã: {cột: số ký tự}. Reader thêm số 0 bên trái cho
     # giá trị TOÀN CHỮ SỐ ngắn hơn — ô Excel kiểu SỐ đọc dtype=str ra "104" chứ
-    # không "0104" (bẫy #1; 40 khách của 得意先全情報_20260925). Chỉ khai cho mã có
-    # độ rộng thật sự cố định (mã phụ trách = 4); mã khách thì KHÔNG (có mã ngắn
-    # hợp lệ như '9996').
+    # không "0104" (bẫy #1; 得意先全情報_20260925). Chỉ khai cho mã có độ rộng thật
+    # sự cố định: mã phụ trách = 4, mã khách / bên nhận hoá đơn = 12, hạng khách = 4.
+    # (Bản trước ghi "mã khách có mã ngắn hợp lệ như '9996'" — SAI: mã ngắn đó chỉ
+    # có trong chính lô 25/9 đã mất số 0; mọi bản xuất khác đo thật đều 12 chữ số.)
     code_width: dict[str, int] = field(default_factory=dict)
 
 def load_specs(path: Path) -> dict[str, FileSpec]:
