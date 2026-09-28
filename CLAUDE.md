@@ -102,7 +102,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 ## Các trang của web app
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
-| `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối kéo thả / đổi cỡ / ẩn hiện, xem theo vai trò, chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu". Từ 2026-09-24 khối số bán hàng theo **khoảng xem** (`?thang=`/`?ky=`/`?tu=&den=`, mặc định tháng hiện tại) — xem bất biến "Khoảng xem" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api` |
+| `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối kéo thả / đổi cỡ / ẩn hiện, **nhiều bảng có tên mỗi người** (056, thanh tab; vai trò là mẫu khi tạo bảng), chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu". Từ 2026-09-24 khối số bán hàng theo **khoảng xem** (`?thang=`/`?ky=`/`?tu=&den=`, mặc định tháng hiện tại) — xem bất biến "Khoảng xem" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api`, `app.bang_tong_quan` |
 | `/khach-hang` | **React** (giai đoạn 2, bám Customer 360.dc.html) tab **Danh sách**: KPI · 8 phân khúc (gồm "mua đều, tháng này chưa", "có mua trong khoảng") · doanh thu + so sánh theo **khoảng xem** (`?thang=`…, sắp mặc định `dt_khoang`; nhãn tháng lọc bằng `?nhan_thang=`) · lọc tìm/hạng (nhiều)/phụ trách/tỉnh/trạng thái/nhãn tháng · bảng sắp xếp máy chủ 50/100/200 dòng · xuất CSV dòng đã chọn · 3 khối phân tích. `/api/khach-hang/ds` — một ảnh chụp danh bạ (`KH.danh_ba`) lọc bằng Python | `mart.khach_360`, `khach_nhom_viec`, `khach_thang_nay`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360° React**: hai cột (thiết kế lại 2026-09-26, đặc tả `2026-09-26-ho-so-khach-360-thiet-ke-lai-design.md`): cột trái dính "Việc với khách này" (lý do · **"Mã đến ngày mua lại"** — KHÁC "Nên chào" của `/lien-he` · chép kịch bản `khach/kich_ban.ts` · lần liên hệ trước + ghi nhanh · công nợ), cột phải 4 ô số + biểu đồ 12 tháng + 4 tab (Mặt hàng · Đơn hàng · Công nợ · Hồ sơ và nhật ký; `#tong_quan`/`#san_pham` cũ → Mặt hàng); Ảnh cửa hàng / Chat Facebook là khối "sắp có" (`KhoiSapCo`); ô tổng, mặt hàng và đơn hàng theo khoảng xem qua `/api/khach-hang/{mã}/khoang` (2 lượt, ngoài trần 8 của hồ sơ), biểu đồ 12 tháng bấm tháng xem mặt hàng, lưới 26 tuần, giỏ theo ngành, lịch mua dự kiến, ghi tiếp xúc (`POST /api/khach-hang/{mã}/tiep-xuc`, chỉ JSON). `/api/khach-hang/{mã}` (+ `/dong?tu=&den=`) | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `khach_thang_nay`, `lan_mua`, `dong_ban`, `ty_suat_mat_hang` |
 | `/lien-he` | **Cần liên hệ — React** (giai đoạn 3, bố cục CRM.dc.html; `/api/lien-he`) (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn · mua đều tháng này chưa — 036) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc ngay trên thẻ qua `POST /api/khach-hang/{mã}/tiep-xuc` (form cũ `POST /khach-hang/{mã}/tiep-xuc` vẫn còn). Ô chọn 担当者 (`?nv=`); mỗi cột một màu theo lý do (`.lh-m-<lý do>`, pha từ token); "Nên chào" ≤ 3 mã khách đã mua đều (`LH.goi_y_va_nhan_vien`, đọc `mart.khach_mat_hang`, LATERAL `= mã` — `= ANY` không đẩy xuống được qua `nhip_mat_hang`, đo thật 2 s → 0,1 s) + nút chép kịch bản gọi. KHÔNG in % chắc chắn. **4 truy vấn** | `mart.uu_tien_lien_he`, `mart.khach_thang_nay`, `mart.khach_mat_hang`, `app.nhat_ky_tiep_xuc` |
@@ -778,14 +778,27 @@ Có test canh: `tests/test_ve_phan_tich.py::test_ve_cay_o_bo_nganh_am_va_cong_do
 
 **Bất biến (034, bố cục Tổng quan):** mỗi người tự sắp khối, nhưng **cùng các
 khối và cùng con số** cho mọi người — bố cục là cách XẾP, không phải bộ lọc dữ liệu.
-Lưu ở `app.nguoi_dung.bo_cuc_tong_quan` (KHÔNG localStorage — máy chủ chèn sẵn vào
-`window.__KOME__`, không có khung hình giật), đọc cùng lượt hỏi của cổng đăng nhập (0
-truy vấn thêm). Mọi bố cục đi qua `kome/web/bo_cuc.py::chuan_hoa` lúc ghi và lúc đọc;
+Lưu trên máy chủ (KHÔNG localStorage — máy chủ chèn sẵn vào `window.__KOME__`, không có
+khung hình giật), đọc cùng lượt hỏi của cổng đăng nhập (0 truy vấn thêm) — từ 056 là
+`app.bang_tong_quan` (nhiều bảng mỗi người, xem bất biến 056), cột cũ
+`app.nguoi_dung.bo_cuc_tong_quan` ngừng dùng. Mọi bố cục đi qua `kome/web/bo_cuc.py::chuan_hoa` lúc ghi và lúc đọc;
 mã khối cũ của bản Jinja (`chi_so`, `can_han`…) đổi qua `MA_CU`. Danh mục 21 khối +
 6 nhóm + 4 vai trò là `bo_cuc.KHOI`/`NHOM`/`VAI_TRO` (chép `MODULES`/`VAI_TRO` của gói
 thiết kế) — giao diện ĐỌC danh mục đó, không tự chép. Mọi khối trong danh mục phải có
 hoặc một hàm trong `kome/khoi_tong_quan.py::KHOI`, hoặc một câu trong `CHUA_CO` (có
 test canh).
+
+**Bất biến (056, nhiều bảng Tổng quan — chủ DN chốt 2026-09-28):** mỗi người có NHIỀU bảng có tên
+(`app.bang_tong_quan`), RIÊNG từng người — không chia sẻ. Mọi quy tắc ở `kome/web/bang_tong_quan.py`
+(≤ 20 bảng, tên 1–40 ký tự không trùng theo `lower(btrim)`, không xoá bảng cuối); bảng người khác →
+**404**, y như không tồn tại. Danh sách bảng (kèm bố cục) đọc bằng truy vấn con `json_agg` trong câu
+cổng đăng nhập (`nguoi_dung._CHON`) — 0 lượt hỏi mới, `/` vẫn ≤ 9; `liet_ke` (Cài đặt) dùng `_CHON_GON`,
+KHÔNG đọc nó. Người chưa có dòng nào có bảng ẢO (`id` null), lưu lần đầu mới tạo "Bảng của tôi"
+(tạo bảng thứ hai cũng lưu bảng ảo trước — không để tab đầu biến mất). `bang_gan_nhat` CHỈ ghi khi chủ
+động chuyển tab / tạo bảng — mở `/` hay link `?bang=` không ghi gì. `?bang=` đi qua `giuKhoang()` như
+mọi bộ lọc trên URL. Vai trò (`bo_cuc.VAI_TRO`) là MẪU khi tạo bảng (`tu = vai:<mã>`), không còn là chip
+áp đè lên bảng đang xem. `POST /tong-quan/bo-cuc` chỉ còn là đường đời cho bản build cũ. Có test canh:
+`tests/test_bang_tong_quan.py`. **Migration 056 phải chạy TRƯỚC khi triển khai.**
 
 **Bất biến (giao diện React, 2026-09-23):** chủ doanh nghiệp đổi nguyên tắc "không
 JavaScript" — màn nào đã chuyển (`/` trước tiên) là ứng dụng React (`giao_dien/`,

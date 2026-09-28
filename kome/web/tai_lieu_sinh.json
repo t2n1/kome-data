@@ -2,6 +2,7 @@
  "bang": {
   "app": [
    "anh_chup_api",
+   "bang_tong_quan",
    "ngan_sach",
    "ngan_sach_cong_ty",
    "ngan_sach_nhat_ky",
@@ -92,6 +93,7 @@
  ],
  "chu_thich": {
   "app.anh_chup_api": "Bộ đệm kết quả API theo phiên bản dữ liệu (kome/web/anh_chup.py). Xoá sạch lúc nào cũng an toàn.",
+  "app.bang_tong_quan": "Bảng Tổng quan có tên của từng người (056). bo_cuc: [{id, rong 1-3, cao 1-4, an}], NULL = mặc định.",
   "app.ngan_sach": "Chỉ tiêu doanh thu do chủ DN đặt. KHÔNG có dòng = chưa đặt; muc_tieu = 0 = đã đặt và đặt bằng không. Hai thứ khác nhau và màn hình phải hiện khác nhau — cùng nếp mart.san_pham_360.ton.",
   "app.ngan_sach_cong_ty": "Ngân sách của CẢ CÔNG TY theo tháng, nhập thẳng — không phải tổng của app.ngan_sach. NULL = chưa đặt, 0 = đặt bằng không.",
   "app.nhat_ky_quyen": "Ai bật/tắt cờ quyền nào của ai, lúc nào. Chỉ thêm — không sửa, không xoá.",
