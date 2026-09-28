@@ -9,6 +9,8 @@ import { gio_tokyo, gon, ngay, ngay_ngan, pc, so, thang_nhan, thay_doi, yen } fr
 import { KD, TN } from "../khoi_dau";
 import { useNhanMoc, type KhoangMayChu } from "../khung/khoang";
 import { DongSoSanh, VachSoSanh } from "../chung/SoSanh";
+import { DongNoi, ONoi } from "../chung/ONoi";
+import { HangSo, MucSo, SoLon, ThanhChong } from "../chung/Hinh";
 
 const LUC = { ok: "var(--ok-vien)", canh: "var(--lien-ket)", do: "var(--do)", nhat: "var(--chu-mo)", nen: "var(--vien)" };
 const tenNguoi = (ten: string | null | undefined, ma: string) => ten || `(mã ${ma})`;
@@ -28,6 +30,7 @@ function TdSs({ nay, ss, nhan }: { nay: number | null | undefined; ss: number | 
 /** Tháng 'YYYY-MM' có nằm trong khoảng xem không (tô đậm cột). */
 const trongKhoang = (kx: KhoangMayChu | null | undefined, thang: string) =>
   !!kx && thang >= kx.tu.slice(0, 7) && thang <= kx.den.slice(0, 7);
+const NS_THEO_THANG = "Chỉ tiêu chỉ đặt theo tháng — chọn dạng Tháng hoặc Kỳ ở thanh KHOẢNG XEM để xem tiến độ.";
 
 // ---- Chỉ số hôm nay ---------------------------------------------------------
 type SoSanhKpi = { ma: string; nhan: string; co: boolean; tu: string; den: string; dt_ck: number | null; tang: number | null };
@@ -41,47 +44,52 @@ type Kpi = {
   khach: { can_goi: number; roi_bo: number };
 };
 
+/** Một ô của khối Chỉ số: nhãn · số lớn · (con: dòng kỳ so, đường nhỏ). Chi tiết trong ô nổi. */
+function OKpi({ href, nhan, gia, lop, chi_tiet, chua, children }: {
+  href?: string; nhan: string; gia: React.ReactNode; lop?: string; chi_tiet?: React.ReactNode; chua?: boolean; children?: React.ReactNode }) {
+  return (
+    <ONoi href={href} className={"o-kpi" + (chua ? " chua" : "")} noi_dung={<><strong>{nhan}</strong>{chi_tiet}</>}>
+      <div className="nhan">{nhan}</div><div className={"gia" + (lop ? " " + lop : "")}>{gia}</div>{children}
+    </ONoi>);
+}
+
 export function KhoiKpi() {
   const { data: d, isLoading, error } = useKhoi<Kpi>("kpi");
   const nm = useNhanMoc();
+  const ns = d?.ngan_sach;
   return (
     <Khoi tieu_de={`Chỉ số · ${d?.khoang?.nhan ?? "tháng này"}`} dang_tai={isLoading} loi={error?.message}
-      phu={d?.doanh_thu.tu_ngay ? `${ngay(d.doanh_thu.tu_ngay)} – ${ngay(d.doanh_thu.den_ngay)} · kho & khách: tính ${nm}` : undefined}>
+      cach_tinh={d?.doanh_thu.tu_ngay ? `Doanh thu ${ngay(d.doanh_thu.tu_ngay)} – ${ngay(d.doanh_thu.den_ngay)}. Kho và khách tính ${nm}.` : undefined}>
       {d && <div className="o-kpi-luoi">
-        <a className="o-kpi" href="/bao-cao">
-          <div className="nhan">Doanh thu · {d.khoang?.nhan ?? "tháng này"}</div>
-          <div className="gia">{yen(d.doanh_thu.gia_tri)}</div>
-          {d.doanh_thu.so_sanh.map(s => <DongSoSanh key={s.ma} nhan={s.nhan} co={s.co} nay={d.doanh_thu.gia_tri} ss={s.dt_ck} dinh_dang={gon} />)}
+        <OKpi href="/bao-cao" nhan="Doanh thu" gia={gon(d.doanh_thu.gia_tri)}
+          chi_tiet={<><DongNoi nhan={d.khoang?.nhan ?? "Tháng này"} gia={yen(d.doanh_thu.gia_tri)} />
+            {d.doanh_thu.so_sanh.map(s => <DongNoi key={s.ma} nhan={hoa(s.nhan)} gia={s.co ? yen(s.dt_ck) : "không có dữ liệu"} />)}</>}>
+          {d.doanh_thu.so_sanh.map(s => <DongSoSanh key={s.ma} nhan={s.nhan} co={s.co} nay={d.doanh_thu.gia_tri} ss={s.dt_ck} />)}
           <Spark gia_tri={d.doanh_thu.spark} so_sanh={d.doanh_thu.spark_ss} mau={(d.doanh_thu.tang ?? 0) >= 0 ? LUC.ok : LUC.do} />
-        </a>
-        <a className="o-kpi" href={KD.hien_ngan_sach ? "/ngan-sach" : "/bao-cao"}>
-          <div className="nhan">Tiến độ ngân sách {d.ngan_sach ? thang_nhan(d.ngan_sach.thang) : ""}</div>
-          {d.ngan_sach_chi_theo_thang ? <><div className="gia nhat-chu" style={{ fontSize: "1rem" }}>Chỉ theo tháng / kỳ</div>
-            <div className="dong-phu nhat-chu">chỉ tiêu đặt theo tháng — chọn dạng Tháng hoặc Kỳ</div></> : d.ngan_sach ? <>
-            <div className="gia">{pc(d.ngan_sach.tien_do)}</div>
-            <div className="dong-phu" style={{ color: mauTienDo(d.ngan_sach.tien_do, d.ngan_sach.moc) }}>
-              {d.ngan_sach.muc_tieu_den_hom_nay != null && d.ngan_sach.thuc_te < d.ngan_sach.muc_tieu_den_hom_nay
-                ? `thiếu ${gon(d.ngan_sach.muc_tieu_den_hom_nay - d.ngan_sach.thuc_te)} so mốc ${pc(d.ngan_sach.moc)}`
-                : `vượt mốc ${pc(d.ngan_sach.moc)}`}</div>
-            <Spark gia_tri={d.ngan_sach.spark} mau={mauTienDo(d.ngan_sach.tien_do, d.ngan_sach.moc)} />
-          </> : <><div className="gia nhat-chu" style={{ fontSize: "1rem" }}>Chưa đặt chỉ tiêu</div>
-            <div className="dong-phu nhat-chu">đặt ở màn Ngân sách</div></>}
-        </a>
+        </OKpi>
+        {d.ngan_sach_chi_theo_thang
+          ? <OKpi chua nhan="Ngân sách" gia="chỉ theo tháng" chi_tiet={<div className="o-noi-chu">{NS_THEO_THANG}</div>} />
+          : ns ? <OKpi href={KD.hien_ngan_sach ? "/ngan-sach" : "/bao-cao"} nhan={`Ngân sách ${thang_nhan(ns.thang)}`}
+              gia={<span style={{ color: mauTienDo(ns.tien_do, ns.moc) }}>{pc(ns.tien_do)}</span>}
+              chi_tiet={<><DongNoi nhan="Mốc hôm nay" gia={pc(ns.moc)} />
+                <DongNoi nhan={ns.muc_tieu_den_hom_nay != null && ns.thuc_te < ns.muc_tieu_den_hom_nay ? "Thiếu so mốc" : "Vượt mốc"}
+                  gia={ns.muc_tieu_den_hom_nay != null ? yen(Math.abs(ns.muc_tieu_den_hom_nay - ns.thuc_te)) : "—"} />
+                <DongNoi nhan="Đã bán" gia={yen(ns.thuc_te)} /><DongNoi nhan="Ngân sách" gia={yen(ns.muc_tieu)} /></>}>
+              <Spark gia_tri={ns.spark} mau={mauTienDo(ns.tien_do, ns.moc)} />
+            </OKpi>
+          : <OKpi href={KD.hien_ngan_sach ? "/ngan-sach" : undefined} chua nhan="Ngân sách" gia="chưa đặt"
+              chi_tiet={<div className="o-noi-chu">Chưa đặt chỉ tiêu tháng này — đặt ở màn Ngân sách.</div>} />}
         {TN.cong_no && <OKpiCongNo />}
-        <div className="o-kpi chua" title={KD.chua_co.dong_tien}>
-          <div className="nhan">Phải trả 7 ngày tới</div><div className="gia">chưa có dữ liệu</div>
-          <div className="dong-phu nhat-chu">cần sổ phải trả</div></div>
-        <a className="o-kpi" href="/kho-hang">
-          <div className="nhan">Kho cần xử lý · {nm}</div>
-          <div className="gia">{so(d.kho.het_hang + d.kho.can_han + d.kho.qua_han)}</div>
-          <div className={"dong-phu " + (d.kho.het_hang + d.kho.qua_han ? "giam" : "canh-chu")}>
-            {d.kho.het_hang} mã hết hàng · {d.kho.can_han} lô cận hạn · {d.kho.qua_han} lô quá hạn</div>
-        </a>
-        <a className="o-kpi" href="/lien-he?tat_ca=1">
-          <div className="nhan">Khách cần gọi · {nm}</div>
-          <div className="gia">{so(d.khach.can_goi + d.khach.roi_bo)}</div>
-          <div className="dong-phu canh-chu">{d.khach.can_goi} im lặng quá nhịp · {d.khach.roi_bo} đã rời bỏ</div>
-        </a>
+        <OKpi chua nhan="Phải trả 7 ngày" gia="chưa có" chi_tiet={<div className="o-noi-chu">{KD.chua_co.dong_tien ?? "Cần sổ phải trả."}</div>} />
+        <OKpi href="/kho-hang" nhan="Kho cần xử lý" gia={so(d.kho.het_hang + d.kho.can_han + d.kho.qua_han)}
+          lop={d.kho.het_hang + d.kho.qua_han ? "giam" : undefined}
+          chi_tiet={<><DongNoi mau={LUC.do} nhan="Mã hết hàng" gia={so(d.kho.het_hang)} />
+            <DongNoi mau={LUC.canh} nhan="Lô cận hạn" gia={so(d.kho.can_han)} />
+            <DongNoi mau={LUC.do} nhan="Lô quá hạn" gia={so(d.kho.qua_han)} />
+            <em>tính {nm}</em></>} />
+        <OKpi href="/lien-he?tat_ca=1" nhan="Khách cần gọi" gia={so(d.khach.can_goi + d.khach.roi_bo)}
+          chi_tiet={<><DongNoi mau={LUC.canh} nhan="Im lặng quá nhịp" gia={so(d.khach.can_goi)} />
+            <DongNoi mau={LUC.do} nhan="Đã rời bỏ" gia={so(d.khach.roi_bo)} /><em>tính {nm}</em></>} />
       </div>}
     </Khoi>
   );
@@ -98,34 +106,30 @@ const MAU_TUOI: Record<string, string> = { d30: LUC.ok, d60: LUC.canh, d90: LUC.
 /** Ô "Phải thu quá hạn" của khối Chỉ số — đọc chung ảnh chụp của khối Tuổi nợ. */
 function OKpiCongNo() {
   const { data: d, isLoading } = useKhoi<CongNo>("cong_no");
-  if (isLoading) return <div className="o-kpi"><div className="nhan">Phải thu quá hạn</div><div className="gia nhat-chu">…</div></div>;
-  if (!d) return (
-    <div className="o-kpi chua" title="Chưa nạp sổ 請求先元帳 nào."><div className="nhan">Phải thu quá hạn</div>
-      <div className="gia">chưa có dữ liệu</div><div className="dong-phu nhat-chu">chưa nạp sổ công nợ</div></div>);
+  if (isLoading) return <OKpi nhan="Phải thu quá hạn" gia="…" chua />;
+  if (!d) return <OKpi chua nhan="Phải thu quá hạn" gia="chưa có" chi_tiet={<div className="o-noi-chu">Chưa nạp sổ 請求先元帳 nào.</div>} />;
   return (
-    <a className="o-kpi" href="/cong-no?tab=qua_han">
-      <div className="nhan">Phải thu quá hạn</div><div className={"gia" + (d.tq.qua_han ? " giam" : "")}>{gon(d.tq.qua_han)}</div>
-      <div className="dong-phu nhat-chu">{d.tq.so_phieu_qua_han} phiếu · tổng phải thu {gon(d.tq.tong_phai_thu)} · đến {ngay_ngan(d.moc)}</div></a>);
+    <OKpi href="/cong-no?tab=qua_han" nhan="Phải thu quá hạn" gia={gon(d.tq.qua_han)} lop={d.tq.qua_han ? "giam" : undefined}
+      chi_tiet={<><DongNoi nhan="Phiếu quá hạn" gia={so(d.tq.so_phieu_qua_han)} />
+        <DongNoi nhan="Tổng phải thu" gia={yen(d.tq.tong_phai_thu)} /><em>đến {ngay(d.moc)}</em></>} />);
 }
 
 export function KhoiCongNo() {
   const { data: d, isLoading, error } = useKhoi<CongNo>("cong_no");
-  if (!isLoading && !error && !d) return <ChuaCoDuLieu tieu_de="Tuổi nợ phải thu" ly_do="Chưa nạp sổ 請求先元帳 nào — xuất từ OBC rồi nạp ở màn Kho dữ liệu." />;
-  const max = Math.max(1, ...(d?.tq.tuoi ?? []).map(t => t.tien));
+  if (!isLoading && !error && !d) return <ChuaCoDuLieu gon tieu_de="Tuổi nợ phải thu" ly_do="Chưa nạp sổ 請求先元帳 nào — xuất từ OBC rồi nạp ở màn Kho dữ liệu." />;
   return (
     <Khoi tieu_de="Tuổi nợ phải thu" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/cong-no" }}
-      phu={d ? `tổng ${yen(d.tq.tong_phai_thu)} · tính đến ${ngay(d.moc)}` : undefined}>
+      phu={d ? `đến ${ngay_ngan(d.moc)}` : undefined} cach_tinh={d?.cach_tinh}>
       {d && <>
-        <div className="tuoi-no">{d.tq.tuoi.map(t => (
-          <a key={t.nhom} className="tuoi-no-dong" href={`/cong-no?nhom=${t.nhom}`}>
-            <span className="nhat-chu">{t.nhan}</span>
-            <span className="tuoi-no-thanh"><i style={{ width: `${Math.max(2, t.tien / max * 100)}%`, background: MAU_TUOI[t.nhom] }} /></span>
-            <b className="so">{gon(t.tien)}</b></a>))}</div>
-        {d.lau_nhat.length > 0 && <><div className="tieu-muc">NỢ LÂU / QUÁ HẠN NHIỀU NHẤT</div>
-          <table className="bang"><tbody>{d.lau_nhat.map(x => (
-            <tr key={x.ma}><td className="ten-jp"><a href={`/cong-no?tim=${encodeURIComponent(x.ma)}`}>{x.ten}</a></td>
-              <td className="so">{yen(x.tien)}</td></tr>))}</tbody></table></>}
-        <p className="phu" style={{ fontSize: ".72rem" }}>{d.cach_tinh}</p>
+        <SoLon href="/cong-no?tab=qua_han" gia={gon(d.tq.qua_han)} lop={d.tq.qua_han ? "giam" : undefined} nhan="quá hạn"
+          chi_tiet={<><DongNoi nhan="Tổng phải thu" gia={yen(d.tq.tong_phai_thu)} />
+            <DongNoi nhan="Phiếu quá hạn" gia={so(d.tq.so_phieu_qua_han)} />
+            <DongNoi nhan="Bên nhận hoá đơn quá hạn" gia={so(d.tq.so_ben_qua_han)} />
+            {d.lau_nhat.length > 0 && <em>Nợ lâu / quá hạn nhiều nhất:</em>}
+            {d.lau_nhat.map(x => <DongNoi key={x.ma} nhan={<span className="ten-jp">{x.ten}</span>} gia={gon(x.tien)} />)}</>} />
+        <ThanhChong dinh_dang={gon} don_vi="Còn nợ"
+          khuc={d.tq.tuoi.map(t => ({ khoa: t.nhom, nhan: t.nhan, dem: t.tien, mau: MAU_TUOI[t.nhom] ?? LUC.nhat,
+            href: `/cong-no?nhom=${t.nhom}`, chi_tiet: <DongNoi nhan="Số phiếu" gia={so(t.dem)} /> }))} />
       </>}
     </Khoi>
   );
@@ -178,71 +182,70 @@ function DuongNganSach({ duong }: { duong: DuongNS }) {
         cao={180} mo_ta={`${ten} luỹ kế so với nhịp ngân sách`} chuoi={chuoi}
         vach={iDen >= 0 && iDen < ds.length - 1 ? { i: iDen, chu: "mốc" } : null}
         dinh_dang={v => yen(v)} dinh_dang_truc={v => gon(v)} />
-      {!coSS && duong.nhan_ss && <div className="phu">{hoa(duong.nhan_ss)}: không vẽ được đường luỹ kế để so (không có dữ liệu, hoặc kỳ so không cùng gốc tháng).</div>}
+      {!coSS && duong.nhan_ss && <div className="khoi-canh">{hoa(duong.nhan_ss)}: không vẽ được đường luỹ kế để so (không có dữ liệu, hoặc kỳ so không cùng gốc tháng).</div>}
     </div>
   );
 }
 
-const NS_THEO_THANG = "Chỉ tiêu chỉ đặt theo tháng — chọn dạng Tháng hoặc Kỳ ở thanh KHOẢNG XEM để xem tiến độ.";
-
 export function KhoiNganSach() {
   const { data: d, isLoading, error } = useKhoi<NganSach | null>("ns_thang");
-  if (d?.chi_theo_thang) return <ChuaCoDuLieu tieu_de="Tiến độ ngân sách" ly_do={NS_THEO_THANG} />;
+  if (d?.chi_theo_thang) return <ChuaCoDuLieu gon tieu_de="Tiến độ ngân sách" ly_do={NS_THEO_THANG} />;
   const nguoi = [...(d?.nguoi ?? [])].sort((a, b) => b.thuc_te - a.thuc_te);
   const maxNS = Math.max(1, ...nguoi.map(n => Math.max(n.muc_tieu ?? 0, n.thuc_te, n.dt_ss ?? 0)));
   const ssN = d?.so_sanh;
+  const vuot = !!d && d.muc_tieu_den_hom_nay != null && d.thuc_te >= d.muc_tieu_den_hom_nay;
   return (
-    <Khoi tieu_de={`Tiến độ ngân sách tháng ${d ? thang_nhan(d.thang).slice(1) : ""}`} dang_tai={isLoading} loi={error?.message}
-      nhan={d ? `Còn ${d.ngay_kd_con_lai} ngày làm việc` : undefined} lien_ket={{ href: "/bao-cao", chu: "Xem chi tiết" }}>
+    <Khoi tieu_de={`Ngân sách ${d ? thang_nhan(d.thang) : ""}`} dang_tai={isLoading} loi={error?.message}
+      nhan={d ? `Còn ${d.ngay_kd_con_lai} ngày làm việc` : undefined} lien_ket={{ href: "/bao-cao", chu: "Xem chi tiết" }}
+      phu={ssN?.co ? <>so {ssN.nhan}</> : undefined}
+      cach_tinh={d ? <>{d.co_ngan_sach ? `Vạch đen = mốc đáng lẽ đạt tới hôm nay (${pc(d.moc)}) — tính theo ngày làm việc, trừ ngày lễ.` : "Thanh = doanh thu thực tế của từng người phụ trách."}
+        {ssN?.co ? ` Vạch đứt = doanh thu ${ssN.nhan}.` : ""}</> : undefined}
+      canh_bao={d && !d.co_ngan_sach ? <>Chưa đặt chỉ tiêu tháng này.{KD.hien_ngan_sach && <> <a href="/ngan-sach">Đặt chỉ tiêu →</a></>}</>
+        : ssN && !ssN.co ? `${hoa(ssN.nhan)}: không có dữ liệu để so.` : undefined}>
       {d && <div className="ns-luoi">
         <div className="ns-so">
-          {d.co_ngan_sach ? <>
-            <div><div className="nhan">Tiến độ toàn công ty</div>
-              <div className="gia" style={{ color: mauTienDo(d.tien_do, d.moc) }}>{pc(d.tien_do)}</div>
-              <div className="phu">mốc hôm nay {pc(d.moc)}</div></div>
-            <div><div className="nhan">{d.muc_tieu_den_hom_nay != null && d.thuc_te >= d.muc_tieu_den_hom_nay ? "Vượt mốc" : "Thiếu so mốc"}</div>
-              <div className="gia" style={{ color: d.muc_tieu_den_hom_nay != null && d.thuc_te >= d.muc_tieu_den_hom_nay ? LUC.ok : LUC.do }}>
-                {yen(Math.abs((d.muc_tieu_den_hom_nay ?? 0) - d.thuc_te))}</div>
-              <div className="phu">trên ngân sách {yen(d.muc_tieu)}</div></div>
-            <div><div className="nhan">Cần bán mỗi ngày</div>
-              <div className="gia">{yen(d.can_ban_moi_ngay)}</div>
-              <div className="phu">{d.can_ban_moi_ngay != null && d.nhip_chuan ? `gấp ${(d.can_ban_moi_ngay / d.nhip_chuan).toFixed(2).replace(".", ",")}× nhịp chuẩn` : "tháng đã hết ngày làm việc"}</div></div>
-          </> : <>
-            <div><div className="nhan">Đã bán tháng này</div><div className="gia">{yen(d.thuc_te)}</div>
-              <div className="phu">{d.ngay_kd_da_qua}/{d.ngay_kd} ngày làm việc</div></div>
-            <div className="chua-co" style={{ padding: ".55rem .7rem" }}><p>Chưa đặt chỉ tiêu tháng này.</p>
-              {KD.hien_ngan_sach && <p><a href="/ngan-sach">Đặt chỉ tiêu →</a></p>}</div>
-          </>}
+          {d.co_ngan_sach
+            ? <SoLon gia={pc(d.tien_do)} mau={mauTienDo(d.tien_do, d.moc)} nhan="tiến độ công ty"
+                chi_tiet={<><DongNoi nhan="Mốc hôm nay" gia={pc(d.moc)} />
+                  <DongNoi nhan={vuot ? "Vượt mốc" : "Thiếu so mốc"} gia={yen(Math.abs((d.muc_tieu_den_hom_nay ?? 0) - d.thuc_te))} />
+                  <DongNoi nhan="Ngân sách" gia={yen(d.muc_tieu)} />
+                  <DongNoi nhan="Cần bán mỗi ngày" gia={yen(d.can_ban_moi_ngay)} />
+                  {d.can_ban_moi_ngay != null && d.nhip_chuan
+                    ? <DongNoi nhan="So nhịp chuẩn" gia={`${(d.can_ban_moi_ngay / d.nhip_chuan).toFixed(2).replace(".", ",")}×`} />
+                    : <em>tháng đã hết ngày làm việc</em>}</>} />
+            : <SoLon gia={gon(d.thuc_te)} nhan="đã bán tháng này"
+                chi_tiet={<DongNoi nhan="Ngày làm việc" gia={`${d.ngay_kd_da_qua}/${d.ngay_kd}`} />} />}
         </div>
         <div className="ns-thanh">
           {/* Ngân sách CHUNG của công ty đứng trước (doanh thu + lãi gộp, nhập thẳng — 041), rồi mới tới từng người. */}
           <div className="ns-cong-ty">
-            <div className="ns-nhom-nhan">Toàn công ty</div>
             {([["Doanh thu", d.thuc_te, d.muc_tieu, d.tien_do, d.moc, d.co_ngan_sach],
                ["Lãi gộp", d.thuc_te_lg, d.muc_tieu_lg, d.tien_do_lg, d.moc_lg, d.co_ngan_sach_lg]] as const).map(([ten, tt, mt, td, moc, co]) => (
-              <div key={ten}>
+              <ONoi key={ten} className="ns-khoi-dong" noi_dung={<><strong>{ten} · toàn công ty</strong>
+                <DongNoi nhan="Thực tế" gia={yen(tt)} /><DongNoi nhan="Ngân sách" gia={co ? yen(mt) : "chưa đặt"} />
+                {co && <DongNoi nhan="Mốc hôm nay" gia={pc(moc)} />}</>}>
                 <div className="ns-dong"><span>{ten}</span>
-                  <span className="so-nhat">{yen(tt)}{co ? ` / ${yen(mt)}` : " · chưa đặt ngân sách"}</span>
-                  {co && <b style={{ color: mauTienDo(td, moc) }}>{pc(td)}</b>}</div>
+                  {co ? <b style={{ color: mauTienDo(td, moc) }}>{pc(td)}</b> : <em className="nhat-chu">chưa đặt</em>}</div>
                 {co && <ThanhMoc ty_le={td} moc={moc} mau={mauTienDo(td, moc)} />}
-              </div>))}
+              </ONoi>))}
           </div>
-          {nguoi.length > 0 && <div className="ns-nhom-nhan">Từng người phụ trách</div>}
           {nguoi.map(n => (
-            <div key={n.ma}>
+            <ONoi key={n.ma} className="ns-khoi-dong" noi_dung={<><strong>{tenNguoi(n.ten, n.ma)}</strong>
+              <DongNoi nhan="Doanh thu" gia={yen(n.thuc_te)} />
+              <DongNoi nhan="Chỉ tiêu" gia={n.muc_tieu ? yen(n.muc_tieu) : "chưa có"} />
+              {n.muc_tieu_den_hom_nay != null && <DongNoi nhan="Mốc hôm nay" gia={yen(n.muc_tieu_den_hom_nay)} />}
+              {n.muc_tieu_lg != null && <DongNoi nhan="Lãi gộp" gia={pc(n.tien_do_lg)} />}
+              {ssN?.co && <DongNoi nhan={hoa(ssN.nhan)} gia={yen(n.dt_ss)} />}</>}>
               <div className="ns-dong"><span>{tenNguoi(n.ten, n.ma)}</span>
-                {n.muc_tieu_lg != null && <span className="so-nhat">lãi gộp {pc(n.tien_do_lg)}</span>}
                 {ssN && <TdSs nay={n.thuc_te} ss={n.dt_ss} nhan={ssN.nhan} />}
-                <b style={{ color: mauTienDo(n.tien_do, d.moc) }}>{n.muc_tieu ? pc(n.tien_do) : yen(n.thuc_te)}</b></div>
+                <b style={{ color: mauTienDo(n.tien_do, d.moc) }}>{n.muc_tieu ? pc(n.tien_do) : gon(n.thuc_te)}</b></div>
               <div className="ns-ba-lop">
                 <div className="lop-ns" style={{ width: `${(n.muc_tieu ?? 0) / maxNS * 100}%` }} />
                 <div className="lop-tt" style={{ width: `${Math.min(n.thuc_te / maxNS, 1) * 100}%`, background: n.muc_tieu ? mauTienDo(n.tien_do, d.moc) : LUC.nhat }} />
                 {n.muc_tieu_den_hom_nay != null && <div className="lop-moc" style={{ left: `${n.muc_tieu_den_hom_nay / maxNS * 100}%` }} />}
                 {ssN && <VachSoSanh ty_le={n.dt_ss != null ? n.dt_ss / maxNS : null} nhan={`${hoa(ssN.nhan)}: ${yen(n.dt_ss)}`} />}
               </div>
-            </div>))}
-          <div className="phu">{d.co_ngan_sach ? `Vạch đen = mốc đáng lẽ đạt tới hôm nay (${pc(d.moc)}) — tính theo ngày làm việc, trừ ngày lễ.` : "Thanh = doanh thu thực tế của từng người phụ trách."}
-            {ssN && (ssN.co ? ` Vạch đứt = doanh thu ${ssN.nhan}.` : ` ${hoa(ssN.nhan)}: không có dữ liệu để so.`)}</div>
+            </ONoi>))}
         </div>
       </div>}
       {d?.duong && <DuongNganSach duong={d.duong} />}
@@ -302,42 +305,34 @@ export function KhoiTheoThang() {
     { ten: "Ngân sách tháng", kieu: "duong", gia_tri: t.map(x => x.ngan_sach), mau: "var(--lien-ket)" },
   ];
   return (
-    <Khoi tieu_de="Kết quả theo từng tháng" phu={d?.company_fy ? `cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}) · cột đậm = thuộc khoảng xem` : undefined}
-      dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/bao-cao", chu: "Xem báo cáo tháng" }}>
+    <Khoi tieu_de="Theo từng tháng" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/bao-cao", chu: "Báo cáo" }}
+      phu={ss ? <>so {ss.nhan}</> : undefined}
+      cach_tinh={d?.company_fy ? `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}). Cột đậm = thuộc khoảng xem; cột viền đứt = ${ss?.nhan ?? "kỳ so"}; đường = ngân sách tháng.` : undefined}
+      canh_bao={!d ? undefined
+        : ss && ss.co && ss.lech_thang == null ? "Kỳ so không lệch tròn tháng — không so theo tháng được."
+        : ss && !ck ? `${hoa(ss.nhan)}: không có dữ liệu để so.`
+        : thangNay && t.some(x => x.thang === thangNay)
+          ? (d.cat_cung_ngay ? `Tháng đang chạy chưa đủ ngày — %NS chưa so ngang được; cột ma của tháng này đã cắt cùng dải ngày ở ${ss?.nhan}.`
+            : "Tháng đang chạy chưa đủ ngày — %NS và phép so của tháng này chưa so ngang được.")
+          : undefined}>
       {d && <>
-        <div className="so-khoi o-vien">
-          <div><div className="nhan">Luỹ kế {t.length ? `${thang_nhan(t[0].thang)} – ${thang_nhan(t[t.length - 1].thang)}` : ""}</div>
-            <div className="gia">{gon(tong)}</div><div className="phu">{t.length} tháng có dữ liệu</div></div>
-          <div><div className="nhan">So {ss?.nhan ?? "kỳ so"} ({coCK.length} tháng đối chiếu)</div>
-            <div className={"gia " + (dtCK >= ck ? "tang" : "giam")}>{ck ? thay_doi(dtCK / ck - 1) : "—"}</div>
-            <div className="phu">{ck ? `chênh ${gon(dtCK - ck)}` : ss && ss.co && ss.lech_thang == null ? "kỳ so không lệch tròn tháng — không so theo tháng được" : "không có dữ liệu để so"}</div></div>
-          <div><div className="nhan">Tháng đạt ngân sách</div>
-            <div className="gia">{coNS.length ? `${dat}/${coNS.length}` : "—"}</div>
-            <div className="phu">{coNS.length ? "tháng đã khép lại" : "chưa đặt chỉ tiêu tháng nào"}</div></div>
-          <div><div className="nhan">Tháng cao nhất</div><div className="gia">{cao ? thang_nhan(cao.thang) : "—"}</div>
-            <div className="phu">{cao ? `${gon(cao.doanh_thu)} · biên gộp ${pc(cao.ty_suat)}` : ""}</div></div>
-        </div>
-        <div className="hai-cot-tt">
-          <BieuDo nhan={t.map(x => thang_nhan(x.thang))} chuoi={chuoi} cao={190} mo_ta={`Doanh thu từng tháng của kỳ so ngân sách và ${ss?.nhan ?? "kỳ so"}`}
-            dinh_dang={v => yen(v)} dinh_dang_truc={v => gon(v)}
-            vach={thangNay ? { i: t.findIndex(x => x.thang === thangNay), chu: "đang chạy" } : null} />
-          <div className="bang-cuon"><table className="bang">
-            <thead><tr><th>Tháng</th><th className="so">Doanh thu</th><th className="so">Ngân sách</th><th className="so">%NS</th>
-              <th className="so">So {ss?.nhan ?? "kỳ so"}</th><th className="so">Biên gộp</th><th className="so">Khách</th></tr></thead>
-            <tbody>{t.map(x => (
-              <tr key={x.thang} className={(x.thang === thangNay ? "dang-chay" : "") + (trongKhoang(kx, x.thang) ? " dang-xem" : "")}>
-                <td>{thang_nhan(x.thang)}{x.thang === thangNay && <em className="nhat-chu"> · đang chạy</em>}</td>
-                <td className="so">{gon(x.doanh_thu)}</td><td className="so">{gon(x.ngan_sach)}</td>
-                <td className={"so " + (x.ngan_sach ? (x.doanh_thu >= x.ngan_sach ? "tang" : "giam") : "")}>{x.ngan_sach ? pc(x.doanh_thu / x.ngan_sach, 0) : "—"}</td>
-                <td className={"so " + (x.cung_ky ? (x.doanh_thu >= x.cung_ky ? "tang" : "giam") : "")}>{x.cung_ky ? thay_doi(x.doanh_thu / x.cung_ky - 1) : "—"}</td>
-                <td className="so">{pc(x.ty_suat)}</td><td className="so">{so(x.so_khach)}</td>
-              </tr>))}</tbody>
-          </table>
-          {thangNay && t.some(x => x.thang === thangNay) && <div className="phu" style={{ marginTop: ".45rem" }}>
-            {d.cat_cung_ngay ? `Tháng đang chạy chưa đủ ngày — %NS chưa so ngang được; cột ma của tháng này đã cắt cùng dải ngày ở ${ss?.nhan}.`
-              : "Tháng đang chạy chưa đủ ngày — %NS và phép so của tháng này chưa so ngang được."}</div>}
-          </div>
-        </div>
+        <HangSo>
+          <MucSo nhan="Luỹ kế" gia={gon(tong)} chi_tiet={<DongNoi nhan="Tháng có dữ liệu"
+            gia={t.length ? `${t.length} (${thang_nhan(t[0].thang)} – ${thang_nhan(t[t.length - 1].thang)})` : "0"} />} />
+          <MucSo nhan={<>so {ss?.nhan ?? "kỳ so"}</>} gia={ck ? thay_doi(dtCK / ck - 1) : "—"} lop={ck ? (dtCK >= ck ? "tang" : "giam") : undefined}
+            chi_tiet={ck ? <><DongNoi nhan="Tháng đối chiếu" gia={so(coCK.length)} /><DongNoi nhan="Chênh" gia={gon(dtCK - ck)} /></> : undefined} />
+          <MucSo nhan="Đạt ngân sách" gia={coNS.length ? `${dat}/${coNS.length}` : "—"}
+            chi_tiet={<div className="o-noi-chu">{coNS.length ? "Số tháng đã khép lại đạt ngân sách." : "Chưa đặt chỉ tiêu tháng nào."}</div>} />
+          <MucSo nhan="Cao nhất" gia={cao ? thang_nhan(cao.thang) : "—"}
+            chi_tiet={cao ? <><DongNoi nhan="Doanh thu" gia={yen(cao.doanh_thu)} /><DongNoi nhan="Biên gộp" gia={pc(cao.ty_suat)} /></> : undefined} />
+        </HangSo>
+        <BieuDo nhan={t.map(x => thang_nhan(x.thang))} chuoi={chuoi} cao={200} mo_ta={`Doanh thu từng tháng của kỳ so ngân sách và ${ss?.nhan ?? "kỳ so"}`}
+          dinh_dang={v => yen(v)} dinh_dang_truc={v => gon(v)}
+          vach={thangNay ? { i: t.findIndex(x => x.thang === thangNay), chu: "đang chạy" } : null}
+          them_noi={i => { const x = t[i]; return x && <>
+            <div>%NS<b>{x.ngan_sach ? pc(x.doanh_thu / x.ngan_sach, 0) : "—"}</b></div>
+            <div>Biên gộp<b>{pc(x.ty_suat)}</b></div>
+            <div>Khách<b>{so(x.so_khach)}</b></div></>; }} />
       </>}
     </Khoi>
   );
@@ -357,14 +352,17 @@ export function KhoiXuHuong() {
   const coNgay = ds.filter(x => x[1] !== 0).length;
   const theoNgay = d?.kieu !== "thang";
   return (
-    <Khoi tieu_de={`Xu hướng doanh thu · ${kx?.nhan ?? ""}`} dang_tai={isLoading} loi={error?.message}
-      phu={ss ? (ss.co ? `${ds.length <= 40 ? "cột viền đứt" : "nét đứt"}: ${ss.nhan} (${ngay(ss.tu)} → ${ngay(ss.den)})${coCk ? "" : " · khác độ dài, chỉ so tổng"}` : `${hoa(ss.nhan)}: không có dữ liệu để so`) : undefined}>
+    <Khoi tieu_de={`Xu hướng · ${kx?.nhan ?? ""}`} dang_tai={isLoading} loi={error?.message}
+      phu={ss?.co ? <>so {ss.nhan}</> : undefined}
+      cach_tinh={ss?.co ? `${ds.length <= 40 ? "Cột viền đứt" : "Nét đứt"}: ${ss.nhan} (${ngay(ss.tu)} → ${ngay(ss.den)}).` : undefined}
+      canh_bao={ss && !ss.co ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : ss && !coCk ? "Kỳ so khác độ dài — chỉ so tổng." : undefined}>
       {d && <>
-        <div className="xh-so">
-          <div><div className="nhan">TỔNG {ds.length} {theoNgay ? "NGÀY" : "THÁNG"}</div><div className="gia">{gon(tong)}</div></div>
-          <div><div className="nhan">SO {ss ? ss.nhan.toUpperCase() : "—"}</div><div className={"gia " + (tong >= tongCk ? "tang" : "giam")}>{coCk && tongCk > 0 ? thay_doi(tong / tongCk - 1) : "—"}</div></div>
-          <div><div className="nhan">TRUNG BÌNH / {theoNgay ? "NGÀY CÓ BÁN" : "THÁNG"}</div><div className="gia">{gon(theoNgay ? (coNgay ? tong / coNgay : null) : (ds.length ? tong / ds.length : null))}</div></div>
-        </div>
+        <HangSo>
+          <MucSo nhan={`Tổng ${ds.length} ${theoNgay ? "ngày" : "tháng"}`} gia={gon(tong)} />
+          <MucSo nhan={<>so {ss?.nhan ?? "—"}</>} gia={coCk && tongCk > 0 ? thay_doi(tong / tongCk - 1) : "—"} lop={tong >= tongCk ? "tang" : "giam"}
+            chi_tiet={coCk ? <DongNoi nhan={hoa(ss?.nhan)} gia={yen(tongCk)} /> : undefined} />
+          <MucSo nhan={theoNgay ? "TB / ngày có bán" : "TB / tháng"} gia={gon(theoNgay ? (coNgay ? tong / coNgay : null) : (ds.length ? tong / ds.length : null))} />
+        </HangSo>
         <BieuDo nhan={ds.map(x => theoNgay ? ngay_ngan(x[0]) : thang_nhan(x[0]))} nhan_day_du={ds.map(x => theoNgay ? ngay(x[0]) : thang_nhan(x[0]))}
           cao={200} mo_ta={`Doanh thu ${kx?.nhan ?? ""} so ${ss?.nhan ?? ""}`}
           chuoi={[
