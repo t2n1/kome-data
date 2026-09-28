@@ -126,7 +126,7 @@ export function KhoiCongNo() {
             <DongNoi nhan="Phiếu quá hạn" gia={so(d.tq.so_phieu_qua_han)} />
             <DongNoi nhan="Bên nhận hoá đơn quá hạn" gia={so(d.tq.so_ben_qua_han)} />
             {d.lau_nhat.length > 0 && <em>Nợ lâu / quá hạn nhiều nhất:</em>}
-            {d.lau_nhat.map(x => <DongNoi key={x.ma} nhan={<span className="ten-jp">{x.ten}</span>} gia={gon(x.tien)} />)}</>} />
+            {d.lau_nhat.map(x => <DongNoi key={x.ma} nhan={<span className="ten-jp">{x.ten}</span>} gia={yen(x.tien)} />)}</>} />
         <ThanhChong dinh_dang={gon} don_vi="Còn nợ"
           khuc={d.tq.tuoi.map(t => ({ khoa: t.nhom, nhan: t.nhan, dem: t.tien, mau: MAU_TUOI[t.nhom] ?? LUC.nhat,
             href: `/cong-no?nhom=${t.nhom}`, chi_tiet: <DongNoi nhan="Số phiếu" gia={so(t.dem)} /> }))} />
@@ -214,7 +214,8 @@ export function KhoiNganSach() {
                     ? <DongNoi nhan="So nhịp chuẩn" gia={`${(d.can_ban_moi_ngay / d.nhip_chuan).toFixed(2).replace(".", ",")}×`} />
                     : <em>tháng đã hết ngày làm việc</em>}</>} />
             : <SoLon gia={gon(d.thuc_te)} nhan="đã bán tháng này"
-                chi_tiet={<DongNoi nhan="Ngày làm việc" gia={`${d.ngay_kd_da_qua}/${d.ngay_kd}`} />} />}
+                chi_tiet={<><DongNoi nhan="Đã bán" gia={yen(d.thuc_te)} />
+                  <DongNoi nhan="Ngày làm việc" gia={`${d.ngay_kd_da_qua}/${d.ngay_kd}`} /></>} />}
         </div>
         <div className="ns-thanh">
           {/* Ngân sách CHUNG của công ty đứng trước (doanh thu + lãi gộp, nhập thẳng — 041), rồi mới tới từng người. */}
