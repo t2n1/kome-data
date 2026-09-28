@@ -745,7 +745,9 @@ def can_xu_ly(conn, gioi_han: int = 100, sale: str | None = None) -> list[Khach]
     return [_khach(r) for r in conn.execute(
         f"""SELECT {_COT} FROM mart.khach_360
             WHERE trang_thai = ANY(%s) {dieu_kien}
-            ORDER BY doanh_thu_thuan DESC NULLS LAST LIMIT %s""",
+            -- customer_code phân định khi hoà doanh thu: thiếu nó thì thứ tự (và khách
+            -- nào lọt qua LIMIT) đổi giữa hai lần gọi — dem_va_can_xu_ly() phải khớp y hệt.
+            ORDER BY doanh_thu_thuan DESC NULLS LAST, customer_code LIMIT %s""",
         tham_so).fetchall()]
 
 
@@ -783,10 +785,10 @@ def dem_va_can_xu_ly(conn, gioi_han: int = 100,
              ),
              c AS (
                  SELECT * FROM k WHERE trang_thai = ANY(%s) {dieu_kien}
-                 ORDER BY doanh_thu_thuan DESC NULLS LAST LIMIT %s
+                 ORDER BY doanh_thu_thuan DESC NULLS LAST, customer_code LIMIT %s
              )
         SELECT d.dem, c.* FROM d LEFT JOIN c ON true
-        ORDER BY c.doanh_thu_thuan DESC NULLS LAST
+        ORDER BY c.doanh_thu_thuan DESC NULLS LAST, c.customer_code
     """, tham_so).fetchall()
 
     dem = rows[0][0] or {} if rows else {}
