@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { lay } from "../../api";
 import { BieuDo } from "../../chung/BieuDo";
 import { The } from "../../khach/HoSoTab";
-import { chuoiKhoang, useKhoang, voiKhoang } from "../../khung/khoang";
+import { chuoiKhoang, useKhoang, useKhoangMayChu, voiKhoang } from "../../khung/khoang";
 import { gon, ngay, so, so_luong as soLuong, thay_doi, yen } from "../../dinh_dang";
 import type { NgayApi } from "../kieu";
 import type { TabThoiGianApi } from "./kieu";
@@ -19,10 +19,16 @@ function BanTheoNgay({ ma, thangDau, dsThang, chuaTungBan }: { ma: string; thang
   const [thang, datThang] = useState(thangDau ?? dsThang[dsThang.length - 1] ?? "");
   useEffect(() => { if (thangDau) datThang(thangDau); }, [thangDau]);
   const [cs, datCs] = useState<ChiSo>("so_luong");
+  // Tháng so = lùi `lech_thang` của kỳ so đang bật (máy chủ — đặc tả 2026-09-28); không
+  // lệch tròn tháng / không có dữ liệu: `lech=` rỗng, không so. Chờ khoảng của máy chủ.
+  const kxm = useKhoangMayChu();
+  const s0 = kxm?.so_sanh[0];
+  const lech = s0 && s0.co && s0.lech_thang != null ? String(s0.lech_thang) : "";
   const { data, error, isFetching } = useQuery<NgayApi>({
-    queryKey: ["sp-ngay", ma, thang], enabled: !!thang, placeholderData: keepPreviousData,
-    queryFn: () => lay<NgayApi>(`/api/san-pham/${encodeURIComponent(ma)}/ngay?thang=${thang}`),
+    queryKey: ["sp-ngay", ma, thang, lech], enabled: !!thang && !!kxm, placeholderData: keepPreviousData,
+    queryFn: () => lay<NgayApi>(`/api/san-pham/${encodeURIComponent(ma)}/ngay?thang=${thang}&lech=${lech}`),
   });
+  const nhanSs = s0?.nhan ?? "kỳ so";
   if (chuaTungBan || !thang) return <section className="kh-the sp-ngay" id="sp-ngay"><div className="kh-the-dau"><h2>Lượng bán theo ngày</h2></div>
     <p className="trong-nho">Mã này chưa từng có dòng bán.</p></section>;
   const n = data?.nay ?? [], t = data?.truoc ?? [];
@@ -34,19 +40,21 @@ function BanTheoNgay({ ma, thangDau, dsThang, chuaTungBan }: { ma: string; thang
   const dinh = n.reduce<(typeof n)[number] | null>((a, d) => (!a || d[cs] > a[cs] ? d : a), null);
   const ngayCoBan = n.filter(d => d.so_luong !== 0).length;
   const fmt = (v: number | null) => v == null ? "—" : cs === "so_luong" ? soLuong(v) : yen(v);
-  const tmoi = +thang.slice(5), ttruoc = tmoi === 1 ? 12 : tmoi - 1;
+  const tmoi = +thang.slice(5);
+  const ts_ = data?.thang_so;          // tháng so của máy chủ ('YYYY-MM') — null: không so
+  const nhanTs = ts_ ? `${+ts_.slice(5)}/${ts_.slice(0, 4)}` : null;
   // Tháng bấm từ biểu đồ 24 tháng có thể là tháng KHÔNG bán (không nằm trong dsThang) — thêm nó
   // vào danh sách chọn để <select> hiện đúng và ‹ › vẫn đi được (iThang ≠ -1).
   const cacThang = dsThang.includes(thang) ? dsThang : [...dsThang, thang].sort();
   const iThang = cacThang.indexOf(thang);
-  // Cột nhạt = CÙNG NGÀY của tháng trước (ngày 31 không có ở tháng trước thì trống).
+  // Cột viền đứt = CÙNG NGÀY của tháng so (ngày 31 không có ở tháng so thì trống).
   const theoNgay = new Map(t.map(d => [+d.ngay.slice(8, 10), d]));
 
   return (
     <section className={"kh-the sp-ngay" + (isFetching ? " dang-tai" : "")} id="sp-ngay">
       <div className="kh-the-dau">
         <h2>Lượng bán theo ngày</h2>
-        <span className="phu">tháng {tmoi}/{thang.slice(0, 4)}{mocNgay ? ` · đến ngày ${mocNgay}` : ""} · cột nhạt là cùng ngày tháng {ttruoc}</span>
+        <span className="phu">tháng {tmoi}/{thang.slice(0, 4)}{mocNgay ? ` · đến ngày ${mocNgay}` : ""} · {nhanTs ? `cột viền đứt là cùng ngày tháng ${nhanTs} (${nhanSs})` : `${nhanSs}: không so theo tháng được`}</span>
         <span className="sp-thang-chon">
           <button type="button" className="nut-nho" disabled={iThang <= 0} onClick={() => datThang(cacThang[iThang - 1])} aria-label="Tháng trước">‹</button>
           <select value={thang} onChange={e => datThang(e.target.value)} aria-label="Chọn tháng">
@@ -59,9 +67,9 @@ function BanTheoNgay({ ma, thangDau, dsThang, chuaTungBan }: { ma: string; thang
       {error ? <div className="khoi-loi">{(error as Error).message}</div> : !data ? <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div> : <>
         <div className="so-khoi sp-ngay-o">
           <div><div className="nhan">{CHI_SO.find(c => c[0] === cs)![1]} tháng {tmoi}{mocNgay ? ` (1–${mocNgay})` : ""}</div><div className="gia">{fmt(nay)}</div></div>
-          <div><div className="nhan">So tháng {ttruoc} {mocNgay ? "cùng ngày" : "cả tháng"}</div>
+          <div><div className="nhan">So tháng {nhanTs ?? "—"} {mocNgay ? "cùng ngày" : "cả tháng"}</div>
             <div className={"gia " + (ss == null ? "nhat-chu" : ss >= 0 ? "tang" : "giam")}>{ss == null ? "—" : thay_doi(ss)}</div>
-            <div className="phu">tháng {ttruoc}: {fmt(truoc)}</div></div>
+            <div className="phu">{nhanTs ? `tháng ${nhanTs}: ${fmt(truoc)}` : "không có tháng so"}</div></div>
           <div><div className="nhan">Ngày bán nhiều nhất</div><div className="gia">{dinh && dinh[cs] ? fmt(dinh[cs]) : "—"}</div>
             <div className="phu">{dinh && dinh[cs] ? ngay(dinh.ngay) : "không có ngày nào có đơn"}</div></div>
           <div><div className="nhan">Số ngày có đơn</div><div className="gia">{so(ngayCoBan)}</div>
@@ -71,11 +79,11 @@ function BanTheoNgay({ ma, thangDau, dsThang, chuaTungBan }: { ma: string; thang
           nhan_day_du={n.map(d => `${ngay(d.ngay)}${d.la_ngay_kd ? "" : " · ngày nghỉ"}`)} cao={190} moi_nhan={n.length > 20 ? 2 : 1}
           mo_ta={`Lượng bán theo ngày của mã ${ma}, tháng ${tmoi}/${thang.slice(0, 4)}`}
           chuoi={[
-            { ten: `Tháng ${ttruoc} cùng ngày`, kieu: "cot_nen", mau: "var(--do-nen)",
-              gia_tri: n.map(d => theoNgay.get(+d.ngay.slice(8, 10))?.[cs] ?? null) },
-            { ten: `Tháng ${tmoi}`, kieu: "cot", mau: "var(--do)",
+            { ten: `Tháng ${tmoi}`, kieu: "cot", mau: "var(--do)", so_voi: nhanTs ? 1 : undefined,
               mau_tung_cot: n.map(d => d.la_ngay_kd ? null : "var(--chu-mo)"),
               gia_tri: n.map(d => mocNgay != null && +d.ngay.slice(8, 10) > mocNgay ? null : d[cs]) },
+            ...(nhanTs ? [{ ten: `Tháng ${nhanTs} cùng ngày`, kieu: "cot_ma" as const, mau: "var(--vien-dam)",
+              gia_tri: n.map(d => theoNgay.get(+d.ngay.slice(8, 10))?.[cs] ?? null) }] : []),
           ]}
           dinh_dang={v => fmt(v)} dinh_dang_truc={v => cs === "so_luong" ? soLuong(v, 0) : gon(v)}
           vach={mocNgay ? { i: mocNgay - 1, chu: "mốc dữ liệu" } : null} />
@@ -89,14 +97,19 @@ export function TabThoiGian({ ma, thang, dsThang, chuaTungBan }: { ma: string; t
   const kx = chuoiKhoang(useKhoang());
   const { data, error } = useQuery<TabThoiGianApi>({ queryKey: ["sp360-tg", ma, kx],
     queryFn: () => lay<TabThoiGianApi>(voiKhoang(`/api/san-pham/${encodeURIComponent(ma)}/thoi-gian`)) });
+  const nhanSsTab = useKhoangMayChu()?.so_sanh[0]?.nhan ?? "kỳ so";
   return (<>
     <BanTheoNgay ma={ma} thangDau={thang} dsThang={dsThang} chuaTungBan={chuaTungBan} />
     {error ? <div className="khoi-loi">Không tải được tab Thời gian: {(error as Error).message}</div> :
      !data ? <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div> : <>
-      <The tieu_de="26 tuần" cach_tinh={data.cach_tinh.tuan}>
+      <The tieu_de="26 tuần" cach_tinh={<>{data.cach_tinh.tuan}{data.t.tuan_ss.length
+          ? <> Cột viền đứt = cùng vị trí tuần, lùi {data.t.tuan_lui} tuần ({nhanSsTab}).</>
+          : <> {nhanSsTab}: không vẽ — cửa sổ lùi{data.t.tuan_lui ? ` ${data.t.tuan_lui} tuần` : ""} bắt đầu trước dữ liệu, hoặc không có kỳ so.</>}</>}>
         <BieuDo nhan={data.t.tuan.map(x => x.tuan.slice(5).split("-").reverse().join("/"))} cao={180} moi_nhan={2}
-          chuoi={[{ ten: "Số lượng", kieu: "cot", gia_tri: data.t.tuan.map(x => x.so_luong), mau: "var(--ok-vien)" },
-                  { ten: "Doanh thu", kieu: "duong", gia_tri: data.t.tuan.map(x => x.doanh_thu), mau: "var(--lien-ket)", truc_phai: true, an_mac_dinh: true }]}
+          chuoi={[{ ten: "Số lượng", kieu: "cot", gia_tri: data.t.tuan.map(x => x.so_luong), mau: "var(--ok-vien)", so_voi: data.t.tuan_ss.length ? 2 : undefined },
+                  { ten: "Doanh thu", kieu: "duong", gia_tri: data.t.tuan.map(x => x.doanh_thu), mau: "var(--lien-ket)", truc_phai: true, an_mac_dinh: true },
+                  ...(data.t.tuan_ss.length ? [{ ten: `Số lượng · lùi ${data.t.tuan_lui} tuần`, kieu: "cot_ma" as const,
+                    gia_tri: data.t.tuan_ss.map(x => x.so_luong), mau: "var(--vien-dam)" }] : [])]}
           dinh_dang={(v, c) => c.truc_phai ? yen(v) : soLuong(v)} dinh_dang_truc={v => soLuong(v, 0)}
           mo_ta="Số lượng bán theo tuần, 26 tuần gần nhất" />
       </The>

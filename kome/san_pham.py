@@ -696,7 +696,7 @@ def danh_muc(conn) -> dict:
             "trang_thai": {k: list(v) for k, v in TRANG_THAI_TON.items()}}
 
 
-def ban_theo_ngay(conn, ma: str, thang: str) -> dict:
+def ban_theo_ngay(conn, ma: str, thang: str, lech: int | None = 1) -> dict:
     """Bán theo NGÀY của một mã trong `thang` ('YYYY-MM') và tháng liền trước
     (cột nhạt "cùng kỳ tháng trước" của gói thiết kế) — MỘT lượt hỏi trên
     `mart.dong_ban`. Ngày không có dòng bán không có dòng ở đây; giao diện vẽ ô
@@ -704,32 +704,45 @@ def ban_theo_ngay(conn, ma: str, thang: str) -> dict:
     ngày nghỉ thì giao diện tô khác — xem `la_ngay_kd`).
 
     `la_ngay_kd` đọc `mart.lich_kinh_doanh` — định nghĩa "ngày làm việc" DUY
-    NHẤT của dự án (migration 031)."""
+    NHẤT của dự án (migration 031).
+
+    `lech` (đặc tả 2026-09-28): tháng so = lùi `lech` tháng — `so_sanh[0].lech_thang`
+    của khoảng xem (1 = tháng trước như cũ, 12 = cùng tháng năm trước). None = kỳ so
+    không lệch tròn tháng: không có tháng so (`truoc` rỗng)."""
     y, m = int(thang[:4]), int(thang[5:7])
     dau = date(y, m, 1)
-    truoc = date(y - 1, 12, 1) if m == 1 else date(y, m - 1, 1)
+    t = y * 12 + m - 1 - (lech or 0)
+    truoc = date(t // 12, t % 12 + 1, 1)
+    # Tháng so liền ngay trước tháng xem thì một dải liền; lùi xa hơn thì chỉ cần
+    # hai tháng rời — bỏ các tháng giữa bằng vị từ trên `n` / `b`.
+    cuoi_truoc = date(truoc.year + (truoc.month == 12), truoc.month % 12 + 1, 1)
     sau = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
     rows = conn.execute("""
         WITH n AS (
             SELECT l.ngay, l.la_ngay_kd FROM mart.lich_kinh_doanh l
-             WHERE l.ngay >= %s AND l.ngay < %s
+             WHERE (l.ngay >= %(dau)s AND l.ngay < %(sau)s)
+                OR (%(co)s AND l.ngay >= %(truoc)s AND l.ngay < %(cuoi_truoc)s)
         ), b AS (
             SELECT sales_date, sum(qty) AS sl, sum(doanh_thu_thuan) AS dt,
                    sum(gross_profit) AS lg, count(DISTINCT customer_code) AS kh
               FROM mart.dong_ban
-             WHERE product_code = %s AND sales_date >= %s AND sales_date < %s
+             WHERE product_code = %(ma)s
+               AND ((sales_date >= %(dau)s AND sales_date < %(sau)s)
+                    OR (%(co)s AND sales_date >= %(truoc)s AND sales_date < %(cuoi_truoc)s))
              GROUP BY 1
         )
         SELECT n.ngay, n.la_ngay_kd, b.sl, b.dt, b.lg, b.kh,
                (SELECT hom_nay FROM mart.moc_thoi_gian)
           FROM n LEFT JOIN b ON b.sales_date = n.ngay
          ORDER BY n.ngay
-    """, (truoc, sau, ma, truoc, sau)).fetchall()
+    """, {"dau": dau, "sau": sau, "truoc": truoc, "cuoi_truoc": cuoi_truoc, "ma": ma,
+          "co": lech is not None}).fetchall()
     hom_nay = rows[0][6] if rows else None
 
     def _ngay(r):
         return {"ngay": r[0], "la_ngay_kd": bool(r[1]), "so_luong": _so(r[2]) or 0.0,
                 "doanh_thu": int(r[3] or 0), "lai_gop": int(r[4] or 0), "so_khach": int(r[5] or 0)}
-    return {"thang": thang, "hom_nay": hom_nay,
+    return {"thang": thang, "hom_nay": hom_nay, "lech": lech,
+            "thang_so": f"{truoc:%Y-%m}" if lech is not None else None,
             "nay": [_ngay(r) for r in rows if r[0] >= dau],
             "truoc": [_ngay(r) for r in rows if r[0] < dau]}

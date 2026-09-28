@@ -4,6 +4,8 @@
 Chỉ số mới là hàm `mart.sp_*` (migration 051–053) — Python không định nghĩa chỉ số, chỉ hỏi
 và đổi hình dạng.
 """
+from datetime import date, timedelta
+
 from kome.san_pham import _COT, _so, _sp, LOAI_HAN, QUY_CACH
 
 # Một câu cách tính cho mỗi khối — màn in ngay dưới khối (nút "Cách tính").
@@ -269,10 +271,29 @@ def ho_so(conn, ma: str) -> dict | None:
             "dt_12t": dt_12t, "lg_12t": lg_12t, "bien_12t": _bien(lg_12t, dt_12t)}
 
 
-def tab_khach(conn, ma: str) -> dict | None:
-    """Tab Khách hàng. 3 lượt: 1) tập trung + người phụ trách + mới/quay lại + tồn tại mã;
+# Mặc định (không tham số khoảng xem nào) kỳ so là NĂM TRƯỚC: lùi 12 tháng / 52 tuần —
+# biết được theo CÚ PHÁP, không cần giải khoảng (giữ trần lượt hỏi của hai tab).
+LUI_MAC_DINH = (12, 52)
+
+
+def lui_cua(kx) -> tuple[int | None, int | None]:
+    """(số tháng, số tuần) cửa sổ KỲ SO lùi so với mốc (đặc tả 2026-09-28). Tháng =
+    `lech_thang` (None: không lệch tròn tháng). Tuần = số tuần gần nhất với độ lệch
+    ngày của kỳ so (năm trước = 52, tháng trước ≈ 4) — tuần ISO không khớp tháng nên
+    màn in số tuần đã lùi. Không có kỳ so / không có dữ liệu để so: (None, None)."""
+    s = kx.so_sanh[0] if kx is not None and kx.so_sanh else None
+    if s is None or not s.co:
+        return None, None
+    tuan = round((s.tu_nay - s.tu).days / 7)
+    return s.lech_thang, (tuan if tuan > 0 else None)
+
+
+def tab_khach(conn, ma: str, lui: tuple = (None, None)) -> dict | None:
+    """Tab Khách hàng. 3 lượt: 1) tập trung + người phụ trách + mới/quay lại (+ cùng
+    chỉ số ở cửa sổ KỲ SO, `mart.sp_khach_moi_thang_den` — 057) + tồn tại mã;
     2) 47 tỉnh; 3) khách đang mua / đã ngừng."""
     from kome import ban_do as BD
+    lui_thang = lui[0]
     r = conn.execute("""
         SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
                (SELECT coalesce(json_agg(json_build_object('ma', customer_code, 'ten', ten,
@@ -283,8 +304,17 @@ def tab_khach(conn, ma: str) -> dict | None:
                   FROM mart.sp_theo_nguoi(%s)),
                (SELECT coalesce(json_agg(json_build_object('thang', thang, 'moi', khach_moi,
                         'quay_lai', khach_quay_lai) ORDER BY thang), '[]')
-                  FROM mart.sp_khach_moi_thang(%s))
-    """, (ma, ma, ma, ma)).fetchone()
+                  FROM mart.sp_khach_moi_thang(%s)),
+               -- Cửa sổ 12 tháng của KỲ SO (057): tháng mốc lùi `lui_thang`; chỉ khi cả
+               -- cửa sổ nằm trong dải dữ liệu (tháng trước dữ liệu không phải "0 khách").
+               (SELECT coalesce(json_agg(json_build_object('thang', k.thang, 'moi', k.khach_moi,
+                        'quay_lai', k.khach_quay_lai) ORDER BY k.thang), '[]')
+                  FROM (SELECT (m.hom_nay - make_interval(months => %s::int))::date AS den
+                          FROM mart.moc_thoi_gian m WHERE %s::int IS NOT NULL) d
+                  CROSS JOIN LATERAL mart.sp_khach_moi_thang_den(%s, d.den) k
+                 WHERE date_trunc('month', d.den) - interval '11 months'
+                       >= date_trunc('month', (SELECT min(sales_date) FROM core.fact_sales_line)))
+    """, (ma, ma, ma, ma, lui_thang, lui_thang, ma)).fetchone()
     if not r[0]:
         return None
     tap_trung = r[1]
@@ -311,20 +341,32 @@ def tab_khach(conn, ma: str) -> dict | None:
 
     dang_mua, da_ngung = _khach_dang_ngung(conn, ma)
     return {"tap_trung": tap_trung, "top10_ty_trong": top10, "tinh": tinh,
-            "nguoi": nguoi, "khach_moi": r[3], "dang_mua": dang_mua, "da_ngung": da_ngung}
+            "nguoi": nguoi, "khach_moi": r[3], "dang_mua": dang_mua, "da_ngung": da_ngung,
+            # Cùng vị trí với `khach_moi` (12 tháng) — [] khi không so được.
+            "khach_moi_ss": r[4] or [], "lui_thang": lui_thang}
 
 
 _NHOM_NHIP = (("≤7", 7), ("8–14", 14), ("15–30", 30), ("31–60", 60), (">60", None))
 
 
-def tab_thoi_gian(conn, ma: str) -> dict | None:
-    """Tab Thời gian. 2 lượt: 1) 26 tuần + tồn tại mã; 2) nhịp + cỡ đơn.
-    (Bán theo ngày vẫn là /ngay, 1 lượt riêng.)"""
+def tab_thoi_gian(conn, ma: str, lui: tuple = (None, None)) -> dict | None:
+    """Tab Thời gian. 2 lượt: 1) 26 tuần (+ 26 tuần của KỲ SO, `mart.sp_theo_tuan_den` —
+    057) + tồn tại mã; 2) nhịp + cỡ đơn. (Bán theo ngày vẫn là /ngay, 1 lượt riêng.)"""
+    lui_tuan = lui[1]
     r = conn.execute("""
         SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
                (SELECT coalesce(json_agg(json_build_object('tuan', tuan, 'so_luong', so_luong,
-                        'doanh_thu', doanh_thu) ORDER BY tuan), '[]') FROM mart.sp_theo_tuan(%s))
-    """, (ma, ma)).fetchone()
+                        'doanh_thu', doanh_thu) ORDER BY tuan), '[]') FROM mart.sp_theo_tuan(%s)),
+               -- 26 tuần của KỲ SO (057): mốc lùi `lui_tuan` tuần; chỉ khi tuần đầu của cửa
+               -- sổ nằm trong dải dữ liệu.
+               (SELECT coalesce(json_agg(json_build_object('tuan', t.tuan, 'so_luong', t.so_luong,
+                        'doanh_thu', t.doanh_thu) ORDER BY t.tuan), '[]')
+                  FROM (SELECT m.hom_nay - 7 * %s::int AS den
+                          FROM mart.moc_thoi_gian m WHERE %s::int IS NOT NULL) d
+                  CROSS JOIN LATERAL mart.sp_theo_tuan_den(%s, d.den) t
+                 WHERE date_trunc('week', d.den)::date - 7 * 25
+                       >= date_trunc('week', (SELECT min(sales_date) FROM core.fact_sales_line))::date)
+    """, (ma, ma, lui_tuan, lui_tuan, ma)).fetchone()
     if not r[0]:
         return None
     r2 = conn.execute("""
@@ -346,7 +388,7 @@ def tab_thoi_gian(conn, ma: str) -> dict | None:
                 break
     nhip = [{"nhom": n, "so_cap": c} for n, c in dem.items()]
     co_don = [x | {"quy_cach": QUY_CACH.get(x["pack_code"], x["pack_code"])} for x in r2[1]]
-    return {"tuan": r[1], "nhip": nhip, "co_don": co_don}
+    return {"tuan": r[1], "nhip": nhip, "co_don": co_don, "tuan_ss": r[2] or [], "tuan_lui": lui_tuan}
 
 
 def tab_gia(conn, ma: str) -> dict | None:

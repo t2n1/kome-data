@@ -89,6 +89,9 @@ class O:
     # Khoảng xem (đợt B): doanh thu và số khách có phiếu trong khoảng.
     dt_khoang: int = 0
     khach_mua: int = 0
+    # Doanh thu KỲ SO (đặc tả 2026-09-28) cùng người phụ trách đang lọc. None = kỳ
+    # so không có dữ liệu (khác 0: tỉnh không bán ở kỳ so).
+    dt_khoang_ss: int | None = None
 
 
 @dataclass(frozen=True)
@@ -216,6 +219,11 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach", kx=None) -> Tra
     # Khoảng xem (đợt B): không có khoảng thì truyền NULL — mart.tinh_khoang
     # không trả dòng nào, hai cột theo khoảng bằng 0, câu lệnh vẫn MỘT hình dạng.
     dai = [kx.tu, kx.den] if kx is not None else [None, None]
+    # Kỳ so của khoảng: cùng hàm mart.tinh_khoang trên dải so, CHUNG hai câu dưới
+    # (không thêm lượt hỏi). Không có dữ liệu để so: NULL -> không dòng nào.
+    s = kx.so_sanh[0] if kx is not None and kx.so_sanh else None
+    co_ss = s is not None and s.co
+    dai_ss = [s.tu, s.den] if co_ss else [None, None]
 
     # Truy vấn A (1 lượt): 47 dòng đã LEFT JOIN sẵn từ core.dim_prefecture
     # sang số liệu.
@@ -240,15 +248,21 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach", kx=None) -> Tra
               FROM mart.tinh_khoang(%s, %s) s
              WHERE true {dk_sale}
              GROUP BY s.prefecture
+        ), ks AS MATERIALIZED (
+            SELECT s.prefecture, sum(s.dt) AS dt
+              FROM mart.tinh_khoang(%s, %s) s
+             WHERE true {dk_sale}
+             GROUP BY s.prefecture
         )
         SELECT p.ma_jis, p.ten, p.ten_latin, p.ten_ngan, p.vung, p.hang_luoi, p.cot_luoi,
                coalesce(t.so_khach, 0), coalesce(t.doanh_thu, 0), coalesce(t.can_goi, 0),
-               coalesce(kh.dt, 0), coalesce(kh.n, 0)
+               coalesce(kh.dt, 0), coalesce(kh.n, 0), coalesce(ks.dt, 0)
           FROM core.dim_prefecture p
           LEFT JOIN tinh t ON t.prefecture = p.ten
           LEFT JOIN kh ON kh.prefecture = p.ten
+          LEFT JOIN ks ON ks.prefecture = p.ten
          ORDER BY p.ma_jis
-    """, tham_so_sale + dai + tham_so_sale).fetchall()
+    """, tham_so_sale + dai + tham_so_sale + dai_ss + tham_so_sale).fetchall()
 
     # Truy vấn B (1 lượt): phần KHÔNG khớp tỉnh nào ("(không rõ tỉnh)") và
     # tổng toàn công ty (hoặc tổng của riêng `sale` nếu có lọc) — gộp bằng
@@ -271,29 +285,35 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach", kx=None) -> Tra
             SELECT * FROM mart.khach_theo_tinh s WHERE true {dk_sale}
         ), k AS MATERIALIZED (
             SELECT * FROM mart.tinh_khoang(%s, %s) s WHERE true {dk_sale}
+        ), ks AS MATERIALIZED (
+            SELECT * FROM mart.tinh_khoang(%s, %s) s WHERE true {dk_sale}
         )
         SELECT 'khong_ro'::text, coalesce(sum(so_khach),0), coalesce(sum(doanh_thu_12t),0), coalesce(sum(can_goi),0),
                (SELECT coalesce(sum(k.dt),0) FROM k
                  WHERE coalesce(k.prefecture, '') NOT IN (SELECT ten FROM core.dim_prefecture)),
                (SELECT coalesce(sum(k.so_khach_mua),0) FROM k
+                 WHERE coalesce(k.prefecture, '') NOT IN (SELECT ten FROM core.dim_prefecture)),
+               (SELECT coalesce(sum(k.dt),0) FROM ks k
                  WHERE coalesce(k.prefecture, '') NOT IN (SELECT ten FROM core.dim_prefecture))
           FROM s
          WHERE coalesce(s.prefecture, '') NOT IN (SELECT ten FROM core.dim_prefecture)
         UNION ALL
         SELECT 'tong', coalesce(sum(so_khach),0), coalesce(sum(doanh_thu_12t),0), coalesce(sum(can_goi),0),
-               (SELECT coalesce(sum(k.dt),0) FROM k), (SELECT coalesce(sum(k.so_khach_mua),0) FROM k)
+               (SELECT coalesce(sum(k.dt),0) FROM k), (SELECT coalesce(sum(k.so_khach_mua),0) FROM k),
+               (SELECT coalesce(sum(k.dt),0) FROM ks k)
           FROM s
-    """, tham_so_sale + dai + tham_so_sale).fetchall()
+    """, tham_so_sale + dai + tham_so_sale + dai_ss + tham_so_sale).fetchall()
 
     # ---- Từ đây trở xuống: KHÔNG còn lượt hỏi CSDL nào nữa -----------------
 
     tho = []
-    for ma_jis, ten, ten_latin, ten_ngan, vung, hang, cot, so_khach, doanh_thu, can_goi, dt_kx, n_kx in rows_a:
+    for ma_jis, ten, ten_latin, ten_ngan, vung, hang, cot, so_khach, doanh_thu, can_goi, dt_kx, n_kx, dt_ss in rows_a:
         d = {
             "ma_jis": ma_jis, "ten": ten, "ten_latin": ten_latin,
             "ten_ngan": ten_ngan, "vung": vung, "hang": hang, "cot": cot,
             "so_khach": int(so_khach), "doanh_thu": int(doanh_thu),
             "can_goi": int(can_goi), "dt_khoang": int(dt_kx), "khach_mua": int(n_kx),
+            "dt_khoang_ss": int(dt_ss) if co_ss else None,
         }
         d["gia_tri"] = d[_COT_THEO_CHI_SO[chi_so]]
         # None khi so_khach == 0 — "không biết tỷ lệ" khác "0%" (xem chú
@@ -314,7 +334,7 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach", kx=None) -> Tra
           so_khach=d["so_khach"], doanh_thu=d["doanh_thu"], can_goi=d["can_goi"],
           ty_le_can_goi=d["ty_le_can_goi"], gia_tri=d["gia_tri"], bac=bac,
           x=(d["cot"] - 1) * (O_RONG + KHE), y=(d["hang"] - 1) * (O_CAO + KHE),
-          dt_khoang=d["dt_khoang"], khach_mua=d["khach_mua"])
+          dt_khoang=d["dt_khoang"], khach_mua=d["khach_mua"], dt_khoang_ss=d["dt_khoang_ss"])
         for d, bac in zip(tho, bac_theo_o)
     ]
 
@@ -326,6 +346,7 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach", kx=None) -> Tra
             "doanh_thu": sum(o.doanh_thu for o in cua_vung),
             "can_goi": sum(o.can_goi for o in cua_vung),
             "dt_khoang": sum(o.dt_khoang for o in cua_vung),
+            "dt_khoang_ss": sum(o.dt_khoang_ss for o in cua_vung) if co_ss else None,
             "khach_mua": sum(o.khach_mua for o in cua_vung),
             # Tổng theo ĐÚNG chi_so đang chọn — để template khỏi phải viết
             # if/elif ba nhánh (khach/doanh_thu/can_goi) mỗi lần đọc khối này.
@@ -372,6 +393,7 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach", kx=None) -> Tra
         "can_goi": int(tong_row[3]) if tong_row else 0,
         "dt_khoang": int(tong_row[4]) if tong_row else 0,
         "khach_mua": int(tong_row[5]) if tong_row else 0,
+        "dt_khoang_ss": (int(tong_row[6]) if tong_row else 0) if co_ss else None,
     }
 
     return TrangBanDo(o=cac_o, vung=vung_gop, bang=bang, chu_giai=chu_giai,

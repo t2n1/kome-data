@@ -40,12 +40,14 @@ export type ONhanh = {
   ma_jis: string; ten: string; ten_ngan: string; ten_latin: string; vung: string; hang: number; cot: number;
   so_khach: number; doanh_thu: number; can_goi: number; ty_le_can_goi: number | null;
   gia_tri: number; bac: number; x: number; y: number; dt_khoang: number; khach_mua: number;
+  /** Doanh thu KỲ SO của tỉnh (đặc tả 2026-09-28); null = kỳ so không có dữ liệu. */
+  dt_khoang_ss: number | null;
 };
 export type BanDoApi = {
   t: {
     o: ONhanh[]; vung: { vung: string; gia_tri: number }[]; bang: ONhanh[];
     chu_giai: { bac: number; tu: number; den: number; so_tinh: number }[];
-    khong_ro_tinh: number; tong: { so_khach: number; doanh_thu: number; can_goi: number };
+    khong_ro_tinh: number; tong: { so_khach: number; doanh_thu: number; can_goi: number; dt_khoang: number; khach_mua: number; dt_khoang_ss: number | null };
     chi_so: string; rong: number; cao: number;
   };
   sale: string | null; ten_sale: string | null; chi_so_ds: Record<string, string>; o_rong: number; o_cao: number;

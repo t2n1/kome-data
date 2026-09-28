@@ -251,6 +251,31 @@ def danh_ba_khoang(conn, kx: KhoangXem) -> dict:
             "dong": {r[0]: [_i(r[1]), _i(r[2]), r[3], _i(r[4])] for r in rows}}
 
 
+def _thang_cua_so(den: date, n: int) -> list[str]:
+    """n tháng 'YYYY-MM' kết thúc ở tháng chứa `den` (cũ → mới)."""
+    t0 = den.year * 12 + den.month - 1
+    return [f"{t // 12:04d}-{t % 12 + 1:02d}" for t in range(t0 - n + 1, t0 + 1)]
+
+
+def _thang_ss_map(kx: KhoangXem, thang: list[str], dt_theo_thang: dict, dt_cat: int | None) -> dict | None:
+    """{tháng đang xem: doanh thu tháng dời `lech_thang`} cho một cửa sổ tháng
+    (đặc tả 2026-09-28). Tháng dời trong dải dữ liệu mà không có phiếu = 0; trước
+    dải = None. Tháng đang xem dở dang (dạng Tháng) = tổng ĐÚNG dải so đã cắt cùng
+    ngày (`dt_cat`), không trọn tháng dời. None = không so theo tháng được."""
+    s = kx.so_sanh[0] if kx.so_sanh else None
+    if s is None or not s.co or s.lech_thang is None:
+        return None
+    dau = kx.ngay_dau.strftime("%Y-%m")
+    ra = {}
+    for t in thang:
+        m = int(t[:4]) * 12 + int(t[5:7]) - 1 - s.lech_thang
+        d = f"{m // 12:04d}-{m % 12 + 1:02d}"
+        ra[t] = int(dt_theo_thang.get(d) or 0) if d >= dau else None
+    if kx.loai == "thang" and not kx.tron_thang and kx.thang in ra and dt_cat is not None:
+        ra[kx.thang] = dt_cat
+    return ra
+
+
 def cua_khach(conn, kx: KhoangXem, ma: str) -> dict:
     """Số trong khoảng của MỘT khách — MỘT lượt hỏi (ba khối JSON trong một
     dòng): tổng + mọi phép so (`mart.khach_khoang`), mặt hàng trong khoảng
@@ -279,8 +304,16 @@ def cua_khach(conn, kx: KhoangXem, ma: str) -> dict:
                                   'doanh_thu', l.dt) ORDER BY l.sales_date DESC), '[]')
                  FROM (SELECT sales_date, count(*) AS n, sum(doanh_thu_thuan) AS dt
                          FROM mart.lan_mua WHERE customer_code = %s AND sales_date BETWEEN %s AND %s
-                        GROUP BY 1) l)""",
-        [d for cap in dai for d in cap] + [ma, kx.tu, kx.den, ma, ma, kx.tu, kx.den]).fetchone()
+                        GROUP BY 1) l),
+              -- Kỳ so (đặc tả 2026-09-28): doanh thu theo tháng của khách (cho cột ma của
+              -- biểu đồ 12 tháng) + doanh thu từng mã ở dải so — CHUNG câu này.
+              (SELECT coalesce(json_object_agg(t.thang, t.doanh_thu_thuan), '{{}}')
+                 FROM mart.khach_theo_thang t WHERE t.customer_code = %s),
+              (SELECT coalesce(json_object_agg(coalesce(m.product_code, ''), m.dt), '{{}}')
+                 FROM mart.khach_mat_hang_khoang(%s, %s) m WHERE m.customer_code = %s)""",
+        [d for cap in dai for d in cap] + [ma, kx.tu, kx.den, ma, ma, kx.tu, kx.den, ma]
+        + [kx.so_sanh[0].tu if kx.so_sanh and kx.so_sanh[0].co else None,
+           kx.so_sanh[0].den if kx.so_sanh and kx.so_sanh[0].co else None, ma]).fetchone()
     t = {x["i"]: x for x in (r[0] or [])}
 
     def so(i, k):
@@ -293,11 +326,16 @@ def cua_khach(conn, kx: KhoangXem, ma: str) -> dict:
             dt=so(1 + 2 * j, "dt"), lg=so(1 + 2 * j, "lg"), so_khach=None,
             dt_ck=so(2 + 2 * j, "dt") if s.co else None, lg_ck=so(2 + 2 * j, "lg") if s.co else None,
             so_khach_ck=None))
+    co = bool(kx.so_sanh) and kx.so_sanh[0].co
+    mh_ss = r[4] or {}
+    mat_hang = [m | {"dt_ss": int(mh_ss.get(m["ma"] or "") or 0) if co else None} for m in (r[1] or [])]
     return {"khoang": kx,
             "tong": {"dt": so(0, "dt"), "lg": so(0, "lg"), "so_phieu": so(0, "so_phieu"),
                      "so_ngay": so(0, "so_ngay"),
                      "ty_suat": BC._SoCungKy._ty_suat(so(0, "dt"), so(0, "lg"))},
-            "so_sanh": ss, "mat_hang": r[1], "ngay": r[2]}
+            "so_sanh": ss, "mat_hang": mat_hang, "ngay": r[2],
+            "thang_ss": _thang_ss_map(kx, _thang_cua_so(kx.den, 12), r[3] or {},
+                                      ss[0].dt_ck if ss else None)}
 
 
 # ---- Đợt C: Sản phẩm ---------------------------------------------------------
@@ -334,9 +372,12 @@ def cua_ma(conn, kx: KhoangXem, ma: str, gioi_han: int = 30) -> dict:
                          FROM mart.khach_mat_hang_khoang(%s, %s) k
                          LEFT JOIN core.dim_customer c ON c.customer_code = k.customer_code AND c.is_current
                         WHERE k.product_code = %s
-                        ORDER BY k.dt DESC NULLS LAST, k.customer_code LIMIT %s) x)""",
+                        ORDER BY k.dt DESC NULLS LAST, k.customer_code LIMIT %s) x),
+              -- Kỳ so (đặc tả 2026-09-28): doanh thu theo tháng của mã — cột ma của 24 tháng.
+              (SELECT coalesce(json_object_agg(t.thang, t.doanh_thu_thuan), '{}')
+                 FROM mart.san_pham_theo_thang t WHERE t.product_code = %s)""",
         (kx.tu, kx.den, ma, s.tu if s.co else None, s.den if s.co else None, ma,
-         kx.tu, kx.den, ma, gioi_han)).fetchone()
+         kx.tu, kx.den, ma, gioi_han, ma)).fetchone()
     t = r[0] or {}
     dt = int(t.get("dt") or 0)
     return {"khoang": kx, "so_sanh": s,
@@ -344,4 +385,6 @@ def cua_ma(conn, kx: KhoangXem, ma: str, gioi_han: int = 30) -> dict:
                      "so_khach": t.get("so_khach") or 0},
             "dt_ss": (int(r[1] or 0) if s.co else None),
             "tang": BC._SoCungKy._tang(dt, int(r[1] or 0)) if s.co else None,
-            "khach": r[2]}
+            "khach": r[2],
+            "thang_ss": _thang_ss_map(kx, _thang_cua_so(kx.den, 24), r[3] or {},
+                                      int(r[1] or 0) if s.co else None)}

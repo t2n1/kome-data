@@ -14,6 +14,11 @@ import { thamSoBanDo } from "./loc";
 import type { BanDoApi, ONhanh } from "./kieu";
 import { useDs } from "./DanhSach";
 import { MAU_CHU, MAU_O } from "../chung/LuoiTinh";
+import { MauSs } from "../chung/SoSanh";
+
+/** % so kỳ so — mẫu số ≤ 0 thì không tính được (không phải 0). */
+const tdSs = (a: number, b: number | null) => (b != null && b > 0 ? a / b - 1 : null);
+const dauPc = (v: number) => `${v >= 0 ? "▲" : "▼"}${Math.abs(v * 100).toFixed(0)}%`;
 
 export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: Tab }, day?: boolean) => void }) {
   const q = thamSoBanDo(b);
@@ -31,6 +36,10 @@ export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: 
   const f = (v: number) => tien ? yen(v) : so(v);
   const moTinh = (ten: string) => dat({ tab: "danh_sach", tinh: ten }, true);
   const nvDang = b.nv || d.sale || ds?.nv_moi_nguoi || "__moi_nguoi";
+  // Kỳ so của khoảng (máy chủ) — doanh thu theo tỉnh so với nó.
+  const ss = d.khoang?.so_sanh[0];
+  const coSs = !!ss?.co && t.tong.dt_khoang_ss != null;
+  const nhanKx = d.khoang?.nhan ?? "khoảng xem";
 
   return (
     <div className={"kh-bd" + (isFetching ? " dang-tai" : "")}>
@@ -60,6 +69,10 @@ export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: 
                 <text x={o.x + d.o_rong / 2} y={o.y + 23} textAnchor="middle" fontSize={12} fill={MAU_CHU[o.bac]}>{o.ten_ngan}</text>
                 <text x={o.x + d.o_rong / 2} y={o.y + 41} textAnchor="middle" fontSize={tien ? 10.5 : 13} fontWeight={600}
                   fill={MAU_CHU[o.bac]} className="so">{tien ? gon(o.gia_tri) : so(o.gia_tri)}</text>
+                {/* Đang tô theo doanh thu khoảng: dòng nhỏ ▲▼ so kỳ so ngay trong ô. */}
+                {t.chi_so === "dt_khoang" && coSs && (() => { const v = tdSs(o.dt_khoang, o.dt_khoang_ss);
+                  return v != null && <text x={o.x + d.o_rong / 2} y={o.y + 54} textAnchor="middle" fontSize={9}
+                    fill={MAU_CHU[o.bac]} opacity={0.85}>{dauPc(v)}</text>; })()}
               </g>))}
           </svg>
           {tro && <div className="kh-bd-noi" role="status">
@@ -67,6 +80,9 @@ export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: 
             <div>Số khách <b>{so(tro.so_khach)}</b></div>
             <div>Doanh thu 12 tháng <b>{yen(tro.doanh_thu)}</b></div>
             <div>Cần gọi lại <b>{so(tro.can_goi)}</b>{tro.ty_le_can_goi != null && <> · {(tro.ty_le_can_goi * 100).toFixed(1).replace(".", ",")}%</>}</div>
+            <div>Doanh thu · {nhanKx} <b>{yen(tro.dt_khoang)}</b></div>
+            {ss && <div><MauSs />{ss.nhan} <b>{coSs && tro.dt_khoang_ss != null ? yen(tro.dt_khoang_ss) : "không có dữ liệu"}</b>
+              {coSs && (() => { const v = tdSs(tro.dt_khoang, tro.dt_khoang_ss); return v != null && <> · <span className={v >= 0 ? "tang" : "giam"}>{dauPc(v)}</span></>; })()}</div>}
             <em>bấm để mở danh sách khách của tỉnh này</em>
           </div>}
         </div>
@@ -80,6 +96,8 @@ export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: 
           </ul>
           <h3>Theo vùng (地方)</h3>
           <ul className="kh-bd-vung">{t.vung.map(v => <li key={v.vung}><span className="ten-jp">{v.vung}</span><b>{f(v.gia_tri)}</b></li>)}</ul>
+          {coSs && ss && <p className="phu">Doanh thu {nhanKx}: <b>{yen(t.tong.dt_khoang)}</b> · <MauSs />{ss.nhan}: <b>{yen(t.tong.dt_khoang_ss)}</b>
+            {(() => { const v = tdSs(t.tong.dt_khoang, t.tong.dt_khoang_ss); return v != null && <> (<span className={v >= 0 ? "tang" : "giam"}>{dauPc(v)}</span>)</>; })()}</p>}
           <p className="phu">Tổng (47 ô + không rõ tỉnh): <b>{so(t.tong.so_khach)}</b> khách · <b>{yen(t.tong.doanh_thu)}</b> doanh thu 12 tháng ·{" "}
             <b>{so(t.tong.can_goi)}</b> cần gọi lại. Không rõ tỉnh: {so(t.khong_ro_tinh)} khách (chưa có hồ sơ 得意先全情報 khớp tỉnh).</p>
         </aside>
@@ -88,11 +106,16 @@ export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: 
       <h3 className="kh-muc-nho">Bảng xếp hạng 47 tỉnh</h3>
       <div className="bang-cuon"><table className="bang">
         <thead><tr><th>Tỉnh</th><th>Vùng</th><th className="so">Số khách</th><th className="so">Doanh thu 12 tháng</th>
+          <th className="so">DT · {nhanKx}</th><th className="so"><MauSs />{ss?.nhan ?? "Kỳ so"}</th><th className="so">So</th>
           <th className="so">Cần gọi</th><th className="so">Tỷ lệ cần gọi</th></tr></thead>
         <tbody>{t.bang.map(o => (
           <tr key={o.ma_jis}>
             <td><button type="button" className="lien-ket ten-jp" onClick={() => moTinh(o.ten)}>{o.ten}</button></td>
             <td className="ten-jp">{o.vung}</td><td className="so">{so(o.so_khach)}</td><td className="so">{yen(o.doanh_thu)}</td>
+            <td className="so">{yen(o.dt_khoang)}</td>
+            <td className="so nhat-chu">{coSs && o.dt_khoang_ss != null ? yen(o.dt_khoang_ss) : "—"}</td>
+            {(() => { const v = coSs ? tdSs(o.dt_khoang, o.dt_khoang_ss) : null;
+              return <td className={"so " + (v == null ? "" : v >= 0 ? "tang" : "giam")}>{v == null ? "—" : dauPc(v)}</td>; })()}
             <td className="so">{so(o.can_goi)}</td>
             <td className="so">{o.ty_le_can_goi == null ? "—" : `${(o.ty_le_can_goi * 100).toFixed(1).replace(".", ",")}%`}</td>
           </tr>))}</tbody>

@@ -913,8 +913,16 @@ gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hi�
   câu có sẵn — người phụ trách FULL JOIN hai dải `mart.sale_khoang` (`BK.sale`, câu (5) của
   `bao_cao.tinh_bao_cao` khi có `ss`), ngành × tháng dời `lech_thang` (`BK.nganh_thang_ss`, mọi
   tháng của kỳ trong dải dữ liệu, THAY `doc_nganh_thang` ở dạng Tháng / Khoảng), luỹ kế kỳ so
-  cộng từ số đã có (`api._luy_ke_ky_so`; thiếu số ở một tháng đã có thực tế ⇒ không vẽ). Test:
-  `tests/test_khoang_xem.py`, `tests/test_tong_quan_ky_so.py`, `tests/test_bao_cao_ky_so.py`. Đặc tả: `docs/superpowers/specs/2026-09-28-ky-so-sanh-toan-web-design.md`.
+  cộng từ số đã có (`api._luy_ke_ky_so`; thiếu số ở một tháng đã có thực tế ⇒ không vẽ). Đợt 3
+  (Khách hàng · Sản phẩm): `/api/ban-do` KHÔNG còn `.chinh()` (doanh thu tỉnh ở kỳ so, CTE thứ ba
+  trong hai câu cũ — vẫn 2 lượt); `/khoang` của hồ sơ khách và của mã trả `thang_ss` (tháng dời
+  `lech_thang`, tháng dở dang = dải so đã cắt) + `dt_ss` từng mặt hàng — CHUNG câu cũ; `/ngay?lech=`
+  (tháng so = lùi `lech` tháng; rỗng = không so); tab Khách / Thời gian của Sản phẩm 360 đọc
+  `mart.sp_khach_moi_thang_den` / `mart.sp_theo_tuan_den` (057 — hai hàm cũ là lớp bọc, MỘT công
+  thức) trong câu 1 có sẵn; mặc định (không tham số) lùi 12 tháng / 52 tuần biết theo cú pháp
+  (`SP360.LUI_MAC_DINH`) nên trần 3 / 2 lượt không đổi; cửa sổ lùi bắt đầu trước dữ liệu ⇒ không vẽ.
+  Test: `tests/test_khoang_xem.py`, `tests/test_tong_quan_ky_so.py`, `tests/test_bao_cao_ky_so.py`,
+  `tests/test_khach_sp_ky_so.py`. **Migration 057 phải chạy TRƯỚC khi triển khai.** Đặc tả: `docs/superpowers/specs/2026-09-28-ky-so-sanh-toan-web-design.md`.
 Liên kết nội bộ giữ khoảng xem nhờ MỘT bộ viết lại `href` ở `document`
 (`khoang.ts::ganVietLaiLienKet`); mọi `history.pushState/replaceState` của từng màn đi
 qua `giuKhoang()` — thêm một màn có bộ lọc trên URL mà quên hàm đó là đổi bộ lọc xong mất

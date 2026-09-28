@@ -535,7 +535,8 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import ban_do as BD
         sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
         try:
-            ts = _ts(request, thang, ky, tu, den).chinh()
+            # KHÔNG .chinh(): doanh thu theo tỉnh so kỳ so đang bật (đặc tả 2026-09-28).
+            ts = _ts(request, thang, ky, tu, den)
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
 
@@ -627,21 +628,30 @@ def tao_api(open_app_conn) -> APIRouter:
         return _json(request, du_lieu, pb)
 
     @r.get("/san-pham/{ma}/ngay")
-    def sp_ngay(request: Request, ma: str, thang: str):
-        """Bán theo ngày của một mã trong một tháng + tháng trước. 1 lượt hỏi."""
+    def sp_ngay(request: Request, ma: str, thang: str, lech: str = "1"):
+        """Bán theo ngày của một mã trong một tháng + tháng KỲ SO (lùi `lech` tháng —
+        `khoang.so_sanh[0].lech_thang` của máy chủ; `lech=` rỗng = kỳ so không lệch tròn
+        tháng, không so). 1 lượt hỏi."""
         from kome import san_pham as SP
         import re
         if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", thang):
             return _loi("Tháng phải có dạng YYYY-MM.", 400)
-        return _chup(request, _khoa("san-pham/ngay", ma=ma, thang=thang),
-                     lambda c: SP.ban_theo_ngay(c, ma, thang),
+        if lech and not (lech.isdigit() and 0 < int(lech) <= 120):
+            return _loi("'lech' phải là số tháng 1–120.", 400)
+        n = int(lech) if lech else None
+        return _chup(request, _khoa("san-pham/ngay", ma=ma, thang=thang, lech=lech),
+                     lambda c: SP.ban_theo_ngay(c, ma, thang, n),
                      "Không đọc được lượng bán theo ngày.", chi_nap=True)
 
     def _tab_sp(request: Request, ma: str, ten: str, thang: str, ky: str, tu: str, den: str):
         """Một tab của Sản phẩm 360 — ảnh chụp riêng, tính đến MỐC của khoảng xem (040)."""
         from kome import san_pham_360 as SP360
+        # Hai tab có chuỗi KỲ SO (26 tuần, khách mới/quay lại — đặc tả 2026-09-28) giải
+        # khoảng để biết kỳ so (+1 lượt `pham_vi`, thay lượt đặt mốc); tab khác bỏ `ss`.
+        co_ss = ten in ("khach", "thoi-gian")
         try:
-            ts = _ts(request, thang, ky, tu, den).chinh()
+            ts = _ts(request, thang, ky, tu, den)
+            ts = ts if co_ss else ts.chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         ham = {"khach": SP360.tab_khach, "thoi-gian": SP360.tab_thoi_gian,
@@ -651,10 +661,23 @@ def tao_api(open_app_conn) -> APIRouter:
         def tinh_(c):
             t = ham(c, ma)
             return None if t is None else thanh_json({"t": t, "cach_tinh": SP360.CACH_TINH})
+
+        def tinh_ss(c):
+            # Không tham số nào: kỳ so = năm trước, biết theo cú pháp (0 lượt thêm — y như
+            # _voi_moc không đặt mốc). Có tham số: giải khoảng — một lượt, THAY lượt đặt
+            # mốc (giai_conn đặt mốc + đọc dải trong cùng round-trip).
+            if not ts.khoa():
+                lui = SP360.LUI_MAC_DINH
+            else:
+                lui = SP360.lui_cua(KX.giai_conn(c, ts))
+            t = ham(c, ma, lui)
+            return None if t is None else thanh_json({"t": t, "cach_tinh": SP360.CACH_TINH})
         try:
             with open_app_conn() as conn:
                 du_lieu, pb = anh_chup.lay(conn, _khoa(f"san-pham/tab-{ten}", ma=ma, **ts.khoa()),
-                                           _voi_moc(ts, tinh_), chi_nap=True)
+                                           tinh_ss if co_ss else _voi_moc(ts, tinh_), chi_nap=True)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
         except Exception:
             traceback.print_exc()
             return _loi("Không đọc được dữ liệu tab này.")

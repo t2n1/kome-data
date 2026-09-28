@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { lay } from "../api";
 import { BieuDo } from "../chung/BieuDo";
+import { DongSoSanh, MauSs } from "../chung/SoSanh";
 
 import { gon, ngay, pc, so, thay_doi, yen } from "../dinh_dang";
 import type { DongBan, HoSoApi, LichMa, MatHang } from "./kieu";
@@ -21,8 +22,11 @@ type SoSanhKh = { ma: string; nhan: string; co: boolean; tu: string; den: string
 type KhoangKhach = {
   khoang: KhoangMayChu; tong: { dt: number; lg: number; so_phieu: number; so_ngay: number; ty_suat: number | null };
   so_sanh: SoSanhKh[];
-  mat_hang: { ma: string; ten: string; doanh_thu: number; lai_gop: number; so_luong: number; so_ngay: number; lan_cuoi: string; la_phi: boolean; la_hang_tang: boolean; la_ngung_ban_het_ton: boolean }[];
+  mat_hang: { ma: string; ten: string; doanh_thu: number; lai_gop: number; so_luong: number; so_ngay: number; lan_cuoi: string; la_phi: boolean; la_hang_tang: boolean; la_ngung_ban_het_ton: boolean;
+    dt_ss: number | null }[];
   ngay: { ngay: string; so_phieu: number; doanh_thu: number }[];
+  /** {tháng: doanh thu tháng dời theo kỳ so} của 12 tháng — null = không so theo tháng được. */
+  thang_ss: Record<string, number | null> | null;
 } | null;
 function useKhoangKhach(ma: string) {
   const kx = chuoiKhoang(useKhoang());
@@ -73,9 +77,8 @@ export function OSoSucKhoe({ h }: { h: HoSoApi }) {
     <div className="o-kpi-luoi hs2-o">
       <div className="o-kpi"><div className="nhan">DT · {kh?.khoang.nhan ?? "…"}</div>
         <div className="gia">{kh ? gon(kh.tong.dt) : "…"}</div>
-        {kh?.so_sanh.map(s => <div key={s.ma} className={"dong-phu " + (!s.co || s.tang_dt == null ? "nhat-chu" : s.tang_dt >= 0 ? "tang" : "giam")}
-          title={s.co ? `${ngay(s.tu)} → ${ngay(s.den)}: ${yen(s.dt_ck)}` : undefined}>
-          {!s.co ? `${s.nhan}: không có dữ liệu` : s.tang_dt == null ? `${s.nhan}: ${s.dt_ck ? "—" : "chưa mua"}` : `${thay_doi(s.tang_dt, 0)} so ${s.nhan}`}</div>)}</div>
+        {kh?.so_sanh.map(s => s.co && !s.dt_ck ? <div key={s.ma} className="dong-phu nhat-chu ss-dong"><MauSs />{s.nhan}: chưa mua</div>
+          : <DongSoSanh key={s.ma} nhan={s.nhan} co={s.co} nay={kh.tong.dt} ss={s.dt_ck} dinh_dang={gon} />)}</div>
       <div className="o-kpi"><div className="nhan">DT 30 ngày · {nm}</div><div className="gia">{gon(o.dt_30)}</div>
         <div className={"dong-phu " + (ss30 == null ? "nhat-chu" : ss30 >= 0 ? "tang" : "giam")}>{ss30 == null ? "30 ngày trước chưa mua" : `${thay_doi(ss30, 0)} so 30 ngày trước`}</div></div>
       <div className="o-kpi" title="số ngày im lặng ÷ nhịp mua riêng của khách (trung vị khoảng cách giữa các lần mua)">
@@ -89,22 +92,30 @@ export function OSoSucKhoe({ h }: { h: HoSoApi }) {
 
 export function BieuDo12Thang({ h }: { h: HoSoApi }) {
   const thang = dsThang(h.hom_nay);
-  const kx = useKhoangKhach(h.khach.ma).data?.khoang;
+  const khq = useKhoangKhach(h.khach.ma).data;
+  const kx = khq?.khoang;
+  const s0 = kx?.so_sanh[0];
+  const tss = khq?.thang_ss ?? null;
   const theo = Object.fromEntries(h.thang.map(t => [t.thang, t]));
   const gt = thang.map(t => theo[t]?.doanh_thu ?? 0);
   const tb = gt.reduce((s, x) => s + x, 0) / (gt.length || 1);
   const [chon, datChon] = useState<string | null>(null);
   const tb3 = h.thang_nay?.dt_tb_3_thang;
-  const ss = h.thang_nay ? tiLe(h.thang_nay.dt_thang_nay, h.thang_nay.dt_thang_truoc_den_ngay) : null;
+  // Đầu khối: doanh thu KHOẢNG XEM so kỳ so đang bật (đặc tả 2026-09-28) — cùng số với ô DT · khoảng.
+  const ssKx = khq?.so_sanh[0];
+  const tdKx = ssKx?.co && ssKx.dt_ck ? khq!.tong.dt / ssKx.dt_ck - 1 : null;
   return (
     <The tieu_de="Doanh thu 12 tháng" className="rong2"
-      goc={ss != null ? <span className={ss >= 0 ? "tang" : "giam"}>{thay_doi(ss, 0)} tháng này so tháng trước cùng ngày</span> : null}
-      cach_tinh={<>cột = tháng{kx ? <> · cột đậm = thuộc {kx.nhan}</> : null} · nét đứt = trung bình 12 tháng · <b>bấm một tháng</b> để xem mặt hàng tháng đó{tb3 != null && <> · TB 3 tháng trước {gon(tb3)}</>}</>}>
+      goc={tdKx != null ? <span className={tdKx >= 0 ? "tang" : "giam"}>{thay_doi(tdKx, 0)} {kx?.nhan} so <MauSs />{ssKx!.nhan}</span> : null}
+      cach_tinh={<>cột = tháng{kx ? <> · cột đậm = thuộc {kx.nhan}</> : null} · cột viền đứt = {s0?.nhan ?? "kỳ so"}{tss ? "" : " (không so theo tháng được)"} · đường mảnh = trung bình 12 tháng · <b>bấm một tháng</b> để xem mặt hàng tháng đó{tb3 != null && <> · TB 3 tháng trước {gon(tb3)}</>}</>}>
       <BieuDo nhan={thang.map(tNhan)} nhan_day_du={thang.map(t => `Tháng ${+t.slice(5)}/${t.slice(0, 4)}`)} cao={170}
-        chuoi={[{ ten: "Doanh thu", kieu: "cot", gia_tri: gt, mau: "var(--ok-vien)",
+        chuoi={[{ ten: "Doanh thu", kieu: "cot", gia_tri: gt, mau: "var(--ok-vien)", so_voi: tss ? 2 : undefined,
                   mau_tung_cot: gt.map((v, i) => kx && !trongKhoang(kx, thang[i]) ? "color-mix(in srgb, var(--ok-vien) 30%, var(--nen-the))"
                     : i === gt.length - 1 ? "var(--do)" : v >= tb ? "var(--ok-vien)" : "var(--canh-vien)") },
-                { ten: "Trung bình 12 tháng", kieu: "duong_dut", gia_tri: gt.map(() => tb), mau: "var(--chu-nhat)" }]}
+                // Nét đứt dành cho KỲ SO — trung bình là đường liền mảnh.
+                { ten: "Trung bình 12 tháng", kieu: "duong", gia_tri: gt.map(() => tb), mau: "var(--chu-nhat)" },
+                ...(tss ? [{ ten: s0 ? s0.nhan.replace(/^./, c => c.toUpperCase()) : "Kỳ so", kieu: "cot_ma" as const,
+                  gia_tri: thang.map(t => tss[t] ?? null), mau: "var(--vien-dam)" }] : [])]}
         dinh_dang={v => v == null ? "—" : v === 0 ? "không mua" : yen(v)} dinh_dang_truc={gon}
         onBam={i => datChon(thang[i])} mo_ta="Doanh thu 12 tháng của khách, bấm một cột để xem mặt hàng" />
       <div className="hs-luoi-thang" role="group" aria-label="12 tháng — tháng không mua để trống">
@@ -217,26 +228,34 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
       const tang = kh.mat_hang.filter(m => m.la_hang_tang);
       const ngung = kh.mat_hang.filter(m => m.la_ngung_ban_het_ton && !m.la_phi && !m.la_hang_tang);
       const tongPhi = phi.reduce((a, m) => a + (m.doanh_thu || 0), 0);
+      // Cột kỳ so của bảng mặt hàng — chỉ hàng thật (phí / POSM / ※終売※ không có cột này).
+      const coSsMh = !!kh.so_sanh[0]?.co;
+      const cot = coSsMh ? 8 : 6;
       return <The tieu_de={`Mặt hàng mua · ${kh.khoang.nhan}`} phu={`${hang.length} mã · ${yen(kh.tong.dt)}${phi.length ? ` (gồm ${yen(tongPhi)} phí & điều chỉnh)` : ""} · ${kh.tong.so_ngay} ngày có mua (${ngay(kh.khoang.tu)} → ${ngay(kh.khoang.den)})`}>
       {!kh.mat_hang.length ? <p className="phu">Không mua mã nào trong khoảng này.</p> :
       <div className="bang-cuon" style={{ maxHeight: 320 }}><table className="bang"><thead><tr><th>Mặt hàng</th><th className="so">Doanh thu</th>
+        {coSsMh && <><th className="so"><MauSs />{kh.so_sanh[0].nhan}</th><th className="so">So</th></>}
         <th className="so">Lãi gộp</th><th className="so">Số lượng</th><th className="so">Số ngày mua</th><th className="so">Mua cuối</th></tr></thead>
         <tbody>{hang.map(m => (
           <tr key={m.ma}><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></td>
-            <td className="so">{yen(m.doanh_thu)}</td><td className="so">{yen(m.lai_gop)}</td><td className="so">{so(m.so_luong)}</td>
+            <td className="so">{yen(m.doanh_thu)}</td>
+            {coSsMh && (() => { const v = m.dt_ss ? m.doanh_thu / m.dt_ss - 1 : null; return <>
+              <td className="so nhat-chu">{m.dt_ss ? yen(m.dt_ss) : "không mua"}</td>
+              <td className={"so " + (v == null ? "" : v >= 0 ? "tang" : "giam")}>{v == null ? (m.dt_ss === 0 ? "mới" : "—") : thay_doi(v, 0)}</td></>; })()}
+            <td className="so">{yen(m.lai_gop)}</td><td className="so">{so(m.so_luong)}</td>
             <td className="so">{so(m.so_ngay)}</td><td className="so">{ngay(m.lan_cuoi)}</td></tr>))}
-          {phi.length > 0 && <tr><th colSpan={6} scope="rowgroup" className="phu">Phí &amp; điều chỉnh — không phải hàng</th></tr>}
+          {phi.length > 0 && <tr><th colSpan={cot} scope="rowgroup" className="phu">Phí &amp; điều chỉnh — không phải hàng</th></tr>}
           {phi.map(m => (
           <tr key={m.ma || "(khong-ma)"}><td className="ten-jp">{m.ten}{m.ma && <div className="ma-nho"><code>{m.ma}</code></div>}</td>
-            <td className="so">{yen(m.doanh_thu)}</td><td className="so">{yen(m.lai_gop)}</td><td className="so">—</td>
+            <td className="so">{yen(m.doanh_thu)}</td>{coSsMh && <><td /><td /></>}<td className="so">{yen(m.lai_gop)}</td><td className="so">—</td>
             <td className="so">{so(m.so_ngay)}</td><td className="so">{ngay(m.lan_cuoi)}</td></tr>))}
-          {tang.length > 0 && <tr><th colSpan={6} scope="rowgroup" className="phu">Hàng tặng (POSM) — không phải hàng bán</th></tr>}
+          {tang.length > 0 && <tr><th colSpan={cot} scope="rowgroup" className="phu">Hàng tặng (POSM) — không phải hàng bán</th></tr>}
           {tang.map(m => (
           <tr key={m.ma}><td className="ten-jp">{m.ten}<div className="ma-nho"><code>{m.ma}</code></div></td>
-            <td className="so">{yen(m.doanh_thu)}</td><td className="so">{yen(m.lai_gop)}</td><td className="so">{so(m.so_luong)}</td>
+            <td className="so">{yen(m.doanh_thu)}</td>{coSsMh && <><td /><td /></>}<td className="so">{yen(m.lai_gop)}</td><td className="so">{so(m.so_luong)}</td>
             <td className="so">{so(m.so_ngay)}</td><td className="so">{ngay(m.lan_cuoi)}</td></tr>))}
           {ngung.length > 0 && <tr><td className="ten-jp">Hàng đã ngừng kinh doanh ※終売※ ({ngung.length} mã)<div className="ma-nho">hết tồn — không phân tích từng mã</div></td>
-            <td className="so">{yen(ngung.reduce((a, m) => a + (m.doanh_thu || 0), 0))}</td><td className="so">{yen(ngung.reduce((a, m) => a + (m.lai_gop || 0), 0))}</td>
+            <td className="so">{yen(ngung.reduce((a, m) => a + (m.doanh_thu || 0), 0))}</td>{coSsMh && <><td /><td /></>}<td className="so">{yen(ngung.reduce((a, m) => a + (m.lai_gop || 0), 0))}</td>
             <td className="so">—</td><td className="so">—</td><td className="so">{ngay(ngung.map(m => m.lan_cuoi).sort().pop() ?? "")}</td></tr>}</tbody></table></div>}
     </The>;
     })()}

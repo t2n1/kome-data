@@ -102,9 +102,16 @@ danh sách khách, danh mục sản phẩm, ô DT·khoảng của hai hồ sơ).
 | Người phụ trách | cột kỳ so + "So" (FULL JOIN hai dải trong câu người phụ trách); khối ngân sách dạng Tháng: vạch đứt trên thanh + bảng chi tiết theo kỳ so |
 | Bảng chi tiết · CSV | tiêu đề theo nhãn kỳ so |
 
-**Đợt 3 — Khách hàng & Sản phẩm**: bản đồ (Δ theo tỉnh), hồ sơ khách 12 tháng (qua `/khoang`,
-hồ sơ đã chạm trần 8), bảng mặt hàng, sản phẩm 360 (24 tháng, theo ngày theo khoảng xem, 26 tuần,
-khách mới/quay lại).
+**Đợt 3 — Khách hàng & Sản phẩm** (mọi ngân sách lượt hỏi giữ nguyên):
+
+| Khối | Thay đổi |
+|---|---|
+| Bản đồ | doanh thu tỉnh ở kỳ so (CTE thứ ba trong hai câu cũ): ô nổi, bảng xếp hạng (cột kỳ so + So), ▲▼ trong ô khi tô theo doanh thu khoảng |
+| Hồ sơ khách — ô số, 12 tháng | `DongSoSanh`; cột ma từ `/khoang.thang_ss`; đầu khối so khoảng xem với kỳ so (bỏ "tháng trước cùng ngày" cứng); trung bình thành nét liền |
+| Hồ sơ khách — Mặt hàng | cột kỳ so + So (`dt_ss`, chung câu `/khoang`) |
+| Sản phẩm 360 — 24 tháng | cột ma từ `/khoang.thang_ss` (thay cột mờ năm trước cứng) |
+| Theo ngày | `/ngay?lech=` = `lech_thang` của kỳ so (thay tháng trước cứng) |
+| 26 tuần · khách mới/quay lại | migration 057 (`…_den(mã, ngày)`), cửa sổ lùi `lui_cua(kx)` (tuần gần nhất / `lech_thang`) |
 
 ## 8. Test và bất biến
 
