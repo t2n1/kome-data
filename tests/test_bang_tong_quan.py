@@ -174,3 +174,93 @@ def test_sap_thu_tu_phai_dung_tap_bang_cua_minh(conn):
     assert _loi(BT.sap_thu_tu, conn, a, [z.id, x.id]) == 422
     assert _loi(BT.sap_thu_tu, conn, a, [z.id, x.id, y.id, 999]) == 422
     assert _loi(BT.sap_thu_tu, conn, a, "rác") == 422
+
+
+# ---- Trang web + API -----------------------------------------------------
+
+from tests.test_bo_cuc import _khoi_dau, web  # noqa: E402,F401  (web là fixture)
+
+
+def _gui(c, url, du_lieu=None):
+    return c.post(url, content=json.dumps(du_lieu), headers={"Content-Type": "application/json"})
+
+
+def _hien(kd):
+    return next(b for b in kd["bang"] if b["id"] == kd["bang_hien_id"])
+
+
+def test_nguoi_moi_thay_bang_ao_va_mo_trang_khong_ghi_gi(web, conn):
+    c = web.vao(web())
+    kd = _khoi_dau(c.get("/").text)
+    assert kd["bang_hien_id"] is None and [b["ten"] for b in kd["bang"]] == ["Bảng của tôi"]
+    assert "bo_cuc" not in kd
+    assert conn.execute("SELECT count(*) FROM app.bang_tong_quan").fetchone()[0] == 0
+
+
+def test_tao_chuyen_va_mo_lai_ra_bang_gan_nhat(web):
+    c = web.vao(web())
+    r = _gui(c, "/tong-quan/bang", {"ten": "Kho", "tu": "vai:kho"})
+    assert r.status_code == 201
+    kho = r.json()["bang"]
+    _gui(c, "/tong-quan/bang", {"ten": "Họp", "tu": "mac_dinh"})
+    assert _khoi_dau(c.get("/").text)["bang_hien_id"] != kho["id"]      # vừa tạo "Họp" -> gần nhất
+    assert _gui(c, f"/tong-quan/bang/{kho['id']}/mo").json() == {}
+    kd = _khoi_dau(c.get("/").text)
+    assert kd["bang_hien_id"] == kho["id"] and [b["ten"] for b in kd["bang"]] == ["Kho", "Họp"]
+    # ?bang= chọn thẳng nhưng KHÔNG đổi bảng gần nhất
+    hop = kd["bang"][1]["id"]
+    assert _khoi_dau(c.get(f"/?bang={hop}").text)["bang_hien_id"] == hop
+    assert _khoi_dau(c.get("/").text)["bang_hien_id"] == kho["id"]
+
+
+def test_luu_bo_cuc_bang_ao_roi_bang_that(web):
+    c = web.vao(web())
+    r = _gui(c, "/tong-quan/bang/moi/bo-cuc", [{"id": "han_su_dung", "rong": 3, "cao": 1}])
+    assert r.status_code == 200
+    bid = r.json()["bang"]["id"]
+    _gui(c, f"/tong-quan/bang/{bid}/bo-cuc", [{"id": "kpi", "rong": 1, "cao": 3}])
+    assert _hien(_khoi_dau(c.get("/").text))["bo_cuc"][0] == {"id": "kpi", "rong": 1, "cao": 3, "an": False}
+
+
+def test_bang_nguoi_khac_la_404_qua_web(web):
+    b = web.vao(web(), "binh")
+    x = _gui(b, "/tong-quan/bang", {"ten": "Của Bình", "tu": "mac_dinh"}).json()["bang"]["id"]
+    a = web.vao(web(), "an")
+    for duong, than in [("bo-cuc", []), ("ten", {"ten": "Chiếm"}), ("xoa", None), ("mo", None)]:
+        assert _gui(a, f"/tong-quan/bang/{x}/{duong}", than).status_code == 404, duong
+    assert _khoi_dau(a.get(f"/?bang={x}").text)["bang_hien_id"] is None
+
+
+def test_loi_quy_tac_tra_json_tieng_viet(web):
+    c = web.vao(web())
+    assert _gui(c, "/tong-quan/bang", {"ten": "", "tu": "mac_dinh"}).status_code == 422
+    x = _gui(c, "/tong-quan/bang", {"ten": "Kho", "tu": "mac_dinh"}).json()["bang"]["id"]
+    r = _gui(c, "/tong-quan/bang", {"ten": "kho", "tu": "mac_dinh"})
+    assert r.status_code == 409 and r.json()["loi"] == "Đã có bảng tên này."
+    assert _gui(c, f"/tong-quan/bang/{x}/xoa").status_code == 409
+    assert _gui(c, "/tong-quan/bang/thu-tu", [x, 999]).status_code == 422
+    assert c.post("/tong-quan/bang", data={"ten": "x"}).status_code == 415
+    assert _gui(c, "/tong-quan/bang/abc/mo").status_code == 404
+
+
+def test_duong_cu_bo_cuc_ghi_vao_bang_gan_nhat(web):
+    c = web.vao(web())
+    _gui(c, "/tong-quan/bang", {"ten": "A", "tu": "mac_dinh"})
+    b = _gui(c, "/tong-quan/bang", {"ten": "B", "tu": "mac_dinh"}).json()["bang"]["id"]
+    _gui(c, "/tong-quan/bo-cuc", [{"id": "tuong_quan"}])
+    kd = _khoi_dau(c.get("/").text)
+    assert kd["bang_hien_id"] == b and _hien(kd)["bo_cuc"][0]["id"] == "tuong_quan"
+
+
+def test_khong_co_cong_dang_nhap_thi_403(web):
+    c = web(bi_mat=None)
+    assert _gui(c, "/tong-quan/bang", {"ten": "A", "tu": "mac_dinh"}).status_code == 403
+    kd = _khoi_dau(c.get("/").text)
+    assert kd["bang_hien_id"] is None and len(kd["bang"]) == 1
+
+
+def test_cai_dat_khong_doc_bang_tong_quan():
+    import inspect
+    from kome.web import nguoi_dung as ND
+    assert "bang_tong_quan" not in inspect.getsource(ND.liet_ke)
+    assert "bang_tong_quan" not in ND._CHON_GON

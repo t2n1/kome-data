@@ -1,5 +1,5 @@
 # kome/web/app.py
-import os, re, shutil, sys, tempfile, traceback
+import json, os, re, shutil, sys, tempfile, traceback
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, Form, UploadFile, Request
@@ -21,6 +21,7 @@ from kome.tuoi_du_lieu import tinh_tuoi
 from kome.web import bao_mat
 from kome.web import nguoi_dung as ND
 from kome.web import bo_cuc as BC
+from kome.web import bang_tong_quan as BT
 from kome.web import spa as SPA
 from kome.web import anh_chup
 from kome.web.api import tao_api
@@ -435,6 +436,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         """Những gì giao diện React cần để vẽ khung NGAY, không chờ /api."""
         nguoi = getattr(request.state, "nguoi", None)
         che_do = _che_do_giao_dien(request)
+        # Các bảng Tổng quan (056): mọi bảng mang sẵn bố cục (≤ 20 × vài trăm
+        # byte) để chuyển tab không gọi máy chủ; `?bang=` chỉ CHỌN, không ghi
+        # bảng gần nhất.
+        ds = BT.tu_tho(nguoi.bang) if nguoi else []
+        hien = BT.chon(ds, request.query_params.get("bang"), nguoi.bang_gan_nhat if nguoi else None)
         return {
             "nguoi": None if nguoi is None else {
                 "id": nguoi.id, "ten_dang_nhap": nguoi.ten_dang_nhap,
@@ -447,7 +453,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "hien_kho": nguoi is None or nguoi.duoc_vao_kho_du_lieu,
             "hien_ngan_sach": nguoi is None or nguoi.duoc_sua_ngan_sach,
             "che_do_giao_dien": che_do,
-            "bo_cuc": [o.dict() for o in BC.chuan_hoa(nguoi.bo_cuc if nguoi else None)],
+            "bang": [b.dict() for b in (ds or [hien])],
+            "bang_hien_id": hien.id,
             "sap_xep_duoc": nguoi is not None,
             "danh_muc": BC.danh_muc(),
             "chua_co": KTQ_CHUA_CO,
@@ -501,44 +508,127 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                                      "Chạy: cd giao_dien && npm run build"))
         return _spa(request, tuoi=True)
 
-    @app.post("/tong-quan/bo-cuc")
-    async def luu_bo_cuc(request: Request):
-        """Lưu bố cục trang Tổng quan của người đang đăng nhập — tong_quan.js
-        gửi sau mỗi lần kéo/đổi cỡ/ẩn/hiện. Chỉ nhận JSON; mọi giá trị đi qua
-        `BC.chuan_hoa` (chỉ mã khối đã biết, kích thước kẹp trong dải), nên
-        thứ ghi xuống luôn là một bố cục hợp lệ, dù gửi lên là gì.
+    # ---- Bảng Tổng quan (056, kome/web/bang_tong_quan.py) -------------------
+    # Mọi đường chỉ nhận JSON và trả JSON. KHÔNG bị `_chi_doc` chặn — cùng lý lẽ
+    # `POST /ngan-sach` (CLAUDE.md): chế độ chỉ-đọc là giới hạn của luồng NẠP
+    # OBC, không phải phân quyền. Bảng người khác -> 404 (BT.LoiBang).
 
-        Không bị `_chi_doc` chặn — cùng lý lẽ `POST /ngan-sach` (CLAUDE.md):
-        chế độ chỉ-đọc là giới hạn của luồng NẠP OBC, không phải phân quyền,
-        và một mảng vài trăm byte vào app.nguoi_dung nằm thừa trong giới hạn."""
+    async def _doc_json(request: Request):
+        """(nguoi, thân JSON) — hoặc một JSONResponse lỗi để trả thẳng."""
         nguoi = getattr(request.state, "nguoi", None)
         if nguoi is None:
-            return JSONResponse({"loi": "Máy này chưa bật đăng nhập — không biết lưu bố cục cho ai."},
+            return JSONResponse({"loi": "Máy này chưa bật đăng nhập — không biết lưu bảng cho ai."},
                                 status_code=403)
         if not request.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse({"loi": "Cần gửi JSON."}, status_code=415)
         than = await request.body()
         if len(than) > BC.DAI_TOI_DA:
-            return JSONResponse({"loi": "Bố cục quá lớn."}, status_code=413)
-        bo_cuc = BC.chuan_hoa(than)
+            return JSONResponse({"loi": "Dữ liệu quá lớn."}, status_code=413)
+        try:
+            return nguoi, (json.loads(than) if than else None)
+        except ValueError:
+            return nguoi, None
+
+    def _chay_bang(viec, status_code: int = 200):
+        """Chạy `viec(conn)` trong một giao dịch kome_app; LoiBang -> JSON đúng mã."""
         try:
             with open_app_conn() as conn:
-                BC.luu(conn, nguoi.id, bo_cuc)
+                kq = viec(conn)
                 conn.commit()
+        except BT.LoiBang as e:
+            return JSONResponse({"loi": e.loi}, status_code=e.ma)
         except Exception:
             traceback.print_exc()
-            return JSONResponse({"loi": "Không lưu được bố cục."}, status_code=500)
-        return JSONResponse({"bo_cuc": [o.dict() for o in bo_cuc]})
+            return JSONResponse({"loi": "Không lưu được bảng."}, status_code=500)
+        return JSONResponse(kq, status_code=status_code)
+
+    def _ma_bang(ma: str) -> int:
+        if not ma.isdigit():
+            raise BT.LoiBang(404, "Không tìm thấy bảng này.")
+        return int(ma)
+
+    @app.post("/tong-quan/bang")
+    async def tao_bang(request: Request):
+        kq = await _doc_json(request)
+        if isinstance(kq, JSONResponse):
+            return kq
+        nguoi, than = kq
+        than = than if isinstance(than, dict) else {}
+        return _chay_bang(lambda c: {"bang": BT.tao(c, nguoi.id, than.get("ten"), than.get("tu")).dict()},
+                          status_code=201)
+
+    @app.post("/tong-quan/bang/thu-tu")
+    async def thu_tu_bang(request: Request):
+        kq = await _doc_json(request)
+        if isinstance(kq, JSONResponse):
+            return kq
+        nguoi, than = kq
+        return _chay_bang(lambda c: BT.sap_thu_tu(c, nguoi.id, than) or {})
+
+    @app.post("/tong-quan/bang/{ma}/bo-cuc")
+    async def luu_bo_cuc_bang(request: Request, ma: str):
+        """Tự lưu bố cục của MỘT bảng (400 ms sau lần kéo cuối). Mọi giá trị qua
+        `BC.chuan_hoa`. `ma = moi` = bảng ảo -> tạo dòng "Bảng của tôi"."""
+        kq = await _doc_json(request)
+        if isinstance(kq, JSONResponse):
+            return kq
+        nguoi, than = kq
+        bo_cuc = BC.chuan_hoa(than)
+        return _chay_bang(lambda c: {"bang": BT.luu_bo_cuc(
+            c, nguoi.id, None if ma == "moi" else _ma_bang(ma), bo_cuc).dict()})
+
+    @app.post("/tong-quan/bang/{ma}/ten")
+    async def doi_ten_bang(request: Request, ma: str):
+        kq = await _doc_json(request)
+        if isinstance(kq, JSONResponse):
+            return kq
+        nguoi, than = kq
+        ten = than.get("ten") if isinstance(than, dict) else None
+        return _chay_bang(lambda c: {"bang": BT.doi_ten(c, nguoi.id, _ma_bang(ma), ten).dict()})
+
+    @app.post("/tong-quan/bang/{ma}/xoa")
+    async def xoa_bang(request: Request, ma: str):
+        kq = await _doc_json(request)
+        if isinstance(kq, JSONResponse):
+            return kq
+        nguoi, _ = kq
+        return _chay_bang(lambda c: {"bang_hien": BT.xoa(c, nguoi.id, _ma_bang(ma))})
+
+    @app.post("/tong-quan/bang/{ma}/mo")
+    async def mo_bang(request: Request, ma: str):
+        """Ghi bảng xem gần nhất — CHỈ khi người dùng chủ động chuyển tab."""
+        kq = await _doc_json(request)
+        if isinstance(kq, JSONResponse):
+            return kq
+        nguoi, _ = kq
+        return _chay_bang(lambda c: BT.mo(c, nguoi.id, _ma_bang(ma)) or {})
+
+    @app.post("/tong-quan/bo-cuc")
+    async def luu_bo_cuc(request: Request):
+        """ĐƯỜNG CŨ (trước 056) — giữ một bản đời cho tab đang mở bản build cũ lúc
+        triển khai: ghi vào bảng mà `/` đang hiện (gần nhất / đầu / ảo). Xoá ở
+        đợt sau."""
+        kq = await _doc_json(request)
+        if isinstance(kq, JSONResponse):
+            return kq
+        nguoi, than = kq
+        bo_cuc = BC.chuan_hoa(than)
+        bid = BT.chon(BT.tu_tho(nguoi.bang), None, nguoi.bang_gan_nhat).id
+        return _chay_bang(lambda c: {"bo_cuc": [o.dict() for o in
+                                                BT.luu_bo_cuc(c, nguoi.id, bid, bo_cuc).bo_cuc]})
 
     @app.post("/tong-quan/bo-cuc/mac-dinh")
-    def bo_cuc_mac_dinh(request: Request):
-        """Nút "Về bố cục mặc định" — một FORM thường, nên chạy được cả khi
-        trình duyệt không chạy JavaScript."""
+    async def bo_cuc_mac_dinh(request: Request):
+        """Form "Đặt lại bố cục" — một FORM thường, chạy được cả khi trình duyệt
+        không chạy JavaScript. Trường `bang` = bảng cần đặt lại; thiếu / lạ thì
+        bảng đang hiện."""
         nguoi = getattr(request.state, "nguoi", None)
         if nguoi is not None:
+            ma = (await request.form()).get("bang")
+            b = BT.chon(BT.tu_tho(nguoi.bang), ma if isinstance(ma, str) else None, nguoi.bang_gan_nhat)
             try:
                 with open_app_conn() as conn:
-                    BC.luu(conn, nguoi.id, None)
+                    BT.luu_bo_cuc(conn, nguoi.id, b.id, None)
                     conn.commit()
             except Exception as e:
                 return _loi(request, "đưa bố cục về mặc định", e)
