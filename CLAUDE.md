@@ -807,7 +807,9 @@ khối; mọi chi tiết trong ô nổi `chung/ONoi.tsx` (chuột: rê hiện / 
 bàn phím: Tab hiện / Enter đi). Không bảng nào. Luật chữ: câu ĐỊNH NGHĨA cách tính vào `Khoi.cach_tinh`
 (ⓘ) — vẫn là `cach_tinh` của máy chủ truyền thẳng, không chép câu; câu NGOẠI LỆ đang xảy ra (tháng
 chưa đủ ngày, kỳ so không so được, kỳ thiếu tháng…) vào `Khoi.canh_bao`, LUÔN hiện; nhãn kỳ so LUÔN
-hiện. Vạch đứt của `ThanhNgang` (`ss`) chỉ dành cho kỳ so. Có test canh: `tests/test_tong_quan_it_chu.py`.
+hiện. Vạch đứt của `ThanhNgang` (`ss`) chỉ dành cho kỳ so. Quy tắc chạm hai lần của `BieuDo` (lần 1
+hiện ô nổi, lần 2 mới gọi `onBam`) không riêng của `/` — nó áp dụng cho biểu đồ của MỌI màn hình,
+vì `BieuDo`/`buocCham` dùng chung. Có test canh: `tests/test_tong_quan_it_chu.py`.
 Đặc tả: `docs/superpowers/specs/2026-09-28-tong-quan-it-chu-design.md`.
 
 **Bất biến (giao diện React, 2026-09-23):** chủ doanh nghiệp đổi nguyên tắc "không

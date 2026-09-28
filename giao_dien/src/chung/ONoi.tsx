@@ -7,7 +7,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore,
   type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { buocCham, viTriNoi } from "./o_noi_logic";
+import { buocCham, hoanToanNgoaiKhung, viTriNoi } from "./o_noi_logic";
 
 let dangMo: string | null = null;
 const nghe = new Set<() => void>();
@@ -35,7 +35,16 @@ export function ONoi({ noi_dung, href, onBam, children, className, style, nhan }
   useEffect(() => {
     if (!mo) return;
     const ngoai = (e: PointerEvent) => { if (!goc.current?.contains(e.target as Node)) datMo(null); };
-    const cuon = () => datMo(null);
+    // Cuộn (kể cả cuộn Tab đưa phần tử vào khung nhìn) ĐỊNH VỊ LẠI ô nổi thay vì đóng —
+    // đóng ở đây từng làm Tab bàn phím mở ô nổi rồi tự đóng ngay khi trình duyệt cuộn tới.
+    // Chỉ đóng khi phần tử gốc đã ra khỏi khung nhìn hẳn.
+    const cuon = () => {
+      const khung = { w: window.innerWidth, h: window.innerHeight };
+      if (!goc.current || !noi.current) { datMo(null); return; }
+      const r = goc.current.getBoundingClientRect();
+      if (hoanToanNgoaiKhung(r, khung)) { datMo(null); return; }
+      datVt(viTriNoi(r, { w: noi.current.offsetWidth, h: noi.current.offsetHeight }, khung));
+    };
     document.addEventListener("pointerdown", ngoai);
     window.addEventListener("scroll", cuon, true);
     return () => { document.removeEventListener("pointerdown", ngoai); window.removeEventListener("scroll", cuon, true); };
@@ -50,19 +59,21 @@ export function ONoi({ noi_dung, href, onBam, children, className, style, nhan }
     "aria-label": nhan,
     "aria-describedby": mo ? id : undefined,
     onPointerDown: (e: React.PointerEvent) => { kieu.current = e.pointerType; quaCon.current = true; },
-    onPointerEnter: (e: React.PointerEvent) => { if (e.pointerType === "mouse") datMo(id); },
-    onPointerLeave: (e: React.PointerEvent) => { if (e.pointerType === "mouse" && dangMo === id) datMo(null); },
+    onPointerEnter: (e: React.PointerEvent) => { if (e.pointerType !== "touch") datMo(id); },
+    onPointerLeave: (e: React.PointerEvent) => { if (e.pointerType !== "touch" && dangMo === id) datMo(null); },
     onFocus: () => { if (!quaCon.current) datMo(id); },
     onBlur: () => { quaCon.current = false; if (dangMo === id) datMo(null); },
     onKeyDown: (e: React.KeyboardEvent) => {
       if (e.key === "Escape") datMo(null);
       else if (e.key === "Enter" && !href) onBam?.();
+      else if (e.key === " " && !href) { e.preventDefault(); onBam?.(); }
     },
     onClick: (e: React.MouseEvent) => {
       const b = buocCham(mo, kieu.current);
       kieu.current = "mouse";
-      if (b === "mo") { e.preventDefault(); datMo(id); return; }
+      if (b === "mo") { e.preventDefault(); datMo(id); quaCon.current = false; return; }
       if (!href) onBam?.();
+      quaCon.current = false;
     },
   };
 

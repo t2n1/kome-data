@@ -87,7 +87,7 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
     <div className="bd" ref={khung}>
       <svg ref={svgRef} width="100%" height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={mo_ta}
         tabIndex={0}
-        onPointerMove={chon} onPointerLeave={e => { if (e.pointerType === "mouse") datTro(null); }}
+        onPointerMove={chon} onPointerLeave={e => { if (e.pointerType !== "touch") datTro(null); }}
         onPointerDown={e => { kieu.current = e.pointerType; daChon.current = tro; chon(e); }}
         onKeyDown={e => {
           if (e.key === "ArrowRight") datTro(t => Math.min((t ?? -1) + 1, n - 1));

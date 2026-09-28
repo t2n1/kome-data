@@ -17,3 +17,10 @@ export function viTriNoi(goc: { left: number; top: number; right: number; bottom
   const top = duoi + noi.h <= khung.h - le || tren < le ? duoi : tren;
   return { left: Math.round(left), top: Math.round(top) };
 }
+
+/** Cuộn (Tab kéo phần tử vào khung, hay cuộn tay): phần tử gốc đã ra khỏi khung hẳn chưa —
+ *  dùng để QUYẾT ĐỊNH đóng ô nổi thay vì định vị lại nó. */
+export function hoanToanNgoaiKhung(goc: { left: number; top: number; right: number; bottom: number },
+  khung: { w: number; h: number }): boolean {
+  return goc.right <= 0 || goc.bottom <= 0 || goc.left >= khung.w || goc.top >= khung.h;
+}

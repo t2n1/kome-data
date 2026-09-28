@@ -1,6 +1,6 @@
 // Các khối của Tổng quan — bố cục theo Dashboard.dc.html, số THẬT từ
 // /api/tong-quan/<khối> (kome/khoi_tong_quan.py). Không số mẫu ở đâu cả.
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState, type ReactNode } from "react";
 import { useKhoi } from "../api";
 import { giuKhoang } from "../khung/khoang";
 import { BieuDo, type Chuoi } from "../chung/BieuDo";
@@ -16,6 +16,12 @@ import { demTheoTag, sapViec, tenViec } from "./viec_logic";
 import { DaiHan, type Lo } from "./DaiHan";
 
 const LUC = { ok: "var(--ok-vien)", canh: "var(--lien-ket)", do: "var(--do)", nhat: "var(--chu-mo)", nen: "var(--vien)" };
+/** Nhiều ngoại lệ có thể cùng xảy ra (đặc tả §4: LUÔN hiện, không phải chỉ ngoại lệ đầu tiên
+ *  của một chuỗi ternary) — lọc bỏ cái không áp dụng rồi in mỗi cái một dòng. */
+function canhBaoNhieu(ds: (ReactNode | null | undefined | false)[]): ReactNode | undefined {
+  const ap = ds.filter((x): x is ReactNode => x != null && x !== false);
+  return ap.length ? <>{ap.map((m, i) => <Fragment key={i}>{i > 0 && <br />}{m}</Fragment>)}</> : undefined;
+}
 const tenNguoi = (ten: string | null | undefined, ma: string) => ten || `(mã ${ma})`;
 const MO = "color-mix(in srgb, var(--lien-ket) 35%, var(--nen-the))";
 // Kỳ so (đặc tả 2026-09-28): một kỳ cho cả trang, nhãn của MÁY CHỦ. Màu chung của
@@ -203,8 +209,10 @@ export function KhoiNganSach() {
       phu={ssN?.co ? <>so {ssN.nhan}</> : undefined}
       cach_tinh={d ? <>{d.co_ngan_sach ? `Vạch đen = mốc đáng lẽ đạt tới hôm nay (${pc(d.moc)}) — tính theo ngày làm việc, trừ ngày lễ.` : "Thanh = doanh thu thực tế của từng người phụ trách."}
         {ssN?.co ? ` Vạch đứt = doanh thu ${ssN.nhan}.` : ""}</> : undefined}
-      canh_bao={d && !d.co_ngan_sach ? <>Chưa đặt chỉ tiêu tháng này.{KD.hien_ngan_sach && <> <a href="/ngan-sach">Đặt chỉ tiêu →</a></>}</>
-        : ssN && !ssN.co ? `${hoa(ssN.nhan)}: không có dữ liệu để so.` : undefined}>
+      canh_bao={canhBaoNhieu([
+        d && !d.co_ngan_sach ? <>Chưa đặt chỉ tiêu tháng này.{KD.hien_ngan_sach && <> <a href="/ngan-sach">Đặt chỉ tiêu →</a></>}</> : null,
+        ssN && !ssN.co ? `${hoa(ssN.nhan)}: không có dữ liệu để so.` : null,
+      ])}>
       {d && <div className="ns-luoi">
         <div className="ns-so">
           {d.co_ngan_sach
@@ -311,13 +319,14 @@ export function KhoiTheoThang() {
     <Khoi tieu_de="Theo từng tháng" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/bao-cao", chu: "Báo cáo" }}
       phu={ss ? <>so {ss.nhan}</> : undefined}
       cach_tinh={d?.company_fy ? `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}). Cột đậm = thuộc khoảng xem; cột viền đứt = ${ss?.nhan ?? "kỳ so"}; đường = ngân sách tháng.` : undefined}
-      canh_bao={!d ? undefined
-        : ss && ss.co && ss.lech_thang == null ? "Kỳ so không lệch tròn tháng — không so theo tháng được."
-        : ss && !ck ? `${hoa(ss.nhan)}: không có dữ liệu để so.`
-        : thangNay && t.some(x => x.thang === thangNay)
+      canh_bao={!d ? undefined : canhBaoNhieu([
+        ss && ss.co && ss.lech_thang == null ? "Kỳ so không lệch tròn tháng — không so theo tháng được." : null,
+        ss && !ck ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : null,
+        thangNay && t.some(x => x.thang === thangNay)
           ? (d.cat_cung_ngay ? `Tháng đang chạy chưa đủ ngày — %NS chưa so ngang được; cột ma của tháng này đã cắt cùng dải ngày ở ${ss?.nhan}.`
             : "Tháng đang chạy chưa đủ ngày — %NS và phép so của tháng này chưa so ngang được.")
-          : undefined}>
+          : null,
+      ])}>
       {d && <>
         <HangSo>
           <MucSo nhan="Luỹ kế" gia={gon(tong)} chi_tiet={<DongNoi nhan="Tháng có dữ liệu"
@@ -488,7 +497,7 @@ export function KhoiTuongQuan() {
           {k.map(x => <circle key={x.ma} cx={px(x)} cy={py(x)} r={tro?.ma === x.ma ? 6 : 4} fill={MAU_TT[x.trang_thai] ?? LUC.nhat}
             opacity={tro && tro.ma !== x.ma ? 0.35 : 0.72} style={{ cursor: "pointer" }}
             onPointerDown={e => { kieu.current = e.pointerType; }}
-            onPointerEnter={e => { if (e.pointerType === "mouse") datTro(x); }} onPointerLeave={e => { if (e.pointerType === "mouse") datTro(null); }}
+            onPointerEnter={e => { if (e.pointerType !== "touch") datTro(x); }} onPointerLeave={e => { if (e.pointerType !== "touch") datTro(null); }}
             onClick={() => {
               const b = buocCham(tro?.ma === x.ma, kieu.current);
               kieu.current = "mouse";
@@ -551,8 +560,8 @@ export function KhoiKhachMoi() {
         {d.so_sanh.map(s => <DongSoSanh key={s.ma} nhan={s.nhan} co={s.co && s.so_khach != null}
           nay={s.so_khach_nay} ss={s.so_khach} />)}
         <ThanhChong dinh_dang={so} don_vi="Khách" khuc={[
-          { khoa: "da", nhan: "Đã có đơn", dem: d.da_mua, mau: "var(--lien-ket)" },
-          { khoa: "chua", nhan: "Chưa có đơn", dem: d.chua_mua, mau: LUC.canh,
+          { khoa: "da", nhan: "Đã có đơn", dem: d.da_mua, mau: LUC.ok },
+          { khoa: "chua", nhan: "Chưa có đơn", dem: d.chua_mua, mau: "var(--canh-chu)",
             chi_tiet: <>{chua.slice(0, 10).map(k => <DongNoi key={k.ma} nhan={<span className="ten-jp">{k.ten}</span>} gia={ngay_ngan(k.ngay_dang_ky)} />)}
               {d.chua_mua > Math.min(chua.length, 10) && <em>… và {so(d.chua_mua - Math.min(chua.length, 10))} khách nữa</em>}</> },
         ]} />
@@ -560,8 +569,8 @@ export function KhoiKhachMoi() {
           mo_ta="Số khách mới đăng ký từng tháng, 12 tháng gần nhất, và số đã có đơn"
           chuoi={[
             { ten: "Đăng ký", kieu: "cot_nen", gia_tri: t.map(x => x.so_khach), mau: "var(--vien)", so_voi: t.some(x => x.so_khach_ss != null) ? 2 : undefined },
-            { ten: "Đã có đơn", kieu: "cot", gia_tri: t.map(x => x.da_mua), mau: "var(--lien-ket)",
-              mau_tung_cot: t.map(x => trongKhoang(d.khoang, x.thang) ? "var(--lien-ket)" : MO) },
+            { ten: "Đã có đơn", kieu: "cot", gia_tri: t.map(x => x.da_mua), mau: LUC.ok,
+              mau_tung_cot: t.map(x => trongKhoang(d.khoang, x.thang) ? LUC.ok : MO) },
             // Đã có hai lớp cột -> kỳ so là NÉT ĐỨT, không thêm lớp cột thứ ba (đặc tả §6).
             ...(t.some(x => x.so_khach_ss != null) ? [{ ten: `Đăng ký · ${d.ss?.nhan ?? "kỳ so"}`, kieu: "duong_dut" as const,
               gia_tri: t.map(x => x.so_khach_ss), mau: MAU_SS }] : []),
@@ -623,7 +632,8 @@ export function KhoiViec() {
   return (
     <Khoi tieu_de="Việc hôm nay" dang_tai={isLoading} loi={error?.message}
       nhan={v.length ? `${soXong}/${v.length} xong` : undefined} mau_nhan={soXong === v.length ? "ok" : "nhat"}
-      phu={KD.nguoi?.sale ? <button type="button" className="chip" aria-pressed={!tatCa} onClick={() => datTatCa(t => !t)}>{tatCa ? "Mọi người" : "Của tôi"}</button> : undefined}
+      phu={KD.nguoi?.sale ? <button type="button" className="chip" aria-pressed={!tatCa}
+        onClick={() => { datTatCa(t => !t); datLoc(null); datMoRong(false); }}>{tatCa ? "Mọi người" : "Của tôi"}</button> : undefined}
       cach_tinh={d ? `Chưa gom được việc từ ${d.thieu_nguon.join(", ")} — chưa có nguồn dữ liệu. Dấu "xong" chỉ nhớ trên máy này, trong hôm nay. Bấm một khúc của thanh để lọc theo lý do.` : undefined}>
       {d && <>
         {v.length > 0 && <ThanhChong dinh_dang={so} don_vi="Việc"

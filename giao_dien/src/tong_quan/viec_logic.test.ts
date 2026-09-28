@@ -8,6 +8,10 @@ describe("tenViec", () => {
   });
   it("câu không phải gọi khách giữ nguyên", () =>
     expect(tenViec("Chưa nạp 得意先全情報 hôm nay")).toBe("Chưa nạp 得意先全情報 hôm nay"));
+  it("hẹn gọi lại — có ghi chú", () =>
+    expect(tenViec("Gọi lại 山田商店 — báo giá mới")).toBe("山田商店"));
+  it("hẹn gọi lại — không ghi chú", () =>
+    expect(tenViec("Gọi lại 山田商店")).toBe("山田商店"));
 });
 
 describe("sapViec", () => {

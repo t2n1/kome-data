@@ -3,7 +3,7 @@
 export type ViecTho = { muc: "gap" | "canh" | "thuong"; tag: string; chu: string };
 
 export function tenViec(chu: string): string {
-  const m = /^Gọi\s+(.+?)\s+—\s/.exec(chu);
+  const m = /^Gọi(?:\s+lại)?\s+(.+?)(?:\s+—\s|$)/.exec(chu);
   return m ? m[1] : chu;
 }
 

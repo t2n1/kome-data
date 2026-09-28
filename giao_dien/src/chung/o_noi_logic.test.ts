@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buocCham, viTriNoi } from "./o_noi_logic";
+import { buocCham, hoanToanNgoaiKhung, viTriNoi } from "./o_noi_logic";
 
 describe("buocCham", () => {
   it("chạm lần 1 (chưa mở) chỉ mở ô nổi", () => expect(buocCham(false, "touch")).toBe("mo"));
@@ -30,5 +30,19 @@ describe("viTriNoi", () => {
   });
   it("không chỗ nào vừa thì vẫn nằm dưới (không đẩy lên khỏi mép trên)", () => {
     expect(viTriNoi({ left: 100, top: 20, right: 200, bottom: 40 }, { w: 100, h: 900 }, khung).top).toBe(46);
+  });
+});
+
+describe("hoanToanNgoaiKhung", () => {
+  const khung = { w: 375, h: 800 };
+  it("còn một phần trong khung (cuộn giữa chừng) — chưa ra hẳn", () => {
+    expect(hoanToanNgoaiKhung({ left: 100, top: 790, right: 200, bottom: 830 }, khung)).toBe(false);
+    expect(hoanToanNgoaiKhung({ left: 100, top: -10, right: 200, bottom: 20 }, khung)).toBe(false);
+  });
+  it("ra khỏi khung hẳn — dưới đáy, trên đỉnh, trái, phải", () => {
+    expect(hoanToanNgoaiKhung({ left: 100, top: 810, right: 200, bottom: 850 }, khung)).toBe(true);
+    expect(hoanToanNgoaiKhung({ left: 100, top: -60, right: 200, bottom: -10 }, khung)).toBe(true);
+    expect(hoanToanNgoaiKhung({ left: -100, top: 100, right: -10, bottom: 120 }, khung)).toBe(true);
+    expect(hoanToanNgoaiKhung({ left: 400, top: 100, right: 450, bottom: 120 }, khung)).toBe(true);
   });
 });
