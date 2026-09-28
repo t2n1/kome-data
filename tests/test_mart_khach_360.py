@@ -70,35 +70,6 @@ def test_tre_ngay_la_NULL_va_du_kien_lan_toi_dung_khi_chua_qua_han(conn, batch):
     assert tre_ngay is None, "còn trong hạn (mua cách đây 3 ngày, nhịp 7 ngày) không được có số trễ"
 
 
-def test_hang_doanh_thu_phu_dung_100_phan_tram_khach_khong_trung_bac(conn, batch):
-    """[IMPORTANT] Khách rơi ra khỏi mọi bậc là khách biến mất khỏi mọi bộ lọc
-    hạng — không ai thấy họ nữa và không có gì báo."""
-    for i in range(12):
-        _ho_so_khach(conn, batch, f"H{i:04d}", f"Quán {i}")
-        _mua(conn, batch, f"H{i:04d}", HOM_NAY - timedelta(days=5), tien=(i + 1) * 10_000)
-    _neo(conn, batch)
-    tong = conn.execute("SELECT count(*) FROM mart.khach_360").fetchone()[0]
-    r = conn.execute(
-        """SELECT count(*), count(DISTINCT customer_code), count(*) FILTER (WHERE hang IS NULL)
-           FROM mart.hang_doanh_thu""").fetchone()
-    assert r[0] == tong, "số dòng hạng phải bằng số khách"
-    assert r[1] == tong, "không khách nào được xuất hiện hai lần"
-    assert r[2] == 0, "không khách nào được thiếu hạng"
-    assert {x[0] for x in conn.execute(
-        "SELECT DISTINCT hang FROM mart.hang_doanh_thu").fetchall()} <= {"S", "A", "B", "C", "D"}
-
-
-def test_khach_doanh_thu_cao_nhat_o_hang_S(conn, batch):
-    for i in range(20):
-        _ho_so_khach(conn, batch, f"H{i:04d}", f"Quán {i}")
-        _mua(conn, batch, f"H{i:04d}", HOM_NAY - timedelta(days=5), tien=(i + 1) * 10_000)
-    _neo(conn, batch)
-    r = conn.execute(
-        """SELECT hang FROM mart.hang_doanh_thu
-           ORDER BY dt_12t DESC LIMIT 1""").fetchone()
-    assert r[0] == "S"
-
-
 def test_nhom_im_lang_trung_khop_voi_can_xu_ly(conn, batch):
     """[CRITICAL] `/can-xu-ly` và nhóm việc 'Im lặng' trả lời CÙNG một câu hỏi.
     Hai định nghĩa là hai trang nói hai điều, và người dùng không biết tin cái
@@ -161,11 +132,10 @@ def test_ba_cho_noi_ve_khach_dang_roi_di_deu_cho_cung_mot_tap(conn, batch):
 def test_nhom_tut_bat_khach_hang_cao_dang_giam_manh(conn, batch):
     """[IMPORTANT] `tut` là đoạn SQL phức tạp nhất file (hai truy vấn con
     tương quan, cửa sổ trượt 30/90 ngày, ngưỡng 80%, cổng hạng S/A) — chưa có
-    test nào canh nó trước vòng sửa này. Dựng 1 khách hạng cao (doanh thu cao
-    nhất trong 5 khách -> vị trí 1/5 = 0,20 -> hạng A) có 30 ngày gần nhất tụt
-    hẳn dưới 80% trung bình ba kỳ 30 ngày trước đó."""
+    test nào canh nó trước vòng sửa này. Dựng 1 khách hạng OBC A (055) có 30
+    ngày gần nhất tụt hẳn dưới 80% trung bình ba kỳ 30 ngày trước đó."""
     ma = "TU001"
-    _ho_so_khach(conn, batch, ma, "Quán tụt")
+    _ho_so_khach(conn, batch, ma, "Quán tụt", rank_code="0002")
     # 3 kỳ 30 ngày trước (31-120 ngày trước): đều 100.000 yên/lần -> TB 100.000/kỳ.
     for i in range(3):
         _mua(conn, batch, ma, HOM_NAY - timedelta(days=40 + i * 30), tien=110_000)
@@ -178,8 +148,8 @@ def test_nhom_tut_bat_khach_hang_cao_dang_giam_manh(conn, batch):
         _mua(conn, batch, f, HOM_NAY - timedelta(days=200), tien=tien)
     _neo(conn, batch)
     hang = conn.execute(
-        "SELECT hang FROM mart.hang_doanh_thu WHERE customer_code=%s", (ma,)).fetchone()[0]
-    assert hang in ("S", "A"), f"khách doanh thu cao nhất phải ở hạng cao, hạng thực={hang}"
+        "SELECT hang_obc FROM mart.khach_360 WHERE customer_code=%s", (ma,)).fetchone()[0]
+    assert hang in ("S", "A"), f"khách phải ở hạng OBC cao, hạng thực={hang}"
     assert conn.execute(
         "SELECT count(*) FROM mart.khach_nhom_viec WHERE customer_code=%s AND nhom='tut'",
         (ma,)).fetchone()[0] == 1
@@ -190,7 +160,7 @@ def test_nhom_tut_khong_bat_khach_hang_cao_khong_giam(conn, batch):
     nhất KHÔNG tụt (bằng đúng trung bình ba kỳ trước) thì không được vào
     nhóm 'tut'."""
     ma = "TB001"
-    _ho_so_khach(conn, batch, ma, "Quán ổn định")
+    _ho_so_khach(conn, batch, ma, "Quán ổn định", rank_code="0001")
     for i in range(3):
         _mua(conn, batch, ma, HOM_NAY - timedelta(days=40 + i * 30), tien=110_000)
     # 30 ngày gần nhất mua bằng đúng mức trung bình các kỳ trước -> không tụt.
@@ -201,8 +171,8 @@ def test_nhom_tut_khong_bat_khach_hang_cao_khong_giam(conn, batch):
         _mua(conn, batch, f, HOM_NAY - timedelta(days=200), tien=tien)
     _neo(conn, batch)
     hang = conn.execute(
-        "SELECT hang FROM mart.hang_doanh_thu WHERE customer_code=%s", (ma,)).fetchone()[0]
-    assert hang in ("S", "A"), f"khách doanh thu cao nhất phải ở hạng cao, hạng thực={hang}"
+        "SELECT hang_obc FROM mart.khach_360 WHERE customer_code=%s", (ma,)).fetchone()[0]
+    assert hang in ("S", "A"), f"khách phải ở hạng OBC cao, hạng thực={hang}"
     assert conn.execute(
         "SELECT count(*) FROM mart.khach_nhom_viec WHERE customer_code=%s AND nhom='tut'",
         (ma,)).fetchone()[0] == 0

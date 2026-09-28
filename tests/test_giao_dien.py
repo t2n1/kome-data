@@ -10,6 +10,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from kome import khach_hang as KH
 from kome.web.app import create_app
 from tests.spa_kd import kd, nguon
 
@@ -358,32 +359,31 @@ def test_trang_danh_sach_co_du_bon_khoi_va_ba_bo_loc(conn, test_db_url):
     c = TestClient(create_app(db_url=test_db_url))
     tq = c.get("/api/khach-hang/ds").json()["tq"]
     assert set(tq["nhom"]) == {"im", "tut", "moi"}
-    assert [h for h, _ in tq["hang"]] == ["S", "A", "B", "C", "D"]
+    assert [h for h, _ in tq["hang"]] == list(KH.THU_TU_HANG)
     assert "tinh" in tq and "nhan_vien" in tq and "thang" in tq
     nguon = Path("giao_dien/src/khach/DanhSach.tsx").read_text(encoding="utf-8")
     for ten in ("Toàn bộ danh bạ", "Im lặng ≥ 2× nhịp", "đang tụt", "Khách mới", "Mua đều, tháng này chưa"):
         assert ten in nguon, f"thiếu nút nhóm việc: {ten}"
-    for tieu_de in ("Phân bố theo hạng doanh thu 12 tháng", "Tập trung ở đâu", "Tải của từng nhân viên"):
+    for tieu_de in ("Phân bố theo hạng OBC", "Tập trung ở đâu", "Tải của từng nhân viên"):
         assert tieu_de in nguon, f"thiếu khối: {tieu_de}"
-    # Bộ lọc: chip hạng S..D, ô chọn người phụ trách, ô chọn tỉnh.
-    assert '["S", "A", "B", "C", "D"].map(h =>' in nguon
+    # Bộ lọc: chip hạng (danh sách hạng OBC của máy chủ), ô chọn người phụ trách, ô chọn tỉnh.
+    assert "tq.hang.map(([h]) =>" in nguon
     assert "<span>Phụ trách</span>" in nguon and "<span>Tỉnh</span>" in nguon
 
 
 def test_nhan_hang_khong_bao_gio_tro_troi():
-    """[IMPORTANT] core.dim_customer.rank_code (得意先ランク của OBC, 10 nhóm;
-    từ 043 có cả tên — rank_name, hiện ở tab Hồ sơ) cũng tồn tại. Gọi tắt chỉ số của ta là "hạng" thì sáu
-    tháng nữa sẽ có người đối chiếu với OBC, thấy lệch, và không biết tin cái
-    nào. Giai đoạn 2: màn Khách hàng là React — MỌI dòng mã giao diện nhắc
-    "hạng" phải mang theo "doanh thu 12 tháng" trên CHÍNH phần tử đó (chữ hiện
-    ra hoặc `title`). Ngoại lệ: "Hạng S·A đang tụt" (mô tả ngay dưới đã nói đủ)
-    và "xếp hạng" (động từ, không phải chỉ số)."""
+    """[IMPORTANT] Từ 055 "hạng" là 得意先ランク của OBC (chủ DN chốt 2026-09-28;
+    trước đó web tự tính hạng theo doanh thu và người ta đối chiếu với OBC thấy lệch).
+    MỌI dòng mã giao diện nhắc "hạng" phải nói rõ đó là hạng OBC (chữ hiện ra hoặc
+    `title`) — "Hạng OBC" / "得意先ランク". Ngoại lệ: "Hạng S·A đang tụt" (mô tả ngay
+    dưới đã nói đủ), "xếp hạng" (động từ) và `Hạng {h}` trong khối đã có tiêu đề
+    "Phân bố theo hạng OBC" (dòng có title 得意先ランク)."""
     tro_troi = []
     for p in sorted(Path("giao_dien/src/khach").glob("*.tsx")):
         for i, dong in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
             d = dong.lower()
             if "hạng" in d and not dong.lstrip().startswith("//") and not re.search(
-                    r"doanh thu 12 tháng|s·a|xếp hạng", d):
+                    r"hạng obc|得意先ランク|s·a|xếp hạng", d):
                 tro_troi.append(f"{p.name}:{i}: {dong.strip()[:90]}")
     assert not tro_troi, "'hạng' trơ trọi — sẽ bị đối chiếu nhầm với 得意先ランク: " + " | ".join(tro_troi)
 

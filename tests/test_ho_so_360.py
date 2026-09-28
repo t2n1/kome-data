@@ -46,5 +46,5 @@ def test_hash_cu_va_loi_tx_van_duoc_xu_ly():
     assert "TN.cong_no" in hs
 
 
-def test_nhan_hang_noi_ro_la_hang_theo_doanh_thu():
-    assert 'title="hạng theo doanh thu 12 tháng"' in _doc("HoSo.tsx")
+def test_nhan_hang_noi_ro_la_hang_OBC():
+    assert "Hạng OBC (得意先ランク)" in _doc("HoSo.tsx")

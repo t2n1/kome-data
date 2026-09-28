@@ -14,7 +14,7 @@ import type { DsApi, HoSoApi } from "./kieu";
 import { MAU_THANG, MAU_TT } from "./DanhSach";
 import { BieuDo12Thang, OSoSucKhoe, TabCongNo, TabDonHang, TabHoSo, TabMatHang } from "./HoSoTab";
 import { HoSoViec, ID_GHI_NHANH } from "./HoSoViec";
-import { TAB_HO_SO, tabTuHash, type MaTabHoSo } from "./ho_so_logic";
+import { lopHang, TAB_HO_SO, tabTuHash, type MaTabHoSo } from "./ho_so_logic";
 import "./khach.css";
 import { TN } from "../khoi_dau";
 
@@ -60,7 +60,7 @@ export default function HoSo({ ma }: { ma: string }) {
       <header className="hs2-dau">
         <div className="hs2-dau-chu">
           <h1><span className="ten-jp">{k.ten}</span>
-            {h.hang && <span className={"kh-hang-nhan lon h" + h.hang} title="hạng theo doanh thu 12 tháng">Hạng {h.hang}</span>}
+            {h.hang && <span className={"kh-hang-nhan lon " + lopHang(h.hang)} title={`Hạng OBC (得意先ランク): ${k.hang_ten ?? h.hang}`}>Hạng {h.hang}</span>}
             <span className={"nhan-vien " + (MAU_TT[k.trang_thai] ?? "nhat")}>{h.nhan_trang_thai[k.trang_thai] ?? k.trang_thai}</span>
             {tn && (tn.nhan === "tre" || tn.nhan === "da_mua" || tn.nhan === "chua_toi_ngay") && <span className={"nhan-vien " + (MAU_THANG[tn.nhan] ?? "nhat")}
               title={tn.nhan === "tre" ? h.cach_tinh_thang : undefined}>{h.nhan_thang[tn.nhan]}</span>}

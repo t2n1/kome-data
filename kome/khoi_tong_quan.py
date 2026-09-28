@@ -74,7 +74,7 @@ def kpi(conn, sale=None, ts=None) -> dict:
         nay, ss = BK.tong(conn, kx)
         spark = [o.doanh_thu for o in BK.chuoi(conn, kx)[1]]
     ns = _ns_theo_khoang(conn, kx)
-    dem, _ = KH.dem_va_can_xu_ly(conn, gioi_han=0, sale=None)
+    dem, _ = KH.dem_va_can_xu_ly(conn, gioi_han=0, sale=None, chi_goi=True)
     kho = dict(conn.execute(
         "SELECT trang_thai, count(*)::int FROM mart.san_pham_360 GROUP BY 1").fetchall())
     can_han, so_qua_han = SP.lo_can_han(conn, gioi_han=1000)
@@ -98,6 +98,7 @@ def kpi(conn, sale=None, ts=None) -> dict:
         "ngan_sach_chi_theo_thang": kx is not None and kx.loai == "khoang",
         "kho": {"het_hang": kho.get("het_hang", 0), "can_han": len(can_han),
                 "qua_han": so_qua_han},
+        # Ô "cần gọi" đếm khách ĐƯỢC gọi (bỏ khong_goi — hạng OBC Z/ZZ/ZZZ, 055).
         "khach": {"can_goi": dem.get("canh_bao", 0), "roi_bo": dem.get("da_roi_bo", 0)},
     }
 

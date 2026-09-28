@@ -78,7 +78,7 @@ export default function CaiDat() {
             <ul>
               <li><strong>Nhịp mua</strong> = trung vị khoảng cách giữa các lần mua của CHÍNH khách đó (cần ≥ 3 lần mua).</li>
               <li><strong>Quá hạn mua lại</strong> khi im lặng ≥ 2 lần nhịp · <strong>lâu không mua</strong> khi ≥ 4 lần · <strong>sắp đến hạn</strong> khi 1–2 lần.</li>
-              <li><strong>Hạng</strong> tính theo doanh thu 12 tháng của ta, KHÔNG phải 得意先ランク của OBC.</li>
+              <li><strong>Hạng</strong> là 得意先ランク của OBC (file 得意先全情報). Khách hạng Z / ZZ / ZZZ không vào danh sách gọi.</li>
               <li><strong>Mua đều, tháng này chưa</strong> = có đơn đến cùng ngày ở ≥ 2 trong 3 tháng trước mà tháng này chưa.</li>
               <li>Khách OBC đánh dấu ※廃業※ / ※取引停止※ không bao giờ vào danh sách gọi lại.</li>
             </ul>

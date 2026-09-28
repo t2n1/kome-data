@@ -6,7 +6,9 @@ export type KhachDong = {
   nguoi_phu_trach: string | null; doanh_thu: number; lai_gop: number; ty_suat: number | null;
   lan_cuoi: string | null; so_ngay_im_lang: number | null; nhip_ngay: number | null;
   ty_le_im_lang: number | null; trang_thai: string; dau_hieu_obc: string | null;
-  hang: string | null; thang_nay: number | null; thang_truoc_cung_ngay: number | null;
+  // Hạng OBC (得意先ランク, 055): nhãn ngắn + tên đầy đủ; khong_goi = không vào danh sách gọi.
+  hang: string | null; hang_ten: string | null; khong_goi: boolean;
+  thang_nay: number | null; thang_truoc_cung_ngay: number | null;
   tb_3_thang: number | null; nhan_thang: string | null;
   dt_khoang: number | null; lg_khoang: number | null; so_phieu_khoang: number | null; dt_ss: number | null;
 };

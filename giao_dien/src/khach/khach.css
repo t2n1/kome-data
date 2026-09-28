@@ -40,7 +40,8 @@
 .kh-tim{flex:1 1 260px;font:inherit;font-size:.84rem;padding:.42rem .65rem;border:1px solid var(--vien-dam);border-radius:8px;
   background:var(--nen);color:var(--chu);min-width:0}
 .kh-hang{display:inline-flex;gap:.2rem}
-.kh-hang button{font:inherit;font-size:.78rem;font-weight:600;width:30px;height:30px;border-radius:7px;border:1px solid var(--vien);
+.kh-hang{flex-wrap:wrap}
+.kh-hang button{font:inherit;font-size:.78rem;font-weight:600;min-width:30px;padding:0 .4rem;height:30px;border-radius:7px;border:1px solid var(--vien);
   background:var(--nen-the);color:var(--chu-thuong);cursor:pointer}
 .kh-hang button[aria-pressed="true"]{border-color:var(--do);background:var(--do-nen);color:var(--do-chu)}
 .kh-chon{display:flex;flex-direction:column;gap:.12rem;font-size:.68rem;color:var(--chu-nhat);letter-spacing:.03em}
@@ -66,7 +67,8 @@ table.kh-bang td{height:46px;padding-top:.3rem;padding-bottom:.3rem}
 .kh-pt{white-space:nowrap;font-size:.78rem}
 .kh-hang-nhan{display:inline-block;min-width:22px;text-align:center;font-size:.72rem;font-weight:700;border-radius:5px;padding:.1rem .35rem;
   background:var(--nen-phu);color:var(--chu-thuong)}
-.kh-hang-nhan.hS,.kh-hang-nhan.hA{background:var(--ok-nen);color:var(--ok-chu)}
+.kh-hang-nhan.hS{background:var(--ok-nen);color:var(--ok-chu)}
+.kh-hang-nhan.hZ{background:var(--loi-nen);color:var(--loi-chu)}
 .kh-hang-nhan.lon{font-size:.78rem;padding:.15rem .5rem;margin:0 .45rem;vertical-align:middle}
 .kh-ss{white-space:nowrap;min-width:118px;font-size:.76rem;font-variant-numeric:tabular-nums}
 .kh-ss-thanh{display:inline-block;position:relative;width:54px;height:7px;background:var(--nen-phu);border-radius:4px;

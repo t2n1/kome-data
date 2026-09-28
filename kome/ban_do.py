@@ -22,7 +22,7 @@ CHI_SO = {
 
 # Khoảng xem (đợt B): hai chỉ số theo khoảng đang xem — chỉ có khi API giải
 # được khoảng (`kx`). "Doanh thu 12 tháng" ở trên GIỮ NGUYÊN (đọc
-# mart.hang_doanh_thu.dt_12t — bất biến CLAUDE.md); đây là chỉ số KHÁC, đọc
+# mart.doanh_thu_12t.dt_12t — bất biến CLAUDE.md); đây là chỉ số KHÁC, đọc
 # mart.tinh_khoang (migration 039).
 CHI_SO_KHOANG = {
     "dt_khoang": "Doanh thu",
@@ -258,7 +258,7 @@ def ban_do(conn, sale: str | None = None, chi_so: str = "khach", kx=None) -> Tra
     # [Vòng sửa 1] CTE `s AS MATERIALIZED`, ghi TƯỜNG MINH — BẢN ĐẦU không có
     # CTE này, và mỗi nhánh UNION ALL bên dưới tự viết `FROM
     # mart.khach_theo_tinh` riêng, tức MỖI LẦN THAM CHIẾU LÀ MỘT LẦN DỰNG LẠI
-    # cả view (khach_360 + hang_doanh_thu + EXISTS vào khach_nhom_viec).
+    # cả view (khach_360 + doanh_thu_12t + EXISTS vào khach_nhom_viec).
     # Cộng CTE `tinh` của truy vấn A ở trên, một lần mở trang dựng lại
     # khach_theo_tinh BA LẦN — trong khi ngân sách "<= 2 truy vấn" chỉ đếm SỐ
     # LƯỢT HỎI, không đếm sức tính, nên nó không hề bắt được lớp lỗi này

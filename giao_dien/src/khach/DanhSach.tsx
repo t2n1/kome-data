@@ -11,6 +11,7 @@ import { gon, so, thay_doi, yen } from "../dinh_dang";
 import type { BoLoc } from "./loc";
 import { nhoDanhSach, thamSoDs } from "./loc";
 import type { DsApi, KhachDong } from "./kieu";
+import { lopHang } from "./ho_so_logic";
 import { TN } from "../khoi_dau";
 
 // Công nợ ghi theo BÊN NHẬN HOÁ ĐƠN (請求先), không theo từng khách — nên danh sách
@@ -77,7 +78,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       {chu}{t.sap === cot ? (b.giam === "0" ? " ▲" : " ▼") : ""}</th>);
 
   const xuatCsv = () => {
-    const cot = ["Mã", "Tên", "Tỉnh", "Điện thoại", "Phụ trách", "Hạng theo doanh thu 12 tháng", `DT ${kxNhan}`, ssp ? `DT ${ssp.nhan}` : "So sánh", "TB 3 tháng",
+    const cot = ["Mã", "Tên", "Tỉnh", "Điện thoại", "Phụ trách", "Hạng OBC", `DT ${kxNhan}`, ssp ? `DT ${ssp.nhan}` : "So sánh", "TB 3 tháng",
       "Doanh thu luỹ kế", "Im lặng (× nhịp)", "Đơn cuối", "Trạng thái"];
     const dong = dongChon.map(k => [k.ma, k.ten, k.tinh ?? "", k.dien_thoai ?? "", tenNv[k.nguoi_phu_trach ?? ""] ?? k.nguoi_phu_trach ?? "",
       k.hang ?? "", k.dt_khoang ?? "", k.dt_ss ?? "", k.tb_3_thang ?? "", k.doanh_thu,
@@ -125,9 +126,9 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       <div className="kh-cong-cu">
         <input type="search" className="kh-tim" placeholder={`Tìm mã, tên, điện thoại, địa chỉ, số TK chuyển khoản… (${so(tq.tong_tat_ca)} khách)`}
           value={tim} onChange={e => datTim(e.target.value)} aria-label="Tìm khách hàng" />
-        <div className="kh-hang" role="group" aria-label="Hạng theo doanh thu 12 tháng">
-          {["S", "A", "B", "C", "D"].map(h => (
-            <button key={h} type="button" aria-pressed={b.hang.includes(h)} title={`Hạng ${h} theo doanh thu 12 tháng`}
+        <div className="kh-hang" role="group" aria-label="Hạng OBC (得意先ランク)">
+          {tq.hang.map(([h]) => (
+            <button key={h} type="button" aria-pressed={b.hang.includes(h)} title={`Hạng OBC ${h}`}
               onClick={() => dat({ hang: b.hang.includes(h) ? b.hang.filter(x => x !== h) : [...b.hang, h] })}>{h}</button>))}
         </div>
         <label className="kh-chon"><span>Phụ trách</span>
@@ -180,7 +181,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
             <th className="kh-o-chon"><input type="checkbox" aria-label="Chọn cả trang"
               checked={t.khach.length > 0 && t.khach.every(k => chon[k.ma])}
               onChange={e => datChon(e.target.checked ? Object.fromEntries(t.khach.map(k => [k.ma, true])) : {})} /></th>
-            {sapCot("ten", "Khách hàng")}{sapCot("hang", "Hạng", "", "hạng theo doanh thu 12 tháng (không phải 得意先ランク)")}{sapCot("pt", "Phụ trách")}
+            {sapCot("ten", "Khách hàng")}{sapCot("hang", "Hạng", "", "hạng OBC (得意先ランク)")}{sapCot("pt", "Phụ trách")}
             {sapCot("dt_khoang", `DT ${kxNhan}`, "so", "doanh thu thuần trong khoảng đang xem")}{sapCot("so_khoang", ssp ? `So ${ssp.nhan}` : "So sánh", "", ssp ? `${ssp.tu} → ${ssp.den}` : undefined)}
             {sapCot("tb3", "TB 3 tháng", "so")}{sapCot("im_lang", "Im lặng", "so")}{sapCot("don_cuoi", "Đơn cuối", "so")}
             {sapCot("trang_thai", "Trạng thái")}
@@ -208,11 +209,11 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       </div>
 
       <div className="kh-ba-khoi">
-        <section className="kh-the"><h2>Phân bố theo hạng doanh thu 12 tháng</h2><p className="phu">không phải 得意先ランク của OBC</p>
+        <section className="kh-the"><h2>Phân bố theo hạng OBC</h2><p className="phu">得意先ランク trong 得意先全情報 · Z/ZZ/ZZZ không vào danh sách gọi</p>
           {tq.hang.map(([h, n]) => (
             <button key={h} type="button" className="kh-thanh-dong" aria-pressed={b.hang.includes(h)}
               onClick={() => dat({ hang: b.hang.includes(h) ? b.hang.filter(x => x !== h) : [h] })}>
-              <span className="kh-td-nhan"><b title="hạng theo doanh thu 12 tháng">Hạng {h}</b><span>{so(n)} khách · {gon(tq.hang_tien[h] ?? 0)}</span></span>
+              <span className="kh-td-nhan"><b title="hạng OBC (得意先ランク)">Hạng {h}</b><span>{so(n)} khách · {gon(tq.hang_tien[h] ?? 0)}</span></span>
               <span className="kh-td-thanh"><i style={{ width: `${n / maxHang * 100}%` }} /></span>
             </button>))}
         </section>
@@ -257,7 +258,7 @@ function Dong({ k, d, tenNv, chon, datChon }: { k: KhachDong; d: DsApi; tenNv: R
       <td className="kh-o-chon"><input type="checkbox" checked={chon} onChange={e => datChon(e.target.checked)} aria-label={`Chọn ${k.ten}`} /></td>
       <td className="kh-ten"><a href={`/khach-hang/${encodeURIComponent(k.ma)}`} className="ten-jp">{k.ten}</a>
         <div className="ma-nho"><code>{k.ma}</code>{k.tinh ? ` · ${k.tinh}` : ""}{k.dau_hieu_obc ? ` · ※${k.dau_hieu_obc}※` : ""}</div></td>
-      <td>{k.hang ? <span className={"kh-hang-nhan h" + k.hang}>{k.hang}</span> : <span className="nhat-chu">—</span>}</td>
+      <td>{k.hang ? <span className={"kh-hang-nhan " + lopHang(k.hang)} title={k.hang_ten ?? undefined}>{k.hang}</span> : <span className="nhat-chu">—</span>}</td>
       <td className="kh-pt">{k.nguoi_phu_trach ? (tenNv[k.nguoi_phu_trach] ?? k.nguoi_phu_trach) : <span className="nhat-chu">— chưa giao —</span>}</td>
       <td className="so"><b>{k.dt_khoang == null ? "—" : yen(k.dt_khoang)}</b></td>
       <td className="kh-ss">{ss == null ? <span className="nhat-chu">{k.dt_ss == null ? "—" : k.dt_khoang ? "kỳ so chưa mua" : "—"}</span> : <>

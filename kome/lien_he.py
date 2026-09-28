@@ -245,7 +245,7 @@ def goi_y_va_nhan_vien(conn, ma_khach: list[str], so_ma: int = SO_MA_GOI_Y) -> d
     Gợi ý ĐỌC `mart.khach_mat_hang` (view đó đã bỏ phí/điều chỉnh 048 và hàng
     tặng 049, đã quay về theo mốc 040) — không tự định nghĩa lại "mặt hàng".
     `nhip_ngay IS NOT NULL` = ≥ 3 lần mua (định nghĩa của chính view đó); cặp
-    'khong_goi' (khách ※廃業※) không bao giờ được gợi ý. Cặp 'ngung' VẪN được
+    'khong_goi' (khách ※廃業※ / hạng OBC Z/ZZ/ZZZ — 055) không bao giờ được gợi ý. Cặp 'ngung' VẪN được
     gợi ý: khách ở cột "Lâu không mua" thì hầu hết mặt hàng quen đều đã quá 2×
     nhịp — bỏ chúng là đúng khách cần gọi nhất không có gợi ý nào; thẻ in số
     ngày từ lần cuối để sale tự thấy."""

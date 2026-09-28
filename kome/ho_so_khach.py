@@ -78,7 +78,7 @@ def theo_nganh(mat_hang: list[dict]) -> dict:
 def lich_mua(mat_hang: list[dict], moc: date | None) -> dict:
     """Mã có ngày dự kiến mua lại (khach_mat_hang.du_kien_lan_toi). `con` < 0 =
     đã quá ngày dự kiến. Chỉ mã còn nhãn 'mua' — mã 'ngung' đã có khối riêng,
-    'khong_goi' (※廃業※) không bao giờ vào danh sách gọi."""
+    'khong_goi' (※廃業※, hạng OBC Z/ZZ/ZZZ — 055) không bao giờ vào danh sách gọi."""
     if moc is None:
         return {"ma": [], "so_tre": 0, "tong": 0}
     ds = []
@@ -96,8 +96,11 @@ def lich_mua(mat_hang: list[dict], moc: date | None) -> dict:
 def the_tu_dong(h: KH.HoSo, hang: str | None) -> list[dict]:
     """Thẻ suy ra từ dữ liệu THẬT — mỗi thẻ kèm câu giải thích nó đến từ đâu."""
     k, the = h.khach, []
+    if k.khong_goi and k.trang_thai != "ngung_giao_dich":
+        the.append({"chu": f"🚫 OBC: không gọi ({hang})", "vi": k.hang_ten or "hạng OBC Z/ZZ/ZZZ",
+                    "mau": "nhat"})
     if hang in ("S", "A"):
-        the.append({"chu": f"⭐ Hạng {hang}", "vi": "hạng theo doanh thu 12 tháng (không phải 得意先ランク)"})
+        the.append({"chu": f"⭐ Hạng {hang}", "vi": k.hang_ten or "hạng OBC (得意先ランク)"})
     if k.trang_thai == "da_roi_bo":
         the.append({"chu": "💤 Lâu không mua", "vi": "im lặng ≥ 4× nhịp mua riêng", "mau": "do"})
     elif k.trang_thai == "canh_bao":
@@ -149,7 +152,7 @@ def dien_giai(h: KH.HoSo, lich: dict) -> str:
 
 
 def cho_giao_dien(h: KH.HoSo) -> dict:
-    hang = h.ho_so.get("hang_dt")
+    hang = h.khach.hang
     moc = _d(h.hom_nay)
     lich = lich_mua(h.tat_ca_mat_hang, moc)
     k = h.khach

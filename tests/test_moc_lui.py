@@ -1,7 +1,7 @@
 """Migration 040 — mốc thời gian dời được ("mọi thứ quay về tháng đó").
 
 Đẳng thức vàng: đặt mốc D phải cho ra ĐÚNG kết quả như thể kho chỉ có dữ liệu bán
-tới D — trạng thái khách, nhịp mua, hạng 12 tháng, nhóm cần gọi, "tháng này chưa
+tới D — trạng thái khách, nhịp mua, doanh thu 12 tháng, nhóm cần gọi, "tháng này chưa
 mua", cần liên hệ, tốc độ bán… không được lệch một dòng nào.
 """
 from datetime import date, timedelta
@@ -24,7 +24,7 @@ VIEW = [
     ("mart.khach_thang_nay", "customer_code"),
     ("mart.uu_tien_lien_he", "customer_code"),
     ("mart.khach_mat_hang", "customer_code, product_code"),
-    ("mart.hang_doanh_thu", "customer_code"),
+    ("mart.doanh_thu_12t", "customer_code"),
     ("mart.nhip_mua", "customer_code"),
     ("mart.toc_do_ban", "product_code"),
     ("mart.tai_nhan_vien", "salesperson_code"),
