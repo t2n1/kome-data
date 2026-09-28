@@ -118,6 +118,31 @@ a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
 .kx-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.12rem .2rem .12rem .6rem;border-radius:999px;
   border:1px solid var(--vien);background:var(--nen-phu)}
 @media (max-width: 640px){ .kx{padding:.5rem .6rem} .kx-o{max-width:100%} }
+/* Hai thẻ (đặc tả 2026-09-28 §5): ĐANG XEM viền liền · SO VỚI viền đứt — cùng mẫu
+   nét liền / nét đứt của mọi biểu đồ. Hẹp thì xếp chồng. */
+.kx-hai{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:stretch;gap:.6rem;
+  padding:0;background:transparent;border:0}
+.kx-the{display:flex;flex-direction:column;gap:.35rem;padding:.6rem .8rem .65rem;border-radius:12px;
+  background:var(--nen-the);min-width:0}
+.kx-xem{border:1.5px solid color-mix(in srgb, var(--chu) 55%, var(--vien))}
+.kx-ss{border:1.5px dashed var(--vien-dam);background:color-mix(in srgb, var(--nen-phu) 55%, var(--nen-the))}
+.kx-dau{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.35rem .6rem}
+.kx-dau .kx-nhan{display:inline-flex;align-items:center}
+.kx-dau .ss-mau{margin:0 .4rem 0 0}
+.kx-giua{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.35rem .7rem}
+.kx-to{font-size:1.12rem;font-weight:650;letter-spacing:-.01em;line-height:1.2}
+.kx-ss .kx-to{color:var(--chu-nhat)}
+.kx-dai{font-size:.74rem;line-height:1.45;margin:0}
+.kx-vs{align-self:center;font-size:.68rem;color:var(--chu-mo);font-style:italic}
+.kx-chips{display:flex;flex-wrap:wrap;gap:.3rem}
+.kx-chips .chip{font-size:.72rem;padding:.2rem .55rem}
+.kx-chip-tc{display:inline-flex;align-items:center;gap:.3rem;border-color:var(--do);background:var(--do-nen);color:var(--do-chu);font-weight:600;cursor:default}
+.kx-chip-tc button{font:inherit;border:0;background:transparent;color:inherit;cursor:pointer;padding:0 .1rem}
+.kx-tuy-chon{padding-top:.35rem;border-top:1px dashed var(--vien)}
+@media (max-width: 820px){
+  .kx-hai{grid-template-columns:minmax(0,1fr)}
+  .kx-vs{justify-self:center}
+}
 
 /* Thanh tải chung (ThanhTai.tsx) */
 .thanh-tai{position:fixed;top:0;left:0;right:0;z-index:70;pointer-events:none}

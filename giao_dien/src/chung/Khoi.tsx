@@ -41,13 +41,21 @@ export function ChuaCoDuLieu({ tieu_de, ly_do }: { tieu_de: string; ly_do: strin
   );
 }
 
-export function Spark({ gia_tri, mau = "var(--ok-vien)", cao = 24 }: { gia_tri: number[]; mau?: string; cao?: number }) {
+/** Đường nhỏ trong ô số. `so_sanh` = chuỗi KỲ SO cùng trục X (đặc tả 2026-09-28) — vẽ
+ *  nét đứt, CÙNG thang với chuỗi chính để hai đường so được bằng mắt. */
+export function Spark({ gia_tri, so_sanh, mau = "var(--ok-vien)", cao = 24 }:
+  { gia_tri: number[]; so_sanh?: (number | null)[]; mau?: string; cao?: number }) {
   if (gia_tri.length < 2) return <div style={{ height: cao }} />;
-  const mn = Math.min(...gia_tri), mx = Math.max(...gia_tri), d = mx - mn || 1;
-  const p = gia_tri.map((v, i) => `${(i / (gia_tri.length - 1) * 118 + 1).toFixed(1)},${(23 - (v - mn) / d * 20).toFixed(1)}`).join(" ");
+  const ss = (so_sanh ?? []).filter((v): v is number => v != null);
+  const tat = [...gia_tri, ...ss];
+  const mn = Math.min(...tat), mx = Math.max(...tat), d = mx - mn || 1;
+  const toa = (v: number, i: number) => `${(i / (gia_tri.length - 1) * 118 + 1).toFixed(1)},${(23 - (v - mn) / d * 20).toFixed(1)}`;
+  const p = gia_tri.map(toa).join(" ");
+  const q = ss.length > 1 ? (so_sanh ?? []).slice(0, gia_tri.length).map((v, i) => v == null ? null : toa(v, i)).filter(Boolean).join(" ") : "";
   return (
     <svg viewBox="0 0 120 26" preserveAspectRatio="none" style={{ width: "100%", height: cao, marginTop: ".35rem", display: "block" }}
       aria-hidden="true" focusable="false">
+      {q && <polyline points={q} fill="none" stroke="var(--vien-dam)" strokeWidth={1.5} strokeDasharray="3 2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
       <polyline points={p} fill="none" stroke={mau} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );

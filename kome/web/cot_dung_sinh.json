@@ -4098,6 +4098,7 @@
       "kome/bao_cao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
+      "kome/khoi_tong_quan.py",
       "kome/ngan_sach.py",
       "kome/san_pham_360.py"
      ],
@@ -10406,6 +10407,7 @@
       "kome/bao_cao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
+      "kome/khoi_tong_quan.py",
       "kome/ngan_sach.py",
       "kome/san_pham_360.py"
      ],

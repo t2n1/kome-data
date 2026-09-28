@@ -1,5 +1,6 @@
-// Biểu đồ theo trục X rời rạc (ngày / tháng / quý) — cột, cột nền, đường, đường
-// nét đứt. Vẽ bằng SVG như gói thiết kế (không thư viện chart), nhưng TƯƠNG TÁC:
+// Biểu đồ theo trục X rời rạc (ngày / tháng / quý) — cột, cột nền, cột ma, đường,
+// đường nét đứt. KỲ SO của khoảng xem (đặc tả 2026-09-28) luôn vẽ bằng nét đứt
+// (`duong_dut`) hoặc cột ma (`cot_ma`: trong suốt, viền đứt, đè lên cột thật). Vẽ bằng SVG như gói thiết kế (không thư viện chart), nhưng TƯƠNG TÁC:
 //   * di chuột / chạm: vạch dọc + ô nổi đúng số mọi chuỗi đang bật;
 //   * bấm chú giải: bật/tắt từng chuỗi;
 //   * bấm một cột (nếu có `onBam`): đi tới danh sách đúng thứ đó;
@@ -9,13 +10,18 @@ import { useRong } from "./hooks";
 
 export type Chuoi = {
   ten: string;
-  kieu: "cot" | "cot_nen" | "duong" | "duong_dut";
+  kieu: "cot" | "cot_nen" | "cot_ma" | "duong" | "duong_dut";
   gia_tri: (number | null)[];
   mau: string;               // biến CSS, vd "var(--ok-vien)"
   mau_tung_cot?: (string | null)[]; // tô riêng từng cột (đạt/hụt ngân sách…)
   truc_phai?: boolean;       // trục phụ (tỷ lệ %) — thang riêng
   an_mac_dinh?: boolean;
+  so_voi?: number;           // chỉ số chuỗi KỲ SO — ô nổi in "▲x% so <tên>" cạnh số này
 };
+
+const la_nen = (c: Chuoi) => c.kieu === "cot_nen" || c.kieu === "cot_ma";
+const tang_giam = (a: number | null, b: number | null) =>
+  a == null || b == null || !b ? null : a / b - 1;
 
 type Props = {
   nhan: string[];                         // nhãn trục X
@@ -56,9 +62,12 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
   const cx = (i: number) => x0 + bw * (i + 0.5);
   const yT = (v: number) => tren + (H - tren - duoi) * (1 - (v - minT) / (maxT - minT || 1));
   const yP = (v: number) => tren + (H - tren - duoi) * (1 - v / maxP);
-  const cot = bat.filter(c => c.kieu === "cot" || c.kieu === "cot_nen");
+  // Thứ tự vẽ: cột nền (sau) → cột thật → cột ma (trên cùng, chỉ viền — luôn thấy
+  // được mức kỳ so dù thấp hơn cột thật).
+  const hang = (c: Chuoi) => c.kieu === "cot_nen" ? 0 : c.kieu === "cot" ? 1 : 2;
+  const cot = bat.filter(c => c.kieu === "cot" || la_nen(c)).sort((a, b) => hang(a) - hang(b));
   const soCot = Math.max(cot.filter(c => c.kieu === "cot").length, 1);
-  const bCot = Math.min(bw * 0.72, 38) / (cot.some(c => c.kieu === "cot_nen") ? 1 : soCot);
+  const bCot = Math.min(bw * 0.72, 38) / (cot.some(la_nen) ? 1 : soCot);
 
   const vach_luoi = [0, 0.25, 0.5, 0.75, 1].map(t => minT + (maxT - minT) * t);
   const buoc = moi_nhan ?? Math.max(1, Math.ceil(n / Math.max(Math.floor((x1 - x0) / 64), 1)));
@@ -93,13 +102,15 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
         </g>}
         {cot.map((c, k) => c.gia_tri.map((v, i) => {
           if (v == null) return null;
-          const nen = c.kieu === "cot_nen";
+          const nen = la_nen(c), ma = c.kieu === "cot_ma";
           const ww = nen ? Math.min(bw * 0.86, 44) : bCot;
           const lech = nen ? -ww / 2 : -bCot * soCot / 2 + bCot * cot.filter(x => x.kieu === "cot").indexOf(c);
           const y = yT(Math.max(v, 0)), y0 = yT(Math.min(v, 0));
           return <rect key={`${k}-${i}`} x={cx(i) + lech + (nen ? 0 : 0.5)} y={y} width={Math.max(ww - 1, 1)}
             height={Math.max(y0 - y, v === 0 ? 0 : 1)} rx={2}
-            fill={c.mau_tung_cot?.[i] ?? c.mau} opacity={tro != null && tro !== i ? 0.55 : 1} />;
+            fill={ma ? "none" : c.mau_tung_cot?.[i] ?? c.mau}
+            stroke={ma ? c.mau : undefined} strokeWidth={ma ? 1.4 : undefined} strokeDasharray={ma ? "4 3" : undefined}
+            opacity={tro != null && tro !== i ? 0.55 : 1} />;
         }))}
         {bat.filter(c => c.kieu === "duong" || c.kieu === "duong_dut").map((c, k) => {
           const y = c.truc_phai ? yP : yT;
@@ -120,15 +131,20 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
       {tro != null && <div className="bd-noi" role="status"
         style={{ left: `${Math.min(Math.max(cx(tro) / W * 100, 12), 88)}%` }}>
         <strong>{(nhan_day_du ?? nhan)[tro]}</strong>
-        {bat.map(c => <div key={c.ten}><i style={{ background: c.mau_tung_cot?.[tro] ?? c.mau }} />{c.ten}
-          <b>{dinh_dang(c.gia_tri[tro] ?? null, c)}</b></div>)}
+        {bat.map(c => {
+          const ss = c.so_voi != null ? chuoi[c.so_voi] : null;
+          const td = ss && !tat[ss.ten] ? tang_giam(c.gia_tri[tro] ?? null, ss.gia_tri[tro] ?? null) : null;
+          return <div key={c.ten}><i className={c.kieu} style={{ background: c.kieu.startsWith("duong") || c.kieu === "cot_ma" ? undefined : c.mau_tung_cot?.[tro] ?? c.mau, borderColor: c.mau }} />{c.ten}
+            <b>{dinh_dang(c.gia_tri[tro] ?? null, c)}{td != null && <span className={"bd-td " + (td >= 0 ? "tang" : "giam")}>
+              {" "}{td >= 0 ? "▲" : "▼"}{Math.abs(td * 100).toFixed(1).replace(".", ",")}%</span>}</b></div>;
+        })}
         {onBam && <em>bấm để xem chi tiết</em>}
       </div>}
       <div className="bd-chu-giai">
         {chuoi.map(c => (
           <button key={c.ten} type="button" aria-pressed={!tat[c.ten]} className={tat[c.ten] ? "tat" : ""}
             onClick={() => datTat(t => ({ ...t, [c.ten]: !t[c.ten] }))}>
-            <i className={c.kieu} style={{ background: c.kieu.startsWith("duong") ? undefined : c.mau, borderColor: c.mau }} />
+            <i className={c.kieu} style={{ background: c.kieu.startsWith("duong") || c.kieu === "cot_ma" ? undefined : c.mau, borderColor: c.mau }} />
             {c.ten}
           </button>))}
       </div>

@@ -49,9 +49,19 @@ def test_duong_trung_con_so_chu_tai_moc(conn, batch):
     assert p["2026-07-31"]["ns"] == d["muc_tieu"] == 10_000_000
     assert p["2026-07-21"]["tt"] is None          # sau mốc: chưa có dữ liệu
     assert p["2026-07-09"]["tt"] == 0 and p["2026-07-10"]["tt"] == 100_000
-    # luỹ kế tháng trước theo cùng số ngày; tháng 6 không có ngày 31
+    # Mặc định so NĂM TRƯỚC (đặc tả 2026-09-28) — 7/2025 không có dữ liệu: không có đường so.
+    assert d["duong"]["nhan_ss"] == "cùng tháng năm trước"
+    assert all(x["ss"] is None for x in d["duong"]["diem"])
+
+
+def test_duong_ky_so_thang_truoc_cong_don_theo_vi_tri_ngay(conn, batch):
+    _gieo(conn, batch)
+    d = KTQ.ngan_sach_thang(conn, None, KX.ThamSo(ss_ma="truoc"))
+    p = _theo_ngay(d)
+    assert d["duong"]["nhan_ss"] == "tháng trước"
+    # Kỳ so = 1 → 20/6 (tháng 7 dở dang tới 20/7): cộng dồn theo ngày thứ i, dừng ở 20/6.
     assert p["2026-07-04"]["ss"] == 0 and p["2026-07-05"]["ss"] == 100_000
-    assert p["2026-07-31"]["ss"] is None
+    assert p["2026-07-20"]["ss"] == 100_000 and p["2026-07-21"]["ss"] is None
 
 
 def test_nhip_ngan_sach_chi_tang_vao_ngay_lam_viec(conn, batch):
@@ -86,7 +96,7 @@ def test_dang_ky_dung_luy_ke_theo_thang(conn, batch):
 
 def test_duong_lai_gop_trung_con_so_chu_tai_moc(conn, batch):
     _gieo(conn, batch)
-    d = KTQ.ngan_sach_thang(conn, None, KX.ThamSo())
+    d = KTQ.ngan_sach_thang(conn, None, KX.ThamSo(ss_ma="truoc"))
     p = _theo_ngay(d)
     assert p["2026-07-20"]["tt_lg"] == d["thuc_te_lg"] == 60_000
     assert p["2026-07-20"]["ns_lg"] == d["muc_tieu_lg_den_hom_nay"]
