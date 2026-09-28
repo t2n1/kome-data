@@ -1,6 +1,6 @@
 # Nhiều bảng Tổng quan có tên cho mỗi người — đặc tả
 
-Ngày: 2026-09-28 · Trạng thái: chờ duyệt · Migration: `056_bang_tong_quan.sql`
+Ngày: 2026-09-28 · Trạng thái: đã duyệt, đã triển khai · Migration: `056_bang_tong_quan.sql`
 
 ## 1. Mục tiêu
 
@@ -112,8 +112,10 @@ Mã vai trò lạ → 422.
 | `POST /tong-quan/bang/{id}/bo-cuc` | bố cục | `{bo_cuc}` — `id = moi` với bảng ảo → tạo dòng, trả `{bang}` |
 | `POST /tong-quan/bang/{id}/ten` | `{ten}` | `{bang}` |
 | `POST /tong-quan/bang/{id}/xoa` | — | `{bang_hien}` (bảng sẽ hiện tiếp) |
-| `POST /tong-quan/bang/{id}/mo` | — | 204 |
-| `POST /tong-quan/bang/thu-tu` | `[id…]` (đúng tập bảng của mình) | 204; tập khác → 422 |
+| `POST /tong-quan/bang/{id}/mo` | — | `{}` |
+| `POST /tong-quan/bang/thu-tu` | `[id…]` (đúng tập bảng của mình) | `{}`; tập khác → 422 |
+
+Thành công không có dữ liệu trả `{}` (200), không 204 — `api.ts::gui` luôn đọc JSON.
 
 - `POST /tong-quan/bo-cuc` (cũ) giữ MỘT bản đời: ghi vào bảng gần nhất (hoặc tạo từ bảng
   ảo) — tab mở bản build cũ lúc triển khai không lưu hỏng. Ghi chú xoá ở đợt sau.

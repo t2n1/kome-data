@@ -135,8 +135,20 @@ def _khoi_dau(html):
     return json.loads(m.group(1))
 
 
+def _bo_cuc(html):
+    """Bố cục của bảng đang hiện (056: mỗi người nhiều bảng)."""
+    kd = _khoi_dau(html)
+    return next(b for b in kd["bang"] if b["id"] == kd["bang_hien_id"])["bo_cuc"]
+
+
 def _thu_tu(html):
-    return [o["id"] for o in _khoi_dau(html)["bo_cuc"]]
+    return [o["id"] for o in _bo_cuc(html)]
+
+
+def _luu_db(conn, ten="an"):
+    return conn.execute("""SELECT b.bo_cuc FROM app.bang_tong_quan b
+                           JOIN app.nguoi_dung n ON n.id = b.nguoi_dung_id
+                           WHERE n.ten_dang_nhap = %s""", (ten,)).fetchone()[0]
 
 
 def test_luu_roi_trang_ve_SAN_dung_thu_tu_va_kich_thuoc(web, conn):
@@ -146,11 +158,12 @@ def test_luu_roi_trang_ve_SAN_dung_thu_tu_va_kich_thuoc(web, conn):
     r = _luu(c, [{"id": "han_su_dung", "rong": 3, "cao": 1}, {"id": "kpi", "rong": 1, "cao": 3}])
     assert r.status_code == 200
     assert r.json()["bo_cuc"][0] == {"id": "han_su_dung", "rong": 3, "cao": 1, "an": False}
-    kd = _khoi_dau(c.get("/").text)
-    assert [o["id"] for o in kd["bo_cuc"]][:2] == ["han_su_dung", "kpi"]
-    assert kd["bo_cuc"][1] == {"id": "kpi", "rong": 1, "cao": 3, "an": False}
-    assert kd["sap_xep_duoc"] is True
-    luu = conn.execute("SELECT bo_cuc_tong_quan FROM app.nguoi_dung WHERE ten_dang_nhap='an'").fetchone()[0]
+    html = c.get("/").text
+    bc = _bo_cuc(html)
+    assert [o["id"] for o in bc][:2] == ["han_su_dung", "kpi"]
+    assert bc[1] == {"id": "kpi", "rong": 1, "cao": 3, "an": False}
+    assert _khoi_dau(html)["sap_xep_duoc"] is True
+    luu = _luu_db(conn)
     assert [x["id"] for x in luu][:2] == ["han_su_dung", "kpi"] and len(luu) == len(MA)
 
 
@@ -159,8 +172,7 @@ def test_khoi_an_van_nam_trong_bo_cuc_voi_co_an(web):
     hiện lại được."""
     c = web.vao(web())
     _luu(c, [{"id": "xu_huong", "an": True}])
-    kd = _khoi_dau(c.get("/").text)
-    an = {o["id"]: o["an"] for o in kd["bo_cuc"]}
+    an = {o["id"]: o["an"] for o in _bo_cuc(c.get("/").text)}
     assert an["xu_huong"] is True and an["kpi"] is False and len(an) == len(MA)
 
 
@@ -176,15 +188,17 @@ def test_hai_nguoi_hai_bo_cuc(web):
 def test_ve_mac_dinh_bang_form_thuong(web, conn):
     c = web.vao(web())
     _luu(c, [{"id": "han_su_dung"}])
-    r = c.post("/tong-quan/bo-cuc/mac-dinh")
+    bang = _khoi_dau(c.get("/").text)["bang_hien_id"]
+    r = c.post("/tong-quan/bo-cuc/mac-dinh", data={"bang": str(bang)})
     assert r.status_code == 303 and r.headers["location"] == "/"
     assert _thu_tu(c.get("/").text) == MA
-    assert conn.execute("SELECT bo_cuc_tong_quan FROM app.nguoi_dung WHERE ten_dang_nhap='an'").fetchone()[0] is None
+    assert _luu_db(conn) is None
 
 
 def test_bo_cuc_rac_trong_csdl_khong_lam_hong_trang_chu(web, conn):
     c = web.vao(web())
-    conn.execute("""UPDATE app.nguoi_dung SET bo_cuc_tong_quan = '{"la": "rac"}'::jsonb
+    conn.execute("""INSERT INTO app.bang_tong_quan (nguoi_dung_id, ten, bo_cuc, thu_tu)
+                    SELECT id, 'Rác', '{"la": "rac"}'::jsonb, 0 FROM app.nguoi_dung
                     WHERE ten_dang_nhap = 'an'""")
     conn.commit()
     r = c.get("/")

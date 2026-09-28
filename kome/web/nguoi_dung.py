@@ -28,15 +28,24 @@ SCRYPT_P = 1
 DAI_HASH = 32
 DAI_SALT = 16
 
-# Truy vấn dùng chung cho kiem_tra/theo_id/liet_ke. LEFT JOIN chứ không JOIN:
+# Cột dùng chung cho kiem_tra/theo_id/liet_ke. LEFT JOIN chứ không JOIN:
 # người không phụ trách khách nào (chủ DN, kế toán) có salesperson_code NULL
 # và vẫn phải đăng nhập được.
-_CHON = f"""SELECT n.id, n.ten_dang_nhap, n.salesperson_code,
-                   n.duoc_vao_kho_du_lieu, n.duoc_sua_ngan_sach, s.ten,
-                   n.duoc_quan_tri, n.bo_cuc_tong_quan
-            FROM app.nguoi_dung n
-            LEFT JOIN core.dim_salesperson s
-                   ON s.salesperson_code = n.salesperson_code"""
+_COT = """SELECT n.id, n.ten_dang_nhap, n.salesperson_code,
+                 n.duoc_vao_kho_du_lieu, n.duoc_sua_ngan_sach, s.ten,
+                 n.duoc_quan_tri{them}
+          FROM app.nguoi_dung n
+          LEFT JOIN core.dim_salesperson s
+                 ON s.salesperson_code = n.salesperson_code"""
+# Cổng đăng nhập (kiem_tra/theo_id) kéo luôn các bảng Tổng quan (056) trong
+# CÙNG lượt hỏi — trang chủ không tốn thêm truy vấn. liet_ke (màn Cài đặt)
+# dùng _CHON_GON: không cần bố cục của cả công ty.
+_CHON = _COT.format(them=""",
+                 n.bang_gan_nhat,
+                 (SELECT json_agg(json_build_object('id', b.id, 'ten', b.ten, 'bo_cuc', b.bo_cuc)
+                                  ORDER BY b.thu_tu, b.id)
+                    FROM app.bang_tong_quan b WHERE b.nguoi_dung_id = n.id)""")
+_CHON_GON = _COT.format(them="")
 
 
 @dataclass(frozen=True)
@@ -52,11 +61,12 @@ class NguoiDung:
     # Quyền quản trị (033): đổi được cờ quyền của người khác trên /cai-dat.
     # Mặc định để đối tượng dựng tay trong test cũ vẫn chạy.
     duoc_quan_tri: bool = False
-    # Bố cục trang Tổng quan đã lưu (034), JSON thô — CHƯA tin được, luôn đi
-    # qua kome.web.bo_cuc.chuan_hoa trước khi dùng. Đọc cùng lượt hỏi của cổng
+    # Các bảng Tổng quan (056), JSON thô của json_agg — CHƯA tin được, luôn qua
+    # kome.web.bang_tong_quan.tu_tho trước khi dùng. Đọc cùng lượt hỏi của cổng
     # đăng nhập nên trang chủ không tốn thêm truy vấn nào. compare/hash=False:
-    # list không băm được, và bố cục không phải một phần danh tính.
-    bo_cuc: object = field(default=None, compare=False, hash=False)
+    # list không băm được, và bảng không phải một phần danh tính.
+    bang: object = field(default=None, compare=False, hash=False)
+    bang_gan_nhat: int | None = field(default=None, compare=False, hash=False)
 
 
 # Ba cờ quyền đổi được — thứ tự này là thứ tự cột trên màn Cài đặt, và là
@@ -67,7 +77,9 @@ CO_QUYEN = ("duoc_vao_kho_du_lieu", "duoc_sua_ngan_sach", "duoc_quan_tri")
 def _nguoi(r) -> NguoiDung:
     return NguoiDung(id=r[0], ten_dang_nhap=r[1], salesperson_code=r[2],
                      duoc_vao_kho_du_lieu=r[3], duoc_sua_ngan_sach=r[4],
-                     ten_sale=r[5], duoc_quan_tri=bool(r[6]), bo_cuc=r[7])
+                     ten_sale=r[5], duoc_quan_tri=bool(r[6]),
+                     bang_gan_nhat=r[7] if len(r) > 8 else None,
+                     bang=r[8] if len(r) > 8 else None)
 
 
 def bam(mat_khau: str, salt: bytes) -> bytes:
@@ -162,4 +174,4 @@ def dat_quyen(conn, ten: str, kho_du_lieu: bool | None = None,
 
 def liet_ke(conn) -> list[NguoiDung]:
     return [_nguoi(r) for r in conn.execute(
-        f"{_CHON} ORDER BY n.ten_dang_nhap").fetchall()]
+        f"{_CHON_GON} ORDER BY n.ten_dang_nhap").fetchall()]

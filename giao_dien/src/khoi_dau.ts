@@ -12,6 +12,8 @@ export type NguoiDung = {
 };
 
 export type OBoCuc = { id: string; rong: number; cao: number; an: boolean };
+// Một bảng Tổng quan có tên của người đăng nhập (056). Bảng ảo (chưa lưu) có id = null.
+export type BangTQ = { id: number | null; ten: string; bo_cuc: OBoCuc[] };
 export type MucKhoi = { id: string; nhan: string; rong: number; cao: number; nhom: string; mo_ta: string };
 
 export type KhoiDau = {
@@ -23,7 +25,9 @@ export type KhoiDau = {
   hien_kho: boolean;
   hien_ngan_sach: boolean;
   che_do_giao_dien: "sang" | "toi" | "he-thong" | "theo-gio";
-  bo_cuc: OBoCuc[];
+  // Các bảng Tổng quan (056) — luôn ≥ 1 khi máy chủ gửi; bảng hiện chọn theo ?bang= / gần nhất.
+  bang: BangTQ[];
+  bang_hien_id: number | null;
   sap_xep_duoc: boolean;
   danh_muc: {
     khoi: MucKhoi[];
@@ -47,7 +51,7 @@ declare global {
 
 export const KD: KhoiDau = window.__KOME__ ?? {
   nguoi: null, co_dang_nhap: false, chi_doc: false, hien_kho: true, hien_ngan_sach: true,
-  che_do_giao_dien: "he-thong", bo_cuc: [], sap_xep_duoc: false,
+  che_do_giao_dien: "he-thong", bang: [], bang_hien_id: null, sap_xep_duoc: false,
   danh_muc: { khoi: [], nhom: [], vai_tro: [] }, chua_co: {},
 };
 
