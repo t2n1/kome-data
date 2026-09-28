@@ -3,7 +3,7 @@
 // Không theo khoảng xem chung (thanh kéo là trục thời gian riêng). Chỉ số (?cs=) và cửa
 // sổ (?n=) nằm trên URL; vị trí thanh kéo thì không.
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { lay } from "../api";
 import { useRong } from "../chung/hooks";
 import { Khoi } from "../chung/Khoi";
@@ -65,9 +65,11 @@ export default function ManMuaVu() {
     return t.sort((a, c) => c.v - a.v).map(x => x.k);
   }, [dl, L, cs, nganhCua]);
 
-  useEffect(() => { if (L && b === null) datBTho(L.so_ngay - 1); }, [L, b]);
-
-  const bb = b ?? 0;
+  // Mở trang ở NGÀY CUỐI có dữ liệu (đặc tả §3) — suy trực tiếp từ `b ?? …`,
+  // không qua một effect chạy SAU lần vẽ đầu (effect đó từng làm ô đầu tiên vẽ
+  // ở ngày 0 rồi mới nhảy sang ngày cuối, ai mở trang cũng thấy mọi ô "bay" một
+  // nhịp animation từ bố cục ngày 0 sang bố cục thật).
+  const bb = b ?? (L ? Math.max(0, L.so_ngay - 1) : 0);
   const cua = cuaSo(bb, n);
   const truoc = dl?.ngay_dau ? namTruoc(dl.ngay_dau, bb, n) : null;
   const gia = useMemo(() => (L ? Float64Array.from({ length: L.so_ma }, (_, m) => L.tong(cs, m, cua.a, cua.b)) : new Float64Array()),
