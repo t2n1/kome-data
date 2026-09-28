@@ -29,33 +29,36 @@ CAO_TOI_DA = 4
 # kích thước `BO_CUC_MAC_DINH` của Dashboard.dc.html (21 khối) + khối tháng (036). Khối không có
 # nguồn dữ liệu vẫn có mặt (khung "chưa có dữ liệu", kome/khoi_tong_quan.py
 # ::CHUA_CO) — lựa chọn của chủ doanh nghiệp, đặc tả giao diện React §2.
+# Chiều cao LỆCH CÓ CHỦ Ý khỏi BO_CUC_MAC_DINH của gói thiết kế từ 2026-09-28 (đặc tả
+# 2026-09-28-tong-quan-it-chu-design.md §5): khối từng chứa bảng thấp còn 2, khối chưa có
+# nguồn còn 1. Bố cục đã lưu (app.bang_tong_quan) không tự đổi.
 _KHOI_DAY_DU = (
     ("kpi", "Chỉ số hôm nay", 3, 1, "tong_quan", "Sáu con số mở đầu ngày, mỗi ô dẫn thẳng tới màn hình của nó"),
     ("ns_thang", "Tiến độ ngân sách tháng", 3, 1, "tong_quan", "Từng sale so với mốc đáng lẽ đạt tới hôm nay"),
-    ("theo_thang", "Kết quả theo từng tháng", 3, 3, "tong_quan", "12 tháng của kỳ kế toán so ngân sách và cùng kỳ"),
-    ("viec_hom_nay", "Việc cần làm hôm nay", 2, 3, "tong_quan", "Gom việc từ khách cần gọi, hẹn gọi lại, kho và dữ liệu"),
+    ("theo_thang", "Kết quả theo từng tháng", 3, 2, "tong_quan", "12 tháng của kỳ kế toán so ngân sách và cùng kỳ"),
+    ("viec_hom_nay", "Việc cần làm hôm nay", 2, 2, "tong_quan", "Gom việc từ khách cần gọi, hẹn gọi lại, kho và dữ liệu"),
     # Ngoài 21 khối của gói thiết kế — thêm 2026-09-23 theo yêu cầu chủ DN
     # ("công ty chạy doanh thu theo tháng"), nguồn: mart.khach_thang_nay (036).
-    ("thang_nay_chua_mua", "Tháng này chưa mua", 1, 3, "khach_hang", "Khách mua đều hằng tháng mà tháng này chưa có đơn"),
+    ("thang_nay_chua_mua", "Tháng này chưa mua", 1, 2, "khach_hang", "Khách mua đều hằng tháng mà tháng này chưa có đơn"),
     # Ngoài gói thiết kế — thêm 2026-09-26 theo yêu cầu chủ DN: khách mới theo
     # ngày đăng ký đọc từ mã khách (mart.khach_moi_khoang, 044).
-    ("khach_moi", "Khách mới đăng ký", 2, 3, "khach_hang", "Khách đăng ký trong khoảng xem, ai đã có đơn, ai chưa"),
+    ("khach_moi", "Khách mới đăng ký", 2, 2, "khach_hang", "Khách đăng ký trong khoảng xem, ai đã có đơn, ai chưa"),
     ("cong_no", "Tuổi nợ phải thu", 1, 2, "tien", "Chia 0–30 / 30–60 / trên 60 ngày và ai nợ lâu nhất"),
     ("xu_huong", "Xu hướng doanh thu", 2, 2, "tien", "Doanh thu ngày, có đường so sánh kỳ trước"),
-    ("dong_tien", "Dòng tiền 8 tuần", 1, 2, "tien", "Tiền vào trừ tiền ra theo tuần và số dư dự kiến"),
+    ("dong_tien", "Dòng tiền 8 tuần", 1, 1, "tien", "Tiền vào trừ tiền ra theo tuần và số dư dự kiến"),
     ("mua_hang", "Đơn đặt nhà cung cấp", 1, 1, "hang_hoa", "PO đang mở, đơn trễ hẹn và đơn chờ duyệt"),
     ("khieu_nai", "Trả hàng & khiếu nại", 1, 1, "hang_hoa", "Phiếu đang mở, quá hạn xử lý và chi phí bồi hoàn"),
     ("suc_khoe_khach", "Sức khoẻ khách hàng", 1, 1, "khach_hang", "Bao nhiêu khách khoẻ, cần theo dõi, đang rời bỏ"),
     ("danh_sach_khach", "Danh sách khách hàng", 3, 2, "khach_hang", "Doanh thu, nhịp mua và việc cần làm"),
-    ("hang_sap_ve", "Sản phẩm sắp về kho", 3, 2, "hang_hoa", "Container đang trên đường và lô nào trễ hẹn"),
+    ("hang_sap_ve", "Sản phẩm sắp về kho", 3, 1, "hang_hoa", "Container đang trên đường và lô nào trễ hẹn"),
     ("han_su_dung", "Sản phẩm sắp hết hạn", 3, 2, "hang_hoa", "Lô cận date và giá trị tồn đang có rủi ro"),
     ("hieu_suat_nganh", "Hiệu suất theo ngành hàng", 2, 2, "thi_truong", "Tỷ trọng doanh thu và biên lãi gộp từng nhóm"),
     ("so_sanh_sale", "Doanh thu theo sale", 1, 2, "khach_hang", "Ai đang đạt, ai đang hụt ngân sách cá nhân"),
     ("tuong_quan", "Doanh thu × tần suất mua", 2, 2, "khach_hang", "Mỗi chấm một khách, thấy ngay ai to mà thưa đơn"),
-    ("nhip_mua", "Tỷ lệ im lặng theo tuần", 1, 2, "khach_hang", "Khoảng cách giữa các đơn đang giãn ra hay thu lại"),
+    ("nhip_mua", "Tỷ lệ im lặng theo tuần", 1, 1, "khach_hang", "Khoảng cách giữa các đơn đang giãn ra hay thu lại"),
     ("bien_loi_nhuan", "Biên lợi nhuận theo quý", 2, 2, "tien", "Biên lãi gộp sáu quý gần nhất"),
     ("tang_truong", "Số khách đang mua", 1, 2, "khach_hang", "Số khách có đơn theo từng kỳ kế toán"),
-    ("thoi_tiet", "Thời tiết 7 ngày tới", 2, 2, "thi_truong", "Nắng nóng đẩy bia và nước, mưa to ảnh hưởng lịch xe"),
+    ("thoi_tiet", "Thời tiết 7 ngày tới", 2, 1, "thi_truong", "Nắng nóng đẩy bia và nước, mưa to ảnh hưởng lịch xe"),
     ("don_hang", "Nạp dữ liệu / phiếu gần nhất", 3, 2, "tong_quan", "Nhật ký nạp và các phiếu bán mới nhất"),
 )
 # Khối sống nhờ một tính năng mà công ty chưa dùng (kome/nguon_dung.py) không

@@ -513,7 +513,8 @@ Tổng quan `thang_nay_chua_mua`, cột thứ tư của `/lien-he` (đi chung c�
 vẫn 3 truy vấn; khách đã ở cột nhịp không lặp lại), việc hôm nay. "Tháng này" theo
 mốc dữ liệu; "tháng có mua" = có phiếu doanh thu thuần > 0; "đến cùng ngày" =
 `extract(day) <= ngày mốc`, mốc là ngày cuối tháng thì tính trọn tháng trước. Nhóm
-này KHÁC nhóm `'im'` (nhịp riêng) — không gộp, mỗi khối in `khach_thang.CACH_TINH`.
+này KHÁC nhóm `'im'` (nhịp riêng) — không gộp, mỗi khối in `khach_thang.CACH_TINH` (ở
+Tổng quan: trong ⓘ của khối).
 Có test canh: `tests/test_khach_thang.py::test_ba_cho_doc_tra_CUNG_MOT_tap_khach`.
 Đặc tả: `docs/superpowers/specs/2026-09-23-nhin-theo-thang-design.md`.
 
@@ -522,8 +523,9 @@ Có test canh: `tests/test_khach_thang.py::test_ba_cho_doc_tra_CUNG_MOT_tap_khac
 mã ngắn, `009…`/`999…` — ~1.700/2.980 mã) → NULL, KHÔNG BAO GIỜ là khách mới. Khối Tổng quan
 `khach_moi` đọc `mart.khach_moi_khoang(tu, den)` (đơn đầu qua `mart.lan_mua` ← `ban_den_moc`, nên
 "chưa có đơn" là tính đến mốc). Khác nhóm `'moi'` của `mart.khach_nhom_viec` (đơn ĐẦU trong 90
-ngày mà đã im) — hai khái niệm, hai tên, khối in `CACH_TINH_KHACH_MOI`. Khoảng đã qua kết thúc ở
-chính mốc (xem bất biến Khoảng xem), nên khách đăng ký cuối tuần cuối tháng không rơi mất. Có test canh: `tests/test_khach_moi.py`. **Migration 044 phải chạy TRƯỚC khi triển khai.**
+ngày mà đã im) — hai khái niệm, hai tên, khối in `CACH_TINH_KHACH_MOI` (ở Tổng quan: trong ⓘ).
+Khoảng đã qua kết thúc ở chính mốc (xem bất biến Khoảng xem), nên khách đăng ký cuối tuần cuối
+tháng không rơi mất. Có test canh: `tests/test_khach_moi.py`. **Migration 044 phải chạy TRƯỚC khi triển khai.**
 
 **Bất biến:** khách OBC đã đánh dấu `※廃業※` / `※取引停止※` trong TÊN (281/2.077
 khách) không bao giờ vào danh sách gọi lại. Doanh nghiệp đã phá sản thì im lặng
@@ -800,6 +802,14 @@ mọi bộ lọc trên URL. Vai trò (`bo_cuc.VAI_TRO`) là MẪU khi tạo bả
 áp đè lên bảng đang xem. `POST /tong-quan/bo-cuc` chỉ còn là đường đời cho bản build cũ. Có test canh:
 `tests/test_bang_tong_quan.py`. **Migration 056 phải chạy TRƯỚC khi triển khai.**
 
+**Bất biến (Tổng quan ít chữ — chủ DN chốt 2026-09-28):** màn `/` là HÌNH + tối đa một số lớn mỗi
+khối; mọi chi tiết trong ô nổi `chung/ONoi.tsx` (chuột: rê hiện / bấm đi; chạm: lần 1 hiện, lần 2 đi;
+bàn phím: Tab hiện / Enter đi). Không bảng nào. Luật chữ: câu ĐỊNH NGHĨA cách tính vào `Khoi.cach_tinh`
+(ⓘ) — vẫn là `cach_tinh` của máy chủ truyền thẳng, không chép câu; câu NGOẠI LỆ đang xảy ra (tháng
+chưa đủ ngày, kỳ so không so được, kỳ thiếu tháng…) vào `Khoi.canh_bao`, LUÔN hiện; nhãn kỳ so LUÔN
+hiện. Vạch đứt của `ThanhNgang` (`ss`) chỉ dành cho kỳ so. Có test canh: `tests/test_tong_quan_it_chu.py`.
+Đặc tả: `docs/superpowers/specs/2026-09-28-tong-quan-it-chu-design.md`.
+
 **Bất biến (giao diện React, 2026-09-23):** chủ doanh nghiệp đổi nguyên tắc "không
 JavaScript" — màn nào đã chuyển (`/` trước tiên) là ứng dụng React (`giao_dien/`,
 Vite + TS + TanStack Query, KHÔNG thư viện biểu đồ — biểu đồ SVG tự vẽ như gói thiết
@@ -947,7 +957,7 @@ có kỳ kết thúc muộn nhất (`mart.so_cong_no_moi_nhat`). Ba luật:
   【合計】 = số dư cuối (bản thật khớp 215/215).
 - **Phần còn nợ từng phiếu là GIẢ ĐỊNH trả cũ trước** (`mart.cong_no_phieu`) — OBC không
   ghi phiếu nào đã trả. Màn phải in câu đó (`kome.cong_no.CACH_TINH["fifo"]`) và gọi cột là
-  "Đã thu (ước)".
+  "Đã thu (ước)" (khối Tuổi nợ của Tổng quan: trong ⓘ).
 - **Hạn trả chỉ suy từ hai mẫu tên điều kiện** (`末締/翌月末日`, `末締/翌月N日`). 代引請求 /
   その都度請求 / 前払い … → "không suy được hạn", KHÔNG BAO GIỜ tính là quá hạn — `代引専用`
   (tiền hãng vận chuyển thu hộ) chiếm ~¥93M số dư, gán hạn đoán cho nó là thổi phồng

@@ -90,6 +90,7 @@ table.bang a:hover{color:var(--lien-ket);text-decoration:underline}
 .bd-chu-giai{display:flex;flex-wrap:wrap;gap:.2rem .9rem;margin-top:.4rem}
 .bd-chu-giai button{font:inherit;font-size:.72rem;color:var(--chu-nhat);background:transparent;border:0;cursor:pointer;
   display:inline-flex;align-items:center;gap:.35rem;padding:.1rem 0}
+.bd-chu-giai span{font-size:.72rem;color:var(--chu-nhat);display:inline-flex;align-items:center}
 .bd-chu-giai button.tat{opacity:.4;text-decoration:line-through}
 .bd-chu-giai i{width:10px;height:10px;border-radius:2px;display:inline-block;border:0 solid}
 .bd-chu-giai i.duong{height:0;width:14px;border-top-width:2px;border-radius:0}

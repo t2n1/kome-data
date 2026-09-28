@@ -502,7 +502,7 @@ export function KhoiTuongQuan() {
           <strong className="ten-jp">{tro.ten}</strong><div>Doanh thu<b>{yen(tro.doanh_thu)}</b></div>
           <div>Số ngày mua<b>{so(tro.so_lan)}</b></div><div>Biên gộp<b>{pc(tro.ty_suat)}</b></div></div>}
         <div className="bd-chu-giai">{Object.entries({ binh_thuong: "khoẻ", canh_bao: "cần theo dõi", da_roi_bo: "đang rời bỏ" }).map(([m, n]) =>
-          <span key={m} className="phu"><i style={{ background: MAU_TT[m], borderRadius: "50%", width: 9, height: 9, display: "inline-block", marginRight: 4 }} />{n}</span>)}</div>
+          <span key={m}><i style={{ background: MAU_TT[m], borderRadius: "50%", width: 9, height: 9, display: "inline-block", marginRight: 4 }} />{n}</span>)}</div>
       </div>}
     </Khoi>
   );
