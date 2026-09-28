@@ -1,6 +1,6 @@
 // Các khối của Tổng quan — bố cục theo Dashboard.dc.html, số THẬT từ
 // /api/tong-quan/<khối> (kome/khoi_tong_quan.py). Không số mẫu ở đâu cả.
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useKhoi } from "../api";
 import { giuKhoang } from "../khung/khoang";
 import { BieuDo, type Chuoi } from "../chung/BieuDo";
@@ -10,7 +10,8 @@ import { KD, TN } from "../khoi_dau";
 import { useNhanMoc, type KhoangMayChu } from "../khung/khoang";
 import { DongSoSanh, VachSoSanh } from "../chung/SoSanh";
 import { DongNoi, ONoi } from "../chung/ONoi";
-import { HangSo, MucSo, SoLon, ThanhChong } from "../chung/Hinh";
+import { HangSo, MucSo, SoLon, ThanhChong, ThanhNgang, type DongThanh } from "../chung/Hinh";
+import { demTheoTag, sapViec, tenViec } from "./viec_logic";
 
 const LUC = { ok: "var(--ok-vien)", canh: "var(--lien-ket)", do: "var(--do)", nhat: "var(--chu-mo)", nen: "var(--vien)" };
 const tenNguoi = (ten: string | null | undefined, ma: string) => ten || `(mã ${ma})`;
@@ -383,18 +384,14 @@ const MAU_TT: Record<string, string> = { binh_thuong: LUC.ok, canh_bao: LUC.canh
 export function KhoiSucKhoe() {
   const { data: d, isLoading, error } = useKhoi<{ dem: Record<string, number>; nhom: string[]; nhan: Record<string, string> }>("suc_khoe_khach");
   const nm = useNhanMoc();
-  const tong = d ? d.nhom.reduce((s, n) => s + (d.dem[n] ?? 0), 0) : 0;
   const hd = d ? (d.dem.binh_thuong ?? 0) + (d.dem.canh_bao ?? 0) : 0;
   return (
-    <Khoi tieu_de="Sức khoẻ khách hàng" phu={`tính ${nm}`} dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}>
+    <Khoi tieu_de="Sức khoẻ khách" phu={`tính ${nm}`} dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}
+      cach_tinh="Cần gọi lại = im lặng quá nhịp mua riêng của CHÍNH từng khách (không phải một ngưỡng chung). Bấm một khúc để mở danh sách khách đó.">
       {d && <>
-        <div className="sk-dau">{so(hd)} <span>khách đang mua</span></div>
-        <div className="phu" style={{ marginBottom: ".6rem" }}>{so(d.dem.canh_bao ?? 0)} khách im lặng quá nhịp mua riêng · so với nhịp của CHÍNH từng khách</div>
-        <div className="sk-thanh">{d.nhom.map(n => (d.dem[n] ?? 0) > 0 &&
-          <a key={n} href={`/khach-hang?loc=${n}&tat_ca=1`} style={{ width: `${(d.dem[n] ?? 0) / (tong || 1) * 100}%`, background: MAU_TT[n] }}
-             title={`${d.nhan[n]}: ${so(d.dem[n])} khách`} aria-label={`${d.nhan[n]}: ${so(d.dem[n])} khách`} />)}</div>
-        <div className="sk-ds">{d.nhom.map(n => (
-          <a key={n} href={`/khach-hang?loc=${n}&tat_ca=1`}><i style={{ background: MAU_TT[n] }} />{d.nhan[n]}<b>{so(d.dem[n] ?? 0)}</b></a>))}</div>
+        <SoLon gia={so(hd)} nhan="khách đang mua" />
+        <ThanhChong dinh_dang={so} don_vi="Khách"
+          khuc={d.nhom.map(n => ({ khoa: n, nhan: d.nhan[n], dem: d.dem[n] ?? 0, mau: MAU_TT[n], href: `/khach-hang?loc=${n}&tat_ca=1` }))} />
       </>}
     </Khoi>
   );
@@ -403,46 +400,32 @@ export function KhoiSucKhoe() {
 // ---- Danh sách khách hàng ---------------------------------------------------
 type KhachDS = { ma: string; ten: string; sale: string | null; ten_sale: string | null; doanh_thu: number; ty_le_im_lang: number | null;
   trang_thai: string; so_ngay_im_lang: number | null; nhip_ngay: number | null; thang_nay: number; thang_truoc: number | null };
-const UU_TIEN: Record<string, number> = { da_roi_bo: 0, canh_bao: 1, binh_thuong: 2, chua_du_lich_su: 3, ngung_giao_dich: 4 };
-type CotSap = "can" | "ten" | "thang_nay" | "thang_truoc" | "ty_le" | "doanh_thu";
+
+const VIEC_TT: Record<string, string> = { da_roi_bo: "Gọi lại ngay", canh_bao: "Gọi lại trong tuần" };
+const SO_KHACH_GON = 15;
 
 export function KhoiDanhSachKhach() {
   const { data: d, isLoading, error } = useKhoi<{ khach: KhachDS[]; nhan: Record<string, string>; khoang: KhoangMayChu | null;
     so_sanh: { ma: string; nhan: string; co: boolean; tu: string; den: string } | null }>("danh_sach_khach");
-  const nhanSs = d?.so_sanh ? d.so_sanh.nhan.replace(/^./, c => c.toUpperCase()) : "So sánh";
   const nm = useNhanMoc();
-  const [sap, datSap] = useState<{ cot: CotSap; giam: boolean }>({ cot: "can", giam: false });
-  const ds = useMemo(() => {
-    const a = [...(d?.khach ?? [])];
-    const g = (k: KhachDS): number | string => sap.cot === "can" ? (UU_TIEN[k.trang_thai] ?? 9) * 1e12 - k.doanh_thu
-      : sap.cot === "ten" ? k.ten : sap.cot === "ty_le" ? (k.ty_le_im_lang ?? -1) : (k[sap.cot] ?? -Infinity);
-    a.sort((x, y) => { const p = g(x), q = g(y); const r = p < q ? -1 : p > q ? 1 : 0; return sap.giam ? -r : r; });
-    return a;
-  }, [d, sap]);
-  const th = (cot: CotSap, chu: string, so_ = false) => (
-    <th className={"sap" + (so_ ? " so" : "")} aria-sort={sap.cot === cot ? (sap.giam ? "descending" : "ascending") : "none"}
-      onClick={() => datSap(s => ({ cot, giam: s.cot === cot ? !s.giam : cot !== "ten" && cot !== "can" }))}>
-      {chu}{sap.cot === cot ? (sap.giam ? " ↓" : " ↑") : ""}</th>);
+  const ss = d?.so_sanh;
+  const ds = [...(d?.khach ?? [])].sort((a, b) => b.thang_nay - a.thang_nay).slice(0, SO_KHACH_GON);
   return (
-    <Khoi tieu_de="Danh sách khách hàng" phu={`60 khách doanh thu cao nhất · ${d?.khoang?.nhan ?? ""} · bấm tiêu đề cột để sắp xếp`} dang_tai={isLoading} loi={error?.message}
-      lien_ket={{ href: "/khach-hang?tat_ca=1" }}>
-      {d && <div className="bang-cuon" style={{ maxHeight: 420 }}><table className="bang">
-        <thead><tr>{th("ten", "Khách hàng")}{th("thang_nay", d.khoang?.nhan ?? "Khoảng xem", true)}{th("thang_truoc", nhanSs, true)}
-          <th className="so">So {d.so_sanh?.nhan ?? ""}</th>{th("ty_le", `Im lặng · ${nm}`, true)}{th("doanh_thu", "Doanh thu 12 tháng", true)}<th>Phụ trách</th>{th("can", "Cần làm")}</tr></thead>
-        <tbody>{ds.map(k => (
-          <tr key={k.ma}>
-            <td className="ten-jp"><a href={`/khach-hang/${k.ma}`}>{k.ten}</a></td>
-            <td className="so">{yen(k.thang_nay)}</td><td className="so">{k.thang_truoc != null ? yen(k.thang_truoc) : "—"}</td>
-            <td className={"so " + (k.thang_truoc ? (k.thang_nay >= k.thang_truoc ? "tang" : "giam") : "")}>{k.thang_truoc ? thay_doi(k.thang_nay / k.thang_truoc - 1, 0) : "—"}</td>
-            <td className={"so " + ((k.ty_le_im_lang ?? 0) >= 2 ? "giam" : (k.ty_le_im_lang ?? 0) >= 1 ? "canh-chu" : "")} title={k.nhip_ngay ? `im ${k.so_ngay_im_lang} ngày · nhịp ${Math.round(k.nhip_ngay)} ngày` : undefined}>
-              {k.ty_le_im_lang != null ? `${k.ty_le_im_lang.toFixed(1).replace(".", ",")}×` : "—"}</td>
-            <td className="so">{gon(k.doanh_thu)}</td>
-            <td>{tenNguoi(k.ten_sale, k.sale ?? "—")}</td>
-            <td><span className={"nhan-vien " + ({ da_roi_bo: "do", canh_bao: "canh", binh_thuong: "ok" } as Record<string, string>)[k.trang_thai] || "nhat"}>
-              {k.trang_thai === "da_roi_bo" ? "Gọi lại ngay" : k.trang_thai === "canh_bao" ? "Gọi lại trong tuần" : d.nhan[k.trang_thai]}</span></td>
-          </tr>))}</tbody>
-      </table></div>}
-      <div className="phu" style={{ marginTop: ".4rem" }}>Im lặng = số ngày chưa mua ÷ nhịp mua riêng của khách, tính {nm}.{d?.so_sanh && !d.so_sanh.co ? ` ${d.so_sanh.nhan}: không có dữ liệu để so.` : ""}</div>
+    <Khoi tieu_de="Khách lớn nhất" phu={d ? <>{d.khoang?.nhan}{ss?.co ? <> · so {ss.nhan}</> : null}</> : undefined}
+      dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}
+      cach_tinh={`${SO_KHACH_GON} khách doanh thu cao nhất trong khoảng xem. Màu thanh: đỏ = gọi lại ngay, cam = gọi lại trong tuần, xanh = bình thường. Im lặng = số ngày chưa mua ÷ nhịp mua riêng của khách, tính ${nm}.${ss?.co ? ` Vạch đứt = ${ss.nhan}.` : ""}`}
+      canh_bao={ss && !ss.co ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : undefined}>
+      {d && <ThanhNgang nhan_ss={ss?.co ? hoa(ss.nhan) : undefined} dong={ds.map((k): DongThanh => ({
+        khoa: k.ma, ten: k.ten, ten_jp: true, gia_tri: k.thang_nay, ss: ss?.co ? k.thang_truoc : null, chu: gon(k.thang_nay),
+        phu: <TdSs nay={k.thang_nay} ss={k.thang_truoc} nhan={ss?.nhan ?? ""} />,
+        mau: MAU_TT[k.trang_thai] ?? LUC.nhat, href: `/khach-hang/${k.ma}`,
+        chi_tiet: <>
+          <DongNoi nhan={d.khoang?.nhan ?? "Khoảng xem"} gia={yen(k.thang_nay)} />
+          {ss?.co && <DongNoi nhan={hoa(ss.nhan)} gia={k.thang_truoc != null ? yen(k.thang_truoc) : "—"} />}
+          <DongNoi nhan="Doanh thu 12 tháng" gia={gon(k.doanh_thu)} />
+          <DongNoi nhan="Im lặng" gia={k.ty_le_im_lang != null ? `${k.ty_le_im_lang.toFixed(1).replace(".", ",")}×${k.nhip_ngay ? ` (im ${k.so_ngay_im_lang} / nhịp ${Math.round(k.nhip_ngay)} ngày)` : ""}` : "—"} />
+          <DongNoi nhan="Phụ trách" gia={tenNguoi(k.ten_sale, k.sale ?? "—")} />
+          <DongNoi mau={MAU_TT[k.trang_thai]} nhan="Cần làm" gia={VIEC_TT[k.trang_thai] ?? d.nhan[k.trang_thai]} /></> }))} />}
     </Khoi>
   );
 }
@@ -557,19 +540,21 @@ type KhachMoiKhoi = { khoang: KhoangMayChu | null; so_khach: number; da_mua: num
 
 export function KhoiKhachMoi() {
   const { data: d, isLoading, error } = useKhoi<KhachMoiKhoi>("khach_moi");
-  const [chiChuaMua, datChiChuaMua] = useState(false);
   const t = d?.thang ?? [];
-  const ds = (d?.khach ?? []).filter(k => !chiChuaMua || !k.da_mua);
+  const chua = (d?.khach ?? []).filter(k => !k.da_mua);
   return (
-    <Khoi tieu_de="Khách mới đăng ký" phu={d?.khoang ? `${d.khoang.nhan} · theo ngày trong mã khách` : undefined}
+    <Khoi tieu_de="Khách mới" phu={d?.khoang?.nhan} cach_tinh={d?.cach_tinh}
       dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}>
       {d && <>
-        <div className="tn-dau">
-          <div><b>{so(d.so_khach)}</b><span>khách mới đăng ký</span></div>
-          <div className="phu">Đã có đơn: <b>{so(d.da_mua)}</b> · chưa có đơn: <b className={d.chua_mua ? "canh-chu" : ""}>{so(d.chua_mua)}</b></div>
-          {d.so_sanh.map(s => <DongSoSanh key={s.ma} className="phu" nhan={s.nhan} co={s.co && s.so_khach != null}
-            nay={s.so_khach_nay} ss={s.so_khach} dinh_dang={v => `${so(v)} khách`} />)}
-        </div>
+        <SoLon gia={so(d.so_khach)} nhan="khách mới đăng ký" />
+        {d.so_sanh.map(s => <DongSoSanh key={s.ma} nhan={s.nhan} co={s.co && s.so_khach != null}
+          nay={s.so_khach_nay} ss={s.so_khach} />)}
+        <ThanhChong dinh_dang={so} don_vi="Khách" khuc={[
+          { khoa: "da", nhan: "Đã có đơn", dem: d.da_mua, mau: "var(--lien-ket)" },
+          { khoa: "chua", nhan: "Chưa có đơn", dem: d.chua_mua, mau: LUC.canh,
+            chi_tiet: <>{chua.slice(0, 10).map(k => <DongNoi key={k.ma} nhan={<span className="ten-jp">{k.ten}</span>} gia={ngay_ngan(k.ngay_dang_ky)} />)}
+              {d.chua_mua > Math.min(chua.length, 10) && <em>… và {so(d.chua_mua - Math.min(chua.length, 10))} khách nữa</em>}</> },
+        ]} />
         <BieuDo nhan={t.map(x => thang_nhan(x.thang))} nhan_day_du={t.map(x => `Tháng ${thang_nhan(x.thang)}`)} cao={130}
           mo_ta="Số khách mới đăng ký từng tháng, 12 tháng gần nhất, và số đã có đơn"
           chuoi={[
@@ -581,23 +566,6 @@ export function KhoiKhachMoi() {
               gia_tri: t.map(x => x.so_khach_ss), mau: MAU_SS }] : []),
           ]}
           dinh_dang={v => `${so(v)} khách`} dinh_dang_truc={v => so(v)} />
-        <div style={{ margin: ".4rem 0" }}>
-          <button type="button" className="chip" aria-pressed={chiChuaMua} onClick={() => datChiChuaMua(c => !c)}>
-            Chỉ khách chưa có đơn ({so(d.chua_mua)})</button></div>
-        <div className="bang-cuon" style={{ maxHeight: 300 }}><table className="bang">
-          <thead><tr><th>Khách hàng</th><th>Đăng ký</th><th>Đơn đầu</th><th className="so">Doanh thu</th><th>Phụ trách</th></tr></thead>
-          <tbody>{ds.map(k => (
-            <tr key={k.ma}>
-              <td className="ten-jp"><a href={`/khach-hang/${k.ma}`}>{k.ten}</a><div className="ma-nho">{k.ma}{k.da_ngung ? " · OBC đánh dấu ngừng" : ""}</div></td>
-              <td className="so">{ngay(k.ngay_dang_ky)}</td>
-              <td className="so">{k.lan_dau ? ngay(k.lan_dau) : <span className="nhan-vien canh">Chưa có đơn</span>}</td>
-              <td className="so">{k.da_mua ? yen(k.doanh_thu) : "—"}</td>
-              <td>{k.sale ? tenNguoi(k.ten_sale, k.sale) : "—"}</td>
-            </tr>))}</tbody></table>
-          {!ds.length && <div className="trong">{d.so_khach ? "Mọi khách mới đều đã có đơn." : "Không có khách mới đăng ký trong khoảng này."}</div>}
-          {d.so_khach > d.khach.length && <div className="phu">Hiện {so(d.khach.length)}/{so(d.so_khach)} khách mới nhất.</div>}
-        </div>
-        <div className="phu" style={{ marginTop: ".4rem" }}>{d.cach_tinh}</div>
       </>}
     </Khoi>
   );
@@ -636,32 +604,44 @@ export function KhoiBien() {
 // ---- Việc cần làm hôm nay ---------------------------------------------------
 type Viec = { muc: "gap" | "canh" | "thuong"; tag: string; chu: string; lien_ket: string; han: string | null };
 
+const MAU_MUC: Record<Viec["muc"], string> = { gap: LUC.do, canh: LUC.canh, thuong: LUC.nhat };
+const SO_VIEC_GON = 5;
+
 export function KhoiViec() {
   const [tatCa, datTatCa] = useState(false);
+  const [loc, datLoc] = useState<string | null>(null);
+  const [moRong, datMoRong] = useState(false);
   const { data: d, isLoading, error } = useKhoi<{ viec: Viec[]; thieu_nguon: string[] }>("viec_hom_nay", true, tatCa ? "tat_ca=1" : "");
   const khoa = `kome_viec_xong_${new Date().toISOString().slice(0, 10)}`;
   const [xong, datXong] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem(khoa) || "{}"); } catch { return {}; } });
   const v = d?.viec ?? [];
   const soXong = v.filter(x => xong[x.chu]).length;
   const bat = (c: string) => { const m = { ...xong, [c]: !xong[c] }; datXong(m); try { localStorage.setItem(khoa, JSON.stringify(m)); } catch { /* */ } };
+  const ds = sapViec(v.filter(x => !loc || x.tag === loc));
+  const hien = moRong || loc ? ds : ds.slice(0, SO_VIEC_GON);
   return (
-    <Khoi tieu_de="Việc cần làm hôm nay" dang_tai={isLoading} loi={error?.message}
-      phu={<span className="viec-tt">{soXong}/{v.length} xong
-        <span className="thanh-mong" style={{ width: 90 }}><span style={{ width: `${v.length ? soXong / v.length * 100 : 0}%`, background: LUC.ok }} /></span>
-        {KD.nguoi?.sale && <button type="button" className="chip" aria-pressed={!tatCa} onClick={() => datTatCa(t => !t)}>{tatCa ? "Việc của mọi người" : "Chỉ việc của tôi"}</button>}
-      </span>}>
-      {d && <div className="viec-ds">
-        {v.map(x => (
-          <div key={x.chu} className={"viec-dong" + (xong[x.chu] ? " xong" : "")}>
-            <input type="checkbox" checked={!!xong[x.chu]} onChange={() => bat(x.chu)} aria-label={`Đánh dấu xong: ${x.chu}`} />
-            <span className={"nhan-vien " + (x.muc === "gap" ? "do" : x.muc === "canh" ? "canh" : "nhat")}>{x.tag}</span>
-            <span className="viec-chu">{x.chu}</span>
-            {x.han && <span className="viec-han">{x.han}</span>}
-            <a href={x.lien_ket}>Mở →</a>
-          </div>))}
-        {!v.length && <div className="trong">Không có việc nào hôm nay.</div>}
-        <div className="phu" style={{ marginTop: ".5rem" }}>Chưa gom được việc từ {d.thieu_nguon.join(", ")} — chưa có nguồn dữ liệu. Dấu "xong" chỉ nhớ trên máy này, trong hôm nay.</div>
-      </div>}
+    <Khoi tieu_de="Việc hôm nay" dang_tai={isLoading} loi={error?.message}
+      nhan={v.length ? `${soXong}/${v.length} xong` : undefined} mau_nhan={soXong === v.length ? "ok" : "nhat"}
+      phu={KD.nguoi?.sale ? <button type="button" className="chip" aria-pressed={!tatCa} onClick={() => datTatCa(t => !t)}>{tatCa ? "Mọi người" : "Của tôi"}</button> : undefined}
+      cach_tinh={d ? `Chưa gom được việc từ ${d.thieu_nguon.join(", ")} — chưa có nguồn dữ liệu. Dấu "xong" chỉ nhớ trên máy này, trong hôm nay. Bấm một khúc của thanh để lọc theo lý do.` : undefined}>
+      {d && <>
+        {v.length > 0 && <ThanhChong dinh_dang={so} don_vi="Việc"
+          khuc={demTheoTag(v).map(t => ({ khoa: t.tag, nhan: t.tag, dem: t.dem, mau: MAU_MUC[t.muc], chon: loc === t.tag,
+            onBam: () => datLoc(l => (l === t.tag ? null : t.tag)) }))} />}
+        <div className="viec-ds">
+          {hien.map(x => (
+            <div key={x.chu} className={"viec-dong" + (xong[x.chu] ? " xong" : "")}>
+              <input type="checkbox" checked={!!xong[x.chu]} onChange={() => bat(x.chu)} aria-label={`Đánh dấu xong: ${x.chu}`} />
+              <i className="viec-cham" style={{ background: MAU_MUC[x.muc] }} aria-hidden="true" />
+              <ONoi href={x.lien_ket} className="viec-chu ten-jp"
+                noi_dung={<><strong>{x.tag}</strong><div className="o-noi-chu">{x.chu}</div>{x.han && <DongNoi nhan="Hạn" gia={x.han} />}</>}>
+                {tenViec(x.chu)}</ONoi>
+            </div>))}
+          {!v.length && <div className="trong">Không có việc nào hôm nay.</div>}
+          {!moRong && !loc && ds.length > SO_VIEC_GON &&
+            <button type="button" className="lien-ket viec-them" onClick={() => datMoRong(true)}>+{ds.length - SO_VIEC_GON} việc</button>}
+        </div>
+      </>}
     </Khoi>
   );
 }
@@ -680,28 +660,23 @@ export function KhoiThangNay() {
   const da = d?.dem.da_mua ?? 0, truoc = d?.thang_truoc_den_ngay ?? 0;
   return (
     <Khoi tieu_de="Tháng này chưa mua" dang_tai={isLoading} loi={error?.message}
-      phu={d?.thang ? <>tháng {thang_nhan(d.thang)} · tính đến {ngay(d.ngay_moc)}
+      phu={d?.thang ? <>{thang_nhan(d.thang)} · đến {ngay_ngan(d.ngay_moc ?? "")}
         {KD.nguoi?.sale && <button type="button" className="chip" aria-pressed={!tatCa} onClick={() => datTatCa(t => !t)}
-          style={{ marginLeft: ".4rem" }}>{tatCa ? "Khách của mọi người" : "Chỉ khách của tôi"}</button>}</> : undefined}
-      lien_ket={{ href: `/lien-he?ly_do=thang_nay_chua_mua${giu}` }}>
+          style={{ marginLeft: ".4rem" }}>{tatCa ? "Mọi người" : "Của tôi"}</button>}</> : undefined}
+      lien_ket={{ href: `/lien-he?ly_do=thang_nay_chua_mua${giu}` }}
+      cach_tinh={d ? `${d.cach_tinh} Bộ đếm là của cả công ty; thanh = trung bình mỗi tháng, xếp giảm dần.` : undefined}>
       {d && <>
-        <div className="tn-dau">
-          <div><b>{so(d.dem.tre ?? 0)}</b><span>khách mua đều, tháng này chưa có đơn</span></div>
-          <div className="phu">Đã mua tháng này: <b>{so(da)}</b> khách
-            {truoc > 0 && <> · tháng trước đến cùng ngày: {so(truoc)} <span className={da >= truoc ? "tang" : "giam"}>({thay_doi(da / truoc - 1, 0)})</span></>}</div>
-          {(d.dem.chua_toi_ngay ?? 0) > 0 &&
-            <div className="phu nhat-chu">+ {so(d.dem.chua_toi_ngay)} khách mua đều nhưng thường mua muộn hơn trong tháng — chưa tới ngày.</div>}
-        </div>
-        <div className="bang-cuon"><table className="bang">
-          <thead><tr><th>Khách hàng</th><th className="so">TB/tháng</th><th className="so">Tháng trước</th></tr></thead>
-          <tbody>{d.khach.map(k => (
-            <tr key={k.ma}>
-              <td className="ten-jp"><a href={`/khach-hang/${k.ma}`}>{k.ten}</a><div className="ma-nho">mua {k.so_thang}/3 tháng trước</div></td>
-              <td className="so">{gon(k.tb_thang)}</td><td className="so">{gon(k.thang_truoc)}</td>
-            </tr>))}</tbody></table>
-          {!d.khach.length && <div className="trong">Không có khách mua đều nào đang trễ tháng này.</div>}
-        </div>
-        <div className="phu" style={{ marginTop: ".4rem" }}>{d.cach_tinh} Bộ đếm là của cả công ty; danh sách xếp theo trung bình mỗi tháng.</div>
+        <SoLon gia={so(d.dem.tre ?? 0)} nhan="khách mua đều chưa có đơn"
+          chi_tiet={<><DongNoi nhan="Đã mua tháng này" gia={`${so(da)} khách`} />
+            {truoc > 0 && <DongNoi nhan="Tháng trước đến cùng ngày" gia={<>{so(truoc)} <span className={da >= truoc ? "tang" : "giam"}>({thay_doi(da / truoc - 1, 0)})</span></>} />}
+            {(d.dem.chua_toi_ngay ?? 0) > 0 && <DongNoi nhan="Thường mua muộn hơn — chưa tới ngày" gia={so(d.dem.chua_toi_ngay)} />}</>} />
+        {d.khach.length
+          ? <ThanhNgang dong={d.khach.slice(0, 10).map((k): DongThanh => ({
+              khoa: k.ma, ten: k.ten, ten_jp: true, gia_tri: k.tb_thang, chu: gon(k.tb_thang), mau: LUC.canh,
+              href: `/khach-hang/${k.ma}`,
+              chi_tiet: <><DongNoi nhan="Mua" gia={`${k.so_thang}/3 tháng trước`} /><DongNoi nhan="TB / tháng" gia={yen(k.tb_thang)} />
+                <DongNoi nhan="Tháng trước" gia={yen(k.thang_truoc)} /></> }))} />
+          : <div className="trong">Không có khách mua đều nào đang trễ tháng này.</div>}
       </>}
     </Khoi>
   );
