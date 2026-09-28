@@ -519,7 +519,7 @@ export function KhoiTangTruong() {
       canh_bao={cuoi && cuoi.so_thang < 12 ? `${cuoi.nhan} mới có ${cuoi.so_thang} tháng — số khách thấp hơn, đừng so thẳng với kỳ đủ.` : undefined}>
       {d && <>
         {cuoi && <SoLon gia={so(cuoi.so_khach)} nhan={`khách có đơn · ${cuoi.nhan}`} />}
-        <BieuDo nhan={ky.map(x => x.nhan.replace(/^Kỳ\s*/, "K"))} nhan_day_du={ky.map(x => `${x.nhan} · ${x.so_thang} tháng dữ liệu`)} cao={150}
+        <BieuDo nhan={ky.map(x => `K${x.company_fy}`)} nhan_day_du={ky.map(x => `${x.nhan} · ${x.so_thang} tháng dữ liệu`)} cao={150}
           mo_ta="Số khách có đơn theo từng kỳ kế toán"
           chuoi={[{ ten: "Khách có đơn", kieu: "cot", gia_tri: ky.map(x => x.so_khach), mau: "var(--lien-ket)",
             mau_tung_cot: ky.map(x => x.company_fy === d.chon ? "var(--lien-ket)" : MO) }]}
