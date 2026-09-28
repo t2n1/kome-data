@@ -186,7 +186,9 @@ class PhamVi:
     hom_nay_that: date | None = None
 
     def ky_chua(self, d: date) -> KyDl | None:
-        return next((k for k in self.ky if k.tu <= d <= k.den), None)
+        # Kỳ chạy tới 31/7 theo LỊCH, không tới ngày bán cuối của nó: khoảng đã qua kết thúc ở
+        # chính mốc (có thể sau ngày bán cuối — tháng kết thúc Chủ nhật) vẫn thuộc kỳ đó.
+        return next((k for k in self.ky if k.tu <= d <= max(k.den, date(k.company_fy, 7, 31))), None)
 
 
 _PHAM_VI = """WITH r AS (SELECT (SELECT min(sales_date) FROM core.fact_sales_line) AS dau,

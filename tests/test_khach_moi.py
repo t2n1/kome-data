@@ -110,3 +110,18 @@ def test_12_thang_ket_thuc_o_thang_cua_khoang(conn, batch):
 def test_khoi_trong_khi_kho_rong(conn):
     d = KTQ.khach_moi(conn, None, None)
     assert d["so_khach"] == 0 and d["khach"] == [] and d["khoang"] is None
+
+
+def test_khoi_theo_thang_dem_khach_moi_BANG_khoi_khach_moi(conn, batch):
+    """Cách xem "Khách mới" của khối Theo từng tháng (2026-09-29) đọc CÙNG hàm
+    `mart.khach_moi_khoang` — số từng tháng khớp khối khach_moi, kỳ so = tháng dời."""
+    _nen(conn, batch)
+    ts = KX.ThamSo(thang="2026-07")
+    tt = {x["thang"]: x for x in KTQ.theo_thang(conn, None, ts)["thang"]}
+    km = {x["thang"]: x for x in KTQ.khach_moi(conn, None, ts)["thang"]}
+    for m, x in tt.items():
+        assert (x["khach_moi"], x["khach_moi_da_mua"]) == (km[m]["so_khach"], km[m]["da_mua"])
+    assert (tt["2026-07"]["khach_moi"], tt["2026-07"]["khach_moi_da_mua"]) == (3, 1)
+    assert tt["2026-07"]["khach_moi_ss"] == 1            # 202507100001, năm trước
+    lg = conn.execute("SELECT lai_gop FROM mart.ban_theo_thang WHERE thang = '2025-07'").fetchone()[0]
+    assert tt["2026-07"]["cung_ky_lg"] == int(lg)

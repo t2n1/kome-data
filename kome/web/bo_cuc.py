@@ -107,7 +107,8 @@ MA_CU = {"chi_so": "kpi", "ngan_sach": "ns_thang", "suc_khoe": "suc_khoe_khach",
 # Lựa chọn lưu trong ô bố cục (`O.xem`), mỗi bảng một cách nhìn. Có test canh: mọi mã ở
 # đây phải có nhánh vẽ trong giao_dien/src/tong_quan/khoi.tsx (tests/test_cach_xem.py).
 CACH_XEM: dict[str, tuple[tuple[str, str], ...]] = {
-    "theo_thang": (("cot", "Theo tháng"), ("luy_ke", "Luỹ kế"), ("bien", "Biên gộp")),
+    # 2026-09-29 (chủ DN): Doanh thu · Lãi gộp · Khách mới; "bien" cũ gộp vào "lai_gop" (XEM_CU).
+    "theo_thang": (("cot", "Doanh thu"), ("lai_gop", "Lãi gộp"), ("khach_moi", "Khách mới"), ("luy_ke", "Luỹ kế")),
     "xu_huong": (("doanh_thu", "Doanh thu"), ("luy_ke", "Luỹ kế"), ("lai_gop", "Lãi gộp"), ("so_khach", "Số khách")),
     "ns_thang": (("doanh_thu", "Doanh thu"), ("lai_gop", "Lãi gộp")),
     "so_sanh_sale": (("tien_do", "Tiến độ"), ("doanh_thu", "Doanh thu"), ("lai_gop", "Lãi gộp")),
@@ -221,7 +222,12 @@ def _la_toa_do(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
+# Mã cách xem đã đổi tên: bố cục đã lưu vẫn giữ lựa chọn.
+XEM_CU = {("theo_thang", "bien"): "lai_gop"}
+
+
 def _xem(ma: str, v) -> str | None:
+    v = XEM_CU.get((ma, v), v) if isinstance(v, str) else v
     return v if isinstance(v, str) and any(v == a for a, _ in CACH_XEM.get(ma, ())) else None
 
 

@@ -330,80 +330,105 @@ export function KhoiSale(p: XemP) {
 
 // ---- Kết quả theo từng tháng ------------------------------------------------
 type Thang = { thang: string; thang_trong_ky: number; doanh_thu: number; lai_gop: number; ty_suat: number | null; so_khach: number;
-  cung_ky: number | null; co_cung_ky: boolean; ngan_sach: number | null };
+  cung_ky: number | null; co_cung_ky: boolean; ngan_sach: number | null; ngan_sach_lg: number | null; cung_ky_lg: number | null;
+  khach_moi: number; khach_moi_da_mua: number; khach_moi_ss: number | null };
+/** Chỉ số đang vẽ của khối theo tháng: giá trị · kỳ so · ngân sách (nếu có) của một tháng. */
+type ChiSoThang = { ten: string; gt: (x: Thang) => number; ss: (x: Thang) => number | null; ns: (x: Thang) => number | null;
+  mau: string; mo: string; tien: boolean };
+const CS_THANG: Record<"doanh_thu" | "lai_gop" | "khach_moi", ChiSoThang> = {
+  doanh_thu: { ten: "Doanh thu", gt: x => x.doanh_thu, ss: x => x.cung_ky, ns: x => x.ngan_sach, mau: LUC.do, mo: MO, tien: true },
+  lai_gop: { ten: "Lãi gộp", gt: x => x.lai_gop, ss: x => x.cung_ky_lg, ns: x => x.ngan_sach_lg, mau: LUC.ok,
+    mo: "color-mix(in srgb, var(--ok-vien) 35%, var(--nen-the))", tien: true },
+  khach_moi: { ten: "Khách mới", gt: x => x.khach_moi, ss: x => x.khach_moi_ss, ns: () => null, mau: "var(--lien-ket)", mo: MO, tien: false },
+};
 
 export function KhoiTheoThang(p: XemP) {
   const cx = useCachXem("theo_thang", p);
   const { data: d, isLoading, error } = useKhoi<{ company_fy: number | null; thang: Thang[]; hom_nay: string | null; khoang: KhoangMayChu | null;
-    so_sanh: SsKhoi; cat_cung_ngay: boolean }>("theo_thang");
+    so_sanh: SsKhoi; cat_cung_ngay: boolean; khach_moi_cach_tinh: string }>("theo_thang");
   const t = d?.thang ?? [];
   const thangNay = d?.hom_nay?.slice(0, 7);
   const kx = d?.khoang;
-  const tong = t.reduce((s, x) => s + x.doanh_thu, 0);
   const ss = d?.so_sanh;
-  // Tháng đang chạy chỉ so ngang được khi máy chủ đã cắt kỳ so cùng dải ngày.
-  const coCK = t.filter(x => x.cung_ky != null && (x.thang !== thangNay || d?.cat_cung_ngay));
-  const dtCK = coCK.reduce((s, x) => s + x.doanh_thu, 0), ck = coCK.reduce((s, x) => s + (x.cung_ky ?? 0), 0);
-  const coNS = t.filter(x => x.ngan_sach != null && x.thang !== thangNay);
-  const dat = coNS.filter(x => x.doanh_thu >= (x.ngan_sach ?? 0)).length;
-  const cao = t.length ? t.reduce((a, b) => (b.doanh_thu > a.doanh_thu ? b : a)) : null;
   const xem = cx.chon;
-  const tongLg = t.reduce((s, x) => s + x.lai_gop, 0);
+  // Luỹ kế là luỹ kế DOANH THU; ba cách còn lại mỗi cách một chỉ số.
+  const cs = CS_THANG[xem === "lai_gop" ? "lai_gop" : xem === "khach_moi" ? "khach_moi" : "doanh_thu"];
+  const dd = (v: number | null | undefined) => (cs.tien ? yen(v) : so(v));
+  const tong = t.reduce((s, x) => s + cs.gt(x), 0);
+  // Tháng đang chạy chỉ so ngang được khi máy chủ đã cắt kỳ so cùng dải ngày.
+  const coCK = t.filter(x => cs.ss(x) != null && (x.thang !== thangNay || d?.cat_cung_ngay));
+  const nayCK = coCK.reduce((s, x) => s + cs.gt(x), 0), ck = coCK.reduce((s, x) => s + (cs.ss(x) ?? 0), 0);
+  const coNS = t.filter(x => cs.ns(x) != null && x.thang !== thangNay);
+  const dat = coNS.filter(x => cs.gt(x) >= (cs.ns(x) ?? 0)).length;
+  const cao = t.length ? t.reduce((a, b) => (cs.gt(b) > cs.gt(a) ? b : a)) : null;
+  const tongDt = t.reduce((s, x) => s + x.doanh_thu, 0), tongLg = t.reduce((s, x) => s + x.lai_gop, 0);
+  const daMua = t.reduce((s, x) => s + x.khach_moi_da_mua, 0);
   const nsL = luyKe(t.map(x => x.ngan_sach)), ckL = luyKe(t.map(x => x.cung_ky));
   const coNsL = nsL.some(v => v != null), coCkL = ckL.some(v => v != null);
+  const coNsCs = t.some(x => cs.ns(x) != null);
   const chuoi: Chuoi[] = xem === "luy_ke" ? [
     { ten: "Doanh thu (luỹ kế)", kieu: "duong", gia_tri: luyKe(t.map(x => x.doanh_thu)), mau: LUC.do,
       so_voi: coCkL ? 1 + (coNsL ? 1 : 0) : undefined },
     ...(coNsL ? [{ ten: "Ngân sách (luỹ kế)", kieu: "duong" as const, gia_tri: nsL, mau: "var(--lien-ket)" }] : []),
     ...(coCkL ? [{ ten: `${hoa(ss?.nhan) || "Kỳ so"} (luỹ kế)`, kieu: "duong_dut" as const, gia_tri: ckL, mau: MAU_SS }] : []),
-  ] : xem === "bien" ? [
-    { ten: "Lãi gộp", kieu: "cot", gia_tri: t.map(x => x.lai_gop), mau: LUC.ok,
-      mau_tung_cot: t.map(x => trongKhoang(kx, x.thang) ? LUC.ok : "color-mix(in srgb, var(--ok-vien) 35%, var(--nen-the))") },
-    { ten: "Biên gộp", kieu: "duong", gia_tri: t.map(x => x.ty_suat), mau: "var(--lien-ket)", truc_phai: true },
   ] : [
-    { ten: hoa(ss?.nhan) || "Kỳ so", kieu: "cot_ma", gia_tri: t.map(x => x.cung_ky), mau: MAU_SS },
-    { ten: "Doanh thu", kieu: "cot", gia_tri: t.map(x => x.doanh_thu), mau: LUC.do, so_voi: 0,
-      mau_tung_cot: t.map(x => !trongKhoang(kx, x.thang) ? MO : x.ngan_sach == null ? "var(--lien-ket)" : x.doanh_thu >= x.ngan_sach ? LUC.do : "color-mix(in srgb, var(--do) 50%, var(--nen-the))") },
-    { ten: "Ngân sách tháng", kieu: "duong", gia_tri: t.map(x => x.ngan_sach), mau: "var(--lien-ket)" },
+    { ten: hoa(ss?.nhan) || "Kỳ so", kieu: "cot_ma", gia_tri: t.map(x => cs.ss(x)), mau: MAU_SS },
+    { ten: cs.ten, kieu: "cot", gia_tri: t.map(x => cs.gt(x)), mau: cs.mau, so_voi: 0,
+      mau_tung_cot: t.map(x => { const n = cs.ns(x);
+        return !trongKhoang(kx, x.thang) ? cs.mo : n == null ? (cs.tien ? "var(--lien-ket)" : cs.mau)
+          : cs.gt(x) >= n ? cs.mau : `color-mix(in srgb, ${cs.mau} 50%, var(--nen-the))`; }) },
+    ...(coNsCs ? [{ ten: xem === "lai_gop" ? "Ngân sách lãi gộp" : "Ngân sách tháng", kieu: "duong" as const,
+      gia_tri: t.map(x => cs.ns(x)), mau: "var(--lien-ket)" }] : []),
   ];
-  const coSsVe = xem !== "bien";
+  const ky = `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d?.company_fy})`;
   return (
     <Khoi tieu_de="Theo từng tháng" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/bao-cao", chu: "Báo cáo" }}
-      phu={ss && coSsVe ? <>so {ss.nhan}</> : undefined} cach_xem={cx}
+      phu={ss ? <>so {ss.nhan}</> : undefined} cach_xem={cx}
       cach_tinh={!d?.company_fy ? undefined
-        : xem === "luy_ke" ? `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}), cộng dồn từ đầu kỳ: doanh thu · ngân sách (dừng ở tháng đầu tiên chưa đặt) · nét đứt = ${ss?.nhan ?? "kỳ so"} (dừng ở tháng đầu tiên không có số).`
-        : xem === "bien" ? `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}). Cột = lãi gộp từng tháng (đậm = thuộc khoảng xem); đường (trục phải) = biên gộp = lãi gộp ÷ doanh thu thuần của tháng.`
-        : `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}). Cột đậm = thuộc khoảng xem; cột viền đứt = ${ss?.nhan ?? "kỳ so"}; đường = ngân sách tháng.`}
+        : xem === "luy_ke" ? `${ky}, cộng dồn từ đầu kỳ: doanh thu · ngân sách (dừng ở tháng đầu tiên chưa đặt) · nét đứt = ${ss?.nhan ?? "kỳ so"} (dừng ở tháng đầu tiên không có số).`
+        : xem === "khach_moi" ? `${ky}. Cột = số khách ĐĂNG KÝ trong tháng (đậm = thuộc khoảng xem); cột viền đứt = ${ss?.nhan ?? "kỳ so"}. ${d.khach_moi_cach_tinh}`
+        : xem === "lai_gop" ? `${ky}. Cột = lãi gộp (粗利益) từng tháng, đậm = thuộc khoảng xem; cột viền đứt = ${ss?.nhan ?? "kỳ so"}; đường = ngân sách lãi gộp của công ty. Biên gộp = lãi gộp ÷ doanh thu thuần.`
+        : `${ky}. Cột đậm = thuộc khoảng xem; cột viền đứt = ${ss?.nhan ?? "kỳ so"}; đường = ngân sách tháng.`}
       canh_bao={!d ? undefined : canhBaoNhieu([
-        xem === "bien" && ss ? `${hoa(ss.nhan)}: khối này không mang lãi gộp của kỳ so — chọn Theo tháng hoặc Luỹ kế để so.` : null,
         ss && ss.co && ss.lech_thang == null ? "Kỳ so không lệch tròn tháng — không so theo tháng được." : null,
-        ss && !ck ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : null,
+        ss && ss.co && ss.lech_thang != null && !coCK.length ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : null,
+        ss && !ss.co ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : null,
         thangNay && t.some(x => x.thang === thangNay)
-          ? (d.cat_cung_ngay ? `Tháng đang chạy chưa đủ ngày — %NS chưa so ngang được; cột ma của tháng này đã cắt cùng dải ngày ở ${ss?.nhan}.`
-            : "Tháng đang chạy chưa đủ ngày — %NS và phép so của tháng này chưa so ngang được.")
+          ? (d.cat_cung_ngay ? `Tháng đang chạy chưa đủ ngày${coNsCs ? " — %NS chưa so ngang được" : ""}; cột ma của tháng này đã cắt cùng dải ngày ở ${ss?.nhan}.`
+            : `Tháng đang chạy chưa đủ ngày — ${coNsCs ? "%NS và " : ""}phép so của tháng này chưa so ngang được.`)
           : null,
       ])}>
       {d && <>
         <HangSo>
-          <MucSo nhan="Luỹ kế" gia={gon(tong)} chi_tiet={<DongNoi nhan="Tháng có dữ liệu"
+          <MucSo nhan={xem === "khach_moi" ? "Cả kỳ" : "Luỹ kế"} gia={xem === "khach_moi" ? so(tong) : gon(tong)}
+            chi_tiet={<DongNoi nhan="Tháng có dữ liệu"
             gia={t.length ? `${t.length} (${thang_nhan(t[0].thang)} – ${thang_nhan(t[t.length - 1].thang)})` : "0"} />} />
-          <MucSo nhan={<>so {ss?.nhan ?? "kỳ so"}</>} gia={ck ? thay_doi(dtCK / ck - 1) : "—"} lop={ck ? (dtCK >= ck ? "tang" : "giam") : undefined}
-            chi_tiet={ck ? <><DongNoi nhan="Tháng đối chiếu" gia={so(coCK.length)} /><DongNoi nhan="Chênh" gia={gon(dtCK - ck)} /></> : undefined} />
-          {xem === "bien" && <MucSo nhan="Biên cả kỳ" gia={tong ? pc(tongLg / tong) : "—"}
-            chi_tiet={<><DongNoi nhan="Lãi gộp" gia={yen(tongLg)} /><DongNoi nhan="Doanh thu" gia={yen(tong)} /></>} />}
-          <MucSo nhan="Đạt ngân sách" gia={coNS.length ? `${dat}/${coNS.length}` : "—"}
-            chi_tiet={<div className="o-noi-chu">{coNS.length ? "Số tháng đã khép lại đạt ngân sách." : "Chưa đặt chỉ tiêu tháng nào."}</div>} />
+          <MucSo nhan={<>so {ss?.nhan ?? "kỳ so"}</>} gia={ck ? thay_doi(nayCK / ck - 1) : "—"} lop={ck ? (nayCK >= ck ? "tang" : "giam") : undefined}
+            chi_tiet={ck ? <><DongNoi nhan="Tháng đối chiếu" gia={so(coCK.length)} />
+              <DongNoi nhan="Chênh" gia={cs.tien ? gon(nayCK - ck) : so(nayCK - ck)} /></> : undefined} />
+          {xem === "lai_gop" && <MucSo nhan="Biên cả kỳ" gia={tongDt ? pc(tongLg / tongDt) : "—"}
+            chi_tiet={<><DongNoi nhan="Lãi gộp" gia={yen(tongLg)} /><DongNoi nhan="Doanh thu" gia={yen(tongDt)} /></>} />}
+          {xem === "khach_moi"
+            ? <MucSo nhan="Đã có đơn" gia={tong ? `${daMua}/${tong}` : "—"}
+                chi_tiet={<div className="o-noi-chu">Khách đăng ký trong kỳ đã có phiếu bán tính đến ngày cuối khoảng.</div>} />
+            : <MucSo nhan="Đạt ngân sách" gia={coNS.length ? `${dat}/${coNS.length}` : "—"}
+                chi_tiet={<div className="o-noi-chu">{coNS.length ? `Số tháng đã khép lại đạt ngân sách${xem === "lai_gop" ? " lãi gộp" : ""}.`
+                  : `Chưa đặt chỉ tiêu ${xem === "lai_gop" ? "lãi gộp " : ""}tháng nào.`}</div>} />}
           <MucSo nhan="Cao nhất" gia={cao ? thang_nhan(cao.thang) : "—"}
-            chi_tiet={cao ? <><DongNoi nhan="Doanh thu" gia={yen(cao.doanh_thu)} /><DongNoi nhan="Biên gộp" gia={pc(cao.ty_suat)} /></> : undefined} />
+            chi_tiet={cao ? <><DongNoi nhan={cs.ten} gia={dd(cs.gt(cao))} /><DongNoi nhan="Biên gộp" gia={pc(cao.ty_suat)} /></> : undefined} />
         </HangSo>
         <BieuDo key={xem} nhan={t.map(x => thang_nhan(x.thang))} chuoi={chuoi} cao={200}
-          mo_ta={xem === "bien" ? "Lãi gộp và biên gộp từng tháng của kỳ" : xem === "luy_ke" ? `Doanh thu luỹ kế của kỳ so ngân sách và ${ss?.nhan ?? "kỳ so"}` : `Doanh thu từng tháng của kỳ so ngân sách và ${ss?.nhan ?? "kỳ so"}`}
-          dinh_dang={(v, c) => c.truc_phai ? pc(v) : yen(v)} dinh_dang_truc={v => gon(v)}
+          mo_ta={xem === "luy_ke" ? `Doanh thu luỹ kế của kỳ so ngân sách và ${ss?.nhan ?? "kỳ so"}` : `${cs.ten} từng tháng của kỳ so ${coNsCs ? "ngân sách và " : ""}${ss?.nhan ?? "kỳ so"}`}
+          dinh_dang={v => (xem === "khach_moi" ? so(v) : yen(v))} dinh_dang_truc={v => (xem === "khach_moi" ? so(v) : gon(v))}
           vach={thangNay ? { i: t.findIndex(x => x.thang === thangNay), chu: "đang chạy" } : null}
-          them_noi={i => { const x = t[i]; return x && <>
-            <div>%NS<b>{x.ngan_sach ? pc(x.doanh_thu / x.ngan_sach, 0) : "—"}</b></div>
+          them_noi={i => { const x = t[i]; return x && (xem === "khach_moi" ? <>
+            <div>Đã có đơn<b>{so(x.khach_moi_da_mua)}</b></div>
+            <div>Doanh thu<b>{gon(x.doanh_thu)}</b></div></> : <>
+            <div>%NS<b>{cs.ns(x) ? pc(cs.gt(x) / cs.ns(x)!, 0) : "—"}</b></div>
+            <div>{xem === "lai_gop" ? "Doanh thu" : "Lãi gộp"}<b>{gon(xem === "lai_gop" ? x.doanh_thu : x.lai_gop)}</b></div>
             <div>Biên gộp<b>{pc(x.ty_suat)}</b></div>
-            <div>Khách<b>{so(x.so_khach)}</b></div></>; }} />
+            <div>Khách mua<b>{so(x.so_khach)}</b></div>
+            <div>Khách mới<b>{so(x.khach_moi)}</b></div></>); }} />
       </>}
     </Khoi>
   );

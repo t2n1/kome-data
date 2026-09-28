@@ -273,24 +273,40 @@ def theo_thang(conn, sale=None, ts=None) -> dict:
     # vẫn phải có dòng — bản LEFT JOIN làm tháng 8/2026 (ngân sách ¥92,7M, chưa
     # nạp dữ liệu) biến mất, và khối in "chưa đặt chỉ tiêu tháng nào". Chỉ lấy
     # tháng ≤ tháng của mốc: ngân sách các tháng tương lai không phải "kết quả".
+    # Khách mới (044, `mart.khach_moi_khoang` — CÙNG hàm của khối khach_moi) đi CHUNG câu:
+    # một dải từ đầu kỳ (lùi `lech` tháng cho kỳ so) tới ngày cuối khoảng, đếm theo tháng.
     rows = [] if kx is None else conn.execute(
         """WITH s AS (SELECT * FROM mart.ban_theo_thang_so_sanh WHERE company_fy = %(fy)s),
-                ns AS (SELECT * FROM mart.ngan_sach_cong_ty_thang WHERE company_fy = %(fy)s)
-           SELECT coalesce(s.thang, ns.thang), %(fy)s, coalesce(s.thang_trong_ky, d.company_fy_month),
-                  s.doanh_thu_thuan, s.lai_gop, s.so_khach,
-                  CASE WHEN coalesce(s.thang, ns.thang) = to_char(%(den)s::date, 'YYYY-MM')
-                            AND %(dd_a)s::date IS NOT NULL AND ck.thang IS NOT NULL
-                       THEN (SELECT t.dt FROM mart.tong_khoang(%(dd_a)s::date, %(dd_b)s::date) t)
-                       ELSE ck.doanh_thu_thuan END,
-                  ck.thang IS NOT NULL,
-                  ns.doanh_thu, ns.lai_gop
+                ns AS (SELECT * FROM mart.ngan_sach_cong_ty_thang WHERE company_fy = %(fy)s),
+                dd AS MATERIALIZED (SELECT * FROM mart.tong_khoang(%(dd_a)s::date, %(dd_b)s::date)),
+                km AS MATERIALIZED (
+                    SELECT to_char(ngay_dang_ky, 'YYYY-MM') AS thang, ngay_dang_ky, da_mua
+                      FROM mart.khach_moi_khoang(
+                           ((SELECT min(date_key) FROM core.dim_date WHERE company_fy = %(fy)s)
+                            - make_interval(months => coalesce(%(lech)s::int, 0)))::date, %(den)s::date)),
+                t AS (
+           SELECT coalesce(s.thang, ns.thang) AS thang, coalesce(s.thang_trong_ky, d.company_fy_month) AS tk,
+                  s.doanh_thu_thuan, s.lai_gop, s.so_khach, ck.thang AS ck_thang,
+                  ck.doanh_thu_thuan AS ck_dt, ck.lai_gop AS ck_lg,
+                  ns.doanh_thu AS ns_dt, ns.lai_gop AS ns_lg
              FROM s FULL JOIN ns ON ns.thang = s.thang
              LEFT JOIN core.dim_date d ON s.thang IS NULL
                    AND d.date_key = to_date(ns.thang || '-01', 'YYYY-MM-DD')
              LEFT JOIN mart.ban_theo_thang ck ON %(lech)s::int IS NOT NULL
                    AND ck.thang = to_char(to_date(coalesce(s.thang, ns.thang) || '-01', 'YYYY-MM-DD')
                                           - make_interval(months => %(lech)s::int), 'YYYY-MM')
-            WHERE coalesce(s.thang, ns.thang) <= to_char(%(den)s::date, 'YYYY-MM')
+            WHERE coalesce(s.thang, ns.thang) <= to_char(%(den)s::date, 'YYYY-MM'))
+           SELECT t.thang, %(fy)s, t.tk, t.doanh_thu_thuan, t.lai_gop, t.so_khach,
+                  CASE WHEN dang THEN (SELECT dd.dt FROM dd) ELSE t.ck_dt END,
+                  t.ck_thang IS NOT NULL, t.ns_dt, t.ns_lg,
+                  CASE WHEN dang THEN (SELECT dd.lg FROM dd) ELSE t.ck_lg END,
+                  (SELECT count(*) FROM km WHERE km.thang = t.thang),
+                  (SELECT count(*) FILTER (WHERE km.da_mua) FROM km WHERE km.thang = t.thang),
+                  CASE WHEN t.ck_thang IS NOT NULL THEN
+                       (SELECT count(*) FROM km WHERE km.thang = t.ck_thang
+                           AND (NOT dang OR km.ngay_dang_ky <= %(dd_b)s::date)) END
+             FROM t, LATERAL (SELECT t.thang = to_char(%(den)s::date, 'YYYY-MM')
+                                     AND %(dd_a)s::date IS NOT NULL AND t.ck_thang IS NOT NULL AS dang) x
             ORDER BY 1""", {"fy": kx.company_fy, "den": kx.den, "lech": lech,
                             "dd_a": dd_a, "dd_b": dd_b}).fetchall()
     thang = [{
@@ -301,10 +317,13 @@ def theo_thang(conn, sale=None, ts=None) -> dict:
         # 041: ngân sách CÔNG TY (nhập thẳng), không cộng từ từng người.
         "ngan_sach": int(r[8]) if r[8] is not None else None,
         "ngan_sach_lg": int(r[9]) if r[9] is not None else None,
+        "cung_ky_lg": int(r[10]) if r[10] is not None else None,
+        "khach_moi": int(r[11]), "khach_moi_da_mua": int(r[12]),
+        "khach_moi_ss": int(r[13]) if r[13] is not None else None,
     } for r in rows]
     return {"company_fy": thang[0]["company_fy"] if thang else None, "thang": thang,
             "hom_nay": kx.hom_nay if kx else None, "khoang": kx, "so_sanh": _ss_json(kx),
-            "cat_cung_ngay": dd_a is not None}
+            "cat_cung_ngay": dd_a is not None, "khach_moi_cach_tinh": CACH_TINH_KHACH_MOI}
 
 
 # ---- Xu hướng doanh thu theo khoảng xem -------------------------------------

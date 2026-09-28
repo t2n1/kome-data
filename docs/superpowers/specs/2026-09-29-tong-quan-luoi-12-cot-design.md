@@ -89,7 +89,7 @@ Ngày: 2026-09-29 · Yêu cầu của chủ DN (4 ý), chủ DN giao "làm hết
 
 | Khối | Cách xem |
 |---|---|
-| `theo_thang` | Theo tháng (cột, như cũ) · Luỹ kế (đường cộng dồn DT / ngân sách / kỳ so) · Biên gộp (cột lãi gộp + đường biên, trục phải) |
+| `theo_thang` | Doanh thu (cột, như cũ) · Lãi gộp (cột + kỳ so lãi gộp + ngân sách lãi gộp; biên trong ô số) · Khách mới (khách ĐĂNG KÝ theo tháng, `mart.khach_moi_khoang`, cùng câu SQL) · Luỹ kế — sửa 2026-09-29 theo chủ DN; `bien` cũ → `lai_gop` (`bo_cuc.XEM_CU`) |
 | `xu_huong` | Doanh thu (như cũ) · Luỹ kế · Lãi gộp · Số khách |
 | `ns_thang` | Doanh thu · Lãi gộp (thay nút tự chế trong đường luỹ kế) |
 | `so_sanh_sale` | Tiến độ % (như cũ) · Doanh thu · Lãi gộp |
