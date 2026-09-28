@@ -18,7 +18,7 @@ vẽ khung "chưa có dữ liệu" và nói rõ thiếu nguồn nào (`CHUA_CO`)
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import date
+from datetime import date, timedelta
 
 from kome import ban_khoang as BK
 from kome import khach_hang as KH
@@ -57,6 +57,31 @@ def _ns_theo_khoang(conn, kx):
     return tien_do_ngan_sach(conn, kx.company_fy, kx.thang if kx.loai == "thang" else None)
 
 
+def _ss(kx):
+    """Kỳ so đang bật của khoảng (đặc tả 2026-09-28: một kỳ so cho cả website)."""
+    return kx.so_sanh[0] if kx is not None and kx.so_sanh else None
+
+
+def _ss_json(kx) -> dict | None:
+    s = _ss(kx)
+    return None if s is None else {"ma": s.ma, "nhan": s.nhan, "co": s.co, "tu": s.tu, "den": s.den,
+                                   "lech_thang": s.lech_thang}
+
+
+def _doi_thang(d: date, n: int) -> date:
+    """Mùng 1 của tháng chứa `d`, dời `n` tháng (n âm = lùi)."""
+    t = d.year * 12 + d.month - 1 + n
+    return date(t // 12, t % 12 + 1, 1)
+
+
+def _thang_ss(thang: str, s) -> str | None:
+    """Tháng 'YYYY-MM' tương ứng ở kỳ so: dời `lech_thang` tháng; None = kỳ so không
+    lệch tròn tháng (không so theo tháng được) hoặc không có dữ liệu để so."""
+    if s is None or not s.co or s.lech_thang is None:
+        return None
+    return _doi_thang(date(int(thang[:4]), int(thang[5:7]), 1), -s.lech_thang).strftime("%Y-%m")
+
+
 def _so_sanh_json(ss) -> list[dict]:
     return [{"ma": s.ma, "nhan": s.nhan, "co": s.co, "tu": s.tu, "den": s.den,
              "dt": s.dt, "dt_ck": s.dt_ck, "tang": s.tang_dt, "lg": s.lg, "lg_ck": s.lg_ck,
@@ -69,10 +94,11 @@ def _so_sanh_json(ss) -> list[dict]:
 def kpi(conn, sale=None, ts=None) -> dict:
     """Ô doanh thu + ngân sách theo KHOẢNG XEM; ô kho và ô khách tính đến hôm nay."""
     kx = _kx(conn, ts)
-    nay, ss, spark = ({"dt": 0, "lg": 0, "so_khach": 0, "so_phieu": 0, "ty_suat": None}, [], [])
+    nay, ss, spark, spark_ss = ({"dt": 0, "lg": 0, "so_khach": 0, "so_phieu": 0, "ty_suat": None}, [], [], [])
     if kx is not None:
         nay, ss = BK.tong(conn, kx)
-        spark = [o.doanh_thu for o in BK.chuoi(conn, kx)[1]]
+        o = BK.chuoi(conn, kx)[1]
+        spark, spark_ss = [x.doanh_thu for x in o], [x.dt_cung_ky for x in o]
     ns = _ns_theo_khoang(conn, kx)
     dem, _ = KH.dem_va_can_xu_ly(conn, gioi_han=0, sale=None, chi_goi=True)
     kho = dict(conn.execute(
@@ -86,6 +112,7 @@ def kpi(conn, sale=None, ts=None) -> dict:
             "cung_ky": chinh.dt_ck if chinh else None, "tang": chinh.tang_dt if chinh else None,
             "lai_gop": nay["lg"], "ty_suat": nay["ty_suat"], "so_khach": nay["so_khach"],
             "so_phieu": nay["so_phieu"], "so_sanh": _so_sanh_json(ss), "spark": spark,
+            "spark_ss": spark_ss,
         },
         "ngan_sach": None if ns is None or not ns.co_ngan_sach else {
             "tien_do": ns.tien_do, "thuc_te": ns.thuc_te, "muc_tieu": ns.muc_tieu,
@@ -114,6 +141,12 @@ def ngan_sach(conn, sale=None, ts=None) -> dict | None:
         return None
     from kome.bao_cao import chi_so_phu
     phu = chi_so_phu(ns)
+    # Doanh thu của từng người ở KỲ SO (+1 lượt hỏi) — vạch đứt trên thanh của họ.
+    s = _ss(kx)
+    co_ss = s is not None and s.co
+    dt_ss = {} if not co_ss else {r[0]: int(r[1] or 0) for r in conn.execute(
+        "SELECT salesperson_code, dt FROM mart.sale_khoang(%s, %s)", (s.tu, s.den)).fetchall()}
+    nguoi = [asdict(n) | {"dt_ss": dt_ss.get(n.ma, 0) if co_ss else None} for n in ns.nguoi]
     return {
         "thang": ns.thang, "co_ngan_sach": ns.co_ngan_sach,
         "thuc_te": ns.thuc_te, "muc_tieu": ns.muc_tieu,
@@ -126,9 +159,9 @@ def ngan_sach(conn, sale=None, ts=None) -> dict | None:
         "ngay_kd": ns.ngay_kd, "ngay_kd_da_qua": ns.ngay_kd_da_qua,
         "ngay_kd_con_lai": phu["ngay_kd_con_lai"], "can_ban_moi_ngay": phu["can_ban_moi_ngay"],
         "nhip_chuan": phu["nhip_chuan"],
-        "nguoi": [asdict(n) for n in ns.nguoi],
+        "nguoi": nguoi,
         "luy_ke": [asdict(m) for m in ns.luy_ke],
-        "khoang": kx,
+        "khoang": kx, "so_sanh": _ss_json(kx),
     }
 
 
@@ -141,65 +174,100 @@ def ngan_sach_thang(conn, sale=None, ts=None) -> dict | None:
 
 
 def duong_luy_ke(conn, kx, ns: dict) -> dict:
-    """Đường luỹ kế của khối ngân sách tháng.
+    """Đường luỹ kế của khối ngân sách tháng — thực tế · nhịp ngân sách · KỲ SO.
 
     Dạng Tháng (+1 lượt hỏi): mỗi ngày của tháng — doanh thu cộng dồn tới ngày đó
-    (tháng hiện tại: tới mốc hôm nay, sau đó None; tháng cũ: trọn tháng), nhịp ngân sách = chỉ tiêu × số ngày làm việc
-    đã qua ÷ số ngày làm việc của tháng — ĐÚNG công thức `muc_tieu_den_hom_nay` của
-    `mart.tien_do_ngan_sach` áp cho từng ngày, nên tại mốc hai số trùng nhau (có
-    test canh) — và luỹ kế tháng trước cùng ngày để so. Ngày làm việc đọc
-    `mart.lich_kinh_doanh` (định nghĩa duy nhất), doanh thu đọc `mart.ngay_khoang`.
-    Dạng Kỳ (0 lượt): luỹ kế theo tháng `TienDoNganSach.luy_ke` đã có sẵn."""
+    (tháng hiện tại: tới mốc hôm nay, sau đó None; tháng cũ: trọn tháng), nhịp ngân
+    sách = chỉ tiêu × số ngày làm việc đã qua ÷ số ngày làm việc của tháng — ĐÚNG công
+    thức `muc_tieu_den_hom_nay` của `mart.tien_do_ngan_sach` áp cho từng ngày, nên tại
+    mốc hai số trùng nhau (có test canh). Kỳ so (`so_sanh[0]`) cộng dồn theo VỊ TRÍ
+    ngày tính từ `s.tu`, dừng ở `s.den` — tại ngày cuối nó bằng đúng tổng của dải so.
+    Ngày làm việc đọc `mart.lich_kinh_doanh` (định nghĩa duy nhất), doanh thu đọc
+    `mart.ngay_khoang`.
+    Dạng Kỳ (+1 lượt): luỹ kế theo tháng `TienDoNganSach.luy_ke` + kỳ so theo tháng
+    dời `lech_thang` (`mart.thang_khoang` trên đúng dải so)."""
+    s = _ss(kx)
+    nhan_ss = s.nhan if s is not None else None
     if kx.loai != "thang":
-        return {"kieu": "thang", "diem": [
-            {"nhan": m["thang"], "tt": m["thuc_te"], "ns": m["ngan_sach"], "ss": None,
-             "tt_lg": m["thuc_te_lg"], "ns_lg": m["ngan_sach_lg"], "ss_lg": None}
-            for m in ns["luy_ke"]], "nhan_ss": None}
+        # Kỳ so bắt đầu muộn hơn (dữ liệu bắt đầu giữa kỳ) thì hai đường luỹ kế không
+        # cùng gốc — không vẽ còn hơn vẽ một đường cộng dồn lệch.
+        ss_thang = {}
+        if s is not None and s.co and s.lech_thang is not None and s.tu_nay == kx.tu:
+            ss_thang = {r[0]: (int(r[1] or 0), int(r[2] or 0)) for r in conn.execute(
+                "SELECT thang, dt, lg FROM mart.thang_khoang(%s, %s)", (s.tu, s.den)).fetchall()}
+        cuoi_ss = s.den.strftime("%Y-%m") if s is not None else ""
+        diem, cong, cong_lg = [], 0, 0
+        for m in ns["luy_ke"]:
+            t = _thang_ss(m["thang"], s) if ss_thang else None
+            co = t is not None and t <= cuoi_ss
+            if co:
+                v = ss_thang.get(t, (0, 0))
+                cong, cong_lg = cong + v[0], cong_lg + v[1]
+            diem.append({"nhan": m["thang"], "tt": m["thuc_te"], "ns": m["ngan_sach"],
+                         "ss": cong if co else None,
+                         "tt_lg": m["thuc_te_lg"], "ns_lg": m["ngan_sach_lg"],
+                         "ss_lg": cong_lg if co else None})
+        return {"kieu": "thang", "diem": diem, "nhan_ss": nhan_ss}
     dau = kx.tu
     cuoi = KX._cuoi_thang(dau.year, dau.month)
     # Tháng đang xem LÙI là tháng đã khép: vẽ trọn tới cuối tháng (ngày cuối không
     # bán gì thì đường nằm ngang — đúng sự thật). Tháng hiện tại dừng ở mốc hôm nay.
     den = cuoi if kx.dang_lui else kx.den
-    dau_truoc = date(dau.year - (dau.month == 1), 12 if dau.month == 1 else dau.month - 1, 1)
+    co_ss = s is not None and s.co
     rows = conn.execute(
-        """SELECT l.ngay, l.la_ngay_kd, coalesce(n.dt, 0), coalesce(n.lg, 0)
+        """SELECT 0, l.ngay, l.la_ngay_kd, coalesce(n.dt, 0), coalesce(n.lg, 0)
              FROM mart.lich_kinh_doanh l
              LEFT JOIN mart.ngay_khoang(%s, %s) n ON n.ngay = l.ngay
-            WHERE l.ngay BETWEEN %s AND %s ORDER BY l.ngay""",
-        (dau_truoc, den, dau_truoc, cuoi)).fetchall()
-    truoc, cong, cong_lg = {}, 0, 0
-    for r in rows:
-        if r[0] < dau:
-            cong += int(r[2])
-            cong_lg += int(r[3])
-            truoc[r[0].day] = (cong, cong_lg)
-    nay = [r for r in rows if r[0] >= dau]
-    ngay_kd = sum(1 for r in nay if r[1])
+            WHERE l.ngay BETWEEN %s AND %s
+           UNION ALL
+           SELECT 1, n.ngay, NULL, n.dt, n.lg FROM mart.ngay_khoang(%s, %s) n WHERE %s
+            ORDER BY 1, 2""",
+        (dau, den, dau, cuoi, s.tu if co_ss else dau, s.den if co_ss else dau, co_ss)).fetchall()
+    # Kỳ so: cộng dồn theo vị trí ngày (ngày thứ i kể từ s.tu), dừng ở s.den.
+    ss_ngay = {r[1]: (int(r[3] or 0), int(r[4] or 0)) for r in rows if r[0] == 1}
+    truoc, cong, cong_lg = [], 0, 0
+    if co_ss:
+        d = s.tu
+        while d <= s.den:
+            v = ss_ngay.get(d, (0, 0))
+            cong, cong_lg = cong + v[0], cong_lg + v[1]
+            truoc.append((cong, cong_lg))
+            d += timedelta(days=1)
+    nay = [r for r in rows if r[0] == 0]
+    ngay_kd = sum(1 for r in nay if r[2])
     muc_tieu, muc_tieu_lg = ns["muc_tieu"], ns["muc_tieu_lg"]
     diem, cong, cong_lg, kd = [], 0, 0, 0
-    for r in nay:
-        kd += bool(r[1])
-        cong += int(r[2])
-        cong_lg += int(r[3])
-        co = r[0] <= den
-        tr = truoc.get(r[0].day)
+    for i, r in enumerate(nay):
+        kd += bool(r[2])
+        cong += int(r[3])
+        cong_lg += int(r[4])
+        co = r[1] <= den
+        tr = truoc[i] if i < len(truoc) else None
         diem.append({
-            "nhan": r[0].isoformat(),
+            "nhan": r[1].isoformat(),
             "tt": cong if co else None,
             "ns": round(muc_tieu * kd / ngay_kd) if muc_tieu is not None and ngay_kd else None,
             "ss": tr[0] if tr else None,
             "tt_lg": cong_lg if co else None,
             "ns_lg": round(muc_tieu_lg * kd / ngay_kd) if muc_tieu_lg is not None and ngay_kd else None,
             "ss_lg": tr[1] if tr else None})
-    return {"kieu": "ngay", "diem": diem, "nhan_ss": "Tháng trước", "den": den.isoformat()}
+    return {"kieu": "ngay", "diem": diem, "nhan_ss": nhan_ss, "den": den.isoformat()}
 
 
 # ---- Kết quả theo từng tháng (kỳ kế toán hiện hành) -------------------------
 
 def theo_thang(conn, sale=None, ts=None) -> dict:
     """Các tháng của KỲ chứa ngày cuối khoảng xem; giao diện tô đậm các tháng
-    thuộc khoảng (`khoang.tu` → `khoang.den`)."""
+    thuộc khoảng (`khoang.tu` → `khoang.den`). Cột so = tháng dời `lech_thang` của
+    kỳ so đang bật (`mart.ban_theo_thang`); tháng cuối dở dang (ngày cuối khoảng
+    không phải cuối tháng) so CÙNG DẢI NGÀY ở tháng dời (`mart.tong_khoang`)."""
     kx = _kx(conn, ts)
+    s = _ss(kx)
+    lech = s.lech_thang if s is not None and s.co else None
+    dd_a = dd_b = None
+    if kx is not None and lech is not None and kx.den != KX._cuoi_thang(kx.den.year, kx.den.month):
+        dd_a = _doi_thang(kx.den, -lech)
+        dd_b = dd_a.replace(day=min(kx.den.day, KX._cuoi_thang(dd_a.year, dd_a.month).day))
     # FULL JOIN, không LEFT JOIN từ doanh thu (cùng bất biến của
     # mart.tien_do_ngan_sach): tháng ĐÃ ĐẶT ngân sách mà không có dòng bán nào
     # vẫn phải có dòng — bản LEFT JOIN làm tháng 8/2026 (ngân sách ¥92,7M, chưa
@@ -210,15 +278,21 @@ def theo_thang(conn, sale=None, ts=None) -> dict:
                 ns AS (SELECT * FROM mart.ngan_sach_cong_ty_thang WHERE company_fy = %(fy)s)
            SELECT coalesce(s.thang, ns.thang), %(fy)s, coalesce(s.thang_trong_ky, d.company_fy_month),
                   s.doanh_thu_thuan, s.lai_gop, s.so_khach,
-                  coalesce(s.dt_cung_ky, ck.doanh_thu_thuan), coalesce(s.co_cung_ky, ck.thang IS NOT NULL),
+                  CASE WHEN coalesce(s.thang, ns.thang) = to_char(%(den)s::date, 'YYYY-MM')
+                            AND %(dd_a)s::date IS NOT NULL AND ck.thang IS NOT NULL
+                       THEN (SELECT t.dt FROM mart.tong_khoang(%(dd_a)s::date, %(dd_b)s::date) t)
+                       ELSE ck.doanh_thu_thuan END,
+                  ck.thang IS NOT NULL,
                   ns.doanh_thu, ns.lai_gop
              FROM s FULL JOIN ns ON ns.thang = s.thang
              LEFT JOIN core.dim_date d ON s.thang IS NULL
                    AND d.date_key = to_date(ns.thang || '-01', 'YYYY-MM-DD')
-             LEFT JOIN mart.ban_theo_thang ck ON s.thang IS NULL
-                   AND ck.thang = to_char(to_date(ns.thang || '-01', 'YYYY-MM-DD') - interval '12 months', 'YYYY-MM')
+             LEFT JOIN mart.ban_theo_thang ck ON %(lech)s::int IS NOT NULL
+                   AND ck.thang = to_char(to_date(coalesce(s.thang, ns.thang) || '-01', 'YYYY-MM-DD')
+                                          - make_interval(months => %(lech)s::int), 'YYYY-MM')
             WHERE coalesce(s.thang, ns.thang) <= to_char(%(den)s::date, 'YYYY-MM')
-            ORDER BY 1""", {"fy": kx.company_fy, "den": kx.den}).fetchall()
+            ORDER BY 1""", {"fy": kx.company_fy, "den": kx.den, "lech": lech,
+                            "dd_a": dd_a, "dd_b": dd_b}).fetchall()
     thang = [{
         "thang": r[0], "company_fy": r[1], "thang_trong_ky": r[2],
         "doanh_thu": int(r[3] or 0), "lai_gop": int(r[4] or 0),
@@ -229,7 +303,8 @@ def theo_thang(conn, sale=None, ts=None) -> dict:
         "ngan_sach_lg": int(r[9]) if r[9] is not None else None,
     } for r in rows]
     return {"company_fy": thang[0]["company_fy"] if thang else None, "thang": thang,
-            "hom_nay": kx.hom_nay if kx else None, "khoang": kx}
+            "hom_nay": kx.hom_nay if kx else None, "khoang": kx, "so_sanh": _ss_json(kx),
+            "cat_cung_ngay": dd_a is not None}
 
 
 # ---- Xu hướng doanh thu theo khoảng xem -------------------------------------
@@ -336,14 +411,14 @@ def nap_gan_nhat(conn, sale=None, ts=None) -> dict:
 # ---- Danh sách khách hàng ---------------------------------------------------
 
 def danh_sach_khach(conn, sale=None, ts=None) -> dict:
-    """60 khách doanh thu cao nhất TRONG KHOẢNG XEM, kèm doanh thu của phép so
-    phụ (tháng trước / khoảng liền trước; dạng Kỳ: năm trước) và các nhãn
+    """60 khách doanh thu cao nhất TRONG KHOẢNG XEM, kèm doanh thu của kỳ so đang
+    bật (`so_sanh[0]`) và các nhãn
     tính đến hôm nay (trạng thái, nhịp, doanh thu 12 tháng)."""
     kx = _kx(conn, ts)
     nhan = {k: v[0] for k, v in KH.TRANG_THAI.items()}
     if kx is None:
         return {"khoang": None, "so_sanh": None, "khach": [], "nhan": nhan}
-    ss = kx.so_sanh[1] if len(kx.so_sanh) > 1 else kx.so_sanh[0]
+    ss = kx.so_sanh[0]
     rows = conn.execute(
         """WITH a AS (SELECT customer_code, dt FROM mart.khach_khoang(%s, %s)),
                 b AS (SELECT customer_code, dt FROM mart.khach_khoang(%s, %s))
@@ -429,7 +504,10 @@ def khach_moi(conn, sale=None, ts=None) -> dict:
     # cuối tuần cuối tháng vẫn nằm trong tháng đó.
     den = kx.den
     d12 = date(den.year - (den.month <= 11), (den.month - 12) % 12 + 1, 1)
-    tu_min = min([kx.tu, d12] + [s.tu for s in kx.so_sanh if s.co])
+    s0 = _ss(kx)
+    lech = s0.lech_thang if s0 is not None and s0.co else None
+    tu_min = min([kx.tu, d12] + [s.tu for s in kx.so_sanh if s.co]
+                 + ([_doi_thang(d12, -lech)] if lech is not None else []))
     rows = conn.execute(
         """SELECT k.customer_code, k.ten, k.salesperson_code, s.ten, k.ngay_dang_ky, lan_dau,
                   so_ngay_mua, doanh_thu, da_mua, da_ngung
@@ -443,7 +521,13 @@ def khach_moi(conn, sale=None, ts=None) -> dict:
     for _ in range(12):
         ma = f"{y}-{m:02d}"
         o = [r for r in rows if r[4].strftime("%Y-%m") == ma]
-        thang.append({"thang": ma, "so_khach": len(o), "da_mua": sum(1 for r in o if r[8])})
+        # Kỳ so: tháng dời `lech_thang`; tháng cuối dở dang chỉ đếm tới cùng ngày.
+        ms = _thang_ss(ma, s0)
+        n_ss = None if ms is None else sum(
+            1 for r in rows if r[4].strftime("%Y-%m") == ms
+            and (ma != den.strftime("%Y-%m") or r[4].day <= den.day))
+        thang.append({"thang": ma, "so_khach": len(o), "da_mua": sum(1 for r in o if r[8]),
+                      "so_khach_ss": n_ss})
         y, m = (y + 1, 1) if m == 12 else (y, m + 1)
     return {
         "khoang": kx, "so_khach": len(nay), "da_mua": sum(1 for r in nay if r[8]),
@@ -451,7 +535,7 @@ def khach_moi(conn, sale=None, ts=None) -> dict:
         "so_sanh": [{"ma": s.ma, "nhan": s.nhan, "co": s.co, "tu": s.tu, "den": s.den,
                      "so_khach": dem(s.tu, s.den) if s.co else None,
                      "so_khach_nay": dem(s.tu_nay, s.den_nay)} for s in kx.so_sanh],
-        "thang": thang,
+        "thang": thang, "ss": _ss_json(kx),
         "khach": [{"ma": r[0], "ten": r[1], "sale": r[2], "ten_sale": r[3], "ngay_dang_ky": r[4],
                    "lan_dau": r[5], "so_ngay_mua": r[6], "doanh_thu": int(r[7] or 0),
                    "da_mua": r[8], "da_ngung": r[9]} for r in nay[:KHACH_MOI_TOI_DA]],
@@ -463,16 +547,38 @@ def khach_moi(conn, sale=None, ts=None) -> dict:
 
 def bien_loi_nhuan(conn, sale=None, ts=None) -> dict:
     """Theo quý (6 quý gần nhất) — `thang_chon` = tháng của ngày cuối khoảng xem;
-    giao diện tô đậm quý có `tu ≤ thang_chon ≤ den`."""
+    giao diện tô đậm quý có `tu ≤ thang_chon ≤ den`. Kỳ so: quý dời `lech_thang / 3`
+    (chỉ khi kỳ so lệch tròn quý — năm trước = 4 quý), trên ĐÚNG các tháng tương ứng
+    với các tháng quý đang xem có (quý dở dang so phần tương ứng). Biên = tỷ số của
+    các tổng."""
     kx = _kx(conn, ts)
+    s = _ss(kx)
+    lech = s.lech_thang if s is not None and s.co else None
+    so_quy = lech // 3 if lech is not None and lech % 3 == 0 else None
     rows = conn.execute(
-        """SELECT company_fy, (thang_trong_ky - 1) / 3 + 1 AS quy, min(thang), max(thang),
-                  count(*)::int, sum(doanh_thu_thuan)::bigint, sum(lai_gop)::bigint
-             FROM mart.ban_theo_thang GROUP BY 1, 2 ORDER BY 1, 2""").fetchall()[-6:]
+        """SELECT company_fy, (thang_trong_ky - 1) / 3 + 1 AS quy, thang,
+                  doanh_thu_thuan::bigint, lai_gop::bigint
+             FROM mart.ban_theo_thang ORDER BY thang""").fetchall()
+    thang = {r[2]: (int(r[3] or 0), int(r[4] or 0)) for r in rows}
+    quy: dict[tuple[int, int], list[str]] = {}
+    for r in rows:
+        quy.setdefault((r[0], r[1]), []).append(r[2])
+    ra = []
+    for k in sorted(quy)[-6:]:
+        t = quy[k]
+        dt, lg = sum(thang[m][0] for m in t), sum(thang[m][1] for m in t)
+        dt_ss = bien_ss = None
+        if so_quy is not None and rows:
+            # Tháng dời nằm trong dải dữ liệu mà không có phiếu = bán 0 đồng.
+            ms = [_thang_ss(m, s) for m in t]
+            if all(m is not None and m >= rows[0][2] for m in ms):
+                dt_ss = sum(thang.get(m, (0, 0))[0] for m in ms)
+                bien_ss = _ty_so(sum(thang.get(m, (0, 0))[1] for m in ms), dt_ss)
+        ra.append({"company_fy": k[0], "quy": k[1], "tu": t[0], "den": t[-1], "so_thang": len(t),
+                   "doanh_thu": dt, "lai_gop": lg, "bien_gop": _ty_so(lg, dt),
+                   "doanh_thu_ss": dt_ss, "bien_gop_ss": bien_ss})
     return {"thang_chon": kx.den.strftime("%Y-%m") if kx else None, "khoang": kx,
-            "quy": [{"company_fy": r[0], "quy": r[1], "tu": r[2], "den": r[3], "so_thang": r[4],
-                     "doanh_thu": int(r[5] or 0), "lai_gop": int(r[6] or 0),
-                     "bien_gop": _ty_so(int(r[6] or 0), int(r[5] or 0))} for r in rows]}
+            "so_sanh": _ss_json(kx), "so_quy": so_quy, "quy": ra}
 
 
 # ---- Chuông thông báo (khung chung) -----------------------------------------

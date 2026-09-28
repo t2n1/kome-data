@@ -54,7 +54,7 @@ def tong(conn, kx: KhoangXem) -> tuple[dict, list[BC.SoSanhSo]]:
 
 def chuoi(conn, kx: KhoangXem) -> tuple[str, list[BC.O]]:
     """Chuỗi cho biểu đồ chính: theo NGÀY nếu khoảng ≤ 92 ngày, theo THÁNG nếu
-    dài hơn — kèm phép so chính (`so_sanh[0]`, năm trước) khớp theo thứ tự.
+    dài hơn — kèm kỳ so đang bật (`so_sanh[0]`) khớp theo thứ tự.
     MỘT lượt hỏi."""
     kieu = "ngay" if kx.so_ngay <= NGAY_TOI_DA_THEO_NGAY else "thang"
     ham = "mart.ngay_khoang" if kieu == "ngay" else "mart.thang_khoang"
@@ -166,18 +166,11 @@ def tinh_bao_cao(conn, kx: KhoangXem) -> BC.BaoCao:
 
 # ---- Đợt B: Khách hàng -------------------------------------------------------
 
-def _ss_phu(kx: KhoangXem):
-    """Phép so của CỘT SO SÁNH trên danh sách / hồ sơ khách: tháng trước (dạng
-    Tháng) / khoảng liền trước (dạng Khoảng) — `so_sanh[1]`; dạng Kỳ chỉ có
-    năm trước. Nhịp làm việc với khách là tháng này so tháng trước."""
-    return kx.so_sanh[1] if len(kx.so_sanh) > 1 else kx.so_sanh[0]
-
-
 def danh_ba_khoang(conn, kx: KhoangXem) -> dict:
-    """Doanh số trong khoảng của MỌI khách + dải so sánh phụ — MỘT lượt hỏi
+    """Doanh số trong khoảng của MỌI khách + kỳ so đang bật — MỘT lượt hỏi
     (`mart.khach_khoang` hai dải, FULL JOIN: khách chỉ mua ở dải so sánh vẫn
     có dòng). Ghép vào danh bạ ở kome/khach_hang.py::ghep_khoang."""
-    s = _ss_phu(kx)
+    s = kx.so_sanh[0]
     rows = conn.execute(
         """SELECT coalesce(a.customer_code, b.customer_code), a.dt, a.lg, a.so_phieu, b.dt
              FROM mart.khach_khoang(%s, %s) a
@@ -239,10 +232,10 @@ def cua_khach(conn, kx: KhoangXem, ma: str) -> dict:
 # ---- Đợt C: Sản phẩm ---------------------------------------------------------
 
 def danh_muc_khoang(conn, kx: KhoangXem) -> dict:
-    """Doanh số trong khoảng của MỌI mã + dải so sánh phụ — MỘT lượt hỏi
+    """Doanh số trong khoảng của MỌI mã + kỳ so đang bật — MỘT lượt hỏi
     (`mart.mat_hang_khoang` hai dải, FULL JOIN). Giao diện ghép vào danh mục
     theo mã (không cộng / chia gì thêm)."""
-    s = _ss_phu(kx)
+    s = kx.so_sanh[0]
     rows = conn.execute(
         """SELECT coalesce(a.product_code, b.product_code), a.dt, a.lg, a.so_luong, a.so_khach, b.dt
              FROM mart.mat_hang_khoang(%s, %s) a
@@ -254,10 +247,10 @@ def danh_muc_khoang(conn, kx: KhoangXem) -> dict:
 
 
 def cua_ma(conn, kx: KhoangXem, ma: str, gioi_han: int = 30) -> dict:
-    """Một mã trong khoảng — MỘT lượt hỏi: tổng + phép so phụ
+    """Một mã trong khoảng — MỘT lượt hỏi: tổng + kỳ so đang bật
     (`mart.mat_hang_khoang`) và khách mua mã này trong khoảng
     (`mart.khach_mat_hang_khoang`, `gioi_han` khách doanh thu cao nhất + tổng số khách)."""
-    s = _ss_phu(kx)
+    s = kx.so_sanh[0]
     r = conn.execute(
         """SELECT
               (SELECT json_build_object('dt', a.dt, 'lg', a.lg, 'so_luong', a.so_luong, 'so_khach', a.so_khach)

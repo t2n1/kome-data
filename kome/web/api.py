@@ -196,12 +196,12 @@ def _voi_moc(ts: "KX.ThamSo", tinh):
 
 
 def _ts(request: Request, thang: str, ky: str, tu: str, den: str) -> "KX.ThamSo":
-    """Khoảng xem + kỳ so sánh tự chọn (`?ss_thang=` · `?ss_ky=` · `?ss_tu=&ss_den=`,
+    """Khoảng xem + kỳ so sánh (`?ss=truoc` · `?ss_thang=` · `?ss_ky=` · `?ss_tu=&ss_den=`,
     đọc thẳng từ query — không thêm tham số vào mọi route). Màn không dùng phép so
     gọi `.chinh()` để đổi kỳ so sánh không làm ảnh chụp của chúng trượt."""
     q = request.query_params
     return KX.doc_tham_so(thang, ky, tu, den, q.get("ss_thang", ""), q.get("ss_ky", ""),
-                          q.get("ss_tu", ""), q.get("ss_den", ""))
+                          q.get("ss_tu", ""), q.get("ss_den", ""), q.get("ss", ""))
 
 
 def tao_api(open_app_conn) -> APIRouter:

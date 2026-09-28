@@ -8,9 +8,11 @@ Ba dạng, đọc từ URL:
   * Kỳ     `?ky=<company_fy>` — 1/8 → 31/7, cắt theo dải dữ liệu.
   * Khoảng `?tu=YYYY-MM-DD&den=YYYY-MM-DD` — cắt theo dải dữ liệu.
 
-Mỗi khoảng kèm các DẢI SO SÁNH, `so_sanh[0]` luôn là năm trước (so "chính",
-cùng nếp "cùng kỳ" của cả dự án), `so_sanh[1]` là tháng trước / khoảng liền
-trước. Giao diện KHÔNG tự tính ngày so sánh — chỉ in `mo_ta`.
+Mỗi khoảng kèm ĐÚNG MỘT dải so sánh, `so_sanh[0]` (đặc tả
+2026-09-28-ky-so-sanh-toan-web-design.md): mặc định năm trước; `?ss=truoc` = tháng
+trước / khoảng liền trước (dạng Kỳ không có — vẫn năm trước); `ss_*` = kỳ tự chọn.
+`lua_chon` liệt kê các chip mặc định cho thanh chọn. Giao diện KHÔNG tự tính ngày so
+sánh.
 
 Luật so sánh (có test canh, tests/test_khoang_xem.py):
   * Tháng dở dang: năm trước = cùng dải ngày trừ một năm (29/2 → 28/2, đúng
@@ -59,6 +61,9 @@ class ThamSo:
     tu: date | None = None
     den: date | None = None
     ss: "ThamSo | None" = None      # kỳ so sánh tự chọn (không lồng `ss`)
+    # Chip mặc định đang bật (`?ss=truoc`): None = năm trước; 'truoc' = tháng trước /
+    # khoảng liền trước (đặc tả 2026-09-28-ky-so-sanh-toan-web-design.md §3).
+    ss_ma: str | None = None
 
     @property
     def loai(self) -> str:
@@ -75,6 +80,8 @@ class ThamSo:
         k = self._khoa_chinh()
         if self.ss is not None:
             k.update({f"ss_{a}": b for a, b in self.ss._khoa_chinh().items()})
+        elif self.ss_ma:
+            k["ss"] = self.ss_ma
         return k
 
     def _khoa_chinh(self) -> dict[str, str]:
@@ -117,13 +124,22 @@ def _doc_ngay(s: str, ten: str) -> date:
 def doc_tham_so(thang: str | None = "", ky: str | int | None = "",
                 tu: str | None = "", den: str | None = "",
                 ss_thang: str | None = "", ss_ky: str | int | None = "",
-                ss_tu: str | None = "", ss_den: str | None = "") -> ThamSo:
+                ss_tu: str | None = "", ss_den: str | None = "", ss: str | None = "") -> ThamSo:
+    ma = (ss or "").strip()
+    if ma not in SS_MA:
+        raise LoiKhoang("Kỳ so sánh: 'ss' chỉ nhận 'nam_truoc' hoặc 'truoc'.")
     try:
-        ss = _doc_mot(ss_thang, ss_ky, ss_tu, ss_den)
+        tc = _doc_mot(ss_thang, ss_ky, ss_tu, ss_den)
     except LoiKhoang as e:
         raise LoiKhoang(f"Kỳ so sánh: {e}") from None
     ts = _doc_mot(thang, ky, tu, den)
-    return ts if ss.loai == "mac_dinh" else ThamSo(ts.thang, ts.ky, ts.tu, ts.den, ss)
+    if tc.loai != "mac_dinh":           # kỳ tự chọn thắng chip mặc định
+        return ThamSo(ts.thang, ts.ky, ts.tu, ts.den, tc)
+    return ThamSo(ts.thang, ts.ky, ts.tu, ts.den, ss_ma="truoc" if ma == "truoc" else None)
+
+
+# Giá trị của `?ss=` — '' và 'nam_truoc' là mặc định (năm trước).
+SS_MA = ("", "nam_truoc", "truoc")
 
 
 def _doc_mot(thang, ky, tu, den) -> ThamSo:
@@ -240,6 +256,9 @@ class SoSanh:
     tu_nay: date
     den_nay: date
     co: bool
+    # Kỳ so lệch kỳ xem bao nhiêu tháng TRÒN (12 = năm trước, 1 = tháng trước); None =
+    # không lệch tròn tháng — biểu đồ theo tháng có cửa sổ riêng không dời được.
+    lech_thang: int | None = None
 
 
 @dataclass(frozen=True)
@@ -261,8 +280,10 @@ class KhoangXem:
     # Đang xem LÙI (040): mọi chỉ số "tính đến hôm nay" là tính đến `hom_nay`, sớm
     # hơn ngày bán mới nhất thật — màn đổi nhãn "hôm nay" thành "đến <ngày>".
     dang_lui: bool = False
-    # Đang so với kỳ tự chọn (`ss_*`) — `so_sanh` khi đó chỉ một phần tử.
+    # Đang so với kỳ tự chọn (`ss_*`). `so_sanh` LUÔN chỉ một phần tử = kỳ đang bật.
     tu_chon: bool = False
+    # Chip mặc định của thanh chọn: ({"ma", "nhan", "chon"}, …).
+    lua_chon: tuple[dict, ...] = ()
 
     @property
     def so_ngay(self) -> int:
@@ -295,10 +316,19 @@ def _dai(a: date, b: date) -> str:
     return f"{_n(a, a.year != b.year)} → {_n(b)}"
 
 
+def _lech_thang(tu: date, tu_nay: date) -> int | None:
+    """Số tháng tròn từ `tu` (kỳ so) tới `tu_nay` (kỳ xem): cùng ngày trong tháng,
+    hoặc cả hai là ngày cuối tháng. Khác thế = None."""
+    cuoi = lambda d: d == _cuoi_thang(d.year, d.month)  # noqa: E731
+    if tu.day != tu_nay.day and not (cuoi(tu) and cuoi(tu_nay)):
+        return None
+    return (tu_nay.year * 12 + tu_nay.month) - (tu.year * 12 + tu.month)
+
+
 def _so(ma: str, nhan: str, tu: date, den: date, tu_nay: date, den_nay: date,
         pv: PhamVi) -> SoSanh:
     co = _dau_thang(tu) >= _dau_thang(pv.ngay_dau) and tu_nay <= den_nay
-    return SoSanh(ma, nhan, tu, den, tu_nay, den_nay, co)
+    return SoSanh(ma, nhan, tu, den, tu_nay, den_nay, co, _lech_thang(tu, tu_nay))
 
 
 def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
@@ -366,11 +396,17 @@ def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
                    _so("lien_truoc", "khoảng liền trước", tu - timedelta(days=so + 1),
                        tu - timedelta(days=1), tu, den, pv))
 
+    # Một kỳ so duy nhất (đặc tả 2026-09-28 §2): chip đang bật chọn một trong cặp mặc định.
+    chon = 1 if ts.ss is None and ts.ss_ma == "truoc" and len(so_sanh) > 1 else 0
+    lua_chon = tuple({"ma": s.ma, "nhan": s.nhan, "chon": ts.ss is None and i == chon}
+                     for i, s in enumerate(so_sanh))
+    so_sanh = (so_sanh[chon],)
     if ts.ss is not None:
         return _voi_ss(pv, ts, KhoangXem(
             loai=loai, tu=tu, den=den, nhan=nhan, mo_ta="", thang=thang,
             company_fy=None, so_ky=None, mac_dinh=ts.loai == "mac_dinh", tron_thang=tron,
-            so_sanh=(), ghi_chu=tuple(ghi_chu), ngay_dau=pv.ngay_dau, hom_nay=pv.hom_nay))
+            so_sanh=(), ghi_chu=tuple(ghi_chu), ngay_dau=pv.ngay_dau, hom_nay=pv.hom_nay,
+            lua_chon=lua_chon))
 
     ky = pv.ky_chua(den)
     phan = []
@@ -385,7 +421,7 @@ def giai(pv: PhamVi, ts: ThamSo) -> KhoangXem:
     return KhoangXem(loai=loai, tu=tu, den=den, nhan=nhan, mo_ta=mo_ta, thang=thang,
                      company_fy=ky.company_fy if ky else None, so_ky=ky.so_ky if ky else None,
                      mac_dinh=ts.loai == "mac_dinh", tron_thang=tron,
-                     so_sanh=so_sanh, ghi_chu=tuple(ghi_chu),
+                     so_sanh=so_sanh, ghi_chu=tuple(ghi_chu), lua_chon=lua_chon,
                      ngay_dau=pv.ngay_dau, hom_nay=pv.hom_nay,
                      dang_lui=pv.hom_nay_that is not None and pv.hom_nay < pv.hom_nay_that)
 

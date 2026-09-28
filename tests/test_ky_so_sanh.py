@@ -22,7 +22,8 @@ def g(**kw):
 
 def test_khong_ss_thi_y_nhu_cu():
     k = g(thang="2026-03")
-    assert not k.tu_chon and [s.ma for s in k.so_sanh] == ["nam_truoc", "thang_truoc"]
+    assert not k.tu_chon and [s.ma for s in k.so_sanh] == ["nam_truoc"]
+    assert [c["ma"] for c in k.lua_chon] == ["nam_truoc", "thang_truoc"]
 
 
 def test_ss_thay_ca_hai_phep_so_mac_dinh():
@@ -91,7 +92,7 @@ def test_ky_so_truoc_du_lieu_thi_khong_co():
 
 def test_ss_bang_thang_truoc_trung_dai_mac_dinh():
     for kw in ({}, {"thang": "2026-06"}):
-        mac_dinh = g(**kw).so_sanh[1]
+        mac_dinh = g(**kw, ss="truoc").so_sanh[0]
         s = g(**kw, ss_thang=f"{mac_dinh.tu:%Y-%m}").so_sanh[0]
         assert (s.tu, s.den, s.tu_nay, s.den_nay) == \
             (mac_dinh.tu, mac_dinh.den, mac_dinh.tu_nay, mac_dinh.den_nay)
@@ -159,3 +160,14 @@ def test_api_nhan_ss_va_bao_loi_400(conn, batch, test_db_url):
     assert [s["ma"] for s in r.json()["doanh_thu"]["so_sanh"]] == ["tu_chon"]
     assert c.get("/api/bao-cao?thang=2026-06&ss_thang=2026-07").status_code == 400
     assert c.get("/api/bao-cao?ss_thang=2026-6").status_code == 400
+
+
+def test_lech_thang_cua_ky_tu_chon():
+    assert g(thang="2026-06", ss_thang="2026-03").so_sanh[0].lech_thang == 3
+    assert g(ky="2026", ss_ky="2025").so_sanh[0].lech_thang == 12
+    assert g(thang="2026-06", ss_tu="2026-03-05", ss_den="2026-03-20").so_sanh[0].lech_thang is None
+
+
+def test_ky_tu_chon_khong_chip_mac_dinh_nao_bat():
+    k = g(thang="2026-06", ss_thang="2026-03")
+    assert k.lua_chon and not any(c["chon"] for c in k.lua_chon)

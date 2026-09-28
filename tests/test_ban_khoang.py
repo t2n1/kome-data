@@ -51,7 +51,8 @@ def test_bao_cao_thang_tong_BANG_ban_theo_thang(conn, batch):
 def test_so_sanh_nam_truoc_va_thang_truoc(conn, batch):
     _gieo(conn, batch)
     bc = BK.tinh_bao_cao(conn, _kx(conn))          # tháng hiện tại = 7/2026, tới 15/7
-    nt, tt = bc.so_sanh
+    (nt,) = bc.so_sanh                              # một kỳ so duy nhất (đặc tả 2026-09-28)
+    (tt,) = BK.tinh_bao_cao(conn, _kx(conn, ss="truoc")).so_sanh
     assert (nt.ma, nt.tu, nt.den, nt.co) == ("nam_truoc", date(2025, 7, 1), date(2025, 7, 15), True)
     assert (nt.dt, nt.dt_ck) == (110_000, 90_000)
     assert abs(nt.tang_dt - (110_000 / 90_000 - 1)) < 1e-9

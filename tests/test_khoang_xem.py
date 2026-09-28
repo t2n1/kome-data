@@ -14,11 +14,20 @@ PV = KX.PhamVi(ngay_dau=date(2025, 3, 3), hom_nay=date(2026, 7, 24), ky=(
     KX.KyDl(2026, 7, date(2025, 8, 1), date(2026, 7, 24))))
 
 
+def hai(pv, **kw):
+    """Hai chip mặc định (năm trước, tháng trước / khoảng liền trước) — mỗi lần giải
+    chỉ mang MỘT phép so (đặc tả 2026-09-28), nên giải hai lần."""
+    a = KX.giai(pv, KX.doc_tham_so(**kw)).so_sanh
+    b = KX.giai(pv, KX.doc_tham_so(**kw, ss="truoc")).so_sanh
+    assert len(a) == len(b) == 1
+    return a[0], b[0]
+
+
 def test_mac_dinh_la_thang_cua_hom_nay_mung_1_den_hom_nay():
     k = KX.giai(PV, KX.doc_tham_so())
     assert (k.loai, k.tu, k.den, k.thang, k.mac_dinh, k.tron_thang) == \
         ("thang", date(2026, 7, 1), date(2026, 7, 24), "2026-07", True, False)
-    nt, tt = k.so_sanh
+    nt, tt = hai(PV)
     assert (nt.ma, nt.tu, nt.den, nt.co) == ("nam_truoc", date(2025, 7, 1), date(2025, 7, 24), True)
     assert (tt.ma, tt.tu, tt.den, tt.co) == ("thang_truoc", date(2026, 6, 1), date(2026, 6, 24), True)
     assert k.company_fy == 2026 and k.so_ky == 7
@@ -27,17 +36,18 @@ def test_mac_dinh_la_thang_cua_hom_nay_mung_1_den_hom_nay():
 def test_thang_tron_so_tron_thang():
     k = KX.giai(PV, KX.doc_tham_so(thang="2026-03"))
     assert (k.tu, k.den, k.tron_thang, k.mac_dinh) == (date(2026, 3, 1), date(2026, 3, 31), True, False)
-    assert (k.so_sanh[0].tu, k.so_sanh[0].den) == (date(2025, 3, 1), date(2025, 3, 31))
-    assert (k.so_sanh[1].tu, k.so_sanh[1].den) == (date(2026, 2, 1), date(2026, 2, 28))
+    nt, tt = hai(PV, thang="2026-03")
+    assert (nt.tu, nt.den) == (date(2025, 3, 1), date(2025, 3, 31))
+    assert (tt.tu, tt.den) == (date(2026, 2, 1), date(2026, 2, 28))
 
 
 def test_thang_do_dang_ngay_cuoi_kep_ve_cuoi_thang_truoc():
     pv = KX.PhamVi(date(2025, 3, 3), date(2026, 3, 31), PV.ky)
     k = KX.giai(pv, KX.doc_tham_so())
-    assert k.tron_thang and k.so_sanh[1].den == date(2026, 2, 28)
+    assert k.tron_thang and hai(pv)[1].den == date(2026, 2, 28)
     pv = KX.PhamVi(date(2025, 3, 3), date(2026, 3, 30), PV.ky)
     k = KX.giai(pv, KX.doc_tham_so())
-    assert not k.tron_thang and k.so_sanh[1].den == date(2026, 2, 28)
+    assert not k.tron_thang and hai(pv)[1].den == date(2026, 2, 28)
 
 
 def test_29_2_tru_mot_nam_kep_ve_28_2():
@@ -49,10 +59,10 @@ def test_29_2_tru_mot_nam_kep_ve_28_2():
 
 
 def test_so_vao_truoc_du_lieu_thi_khong_co():
-    k = KX.giai(PV, KX.doc_tham_so(thang="2025-05"))
-    assert k.so_sanh[0].co is False and k.so_sanh[1].co is True
+    nt, tt = hai(PV, thang="2025-05")
+    assert nt.co is False and tt.co is True
     k = KX.giai(PV, KX.doc_tham_so(thang="2025-03"))
-    assert k.so_sanh[1].co is False
+    assert hai(PV, thang="2025-03")[1].co is False
     assert any("bắt đầu" in g for g in k.ghi_chu), "tháng đầu kho phải nói là chưa đủ tháng"
 
 
@@ -84,7 +94,7 @@ def test_ky_khong_co_trong_kho_bi_tu_choi():
 def test_khoang_cat_vao_dai_du_lieu_va_so_lien_truoc():
     k = KX.giai(PV, KX.doc_tham_so(tu="2026-06-01", den="2026-12-31"))
     assert (k.loai, k.tu, k.den) == ("khoang", date(2026, 6, 1), date(2026, 7, 24))
-    nt, lt = k.so_sanh
+    nt, lt = hai(PV, tu="2026-06-01", den="2026-12-31")
     assert (nt.ma, nt.tu, nt.den) == ("nam_truoc", date(2025, 6, 1), date(2025, 7, 24))
     assert (lt.ma, lt.tu, lt.den) == ("lien_truoc", date(2026, 4, 8), date(2026, 5, 31))
     assert (lt.den - lt.tu).days == (k.den - k.tu).days
@@ -116,7 +126,8 @@ def test_mo_ta_noi_ro_so_voi_gi():
     k = KX.giai(PV, KX.doc_tham_so())
     assert k.nhan == "Tháng 7/2026"
     assert "1/7 → 24/7/2026" in k.mo_ta
-    assert "1/7 → 24/7/2025" in k.mo_ta and "1/6 → 24/6/2026" in k.mo_ta
+    assert "1/7 → 24/7/2025" in k.mo_ta and "1/6" not in k.mo_ta, "mô tả chỉ in kỳ so đang bật"
+    assert "1/6 → 24/6/2026" in KX.giai(PV, KX.doc_tham_so(ss="truoc")).mo_ta
     k = KX.giai(PV, KX.doc_tham_so(thang="2025-05"))
     assert "không có dữ liệu" in k.mo_ta
 
@@ -146,7 +157,7 @@ PV_LUI = KX.PhamVi(ngay_dau=date(2025, 3, 3), hom_nay=date(2026, 7, 29), ky=(
 def test_thang_da_qua_ket_thuc_cuoi_tuan_van_la_thang_tron():
     k = KX.giai(PV_LUI, KX.ThamSo(thang="2026-07"))
     assert (k.tu, k.den, k.tron_thang) == (date(2026, 7, 1), date(2026, 7, 31), True)
-    nt, tt = k.so_sanh
+    nt, tt = hai(PV_LUI, thang="2026-07")
     assert (nt.tu, nt.den) == (date(2025, 7, 1), date(2025, 7, 31))
     assert (tt.tu, tt.den) == (date(2026, 6, 1), date(2026, 6, 30))
     assert k.hom_nay == date(2026, 7, 29) and k.dang_lui   # "tính đến" vẫn là ngày bán cuối
@@ -170,3 +181,41 @@ def test_thang_dang_chay_van_dung_o_ngay_ban_cuoi():
     pv = KX.PhamVi(PV_LUI.ngay_dau, date(2026, 7, 29), PV_LUI.ky, hom_nay_that=date(2026, 7, 29))
     k = KX.giai(pv, KX.ThamSo(thang="2026-07"))
     assert (k.den, k.tron_thang) == (date(2026, 7, 29), False)
+
+
+# ---- Một kỳ so duy nhất (đặc tả 2026-09-28-ky-so-sanh-toan-web-design.md) ----
+
+def test_mac_dinh_chi_MOT_phep_so_la_nam_truoc():
+    k = KX.giai(PV, KX.doc_tham_so())
+    assert [s.ma for s in k.so_sanh] == ["nam_truoc"] and k.so_sanh[0].lech_thang == 12
+    assert [(c["ma"], c["chon"]) for c in k.lua_chon] == [("nam_truoc", True), ("thang_truoc", False)]
+
+
+def test_ss_truoc_chon_thang_truoc_va_khoang_lien_truoc():
+    k = KX.giai(PV, KX.doc_tham_so(ss="truoc"))
+    assert [s.ma for s in k.so_sanh] == ["thang_truoc"] and k.so_sanh[0].lech_thang == 1
+    assert [(c["ma"], c["chon"]) for c in k.lua_chon] == [("nam_truoc", False), ("thang_truoc", True)]
+    k = KX.giai(PV, KX.doc_tham_so(tu="2026-06-01", den="2026-06-10", ss="truoc"))
+    assert k.so_sanh[0].ma == "lien_truoc" and k.so_sanh[0].lech_thang is None
+    k = KX.giai(PV, KX.doc_tham_so(tu="2026-06-01", den="2026-06-10"))
+    assert k.so_sanh[0].lech_thang == 12
+
+
+def test_thang_tron_31_ngay_so_thang_truoc_30_ngay_van_lech_1_thang():
+    s = KX.giai(PV, KX.doc_tham_so(thang="2026-03", ss="truoc")).so_sanh[0]
+    assert (s.tu, s.lech_thang) == (date(2026, 2, 1), 1)
+
+
+def test_dang_ky_ss_truoc_roi_ve_nam_truoc():
+    k = KX.giai(PV, KX.doc_tham_so(ky="2026", ss="truoc"))
+    assert [s.ma for s in k.so_sanh] == ["nam_truoc"] and k.so_sanh[0].lech_thang == 12
+    assert [c["ma"] for c in k.lua_chon] == ["nam_truoc"]
+
+
+def test_ss_sai_bi_tu_choi_va_khoa():
+    with pytest.raises(KX.LoiKhoang, match="Kỳ so sánh"):
+        KX.doc_tham_so(ss="abc")
+    ts = KX.doc_tham_so(thang="2026-06", ss="truoc")
+    assert ts.khoa() == {"thang": "2026-06", "ss": "truoc"} and ts.chinh().khoa() == {"thang": "2026-06"}
+    assert KX.doc_tham_so(ss="nam_truoc").khoa() == {}, "năm trước là mặc định — cùng khoá ảnh chụp"
+    assert KX.doc_tham_so(ss="truoc", ss_thang="2026-03").khoa() == {"ss_thang": "2026-03"},         "kỳ tự chọn thắng chip mặc định"

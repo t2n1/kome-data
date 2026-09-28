@@ -80,9 +80,9 @@ def test_khoi_dem_khach_moi_theo_khoang_va_moc(conn, batch):
 
 def test_khoi_so_nam_truoc_va_thang_truoc(conn, batch):
     _nen(conn, batch)
-    d = KTQ.khach_moi(conn, None, KX.ThamSo(thang="2026-07"))
-    assert len(d["so_sanh"]) == 2
-    nam, thang = d["so_sanh"]
+    (nam,) = KTQ.khach_moi(conn, None, KX.ThamSo(thang="2026-07"))["so_sanh"]
+    (thang,) = KTQ.khach_moi(conn, None, KX.ThamSo(thang="2026-07", ss_ma="truoc"))["so_sanh"]
+    assert (nam["ma"], thang["ma"]) == ("nam_truoc", "thang_truoc")
     assert nam["co"] and nam["so_khach"] == 1
     assert thang["co"] and thang["so_khach"] == 1
 
