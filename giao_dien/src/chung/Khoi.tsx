@@ -6,7 +6,11 @@
 import type { ReactNode } from "react";
 import { ONoi } from "./ONoi";
 
-export function Khoi({ tieu_de, phu, nhan, mau_nhan = "do", lien_ket, children, dang_tai, loi, cach_tinh, canh_bao }: {
+/** Các cách xem của một khối (2026-09-29): danh mục của MÁY CHỦ (bo_cuc.CACH_XEM), cách đang
+ *  chọn, và hàm đổi (lưu vào ô bố cục của bảng đang xem). */
+export type CachXem = { ds: { id: string; nhan: string }[]; chon: string; dat: (ma: string) => void };
+
+export function Khoi({ tieu_de, phu, nhan, mau_nhan = "do", lien_ket, children, dang_tai, loi, cach_tinh, canh_bao, cach_xem }: {
   tieu_de: string;
   phu?: ReactNode;
   nhan?: ReactNode;
@@ -17,6 +21,7 @@ export function Khoi({ tieu_de, phu, nhan, mau_nhan = "do", lien_ket, children, 
   loi?: string | null;
   cach_tinh?: ReactNode;
   canh_bao?: ReactNode;
+  cach_xem?: CachXem;
 }) {
   return (
     <>
@@ -25,6 +30,11 @@ export function Khoi({ tieu_de, phu, nhan, mau_nhan = "do", lien_ket, children, 
         {cach_tinh != null && <ONoi noi_dung={<div className="o-noi-chu">{cach_tinh}</div>} nhan="Cách tính" className="khoi-i">ⓘ</ONoi>}
         {nhan != null && <span className={"nhan-vien " + mau_nhan}>{nhan}</span>}
         {phu != null && <span className="khoi-phu">{phu}</span>}
+        {cach_xem && cach_xem.ds.length > 1 && (
+          <span className="khoi-xem" role="group" aria-label={`Cách xem ${tieu_de}`}>
+            {cach_xem.ds.map(x => <button key={x.id} type="button" aria-pressed={cach_xem.chon === x.id}
+              onClick={() => cach_xem.chon !== x.id && cach_xem.dat(x.id)}>{x.nhan}</button>)}
+          </span>)}
         {lien_ket && <a className="khoi-mo" href={lien_ket.href}>{lien_ket.chu ?? "Mở"} →</a>}
       </div>
       {loi ? <div className="khoi-loi">Không tải được khối này: {loi}</div>

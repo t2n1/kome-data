@@ -1,123 +1,221 @@
-// Lưới 3 cột kéo thả + đổi cỡ góc — chép Dashboard.dc.html (grid-auto-flow:
-// dense, hàng tối thiểu 150px, rộng 1–3 cột, cao 1–4 hàng). Khác gói thiết
-// kế: bố cục LƯU MÁY CHỦ theo tài khoản (POST /tong-quan/bo-cuc, migration
-// 034) chứ không localStorage; kéo từ ĐẦU khối (chữ trong khối vẫn bôi đen /
-// bấm liên kết được); có nút ⠿ cho bàn phím.
-import { useRef, useState, type ReactNode } from "react";
+// Lưới Tổng quan 12 cột (đặc tả 2026-09-29-tong-quan-luoi-12-cot-design.md). Mỗi khối có
+// toạ độ (x, y) + cỡ theo ô lưới; xếp chỗ + nén dọc ở luoi_logic.ts (cùng thuật toán máy chủ).
+//
+// Kéo bằng POINTER EVENTS (chuột / bút / cảm ứng như nhau), không HTML5 drag & drop:
+//   * kéo từ ĐẦU khối ([data-keo], trừ nút / liên kết / ⓘ), bắt đầu khi rời điểm bấm > 4px;
+//   * khối bay theo con trỏ bằng `transform` (không qua React mỗi khung hình); ô BÓNG ở chỗ
+//     khối sẽ rơi; các khối khác dạt ra bằng FLIP (chụp vị trí trước → đổi bố cục → trượt về);
+//   * thả: khối trượt vào ô bóng; Esc huỷ; sát mép cửa sổ thì tự cuộn;
+//   * góc phải dưới đổi cỡ liền mạch theo pixel, ô bóng cho cỡ đã khớp lưới.
+// Khối đang bay GIỮ ô lưới gốc suốt lúc kéo (transform tính từ đó), bố cục tạm chỉ dời khối khác.
+// Màn hẹp (< 900px): một cột theo (y, x), không kéo bằng chuột — bàn phím vẫn được.
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { OBoCuc } from "../khoi_dau";
+import { COT, an as anKhoi, datCho, day, dichPhim, doiCo, hangTai, soHang } from "./luoi_logic";
 
-const RONG = 3, CAO = 4, HANG = 150;
+const HANG = 40, KHE = 12, NGUONG = 4, MEP_CUON = 64;
+const RONG_MAN = "(min-width: 901px)";
 
-export function Luoi({ bo_cuc, datBoCuc, sua_duoc, ve, nhan }: {
+function useManRong() {
+  const [r, dat] = useState(() => matchMedia(RONG_MAN).matches);
+  useEffect(() => {
+    const m = matchMedia(RONG_MAN), f = () => dat(m.matches);
+    m.addEventListener("change", f);
+    return () => m.removeEventListener("change", f);
+  }, []);
+  return r;
+}
+const itChuyenDong = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const vung = (o: OBoCuc): CSSProperties => ({ gridColumn: `${o.x + 1} / span ${o.rong}`, gridRow: `${o.y + 1} / span ${o.cao}` });
+const theoViTri = (ds: OBoCuc[]) => ds.filter(o => !o.an).sort((a, b) => a.y - b.y || a.x - b.x);
+
+type Keo = { id: string; kieu: "doi" | "co" };
+
+export function Luoi({ bo_cuc, datBoCuc, sua_duoc, ve, nhan, hien_luoi }: {
   bo_cuc: OBoCuc[];
   datBoCuc: (b: OBoCuc[]) => void;
   sua_duoc: boolean;
-  ve: (id: string) => ReactNode;
+  ve: (o: OBoCuc) => ReactNode;
   nhan: (id: string) => string;
+  hien_luoi: boolean;
 }) {
   const luoi = useRef<HTMLDivElement>(null);
-  const [keo, datKeo] = useState<string | null>(null);
-  const [dich, datDich] = useState<{ id: string; truoc: boolean } | null>(null);
+  const rongMan = useManRong();
+  const keoDuoc = sua_duoc && rongMan;
+  const [tam, datTam] = useState<OBoCuc[] | null>(null);   // bố cục tạm lúc đang kéo / đổi cỡ
+  const [keo, datKeo] = useState<Keo | null>(null);
   const [bao, datBao] = useState("");
-  // Kéo CHỈ khi bấm xuống ở đầu khối. Phải quyết định trong dragstart (đồng
-  // bộ), không qua state: trình duyệt chốt "có kéo không" trước khi React kịp
-  // vẽ lại, nên bật `draggable` bằng state là không bao giờ kéo được.
-  const tuDau = useRef(false);
-  // Khối đang kéo — ref cho logic (cập nhật NGAY trong dragstart; dragover đầu
-  // tiên có thể tới trước khi state kịp vẽ lại), state chỉ để tô mờ.
-  const dangKeo = useRef<string | null>(null);
-  const dichRef = useRef<{ id: string; truoc: boolean } | null>(null);
+  const truoc = useRef<Map<string, DOMRect> | null>(null);
+  const dangBay = useRef<string | null>(null);              // khối theo con trỏ — FLIP bỏ qua
+  const hien = tam ?? bo_cuc;
 
-  const chuyen = (id: string, toi: string, truoc: boolean) => {
-    if (id === toi) return;
-    const ds = bo_cuc.filter(o => o.id !== id);
-    const i = ds.findIndex(o => o.id === toi);
-    ds.splice(truoc ? i : i + 1, 0, bo_cuc.find(o => o.id === id)!);
-    datBoCuc(ds);
+  /** Chụp vị trí NHÌN THẤY của mọi khối ngay trước khi đổi bố cục (FLIP: First). */
+  const chup = () => {
+    const m = new Map<string, DOMRect>();
+    luoi.current?.querySelectorAll<HTMLElement>("[data-khoi]").forEach(el => m.set(el.dataset.khoi!, el.getBoundingClientRect()));
+    truoc.current = m;
   };
-  const datCo = (id: string, rong: number, cao: number) =>
-    datBoCuc(bo_cuc.map(o => o.id === id ? { ...o, rong: Math.max(1, Math.min(RONG, rong)), cao: Math.max(1, Math.min(CAO, cao)) } : o));
+  // FLIP: Last → Invert → Play, sau khi React đã đặt bố cục mới.
+  useLayoutEffect(() => {
+    const m = truoc.current;
+    truoc.current = null;
+    if (!m || !luoi.current || itChuyenDong()) return;
+    luoi.current.querySelectorAll<HTMLElement>("[data-khoi]").forEach(el => {
+      const id = el.dataset.khoi!, a = m.get(id);
+      if (!a || id === dangBay.current) return;
+      el.style.transition = "none";
+      el.style.transform = "";
+      const b = el.getBoundingClientRect();
+      const dx = a.left - b.left, dy = a.top - b.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      void el.offsetWidth;
+      el.style.transition = "transform 200ms cubic-bezier(.2,.7,.3,1)";
+      el.style.transform = "";
+      el.addEventListener("transitionend", () => { el.style.transition = ""; }, { once: true });
+    });
+  }, [hien]);
 
-  const batDauCo = (id: string, e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault(); e.stopPropagation();
-    const the = e.currentTarget.parentElement!;
-    const kieu = getComputedStyle(luoi.current!);
-    const khe = parseFloat(kieu.columnGap) || 12;
-    const oRong = (luoi.current!.clientWidth - (RONG - 1) * khe) / RONG + khe;
-    const oCao = HANG + (parseFloat(kieu.rowGap) || 12);
-    const x0 = e.clientX, y0 = e.clientY, w0 = the.offsetWidth, h0 = the.offsetHeight;
-    const goc = e.currentTarget;
-    goc.setPointerCapture(e.pointerId);
-    let r = 0, c = 0;
+  const doLuoi = () => {
+    const el = luoi.current!, k = getComputedStyle(el);
+    const khe = parseFloat(k.columnGap) || KHE, kheH = parseFloat(k.rowGap) || KHE;
+    return {
+      oRong: (el.clientWidth - (COT - 1) * khe) / COT + khe, khe, kheH,
+      // Cỡ THẬT của từng hàng (hàng giãn theo nội dung) — Chrome/Firefox trả mọi hàng, kể cả hàng ngầm.
+      hang: k.gridTemplateRows.split(" ").map(parseFloat).filter(v => !Number.isNaN(v)),
+      khung: el.getBoundingClientRect(),
+    };
+  };
+
+  const batDau = (o: OBoCuc, e: React.PointerEvent<HTMLElement>) => {
+    if (!keoDuoc || e.button !== 0 || keo) return;
+    const t = e.target as HTMLElement;
+    const laCo = !!t.closest(".khoi-co");
+    if (!laCo && (!t.closest("[data-keo]") || t.closest("a,button,input,select,textarea,label,.o-noi-goc,.khoi-i"))) return;
+    if (laCo) { e.preventDefault(); e.stopPropagation(); }
+    const the = e.currentTarget, goc = bo_cuc, id = o.id, pid = e.pointerId;
+    const x0 = e.clientX, y0 = e.clientY, cuon0 = window.scrollY;
+    const d0 = doLuoi(), r0 = the.getBoundingClientRect();
+    const ox = r0.left - d0.khung.left, oy = r0.top - d0.khung.top;
+    let dang = false, cuoi = goc, px = x0, py = y0, raf = 0, oCu = "";
+
+    const capNhat = () => {
+      const dx = px - x0, dy = py - y0 + (window.scrollY - cuon0), d = doLuoi();
+      let khoa: string, moi: () => OBoCuc[];
+      if (laCo) {
+        const w = Math.max(80, r0.width + dx), h = Math.max(60, r0.height + dy);
+        the.style.width = `${w}px`;
+        the.style.height = `${h}px`;
+        const rong = Math.round((w + d.khe) / d.oRong), cao = soHang(h, o.y, d.hang, d.kheH, HANG);
+        khoa = `${rong}x${cao}`;
+        moi = () => doiCo(goc, id, rong, cao);
+      } else {
+        the.style.transform = `translate(${dx}px, ${dy}px) rotate(.5deg)`;
+        const x = Math.round((ox + dx) / d.oRong), y = hangTai(Math.max(0, oy + dy), d.hang, d.kheH, HANG);
+        khoa = `${x},${y}`;
+        moi = () => datCho(goc, id, x, y);
+      }
+      if (khoa === oCu) return;
+      oCu = khoa;
+      cuoi = moi();
+      chup();
+      datTam(cuoi);
+    };
+    const cuon = () => {
+      raf = 0;
+      if (!dang) return;
+      const v = py < MEP_CUON ? -(MEP_CUON - py) / 3 : py > innerHeight - MEP_CUON ? (py - innerHeight + MEP_CUON) / 3 : 0;
+      if (!v) return;
+      window.scrollBy(0, v);
+      capNhat();
+      raf = requestAnimationFrame(cuon);
+    };
     const di = (ev: PointerEvent) => {
-      r = Math.round((w0 + ev.clientX - x0) / oRong); c = Math.round((h0 + ev.clientY - y0) / oCao);
-      the.style.gridColumn = `span ${Math.max(1, Math.min(RONG, r))}`;
-      the.style.gridRow = `span ${Math.max(1, Math.min(CAO, c))}`;
+      if (ev.pointerId !== pid) return;
+      px = ev.clientX; py = ev.clientY;
+      if (!dang) {
+        if (!laCo && Math.hypot(px - x0, py - y0) < NGUONG) return;
+        dang = true;
+        dangBay.current = id;
+        the.style.transition = "none";
+        datKeo({ id, kieu: laCo ? "co" : "doi" });
+        datTam(goc);
+        document.body.classList.add("dang-xep-luoi");
+      }
+      ev.preventDefault();
+      capNhat();
+      if (!raf) raf = requestAnimationFrame(cuon);
     };
-    const nha = () => {
-      goc.removeEventListener("pointermove", di); goc.removeEventListener("pointerup", nha);
-      if (r && c) datCo(id, r, c);
+    const xong = (huy: boolean) => {
+      removeEventListener("pointermove", di);
+      removeEventListener("pointerup", nha);
+      removeEventListener("pointercancel", bo);
+      removeEventListener("keydown", esc, true);
+      cancelAnimationFrame(raf);
+      if (!dang) return;
+      dang = false;
+      document.body.classList.remove("dang-xep-luoi");
+      chup();                         // chụp cả khối đang bay → nó trượt từ chỗ thả vào ô
+      dangBay.current = null;
+      the.style.transform = ""; the.style.width = ""; the.style.height = ""; the.style.transition = "";
+      datTam(null); datKeo(null);
+      if (huy || JSON.stringify(cuoi) === JSON.stringify(goc)) { if (huy) datBao("Đã huỷ — bố cục giữ nguyên."); return; }
+      datBoCuc(cuoi);
+      const n = cuoi.find(x => x.id === id)!;
+      datBao(`${nhan(id)}: cột ${n.x + 1}, hàng ${n.y + 1}, rộng ${n.rong}, cao ${n.cao}.`);
     };
-    goc.addEventListener("pointermove", di); goc.addEventListener("pointerup", nha);
+    const nha = (ev: PointerEvent) => { if (ev.pointerId === pid) xong(false); };
+    const bo = (ev: PointerEvent) => { if (ev.pointerId === pid) xong(true); };
+    const esc = (ev: KeyboardEvent) => { if (ev.key === "Escape" && dang) { ev.preventDefault(); ev.stopPropagation(); xong(true); } };
+    addEventListener("pointermove", di, { passive: false });
+    addEventListener("pointerup", nha);
+    addEventListener("pointercancel", bo);
+    addEventListener("keydown", esc, true);
   };
 
+  const PHIM = { ArrowUp: "len", ArrowDown: "xuong", ArrowLeft: "trai", ArrowRight: "phai" } as const;
   const phim = (o: OBoCuc, e: React.KeyboardEvent) => {
-    const hien = bo_cuc.filter(x => !x.an), i = hien.findIndex(x => x.id === o.id);
-    if (e.shiftKey && e.key.startsWith("Arrow")) {
-      e.preventDefault();
-      const r = o.rong + (e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0);
-      const c = o.cao + (e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0);
-      datCo(o.id, r, c); datBao(`${nhan(o.id)}: rộng ${Math.max(1, Math.min(RONG, r))} cột, cao ${Math.max(1, Math.min(CAO, c))} hàng.`);
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "ArrowRight" || e.key === "ArrowDown") {
-      e.preventDefault();
-      const lui = e.key === "ArrowLeft" || e.key === "ArrowUp", j = lui ? i - 1 : i + 1;
-      if (j < 0 || j >= hien.length) return;
-      chuyen(o.id, hien[j].id, lui);
-      datBao(`${nhan(o.id)} ở vị trí ${j + 1} trên ${hien.length}.`);
-      requestAnimationFrame(() => (document.querySelector(`[data-khoi="${o.id}"] .khoi-tay`) as HTMLElement | null)?.focus());
-    }
+    const m = PHIM[e.key as keyof typeof PHIM];
+    if (!m) return;
+    e.preventDefault();
+    const moi = e.shiftKey
+      ? doiCo(bo_cuc, o.id, o.rong + (m === "phai" ? 1 : m === "trai" ? -1 : 0), o.cao + (m === "xuong" ? 1 : m === "len" ? -1 : 0))
+      : dichPhim(bo_cuc, o.id, m);
+    chup();
+    datBoCuc(moi);
+    const n = moi.find(x => x.id === o.id)!;
+    datBao(`${nhan(o.id)}: cột ${n.x + 1}, hàng ${n.y + 1}, rộng ${n.rong}, cao ${n.cao}.`);
+    requestAnimationFrame(() => (document.querySelector(`[data-khoi="${o.id}"] .khoi-tay`) as HTMLElement | null)?.focus());
   };
+
+  const coLuoi = rongMan && (hien_luoi || !!keo);
+  const soHangLuoi = Math.max(day(hien), keo ? day(bo_cuc) : 0) + (keo ? 4 : 0);
+  const bong = keo ? hien.find(x => x.id === keo.id) : undefined;
 
   return (
     <>
-      <div className="luoi-tq" ref={luoi}>
-        {bo_cuc.filter(o => !o.an).map(o => (
-          <section key={o.id} data-khoi={o.id} aria-label={nhan(o.id)}
-            className={"o-luoi" + (keo === o.id ? " dang-keo" : "") + (dich?.id === o.id ? (dich.truoc ? " dich-truoc" : " dich-sau") : "")}
-            style={{ gridColumn: `span ${o.rong}`, gridRow: `span ${o.cao}` }}
-            draggable={sua_duoc}
-            onPointerDown={e => { const t = e.target as HTMLElement; tuDau.current = !!t.closest("[data-keo]") && !t.closest("a,button,input,.o-noi-goc"); }}
-            onDragStart={e => {
-              if (!tuDau.current) { e.preventDefault(); return; }
-              dangKeo.current = o.id; datKeo(o.id);
-              e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", o.id);
-            }}
-            onDragEnter={e => { if (dangKeo.current && dangKeo.current !== o.id) e.preventDefault(); }}
-            onDragOver={e => {
-              if (!dangKeo.current || dangKeo.current === o.id) return;
-              e.preventDefault();
-              const r = e.currentTarget.getBoundingClientRect();
-              const d = { id: o.id, truoc: e.clientX < r.left + r.width / 2 };
-              dichRef.current = d;
-              if (dich?.id !== d.id || dich.truoc !== d.truoc) datDich(d);
-            }}
-            onDrop={e => {
-              e.preventDefault();
-              const k = dangKeo.current, d = dichRef.current;
-              if (k && d) chuyen(k, d.id, d.truoc);
-              dangKeo.current = null; dichRef.current = null; datDich(null); datKeo(null);
-            }}
-            onDragEnd={() => { dangKeo.current = null; dichRef.current = null; datKeo(null); datDich(null); }}>
-            {sua_duoc && <>
-              <button type="button" className="khoi-tay" aria-label={`Sắp xếp khối ${nhan(o.id)} — mũi tên đổi chỗ, Shift + mũi tên đổi cỡ`}
-                title="Kéo đầu khối để sắp xếp" onKeyDown={e => phim(o, e)}>⠿</button>
-              <button type="button" className="khoi-an" aria-label={`Ẩn khối ${nhan(o.id)}`} title="Ẩn khối"
-                onClick={() => { datBoCuc(bo_cuc.map(x => x.id === o.id ? { ...x, an: true } : x)); datBao(`Đã ẩn ${nhan(o.id)} — hiện lại ở "Thêm chức năng".`); }}>✕</button>
-              <div className="khoi-co" title="Kéo để đổi kích thước" aria-hidden="true" onPointerDown={e => batDauCo(o.id, e)} />
-            </>}
-            {ve(o.id)}
-          </section>
-        ))}
+      <div ref={luoi} className={"luoi-tq" + (keo ? " dang-xep" : "") + (coLuoi ? " co-luoi" : "") + (keoDuoc ? " keo-duoc" : "")}>
+        {coLuoi && Array.from({ length: soHangLuoi * COT }, (_, i) =>
+          <div key={"o" + i} className="o-luoi-o" aria-hidden="true" style={{ gridColumn: String(i % COT + 1), gridRow: String(Math.floor(i / COT) + 1) }} />)}
+        {bong && <div className="o-bong" aria-hidden="true" style={vung(bong)} />}
+        {theoViTri(hien).map(o => {
+          // Khối đang kéo giữ ô GỐC (transform tính từ đó); khối khác theo bố cục tạm.
+          const v = keo?.id === o.id ? bo_cuc.find(x => x.id === o.id) ?? o : o;
+          return (
+            <section key={o.id} data-khoi={o.id} aria-label={nhan(o.id)} style={vung(v)}
+              className={"o-luoi" + (keo?.id === o.id ? (keo.kieu === "co" ? " dang-co" : " dang-bay") : "")}
+              onPointerDown={e => batDau(v, e)}>
+              {sua_duoc && <>
+                <button type="button" className="khoi-tay" onKeyDown={e => phim(v, e)}
+                  aria-label={`Sắp xếp khối ${nhan(o.id)} — mũi tên đổi chỗ, Shift + mũi tên đổi cỡ`}
+                  title="Kéo đầu khối để sắp xếp">⠿</button>
+                <button type="button" className="khoi-an" aria-label={`Ẩn khối ${nhan(o.id)}`} title="Ẩn khối"
+                  onClick={() => { chup(); datBoCuc(anKhoi(bo_cuc, o.id)); datBao(`Đã ẩn ${nhan(o.id)} — hiện lại ở "Thêm chức năng".`); }}>✕</button>
+                {keoDuoc && <div className="khoi-co" title="Kéo để đổi kích thước" aria-hidden="true" />}
+              </>}
+              {ve(o)}
+            </section>);
+        })}
       </div>
       <span className="sr" aria-live="polite">{bao}</span>
     </>

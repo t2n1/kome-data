@@ -93,7 +93,7 @@ def test_chuan_ten_sai_la_422(ten):
 
 def test_tu_tho_bo_phan_tu_hong_va_chuan_hoa_bo_cuc():
     ds = BT.tu_tho([{"id": 3, "ten": "A", "bo_cuc": [{"id": "kpi", "rong": 9}]}, {"ten": "không id"}, "rác"])
-    assert [b.id for b in ds] == [3] and ds[0].bo_cuc[0] == BC.O("kpi", 3, 1)
+    assert [b.id for b in ds] == [3] and ds[0].bo_cuc[0] == BC.O("kpi", 12, 3)
     assert len(ds[0].bo_cuc) == len(BC.KHOI)
     assert BT.tu_tho(None) == [] and BT.tu_tho("không phải json") == []
 
@@ -116,7 +116,7 @@ def test_tao_tu_mac_dinh_vai_tro_va_chep(conn):
     assert {o.id for o in v.bo_cuc if not o.an} == set(khoi_vai)
     BT.luu_bo_cuc(conn, a, m.id, BC.chuan_hoa([{"id": "xu_huong", "rong": 1, "cao": 4}]))
     c = BT.tao(conn, a, "Bản chép", f"chep:{m.id}")
-    assert c.bo_cuc[0] == BC.O("xu_huong", 1, 4)
+    assert c.bo_cuc[0] == BC.O("xu_huong", 4, 12)
     assert [r[2] for r in _ds(conn, a)] == [0, 1, 2]
     assert conn.execute("SELECT bang_gan_nhat FROM app.nguoi_dung WHERE id = %s", (a,)).fetchone()[0] == c.id
 
@@ -140,7 +140,7 @@ def test_bang_ao_luu_lan_dau_tao_DUNG_MOT_dong(conn):
     b1 = BT.luu_bo_cuc(conn, a, None, BC.chuan_hoa([{"id": "kpi", "rong": 1}]))
     b2 = BT.luu_bo_cuc(conn, a, None, BC.chuan_hoa([{"id": "kpi", "rong": 2}]))
     assert b1.id == b2.id and b1.ten == BT.TEN_MAC_DINH and len(_ds(conn, a)) == 1
-    assert b2.bo_cuc[0].rong == 2
+    assert b2.bo_cuc[0].rong == 8
 
 
 def test_so_huu_bang_nguoi_khac_la_404_va_khong_doi(conn):
@@ -219,7 +219,7 @@ def test_luu_bo_cuc_bang_ao_roi_bang_that(web):
     assert r.status_code == 200
     bid = r.json()["bang"]["id"]
     _gui(c, f"/tong-quan/bang/{bid}/bo-cuc", [{"id": "kpi", "rong": 1, "cao": 3}])
-    assert _hien(_khoi_dau(c.get("/").text))["bo_cuc"][0] == {"id": "kpi", "rong": 1, "cao": 3, "an": False}
+    assert _hien(_khoi_dau(c.get("/").text))["bo_cuc"][0] == {"id": "kpi", "x": 0, "y": 0, "rong": 4, "cao": 9, "an": False, "xem": None}
 
 
 def test_bang_nguoi_khac_la_404_qua_web(web):

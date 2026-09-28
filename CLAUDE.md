@@ -102,7 +102,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 ## Các trang của web app
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
-| `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối kéo thả / đổi cỡ / ẩn hiện, **nhiều bảng có tên mỗi người** (056, thanh tab; vai trò là mẫu khi tạo bảng), chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu". Từ 2026-09-24 khối số bán hàng theo **khoảng xem** (`?thang=`/`?ky=`/`?tu=&den=`, mặc định tháng hiện tại) — xem bất biến "Khoảng xem" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api`, `app.bang_tong_quan` |
+| `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối trên **lưới toạ độ 12 cột** kéo thả / đổi cỡ / ẩn hiện, **nhiều cách xem mỗi khối** (2026-09-29), **nhiều bảng có tên mỗi người** (056, thanh tab; vai trò là mẫu khi tạo bảng), chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu". Từ 2026-09-24 khối số bán hàng theo **khoảng xem** (`?thang=`/`?ky=`/`?tu=&den=`, mặc định tháng hiện tại) — xem bất biến "Khoảng xem" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api`, `app.bang_tong_quan` |
 | `/khach-hang` | **React** (giai đoạn 2, bám Customer 360.dc.html) tab **Danh sách**: KPI · 8 phân khúc (gồm "mua đều, tháng này chưa", "có mua trong khoảng") · doanh thu + so sánh theo **khoảng xem** (`?thang=`…, sắp mặc định `dt_khoang`; nhãn tháng lọc bằng `?nhan_thang=`) · lọc tìm/hạng (nhiều)/phụ trách/tỉnh/trạng thái/nhãn tháng · bảng sắp xếp máy chủ 50/100/200 dòng · xuất CSV dòng đã chọn · 3 khối phân tích. `/api/khach-hang/ds` — một ảnh chụp danh bạ (`KH.danh_ba`) lọc bằng Python | `mart.khach_360`, `khach_nhom_viec`, `khach_thang_nay`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360° React**: hai cột (thiết kế lại 2026-09-26, đặc tả `2026-09-26-ho-so-khach-360-thiet-ke-lai-design.md`): cột trái dính "Việc với khách này" (lý do · **"Mã đến ngày mua lại"** — KHÁC "Nên chào" của `/lien-he` · chép kịch bản `khach/kich_ban.ts` · lần liên hệ trước + ghi nhanh · công nợ), cột phải 4 ô số + biểu đồ 12 tháng + 4 tab (Mặt hàng · Đơn hàng · Công nợ · Hồ sơ và nhật ký; `#tong_quan`/`#san_pham` cũ → Mặt hàng); Ảnh cửa hàng / Chat Facebook là khối "sắp có" (`KhoiSapCo`); ô tổng, mặt hàng và đơn hàng theo khoảng xem qua `/api/khach-hang/{mã}/khoang` (2 lượt, ngoài trần 8 của hồ sơ), biểu đồ 12 tháng bấm tháng xem mặt hàng, lưới 26 tuần, giỏ theo ngành, lịch mua dự kiến, ghi tiếp xúc (`POST /api/khach-hang/{mã}/tiep-xuc`, chỉ JSON). `/api/khach-hang/{mã}` (+ `/dong?tu=&den=`) | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `khach_thang_nay`, `lan_mua`, `dong_ban`, `ty_suat_mat_hang` |
 | `/lien-he` | **Cần liên hệ — React** (giai đoạn 3, bố cục CRM.dc.html; `/api/lien-he`) (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn · mua đều tháng này chưa — 036) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc ngay trên thẻ qua `POST /api/khach-hang/{mã}/tiep-xuc` (form cũ `POST /khach-hang/{mã}/tiep-xuc` vẫn còn). Ô chọn 担当者 (`?nv=`); mỗi cột một màu theo lý do (`.lh-m-<lý do>`, pha từ token); "Nên chào" ≤ 3 mã khách đã mua đều (`LH.goi_y_va_nhan_vien`, đọc `mart.khach_mat_hang`, LATERAL `= mã` — `= ANY` không đẩy xuống được qua `nhip_mat_hang`, đo thật 2 s → 0,1 s) + nút chép kịch bản gọi. KHÔNG in % chắc chắn. **4 truy vấn** | `mart.uu_tien_lien_he`, `mart.khach_thang_nay`, `mart.khach_mat_hang`, `app.nhat_ky_tiep_xuc` |
@@ -801,6 +801,19 @@ KHÔNG đọc nó. Người chưa có dòng nào có bảng ẢO (`id` null), l�
 mọi bộ lọc trên URL. Vai trò (`bo_cuc.VAI_TRO`) là MẪU khi tạo bảng (`tu = vai:<mã>`), không còn là chip
 áp đè lên bảng đang xem. `POST /tong-quan/bo-cuc` chỉ còn là đường đời cho bản build cũ. Có test canh:
 `tests/test_bang_tong_quan.py`. **Migration 056 phải chạy TRƯỚC khi triển khai.**
+
+**Bất biến (lưới 12 cột + cách xem — chủ DN giao 2026-09-29):** mỗi ô bố cục là
+`{id, x, y, rong, cao, an, xem}` trên lưới **12 cột, hàng 40px**, **nén dọc** (khối nổi lên tới khi
+chạm). MỘT thuật toán `nen`, hai bản: `kome/web/bo_cuc.py::nen` (chuẩn hoá lúc đọc VÀ ghi — không
+bao giờ hai khối chồng nhau) và `giao_dien/src/tong_quan/luoi_logic.ts::nen` (lúc kéo), chạy CHUNG
+`tests/du_lieu/luoi_nen_ca.json` — sửa một bản là sửa cả hai. Bố cục cũ (không x/y, đơn vị 3 cột)
+vẫn đọc được: × `DOI_CU` (4, 3) rồi xếp theo thứ tự đã lưu; không cần migration (jsonb). Bố cục mặc
+định ĐÃ xếp chỗ đi trong `danh_muc()["mac_dinh"]` — giao diện không tự xếp. Kéo bằng pointer events
+(không HTML5 DnD): khối đang bay giữ ô GỐC, bố cục tạm chỉ dời khối khác (FLIP). Cách xem: danh mục
+`bo_cuc.CACH_XEM` (cách đầu = mặc định, `xem` null), lưu THEO BẢNG; chỉ vẽ lại số khối đã tải — không
+endpoint / chỉ số mới; cách nào không có kỳ so thì nói ở `canh_bao`, nét đứt vẫn chỉ cho kỳ so. Có test
+canh: `tests/test_bo_cuc.py`, `tests/test_cach_xem.py`, `luoi_logic.test.ts`. ⋯ của bảng nằm TRONG viên
+tab đang xem (chuột phải cũng mở). Đặc tả: `docs/superpowers/specs/2026-09-29-tong-quan-luoi-12-cot-design.md`.
 
 **Bất biến (Tổng quan ít chữ — chủ DN chốt 2026-09-28):** màn `/` là HÌNH + tối đa một số lớn mỗi
 khối; mọi chi tiết trong ô nổi `chung/ONoi.tsx` (chuột: rê hiện / bấm đi; chạm: lần 1 hiện, lần 2 đi;

@@ -19,7 +19,7 @@ export function ThanhBang({ ds, hien, sua_duoc, chuyen, damBaoCo, datDs, sauXoa,
   const [menu, datMenu] = useState(false);
   const [sua, datSua] = useState<string | null>(null);
   const [loi, datLoi] = useState("");
-  const vung = useRef<HTMLDivElement>(null);
+  const vung = useRef<HTMLSpanElement>(null);
   const i = ds.findIndex(b => b.id === hien.id);
 
   useEffect(() => {
@@ -61,31 +61,45 @@ export function ThanhBang({ ds, hien, sua_duoc, chuyen, damBaoCo, datDs, sauXoa,
     sauXoa(r.bang_hien);
   });
 
+  const menuNoi = (
+    <div role="menu" className="menu-noi">
+      <button role="menuitem" type="button" onClick={() => { datMenu(false); datSua(hien.ten); }}>Đổi tên</button>
+      <button role="menuitem" type="button" onClick={() => { datMenu(false); moBangMoi(); }}>Nhân bản…</button>
+      <button role="menuitem" type="button" disabled={i <= 0} onClick={() => void doi(-1)}>← Dời trái</button>
+      <button role="menuitem" type="button" disabled={i >= ds.length - 1} onClick={() => void doi(1)}>Dời phải →</button>
+      <button role="menuitem" type="button" onClick={() => { datMenu(false); datLai(); }}>Đặt lại bố cục</button>
+      <button role="menuitem" type="button" className="giam" disabled={ds.length <= 1}
+        title={ds.length <= 1 ? "Không xoá được bảng cuối cùng." : undefined} onClick={() => void xoa()}>Xoá bảng…</button>
+    </div>);
+
+  // Tab đang xem là MỘT viên: tên + ⋯ dính liền (2026-09-29, ý 2 của chủ DN) — thao tác
+  // nằm ngay trên bảng nó áp vào. Hai nút cạnh nhau trong một <span>: HTML cấm nút lồng nút.
+  // Chuột phải lên tab đang xem cũng mở menu. Tab khác không có ⋯ — bấm để chuyển trước.
   return (
     <div className="thanh-bang">
       <div role="tablist" aria-label="Bảng Tổng quan của bạn" className="tab-bang">
-        {ds.map(b => b.id === hien.id && sua !== null
-          ? <input key={String(b.id)} className="o-ten-bang" autoFocus maxLength={40} value={sua} aria-label="Tên bảng"
+        {ds.map(b => {
+          const dang = b.id === hien.id;
+          if (dang && sua !== null) return (
+            <input key={String(b.id)} className="o-ten-bang" autoFocus maxLength={40} value={sua} aria-label="Tên bảng"
               onChange={e => datSua(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") void doiTen(sua); if (e.key === "Escape") datSua(null); }}
-              onBlur={() => void doiTen(sua)} />
-          : <button key={String(b.id)} type="button" role="tab" aria-selected={b.id === hien.id} className="chip tab-mot"
-              onClick={() => b.id !== hien.id && chuyen(b.id)}
-              onDoubleClick={() => sua_duoc && b.id === hien.id && datSua(hien.ten)}>{b.ten}</button>)}
-      </div>
-      <div className="menu-bang" ref={vung}>
-        <button type="button" className="nut-nho" aria-haspopup="menu" aria-expanded={menu} aria-label={`Thao tác với bảng "${hien.ten}"`}
-          disabled={!sua_duoc} title={sua_duoc ? "Thao tác với bảng này" : LY_DO} onClick={() => datMenu(m => !m)}>⋯</button>
-        {menu && (
-          <div role="menu" className="menu-noi">
-            <button role="menuitem" type="button" onClick={() => { datMenu(false); datSua(hien.ten); }}>Đổi tên</button>
-            <button role="menuitem" type="button" onClick={() => { datMenu(false); moBangMoi(); }}>Nhân bản…</button>
-            <button role="menuitem" type="button" disabled={i <= 0} onClick={() => void doi(-1)}>← Dời trái</button>
-            <button role="menuitem" type="button" disabled={i >= ds.length - 1} onClick={() => void doi(1)}>Dời phải →</button>
-            <button role="menuitem" type="button" onClick={() => { datMenu(false); datLai(); }}>Đặt lại bố cục</button>
-            <button role="menuitem" type="button" className="giam" disabled={ds.length <= 1}
-              title={ds.length <= 1 ? "Không xoá được bảng cuối cùng." : undefined} onClick={() => void xoa()}>Xoá bảng…</button>
-          </div>)}
+              onBlur={() => void doiTen(sua)} />);
+          const tab = (
+            <button type="button" role="tab" aria-selected={dang} className="chip tab-mot"
+              onClick={() => !dang && chuyen(b.id)}
+              onDoubleClick={() => sua_duoc && dang && datSua(hien.ten)}
+              onContextMenu={e => { if (dang && sua_duoc) { e.preventDefault(); datMenu(true); } }}>{b.ten}</button>);
+          if (!dang) return <span key={String(b.id)} className="tab-vien">{tab}</span>;
+          return (
+            <span key={String(b.id)} className="tab-vien dang" ref={vung}>
+              {tab}
+              <button type="button" className="tab-menu" aria-haspopup="menu" aria-expanded={menu}
+                aria-label={`Thao tác với bảng "${hien.ten}"`} disabled={!sua_duoc}
+                title={sua_duoc ? "Thao tác với bảng này (hoặc chuột phải lên tab)" : LY_DO} onClick={() => datMenu(m => !m)}>⋯</button>
+              {menu && menuNoi}
+            </span>);
+        })}
       </div>
       <button type="button" className="nut-nho" disabled={!sua_duoc} title={sua_duoc ? undefined : LY_DO}
         onClick={moBangMoi}>＋ Bảng mới</button>

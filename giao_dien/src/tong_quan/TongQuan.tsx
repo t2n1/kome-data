@@ -8,9 +8,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gui, useKhoi } from "../api";
 import { gon, pc } from "../dinh_dang";
-import { KD, type BangTQ, type MucKhoi, type OBoCuc } from "../khoi_dau";
+import { KD, type BangTQ, type OBoCuc } from "../khoi_dau";
 import { giuKhoang } from "../khung/khoang";
 import { Luoi } from "./Luoi";
+import { an as anKhoi, hienODay } from "./luoi_logic";
 import { veKhoi } from "./khoi";
 import { DaiTuoi } from "./DaiTuoi";
 import { ThanhBang } from "./ThanhBang";
@@ -27,7 +28,8 @@ function gioTokyo() {
   return { gio: +g("hour") % 24, chu: `${THU[ngay.getDay()]} ${g("day")}/${g("month")}/${g("year")}` };
 }
 
-const macDinh = (khoi: MucKhoi[]): OBoCuc[] => khoi.map(k => ({ id: k.id, rong: k.rong, cao: k.cao, an: false }));
+// Bố cục mặc định ĐÃ xếp chỗ — của máy chủ (bo_cuc.danh_muc()["mac_dinh"]), không tự xếp lại.
+const macDinh = (): OBoCuc[] => KD.danh_muc.mac_dinh.map(o => ({ ...o }));
 
 /** Ghi ?bang= lên URL, giữ khoảng xem (bất biến Khoảng xem: mọi pushState qua giuKhoang). */
 function ghiUrl(id: number | null, thay: boolean) {
@@ -41,13 +43,14 @@ function ghiUrl(id: number | null, thay: boolean) {
 export function TongQuan() {
   const khoi = KD.danh_muc.khoi;
   const nhanCua = useMemo(() => Object.fromEntries(khoi.map(k => [k.id, k.nhan])), [khoi]);
-  const [ds, datDs] = useState<BangTQ[]>(() => KD.bang.length ? KD.bang : [{ id: null, ten: "Bảng của tôi", bo_cuc: macDinh(khoi) }]);
+  const [ds, datDs] = useState<BangTQ[]>(() => KD.bang.length ? KD.bang : [{ id: null, ten: "Bảng của tôi", bo_cuc: macDinh() }]);
   const [hienId, datHienId] = useState<number | null>(KD.bang_hien_id);
   const hien = ds.find(b => b.id === hienId) ?? ds[0];
   const bo_cuc = hien.bo_cuc;
   const [chon, datChon] = useState(false);
   const [moi, datMoi] = useState(false);
   const [loiLuu, datLoiLuu] = useState("");
+  const [hienLuoi, datHienLuoi] = useState(false);
   // Lượt tự lưu đang chờ (400 ms sau lần kéo cuối) — ĐẨY NGAY trước khi chuyển bảng.
   const hen = useRef<{ t: number; chay?: () => Promise<BangTQ | null> }>({ t: 0 });
 
@@ -59,7 +62,13 @@ export function TongQuan() {
     return f ? f() : null;
   };
 
+  // Bố cục MỚI NHẤT, cập nhật ĐỒNG BỘ ở mỗi lần đặt: hai thao tác liền nhau trước khi React
+  // vẽ lại (bấm nhanh hai cách xem, bật nhiều khối trong "Thêm chức năng") không ghi đè nhau.
+  const moiNhat = useRef(bo_cuc);
+  moiNhat.current = bo_cuc;
+  const suaBoCuc = (f: (b: OBoCuc[]) => OBoCuc[]) => datBoCuc(f(moiNhat.current));
   const datBoCuc = (b: OBoCuc[]) => {
+    moiNhat.current = b;
     const id = hien.id;
     thayBang(id, { ...hien, bo_cuc: b });
     if (!KD.sap_xep_duoc) return;          // máy chưa bật đăng nhập: xếp tạm, không lưu
@@ -125,20 +134,24 @@ export function TongQuan() {
       </div>
       <ThanhBang ds={ds} hien={hien} sua_duoc={KD.sap_xep_duoc} chuyen={id => void chuyen(id)} damBaoCo={damBaoCo}
         datDs={datDs} sauXoa={id => { datHienId(id); ghiUrl(id, true); }}
-        datLai={() => datBoCuc(macDinh(khoi))} moBangMoi={() => datMoi(true)} />
+        datLai={() => datBoCuc(macDinh())} moBangMoi={() => datMoi(true)} />
       <DaiTuoi />
       <TomTat />
       <div className="thanh-bo-cuc">
         {KD.sap_xep_duoc
-          ? <span className="phu">⠿ kéo đầu khối để sắp xếp · đổi kích thước ở góc phải dưới</span>
+          ? <span className="phu">⠿ kéo đầu khối vào ô lưới · kéo góc phải dưới để đổi cỡ · Esc huỷ</span>
           : <span className="phu">Máy này chưa bật đăng nhập — sắp xếp chỉ giữ tới khi tải lại trang.</span>}
         <span className="phu mo">{hienIds.size}/{khoi.length} chức năng đang hiện</span>
-        <button type="button" className="nut-nho" onClick={() => datBoCuc(macDinh(khoi))}>Đặt lại bố cục</button>
+        <button type="button" className="nut-nho luoi-bat" aria-pressed={hienLuoi} onClick={() => datHienLuoi(h => !h)}
+          title="Hiện ô lưới 12 cột (khi kéo, lưới luôn hiện)">▦ Lưới</button>
+        <button type="button" className="nut-nho" onClick={() => datBoCuc(macDinh())}>Đặt lại bố cục</button>
         {loiLuu && <span className="giam phu" role="alert">{loiLuu}</span>}
         <button type="button" className="nut-chinh them" onClick={() => datChon(true)}>＋ Thêm chức năng</button>
       </div>
-      <Luoi bo_cuc={bo_cuc} datBoCuc={datBoCuc} sua_duoc={true} nhan={id => nhanCua[id] ?? id} ve={id => veKhoi(id, nhanCua[id] ?? id)} />
-      {chon && <BangThem bo_cuc={bo_cuc} datBoCuc={datBoCuc} dong={() => datChon(false)} />}
+      <Luoi bo_cuc={bo_cuc} datBoCuc={datBoCuc} sua_duoc={true} hien_luoi={hienLuoi} nhan={id => nhanCua[id] ?? id}
+        ve={o => veKhoi(o.id, nhanCua[o.id] ?? o.id, o.xem ?? null,
+          m => suaBoCuc(b => b.map(x => x.id === o.id ? { ...x, xem: m } : x)))} />
+      {chon && <BangThem bo_cuc={bo_cuc} suaBoCuc={suaBoCuc} dong={() => datChon(false)} />}
       {moi && <BangMoi hien={hien} ds={ds} dong={() => datMoi(false)} tao={tao} />}
     </div>
   );
@@ -162,7 +175,7 @@ function TomTat() {
   return <div className={"tom-tat" + (gap ? " canh" : "")}>{cau.length ? cau.join(" · ").replace(/^./, c => c.toUpperCase()) + "." : "Mọi thứ ổn."}</div>;
 }
 
-function BangThem({ bo_cuc, datBoCuc, dong }: { bo_cuc: OBoCuc[]; datBoCuc: (b: OBoCuc[]) => void; dong: () => void }) {
+function BangThem({ bo_cuc, suaBoCuc, dong }: { bo_cuc: OBoCuc[]; suaBoCuc: (f: (b: OBoCuc[]) => OBoCuc[]) => void; dong: () => void }) {
   const [tab, datTab] = useState("tat_ca");
   const [tim, datTim] = useState("");
   const o = useRef<HTMLInputElement>(null);
@@ -182,7 +195,7 @@ function BangThem({ bo_cuc, datBoCuc, dong }: { bo_cuc: OBoCuc[]; datBoCuc: (b: 
           <button key={n.id} type="button" aria-pressed={tab === n.id} onClick={() => datTab(n.id)}>{n.nhan}</button>)}</div>
         <div className="the-them">{ds.map(k => (
           <button key={k.id} type="button" className={"the-mod" + (an[k.id] ? "" : " on")} aria-pressed={!an[k.id]}
-            onClick={() => datBoCuc(bo_cuc.map(x => x.id === k.id ? { ...x, an: !x.an } : x))}>
+            onClick={() => suaBoCuc(b => b.find(x => x.id === k.id)?.an ? hienODay(b, k.id) : anKhoi(b, k.id))}>
             <span className="the-mod-dau"><b>{k.nhan}</b>
               <span className={"nhan-vien " + (an[k.id] ? "nhat" : "ok")}>{an[k.id] ? "Thêm" : "Đang hiện"}</span></span>
             <span className="phu">{k.mo_ta}</span>

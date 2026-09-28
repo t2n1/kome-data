@@ -1,0 +1,298 @@
+[
+ {
+  "ten": "noi_len_khi_co_cho_trong",
+  "vao": [
+   {
+    "id": "a",
+    "x": 0,
+    "y": 5,
+    "rong": 4,
+    "cao": 3,
+    "an": false
+   }
+  ],
+  "ra": {
+   "a": [
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "ten": "chong_thi_bi_day_xuong_duoi",
+  "vao": [
+   {
+    "id": "a",
+    "x": 0,
+    "y": 0,
+    "rong": 6,
+    "cao": 3,
+    "an": false
+   },
+   {
+    "id": "b",
+    "x": 2,
+    "y": 1,
+    "rong": 6,
+    "cao": 3,
+    "an": false
+   }
+  ],
+  "ra": {
+   "a": [
+    0,
+    0
+   ],
+   "b": [
+    2,
+    3
+   ]
+  }
+ },
+ {
+  "ten": "canh_nhau_khong_dung_nhau",
+  "vao": [
+   {
+    "id": "a",
+    "x": 0,
+    "y": 0,
+    "rong": 4,
+    "cao": 3,
+    "an": false
+   },
+   {
+    "id": "b",
+    "x": 4,
+    "y": 0,
+    "rong": 4,
+    "cao": 6,
+    "an": false
+   },
+   {
+    "id": "c",
+    "x": 8,
+    "y": 2,
+    "rong": 4,
+    "cao": 2,
+    "an": false
+   }
+  ],
+  "ra": {
+   "a": [
+    0,
+    0
+   ],
+   "b": [
+    4,
+    0
+   ],
+   "c": [
+    8,
+    0
+   ]
+  }
+ },
+ {
+  "ten": "khoi_an_khong_tham_gia",
+  "vao": [
+   {
+    "id": "a",
+    "x": 0,
+    "y": 4,
+    "rong": 12,
+    "cao": 3,
+    "an": false
+   },
+   {
+    "id": "b",
+    "x": 0,
+    "y": 0,
+    "rong": 12,
+    "cao": 4,
+    "an": true
+   }
+  ],
+  "ra": {
+   "a": [
+    0,
+    0
+   ],
+   "b": [
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "ten": "day_day_chuyen",
+  "vao": [
+   {
+    "id": "a",
+    "x": 0,
+    "y": 0,
+    "rong": 12,
+    "cao": 2,
+    "an": false
+   },
+   {
+    "id": "b",
+    "x": 0,
+    "y": 0,
+    "rong": 6,
+    "cao": 2,
+    "an": false
+   },
+   {
+    "id": "c",
+    "x": 3,
+    "y": 1,
+    "rong": 6,
+    "cao": 2,
+    "an": false
+   }
+  ],
+  "ra": {
+   "a": [
+    0,
+    0
+   ],
+   "b": [
+    0,
+    2
+   ],
+   "c": [
+    3,
+    4
+   ]
+  }
+ },
+ {
+  "ten": "khong_nhay_qua_khoi_da_dat",
+  "vao": [
+   {
+    "id": "a",
+    "x": 0,
+    "y": 0,
+    "rong": 12,
+    "cao": 2,
+    "an": false
+   },
+   {
+    "id": "b",
+    "x": 0,
+    "y": 4,
+    "rong": 4,
+    "cao": 2,
+    "an": false
+   },
+   {
+    "id": "c",
+    "x": 0,
+    "y": 9,
+    "rong": 4,
+    "cao": 1,
+    "an": false
+   }
+  ],
+  "ra": {
+   "a": [
+    0,
+    0
+   ],
+   "b": [
+    0,
+    2
+   ],
+   "c": [
+    0,
+    4
+   ]
+  }
+ },
+ {
+  "ten": "lo_giua_hai_cot",
+  "vao": [
+   {
+    "id": "a",
+    "x": 0,
+    "y": 0,
+    "rong": 4,
+    "cao": 6,
+    "an": false
+   },
+   {
+    "id": "b",
+    "x": 4,
+    "y": 0,
+    "rong": 8,
+    "cao": 2,
+    "an": false
+   },
+   {
+    "id": "c",
+    "x": 6,
+    "y": 7,
+    "rong": 6,
+    "cao": 3,
+    "an": false
+   }
+  ],
+  "ra": {
+   "a": [
+    0,
+    0
+   ],
+   "b": [
+    4,
+    0
+   ],
+   "c": [
+    6,
+    2
+   ]
+  }
+ },
+ {
+  "ten": "hoa_khoa_theo_x",
+  "vao": [
+   {
+    "id": "b",
+    "x": 6,
+    "y": 3,
+    "rong": 6,
+    "cao": 3,
+    "an": false
+   },
+   {
+    "id": "a",
+    "x": 0,
+    "y": 3,
+    "rong": 6,
+    "cao": 3,
+    "an": false
+   },
+   {
+    "id": "c",
+    "x": 3,
+    "y": 0,
+    "rong": 6,
+    "cao": 2,
+    "an": false
+   }
+  ],
+  "ra": {
+   "c": [
+    3,
+    0
+   ],
+   "a": [
+    0,
+    2
+   ],
+   "b": [
+    6,
+    2
+   ]
+  }
+ }
+]

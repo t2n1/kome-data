@@ -13,7 +13,13 @@
 .tab-mot[aria-selected="true"]{border-color:var(--do);background:var(--do-nen);color:var(--do-chu);font-weight:600}
 .o-ten-bang{font:inherit;font-size:.8rem;padding:.25rem .6rem;border:1px solid var(--do);border-radius:999px;
   background:var(--nen-the);color:var(--chu);width:12rem}
-.menu-bang{position:relative}
+/* Viên tab: tên + ⋯ dính liền (2026-09-29). Viên đang xem mang màu chip đang bật. */
+.tab-vien{position:relative;display:inline-flex;align-items:stretch}
+.tab-vien.dang .tab-mot{border-top-right-radius:0;border-bottom-right-radius:0;border-right:0;padding-right:.45rem}
+.tab-menu{font:inherit;font-size:.85rem;line-height:1;padding:0 .55rem 0 .4rem;border:1px solid var(--do);border-left:1px solid color-mix(in srgb, var(--do) 35%, transparent);
+  border-radius:0 999px 999px 0;background:var(--do-nen);color:var(--do-chu);cursor:pointer}
+.tab-menu:hover:not(:disabled),.tab-menu[aria-expanded="true"]{background:color-mix(in srgb, var(--do) 22%, var(--nen-the))}
+.tab-menu:disabled{cursor:not-allowed;opacity:.6}
 .menu-noi{position:absolute;z-index:30;top:calc(100% + .3rem);left:0;min-width:11.5rem;display:flex;flex-direction:column;
   background:var(--nen-the);border:1px solid var(--vien);border-radius:10px;padding:.3rem;box-shadow:0 8px 24px rgb(0 0 0 / .14)}
 .menu-noi button{text-align:left;background:none;border:0;padding:.45rem .65rem;border-radius:6px;color:var(--chu);font:inherit;font-size:.82rem;cursor:pointer}
@@ -32,25 +38,37 @@
 .tom-tat.cho{color:var(--chu-mo)}
 .thanh-bo-cuc{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .8rem;margin:.9rem 0 .8rem}
 .thanh-bo-cuc .phu{font-size:.72rem}.thanh-bo-cuc .mo{color:var(--chu-mo)}
+.luoi-bat[aria-pressed="true"]{border-color:var(--do);background:var(--do-nen);color:var(--do-chu)}
 .nut-chinh.them{margin-left:auto;font-size:.8rem;padding:.4rem .85rem;border-radius:8px;font-weight:700}
 
-.luoi-tq{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-flow:dense;grid-auto-rows:minmax(150px,auto);gap:.75rem}
-.o-luoi{position:relative;min-width:0;background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:.85rem .95rem}
-.o-luoi.dang-keo{opacity:.45}
-.o-luoi.dich-truoc{box-shadow:inset 3px 0 0 var(--do)}
-.o-luoi.dich-sau{box-shadow:inset -3px 0 0 var(--do)}
+/* Lưới 12 cột, hàng 40px (đặc tả 2026-09-29-tong-quan-luoi-12-cot-design.md). Hàng giãn theo
+   nội dung — không bao giờ cắt chữ. Đổi số cột là đổi cả luoi_logic.ts (COT) và bo_cuc.py. */
+.luoi-tq{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:minmax(40px,auto);gap:.75rem;position:relative}
+.o-luoi{position:relative;z-index:1;min-width:0;background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:.85rem .95rem;
+  box-sizing:border-box}
+.luoi-tq.keo-duoc .khoi-dau{touch-action:none;user-select:none}
+.o-luoi.dang-bay{z-index:30;cursor:grabbing;box-shadow:0 22px 48px rgb(0 0 0 / .24);border-color:var(--vien-dam);will-change:transform}
+.o-luoi.dang-co{z-index:30;box-shadow:0 10px 28px rgb(0 0 0 / .16);border-color:var(--do)}
+/* Ô lưới (chỉ khi đang kéo / bật "Lưới") và ô bóng chỗ khối sẽ rơi. */
+.o-luoi-o{border:1px dashed var(--vien);border-radius:8px;pointer-events:none;z-index:0;opacity:.7}
+.o-bong{border:2px dashed var(--do);background:color-mix(in srgb, var(--do) 9%, transparent);border-radius:12px;pointer-events:none;z-index:0;
+  transition:none}
+body.dang-xep-luoi{user-select:none;-webkit-user-select:none}
+body.dang-xep-luoi *{cursor:grabbing !important}
 .khoi-an{position:absolute;top:.45rem;right:.5rem;background:transparent;border:0;color:var(--chu-nhat);cursor:pointer;font-size:.85rem;z-index:5;padding:.1rem .25rem;border-radius:5px}
 .khoi-an:hover{background:var(--nen-phu);color:var(--chu)}
 .khoi-tay{position:absolute;top:.45rem;left:-.1rem;width:1px;height:1px;overflow:hidden;opacity:0;border:0;padding:0}
 .khoi-tay:focus-visible{width:auto;height:auto;opacity:1;left:.3rem;top:.3rem;padding:.1rem .35rem;background:var(--nen-the);
   border:1px solid var(--do);border-radius:6px;color:var(--do-chu);z-index:6}
-.khoi-co{position:absolute;right:2px;bottom:2px;width:16px;height:16px;cursor:nwse-resize;touch-action:none;
-  border-right:2px solid var(--vien-dam);border-bottom:2px solid var(--vien-dam);border-radius:0 0 6px 0;z-index:6}
+.khoi-co{position:absolute;right:2px;bottom:2px;width:18px;height:18px;cursor:nwse-resize;touch-action:none;
+  border-right:2px solid var(--vien-dam);border-bottom:2px solid var(--vien-dam);border-radius:0 0 6px 0;z-index:6;opacity:.55}
+.o-luoi:hover .khoi-co,.o-luoi.dang-co .khoi-co{opacity:1}
 @media (max-width:900px){
   .luoi-tq{grid-template-columns:minmax(0,1fr)}
   .luoi-tq > .o-luoi{grid-column:auto !important;grid-row:auto !important}
-  .khoi-co{display:none}
+  .khoi-co,.o-luoi-o,.o-bong,.luoi-bat{display:none}
 }
+@media (prefers-reduced-motion: reduce){ .o-luoi{transition:none !important} }
 
 /* Tiến độ ngân sách */
 .ns-luoi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:.9rem;align-items:start}

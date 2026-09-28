@@ -20,6 +20,8 @@ MK = "mat-khau-bo-cuc-2026"
 BI_MAT = "bi-mat-phien-du-dai-2026"
 GOC = Path(__file__).resolve().parents[1]
 MA = [k[0] for k in BC.KHOI]
+# Thứ tự của bố cục mặc định ĐÃ xếp chỗ (theo y, x) — khác thứ tự danh mục từ lưới 12 cột.
+MAC = [o.id for o in BC.mac_dinh()]
 
 
 # ---- chuan_hoa: không tin trình duyệt ---------------------------------
@@ -31,31 +33,98 @@ def test_rac_thi_ve_mac_dinh_khong_nem_loi(tho):
 
 def test_giu_thu_tu_va_noi_khoi_thieu_vao_cuoi():
     """Bố cục lưu từ trước khi code thêm một khối vẫn đọc được — khối mới
-    nối vào CUỐI, không vứt cả bố cục về mặc định như gói thiết kế."""
+    nối vào ĐÁY, không vứt cả bố cục về mặc định như gói thiết kế. Bố cục cũ
+    (không x/y, đơn vị 3 cột) đổi × DOI_CU và xếp theo thứ tự đã lưu."""
     ra = BC.chuan_hoa([{"id": "han_su_dung", "rong": 3, "cao": 1}, {"id": "kpi", "rong": 1, "cao": 4}])
     assert [o.id for o in ra[:2]] == ["han_su_dung", "kpi"]
-    assert (ra[0].rong, ra[0].cao, ra[1].rong, ra[1].cao) == (3, 1, 1, 4)
+    assert (ra[0].x, ra[0].y, ra[0].rong, ra[0].cao) == (0, 0, 12, 3)
+    assert (ra[1].x, ra[1].y, ra[1].rong, ra[1].cao) == (0, 3, 4, 12)
     assert sorted(o.id for o in ra) == sorted(MA)
     assert all(not o.an for o in ra)
+    assert all(o.y >= 3 for o in ra[2:])      # khối thiếu nằm dưới khối đã lưu
 
 
 def test_bo_ma_la_va_ma_trung():
     ra = BC.chuan_hoa([{"id": "xoa_du_lieu"}, {"id": "kpi", "rong": 2},
                        {"id": "kpi", "rong": 3}, {"id": "__proto__"}])
     assert [o.id for o in ra].count("kpi") == 1
-    assert ra[0].id == "kpi" and ra[0].rong == 2
+    assert ra[0].id == "kpi" and ra[0].rong == 8
     assert len(ra) == len(MA)
 
 
 @pytest.mark.parametrize("rong,cao,mong", [
-    (0, 0, (1, 1)), (-5, 99, (1, 4)), (7, 2, (3, 2)), (2.9, 3.2, (2, 3)),
+    (0, 0, (4, 3)), (-5, 99, (4, 12)), (7, 2, (12, 6)), (2.9, 3.2, (8, 9)),
     ("3", "2", None), (True, True, None), (None, None, None),
 ])
-def test_kich_thuoc_kep_trong_dai_kieu_sai_lay_mac_dinh(rong, cao, mong):
+def test_kich_thuoc_bo_cuc_CU_kep_roi_doi_don_vi(rong, cao, mong):
     o = BC.chuan_hoa([{"id": "xu_huong", "rong": rong, "cao": cao}])[0]
-    if mong is None:          # chuỗi, bool, thiếu -> mặc định của khối (2, 2)
-        mong = (2, 2)
+    if mong is None:          # chuỗi, bool, thiếu -> mặc định của khối (8, 6)
+        mong = (8, 6)
     assert (o.rong, o.cao) == mong
+
+
+@pytest.mark.parametrize("vao,mong", [
+    ({"x": 11, "y": 0, "rong": 99, "cao": 1}, (0, 0, 12, 2)),
+    ({"x": 10, "y": -3, "rong": 4, "cao": 40}, (8, 0, 4, 16)),
+    ({"x": 2.7, "y": 0, "rong": 1, "cao": 5}, (2, 0, 3, 5)),
+    ({"x": 0, "y": 0, "rong": "4", "cao": None}, (0, 0, 8, 6)),
+])
+def test_bo_cuc_MOI_kep_toa_do_va_kich_thuoc(vao, mong):
+    o = BC.chuan_hoa([{"id": "xu_huong", **vao}])[0]
+    assert (o.x, o.y, o.rong, o.cao) == mong
+
+
+def test_nen_giong_het_ban_typescript():
+    """Cùng file ca với giao_dien/src/tong_quan/luoi_logic.test.ts — hai bản `nen`
+    (máy chủ chuẩn hoá lúc đọc/ghi, trình duyệt lúc kéo) không được trôi khỏi nhau."""
+    ca = json.loads((GOC / "tests/du_lieu/luoi_nen_ca.json").read_text(encoding="utf-8"))
+    assert len(ca) >= 8
+    for c in ca:
+        ra = BC.nen([BC.O(x["id"], x["rong"], x["cao"], x["an"], x["x"], x["y"]) for x in c["vao"]])
+        assert {o.id: [o.x, o.y] for o in ra} == c["ra"], c["ten"]
+
+
+def _chong_nhau(ds):
+    hien = [o for o in ds if not o.an]
+    return [(a.id, b.id) for i, a in enumerate(hien) for b in hien[i + 1:]
+            if BC._chong(a, b.x, b.y, b.rong, b.cao)]
+
+
+@pytest.mark.parametrize("hat", range(40))
+def test_khong_bao_gio_co_hai_khoi_chong_nhau(hat):
+    """Bố cục rác bất kỳ (toạ độ trùng, tràn, lẫn khối ẩn) ra khỏi chuan_hoa là
+    lưới sạch: không cặp khối hiện nào đè nhau, mọi khối nằm trong 12 cột."""
+    import random
+    r = random.Random(hat)
+    tho = [{"id": m, "x": r.randint(-2, 14), "y": r.randint(-2, 30), "rong": r.randint(0, 14),
+            "cao": r.randint(0, 18), "an": r.random() < .2} for m in r.sample(MA, r.randint(1, len(MA)))]
+    ra = BC.chuan_hoa(tho)
+    assert _chong_nhau(ra) == []
+    assert all(0 <= o.x and o.x + o.rong <= 12 and o.y >= 0 for o in ra)
+    assert sorted(o.id for o in ra) == sorted(MA)
+
+
+def test_mac_dinh_da_xep_cho_va_khop_danh_muc():
+    md = BC.mac_dinh()
+    assert _chong_nhau(md) == [] and sorted(o.id for o in md) == sorted(MA)
+    assert BC.danh_muc()["mac_dinh"] == [o.dict() for o in md]
+
+
+def test_cach_xem_chi_nhan_ma_trong_danh_muc():
+    ra = {o.id: o.xem for o in BC.chuan_hoa([
+        {"id": "xu_huong", "x": 0, "y": 0, "rong": 8, "cao": 6, "xem": "luy_ke"},
+        {"id": "theo_thang", "x": 0, "y": 6, "rong": 8, "cao": 6, "xem": "khong_co"},
+        {"id": "kpi", "x": 0, "y": 12, "rong": 8, "cao": 3, "xem": "luy_ke"},
+        {"id": "suc_khoe_khach", "x": 8, "y": 0, "rong": 4, "cao": 3, "xem": 1}])}
+    assert ra == {**ra, "xu_huong": "luy_ke", "theo_thang": None, "kpi": None, "suc_khoe_khach": None}
+
+
+def test_danh_muc_cach_xem_moi_khoi():
+    du = {k[0] for k in BC._KHOI_DAY_DU}
+    assert set(BC.CACH_XEM) <= du
+    assert all(len(v) >= 2 and len({a for a, _ in v}) == len(v) for v in BC.CACH_XEM.values())
+    for k in BC.danh_muc()["khoi"]:
+        assert [x["id"] for x in k["cach_xem"]] == [a for a, _ in BC.CACH_XEM.get(k["id"], ())]
 
 
 def test_an_chi_nhan_dung_true():
@@ -66,15 +135,15 @@ def test_an_chi_nhan_dung_true():
 
 def test_doc_duoc_chuoi_json():
     ra = BC.chuan_hoa(json.dumps([{"id": "suc_khoe_khach", "rong": 3, "cao": 1, "an": True}]))
-    assert ra[0] == BC.O("suc_khoe_khach", 3, 1, True)
+    assert {o.id: o for o in ra}["suc_khoe_khach"] == BC.O("suc_khoe_khach", 12, 3, True)
 
 
 def test_ma_khoi_cua_ban_jinja_van_doc_duoc():
     """Bố cục lưu bằng bản Jinja (034, mã chi_so/can_han…) không bị vứt khi đổi
     sang giao diện React — đổi sang mã mới, giữ nguyên thứ tự và kích thước."""
     ra = BC.chuan_hoa([{"id": "can_han", "rong": 1, "cao": 3}, {"id": "chi_so", "an": True}])
-    assert (ra[0].id, ra[0].rong, ra[0].cao) == ("han_su_dung", 1, 3)
-    assert ra[1].id == "kpi" and ra[1].an is True
+    assert (ra[0].id, ra[0].rong, ra[0].cao) == ("han_su_dung", 4, 9)
+    assert {o.id: o.an for o in ra}["kpi"] is True
 
 
 def test_danh_muc_bam_goi_thiet_ke():
@@ -159,11 +228,11 @@ def test_luu_roi_trang_ve_SAN_dung_thu_tu_va_kich_thuoc(web, conn):
     c = web.vao(web())
     r = _luu(c, [{"id": "han_su_dung", "rong": 3, "cao": 1}, {"id": "kpi", "rong": 1, "cao": 3}])
     assert r.status_code == 200
-    assert r.json()["bo_cuc"][0] == {"id": "han_su_dung", "rong": 3, "cao": 1, "an": False}
+    assert r.json()["bo_cuc"][0] == {"id": "han_su_dung", "x": 0, "y": 0, "rong": 12, "cao": 3, "an": False, "xem": None}
     html = c.get("/").text
     bc = _bo_cuc(html)
     assert [o["id"] for o in bc][:2] == ["han_su_dung", "kpi"]
-    assert bc[1] == {"id": "kpi", "rong": 1, "cao": 3, "an": False}
+    assert bc[1] == {"id": "kpi", "x": 0, "y": 3, "rong": 4, "cao": 9, "an": False, "xem": None}
     assert _khoi_dau(html)["sap_xep_duoc"] is True
     luu = _luu_db(conn)
     assert [x["id"] for x in luu][:2] == ["han_su_dung", "kpi"] and len(luu) == len(MA)
@@ -193,7 +262,7 @@ def test_ve_mac_dinh_bang_form_thuong(web, conn):
     bang = _khoi_dau(c.get("/").text)["bang_hien_id"]
     r = c.post("/tong-quan/bo-cuc/mac-dinh", data={"bang": str(bang)})
     assert r.status_code == 303 and r.headers["location"] == "/"
-    assert _thu_tu(c.get("/").text) == MA
+    assert _thu_tu(c.get("/").text) == MAC
     assert _luu_db(conn) is None
 
 
@@ -204,7 +273,7 @@ def test_bo_cuc_rac_trong_csdl_khong_lam_hong_trang_chu(web, conn):
                     WHERE ten_dang_nhap = 'an'""")
     conn.commit()
     r = c.get("/")
-    assert r.status_code == 200 and _thu_tu(r.text) == MA
+    assert r.status_code == 200 and _thu_tu(r.text) == MAC
 
 
 def test_chi_nhan_json_va_chan_than_qua_lon(web):
@@ -225,7 +294,7 @@ def test_khong_co_cong_dang_nhap_thi_khong_luu_duoc(web):
     từ chối."""
     c = web(bi_mat=None)
     kd = _khoi_dau(c.get("/").text)
-    assert kd["nguoi"] is None and kd["sap_xep_duoc"] is False and _thu_tu(c.get("/").text) == MA
+    assert kd["nguoi"] is None and kd["sap_xep_duoc"] is False and _thu_tu(c.get("/").text) == MAC
     assert _luu(c, [{"id": "han_su_dung"}]).status_code == 403
 
 

@@ -11,10 +11,13 @@ export type NguoiDung = {
   duoc_quan_tri: boolean;
 };
 
-export type OBoCuc = { id: string; rong: number; cao: number; an: boolean };
+// Một ô của lưới Tổng quan 12 cột (2026-09-29): toạ độ + cỡ theo ô lưới, `xem` = cách xem
+// đang chọn của khối (null = cách đầu của danh mục). Máy chủ chuẩn hoá (kome/web/bo_cuc.py).
+export type OBoCuc = { id: string; x: number; y: number; rong: number; cao: number; an: boolean; xem?: string | null };
 // Một bảng Tổng quan có tên của người đăng nhập (056). Bảng ảo (chưa lưu) có id = null.
 export type BangTQ = { id: number | null; ten: string; bo_cuc: OBoCuc[] };
-export type MucKhoi = { id: string; nhan: string; rong: number; cao: number; nhom: string; mo_ta: string };
+export type MucKhoi = { id: string; nhan: string; rong: number; cao: number; nhom: string; mo_ta: string;
+  cach_xem: { id: string; nhan: string }[] };
 
 export type KhoiDau = {
   nguoi: NguoiDung | null;
@@ -33,6 +36,7 @@ export type KhoiDau = {
     khoi: MucKhoi[];
     nhom: { id: string; nhan: string }[];
     vai_tro: { id: string; nhan: string; khoi: string[] }[];
+    mac_dinh: OBoCuc[];   // bố cục mặc định ĐÃ xếp chỗ (máy chủ) — "Đặt lại bố cục"
   };
   chua_co: Record<string, string>;
   // Tính năng sống nhờ một nguồn OBC công ty chưa dùng (kome/nguon_dung.py) — false = ẩn.
@@ -54,7 +58,7 @@ declare global {
 export const KD: KhoiDau = window.__KOME__ ?? {
   nguoi: null, co_dang_nhap: false, chi_doc: false, hien_kho: true, hien_ngan_sach: true,
   che_do_giao_dien: "he-thong", bang: [], bang_hien_id: null, sap_xep_duoc: false,
-  danh_muc: { khoi: [], nhom: [], vai_tro: [] }, chua_co: {},
+  danh_muc: { khoi: [], nhom: [], vai_tro: [], mac_dinh: [] }, chua_co: {},
 };
 
 /** Cờ tính năng — MỘT nguồn: máy chủ (kome/nguon_dung.py::tinh_nang). */

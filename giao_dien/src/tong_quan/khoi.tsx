@@ -4,14 +4,14 @@ import { Fragment, useRef, useState, type ReactNode } from "react";
 import { useKhoi } from "../api";
 import { giuKhoang } from "../khung/khoang";
 import { BieuDo, type Chuoi } from "../chung/BieuDo";
-import { ChuaCoDuLieu, Khoi, Spark, ThanhMoc, mauTienDo } from "../chung/Khoi";
+import { ChuaCoDuLieu, Khoi, Spark, ThanhMoc, mauTienDo, type CachXem } from "../chung/Khoi";
 import { gio_tokyo, gon, ngay, ngay_ngan, pc, so, thang_nhan, thay_doi, yen } from "../dinh_dang";
 import { KD, TN } from "../khoi_dau";
 import { useNhanMoc, type KhoangMayChu } from "../khung/khoang";
 import { DongSoSanh, VachSoSanh } from "../chung/SoSanh";
 import { DongNoi, ONoi } from "../chung/ONoi";
 import { buocCham } from "../chung/o_noi_logic";
-import { HangSo, MucSo, SoLon, ThanhChong, ThanhNgang, type DongThanh } from "../chung/Hinh";
+import { HangSo, MucSo, SoLon, ThanhChong, ThanhNgang, Vong, type DongThanh, type Khuc } from "../chung/Hinh";
 import { demTheoTag, sapViec, tenViec } from "./viec_logic";
 import { DaiHan, type Lo } from "./DaiHan";
 
@@ -39,6 +39,23 @@ function TdSs({ nay, ss, nhan }: { nay: number | null | undefined; ss: number | 
 /** Tháng 'YYYY-MM' có nằm trong khoảng xem không (tô đậm cột). */
 const trongKhoang = (kx: KhoangMayChu | null | undefined, thang: string) =>
   !!kx && thang >= kx.tu.slice(0, 7) && thang <= kx.den.slice(0, 7);
+// ---- Cách xem (2026-09-29) ---------------------------------------------------
+// Danh mục cách xem là của MÁY CHỦ (kome/web/bo_cuc.py::CACH_XEM, qua KD.danh_muc); lựa chọn
+// lưu trong ô bố cục của bảng đang xem (`xem`, null = cách đầu). Mỗi cách chỉ VẼ LẠI số khối đã
+// tải — không chỉ số mới; cách nào dữ liệu không mang kỳ so thì nói ra ở canh_bao.
+export type XemP = { xem: string | null; datXem: (ma: string | null) => void };
+function useCachXem(id: string, p: XemP): CachXem {
+  const ds = KD.danh_muc.khoi.find(k => k.id === id)?.cach_xem ?? [];
+  const chon = ds.some(x => x.id === p.xem) ? p.xem! : ds[0]?.id ?? "";
+  return { ds, chon, dat: m => p.datXem(m === ds[0]?.id ? null : m) };
+}
+/** Cộng dồn; gặp ô trống thì mọi điểm sau là null (không nối luỹ kế qua lỗ). */
+function luyKe(ds: (number | null | undefined)[]): (number | null)[] {
+  let t = 0, dut = false;
+  return ds.map(v => { if (dut || v == null) { dut = true; return null; } t += v; return t; });
+}
+const CHI_DT = (ss: { nhan: string } | null | undefined) => ss ? `${hoa(ss.nhan)}: khối này chỉ mang số kỳ so của doanh thu — chọn cách xem Doanh thu để so.` : undefined;
+
 const NS_THEO_THANG = "Chỉ tiêu chỉ đặt theo tháng — chọn dạng Tháng hoặc Kỳ ở thanh KHOẢNG XEM để xem tiến độ.";
 
 // ---- Chỉ số hôm nay ---------------------------------------------------------
@@ -124,11 +141,12 @@ function OKpiCongNo() {
         <DongNoi nhan="Tổng phải thu" gia={yen(d.tq.tong_phai_thu)} /><em>đến {ngay(d.moc)}</em></>} />);
 }
 
-export function KhoiCongNo() {
+export function KhoiCongNo(p: XemP) {
   const { data: d, isLoading, error } = useKhoi<CongNo>("cong_no");
+  const cx = useCachXem("cong_no", p);
   if (!isLoading && !error && !d) return <ChuaCoDuLieu gon tieu_de="Tuổi nợ phải thu" ly_do="Chưa nạp sổ 請求先元帳 nào — xuất từ OBC rồi nạp ở màn Kho dữ liệu." />;
   return (
-    <Khoi tieu_de="Tuổi nợ phải thu" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/cong-no" }}
+    <Khoi tieu_de="Tuổi nợ phải thu" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/cong-no" }} cach_xem={cx}
       phu={d ? `đến ${ngay_ngan(d.moc)}` : undefined} cach_tinh={d?.cach_tinh}>
       {d && <>
         <SoLon href="/cong-no?tab=qua_han" gia={gon(d.tq.qua_han)} lop={d.tq.qua_han ? "giam" : undefined} nhan="quá hạn"
@@ -137,9 +155,14 @@ export function KhoiCongNo() {
             <DongNoi nhan="Bên nhận hoá đơn quá hạn" gia={so(d.tq.so_ben_qua_han)} />
             {d.lau_nhat.length > 0 && <em>Nợ lâu / quá hạn nhiều nhất:</em>}
             {d.lau_nhat.map(x => <DongNoi key={x.ma} nhan={<span className="ten-jp">{x.ten}</span>} gia={yen(x.tien)} />)}</>} />
-        <ThanhChong dinh_dang={gon} don_vi="Còn nợ"
-          khuc={d.tq.tuoi.map(t => ({ khoa: t.nhom, nhan: t.nhan, dem: t.tien, mau: MAU_TUOI[t.nhom] ?? LUC.nhat,
-            href: `/cong-no?nhom=${t.nhom}`, chi_tiet: <DongNoi nhan="Số phiếu" gia={so(t.dem)} /> }))} />
+        {cx.chon === "lau_nhat"
+          ? (d.lau_nhat.length
+            ? <ThanhNgang dong={d.lau_nhat.map((x): DongThanh => ({ khoa: x.ma, ten: x.ten, ten_jp: true, gia_tri: x.tien, chu: gon(x.tien),
+                mau: LUC.do, chi_tiet: <DongNoi nhan="Còn nợ" gia={yen(x.tien)} /> }))} />
+            : <div className="trong">Không bên nào nợ quá hạn.</div>)
+          : <ThanhChong dinh_dang={gon} don_vi="Còn nợ"
+              khuc={d.tq.tuoi.map(t => ({ khoa: t.nhom, nhan: t.nhan, dem: t.tien, mau: MAU_TUOI[t.nhom] ?? LUC.nhat,
+                href: `/cong-no?nhom=${t.nhom}`, chi_tiet: <DongNoi nhan="Số phiếu" gia={so(t.dem)} /> }))} />}
       </>}
     </Khoi>
   );
@@ -164,8 +187,7 @@ type DiemNS = { nhan: string; tt: number | null; ns: number | null; ss: number |
 type DuongNS = { kieu: "ngay" | "thang"; nhan_ss: string | null; den?: string; diem: DiemNS[] };
 
 /** Đường luỹ kế của khối ngân sách: thực tế cộng dồn · nhịp ngân sách · tháng trước. */
-function DuongNganSach({ duong }: { duong: DuongNS }) {
-  const [cs, datCs] = useState<"dt" | "lg">("dt");
+function DuongNganSach({ duong, cs }: { duong: DuongNS; cs: "dt" | "lg" }) {
   const ds = duong.diem;
   if (!ds.length) return null;
   const lg = cs === "lg";
@@ -183,10 +205,6 @@ function DuongNganSach({ duong }: { duong: DuongNS }) {
   ];
   return (
     <div className="ns-duong">
-      <div className="ns-chon" role="group" aria-label="Chỉ số của biểu đồ">
-        {(["dt", "lg"] as const).map(k => <button key={k} type="button" aria-pressed={cs === k} className={cs === k ? "dang-chon" : undefined}
-          onClick={() => datCs(k)}>{k === "dt" ? "Doanh thu" : "Lãi gộp"}</button>)}
-      </div>
       <BieuDo key={cs} nhan={ds.map(x => theoNgay ? ngay_ngan(x.nhan) : thang_nhan(x.nhan))}
         nhan_day_du={ds.map(x => theoNgay ? ngay(x.nhan) : thang_nhan(x.nhan))}
         cao={180} mo_ta={`${ten} luỹ kế so với nhịp ngân sách`} chuoi={chuoi}
@@ -197,15 +215,16 @@ function DuongNganSach({ duong }: { duong: DuongNS }) {
   );
 }
 
-export function KhoiNganSach() {
+export function KhoiNganSach(p: XemP) {
   const { data: d, isLoading, error } = useKhoi<NganSach | null>("ns_thang");
+  const cx = useCachXem("ns_thang", p);
   if (d?.chi_theo_thang) return <ChuaCoDuLieu gon tieu_de="Tiến độ ngân sách" ly_do={NS_THEO_THANG} />;
   const nguoi = [...(d?.nguoi ?? [])].sort((a, b) => b.thuc_te - a.thuc_te);
   const maxNS = Math.max(1, ...nguoi.map(n => Math.max(n.muc_tieu ?? 0, n.thuc_te, n.dt_ss ?? 0)));
   const ssN = d?.so_sanh;
   const vuot = !!d && d.muc_tieu_den_hom_nay != null && d.thuc_te >= d.muc_tieu_den_hom_nay;
   return (
-    <Khoi tieu_de={`Ngân sách ${d ? thang_nhan(d.thang) : ""}`} dang_tai={isLoading} loi={error?.message}
+    <Khoi tieu_de={`Ngân sách ${d ? thang_nhan(d.thang) : ""}`} dang_tai={isLoading} loi={error?.message} cach_xem={d?.duong ? cx : undefined}
       nhan={d ? `Còn ${d.ngay_kd_con_lai} ngày làm việc` : undefined} lien_ket={{ href: "/bao-cao", chu: "Xem chi tiết" }}
       phu={ssN?.co ? <>so {ssN.nhan}</> : undefined}
       cach_tinh={d ? <>{d.co_ngan_sach ? `Vạch đen = mốc đáng lẽ đạt tới hôm nay (${pc(d.moc)}) — tính theo ngày làm việc, trừ ngày lễ.` : "Thanh = doanh thu thực tế của từng người phụ trách."}
@@ -261,33 +280,50 @@ export function KhoiNganSach() {
             </ONoi>))}
         </div>
       </div>}
-      {d?.duong && <DuongNganSach duong={d.duong} />}
+      {d?.duong && <DuongNganSach duong={d.duong} cs={cx.chon === "lai_gop" ? "lg" : "dt"} />}
     </Khoi>
   );
 }
 
 // ---- Doanh thu theo sale ----------------------------------------------------
-export function KhoiSale() {
+export function KhoiSale(p: XemP) {
   const { data: d, isLoading, error } = useKhoi<NganSach | null>("so_sanh_sale");
+  const cx = useCachXem("so_sanh_sale", p);
   if (d?.chi_theo_thang) return <ChuaCoDuLieu gon tieu_de="Theo sale" ly_do={NS_THEO_THANG} />;
   const nguoi = [...(d?.nguoi ?? [])].sort((a, b) => b.thuc_te - a.thuc_te);
   const max = Math.max(1, ...nguoi.map(n => Math.max(n.thuc_te, n.dt_ss ?? 0)));
+  const maxLg = Math.max(1, ...nguoi.map(n => n.thuc_te_lg));
   const ssN = d?.so_sanh;
-  return (
-    <Khoi tieu_de="Theo sale" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/bao-cao" }}
-      phu={ssN?.co ? <>so {ssN.nhan}</> : undefined}
-      cach_tinh={d ? `${d.co_ngan_sach ? `% = tiến độ so ngân sách cá nhân tháng ${thang_nhan(d.thang).slice(1)}` : `Doanh thu tháng ${thang_nhan(d.thang).slice(1)} — chưa đặt chỉ tiêu nên chưa có %`}.${ssN?.co ? ` Vạch đứt = ${ssN.nhan}.` : ""}` : undefined}
-      canh_bao={ssN && !ssN.co ? `${hoa(ssN.nhan)}: không có dữ liệu để so.` : undefined}>
-      {d && <ThanhNgang thang={1} nhan_ss={ssN?.co ? hoa(ssN.nhan) : undefined} dong={nguoi.map((n): DongThanh => ({
-        khoa: n.ma, ten: tenNguoi(n.ten, n.ma),
+  const xem = cx.chon;
+  const coSs = xem !== "lai_gop" && !!ssN?.co;
+  const thang = d ? thang_nhan(d.thang).slice(1) : "";
+  const noi = (n: NguoiNS) => <><DongNoi nhan="Doanh thu" gia={yen(n.thuc_te)} />
+    <DongNoi nhan="Chỉ tiêu" gia={n.muc_tieu ? yen(n.muc_tieu) : "chưa có"} />
+    <DongNoi nhan="Lãi gộp" gia={yen(n.thuc_te_lg)} />
+    {n.muc_tieu_lg != null && <DongNoi nhan="Chỉ tiêu lãi gộp" gia={yen(n.muc_tieu_lg)} />}
+    {ssN?.co && <DongNoi nhan={hoa(ssN.nhan)} gia={yen(n.dt_ss)} />}</>;
+  const dong = (n: NguoiNS): DongThanh => xem === "doanh_thu"
+    ? { khoa: n.ma, ten: tenNguoi(n.ten, n.ma), gia_tri: n.thuc_te, ss: coSs ? n.dt_ss : null, chu: gon(n.thuc_te),
+        phu: ssN ? <TdSs nay={n.thuc_te} ss={n.dt_ss} nhan={ssN.nhan} /> : undefined, mau: LUC.canh, chi_tiet: noi(n) }
+    : xem === "lai_gop"
+    ? { khoa: n.ma, ten: tenNguoi(n.ten, n.ma), gia_tri: n.muc_tieu_lg ? (n.tien_do_lg ?? 0) : n.thuc_te_lg / maxLg,
+        chu: n.muc_tieu_lg ? pc(n.tien_do_lg) : gon(n.thuc_te_lg),
+        mau: n.muc_tieu_lg ? mauTienDo(n.tien_do_lg, d?.moc_lg ?? d?.moc) : LUC.ok, chi_tiet: noi(n) }
+    : { khoa: n.ma, ten: tenNguoi(n.ten, n.ma),
         gia_tri: n.muc_tieu ? (n.tien_do ?? 0) : n.thuc_te / max,
-        ss: ssN?.co && n.dt_ss != null ? (n.muc_tieu ? n.dt_ss / n.muc_tieu : n.dt_ss / max) : null,
+        ss: coSs && n.dt_ss != null ? (n.muc_tieu ? n.dt_ss / n.muc_tieu : n.dt_ss / max) : null,
         chu: n.muc_tieu ? pc(n.tien_do) : gon(n.thuc_te),
         phu: ssN ? <TdSs nay={n.thuc_te} ss={n.dt_ss} nhan={ssN.nhan} /> : undefined,
-        mau: n.muc_tieu ? mauTienDo(n.tien_do, d.moc) : LUC.canh,
-        chi_tiet: <><DongNoi nhan="Doanh thu" gia={yen(n.thuc_te)} />
-          <DongNoi nhan="Chỉ tiêu" gia={n.muc_tieu ? yen(n.muc_tieu) : "chưa có"} />
-          {ssN?.co && <DongNoi nhan={hoa(ssN.nhan)} gia={yen(n.dt_ss)} />}</> }))} />}
+        mau: n.muc_tieu ? mauTienDo(n.tien_do, d?.moc) : LUC.canh, chi_tiet: noi(n) };
+  const cach = !d ? undefined
+    : xem === "doanh_thu" ? `Doanh thu tháng ${thang} của từng người phụ trách.${coSs ? ` Vạch đứt = ${ssN!.nhan}.` : ""}`
+    : xem === "lai_gop" ? `% = lãi gộp so chỉ tiêu lãi gộp cá nhân tháng ${thang}; người chưa có chỉ tiêu lãi gộp: thanh = lãi gộp thực tế.`
+    : `${d.co_ngan_sach ? `% = tiến độ so ngân sách cá nhân tháng ${thang}` : `Doanh thu tháng ${thang} — chưa đặt chỉ tiêu nên chưa có %`}.${coSs ? ` Vạch đứt = ${ssN!.nhan}.` : ""}`;
+  return (
+    <Khoi tieu_de="Theo sale" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/bao-cao" }} cach_xem={cx}
+      phu={coSs ? <>so {ssN!.nhan}</> : undefined} cach_tinh={cach}
+      canh_bao={xem === "lai_gop" ? CHI_DT(ssN) : ssN && !ssN.co ? `${hoa(ssN.nhan)}: không có dữ liệu để so.` : undefined}>
+      {d && <ThanhNgang thang={xem === "doanh_thu" ? undefined : 1} nhan_ss={coSs ? hoa(ssN!.nhan) : undefined} dong={nguoi.map(dong)} />}
     </Khoi>
   );
 }
@@ -296,7 +332,8 @@ export function KhoiSale() {
 type Thang = { thang: string; thang_trong_ky: number; doanh_thu: number; lai_gop: number; ty_suat: number | null; so_khach: number;
   cung_ky: number | null; co_cung_ky: boolean; ngan_sach: number | null };
 
-export function KhoiTheoThang() {
+export function KhoiTheoThang(p: XemP) {
+  const cx = useCachXem("theo_thang", p);
   const { data: d, isLoading, error } = useKhoi<{ company_fy: number | null; thang: Thang[]; hom_nay: string | null; khoang: KhoangMayChu | null;
     so_sanh: SsKhoi; cat_cung_ngay: boolean }>("theo_thang");
   const t = d?.thang ?? [];
@@ -310,17 +347,35 @@ export function KhoiTheoThang() {
   const coNS = t.filter(x => x.ngan_sach != null && x.thang !== thangNay);
   const dat = coNS.filter(x => x.doanh_thu >= (x.ngan_sach ?? 0)).length;
   const cao = t.length ? t.reduce((a, b) => (b.doanh_thu > a.doanh_thu ? b : a)) : null;
-  const chuoi: Chuoi[] = [
+  const xem = cx.chon;
+  const tongLg = t.reduce((s, x) => s + x.lai_gop, 0);
+  const nsL = luyKe(t.map(x => x.ngan_sach)), ckL = luyKe(t.map(x => x.cung_ky));
+  const coNsL = nsL.some(v => v != null), coCkL = ckL.some(v => v != null);
+  const chuoi: Chuoi[] = xem === "luy_ke" ? [
+    { ten: "Doanh thu (luỹ kế)", kieu: "duong", gia_tri: luyKe(t.map(x => x.doanh_thu)), mau: LUC.do,
+      so_voi: coCkL ? 1 + (coNsL ? 1 : 0) : undefined },
+    ...(coNsL ? [{ ten: "Ngân sách (luỹ kế)", kieu: "duong" as const, gia_tri: nsL, mau: "var(--lien-ket)" }] : []),
+    ...(coCkL ? [{ ten: `${hoa(ss?.nhan) || "Kỳ so"} (luỹ kế)`, kieu: "duong_dut" as const, gia_tri: ckL, mau: MAU_SS }] : []),
+  ] : xem === "bien" ? [
+    { ten: "Lãi gộp", kieu: "cot", gia_tri: t.map(x => x.lai_gop), mau: LUC.ok,
+      mau_tung_cot: t.map(x => trongKhoang(kx, x.thang) ? LUC.ok : "color-mix(in srgb, var(--ok-vien) 35%, var(--nen-the))") },
+    { ten: "Biên gộp", kieu: "duong", gia_tri: t.map(x => x.ty_suat), mau: "var(--lien-ket)", truc_phai: true },
+  ] : [
     { ten: hoa(ss?.nhan) || "Kỳ so", kieu: "cot_ma", gia_tri: t.map(x => x.cung_ky), mau: MAU_SS },
     { ten: "Doanh thu", kieu: "cot", gia_tri: t.map(x => x.doanh_thu), mau: LUC.do, so_voi: 0,
       mau_tung_cot: t.map(x => !trongKhoang(kx, x.thang) ? MO : x.ngan_sach == null ? "var(--lien-ket)" : x.doanh_thu >= x.ngan_sach ? LUC.do : "color-mix(in srgb, var(--do) 50%, var(--nen-the))") },
     { ten: "Ngân sách tháng", kieu: "duong", gia_tri: t.map(x => x.ngan_sach), mau: "var(--lien-ket)" },
   ];
+  const coSsVe = xem !== "bien";
   return (
     <Khoi tieu_de="Theo từng tháng" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/bao-cao", chu: "Báo cáo" }}
-      phu={ss ? <>so {ss.nhan}</> : undefined}
-      cach_tinh={d?.company_fy ? `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}). Cột đậm = thuộc khoảng xem; cột viền đứt = ${ss?.nhan ?? "kỳ so"}; đường = ngân sách tháng.` : undefined}
+      phu={ss && coSsVe ? <>so {ss.nhan}</> : undefined} cach_xem={cx}
+      cach_tinh={!d?.company_fy ? undefined
+        : xem === "luy_ke" ? `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}), cộng dồn từ đầu kỳ: doanh thu · ngân sách (dừng ở tháng đầu tiên chưa đặt) · nét đứt = ${ss?.nhan ?? "kỳ so"} (dừng ở tháng đầu tiên không có số).`
+        : xem === "bien" ? `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}). Cột = lãi gộp từng tháng (đậm = thuộc khoảng xem); đường (trục phải) = biên gộp = lãi gộp ÷ doanh thu thuần của tháng.`
+        : `Cả kỳ chứa ${kx?.nhan ?? "khoảng xem"} (kỳ kết thúc 7/${d.company_fy}). Cột đậm = thuộc khoảng xem; cột viền đứt = ${ss?.nhan ?? "kỳ so"}; đường = ngân sách tháng.`}
       canh_bao={!d ? undefined : canhBaoNhieu([
+        xem === "bien" && ss ? `${hoa(ss.nhan)}: khối này không mang lãi gộp của kỳ so — chọn Theo tháng hoặc Luỹ kế để so.` : null,
         ss && ss.co && ss.lech_thang == null ? "Kỳ so không lệch tròn tháng — không so theo tháng được." : null,
         ss && !ck ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : null,
         thangNay && t.some(x => x.thang === thangNay)
@@ -334,13 +389,16 @@ export function KhoiTheoThang() {
             gia={t.length ? `${t.length} (${thang_nhan(t[0].thang)} – ${thang_nhan(t[t.length - 1].thang)})` : "0"} />} />
           <MucSo nhan={<>so {ss?.nhan ?? "kỳ so"}</>} gia={ck ? thay_doi(dtCK / ck - 1) : "—"} lop={ck ? (dtCK >= ck ? "tang" : "giam") : undefined}
             chi_tiet={ck ? <><DongNoi nhan="Tháng đối chiếu" gia={so(coCK.length)} /><DongNoi nhan="Chênh" gia={gon(dtCK - ck)} /></> : undefined} />
+          {xem === "bien" && <MucSo nhan="Biên cả kỳ" gia={tong ? pc(tongLg / tong) : "—"}
+            chi_tiet={<><DongNoi nhan="Lãi gộp" gia={yen(tongLg)} /><DongNoi nhan="Doanh thu" gia={yen(tong)} /></>} />}
           <MucSo nhan="Đạt ngân sách" gia={coNS.length ? `${dat}/${coNS.length}` : "—"}
             chi_tiet={<div className="o-noi-chu">{coNS.length ? "Số tháng đã khép lại đạt ngân sách." : "Chưa đặt chỉ tiêu tháng nào."}</div>} />
           <MucSo nhan="Cao nhất" gia={cao ? thang_nhan(cao.thang) : "—"}
             chi_tiet={cao ? <><DongNoi nhan="Doanh thu" gia={yen(cao.doanh_thu)} /><DongNoi nhan="Biên gộp" gia={pc(cao.ty_suat)} /></> : undefined} />
         </HangSo>
-        <BieuDo nhan={t.map(x => thang_nhan(x.thang))} chuoi={chuoi} cao={200} mo_ta={`Doanh thu từng tháng của kỳ so ngân sách và ${ss?.nhan ?? "kỳ so"}`}
-          dinh_dang={v => yen(v)} dinh_dang_truc={v => gon(v)}
+        <BieuDo key={xem} nhan={t.map(x => thang_nhan(x.thang))} chuoi={chuoi} cao={200}
+          mo_ta={xem === "bien" ? "Lãi gộp và biên gộp từng tháng của kỳ" : xem === "luy_ke" ? `Doanh thu luỹ kế của kỳ so ngân sách và ${ss?.nhan ?? "kỳ so"}` : `Doanh thu từng tháng của kỳ so ngân sách và ${ss?.nhan ?? "kỳ so"}`}
+          dinh_dang={(v, c) => c.truc_phai ? pc(v) : yen(v)} dinh_dang_truc={v => gon(v)}
           vach={thangNay ? { i: t.findIndex(x => x.thang === thangNay), chu: "đang chạy" } : null}
           them_noi={i => { const x = t[i]; return x && <>
             <div>%NS<b>{x.ngan_sach ? pc(x.doanh_thu / x.ngan_sach, 0) : "—"}</b></div>
@@ -354,36 +412,61 @@ export function KhoiTheoThang() {
 // ---- Xu hướng doanh thu (theo khoảng xem) ---------------------------------
 type XuHuong = { khoang: KhoangMayChu | null; kieu: "ngay" | "thang"; diem: [string, number, number, number, number | null][] };
 
-export function KhoiXuHuong() {
+export function KhoiXuHuong(p: XemP) {
   const { data: d, isLoading, error } = useKhoi<XuHuong>("xu_huong");
+  const cx = useCachXem("xu_huong", p);
   const ds = d?.diem ?? [];
   const kx = d?.khoang;
   const ss = kx?.so_sanh[0];
   const tong = ds.reduce((s, x) => s + x[1], 0);
+  const tongLg = ds.reduce((s, x) => s + x[2], 0);
   const coCk = ds.some(x => x[4] != null);
   const tongCk = ds.reduce((s, x) => s + (x[4] ?? 0), 0);
   const coNgay = ds.filter(x => x[1] !== 0).length;
   const theoNgay = d?.kieu !== "thang";
+  const don = theoNgay ? "ngày" : "tháng";
+  const xem = cx.chon;
+  const coSsVe = xem === "doanh_thu" || xem === "luy_ke";
+  const cot = ds.length <= 40;
+  const chuoi: Chuoi[] = xem === "luy_ke" ? [
+    { ten: "Doanh thu (luỹ kế)", kieu: "duong", gia_tri: luyKe(ds.map(x => x[1])), mau: "var(--lien-ket)", so_voi: coCk ? 1 : undefined },
+    ...(coCk ? [{ ten: `${hoa(ss?.nhan) || "Kỳ so"} (luỹ kế)`, kieu: "duong_dut" as const, gia_tri: luyKe(ds.map(x => x[4])), mau: MAU_SS }] : []),
+  ] : xem === "lai_gop" ? [
+    { ten: `Lãi gộp ${don}`, kieu: cot ? "cot" : "duong", gia_tri: ds.map(x => x[2]), mau: LUC.ok },
+  ] : xem === "so_khach" ? [
+    { ten: `Số khách mua trong ${don}`, kieu: cot ? "cot" : "duong", gia_tri: ds.map(x => x[3]), mau: "var(--lien-ket)" },
+  ] : [
+    { ten: theoNgay ? "Doanh thu ngày" : "Doanh thu tháng", kieu: cot ? "cot" : "duong", gia_tri: ds.map(x => x[1]), mau: "var(--lien-ket)", so_voi: 1 },
+    // Cột → cột ma, đường → nét đứt (đặc tả 2026-09-28 §6).
+    { ten: hoa(ss?.nhan) || "Kỳ so", kieu: cot ? "cot_ma" : "duong_dut", gia_tri: ds.map(x => x[4]), mau: MAU_SS },
+  ];
+  const tienTe = xem !== "so_khach";
   return (
-    <Khoi tieu_de={`Xu hướng · ${kx?.nhan ?? ""}`} dang_tai={isLoading} loi={error?.message}
-      phu={ss?.co ? <>so {ss.nhan}</> : undefined}
-      cach_tinh={ss?.co ? `${ds.length <= 40 ? "Cột viền đứt" : "Nét đứt"}: ${ss.nhan} (${ngay(ss.tu)} → ${ngay(ss.den)}).` : undefined}
-      canh_bao={ss && !ss.co ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : ss && !coCk ? "Kỳ so khác độ dài — chỉ so tổng." : undefined}>
+    <Khoi tieu_de={`Xu hướng · ${kx?.nhan ?? ""}`} dang_tai={isLoading} loi={error?.message} cach_xem={cx}
+      phu={ss?.co && coSsVe ? <>so {ss.nhan}</> : undefined}
+      cach_tinh={xem === "so_khach" ? `Số khách có đơn trong từng ${don} — một khách mua nhiều ${don} được đếm ở mỗi ${don}, nên không cộng thành tổng.`
+        : xem === "lai_gop" ? `Lãi gộp từng ${don}. Biên gộp = tổng lãi gộp ÷ tổng doanh thu thuần của khoảng.`
+        : ss?.co ? `${xem === "luy_ke" ? "Cộng dồn từ đầu khoảng. Nét đứt" : cot ? "Cột viền đứt" : "Nét đứt"}: ${ss.nhan} (${ngay(ss.tu)} → ${ngay(ss.den)}).` : undefined}
+      canh_bao={!coSsVe ? CHI_DT(ss) : ss && !ss.co ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : ss && !coCk ? "Kỳ so khác độ dài — chỉ so tổng." : undefined}>
       {d && <>
         <HangSo>
-          <MucSo nhan={`Tổng ${ds.length} ${theoNgay ? "ngày" : "tháng"}`} gia={gon(tong)} />
-          <MucSo nhan={<>so {ss?.nhan ?? "—"}</>} gia={coCk && tongCk > 0 ? thay_doi(tong / tongCk - 1) : "—"} lop={tong >= tongCk ? "tang" : "giam"}
-            chi_tiet={coCk ? <DongNoi nhan={hoa(ss?.nhan)} gia={yen(tongCk)} /> : undefined} />
-          <MucSo nhan={theoNgay ? "TB / ngày có bán" : "TB / tháng"} gia={gon(theoNgay ? (coNgay ? tong / coNgay : null) : (ds.length ? tong / ds.length : null))} />
+          {xem === "so_khach" ? <>
+            <MucSo nhan={`TB / ${don} có bán`} gia={so(coNgay ? Math.round(ds.reduce((s, x) => s + x[3], 0) / coNgay) : null)} />
+            <MucSo nhan={`Cao nhất một ${don}`} gia={so(Math.max(0, ...ds.map(x => x[3])))} />
+          </> : xem === "lai_gop" ? <>
+            <MucSo nhan={`Tổng ${ds.length} ${don}`} gia={gon(tongLg)} />
+            <MucSo nhan="Biên gộp" gia={tong ? pc(tongLg / tong) : "—"} />
+          </> : <>
+            <MucSo nhan={`Tổng ${ds.length} ${don}`} gia={gon(tong)} />
+            <MucSo nhan={<>so {ss?.nhan ?? "—"}</>} gia={coCk && tongCk > 0 ? thay_doi(tong / tongCk - 1) : "—"} lop={tong >= tongCk ? "tang" : "giam"}
+              chi_tiet={coCk ? <DongNoi nhan={hoa(ss?.nhan)} gia={yen(tongCk)} /> : undefined} />
+            <MucSo nhan={theoNgay ? "TB / ngày có bán" : "TB / tháng"} gia={gon(theoNgay ? (coNgay ? tong / coNgay : null) : (ds.length ? tong / ds.length : null))} />
+          </>}
         </HangSo>
-        <BieuDo nhan={ds.map(x => theoNgay ? ngay_ngan(x[0]) : thang_nhan(x[0]))} nhan_day_du={ds.map(x => theoNgay ? ngay(x[0]) : thang_nhan(x[0]))}
-          cao={200} mo_ta={`Doanh thu ${kx?.nhan ?? ""} so ${ss?.nhan ?? ""}`}
-          chuoi={[
-            { ten: theoNgay ? "Doanh thu ngày" : "Doanh thu tháng", kieu: ds.length <= 40 ? "cot" : "duong", gia_tri: ds.map(x => x[1]), mau: "var(--lien-ket)", so_voi: 1 },
-            // Cột → cột ma, đường → nét đứt (đặc tả 2026-09-28 §6).
-            { ten: hoa(ss?.nhan) || "Kỳ so", kieu: ds.length <= 40 ? "cot_ma" : "duong_dut", gia_tri: ds.map(x => x[4]), mau: MAU_SS },
-          ]}
-          dinh_dang={v => yen(v)} dinh_dang_truc={v => gon(v)} />
+        <BieuDo key={xem} nhan={ds.map(x => theoNgay ? ngay_ngan(x[0]) : thang_nhan(x[0]))} nhan_day_du={ds.map(x => theoNgay ? ngay(x[0]) : thang_nhan(x[0]))}
+          cao={200} mo_ta={`${xem === "so_khach" ? "Số khách" : xem === "lai_gop" ? "Lãi gộp" : "Doanh thu"} ${kx?.nhan ?? ""}${coSsVe ? ` so ${ss?.nhan ?? ""}` : ""}`}
+          chuoi={chuoi}
+          dinh_dang={v => tienTe ? yen(v) : `${so(v)} khách`} dinh_dang_truc={v => tienTe ? gon(v) : so(v)} />
       </>}
     </Khoi>
   );
@@ -392,18 +475,20 @@ export function KhoiXuHuong() {
 // ---- Sức khoẻ khách hàng ----------------------------------------------------
 const MAU_TT: Record<string, string> = { binh_thuong: LUC.ok, canh_bao: LUC.canh, da_roi_bo: LUC.do, ngung_giao_dich: LUC.nhat, chua_du_lich_su: "var(--vien-dam)" };
 
-export function KhoiSucKhoe() {
+export function KhoiSucKhoe(p: XemP) {
+  const cx = useCachXem("suc_khoe_khach", p);
   const { data: d, isLoading, error } = useKhoi<{ dem: Record<string, number>; nhom: string[]; nhan: Record<string, string> }>("suc_khoe_khach");
   const nm = useNhanMoc();
   const hd = d ? (d.dem.binh_thuong ?? 0) + (d.dem.canh_bao ?? 0) : 0;
   return (
-    <Khoi tieu_de="Sức khoẻ khách" phu={`tính ${nm}`} dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}
+    <Khoi tieu_de="Sức khoẻ khách" phu={`tính ${nm}`} cach_xem={cx} dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}
       cach_tinh="Cần gọi lại = im lặng quá nhịp mua riêng của CHÍNH từng khách (không phải một ngưỡng chung). Bấm một khúc để mở danh sách khách đó.">
-      {d && <>
-        <SoLon gia={so(hd)} nhan="khách đang mua" />
-        <ThanhChong dinh_dang={so} don_vi="Khách"
-          khuc={d.nhom.map(n => ({ khoa: n, nhan: d.nhan[n], dem: d.dem[n] ?? 0, mau: MAU_TT[n], href: `/khach-hang?loc=${n}&tat_ca=1` }))} />
-      </>}
+      {d && (() => {
+        const khuc: Khuc[] = d.nhom.map(n => ({ khoa: n, nhan: d.nhan[n], dem: d.dem[n] ?? 0, mau: MAU_TT[n], href: `/khach-hang?loc=${n}&tat_ca=1` }));
+        return cx.chon === "vong"
+          ? <Vong dinh_dang={so} don_vi="Khách" khuc={khuc} giua={so(hd)} nhan_giua="đang mua" />
+          : <><SoLon gia={so(hd)} nhan="khách đang mua" /><ThanhChong dinh_dang={so} don_vi="Khách" khuc={khuc} /></>;
+      })()}
     </Khoi>
   );
 }
@@ -415,20 +500,31 @@ type KhachDS = { ma: string; ten: string; sale: string | null; ten_sale: string 
 const VIEC_TT: Record<string, string> = { da_roi_bo: "Gọi lại ngay", canh_bao: "Gọi lại trong tuần" };
 const SO_KHACH_GON = 15;
 
-export function KhoiDanhSachKhach() {
+export function KhoiDanhSachKhach(p: XemP) {
+  const cx = useCachXem("danh_sach_khach", p);
   const { data: d, isLoading, error } = useKhoi<{ khach: KhachDS[]; nhan: Record<string, string>; khoang: KhoangMayChu | null;
     so_sanh: { ma: string; nhan: string; co: boolean; tu: string; den: string } | null }>("danh_sach_khach");
   const nm = useNhanMoc();
   const ss = d?.so_sanh;
-  const ds = [...(d?.khach ?? [])].sort((a, b) => b.thang_nay - a.thang_nay).slice(0, SO_KHACH_GON);
+  const imLang = cx.chon === "im_lang";
+  const tatCa = d?.khach ?? [];
+  const ds = imLang
+    ? tatCa.filter(k => k.ty_le_im_lang != null).sort((a, b) => (b.ty_le_im_lang ?? 0) - (a.ty_le_im_lang ?? 0)).slice(0, SO_KHACH_GON)
+    : [...tatCa].sort((a, b) => b.thang_nay - a.thang_nay).slice(0, SO_KHACH_GON);
+  const coSs = !imLang && !!ss?.co;
+  const heSo = (v: number) => `${v.toFixed(1).replace(".", ",")}×`;
   return (
-    <Khoi tieu_de="Khách lớn nhất" phu={d ? <>{d.khoang?.nhan}{ss?.co ? <> · so {ss.nhan}</> : null}</> : undefined}
-      dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}
-      cach_tinh={`${SO_KHACH_GON} khách doanh thu cao nhất trong khoảng xem. Màu thanh: đỏ = gọi lại ngay, cam = gọi lại trong tuần, xanh = bình thường. Im lặng = số ngày chưa mua ÷ nhịp mua riêng của khách, tính ${nm}.${ss?.co ? ` Vạch đứt = ${ss.nhan}.` : ""}`}
-      canh_bao={ss && !ss.co ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : undefined}>
-      {d && <ThanhNgang nhan_ss={ss?.co ? hoa(ss.nhan) : undefined} dong={ds.map((k): DongThanh => ({
-        khoa: k.ma, ten: k.ten, ten_jp: true, gia_tri: k.thang_nay, ss: ss?.co ? k.thang_truoc : null, chu: gon(k.thang_nay),
-        phu: <TdSs nay={k.thang_nay} ss={k.thang_truoc} nhan={ss?.nhan ?? ""} />,
+    <Khoi tieu_de={imLang ? "Khách lớn đang im lặng" : "Khách lớn nhất"} phu={d ? <>{d.khoang?.nhan}{coSs ? <> · so {ss!.nhan}</> : null}</> : undefined}
+      dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }} cach_xem={cx}
+      cach_tinh={imLang
+        ? `Trong ${so(tatCa.length)} khách doanh thu cao nhất của khoảng xem: ${SO_KHACH_GON} khách im lặng lâu nhất so với nhịp mua riêng (số ngày chưa mua ÷ nhịp, tính ${nm}). Màu thanh: đỏ = gọi lại ngay, cam = gọi lại trong tuần, xanh = bình thường.`
+        : `${SO_KHACH_GON} khách doanh thu cao nhất trong khoảng xem. Màu thanh: đỏ = gọi lại ngay, cam = gọi lại trong tuần, xanh = bình thường. Im lặng = số ngày chưa mua ÷ nhịp mua riêng của khách, tính ${nm}.${ss?.co ? ` Vạch đứt = ${ss.nhan}.` : ""}`}
+      canh_bao={!imLang && ss && !ss.co ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : undefined}>
+      {d && <ThanhNgang nhan_ss={coSs ? hoa(ss!.nhan) : undefined} dong={ds.map((k): DongThanh => ({
+        khoa: k.ma, ten: k.ten, ten_jp: true,
+        gia_tri: imLang ? (k.ty_le_im_lang ?? 0) : k.thang_nay, ss: coSs ? k.thang_truoc : null,
+        chu: imLang ? heSo(k.ty_le_im_lang ?? 0) : gon(k.thang_nay),
+        phu: imLang ? undefined : <TdSs nay={k.thang_nay} ss={k.thang_truoc} nhan={ss?.nhan ?? ""} />,
         mau: MAU_TT[k.trang_thai] ?? LUC.nhat, href: `/khach-hang/${k.ma}`,
         chi_tiet: <>
           <DongNoi nhan={d.khoang?.nhan ?? "Khoảng xem"} gia={yen(k.thang_nay)} />
@@ -458,20 +554,31 @@ export function KhoiHanSuDung() {
 // ---- Hiệu suất theo ngành hàng ----------------------------------------------
 type Nganh = { nganh: string; doanh_thu: number; lai_gop: number; ty_trong: number | null; ty_suat: number | null; cung_ky: number | null; co_cung_ky: boolean; tang_truong: number | null };
 
-export function KhoiNganh() {
+export function KhoiNganh(p: XemP) {
   const { data: d, isLoading, error } = useKhoi<{ thang: string | null; nganh: Nganh[]; khoang: KhoangMayChu | null }>("hieu_suat_nganh");
+  const cx = useCachXem("hieu_suat_nganh", p);
   const ss = d?.khoang?.so_sanh[0];
+  const xem = cx.chon;
+  const coSs = xem === "doanh_thu" && !!ss?.co;
+  const nganh = xem === "bien" ? [...(d?.nganh ?? [])].sort((a, b) => (b.ty_suat ?? -1) - (a.ty_suat ?? -1)) : d?.nganh ?? [];
+  const maxBien = Math.max(0.01, ...nganh.map(n => n.ty_suat ?? 0));
+  const tang = (n: Nganh) => <span className={(n.tang_truong ?? 0) >= 0 ? "tang" : "giam"}>{n.tang_truong != null ? thay_doi(n.tang_truong) : n.co_cung_ky ? "—" : "chưa có"}</span>;
   return (
-    <Khoi tieu_de="Ngành hàng" phu={d?.thang ? <>{d.thang}{ss?.co ? <> · so {ss.nhan}</> : null}</> : undefined}
-      dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/bao-cao" }}
-      cach_tinh="Thanh = tỷ trọng doanh thu của ngành; số bên phải = tăng / giảm so kỳ so. Biên gộp = tổng lãi gộp ÷ tổng doanh thu thuần."
-      canh_bao={ss && !ss.co ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : undefined}>
-      {d && <ThanhNgang dong={d.nganh.map((n): DongThanh => ({
-        khoa: n.nganh, ten: n.nganh, gia_tri: n.ty_trong ?? 0, chu: pc(n.ty_trong),
-        phu: <span className={(n.tang_truong ?? 0) >= 0 ? "tang" : "giam"}>{n.tang_truong != null ? thay_doi(n.tang_truong) : n.co_cung_ky ? "—" : "chưa có"}</span>,
-        mau: "var(--lien-ket)",
+    <Khoi tieu_de="Ngành hàng" phu={d?.thang ? <>{d.thang}{ss?.co && xem !== "bien" ? <> · so {ss.nhan}</> : null}</> : undefined}
+      dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/bao-cao" }} cach_xem={cx}
+      cach_tinh={xem === "doanh_thu" ? `Thanh = doanh thu của ngành; số bên phải = tăng / giảm so kỳ so.${coSs ? ` Vạch đứt = ${ss!.nhan}.` : ""}`
+        : xem === "bien" ? "Thanh = biên gộp của ngành = tổng lãi gộp ÷ tổng doanh thu thuần, xếp giảm dần."
+        : "Thanh = tỷ trọng doanh thu của ngành; số bên phải = tăng / giảm so kỳ so. Biên gộp = tổng lãi gộp ÷ tổng doanh thu thuần."}
+      canh_bao={ss && !ss.co && xem !== "bien" ? `${hoa(ss.nhan)}: không có dữ liệu để so.` : undefined}>
+      {d && <ThanhNgang thang={xem === "bien" ? maxBien : undefined} nhan_ss={coSs ? hoa(ss!.nhan) : undefined} dong={nganh.map((n): DongThanh => ({
+        khoa: n.nganh, ten: n.nganh,
+        gia_tri: xem === "doanh_thu" ? n.doanh_thu : xem === "bien" ? (n.ty_suat ?? 0) : (n.ty_trong ?? 0),
+        ss: coSs && n.co_cung_ky ? n.cung_ky : null,
+        chu: xem === "doanh_thu" ? gon(n.doanh_thu) : xem === "bien" ? pc(n.ty_suat) : pc(n.ty_trong),
+        phu: xem === "bien" ? undefined : tang(n),
+        mau: xem === "bien" ? LUC.ok : "var(--lien-ket)",
         chi_tiet: <><DongNoi nhan="Doanh thu" gia={yen(n.doanh_thu)} /><DongNoi nhan="Lãi gộp" gia={yen(n.lai_gop)} />
-          <DongNoi nhan="Biên gộp" gia={pc(n.ty_suat)} />
+          <DongNoi nhan="Tỷ trọng" gia={pc(n.ty_trong)} /><DongNoi nhan="Biên gộp" gia={pc(n.ty_suat)} />
           <DongNoi nhan={<>so {ss?.nhan ?? "kỳ so"}</>} gia={n.tang_truong != null ? thay_doi(n.tang_truong) : "—"} /></> }))} />}
     </Khoi>
   );
@@ -519,21 +626,24 @@ export function KhoiTuongQuan() {
 }
 
 // ---- Số khách đang mua theo kỳ ----------------------------------------------
-export function KhoiTangTruong() {
+export function KhoiTangTruong(p: XemP) {
+  const cx = useCachXem("tang_truong", p);
+  const dt = cx.chon === "doanh_thu";
   const { data: d, isLoading, error } = useKhoi<{ chon: number | null; ky: { company_fy: number; nhan: string; so_thang: number; so_khach: number; doanh_thu: number }[] }>("tang_truong");
   const ky = d?.ky ?? [];
   const cuoi = ky[ky.length - 1];
   return (
-    <Khoi tieu_de="Khách đang mua" dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}
-      cach_tinh="Số khách có đơn theo từng kỳ kế toán (1/8 → 31/7)."
+    <Khoi tieu_de={dt ? "Doanh thu theo kỳ" : "Khách đang mua"} dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }}
+      cach_xem={cx} cach_tinh={dt ? "Doanh thu thuần theo từng kỳ kế toán (1/8 → 31/7)." : "Số khách có đơn theo từng kỳ kế toán (1/8 → 31/7)."}
       canh_bao={cuoi && cuoi.so_thang < 12 ? `${cuoi.nhan} mới có ${cuoi.so_thang} tháng — số khách thấp hơn, đừng so thẳng với kỳ đủ.` : undefined}>
       {d && <>
-        {cuoi && <SoLon gia={so(cuoi.so_khach)} nhan={`khách có đơn · ${cuoi.nhan}`} />}
-        <BieuDo nhan={ky.map(x => `K${x.company_fy}`)} nhan_day_du={ky.map(x => `${x.nhan} · ${x.so_thang} tháng dữ liệu`)} cao={150}
-          mo_ta="Số khách có đơn theo từng kỳ kế toán"
-          chuoi={[{ ten: "Khách có đơn", kieu: "cot", gia_tri: ky.map(x => x.so_khach), mau: "var(--lien-ket)",
+        {cuoi && (dt ? <SoLon gia={gon(cuoi.doanh_thu)} nhan={`doanh thu · ${cuoi.nhan}`} />
+          : <SoLon gia={so(cuoi.so_khach)} nhan={`khách có đơn · ${cuoi.nhan}`} />)}
+        <BieuDo key={cx.chon} nhan={ky.map(x => `K${x.company_fy}`)} nhan_day_du={ky.map(x => `${x.nhan} · ${x.so_thang} tháng dữ liệu`)} cao={150}
+          mo_ta={dt ? "Doanh thu theo từng kỳ kế toán" : "Số khách có đơn theo từng kỳ kế toán"}
+          chuoi={[{ ten: dt ? "Doanh thu" : "Khách có đơn", kieu: "cot", gia_tri: ky.map(x => dt ? x.doanh_thu : x.so_khach), mau: "var(--lien-ket)",
             mau_tung_cot: ky.map(x => x.company_fy === d.chon ? "var(--lien-ket)" : MO) }]}
-          dinh_dang={v => `${so(v)} khách`} dinh_dang_truc={v => so(v)} />
+          dinh_dang={v => dt ? yen(v) : `${so(v)} khách`} dinh_dang_truc={v => dt ? gon(v) : so(v)} />
       </>}
     </Khoi>
   );
@@ -716,17 +826,17 @@ export function KhoiNap() {
 }
 
 // ---- Bảng tra mã khối -> thành phần ------------------------------------------
-export const VE: Record<string, () => React.ReactElement> = {
-  kpi: () => <KhoiKpi />, ns_thang: () => <KhoiNganSach />, theo_thang: () => <KhoiTheoThang />,
-  viec_hom_nay: () => <KhoiViec />, xu_huong: () => <KhoiXuHuong />, suc_khoe_khach: () => <KhoiSucKhoe />,
-  danh_sach_khach: () => <KhoiDanhSachKhach />, han_su_dung: () => <KhoiHanSuDung />, hieu_suat_nganh: () => <KhoiNganh />,
-  so_sanh_sale: () => <KhoiSale />, tuong_quan: () => <KhoiTuongQuan />, tang_truong: () => <KhoiTangTruong />,
+export const VE: Record<string, (p: XemP) => React.ReactElement> = {
+  kpi: () => <KhoiKpi />, ns_thang: p => <KhoiNganSach {...p} />, theo_thang: p => <KhoiTheoThang {...p} />,
+  viec_hom_nay: () => <KhoiViec />, xu_huong: p => <KhoiXuHuong {...p} />, suc_khoe_khach: p => <KhoiSucKhoe {...p} />,
+  danh_sach_khach: p => <KhoiDanhSachKhach {...p} />, han_su_dung: () => <KhoiHanSuDung />, hieu_suat_nganh: p => <KhoiNganh {...p} />,
+  so_sanh_sale: p => <KhoiSale {...p} />, tuong_quan: () => <KhoiTuongQuan />, tang_truong: p => <KhoiTangTruong {...p} />,
   bien_loi_nhuan: () => <KhoiBien />, don_hang: () => <KhoiNap />,
-  thang_nay_chua_mua: () => <KhoiThangNay />, cong_no: () => <KhoiCongNo />, khach_moi: () => <KhoiKhachMoi />,
+  thang_nay_chua_mua: () => <KhoiThangNay />, cong_no: p => <KhoiCongNo {...p} />, khach_moi: () => <KhoiKhachMoi />,
 };
 
-export function veKhoi(id: string, nhan: string) {
+export function veKhoi(id: string, nhan: string, xem: string | null = null, datXem: (ma: string | null) => void = () => {}) {
   const f = VE[id];
-  if (f) return f();
+  if (f) return f({ xem, datXem });
   return <ChuaCoDuLieu gon tieu_de={nhan} ly_do={KD.chua_co[id] ?? "Chưa có nguồn dữ liệu cho khối này."} />;
 }

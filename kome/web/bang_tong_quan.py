@@ -16,7 +16,7 @@ Mỗi bảng là một bố cục (kome/web/bo_cuc.py) + một tên, RIÊNG củ
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import psycopg
 
@@ -111,8 +111,9 @@ def _xuat_phat(conn, nguoi_id: int, tu) -> list | None:
         vai = {a: set(c) for a, _, c in BC.VAI_TRO}.get(tu[4:])
         if vai is None:
             raise LoiBang(422, "Không có vai trò này.")
-        # ĐÚNG phép "Xem theo vai trò" cũ (apVai): bố cục mặc định, ẩn khối ngoài vai.
-        return [BC.O(o.id, o.rong, o.cao, o.id not in vai) for o in BC.mac_dinh()]
+        # ĐÚNG phép "Xem theo vai trò" cũ (apVai): bố cục mặc định, ẩn khối ngoài vai —
+        # rồi nén lại để khối ẩn không để lỗ (lưới toạ độ 2026-09-29).
+        return BC.nen([replace(o, an=o.id not in vai) for o in BC.mac_dinh()])
     if isinstance(tu, str) and tu.startswith("chep:") and tu[5:].isdigit():
         return list(_doc(conn, nguoi_id, int(tu[5:])).bo_cuc)
     raise LoiBang(422, "Không rõ bảng mới bắt đầu từ đâu.")

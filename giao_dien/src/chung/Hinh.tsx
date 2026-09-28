@@ -32,29 +32,65 @@ export function ThanhNgang({ dong, nhan_ss, thang }: { dong: DongThanh[]; nhan_s
 export type Khuc = { khoa: string; nhan: string; dem: number; mau: string; href?: string; onBam?: () => void;
   chi_tiet?: ReactNode; chon?: boolean };
 
+function noiKhuc(k: Khuc, pt: number, dinh_dang: (v: number) => string, don_vi: string) {
+  return <>
+    <strong>{k.nhan}</strong>
+    <DongNoi mau={k.mau} nhan={don_vi || "Số"} gia={dinh_dang(k.dem)} />
+    <DongNoi nhan="Tỷ lệ" gia={`${pt.toFixed(1).replace(".", ",")}%`} />
+    {k.chi_tiet}
+  </>;
+}
+
+/** Chú giải chấm màu của các khúc — chung cho thanh chồng và vòng. */
+function ChuGiaiKhuc({ khuc, pt, dinh_dang, don_vi }: { khuc: Khuc[]; pt: number[]; dinh_dang: (v: number) => string; don_vi: string }) {
+  return (
+    <div className="tc-chu-giai">
+      {khuc.map((k, i) => (
+        <ONoi key={k.khoa} href={k.href} onBam={k.onBam} className={"tc-muc" + (k.chon ? " chon" : "")} noi_dung={noiKhuc(k, pt[i], dinh_dang, don_vi)}>
+          <i style={{ background: k.mau }} />{k.nhan}<b>{dinh_dang(k.dem)}</b>
+        </ONoi>))}
+    </div>);
+}
+
 /** Một thanh chia khúc + chú giải chấm màu. Khúc ≤ 0 không vẽ nhưng vẫn có trong chú giải. */
 export function ThanhChong({ khuc, dinh_dang, don_vi = "" }: { khuc: Khuc[]; dinh_dang: (v: number) => string; don_vi?: string }) {
   const pt = chiaKhuc(khuc.map(k => k.dem));
-  const noi = (k: Khuc, i: number) => <>
-    <strong>{k.nhan}</strong>
-    <DongNoi mau={k.mau} nhan={don_vi || "Số"} gia={dinh_dang(k.dem)} />
-    <DongNoi nhan="Tỷ lệ" gia={`${pt[i].toFixed(1).replace(".", ",")}%`} />
-    {k.chi_tiet}
-  </>;
   return (
     <div className="tc">
       <div className="tc-thanh">
         {khuc.map((k, i) => pt[i] > 0 && (
           <ONoi key={k.khoa} href={k.href} onBam={k.onBam} nhan={`${k.nhan}: ${dinh_dang(k.dem)}`}
             className={"tc-khuc" + (k.chon ? " chon" : "")} style={{ width: `${pt[i]}%`, background: k.mau }}
-            noi_dung={noi(k, i)}><span /></ONoi>))}
+            noi_dung={noiKhuc(k, pt[i], dinh_dang, don_vi)}><span /></ONoi>))}
       </div>
-      <div className="tc-chu-giai">
-        {khuc.map((k, i) => (
-          <ONoi key={k.khoa} href={k.href} onBam={k.onBam} className={"tc-muc" + (k.chon ? " chon" : "")} noi_dung={noi(k, i)}>
-            <i style={{ background: k.mau }} />{k.nhan}<b>{dinh_dang(k.dem)}</b>
-          </ONoi>))}
-      </div>
+      <ChuGiaiKhuc khuc={khuc} pt={pt} dinh_dang={dinh_dang} don_vi={don_vi} />
+    </div>
+  );
+}
+
+/** Cùng dữ liệu với ThanhChong, vẽ thành VÒNG (một cách xem khác, 2026-09-29). Cung là hình;
+ *  tương tác (ô nổi, bấm để lọc / mở) nằm ở chú giải bên cạnh — một cung SVG không làm ô nổi được. */
+export function Vong({ khuc, dinh_dang, don_vi = "", giua, nhan_giua }: {
+  khuc: Khuc[]; dinh_dang: (v: number) => string; don_vi?: string; giua?: ReactNode; nhan_giua?: string }) {
+  const pt = chiaKhuc(khuc.map(k => k.dem));
+  const C = 2 * Math.PI * 38;
+  let da = 0;
+  return (
+    <div className="vong">
+      <svg viewBox="0 0 100 100" className="vong-hinh" role="img"
+        aria-label={khuc.map(k => `${k.nhan} ${dinh_dang(k.dem)}`).join(", ")}>
+        <circle cx={50} cy={50} r={38} fill="none" stroke="var(--nen-phu)" strokeWidth={13} />
+        {khuc.map((k, i) => {
+          if (pt[i] <= 0) return null;
+          const dai = pt[i] / 100 * C, lech = da;
+          da += dai;
+          return <circle key={k.khoa} cx={50} cy={50} r={38} fill="none" stroke={k.mau} strokeWidth={13}
+            strokeDasharray={`${Math.max(dai - .6, .1)} ${C}`} strokeDashoffset={-lech} transform="rotate(-90 50 50)" />;
+        })}
+        {giua != null && <text x={50} y={nhan_giua ? 50 : 55} textAnchor="middle" className="vong-so">{giua}</text>}
+        {nhan_giua && <text x={50} y={63} textAnchor="middle" className="vong-nhan">{nhan_giua}</text>}
+      </svg>
+      <ChuGiaiKhuc khuc={khuc} pt={pt} dinh_dang={dinh_dang} don_vi={don_vi} />
     </div>
   );
 }
