@@ -1,11 +1,28 @@
 """Mùa vụ sản phẩm (/mua-vu, migration 058) — đặc tả 2026-09-29-mua-vu-san-pham-design.md."""
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 
 from tests.test_khach_hang import _ho_so_khach, _mua, _neo, HOM_NAY
 
 KHACH = "202607010001"
+
+_SRC = Path(__file__).resolve().parents[1] / "giao_dien" / "src"
+
+
+def test_muc_thanh_ben_va_route_co_mat():
+    """Trang chạy được mà không có trong thanh điều hướng thì không ai vào được."""
+    muc = (_SRC / "khung" / "muc.ts").read_text(encoding="utf-8")
+    assert 'url: "/mua-vu"' in muc and "muavu" in muc
+    assert '"/mua-vu"' in (_SRC / "main.tsx").read_text(encoding="utf-8")
+
+
+def test_man_khong_tu_viet_lai_chi_so_va_dung_giu_khoang():
+    src = (_SRC / "mua_vu" / "ManMuaVu.tsx").read_text(encoding="utf-8")
+    assert "giuKhoang(" in src                       # replaceState qua giuKhoang
+    assert "toFixed(" not in src and "de-DE" not in src   # định dạng qua dinh_dang.ts
+    assert "/api/mua-vu" in src
 
 
 def _hang(conn, batch):

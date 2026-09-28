@@ -14,9 +14,13 @@ const nghe = new Set<() => void>();
 const datMo = (id: string | null) => { dangMo = id; nghe.forEach(f => f()); };
 const theoDoi = (f: () => void) => { nghe.add(f); return () => { nghe.delete(f); }; };
 
-export function ONoi({ noi_dung, href, onBam, children, className, style, nhan }: {
+export function ONoi({ noi_dung, href, onBam, children, className, style, nhan, svg }: {
   noi_dung: ReactNode; href?: string; onBam?: () => void; children: ReactNode;
   className?: string; style?: CSSProperties; nhan?: string;
+  // true khi bọc quanh phần tử SVG (<g>, <rect>…): một `<span>` không href
+  // là phần tử SVG LẠ, trình duyệt coi cả cây con "không vẽ" — ép dùng `<a>`
+  // (hợp lệ trong SVG dù không có href) để con vẫn hiện ra bình thường.
+  svg?: boolean;
 }) {
   const id = useId();
   const mo = useSyncExternalStore(theoDoi, () => dangMo === id);
@@ -79,7 +83,7 @@ export function ONoi({ noi_dung, href, onBam, children, className, style, nhan }
 
   return (
     <>
-      {href ? <a href={href} {...p}>{children}</a> : <span {...p}>{children}</span>}
+      {href || svg ? <a href={href} {...p}>{children}</a> : <span {...p}>{children}</span>}
       {mo && createPortal(
         <div ref={noi} id={id} role="tooltip" className="bd-noi o-noi"
           style={vt ? { left: vt.left, top: vt.top } : { left: -9999, top: 0 }}>{noi_dung}</div>,

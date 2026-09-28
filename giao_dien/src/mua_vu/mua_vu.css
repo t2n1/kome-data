@@ -1,0 +1,52 @@
+/* Màn Mùa vụ sản phẩm (/mua-vu). Màu ngành: 12 sắc độ cố định, độ bão hoà vừa phải để
+   đọc được cả nền sáng lẫn tối (fill-opacity thay vì hai bảng màu). Dùng lại lớp `.chip`
+   chung (chung/chung.css: viền + `aria-pressed="true"` tô đậm) thay vì một lớp "bat" riêng. */
+.mv{display:flex;flex-direction:column;gap:12px}
+.mv-chon{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.mv-nhom{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.mv-tim{position:relative;display:flex;gap:6px;align-items:center}
+.mv-tim input{min-width:220px;font:inherit;font-size:.8rem;padding:.3rem .6rem;border-radius:8px;
+  border:1px solid var(--vien);background:var(--nen-the);color:var(--chu)}
+.mv-goi-y{position:absolute;top:100%;left:0;z-index:5;list-style:none;margin:2px 0 0;padding:4px;
+  background:var(--nen-the);border:1px solid var(--vien);border-radius:6px;min-width:260px}
+.mv-goi-y button{all:unset;display:block;padding:4px 6px;cursor:pointer;width:100%;font-size:.8rem}
+.mv-goi-y button:hover,.mv-goi-y button:focus-visible{background:var(--nen-phu)}
+.mv-nganh{flex-wrap:wrap}
+.mv-chip-n{display:inline-flex;align-items:center;gap:.3rem}
+.mv-chip-n i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.mv-chip-n:not([aria-pressed="true"]){opacity:.5}
+.mv-cay{width:100%;min-height:460px}
+.mv-o-nganh{stroke:var(--nen-the);stroke-width:2;fill-opacity:.35;transition:x .2s,y .2s,width .2s,height .2s}
+.mv-o-ma rect{fill:currentColor;fill-opacity:0;stroke:var(--nen-the);stroke-width:1;
+  transition:x .2s,y .2s,width .2s,height .2s}
+.mv-o-ma:hover rect{fill-opacity:.18}
+.mv-o-ma.danh-dau rect{stroke:var(--chu);stroke-width:3}
+.mv-chu-nganh{font-size:12px;font-weight:600;fill:var(--chu)}
+.mv-chu-ma{font-size:11px;fill:var(--chu);pointer-events:none}
+@media (prefers-reduced-motion: reduce){.mv-o-ma rect,.mv-o-nganh{transition:none}}
+.mv-khong-ve{margin:6px 0 0;color:var(--chu-mo);font-size:12px}
+.mv-thanh{display:flex;gap:8px;align-items:center}
+.mv-nut{display:flex;gap:4px}
+.mv-nut button{font:inherit;padding:.2rem .5rem;border-radius:6px;border:1px solid var(--vien);
+  background:var(--nen-the);color:var(--chu);cursor:pointer}
+.mv-truot{position:relative;flex:1;height:56px}
+.mv-truot svg{position:absolute;inset:0}
+.mv-truot input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.mv-truot:focus-within{outline:2px solid var(--lien-ket);outline-offset:2px;border-radius:4px}
+.mv-cua-so{fill:var(--lien-ket);fill-opacity:.18;stroke:var(--lien-ket)}
+.mv-duong-ngay{stroke:var(--chu-mo);stroke-width:1}
+.mv-vach{stroke:var(--vien-dam)}
+.mv-nhan-thang{font-size:10px;fill:var(--chu-mo)}
+.mv-mua-xuan{fill:hsl(140 40% 55% / .10)} .mv-mua-he{fill:hsl(45 70% 55% / .12)}
+.mv-mua-thu{fill:hsl(20 60% 55% / .10)}  .mv-mua-dong{fill:hsl(210 50% 60% / .10)}
+.mv-n0{fill:hsl(210 55% 50%);background:hsl(210 55% 50%)} .mv-n1{fill:hsl(28 75% 52%);background:hsl(28 75% 52%)}
+.mv-n2{fill:hsl(145 45% 42%);background:hsl(145 45% 42%)} .mv-n3{fill:hsl(355 60% 55%);background:hsl(355 60% 55%)}
+.mv-n4{fill:hsl(265 40% 58%);background:hsl(265 40% 58%)} .mv-n5{fill:hsl(20 35% 45%);background:hsl(20 35% 45%)}
+.mv-n6{fill:hsl(320 45% 60%);background:hsl(320 45% 60%)} .mv-n7{fill:hsl(0 0% 55%);background:hsl(0 0% 55%)}
+.mv-n8{fill:hsl(60 55% 42%);background:hsl(60 55% 42%)}   .mv-n9{fill:hsl(185 55% 42%);background:hsl(185 55% 42%)}
+.mv-n10{fill:hsl(240 35% 62%);background:hsl(240 35% 62%)} .mv-n11{fill:hsl(95 35% 50%);background:hsl(95 35% 50%)}
+.mv-o-ma{color:var(--chu)}
+@media (max-width: 480px){
+  .mv-tim input{min-width:0;width:100%}
+  .mv-truot{height:44px}
+}

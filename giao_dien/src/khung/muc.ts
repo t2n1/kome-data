@@ -4,6 +4,8 @@
 // bị cắt khỏi phạm vi (lộ trình §4.2: web đặt hàng khách, mẫu chứng từ, thị
 // trường & đối thủ, sale mobile) KHÔNG hiện. Từ 2026-09-28 mục `url: null` cũng
 // KHÔNG hiện khi công tắc kome/man_chua_co.py::HIEN tắt (mặc định).
+// "muavu" (Mùa vụ sản phẩm, 2026-09-29) dùng icon "chart" — TA CHỌN trong bộ 24 icon;
+// gói thiết kế không có màn này.
 import { KD, TN } from "../khoi_dau";
 
 export type Muc = { ma: string; nhan: string; url: string | null; icon: string; ly_do?: string };
@@ -41,6 +43,7 @@ export function nhomDieuHuong(): Nhom[] {
       { ma: "kho", nhan: "Kho hàng", url: "/kho-hang", icon: "box" },
       { ma: "muahang", nhan: "Mua hàng & NCC", url: null, icon: "refill", ly_do: CHUA },
       { ma: "sanpham", nhan: "Sản phẩm", url: "/san-pham", icon: "cube" },
+      { ma: "muavu", nhan: "Mùa vụ sản phẩm", url: "/mua-vu", icon: "chart" },
     ] },
     { ma: "hethong", ten: "HỆ THỐNG", muc: [
       ...(KD.hien_kho ? [{ ma: "khodl", nhan: "Kho dữ liệu", url: "/kho-du-lieu", icon: "db" }] : []),
