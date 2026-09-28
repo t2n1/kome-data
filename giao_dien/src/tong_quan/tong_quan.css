@@ -74,8 +74,6 @@
 .sale-ds{display:flex;flex-direction:column;gap:.5rem}
 .thanh-mong{display:inline-block;height:8px;border-radius:99px;background:var(--vien-phu);overflow:hidden;width:100%;vertical-align:middle}
 .thanh-mong > *{display:block;height:100%;border-radius:99px;background:var(--lien-ket)}
-.ty-trong{display:flex;align-items:center;gap:.4rem;font-variant-numeric:tabular-nums;font-size:.75rem}
-.ty-trong .thanh-mong{width:54px;flex-shrink:0;height:6px}
 
 /* Kết quả theo tháng */
 .o-vien > div{border-left:3px solid var(--vien-phu);padding-left:.6rem}
@@ -86,10 +84,6 @@ table.bang tr.dang-chay td{background:var(--nen)}
 .xh-so{display:flex;flex-wrap:wrap;gap:1.1rem;margin-bottom:.5rem}
 .xh-so .nhan{font-size:.68rem;color:var(--chu-nhat);letter-spacing:.04em}
 .xh-so .gia{font-size:.95rem;font-weight:700;font-variant-numeric:tabular-nums}
-
-/* Sức khoẻ khách hàng */
-.sk-dau{font-size:1.35rem;font-weight:700;letter-spacing:-.015em}
-.sk-dau span{font-size:.76rem;color:var(--chu-nhat);font-weight:400}
 
 /* Việc hôm nay */
 .viec-ds{display:flex;flex-direction:column;margin-top:.55rem}
@@ -128,3 +122,22 @@ table.bang tr.dang-chay td{background:var(--nen)}
 .ns-chon{display:flex;gap:.3rem;margin-bottom:.4rem}
 .ns-chon button{font:inherit;font-size:.72rem;padding:.15rem .6rem;border:1px solid var(--vien);border-radius:999px;background:transparent;color:var(--chu-nhat);cursor:pointer}
 .ns-chon button.dang-chon{background:var(--nen-phu);color:var(--chu);border-color:var(--vien-dam)}
+
+/* Dải thời gian lô sắp hết hạn */
+.dh-ray{position:relative;height:110px;border-radius:8px;overflow:hidden;background:var(--nen-phu)}
+.dh-vung{position:absolute;top:0;bottom:0}
+.dh-qua{background:color-mix(in srgb, var(--do) 16%, transparent)}
+.dh-30{background:color-mix(in srgb, var(--do) 8%, transparent)}
+.dh-60{background:color-mix(in srgb, var(--lien-ket) 8%, transparent)}
+.dh-cham{position:absolute;transform:translate(-50%,0);border-radius:50%;opacity:.8;border:1px solid var(--nen-the)}
+.dh-cham:hover,.dh-cham:focus-visible{opacity:1}
+.dh-truc{position:relative;height:1.1rem;font-size:.66rem;color:var(--chu-mo)}
+.dh-truc span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+
+/* Nạp dữ liệu / phiếu gần nhất */
+.nap-ds{display:grid;gap:.15rem}
+.nap-dong{display:grid;grid-template-columns:1fr auto auto;gap:.6rem;align-items:baseline;font-size:.76rem;padding:.15rem .2rem;
+  border-radius:6px;color:inherit;text-decoration:none}
+.nap-dong > :first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nap-dong b{font-variant-numeric:tabular-nums;font-weight:500}
+a.nap-dong:hover{background:var(--nen-phu)}
