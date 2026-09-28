@@ -86,7 +86,7 @@ export function Luoi({ bo_cuc, datBoCuc, sua_duoc, ve, nhan }: {
             className={"o-luoi" + (keo === o.id ? " dang-keo" : "") + (dich?.id === o.id ? (dich.truoc ? " dich-truoc" : " dich-sau") : "")}
             style={{ gridColumn: `span ${o.rong}`, gridRow: `span ${o.cao}` }}
             draggable={sua_duoc}
-            onPointerDown={e => { const t = e.target as HTMLElement; tuDau.current = !!t.closest("[data-keo]") && !t.closest("a,button,input"); }}
+            onPointerDown={e => { const t = e.target as HTMLElement; tuDau.current = !!t.closest("[data-keo]") && !t.closest("a,button,input,.o-noi-goc"); }}
             onDragStart={e => {
               if (!tuDau.current) { e.preventDefault(); return; }
               dangKeo.current = o.id; datKeo(o.id);

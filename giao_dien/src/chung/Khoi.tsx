@@ -1,8 +1,12 @@
 // Nội dung chung của một khối: tiêu đề + nhãn + liên kết "Mở →" + thân.
 // Vỏ ngoài (kéo thả, đổi cỡ, nút ✕) do lưới Tổng quan lo (tong_quan/Luoi.tsx).
+// Luật chữ (đặc tả 2026-09-28-tong-quan-it-chu-design.md §4): câu ĐỊNH NGHĨA cách tính vào
+// `cach_tinh` (ⓘ cạnh tiêu đề), câu NGOẠI LỆ đang xảy ra vào `canh_bao` (luôn hiện).
+// `phu` chỉ còn cho nhãn kỳ so / nhãn mốc ngắn.
 import type { ReactNode } from "react";
+import { ONoi } from "./ONoi";
 
-export function Khoi({ tieu_de, phu, nhan, mau_nhan = "do", lien_ket, children, dang_tai, loi }: {
+export function Khoi({ tieu_de, phu, nhan, mau_nhan = "do", lien_ket, children, dang_tai, loi, cach_tinh, canh_bao }: {
   tieu_de: string;
   phu?: ReactNode;
   nhan?: ReactNode;
@@ -11,24 +15,30 @@ export function Khoi({ tieu_de, phu, nhan, mau_nhan = "do", lien_ket, children, 
   children?: ReactNode;
   dang_tai?: boolean;
   loi?: string | null;
+  cach_tinh?: ReactNode;
+  canh_bao?: ReactNode;
 }) {
   return (
     <>
       <div className="khoi-dau" data-keo="1">
         <h2>{tieu_de}</h2>
+        {cach_tinh != null && <ONoi noi_dung={<div className="o-noi-chu">{cach_tinh}</div>} nhan="Cách tính" className="khoi-i">ⓘ</ONoi>}
         {nhan != null && <span className={"nhan-vien " + mau_nhan}>{nhan}</span>}
         {phu != null && <span className="khoi-phu">{phu}</span>}
         {lien_ket && <a className="khoi-mo" href={lien_ket.href}>{lien_ket.chu ?? "Mở"} →</a>}
       </div>
       {loi ? <div className="khoi-loi">Không tải được khối này: {loi}</div>
         : dang_tai ? <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div>
-        : children}
+        : <>{children}{canh_bao != null && canh_bao !== false && <div className="khoi-canh" role="note">{canh_bao}</div>}</>}
     </>
   );
 }
 
-/** Khối của gói thiết kế chưa có nguồn dữ liệu thật: giữ khung, nói rõ thiếu gì. */
-export function ChuaCoDuLieu({ tieu_de, ly_do }: { tieu_de: string; ly_do: string }) {
+/** Khối của gói thiết kế chưa có nguồn dữ liệu thật: giữ khung, nói rõ thiếu gì.
+ *  `gon` (Tổng quan): chỉ tiêu đề + nhãn "chưa có", lý do trong ⓘ. */
+export function ChuaCoDuLieu({ tieu_de, ly_do, gon = false }: { tieu_de: string; ly_do: string; gon?: boolean }) {
+  if (gon) return <Khoi tieu_de={tieu_de} nhan="chưa có dữ liệu" mau_nhan="nhat"
+    cach_tinh={<>{ly_do}<br />Không hiện số mẫu: khối này sẽ tự có số khi nguồn được nạp.</>} />;
   return (
     <Khoi tieu_de={tieu_de} nhan="chưa có dữ liệu" mau_nhan="nhat">
       <div className="chua-co">

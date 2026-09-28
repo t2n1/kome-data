@@ -119,3 +119,16 @@ button.lien-ket{font:inherit;background:none;border:0;padding:0;color:var(--lien
 .kh-the-goc{margin-left:auto;font-size:.75rem;font-weight:600}
 .kh-the .phu,.kh-the-phu{font-size:.73rem;margin:.2rem 0 .6rem;line-height:1.45}
 .kh-chua-co .khoi-dau{cursor:auto;padding-right:0}
+
+
+/* Ô nổi chung (chung/ONoi.tsx) — dùng lại kiểu .bd-noi, nhưng fixed + portal */
+.o-noi{position:fixed;transform:none;max-width:min(320px,calc(100vw - 16px));z-index:60}
+.o-noi div{white-space:normal}
+.o-noi-chu{display:block;line-height:1.45;color:var(--chu-thuong);font-size:.74rem}
+.o-noi-goc{cursor:default}
+a.o-noi-goc,.o-noi-goc[role="button"]{cursor:pointer}
+.o-noi-goc:focus-visible{outline:2px solid var(--do);outline-offset:2px;border-radius:6px}
+.khoi-i{display:inline-flex;align-items:center;justify-content:center;width:1.15rem;height:1.15rem;border-radius:50%;
+  font-size:.78rem;color:var(--chu-mo);cursor:help;user-select:none}
+.khoi-i:hover{color:var(--chu)}
+.khoi-canh{margin-top:.45rem;font-size:.72rem;color:var(--canh-chu);line-height:1.4}
