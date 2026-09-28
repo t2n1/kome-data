@@ -85,13 +85,21 @@ export default function ManMuaVu() {
   if (!L.so_ngay) return <Khoi tieu_de="Mùa vụ sản phẩm" canh_bao="Kho chưa có dòng bán nào." />;
 
   const kv = cay?.khong_ve;
+  // Mảng đoạn thay vì nối chuỗi trực tiếp — tránh dấu " · " lửng lơ ở cuối khi
+  // đoạn cuối cùng có giá trị nhưng các đoạn sau nó (rỗng) từng để lại dấu chấm mồ côi.
+  const khongVe = kv ? [
+    kv.phi ? `phí & điều chỉnh ${inSo(cs, kv.phi)}` : null,
+    kv.tang ? `hàng tặng ${inSo(cs, kv.tang)}` : null,
+    kv.am ? `${kv.so_am} mã ≤ 0 trong cửa sổ ${inSo(cs, kv.am)}` : null,
+    kv.tat ? `ngành đang tắt ${inSo(cs, kv.tat)}` : null,
+  ].filter((x): x is string => x !== null) : [];
   const timMa = tim.trim().toLowerCase();
   const goiY = timMa ? dl.ma.map((m, k) => ({ m, k })).filter(({ m, k }) => nganhCua[k] >= 0
     && (m.ma.toLowerCase().includes(timMa) || m.ten.toLowerCase().includes(timMa))).slice(0, 8) : [];
 
   const canhBao = [
     cua.thieu ? `Cửa sổ chưa đủ ${n} ngày — dữ liệu chỉ có từ ${ngay(dl.ngay_dau)}.` : null,
-    !truoc ? "Năm trước chưa có dữ liệu cho cửa sổ này — cột so năm trước in “—”." : null,
+    !truoc ? "Năm trước chưa có dữ liệu cho cửa sổ này — số so năm trước trong ô nổi mỗi mã sẽ hiện “—”." : null,
   ].filter(Boolean).join(" ");
 
   const cachTinh = `Mỗi ô = tổng ${n} ngày kết thúc ở ngày đang chọn. Doanh thu thuần (chưa thuế), đã gồm phiếu đỏ (trả hàng, số âm). Không tính mua hàng của nhân viên. Phí & điều chỉnh và hàng tặng không phải sản phẩm nên không vẽ, nhưng tiền vẫn có trong tổng.`
@@ -129,9 +137,10 @@ export default function ManMuaVu() {
 
       <Khoi tieu_de={`${n} ngày · ${ngay(ngayCua(dl.ngay_dau!, cua.a))} → ${ngay(ngayCua(dl.ngay_dau!, cua.b))}`}
             phu={cay ? `Tổng ${inSo(cs, cay.tong)}` : undefined} cach_tinh={cachTinh} canh_bao={canhBao || undefined}>
+        <a href="#mv-ngay-cuoi" className="mv-bo-qua">Bỏ qua ô, tới thanh thời gian</a>
         <div ref={ref} className="mv-cay">
           {cay && (
-            <svg width={rong} height={CAO_CAY} role="img" aria-label="Treemap ngành và mã hàng">
+            <svg width={rong} height={CAO_CAY} role="group" aria-label="Treemap ngành và mã hàng">
               {cay.nganh.map(g => (
                 <g key={"n" + g.n}>
                   <rect x={g.x} y={g.y} width={g.w} height={g.h} className={"mv-o-nganh mv-n" + (g.n % 12)} />
@@ -162,13 +171,7 @@ export default function ManMuaVu() {
                 </g>))}
             </svg>)}
         </div>
-        {kv && (kv.phi || kv.tang || kv.am || kv.tat) ? (
-          <p className="mv-khong-ve">Không vẽ:
-            {kv.phi ? ` phí & điều chỉnh ${inSo(cs, kv.phi)} ·` : ""}
-            {kv.tang ? ` hàng tặng ${inSo(cs, kv.tang)} ·` : ""}
-            {kv.am ? ` ${kv.so_am} mã ≤ 0 trong cửa sổ ${inSo(cs, kv.am)} ·` : ""}
-            {kv.tat ? ` ngành đang tắt ${inSo(cs, kv.tat)}` : ""}
-          </p>) : null}
+        {khongVe.length > 0 && <p className="mv-khong-ve">Không vẽ: {khongVe.join(" · ")}</p>}
       </Khoi>
 
       <ThanhThoiGian so_ngay={L.so_ngay} ngay_dau={dl.ngay_dau!} tong_ngay={L.tongNgay} b={bb} n={n} datB={datB} />

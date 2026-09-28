@@ -53,10 +53,10 @@ export function ThanhThoiGian({ so_ngay, ngay_dau, tong_ngay, b, n, datB }: {
   return (
     <div className="mv-thanh">
       <div className="mv-nut">
-        <button type="button" onClick={() => buoc(-1)} aria-label="Lùi một ngày">◀</button>
+        <button type="button" onClick={() => buoc(-1)} aria-label="Lùi một ngày">‹</button>
         <button type="button" onClick={() => { if (b >= so_ngay - 1) datB(0); datChay(c => !c); }}
                 aria-label={chay ? "Dừng" : "Chạy"}>{chay ? "❚❚" : "▶"}</button>
-        <button type="button" onClick={() => buoc(1)} aria-label="Tiến một ngày">▶</button>
+        <button type="button" onClick={() => buoc(1)} aria-label="Tiến một ngày">›</button>
       </div>
       <div className="mv-truot" ref={ref}>
         {hinh && (
@@ -71,7 +71,7 @@ export function ThanhThoiGian({ so_ngay, ngay_dau, tong_ngay, b, n, datB }: {
             ))}
           </svg>
         )}
-        <input type="range" min={0} max={Math.max(0, so_ngay - 1)} value={b}
+        <input id="mv-ngay-cuoi" type="range" min={0} max={Math.max(0, so_ngay - 1)} value={b}
                aria-label="Ngày cuối cửa sổ" aria-valuetext={ngay(ngayCua(ngay_dau, b))}
                onChange={e => { datChay(false); datB(Number(e.target.value)); }}
                onKeyDown={e => {

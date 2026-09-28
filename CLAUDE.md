@@ -398,13 +398,14 @@ thứ đọc được (`aria-hidden="true" focusable="false"` trên mỗi `<svg>
 hai thuộc tính đó là trình đọc màn hình đọc icon rồi đọc lại nhãn, và Tab
 dừng ở một phần tử không có gì để bấm. Sáu icon (Tổng quan/Báo cáo/Khách
 hàng/Sản phẩm/Kho hàng/Kho dữ liệu) chép NGUYÊN VĂN từ object `I` trong
-`kome-nav.js` của gói thiết kế, đúng ánh xạ NHÓM của chính gói đó. Hai icon
-còn lại — `bell` cho "Cần liên hệ" (trước đợt 7: "Cần xử lý") và `pin` cho "Bản đồ" — là **TA CHỌN**
-trong bộ 24 icon của gói thiết kế, vì gói đó không có mục "Cần xử lý" và gộp
-bản đồ chung vào "Khách hàng & bản đồ" thay vì tách trang riêng như app này.
-Ai chọn cái gì phải ghi rõ ra (xem chú thích đầu `icon.tsx` / `muc.ts`) — không ghi thì
-người sau tưởng cả tám icon đều theo một ánh xạ có sẵn của gói thiết kế, rồi
-đi tìm một ánh xạ không tồn tại khi thêm trang mới.
+`kome-nav.js` của gói thiết kế, đúng ánh xạ NHÓM của chính gói đó. Ba icon
+còn lại — `bell` cho "Cần liên hệ" (trước đợt 7: "Cần xử lý"), `pin` cho "Bản đồ", và
+`chart` cho "Mùa vụ sản phẩm" (2026-09-29, dùng lại icon đã có của "Báo cáo doanh thu")
+— là **TA CHỌN** trong bộ 24 icon của gói thiết kế, vì gói đó không có mục "Cần xử lý",
+gộp bản đồ chung vào "Khách hàng & bản đồ" thay vì tách trang riêng như app này, và
+không có màn Mùa vụ sản phẩm. Ai chọn cái gì phải ghi rõ ra (xem chú thích đầu
+`icon.tsx` / `muc.ts`) — không ghi thì người sau tưởng cả chín icon đều theo một ánh
+xạ có sẵn của gói thiết kế, rồi đi tìm một ánh xạ không tồn tại khi thêm trang mới.
 
 **Bất biến:** lựa chọn sáng/tối lưu bằng **cookie (`kome_giao_dien`) + render
 phía máy chủ** (`data-theme` trên `<html>`), KHÔNG bằng `localStorage`. Gói

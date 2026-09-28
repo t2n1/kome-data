@@ -15,6 +15,14 @@
 .mv-chip-n{display:inline-flex;align-items:center;gap:.3rem}
 .mv-chip-n i{display:inline-block;width:10px;height:10px;border-radius:2px}
 .mv-chip-n:not([aria-pressed="true"]){opacity:.5}
+/* Liên kết "bỏ qua" trước cây ô: ~230 ô trong SVG đều bấm/focus được (mỗi mã là một
+   ONoi), nên bàn phím Tab qua hết cây ô trước khi tới thanh thời gian bên dưới là
+   một hàng rào dài. Ẩn kiểu sr-only (cùng kỹ thuật lớp `.sr` của kome.css) nhưng HIỆN
+   lại khi nhận focus, để người dùng bàn phím thấy và bấm được. */
+.mv-bo-qua{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mv-bo-qua:focus{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal;
+  display:inline-block;margin-bottom:6px;padding:.3rem .7rem;border-radius:8px;
+  border:1px solid var(--lien-ket);background:var(--nen-the);color:var(--chu);text-decoration:none}
 .mv-cay{width:100%;min-height:460px}
 .mv-o-nganh{stroke:var(--nen-the);stroke-width:2;fill-opacity:.35;transition:x .2s,y .2s,width .2s,height .2s}
 .mv-o-ma rect{fill:currentColor;fill-opacity:0;stroke:var(--nen-the);stroke-width:1;
