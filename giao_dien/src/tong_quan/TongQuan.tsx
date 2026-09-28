@@ -1,12 +1,20 @@
-// Trang Tổng quan — Dashboard.dc.html: lời chào · "XEM THEO VAI TRÒ" · dải tóm
+// Trang Tổng quan — Dashboard.dc.html: lời chào · thanh các bảng (056) · dải tóm
 // tắt · thanh bố cục · lưới kéo thả · bảng "Thêm chức năng".
+//
+// Mỗi người có NHIỀU bảng có tên (app.bang_tong_quan, 056). Mọi bảng đi sẵn trong
+// window.__KOME__ nên chuyển tab không gọi máy chủ; dữ liệu khối dùng lại bộ nhớ
+// đệm TanStack (cùng khoá) — chỉ bố cục đổi. Bảng ảo (id null, người chưa lưu gì)
+// thành dòng thật ở lần lưu đầu.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gui, useKhoi } from "../api";
 import { gon, pc } from "../dinh_dang";
-import { KD, type OBoCuc } from "../khoi_dau";
+import { KD, type BangTQ, type MucKhoi, type OBoCuc } from "../khoi_dau";
+import { giuKhoang } from "../khung/khoang";
 import { Luoi } from "./Luoi";
 import { veKhoi } from "./khoi";
 import { DaiTuoi } from "./DaiTuoi";
+import { ThanhBang } from "./ThanhBang";
+import { BangMoi } from "./BangMoi";
 import "./tong_quan.css";
 
 const THU = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
@@ -19,42 +27,105 @@ function gioTokyo() {
   return { gio: +g("hour") % 24, chu: `${THU[ngay.getDay()]} ${g("day")}/${g("month")}/${g("year")}` };
 }
 
+const macDinh = (khoi: MucKhoi[]): OBoCuc[] => khoi.map(k => ({ id: k.id, rong: k.rong, cao: k.cao, an: false }));
+
+/** Ghi ?bang= lên URL, giữ khoảng xem (bất biến Khoảng xem: mọi pushState qua giuKhoang). */
+function ghiUrl(id: number | null, thay: boolean) {
+  const p = new URLSearchParams(location.search);
+  if (id === null) p.delete("bang"); else p.set("bang", String(id));
+  const q = p.toString();
+  const url = giuKhoang("/" + (q ? "?" + q : ""));
+  if (thay) history.replaceState(null, "", url); else history.pushState(null, "", url);
+}
+
 export function TongQuan() {
   const khoi = KD.danh_muc.khoi;
   const nhanCua = useMemo(() => Object.fromEntries(khoi.map(k => [k.id, k.nhan])), [khoi]);
-  const [bo_cuc, datBoCucGoc] = useState<OBoCuc[]>(KD.bo_cuc.length ? KD.bo_cuc : khoi.map(k => ({ id: k.id, rong: k.rong, cao: k.cao, an: false })));
+  const [ds, datDs] = useState<BangTQ[]>(() => KD.bang.length ? KD.bang : [{ id: null, ten: "Bảng của tôi", bo_cuc: macDinh(khoi) }]);
+  const [hienId, datHienId] = useState<number | null>(KD.bang_hien_id);
+  const hien = ds.find(b => b.id === hienId) ?? ds[0];
+  const bo_cuc = hien.bo_cuc;
   const [chon, datChon] = useState(false);
+  const [moi, datMoi] = useState(false);
   const [loiLuu, datLoiLuu] = useState("");
-  const hen = useRef<number>(0);
+  // Lượt tự lưu đang chờ (400 ms sau lần kéo cuối) — ĐẨY NGAY trước khi chuyển bảng.
+  const hen = useRef<{ t: number; chay?: () => Promise<BangTQ | null> }>({ t: 0 });
+
+  const thayBang = (id: number | null, b: BangTQ) => datDs(d => d.map(x => x.id === id ? b : x));
+  const luuNgay = async (): Promise<BangTQ | null> => {
+    clearTimeout(hen.current.t);
+    const f = hen.current.chay;
+    hen.current.chay = undefined;
+    return f ? f() : null;
+  };
 
   const datBoCuc = (b: OBoCuc[]) => {
-    datBoCucGoc(b);
+    const id = hien.id;
+    thayBang(id, { ...hien, bo_cuc: b });
     if (!KD.sap_xep_duoc) return;          // máy chưa bật đăng nhập: xếp tạm, không lưu
-    clearTimeout(hen.current);
-    hen.current = window.setTimeout(() => {
-      gui("/tong-quan/bo-cuc", b).then(() => datLoiLuu("")).catch(() => datLoiLuu("Không lưu được bố cục — thử lại sau."));
-    }, 400);
+    clearTimeout(hen.current.t);
+    hen.current.chay = () => gui<{ bang: BangTQ }>(`/tong-quan/bang/${id ?? "moi"}/bo-cuc`, b)
+      .then(r => {
+        datLoiLuu("");
+        if (id === null) { thayBang(null, r.bang); datHienId(r.bang.id); ghiUrl(r.bang.id, true); }
+        return r.bang;
+      })
+      .catch(() => { datLoiLuu("Không lưu được bố cục — thử lại sau."); return null; });
+    hen.current.t = window.setTimeout(() => { void luuNgay(); }, 400);
   };
+
+  // Bảng ảo phải thành dòng thật trước mọi thao tác ⋯ / nhân bản.
+  const damBaoCo = async (): Promise<BangTQ> => {
+    const vua = await luuNgay();
+    if (hien.id !== null) return hien;
+    if (vua && vua.id !== null) return vua;
+    const r = await gui<{ bang: BangTQ }>("/tong-quan/bang/moi/bo-cuc", hien.bo_cuc);
+    thayBang(null, r.bang); datHienId(r.bang.id); ghiUrl(r.bang.id, true);
+    return r.bang;
+  };
+
+  const chuyen = async (id: number | null) => {
+    await luuNgay();
+    datHienId(id); ghiUrl(id, false);
+    // Ghi "bảng gần nhất" — lỗi thì nuốt: không phải lỗi người dùng cần thấy.
+    if (id !== null && KD.sap_xep_duoc) gui(`/tong-quan/bang/${id}/mo`, null).catch(() => {});
+  };
+
+  const tao = async (ten: string, tu: string) => {
+    // Bảng ảo đang có (người chưa lưu gì) được lưu thành "Bảng của tôi" trước —
+    // không thì tạo bảng thứ hai xong tab đầu biến mất và người ta tưởng mất bảng.
+    const dau = await damBaoCo();
+    const nguon = tu === "chep" ? `chep:${dau.id}` : tu;
+    const r = await gui<{ bang: BangTQ }>("/tong-quan/bang", { ten, tu: nguon });
+    datDs(d => [...d, r.bang]);
+    datHienId(r.bang.id); ghiUrl(r.bang.id, false);
+    datMoi(false);
+  };
+
+  useEffect(() => {
+    const doc = () => {
+      const p = new URLSearchParams(location.search).get("bang");
+      const b = ds.find(x => String(x.id) === p);
+      if (b) datHienId(b.id);
+    };
+    window.addEventListener("popstate", doc);
+    return () => window.removeEventListener("popstate", doc);
+  }, [ds]);
+  useEffect(() => { document.title = `Tổng quan · ${hien.ten}`; }, [hien.ten]);
 
   const { gio, chu } = gioTokyo();
   const ten = KD.nguoi?.ten_sale?.split(" ").slice(-1)[0] || KD.nguoi?.ten_dang_nhap;
   const chao = (gio < 11 ? "Chào buổi sáng" : gio < 18 ? "Chào buổi chiều" : "Chào buổi tối") + (ten ? `, ${ten}` : "");
-
   const hienIds = new Set(bo_cuc.filter(o => !o.an).map(o => o.id));
-  const vaiDang = KD.danh_muc.vai_tro.find(v => v.khoi.length === hienIds.size && v.khoi.every(id => hienIds.has(id)))?.id;
-  const apVai = (khoiVai: string[] | null) => datBoCuc(bo_cuc.map(o => ({ ...o, an: khoiVai ? !khoiVai.includes(o.id) : false })));
 
   return (
     <div className="tq">
       <div className="tieu-de-trang">
         <div><h1>{chao}</h1><div className="phu">{chu} · giờ Tokyo</div></div>
-        <div className="vai-tro" role="group" aria-label="Xem theo vai trò">
-          <span className="nhan-nho">XEM THEO VAI TRÒ</span>
-          {KD.danh_muc.vai_tro.map(v => (
-            <button key={v.id} type="button" className="chip" aria-pressed={vaiDang === v.id}
-              onClick={() => apVai(vaiDang === v.id ? null : v.khoi)}>{v.nhan}</button>))}
-        </div>
       </div>
+      <ThanhBang ds={ds} hien={hien} sua_duoc={KD.sap_xep_duoc} chuyen={id => void chuyen(id)} damBaoCo={damBaoCo}
+        datDs={datDs} sauXoa={id => { datHienId(id); ghiUrl(id, true); }}
+        datLai={() => datBoCuc(macDinh(khoi))} moBangMoi={() => datMoi(true)} />
       <DaiTuoi />
       <TomTat />
       <div className="thanh-bo-cuc">
@@ -62,12 +133,13 @@ export function TongQuan() {
           ? <span className="phu">⠿ kéo đầu khối để sắp xếp · đổi kích thước ở góc phải dưới</span>
           : <span className="phu">Máy này chưa bật đăng nhập — sắp xếp chỉ giữ tới khi tải lại trang.</span>}
         <span className="phu mo">{hienIds.size}/{khoi.length} chức năng đang hiện</span>
-        <button type="button" className="nut-nho" onClick={() => datBoCuc(khoi.map(k => ({ id: k.id, rong: k.rong, cao: k.cao, an: false })))}>Đặt lại bố cục</button>
+        <button type="button" className="nut-nho" onClick={() => datBoCuc(macDinh(khoi))}>Đặt lại bố cục</button>
         {loiLuu && <span className="giam phu" role="alert">{loiLuu}</span>}
         <button type="button" className="nut-chinh them" onClick={() => datChon(true)}>＋ Thêm chức năng</button>
       </div>
       <Luoi bo_cuc={bo_cuc} datBoCuc={datBoCuc} sua_duoc={true} nhan={id => nhanCua[id] ?? id} ve={id => veKhoi(id, nhanCua[id] ?? id)} />
       {chon && <BangThem bo_cuc={bo_cuc} datBoCuc={datBoCuc} dong={() => datChon(false)} />}
+      {moi && <BangMoi hien={hien} ds={ds} dong={() => datMoi(false)} tao={tao} />}
     </div>
   );
 }
