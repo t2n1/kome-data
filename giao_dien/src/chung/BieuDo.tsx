@@ -5,8 +5,9 @@
 //   * bấm chú giải: bật/tắt từng chuỗi;
 //   * bấm một cột (nếu có `onBam`): đi tới danh sách đúng thứ đó;
 //   * bàn phím: Tab vào biểu đồ rồi ←/→ đi qua từng điểm (ô nổi đọc được).
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useRong } from "./hooks";
+import { buocCham } from "./o_noi_logic";
 
 export type Chuoi = {
   ten: string;
@@ -34,15 +35,18 @@ type Props = {
   moi_nhan?: number;                      // cứ bao nhiêu điểm in một nhãn trục X
   mo_ta: string;                          // cho trình đọc màn hình
   vach?: { i: number; chu: string } | null;  // vạch dọc đánh dấu (vd "hôm nay")
+  them_noi?: (i: number) => ReactNode;      // dòng thêm cuối ô nổi (vd %NS, biên gộp của tháng i)
 };
 
 export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_dang_truc, onBam,
-  moi_nhan, mo_ta, vach }: Props) {
+  moi_nhan, mo_ta, vach, them_noi }: Props) {
   const [khung, rong] = useRong<HTMLDivElement>();
   const [tat, datTat] = useState<Record<string, boolean>>(
     () => Object.fromEntries(chuoi.filter(c => c.an_mac_dinh).map(c => [c.ten, true])));
   const [tro, datTro] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const kieu = useRef("mouse");
+  const daChon = useRef<number | null>(null);   // điểm đã hiện ô nổi trước lần chạm này
 
   const W = Math.max(rong, 200), H = cao;
   const tr = 44, ph = chuoi.some(c => c.truc_phai && !tat[c.ten]) ? 40 : 10, tren = 10, duoi = 22;
@@ -82,13 +86,20 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
   return (
     <div className="bd" ref={khung}>
       <svg ref={svgRef} width="100%" height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={mo_ta}
-        tabIndex={0} onPointerMove={chon} onPointerLeave={() => datTro(null)}
+        tabIndex={0}
+        onPointerMove={chon} onPointerLeave={e => { if (e.pointerType === "mouse") datTro(null); }}
+        onPointerDown={e => { kieu.current = e.pointerType; daChon.current = tro; chon(e); }}
         onKeyDown={e => {
           if (e.key === "ArrowRight") datTro(t => Math.min((t ?? -1) + 1, n - 1));
           else if (e.key === "ArrowLeft") datTro(t => Math.max((t ?? n) - 1, 0));
           else if (e.key === "Enter" && tro != null) onBam?.(tro);
+          else if (e.key === "Escape") datTro(null);
         }}
-        onClick={() => { if (tro != null) onBam?.(tro); }}
+        onClick={() => {
+          if (tro == null) return;
+          if (buocCham(daChon.current === tro, kieu.current) === "di") onBam?.(tro);
+          kieu.current = "mouse";
+        }}
         style={{ cursor: onBam ? "pointer" : "crosshair", display: "block" }}>
         {vach_luoi.map((v, k) => (
           <g key={k}>
@@ -138,7 +149,8 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
             <b>{dinh_dang(c.gia_tri[tro] ?? null, c)}{td != null && <span className={"bd-td " + (td >= 0 ? "tang" : "giam")}>
               {" "}{td >= 0 ? "▲" : "▼"}{Math.abs(td * 100).toFixed(1).replace(".", ",")}%</span>}</b></div>;
         })}
-        {onBam && <em>bấm để xem chi tiết</em>}
+        {them_noi?.(tro)}
+        {onBam && <em>{kieu.current === "touch" ? "chạm lần nữa để xem chi tiết" : "bấm để xem chi tiết"}</em>}
       </div>}
       <div className="bd-chu-giai">
         {chuoi.map(c => (
