@@ -5,7 +5,7 @@ Ba lời hứa canh ở đây (cùng nếp tests/test_khach_hang_api.py của gi
   * ngân sách LƯỢT HỎI của từng màn không nới ra khi chuyển sang API — nút
     thắt là số lượt hỏi (~47 ms mạng mỗi lượt tới pooler Tokyo), không phải
     sức tính. /bao-cao <= 11 (bất biến CLAUDE.md), /du-bao 3 (bất biến đợt
-    8), /lien-he 3 (bất biến đợt 7). Ảnh chụp TẮT trong test (conftest), nên
+    8), /lien-he 4 (CLAUDE.md, từ "Nên chào" 226e6b6). Ảnh chụp TẮT trong test (conftest), nên
     đây là số lượt khi tính mới;
   * chưa đăng nhập -> 401 JSON, không phải 303 (fetch() đi theo 303 là nhận
     HTML của trang đăng nhập rồi nổ ở JSON.parse);
@@ -80,13 +80,14 @@ def test_ngan_sach_luot_hoi_bao_cao_du_bao(conn, batch, c, monkeypatch, url, tra
 @pytest.mark.parametrize("url", ["/api/lien-he", "/api/lien-he?tat_ca=1",
                                  "/api/lien-he?ly_do=qua_han", "/api/lien-he?nv=0104"])
 def test_ngan_sach_luot_hoi_lien_he(conn, batch, c, monkeypatch, url):
-    """[IMPORTANT] /lien-he = 3 truy vấn (bất biến đợt 7) — danh sách ưu
-    tiên, hoạt động gần đây, hẹn gọi lại."""
+    """[IMPORTANT] /lien-he = 4 truy vấn (CLAUDE.md) — danh sách ưu tiên,
+    hoạt động gần đây, hẹn gọi lại (3 của đợt 7) + "Nên chào" & danh sách
+    người phụ trách (`LH.goi_y_va_nhan_vien`, 226e6b6)."""
     TLH._nen(conn, batch)
     dem = _dem_luot_hoi(monkeypatch)
     r = c.get(url)
     assert r.status_code == 200, r.text
-    assert dem["n"] <= 3, f"{url} chạy {dem['n']} lượt hỏi, trần 3"
+    assert dem["n"] <= 4, f"{url} chạy {dem['n']} lượt hỏi, trần 4"
 
 
 @pytest.mark.parametrize("url", ["/api/bao-cao", "/api/bao-cao?ky=2026", "/api/du-bao",
