@@ -10,9 +10,11 @@ import { useQuery } from "@tanstack/react-query";
 import { lay } from "../api";
 
 // Khoảng xem + kỳ so sánh tự chọn (đặc tả 2026-09-25-ky-so-sanh-tu-chon-design.md):
-// `ss_*` THAY cả hai phép so mặc định; máy chủ cắt dải, file này chỉ đọc / ghi URL.
+// Một kỳ so cho cả website (đặc tả 2026-09-28-ky-so-sanh-toan-web-design.md): `?ss=truoc`
+// = chip "tháng trước / khoảng liền trước", `ss_*` = kỳ tự chọn, không gì = năm trước.
+// Máy chủ cắt dải, file này chỉ đọc / ghi URL.
 export const THAM_SO_CHINH = ["thang", "ky", "tu", "den"] as const;
-export const THAM_SO_SS = ["ss_thang", "ss_ky", "ss_tu", "ss_den"] as const;
+export const THAM_SO_SS = ["ss", "ss_thang", "ss_ky", "ss_tu", "ss_den"] as const;
 export const THAM_SO = [...THAM_SO_CHINH, ...THAM_SO_SS] as const;
 export type Khoang = Partial<Record<(typeof THAM_SO)[number], string>>;
 export type SoSanhChon = Partial<Record<(typeof THAM_SO_SS)[number], string>>;
@@ -23,7 +25,10 @@ export type KhoangMayChu = {
   thang: string | null; company_fy: number | null; so_ky: number | null; mac_dinh: boolean;
   tron_thang: boolean; ghi_chu: string[]; ngay_dau: string; hom_nay: string; so_ngay: number; dang_lui: boolean;
   tu_chon: boolean;
-  so_sanh: { ma: string; nhan: string; tu: string; den: string; tu_nay: string; den_nay: string; co: boolean }[];
+  /** LUÔN đúng một phần tử — kỳ so đang bật. */
+  so_sanh: { ma: string; nhan: string; tu: string; den: string; tu_nay: string; den_nay: string; co: boolean;
+    lech_thang: number | null }[];
+  lua_chon: { ma: string; nhan: string; chon: boolean }[];
 };
 export type PhamVi = { ngay_dau: string; hom_nay: string; ky: { company_fy: number; so_ky: number; tu: string; den: string }[] };
 
@@ -34,6 +39,7 @@ export function docKhoang(search: string = location.search): Khoang {
   // `thang` chỉ là khoảng xem khi đúng dạng YYYY-MM (phòng một bộ lọc cũ trùng tên).
   if (k.thang && !/^\d{4}-\d{2}$/.test(k.thang)) delete k.thang;
   if (k.ss_thang && !/^\d{4}-\d{2}$/.test(k.ss_thang)) delete k.ss_thang;
+  if (k.ss && k.ss !== "truoc") delete k.ss;
   return k;
 }
 
@@ -77,7 +83,7 @@ function ghi(nhom: readonly (typeof THAM_SO)[number][], k: Khoang) {
  *  phần. GIỮ kỳ so sánh đang chọn (`ss_*`) — chỉ `datSoSanh` đổi nó. */
 export function datKhoang(k: Khoang) { ghi(THAM_SO_CHINH, k); }
 
-/** Đổi kỳ so sánh tự chọn; `{}` = về phép so mặc định (năm trước · tháng trước). */
+/** Đổi kỳ so: `{}` = năm trước, `{ss: "truoc"}` = tháng / khoảng liền trước, `ss_*` = tự chọn. */
 export function datSoSanh(k: SoSanhChon) { ghi(THAM_SO_SS, k); }
 
 export function useKhoang(): Khoang {

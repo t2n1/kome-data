@@ -3917,12 +3917,14 @@
       "mart.sp_don_gia_thang",
       "mart.sp_khach_gia",
       "mart.sp_khach_moi_thang",
+      "mart.sp_khach_moi_thang_den",
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem",
       "mart.sp_tap_trung_khach",
       "mart.sp_theo_nguoi",
       "mart.sp_theo_tinh",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -3964,7 +3966,7 @@
      "he": "customer_code",
      "ja": "得意先コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 64 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 66 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -4044,12 +4046,14 @@
       "mart.sp_don_gia_thang",
       "mart.sp_khach_gia",
       "mart.sp_khach_moi_thang",
+      "mart.sp_khach_moi_thang_den",
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem",
       "mart.sp_tap_trung_khach",
       "mart.sp_theo_nguoi",
       "mart.sp_theo_tinh",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -4098,6 +4102,7 @@
       "kome/bao_cao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
+      "kome/khoi_tong_quan.py",
       "kome/ngan_sach.py",
       "kome/san_pham_360.py"
      ],
@@ -4147,7 +4152,7 @@
      "he": "product_code",
      "ja": "商品コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 29 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 31 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -4193,12 +4198,14 @@
       "mart.sp_don_gia_thang",
       "mart.sp_khach_gia",
       "mart.sp_khach_moi_thang",
+      "mart.sp_khach_moi_thang_den",
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem",
       "mart.sp_tap_trung_khach",
       "mart.sp_theo_nguoi",
       "mart.sp_theo_tinh",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.toc_do_ban",
       "mart.ton_theo_lo",
       "mart.ty_suat_mat_hang"
@@ -4241,8 +4248,9 @@
      "he": "qty",
      "ja": "数量",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 12 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 13 chỉ số khác",
      "ma": [
+      "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
@@ -4276,6 +4284,7 @@
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.toc_do_ban",
       "mart.ton_theo_lo"
      ]
@@ -4372,11 +4381,13 @@
       "mart.sp_don_gia_thang",
       "mart.sp_khach_gia",
       "mart.sp_khach_moi_thang",
+      "mart.sp_khach_moi_thang_den",
       "mart.sp_khach_nen_chao",
       "mart.sp_tap_trung_khach",
       "mart.sp_theo_nguoi",
       "mart.sp_theo_tinh",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.thang_den_hom_nay",
@@ -4394,7 +4405,7 @@
      "he": "tax_amount",
      "ja": "消費税額",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 40 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 42 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -4454,11 +4465,13 @@
       "mart.sp_don_gia_thang",
       "mart.sp_khach_gia",
       "mart.sp_khach_moi_thang",
+      "mart.sp_khach_moi_thang_den",
       "mart.sp_khach_nen_chao",
       "mart.sp_tap_trung_khach",
       "mart.sp_theo_nguoi",
       "mart.sp_theo_tinh",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.thang_den_hom_nay",
@@ -10266,12 +10279,14 @@
       "mart.sp_don_gia_thang",
       "mart.sp_khach_gia",
       "mart.sp_khach_moi_thang",
+      "mart.sp_khach_moi_thang_den",
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem",
       "mart.sp_tap_trung_khach",
       "mart.sp_theo_nguoi",
       "mart.sp_theo_tinh",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -10293,7 +10308,7 @@
      "he": "customer_code",
      "ja": "得意先コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 64 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 66 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
@@ -10373,12 +10388,14 @@
       "mart.sp_don_gia_thang",
       "mart.sp_khach_gia",
       "mart.sp_khach_moi_thang",
+      "mart.sp_khach_moi_thang_den",
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem",
       "mart.sp_tap_trung_khach",
       "mart.sp_theo_nguoi",
       "mart.sp_theo_tinh",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.tap_trung_khoang",
@@ -10406,6 +10423,7 @@
       "kome/bao_cao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
+      "kome/khoi_tong_quan.py",
       "kome/ngan_sach.py",
       "kome/san_pham_360.py"
      ],
@@ -10435,7 +10453,7 @@
      "he": "product_code",
      "ja": "商品コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 29 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 31 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -10481,12 +10499,14 @@
       "mart.sp_don_gia_thang",
       "mart.sp_khach_gia",
       "mart.sp_khach_moi_thang",
+      "mart.sp_khach_moi_thang_den",
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem",
       "mart.sp_tap_trung_khach",
       "mart.sp_theo_nguoi",
       "mart.sp_theo_tinh",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.toc_do_ban",
       "mart.ton_theo_lo",
       "mart.ty_suat_mat_hang"
@@ -10519,8 +10539,9 @@
      "he": "qty",
      "ja": "純売上数量",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 12 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_san_pham, mart.dong_ban và 13 chỉ số khác",
      "ma": [
+      "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
@@ -10554,6 +10575,7 @@
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.toc_do_ban",
       "mart.ton_theo_lo"
      ]
@@ -10640,11 +10662,13 @@
       "mart.sp_don_gia_thang",
       "mart.sp_khach_gia",
       "mart.sp_khach_moi_thang",
+      "mart.sp_khach_moi_thang_den",
       "mart.sp_khach_nen_chao",
       "mart.sp_tap_trung_khach",
       "mart.sp_theo_nguoi",
       "mart.sp_theo_tinh",
       "mart.sp_theo_tuan",
+      "mart.sp_theo_tuan_den",
       "mart.tai_nhan_vien",
       "mart.tap_trung_khach",
       "mart.thang_den_hom_nay",
@@ -11425,6 +11449,8 @@
   ],
   "mart.ban_theo_nganh_thang": [
    "bao_cao",
+   "khach",
+   "san_pham",
    "tong_quan"
   ],
   "mart.ban_theo_nganh_thang_so_sanh": [
@@ -11559,8 +11585,10 @@
   ],
   "mart.khach_theo_thang": [
    "ban_do",
+   "bao_cao",
    "ho_so",
    "khach",
+   "san_pham",
    "tong_quan"
   ],
   "mart.khach_theo_tinh": [
@@ -11733,7 +11761,10 @@
    "tong_quan"
   ],
   "mart.san_pham_theo_thang": [
-   "san_pham"
+   "bao_cao",
+   "khach",
+   "san_pham",
+   "tong_quan"
   ],
   "mart.so_cong_no_moi_nhat": [
    "cong_no",
@@ -11752,6 +11783,9 @@
   "mart.sp_khach_moi_thang": [
    "san_pham"
   ],
+  "mart.sp_khach_moi_thang_den": [
+   "san_pham"
+  ],
   "mart.sp_khach_nen_chao": [
    "san_pham"
   ],
@@ -11768,6 +11802,9 @@
    "san_pham"
   ],
   "mart.sp_theo_tuan": [
+   "san_pham"
+  ],
+  "mart.sp_theo_tuan_den": [
    "san_pham"
   ],
   "mart.tai_nhan_vien": [

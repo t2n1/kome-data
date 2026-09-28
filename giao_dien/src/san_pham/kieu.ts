@@ -57,10 +57,13 @@ export type KhoangMaApi = {
   khoang: import("../khung/khoang").KhoangMayChu; so_sanh: { ma: string; nhan: string; co: boolean; tu: string; den: string };
   tong: { dt: number; lg: number; so_luong: number; so_khach: number }; dt_ss: number | null; tang: number | null;
   khach: { ma: string; ten: string; doanh_thu: number; so_luong: number; so_ngay: number; lan_cuoi: string }[];
+  /** {tháng đang xem: doanh thu tháng dời theo kỳ so} cho 24 tháng; null = không so theo tháng được. */
+  thang_ss: Record<string, number | null> | null;
 } | null;
 
 export type NgayBan = { ngay: string; la_ngay_kd: boolean; so_luong: number; doanh_thu: number; lai_gop: number; so_khach: number };
-export type NgayApi = { thang: string; hom_nay: string | null; nay: NgayBan[]; truoc: NgayBan[] };
+export type NgayApi = { thang: string; hom_nay: string | null; nay: NgayBan[]; truoc: NgayBan[];
+  lech: number | null; thang_so: string | null };
 
 export type DongKho = TonDong & {
   ma: string; ten: string; trang_thai: string | null; nhan_trang_thai: string; mau: string;

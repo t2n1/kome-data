@@ -28,7 +28,7 @@ def c(test_db_url):
 
 def test_danh_muc_khoang_cong_lai_BANG_tong(conn, batch):
     _gieo(conn, batch)
-    kx = KX.giai_conn(conn, KX.doc_tham_so())             # 1/7 → 9/7, so 1/6 → 9/6
+    kx = KX.giai_conn(conn, KX.doc_tham_so(ss="truoc"))   # 1/7 → 9/7, so 1/6 → 9/6
     d = BK.danh_muc_khoang(conn, kx)
     tong = conn.execute("SELECT dt FROM mart.tong_khoang(%s, %s)", (kx.tu, kx.den)).fetchone()[0]
     assert sum(v[0] or 0 for v in d["dong"].values()) == tong
@@ -48,11 +48,12 @@ def test_api_danh_muc_khoang_khong_bi_route_ma_nuot(conn, batch, c):
 
 def test_ho_so_ma_theo_khoang(conn, batch, c):
     _gieo(conn, batch)
-    d = c.get("/api/san-pham/XT07/khoang").json()
+    d = c.get("/api/san-pham/XT07/khoang?ss=truoc").json()
     assert d["tong"]["dt"] == 150_000 and d["tong"]["so_khach"] == 2
     assert sum(k["doanh_thu"] for k in d["khach"]) == d["tong"]["dt"]
     assert [k["ma"] for k in d["khach"]] == ["KA01", "KA02"]
     assert d["dt_ss"] == 60_000 and abs(d["tang"] - (150_000 / 60_000 - 1)) < 1e-9
+    assert c.get("/api/san-pham/XT07/khoang").json()["so_sanh"]["ma"] == "nam_truoc",         "mặc định: mọi màn so năm trước (đặc tả 2026-09-28)"
     assert c.get("/api/san-pham/KHONG_CO/khoang").json()["tong"]["dt"] == 0
 
 

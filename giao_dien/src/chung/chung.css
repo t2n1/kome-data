@@ -94,6 +94,18 @@ table.bang a:hover{color:var(--lien-ket);text-decoration:underline}
 .bd-chu-giai i{width:10px;height:10px;border-radius:2px;display:inline-block;border:0 solid}
 .bd-chu-giai i.duong{height:0;width:14px;border-top-width:2px;border-radius:0}
 .bd-chu-giai i.duong_dut{height:0;width:14px;border-top-width:2px;border-top-style:dashed;border-radius:0}
+/* Kỳ so (đặc tả 2026-09-28): cột ma = khung viền đứt; ô nổi cũng dùng đúng mẫu đó. */
+.bd-chu-giai i.cot_ma,.bd-noi i.cot_ma{background:transparent;border:1.5px dashed}
+.bd-noi i.duong,.bd-noi i.duong_dut{height:0;width:12px;border-radius:0;border:0 solid;border-top-width:2px}
+.bd-noi i.duong_dut{border-top-style:dashed}
+.bd-td{font-weight:500;font-size:.7rem}
+/* Dòng so sánh của ô số + vạch đứt kỳ so trên thanh ngang (chung/SoSanh.tsx). */
+.ss-mau{display:inline-block;width:14px;height:0;border-top:2px dashed var(--vien-dam);vertical-align:middle;margin:0 .25rem}
+.ss-mau.lien{border-top-style:solid;border-top-color:var(--chu)}
+.ss-dong b{font-weight:600}
+.ss-dong .ss-gia{color:var(--chu-nhat);font-variant-numeric:tabular-nums}
+.ss-vach{position:absolute;top:-3px;bottom:-3px;width:0;border-left:2px dashed var(--chu-nhat);pointer-events:none}
+.ss-thanh{position:relative}
 
 /* Thẻ khối dùng chung cho các màn (Khách hàng, Báo cáo, Dự báo, Cần liên hệ…) */
 button.lien-ket{font:inherit;background:none;border:0;padding:0;color:var(--lien-ket);cursor:pointer;text-decoration:underline;text-underline-offset:2px}

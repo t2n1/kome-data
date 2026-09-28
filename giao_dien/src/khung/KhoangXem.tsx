@@ -1,11 +1,12 @@
-// Bộ chọn khoảng xem chung (đặc tả khoảng xem §4): ‹ Tháng 7/2026 › · nút gạt
-// Tháng / Kỳ / Khoảng · dòng mô tả CỦA MÁY CHỦ (kome/khoang_xem.py — bộ chọn
-// không tự tính ngày so sánh). Chỉ tính toán ở đây là điều hướng: tháng trước /
-// sau, và mấy nút nhanh của dạng Khoảng. Dòng "SO VỚI" chọn kỳ so sánh tự chọn
-// (`ss_*`, đặc tả 2026-09-25-ky-so-sanh-tu-chon-design.md) — máy chủ cắt dải.
+// Bộ chọn khoảng xem chung — HAI THẺ (đặc tả 2026-09-28-ky-so-sanh-toan-web-design.md §5):
+// "ĐANG XEM" (nét liền: Tháng / Kỳ / Khoảng · ‹ ô chọn ›) và "SO VỚI" (nét đứt: chip
+// năm trước / tháng trước của máy chủ + kỳ tự chọn `ss_*`). Mọi dải ngày là CỦA MÁY
+// CHỦ (kome/khoang_xem.py — bộ chọn không tự tính ngày so sánh); tính toán ở đây chỉ
+// là điều hướng (tháng trước / sau, nút nhanh của dạng Khoảng) và đếm số ngày để in.
 import { useState } from "react";
 import { datKhoang, datSoSanh, useKhoang, useKhoangMayChu, usePhamVi, type Khoang, type KhoangMayChu,
   type PhamVi } from "./khoang";
+import { MauSs } from "../chung/SoSanh";
 
 const thangCua = (iso: string) => iso.slice(0, 7);
 const cong = (thang: string, n: number) => {
@@ -19,6 +20,15 @@ const lui = (iso: string, ngay: number) => {
   return d.toISOString().slice(0, 10);
 };
 const nhanThang = (t: string) => `Tháng ${+t.slice(5)}/${t.slice(0, 4)}`;
+const hoa = (s: string) => s.replace(/^./, c => c.toUpperCase());
+const _n = (iso: string, nam: boolean) => {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return nam ? `${+d}/${+m}/${y}` : `${+d}/${+m}`;
+};
+/** "1/9 → 28/9/2026" — cùng cách in với máy chủ (khoang_xem._dai). */
+const dai = (tu: string, den: string) => `${_n(tu, tu.slice(0, 4) !== den.slice(0, 4))} → ${_n(den, true)}`;
+const soNgay = (tu: string, den: string) =>
+  Math.round((Date.parse(den.slice(0, 10)) - Date.parse(tu.slice(0, 10))) / 864e5) + 1;
 
 export function KhoangXem({ mo }: { mo?: string }) {
   const k = useKhoang();
@@ -45,42 +55,48 @@ export function KhoangXem({ mo }: { mo?: string }) {
   };
 
   return (
-    <div className="kx" role="group" aria-label="Khoảng xem">
-      <span className="kx-nhan">KHOẢNG XEM</span>
-      <div className="tab-pill" role="group" aria-label="Dạng khoảng xem">
-        {(["thang", "ky", "khoang"] as const).map(l => (
-          <button key={l} type="button" aria-pressed={loai === l} onClick={() => doiLoai(l)}>
-            {l === "thang" ? "Tháng" : l === "ky" ? "Kỳ" : "Khoảng"}</button>))}
-      </div>
+    <div className="kx kx-hai" role="group" aria-label="Khoảng xem và kỳ so sánh">
+      {/* Thẻ ĐANG XEM — nét liền, đúng mẫu của chuỗi chính trên mọi biểu đồ. */}
+      <section className="kx-the kx-xem" aria-label="Đang xem">
+        <div className="kx-dau">
+          <span className="kx-nhan"><MauSs lien />ĐANG XEM</span>
+          <div className="tab-pill" role="group" aria-label="Dạng khoảng xem">
+            {(["thang", "ky", "khoang"] as const).map(l => (
+              <button key={l} type="button" aria-pressed={loai === l} onClick={() => doiLoai(l)}>
+                {l === "thang" ? "Tháng" : l === "ky" ? "Kỳ" : "Khoảng"}</button>))}
+          </div>
+        </div>
+        <div className="kx-giua">
+          <div className="kx-to">{kx?.nhan ?? (loai === "thang" ? nhanThang(tDang) : "…")}</div>
+          {loai === "thang" && <div className="kx-dieu">
+            <button type="button" className="nut-nho" aria-label="Tháng trước" disabled={tDang <= tDau}
+              onClick={() => chonThang(cong(tDang, -1))}>‹</button>
+            <input type="month" className="kx-o" value={tDang} min={tDau} max={tCuoi} aria-label="Chọn tháng"
+              onChange={e => e.target.value && chonThang(e.target.value)} />
+            <button type="button" className="nut-nho" aria-label="Tháng sau" disabled={tDang >= tCuoi}
+              onClick={() => chonThang(cong(tDang, 1))}>›</button>
+            {k.thang && <button type="button" className="nut-nho" onClick={() => chon({})}>Tháng hiện tại</button>}
+          </div>}
+          {loai === "ky" && <div className="kx-dieu">
+            <button type="button" className="nut-nho" aria-label="Kỳ trước" disabled={iKy <= 0}
+              onClick={() => chon({ ky: String(pv.ky[iKy - 1].company_fy) })}>‹</button>
+            <select className="kx-o" value={String(kyDang)} aria-label="Chọn kỳ" onChange={e => chon({ ky: e.target.value })}>
+              {pv.ky.map(x => <option key={x.company_fy} value={x.company_fy}>Kỳ {x.so_ky} (8/{x.company_fy - 1} → 7/{x.company_fy})</option>)}
+            </select>
+            <button type="button" className="nut-nho" aria-label="Kỳ sau" disabled={iKy >= pv.ky.length - 1}
+              onClick={() => chon({ ky: String(pv.ky[iKy + 1].company_fy) })}>›</button>
+          </div>}
+        </div>
+        {loai === "khoang" && <KhoangNgay k={k} pv={pv} mo={moKhoang} />}
+        <div className="kx-dai phu" aria-live="polite">
+          {kx ? <>{dai(kx.tu, kx.den)} · {soNgay(kx.tu, kx.den)} ngày{!kx.tron_thang && kx.loai === "thang" ? " · tháng đang chạy" : ""}
+            {kx.ghi_chu.map(g => <span key={g} className="kx-ghi"> · {g}</span>)}</> : "…"}
+        </div>
+      </section>
 
-      {loai === "thang" && <div className="kx-dieu">
-        <button type="button" className="nut-nho" aria-label="Tháng trước" disabled={tDang <= tDau}
-          onClick={() => chonThang(cong(tDang, -1))}>‹</button>
-        <input type="month" className="kx-o" value={tDang} min={tDau} max={tCuoi} aria-label="Chọn tháng"
-          onChange={e => e.target.value && chonThang(e.target.value)} />
-        <button type="button" className="nut-nho" aria-label="Tháng sau" disabled={tDang >= tCuoi}
-          onClick={() => chonThang(cong(tDang, 1))}>›</button>
-        {k.thang && <button type="button" className="nut-nho" onClick={() => chon({})}>Tháng hiện tại</button>}
-      </div>}
-
-      {loai === "ky" && <div className="kx-dieu">
-        <button type="button" className="nut-nho" aria-label="Kỳ trước" disabled={iKy <= 0}
-          onClick={() => chon({ ky: String(pv.ky[iKy - 1].company_fy) })}>‹</button>
-        <select className="kx-o" value={String(kyDang)} aria-label="Chọn kỳ" onChange={e => chon({ ky: e.target.value })}>
-          {pv.ky.map(x => <option key={x.company_fy} value={x.company_fy}>Kỳ {x.so_ky} (8/{x.company_fy - 1} → 7/{x.company_fy})</option>)}
-        </select>
-        <button type="button" className="nut-nho" aria-label="Kỳ sau" disabled={iKy >= pv.ky.length - 1}
-          onClick={() => chon({ ky: String(pv.ky[iKy + 1].company_fy) })}>›</button>
-      </div>}
-
-      {loai === "khoang" && <KhoangNgay k={k} pv={pv} mo={moKhoang} />}
+      <span className="kx-vs" aria-hidden="true">so với</span>
 
       <SoVoi k={k} pv={pv} kx={kx} />
-
-      <div className="kx-mo-ta phu" aria-live="polite">
-        {kx ? <>{kx.mo_ta}{kx.ghi_chu.map(g => <span key={g} className="kx-ghi"> · {g}</span>)}</>
-          : loai === "thang" ? nhanThang(tDang) : "…"}
-      </div>
     </div>
   );
 }
@@ -111,8 +127,9 @@ function KhoangNgay({ k, pv, mo }: { k: Khoang; pv: { ngay_dau: string; hom_nay:
   );
 }
 
-/** Dòng "SO VỚI": mặc định (năm trước · tháng trước) hoặc MỘT kỳ tự chọn. Ô chọn
- *  giới hạn tới ngày cuối khoảng đang xem — kỳ so phải nằm trước đó (mốc, 040). */
+/** Thẻ "SO VỚI" — nét đứt, đúng mẫu của kỳ so trên mọi biểu đồ. Chip mặc định lấy
+ *  từ máy chủ (`lua_chon`); "Tuỳ chọn…" mở bộ chọn kỳ tự chọn (`ss_*`). Ô chọn giới
+ *  hạn tới ngày cuối khoảng đang xem — kỳ so phải nằm trước đó (mốc, 040). */
 function SoVoi({ k, pv, kx }: { k: Khoang; pv: PhamVi; kx: KhoangMayChu | null }) {
   const coSs = !!(k.ss_thang || k.ss_ky || k.ss_tu);
   const [mo, datMo] = useState(false);
@@ -121,21 +138,37 @@ function SoVoi({ k, pv, kx }: { k: Khoang; pv: PhamVi; kx: KhoangMayChu | null }
   const [den, datDen] = useState(k.ss_den ?? "");
   const cuoi = kx?.den ?? pv.hom_nay;
   const tDau = thangCua(pv.ngay_dau), tCuoi = thangCua(cuoi);
-  const nhanSs = kx?.tu_chon ? kx.so_sanh[0]?.nhan : null;
+  const s = kx?.so_sanh[0];
   const ap = (x: Parameters<typeof datSoSanh>[0]) => { datSoSanh(x); datMo(false); };
+  // Phần của khoảng xem thật sự đem so khác cả khoảng (dạng Kỳ, dữ liệu bắt đầu giữa
+  // chừng) · hai bên khác số ngày (kỳ tự chọn) — nói ra, đừng để người đọc tự suy.
+  const catLai = !!s && !!kx && (s.tu_nay !== kx.tu || s.den_nay !== kx.den);
+  const khacNgay = !!s && soNgay(s.tu_nay, s.den_nay) !== soNgay(s.tu, s.den);
 
   return (
-    <div className="kx-so-voi" role="group" aria-label="So với">
-      <span className="kx-nhan">SO VỚI</span>
-      {coSs
-        ? <span className="kx-chip">So với <b>{nhanSs ?? "kỳ đã chọn"}</b>
-            <button type="button" className="nut-nho" aria-label="Bỏ kỳ so sánh, về mặc định"
-              onClick={() => ap({})}>✕</button></span>
-        : <span className="phu">Mặc định (năm trước · tháng trước)</span>}
-      <button type="button" className="nut-nho" aria-expanded={mo} onClick={() => datMo(!mo)}>
-        {coSs ? "Đổi kỳ so sánh…" : "Chọn kỳ để so…"}</button>
+    <section className="kx-the kx-ss" aria-label="So với">
+      <div className="kx-dau">
+        <span className="kx-nhan"><MauSs />SO VỚI</span>
+        <div className="kx-chips" role="group" aria-label="Kỳ so">
+          {(kx?.lua_chon ?? []).map(c => (
+            <button key={c.ma} type="button" className="chip" aria-pressed={!coSs && c.chon}
+              onClick={() => ap(c.ma === "nam_truoc" ? {} : { ss: "truoc" })}>{hoa(c.nhan)}</button>))}
+          {coSs && <span className="chip kx-chip-tc">{s ? hoa(s.nhan) : "Kỳ đã chọn"}
+            <button type="button" aria-label="Bỏ kỳ so tự chọn, về năm trước" onClick={() => ap({})}>✕</button></span>}
+          <button type="button" className="chip" aria-expanded={mo} onClick={() => datMo(!mo)}>
+            {coSs ? "Đổi…" : "Tuỳ chọn…"}</button>
+        </div>
+      </div>
+      <div className="kx-giua"><div className="kx-to">{s ? hoa(s.nhan) : "…"}</div></div>
+      <div className="kx-dai phu">
+        {!s ? "…" : !s.co ? <span className="kx-ghi">Không có dữ liệu để so — kỳ này nằm trước dữ liệu trong kho.</span>
+          : <>{dai(s.tu, s.den)}
+            {catLai ? ` · so với phần ${dai(s.tu_nay, s.den_nay)} của khoảng xem` : ""}
+            {khacNgay ? ` · ${soNgay(s.tu_nay, s.den_nay)} ngày với ${soNgay(s.tu, s.den)} ngày`
+              : kx && !kx.tron_thang && kx.loai === "thang" ? ` · cắt cùng ${soNgay(kx.tu, kx.den)} ngày` : ""}</>}
+      </div>
 
-      {mo && <div className="kx-dieu">
+      {mo && <div className="kx-dieu kx-tuy-chon">
         <div className="tab-pill" role="group" aria-label="Dạng kỳ so sánh">
           {(["thang", "ky", "khoang"] as const).map(l => (
             <button key={l} type="button" aria-pressed={loai === l} onClick={() => datLoai(l)}>
@@ -160,6 +193,6 @@ function SoVoi({ k, pv, kx }: { k: Khoang; pv: PhamVi; kx: KhoangMayChu | null }
           <button type="submit" className="nut-nho chinh" disabled={!tu || !den || tu > den}>So</button>
         </form>}
       </div>}
-    </div>
+    </section>
   );
 }

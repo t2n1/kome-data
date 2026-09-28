@@ -61,6 +61,11 @@ class O:
     so_phieu: int
     so_khach: int
     dt_cung_ky: int | None
+    # Kỳ so của cùng điểm (đặc tả 2026-09-28): đường nhỏ lãi gộp / khách / tỷ suất
+    # vẽ nét đứt kỳ so. None = không có (dạng Kỳ không có lãi gộp / khách cùng kỳ).
+    lg_cung_ky: int | None = None
+    so_khach_cung_ky: int | None = None
+    ty_suat_cung_ky: float | None = None
 
 
 @dataclass
@@ -186,6 +191,10 @@ class NganhThang:
     dt_cung_ky: int | None
     co_cung_ky: bool
     tang_truong: float | None
+    # Nhánh khoảng xem (ban_khoang.nganh_thang_ss) mang cả lãi gộp — để cộng luỹ
+    # kế kỳ so của khối ngân sách mà không hỏi thêm câu nào.
+    lai_gop: int | None = None
+    lg_cung_ky: int | None = None
 
 
 @dataclass
@@ -256,6 +265,10 @@ class BaoCao:
     so_sanh: list[SoSanhSo] = field(default_factory=list)
     phi: NhomRieng = field(default_factory=NhomRieng)
     hang_tang: NhomRieng = field(default_factory=NhomRieng)
+    # Tổng KỲ SO theo từng tháng của kỳ (khoá = tháng ĐANG XEM, giá trị = [dt, lg]
+    # của tháng dời `lech_thang`) — cộng từ ngành × tháng TRƯỚC khi tách phí, nên
+    # Σ = tổng tháng. Rỗng ở dạng Kỳ (dùng `thang[].dt_cung_ky`).
+    thang_ss: dict = field(default_factory=dict)
 
 
 def _ky_tu_dong(r) -> Ky:
@@ -280,8 +293,10 @@ def _cung_ky_tu_dong(r) -> CungKy:
                   so_khach_ck=r[19])
 
 
-def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
-    """Số liệu cho một kỳ kế toán. company_fy=None => kỳ GẦN NHẤT có dữ liệu."""
+def tinh_bao_cao(conn, company_fy: int | None = None, ss=None) -> BaoCao:
+    """Số liệu cho một kỳ kế toán. company_fy=None => kỳ GẦN NHẤT có dữ liệu.
+    `ss` = kỳ so của khoảng xem (`khoang_xem.SoSanh`, đặc tả 2026-09-28): bảng người
+    phụ trách kèm doanh thu kỳ so trong CÙNG câu (5) — không thêm lượt hỏi."""
     # (1) Một câu lấy MỌI kỳ kèm cùng kỳ: LEFT JOIN mart.ky_cung_ky USING
     # (company_fy) thay vì hỏi riêng — gộp "kỳ" và "cùng kỳ" của gợi ý brief.
     dong_ky = conn.execute(
@@ -312,10 +327,11 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
           ty_suat=float(r[3]) if r[3] is not None else None,
           co_cung_ky=r[4], tang_truong=float(r[5]) if r[5] is not None else None,
           la_thang_chot=r[0].endswith("-07"), so_phieu=r[6], so_khach=r[7],
-          dt_cung_ky=int(r[8]) if r[8] is not None else None)
+          dt_cung_ky=int(r[8]) if r[8] is not None else None,
+          ty_suat_cung_ky=float(r[9]) if r[9] is not None else None)
         for r in conn.execute(
             """SELECT thang, doanh_thu_thuan, lai_gop, ty_suat, co_cung_ky,
-                      tang_truong, so_phieu, so_khach, dt_cung_ky
+                      tang_truong, so_phieu, so_khach, dt_cung_ky, ty_suat_cung_ky
                FROM mart.ban_theo_thang_so_sanh
                WHERE company_fy = %s ORDER BY thang""", (ky.company_fy,)).fetchall()
     ]
@@ -385,12 +401,28 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
     # "không biết" phải luôn đứng SAU mọi giá trị đã biết, kể cả giá trị biết
     # rất xấu. `float('-inf')` không có ca này — luôn nhỏ hơn MỌI số nguyên.
 
-    # (5) Người phụ trách — không đổi.
-    nhan_vien = [dict(zip(("ma", "doanh_thu", "lai_gop", "ty_suat", "so_khach",
-                           "so_phieu"), r)) for r in conn.execute(
-        """SELECT salesperson_code, doanh_thu_thuan, lai_gop, ty_suat, so_khach, so_phieu
-           FROM mart.ban_theo_nhan_vien WHERE company_fy = %s
-           ORDER BY doanh_thu_thuan DESC""", (ky.company_fy,)).fetchall()]
+    # (5) Người phụ trách. Có kỳ so: FULL JOIN hai dải `mart.sale_khoang` trong
+    # CÙNG câu — người chỉ bán ở kỳ so vẫn có dòng (doanh thu 0).
+    if ss is not None and ss.co:
+        nhan_vien = [dict(zip(("ma", "doanh_thu", "lai_gop", "ty_suat", "so_khach",
+                               "so_phieu", "dt_ss", "dt_nay_ss"),
+                              (r[0], int(r[1] or 0), int(r[2] or 0), r[3], r[4] or 0, r[5] or 0,
+                               int(r[6] or 0), int(r[7] or 0)))) for r in conn.execute(
+            """WITH a AS (SELECT * FROM mart.ban_theo_nhan_vien WHERE company_fy = %s),
+                    s AS (SELECT salesperson_code, dt FROM mart.sale_khoang(%s, %s)),
+                    n AS (SELECT salesperson_code, dt FROM mart.sale_khoang(%s, %s))
+               SELECT coalesce(a.salesperson_code, s.salesperson_code), a.doanh_thu_thuan, a.lai_gop,
+                      a.ty_suat, a.so_khach, a.so_phieu, s.dt, n.dt
+                 FROM a FULL JOIN s ON coalesce(s.salesperson_code, '') = coalesce(a.salesperson_code, '')
+                 LEFT JOIN n ON coalesce(n.salesperson_code, '') = coalesce(a.salesperson_code, s.salesperson_code, '')
+                ORDER BY a.doanh_thu_thuan DESC NULLS LAST""",
+            (ky.company_fy, ss.tu, ss.den, ss.tu_nay, ss.den_nay)).fetchall()]
+    else:
+        nhan_vien = [dict(zip(("ma", "doanh_thu", "lai_gop", "ty_suat", "so_khach",
+                               "so_phieu"), r)) for r in conn.execute(
+            """SELECT salesperson_code, doanh_thu_thuan, lai_gop, ty_suat, so_khach, so_phieu
+               FROM mart.ban_theo_nhan_vien WHERE company_fy = %s
+               ORDER BY doanh_thu_thuan DESC""", (ky.company_fy,)).fetchall()]
 
     # (6) Ngành × tháng — cho bản đồ nhiệt.
     nganh_thang = doc_nganh_thang(conn, ky.company_fy)
@@ -577,9 +609,20 @@ def ve_bieu_do(thang: list[O]) -> dict:
     if dang_ve_ck:
         doan_ck.append(" ".join(dang_ve_ck))
 
+    # Cột MA của kỳ so (đặc tả 2026-09-28: cột → cột ma): cùng thang `dinh`, rộng
+    # hơn cột thật một chút để viền đứt luôn thấy được.
+    rong_ma = min(buoc * 0.86, rong_cot + 8)
+    cot_ck = []
+    for i, o in enumerate(thang):
+        if o.dt_cung_ky is None:
+            continue
+        hc = max(cao_ve * (o.dt_cung_ky / dinh), 0) if o.dt_cung_ky > 0 else 0
+        cot_ck.append({"x": round(LE_T + i * buoc + (buoc - rong_ma) / 2, 1),
+                       "y": round(LE_TREN + cao_ve - hc, 1), "w": round(rong_ma, 1),
+                       "h": round(hc, 1), "thang": o.thang, "dt": o.dt_cung_ky})
     return {"co": True, "rong": RONG, "cao": CAO, "cot": cot, "diem": diem,
             "duong": " ".join(f"{x},{y}" for x, y, _ in diem),
-            "duong_ck": doan_ck,
+            "duong_ck": doan_ck, "cot_ck": cot_ck,
             "ts_lo": lo, "ts_hi": hi, "dinh_doanh_thu": dinh}
 
 
@@ -882,7 +925,7 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None,
         tien_do_lg=float(r_thang[7]) if r_thang and r_thang[7] is not None else None)
 
 
-def ve_luy_ke(td: "TienDoNganSach | None", lg: bool = False) -> dict:
+def ve_luy_ke(td: "TienDoNganSach | None", lg: bool = False, ss: list | None = None) -> dict:
     """Toạ độ hai đường luỹ kế (thực tế và nhịp ngân sách) trên cùng một trục.
 
     Tự tính toạ độ SVG như `ve_bieu_do`: trang phải chạy cả trên Vercel (CSP
@@ -895,8 +938,11 @@ def ve_luy_ke(td: "TienDoNganSach | None", lg: bool = False) -> dict:
     _ns = (lambda m: m.ngan_sach_lg) if lg else (lambda m: m.ngan_sach)
     cao_ve = CAO - LE_TREN - LE_DUOI
     rong_ve = RONG - LE_T - LE_P
+    # `ss`: luỹ kế KỲ SO cùng thứ tự `td.luy_ke` (None = không có) — nét đứt.
+    ss = ss or [None] * len(td.luy_ke)
+    ss_thang = {m.thang: v for m, v in zip(td.luy_ke, ss)}
     dinh = max([_tt(m) or 0 for m in td.luy_ke]
-               + [_ns(m) or 0 for m in td.luy_ke]) or 1
+               + [_ns(m) or 0 for m in td.luy_ke] + [v or 0 for v in ss]) or 1
     buoc = rong_ve / max(len(td.luy_ke) - 1, 1)
 
     def _duong(lay) -> str:
@@ -923,4 +969,5 @@ def ve_luy_ke(td: "TienDoNganSach | None", lg: bool = False) -> dict:
     return {"co": True, "rong": RONG, "cao": CAO, "dinh": dinh,
             "thuc_te": _duong(_tt),
             "ngan_sach": _duong(_ns),
+            "so_sanh": _duong(lambda m: ss_thang.get(m.thang)),
             "nhan": nhan}

@@ -18,6 +18,7 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
   if (error) return <div className="khoi-loi">Không tải được tab Khách hàng: {(error as Error).message}</div>;
   if (!data) return <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div>;
   const t = data.t, ct = data.cach_tinh, top = t.tap_trung.slice(0, 30);
+  const nhanSsTab = khoang?.so_sanh.nhan ?? "kỳ so";
   return (<>
     <div className="sp3-luoi-2">
       <The tieu_de="Tập trung khách" cach_tinh={ct.tap_trung}
@@ -44,10 +45,15 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
               <td className="so">{yen(n.doanh_thu)}</td><td className="so">{pc(n.bien)}</td>
               <td className="so">{so(n.so_khach)}</td></tr>))}</tbody></table></div>}
       </The>
-      <The tieu_de="Khách mới / quay lại theo tháng" cach_tinh={ct.khach_moi}>
+      {/* Đã có hai lớp cột -> kỳ so là NÉT ĐỨT (tổng khách của cửa sổ lùi — đặc tả 2026-09-28 §6). */}
+      <The tieu_de="Khách mới / quay lại theo tháng" cach_tinh={<>{ct.khach_moi}{t.khach_moi_ss.length
+          ? <> Nét đứt = tổng khách cùng vị trí tháng, lùi {t.lui_thang} tháng ({nhanSsTab}).</>
+          : <> {nhanSsTab}: không vẽ — cửa sổ lùi bắt đầu trước dữ liệu, hoặc kỳ so không lệch tròn tháng.</>}</>}>
         <BieuDo nhan={t.khach_moi.map(x => `${+x.thang.slice(5)}/${x.thang.slice(2, 4)}`)} cao={180}
           chuoi={[{ ten: "Quay lại", kieu: "cot", gia_tri: t.khach_moi.map(x => x.quay_lai), mau: "var(--chu-mo)" },
-                  { ten: "Mới", kieu: "cot", gia_tri: t.khach_moi.map(x => x.moi), mau: "var(--ok-vien)" }]}
+                  { ten: "Mới", kieu: "cot", gia_tri: t.khach_moi.map(x => x.moi), mau: "var(--ok-vien)" },
+                  ...(t.khach_moi_ss.length ? [{ ten: `Tổng khách · lùi ${t.lui_thang} tháng`, kieu: "duong_dut" as const,
+                    gia_tri: t.khach_moi_ss.map(x => x.moi + x.quay_lai), mau: "var(--vien-dam)" }] : [])]}
           dinh_dang={v => so(v)} dinh_dang_truc={v => so(v)} mo_ta="Số khách mới và khách quay lại mua mã này theo tháng" />
       </The>
     </div>

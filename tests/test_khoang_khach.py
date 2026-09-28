@@ -43,7 +43,7 @@ def c(test_db_url):
 
 def test_danh_ba_khoang_cong_lai_BANG_tong_khoang(conn, batch):
     _gieo(conn, batch)
-    kx = _kx(conn)                                       # tháng 7/2026, 1 → 9
+    kx = _kx(conn, ss="truoc")                           # tháng 7/2026, 1 → 9; so tháng trước
     kk = BK.danh_ba_khoang(conn, kx)
     assert kk["so_sanh"].ma == "thang_truoc"
     assert sum(v[0] or 0 for v in kk["dong"].values()) == _tong(conn, kx.tu, kx.den)[0]
@@ -78,11 +78,12 @@ def test_danh_sach_khoang_sai_la_400(conn, batch, c):
 
 def test_ho_so_theo_khoang(conn, batch, c):
     _gieo(conn, batch)
-    d = c.get("/api/khach-hang/KA01/khoang").json()
+    d = c.get("/api/khach-hang/KA01/khoang?ss=truoc").json()
     assert d["tong"]["dt"] == 150_000 and d["tong"]["so_ngay"] == 2
     assert sum(m["doanh_thu"] for m in d["mat_hang"]) == d["tong"]["dt"]
     assert sum(n["doanh_thu"] for n in d["ngay"]) == d["tong"]["dt"]
-    tt = next(s for s in d["so_sanh"] if s["ma"] == "thang_truoc")
+    (tt,) = d["so_sanh"]
+    assert tt["ma"] == "thang_truoc"
     assert (tt["dt_ck"], tt["tu"], tt["den"]) == (60_000, "2026-06-01", "2026-06-09")
     assert c.get("/api/khach-hang/KHONG_CO/khoang").json()["tong"]["dt"] == 0
 

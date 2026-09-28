@@ -33,10 +33,14 @@ export type TabKhachApi = { t: {
   tinh: { o: OTinhMa[]; rong: number; cao: number; o_rong: number; o_cao: number; khong_ro: number };
   nguoi: { ma: string; ten: string | null; doanh_thu: number; lai_gop: number; so_khach: number; bien: number | null }[];
   khach_moi: { thang: string; moi: number; quay_lai: number }[];
+  /** Cùng 12 vị trí ở cửa sổ KỲ SO (lùi `lui_thang` tháng) — [] khi không so được. */
+  khach_moi_ss: { thang: string; moi: number; quay_lai: number }[]; lui_thang: number | null;
   dang_mua: KhachDong[]; da_ngung: KhachDong[];
 }; cach_tinh: CachTinh };
 export type TabThoiGianApi = { t: {
   tuan: { tuan: string; so_luong: number; doanh_thu: number }[];
+  /** Cùng 26 vị trí ở cửa sổ KỲ SO (lùi `tuan_lui` tuần) — [] khi không so được. */
+  tuan_ss: { tuan: string; so_luong: number; doanh_thu: number }[]; tuan_lui: number | null;
   nhip: { nhom: string; so_cap: number }[];
   co_don: { pack_code: string; quy_cach: string; nhom: string; thu_tu: number; so_dong: number; so_luong: number }[];
 }; cach_tinh: CachTinh };

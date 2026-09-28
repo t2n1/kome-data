@@ -243,7 +243,8 @@ def test_pareto_cau_tom_tat(client, conn, batch):
 
 
 def test_nhiet_chu_giai_co_khong_co_cung_ky(client, conn, batch):
-    """[Chữ bắt buộc] Chú giải bản đồ nhiệt có 'không có cùng kỳ'.
+    """[Chữ bắt buộc] Chú giải bản đồ nhiệt có bậc 'không có số để so' (từ đặc tả
+    2026-09-28 ô so với KỲ SO đang bật — trước đó chữ là 'không có cùng kỳ').
 
     Giai đoạn 3: chú giải là mã React — kiểm nó nằm trong khối chú giải NGAY
     SAU bảng nhiệt (không phải một chữ lạc ở khối khác), cạnh đúng ô màu
@@ -253,7 +254,7 @@ def test_nhiet_chu_giai_co_khong_co_cung_ky(client, conn, batch):
     m = re.search(r'<table className="nhiet-bang">.*?</table>.*?<div className="chu-giai bc-cg">(.*?)</div>',
                   _src(), re.S)
     assert m, "không tìm thấy chú giải của bảng nhiệt"
-    assert '<i className="mau bac-khong_ck" /> không có cùng kỳ' in m.group(1)
+    assert '<i className="mau bac-khong_ck" /> không có số để so' in m.group(1)
 
 
 def test_khong_co_ma_mau_hex_trong_template():
@@ -294,12 +295,14 @@ def test_moi_rect_circle_du_lieu_co_title(client, conn, batch):
     d = _api(client)
     assert d["bd"]["cot"] and d["dg"]["thanh"] and d["co"]["nganh"] and d["pa"]["cot"]
     src = _src()
-    nhan = ("Doanh thu và tỷ suất lãi gộp theo tháng, kèm cùng kỳ năm trước",
-            "Chênh lệch doanh thu theo ngành so cùng kỳ",
+    # Hai nhãn đầu mang tên KỲ SO của máy chủ (đặc tả 2026-09-28) — nhãn là mẫu `${nhanSs}`.
+    nhan = ("Doanh thu và tỷ suất lãi gộp, kèm ${nhanSs}",
+            "Chênh lệch doanh thu theo ngành so ${nhanSs}",
             "Doanh thu theo ngành hàng và mặt hàng",
             "Doanh thu và luỹ kế của 20 khách hàng lớn nhất")
     for n in nhan:
-        m_svg = re.search(rf'aria-label="{re.escape(n)}">(.*?)</svg>', src, re.S)
+        thuoc_tinh = (rf'aria-label=\{{`{re.escape(n)}`\}}' if "${" in n else rf'aria-label="{re.escape(n)}"')
+        m_svg = re.search(thuoc_tinh + r'>(.*?)</svg>', src, re.S)
         assert m_svg, f"không tìm thấy SVG '{n}'"
         khoi = m_svg.group(1)
         dem = 0
@@ -367,7 +370,7 @@ def test_ban_do_nhiet_la_bang_html_co_scope(client, conn, batch):
     ham = o_ham.group(0)
     assert "không bán tháng này" in ham
     assert "chưa tới tháng" in ham
-    assert re.search(r"title=\{`\$\{nhan\}: \$\{dau\(o\.tang_truong\)\}% so cùng kỳ[^`]*`\}>"
+    assert re.search(r"title=\{`\$\{nhan\}: \$\{dau\(o\.tang_truong\)\}% so \$\{nhan_ss\}[^`]*`\}>"
                      r"\{dau\(o\.tang_truong\)\}%</td>", ham), \
         "ô nhiệt và title phải in % bằng CÙNG một hàm làm tròn"
     assert re.search(r"const dau = .*toFixed\(1\)", src), "% phải có đúng MỘT chữ số thập phân"

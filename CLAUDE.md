@@ -862,8 +862,8 @@ nằm TRÊN URL (`?thang=YYYY-MM` · `?ky=<company_fy>` · `?tu=&den=`; không t
 của `mart.moc_thoi_gian.hom_nay`, mùng 1 → hôm nay). Không cookie, không localStorage —
 gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hiện tại. Bốn luật:
 - **Một chỗ hiểu khoảng xem**: `kome/khoang_xem.py` (đọc tham số · cắt vào dải dữ liệu ·
-  dải so sánh · câu mô tả). `so_sanh[0]` luôn là NĂM TRƯỚC; `[1]` là tháng trước / khoảng
-  liền trước. Tháng dở dang so CÙNG DẢI NGÀY (29/2 → 28/2, đúng `mart.thang_den_hom_nay`),
+  dải so sánh · câu mô tả). `so_sanh` có ĐÚNG MỘT phần tử = kỳ so đang bật (xem luật
+  "Một kỳ so" bên dưới). Tháng dở dang so CÙNG DẢI NGÀY (29/2 → 28/2, đúng `mart.thang_den_hom_nay`),
   tháng trọn so trọn tháng; Kỳ so trên các tháng CẢ HAI phía có dữ liệu (đúng
   `mart.ky_cung_ky`). Phép so vào trước dải dữ liệu → `co = false`, màn in "không có dữ liệu
   để so". Khoảng ĐÃ QUA (kho có dữ liệu sau mốc) kết thúc ở CHÍNH mốc, không ở ngày bán
@@ -877,7 +877,8 @@ gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hi�
   `kome/bao_cao.py`. Đẳng thức có test canh (`tests/test_mart_khoang.py`,
   `tests/test_ban_khoang.py`): tháng trọn = `mart.ban_theo_thang`; tháng hiện tại =
   `mart.thang_den_hom_nay`; Σ ngày = Σ ngành = tổng khoảng; dạng Kỳ của `/bao-cao` = đúng
-  số cũ (`BK.tinh_bao_cao` gọi thẳng `bao_cao.tinh_bao_cao`).
+  số cũ (`BK.tinh_bao_cao` gọi thẳng `bao_cao.tinh_bao_cao`; từ 2026-09-28 bảng người phụ
+  trách chỉ THÊM cột kỳ so `dt_ss`/`dt_nay_ss`).
 - **Số bán hàng đổi theo khoảng, và từ migration 040 MỌI THỨ quay về mốc của khoảng** (ngày
   cuối khoảng): hạng 12 tháng, trạng thái / nhịp mua, nhóm cần gọi, tồn, tốc độ, công nợ, dự
   báo — xem bất biến "Mốc thời gian dời được" bên dưới. Nhãn "hôm nay" đổi thành "đến
@@ -889,14 +890,39 @@ gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hi�
   ngân sách lượt hỏi = cũ + 1 (`tests/test_api.py::NGAN_SACH_TRUY_VAN`). `/bao-cao` vẫn ≤ 11
   ở cả ba dạng (`tests/test_ban_khoang.py::test_bao_cao_thang_khong_qua_11_truy_van`).
 - **Kỳ so sánh tự chọn** (`?ss_thang=` · `?ss_ky=` · `?ss_tu=&ss_den=`, 2026-09-25) THAY cả
-  hai phép so mặc định bằng MỘT (`so_sanh = (SoSanh(ma='tu_chon'),)`, `KhoangXem.tu_chon`) — mọi
-  màn đọc `so_sanh[0]`/`_ss_phu` tự đi theo. Tháng↔Tháng dở dang cắt cùng dải ngày, Kỳ↔Kỳ cùng vị
+  chip mặc định (`so_sanh = (SoSanh(ma='tu_chon'),)`, `KhoangXem.tu_chon`; có `ss_*` thì `?ss=`
+  bị bỏ khỏi khoá) — mọi màn đọc `so_sanh[0]` tự đi theo. Tháng↔Tháng dở dang cắt cùng dải ngày, Kỳ↔Kỳ cùng vị
   trí trong kỳ (theo tháng có dữ liệu), tổ hợp khác nguyên văn + `mo_ta` in số ngày hai bên. Dải
   so phải kết thúc ≤ ngày cuối khoảng xem (400) — `mart.dong_ban` chỉ thấy dòng ≤ mốc, KHÔNG nới
   mốc. Màn không dùng phép so gọi `ThamSo.chinh()` (`api._ts(...).chinh()`) để đổi kỳ so sánh
   không làm ảnh chụp của chúng trượt. `/bao-cao?ky=&ss_*=` đi nhánh khoảng (không `cung_ky`).
   `datKhoang` giữ `ss_*`; chỉ `datSoSanh` đổi nó. Test: `tests/test_ky_so_sanh.py`. Đặc tả:
   `docs/superpowers/specs/2026-09-25-ky-so-sanh-tu-chon-design.md`.
+- **Một kỳ so cho cả website** (2026-09-28, chủ DN chốt): không tham số = NĂM TRƯỚC; `?ss=truoc`
+  = tháng trước (dạng Tháng) / khoảng liền trước (dạng Khoảng) — dạng Kỳ không có, rơi về năm
+  trước; `ss_*` = tự chọn. `giai` dựng cặp mặc định rồi giữ MỘT; `KhoangXem.lua_chon` là các
+  chip cho thanh chọn. MỌI ô số / biểu đồ / cột so được đọc `so_sanh[0]` — không khối nào tự chọn
+  "năm trước" hay "tháng trước" (bỏ luật cũ "cột so sánh là phép so PHỤ `so_sanh[1]`",
+  `_ss_phu` đã xoá). Nhãn kỳ so luôn là `so_sanh[0].nhan` của máy chủ. `SoSanh.lech_thang` = số
+  tháng tròn kỳ so lệch kỳ xem (12 / 1 / N; None khi lệch lẻ ngày): biểu đồ theo tháng có cửa sổ
+  riêng (Theo tháng, luỹ kế dạng Kỳ, khách mới 12 tháng, quý khi `lech_thang % 3 == 0`) dời đúng
+  số đó; None → không vẽ phép so và nói ra. Cách vẽ chung: kỳ so = NÉT ĐỨT (đường) · CỘT MA
+  (`BieuDo` kiểu `cot_ma`, viền đứt, đè lên cột thật) · VẠCH ĐỨT (`chung/SoSanh.tsx::VachSoSanh`)
+  — nét đứt KHÔNG dùng cho thứ gì khác (nhịp ngân sách là nét liền). Thanh chọn là hai thẻ ĐANG
+  XEM (viền liền) / SO VỚI (viền đứt). `/bao-cao` (đợt 2) vẫn ≤ 11 lượt: phép so đi CHUNG
+  câu có sẵn — người phụ trách FULL JOIN hai dải `mart.sale_khoang` (`BK.sale`, câu (5) của
+  `bao_cao.tinh_bao_cao` khi có `ss`), ngành × tháng dời `lech_thang` (`BK.nganh_thang_ss`, mọi
+  tháng của kỳ trong dải dữ liệu, THAY `doc_nganh_thang` ở dạng Tháng / Khoảng), luỹ kế kỳ so
+  cộng từ số đã có (`api._luy_ke_ky_so`; thiếu số ở một tháng đã có thực tế ⇒ không vẽ). Đợt 3
+  (Khách hàng · Sản phẩm): `/api/ban-do` KHÔNG còn `.chinh()` (doanh thu tỉnh ở kỳ so, CTE thứ ba
+  trong hai câu cũ — vẫn 2 lượt); `/khoang` của hồ sơ khách và của mã trả `thang_ss` (tháng dời
+  `lech_thang`, tháng dở dang = dải so đã cắt) + `dt_ss` từng mặt hàng — CHUNG câu cũ; `/ngay?lech=`
+  (tháng so = lùi `lech` tháng; rỗng = không so); tab Khách / Thời gian của Sản phẩm 360 đọc
+  `mart.sp_khach_moi_thang_den` / `mart.sp_theo_tuan_den` (057 — hai hàm cũ là lớp bọc, MỘT công
+  thức) trong câu 1 có sẵn; mặc định (không tham số) lùi 12 tháng / 52 tuần biết theo cú pháp
+  (`SP360.LUI_MAC_DINH`) nên trần 3 / 2 lượt không đổi; cửa sổ lùi bắt đầu trước dữ liệu ⇒ không vẽ.
+  Test: `tests/test_khoang_xem.py`, `tests/test_tong_quan_ky_so.py`, `tests/test_bao_cao_ky_so.py`,
+  `tests/test_khach_sp_ky_so.py`. **Migration 057 phải chạy TRƯỚC khi triển khai.** Đặc tả: `docs/superpowers/specs/2026-09-28-ky-so-sanh-toan-web-design.md`.
 Liên kết nội bộ giữ khoảng xem nhờ MỘT bộ viết lại `href` ở `document`
 (`khoang.ts::ganVietLaiLienKet`); mọi `history.pushState/replaceState` của từng màn đi
 qua `giuKhoang()` — thêm một màn có bộ lọc trên URL mà quên hàm đó là đổi bộ lọc xong mất
@@ -909,8 +935,7 @@ sơ khách và của Sản phẩm đi endpoint RIÊNG (`/api/khach-hang/{mã}/kh
 trần 8 lượt, danh mục vẫn MỘT ảnh chụp 1 lượt. Danh sách khách ghép doanh số theo khoảng
 (ảnh chụp riêng theo khoảng, `anh_chup.KHOA_DANH_BA_KHOANG`) vào danh bạ bằng
 `KH.ghep_khoang` — BẢN SAO, không sửa danh bạ gốc (nó là ảnh chụp dùng chung mọi khoảng).
-Cột so sánh ở Khách hàng / Sản phẩm là phép so PHỤ (`so_sanh[1]`: tháng trước / khoảng liền
-trước; dạng Kỳ: năm trước). Bản đồ thêm hai chỉ số `dt_khoang` / `khach_mua`
+Cột so sánh ở Khách hàng / Sản phẩm đọc kỳ so đang bật (`so_sanh[0]`, luật "Một kỳ so"). Bản đồ thêm hai chỉ số `dt_khoang` / `khach_mua`
 (`mart.tinh_khoang`) — "Doanh thu 12 tháng" giữ nguyên. Đặc tả: `docs/superpowers/specs/2026-09-24-khoang-xem-thang-design.md`.
 
 **Bất biến (Đợt 6, migration 038):** công nợ đọc sổ `請求先元帳` (spec `seikyu_motocho`

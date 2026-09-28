@@ -12,6 +12,9 @@
 .bc-svg{display:block;height:auto;margin-top:.4rem}
 .bc-cg{font-size:.74rem;margin-top:.45rem}
 .chu-giai.bc-cg .mau{width:.8rem;height:.8rem;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:.3rem}
+.chu-giai.bc-cg .mau.mau-ma{background:transparent;border:1.5px dashed var(--vien-dam)}
+/* Vạch đứt kỳ so trên thanh tiến độ (thanh có overflow:hidden — vạch nằm trọn trong thanh). */
+.thanh-tien-do .ss-vach{top:0;bottom:0}
 .bc-hai{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(460px,100%),1fr));gap:.75rem;margin-bottom:.8rem}
 .bc-hai > .bc-khoi{margin-bottom:0}
 .bc-cot rect,.bc-thanh rect,.bc-cot-kh{transition:opacity .12s}

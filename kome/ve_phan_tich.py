@@ -149,7 +149,8 @@ def _squarify(gia_tri: list[float], x: float, y: float, w: float, h: float
 
 # ---- Sparkline --------------------------------------------------------------
 
-def ve_duong_nho(so: list[int | float | None], rong: int = 120, cao: int = 32) -> dict:
+def ve_duong_nho(so: list[int | float | None], rong: int = 120, cao: int = 32,
+                 so_sanh: list[int | float | None] | None = None) -> dict:
     """Đường nhỏ (sparkline) cho một ô chỉ số. `None` cắt đường thành đoạn
     mới — KHÔNG nối liền qua tháng thiếu dữ liệu, cùng nếp `ve_bieu_do` với
     tháng không có cùng kỳ.
@@ -164,10 +165,12 @@ def ve_duong_nho(so: list[int | float | None], rong: int = 120, cao: int = 32) -
     gia_tri = [v for v in so if v is not None]
     if not gia_tri:
         return {"co": False}
+    # `so_sanh` (kỳ so, đặc tả 2026-09-28) vẽ CÙNG thang để hai đường so được bằng mắt.
+    ss = [v for v in (so_sanh or [])[:len(so)] if v is not None]
     le = 2
     cao_ve = cao - 2 * le
     rong_ve = rong - 2 * le
-    dinh, day = max(gia_tri), min(gia_tri)
+    dinh, day = max(gia_tri + ss), min(gia_tri + ss)
     khoang = (dinh - day) or 1
     buoc = rong_ve / max(len(so) - 1, 1)
 
@@ -183,16 +186,24 @@ def ve_duong_nho(so: list[int | float | None], rong: int = 120, cao: int = 32) -
         doan.append(" ".join(f"{x},{y}" for x, y in dang_ve))
         dang_ve.clear()
 
-    for i, v in enumerate(so):
-        if v is None:
-            flush()
-            continue
-        x = round(le + i * buoc, 1)
-        y = round(le + cao_ve - cao_ve * (v - day) / khoang, 1)
-        dang_ve.append((x, y))
-    flush()
+    def ve(chuoi) -> None:
+        for i, v in enumerate(chuoi):
+            if v is None:
+                flush()
+                continue
+            x = round(le + i * buoc, 1)
+            y = round(le + cao_ve - cao_ve * (v - day) / khoang, 1)
+            dang_ve.append((x, y))
+        flush()
 
-    return {"co": True, "rong": rong, "cao": cao, "doan": doan, "diem_don": diem_don}
+    ve(so)
+    doan_chinh, diem_chinh = doan[:], diem_don[:]
+    doan.clear()
+    diem_don.clear()
+    if ss:
+        ve((so_sanh or [])[:len(so)])
+    return {"co": True, "rong": rong, "cao": cao, "doan": doan_chinh, "diem_don": diem_chinh,
+            "doan_ss": [d for d in doan if " " in d]}
 
 
 # ---- Xu hướng 30 ngày (đợt 5b Task 5, dashboard `/`) -----------------------
@@ -478,9 +489,15 @@ def _lui_12_thang(th: str) -> str:
     return f"{int(th[:4]) - 1:04d}-{th[5:7]}"
 
 
+def _lui_thang(th: str, n: int) -> str:
+    """"YYYY-MM" lùi `n` tháng (n = 12 ≡ `_lui_12_thang`)."""
+    t = int(th[:4]) * 12 + int(th[5:7]) - 1 - n
+    return f"{t // 12:04d}-{t % 12 + 1:02d}"
+
+
 def ve_nhiet(dong: "list[NganhThang]", thang: list[str],
              thang_cuoi_co_du_lieu: str | None = None,
-             thang_dau_du_lieu: str | None = None) -> dict:
+             thang_dau_du_lieu: str | None = None, lech: int = 12) -> dict:
     """Lưới ngành × tháng. Hàng xếp theo TỔNG doanh thu kỳ giảm dần (tính
     bằng `sorted` trên dữ liệu đã có — chỉ để SẮP XẾP HIỂN THỊ, không phải
     một chỉ số mới). Luôn đủ 12 cột kể cả tháng ngành đó không có dòng bán —
@@ -554,8 +571,9 @@ def ve_nhiet(dong: "list[NganhThang]", thang: list[str],
                 cell = {"thang": th, "nganh": nganh, "bac": "truoc_du_lieu",
                         "tang_truong": None, "doanh_thu": None, "co_cung_ky": False}
             elif d is None and thang_cuoi_co_du_lieu is not None:
+                # `lech`: kỳ so dời bao nhiêu tháng (12 = năm trước; đặc tả 2026-09-28).
                 co_the_ck = (thang_dau_du_lieu is None
-                             or _lui_12_thang(th) >= thang_dau_du_lieu)
+                             or _lui_thang(th, lech) >= thang_dau_du_lieu)
                 cell = {"thang": th, "nganh": nganh, "bac": "khong_ban",
                         "tang_truong": None, "doanh_thu": 0, "co_cung_ky": False,
                         "co_the_ck": co_the_ck}
