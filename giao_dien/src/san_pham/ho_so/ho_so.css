@@ -1,0 +1,8 @@
+/* Sản phẩm 360 — chỉ phần riêng; bố cục hai cột dùng .hs2-* của khach.css. */
+.sp3-so-lon { font-size: 1.8rem; font-weight: 700; margin: 0; font-variant-numeric: tabular-nums; }
+.sp3-canh { color: var(--canh-chu, var(--chu)); background: var(--canh-nen, transparent); border-radius: 6px; padding: .25rem .5rem; margin: .25rem 0; }
+.sp3-luoi-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.sp3-thanh-ds { list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem; }
+.sp3-thanh { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr) auto; gap: .5rem; align-items: center; }
+.sp3-thanh i { display: block; height: .6rem; border-radius: 3px; background: var(--ok-vien); }
+@media (max-width: 900px) { .sp3-luoi-2 { grid-template-columns: minmax(0, 1fr); } }

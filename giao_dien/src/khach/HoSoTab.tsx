@@ -21,7 +21,7 @@ type SoSanhKh = { ma: string; nhan: string; co: boolean; tu: string; den: string
 type KhoangKhach = {
   khoang: KhoangMayChu; tong: { dt: number; lg: number; so_phieu: number; so_ngay: number; ty_suat: number | null };
   so_sanh: SoSanhKh[];
-  mat_hang: { ma: string; ten: string; doanh_thu: number; lai_gop: number; so_luong: number; so_ngay: number; lan_cuoi: string; la_phi: boolean; la_hang_tang: boolean }[];
+  mat_hang: { ma: string; ten: string; doanh_thu: number; lai_gop: number; so_luong: number; so_ngay: number; lan_cuoi: string; la_phi: boolean; la_hang_tang: boolean; la_ngung_ban_het_ton: boolean }[];
   ngay: { ngay: string; so_phieu: number; doanh_thu: number }[];
 } | null;
 function useKhoangKhach(ma: string) {
@@ -212,8 +212,10 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
       // 048: phí thu hộ / phí gửi / giảm giá / làm tròn không phải mặt hàng — tách ra
       // dòng riêng, nhưng vẫn hiện (danh sách cộng lại vẫn bằng tổng khoảng).
       // 049: hàng tặng POSM cũng vậy, nhóm riêng.
-      const hang = kh.mat_hang.filter(m => !m.la_phi && !m.la_hang_tang), phi = kh.mat_hang.filter(m => m.la_phi);
+      // 050: hàng ※終売※ đã hết tồn không hiện từng mã — gộp MỘT dòng (tiền vẫn trong tổng).
+      const hang = kh.mat_hang.filter(m => !m.la_phi && !m.la_hang_tang && !m.la_ngung_ban_het_ton), phi = kh.mat_hang.filter(m => m.la_phi);
       const tang = kh.mat_hang.filter(m => m.la_hang_tang);
+      const ngung = kh.mat_hang.filter(m => m.la_ngung_ban_het_ton && !m.la_phi && !m.la_hang_tang);
       const tongPhi = phi.reduce((a, m) => a + (m.doanh_thu || 0), 0);
       return <The tieu_de={`Mặt hàng mua · ${kh.khoang.nhan}`} phu={`${hang.length} mã · ${yen(kh.tong.dt)}${phi.length ? ` (gồm ${yen(tongPhi)} phí & điều chỉnh)` : ""} · ${kh.tong.so_ngay} ngày có mua (${ngay(kh.khoang.tu)} → ${ngay(kh.khoang.den)})`}>
       {!kh.mat_hang.length ? <p className="phu">Không mua mã nào trong khoảng này.</p> :
@@ -232,7 +234,10 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
           {tang.map(m => (
           <tr key={m.ma}><td className="ten-jp">{m.ten}<div className="ma-nho"><code>{m.ma}</code></div></td>
             <td className="so">{yen(m.doanh_thu)}</td><td className="so">{yen(m.lai_gop)}</td><td className="so">{so(m.so_luong)}</td>
-            <td className="so">{so(m.so_ngay)}</td><td className="so">{ngay(m.lan_cuoi)}</td></tr>))}</tbody></table></div>}
+            <td className="so">{so(m.so_ngay)}</td><td className="so">{ngay(m.lan_cuoi)}</td></tr>))}
+          {ngung.length > 0 && <tr><td className="ten-jp">Hàng đã ngừng kinh doanh ※終売※ ({ngung.length} mã)<div className="ma-nho">hết tồn — không phân tích từng mã</div></td>
+            <td className="so">{yen(ngung.reduce((a, m) => a + (m.doanh_thu || 0), 0))}</td><td className="so">{yen(ngung.reduce((a, m) => a + (m.lai_gop || 0), 0))}</td>
+            <td className="so">—</td><td className="so">—</td><td className="so">{ngay(ngung.map(m => m.lan_cuoi).sort().pop() ?? "")}</td></tr>}</tbody></table></div>}
     </The>;
     })()}
     <The tieu_de="Top 10 sản phẩm hay mua" cach_tinh={<>xếp theo doanh thu luỹ kế · <span className="nhan-vien ok">◎ Đề xuất</span> đã tới ngày mua lại ·{" "}

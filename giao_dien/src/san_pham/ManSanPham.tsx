@@ -1,20 +1,16 @@
-// Màn "Sản phẩm" (Sản phẩm.dc.html): MỘT trang — ô tổng quan · danh mục (lọc
-// nhóm / trạng thái / tìm, sắp theo cột) · hồ sơ 360° của mã đang chọn NGAY BÊN
-// DƯỚI. /san-pham và /san-pham/{mã} là hai địa chỉ của màn này; chọn một dòng là
-// pushState, không tải lại trang. Cả danh mục là MỘT ảnh chụp (/api/san-pham),
-// nên lọc / sắp / tìm chạy ở trình duyệt, không hỏi lại máy chủ.
+// Màn "Sản phẩm" (Sản phẩm.dc.html): /san-pham là danh mục; bấm một dòng mở
+// trang riêng /san-pham/{mã} (ho_so/HoSoMa.tsx). Cả danh mục là MỘT ảnh chụp
+// (/api/san-pham), nên lọc / sắp / tìm chạy ở trình duyệt, không hỏi lại máy chủ.
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { Spark } from "../chung/Khoi";
 import { gon, ngay, pc, so, so_luong as soLuong, thay_doi, yen } from "../dinh_dang";
-import { HoSoSanPham } from "./HoSoSanPham";
 import type { DanhMucApi, DanhMucKhoangApi, MaHang } from "./kieu";
-import { chuoiLocSp, docLocSp, locDanhMuc, SAP } from "./loc";
+import { chuoiLocSp, docLocSp, locDanhMuc, nhoDanhMuc, SAP } from "./loc";
 import type { LocSp } from "./loc";
 import "./san_pham.css";
-import { TN } from "../khoi_dau";
 
 export function useDanhMuc() {
   const kx = chuoiKhoang(useKhoang());
@@ -29,12 +25,9 @@ function useDanhMucKhoang() {
     queryFn: () => lay<DanhMucKhoangApi>(voiKhoang("/api/san-pham/khoang")) });
 }
 
-function maTuUrl(): string | null {
-  const m = location.pathname.match(/^\/san-pham\/([^/]+)$/);
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
-export default function ManSanPham() {
+/** Danh mục đã ghép số theo khoảng — CÙNG hai truy vấn (cùng queryKey) với màn danh mục, nên
+ *  trang 360 (ô tìm, thứ tự ‹ n/N › mặc định) đọc đúng thứ danh mục đang hiện. */
+export function useDanhMucGhep() {
   const { data: d0, error } = useDanhMuc();
   const { data: kh } = useDanhMucKhoang();
   // Ghép số theo khoảng vào từng mã — chỉ gắn số của máy chủ, không tính gì.
@@ -43,32 +36,33 @@ export default function ManSanPham() {
     return { ...m, dt_khoang: x?.[0] ?? 0, sl_khoang: x?.[2] ?? null, kh_khoang: x?.[3] ?? 0,
              dt_ss: kh?.so_sanh.co ? (x?.[4] ?? 0) : null };
   }) }, [d0, kh]);
+  return { d, kh, error };
+}
+
+export default function ManSanPham() {
+  const { d, kh, error } = useDanhMucGhep();
   const [b, datB] = useState<LocSp>(() => docLocSp(location.search));
-  const [ma, datMa] = useState<string | null>(maTuUrl);
   const [tim, datTim] = useState(b.tim);
-  const hoSo = useRef<HTMLDivElement>(null);
 
   // URL = trạng thái (chia sẻ được, nút Back chạy đúng).
   useEffect(() => {
-    const f = () => { datB(docLocSp(location.search)); datMa(maTuUrl()); };
+    const f = () => datB(docLocSp(location.search));
     addEventListener("popstate", f); return () => removeEventListener("popstate", f);
   }, []);
-  const ghi = (bb: LocSp, m: string | null, day = false) => {
+  const ghi = (bb: LocSp, day = false) => {
     const q = chuoiLocSp(bb);
-    const url = giuKhoang((m ? `/san-pham/${encodeURIComponent(m)}` : "/san-pham") + (q ? "?" + q : ""));
+    const url = giuKhoang("/san-pham" + (q ? "?" + q : ""));
     if (url !== location.pathname + location.search) history[day ? "pushState" : "replaceState"](null, "", url);
   };
-  const dat = (sua: Partial<LocSp>) => { const bb = { ...b, ...sua }; datB(bb); ghi(bb, ma); };
-  const chon = (m: string | null, cuon = true) => {
-    datMa(m); ghi(b, m, true);
-    if (m && cuon) setTimeout(() => hoSo.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
-  };
+  const dat = (sua: Partial<LocSp>) => { const bb = { ...b, ...sua }; datB(bb); ghi(bb); };
   useEffect(() => { const h = setTimeout(() => { if (tim !== b.tim) dat({ tim }); }, 200); return () => clearTimeout(h); }, [tim]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (maTuUrl() && d) setTimeout(() => hoSo.current?.scrollIntoView({ block: "start" }), 60); }, [!!d]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kq = useMemo(() => d ? locDanhMuc(d.ma, b, d.trang_thai) : null, [d, b]);
-  const dong = useMemo(() => d && ma ? d.ma.find(x => x.ma === ma) ?? null : null, [d, ma]);
-  useEffect(() => { document.title = dong ? `KOME — ${dong.ten}` : "KOME — sản phẩm"; }, [dong]);
+  useEffect(() => { document.title = "KOME — sản phẩm"; }, []);
+  const moMa = (m: string) => {
+    nhoDanhMuc((kq?.hang ?? []).map(x => x.ma), location.pathname + location.search);
+    location.href = giuKhoang(`/san-pham/${encodeURIComponent(m)}`);
+  };
 
   if (error) return <div className="sp"><h1>Sản phẩm</h1><div className="khoi-loi">Không tải được danh mục: {(error as Error).message}</div></div>;
   if (!d || !kq) return <div className="sp"><h1>Sản phẩm</h1><div className="khoi-cho" aria-busy="true"><span /><span /><span /></div></div>;
@@ -98,9 +92,9 @@ export default function ManSanPham() {
     <div className="sp">
       <div className="tieu-de-trang">
         <div><h1>Sản phẩm</h1>
-          <div className="phu">Danh mục {so(tatCa.length)} mã hàng và hồ sơ 360° của mã đang chọn · dữ liệu đến hết {ngay(d.hom_nay)}</div></div>
+          <div className="phu">Danh mục {so(tatCa.length)} mã hàng · bấm một mã để mở hồ sơ 360° · dữ liệu đến hết {ngay(d.hom_nay)}</div></div>
         <div className="sp-dau-phai">
-          <select value={ma ?? ""} onChange={e => chon(e.target.value || null)} aria-label="Chọn nhanh một mã hàng">
+          <select value="" onChange={e => { if (e.target.value) moMa(e.target.value); }} aria-label="Chọn nhanh một mã hàng">
             <option value="">— chọn nhanh một mã ({so(tatCa.length)}) —</option>
             {[...tatCa].sort((x, y) => x.ma.localeCompare(y.ma)).map(m => <option key={m.ma} value={m.ma}>{m.ma} · {m.ten}</option>)}
           </select>
@@ -130,7 +124,7 @@ export default function ManSanPham() {
           <h2>Danh mục mã hàng</h2>
           <input type="search" className="kh-tim sp-tim" placeholder="Tìm mã, tên hàng, ngành…" value={tim}
             onChange={e => datTim(e.target.value)} aria-label="Tìm mã hàng" />
-          <span className="phu">bấm một dòng để mở hồ sơ bên dưới</span>
+          <span className="phu">bấm một dòng để mở trang hồ sơ 360°</span>
         </div>
         <div className="sp-chip" role="group" aria-label="Ngành hàng">
           <button type="button" className="chip" aria-pressed={!b.nganh} onClick={() => dat({ nganh: "" })}>Mọi ngành ({so(tongNganh)})</button>
@@ -165,7 +159,7 @@ export default function ManSanPham() {
               {cot("lan_cuoi", "Bán gần nhất", "so")}
             </tr></thead>
             <tbody>
-              {kq.hang.map(m => <Dong key={m.ma} m={m} chon={m.ma === ma} onChon={() => chon(m.ma)} />)}
+              {kq.hang.map(m => <Dong key={m.ma} m={m} onChon={() => moMa(m.ma)} />)}
               {!kq.hang.length && <tr><td colSpan={15} className="trong">Không có mã hàng nào khớp{b.tim ? ` với "${b.tim}"` : ""}. Thử bỏ bớt bộ lọc.</td></tr>}
             </tbody>
           </table>
@@ -174,21 +168,16 @@ export default function ManSanPham() {
           在庫一覧 thì ta không biết kho còn bao nhiêu — cột Tồn hiện "—". <b>Ngừng kinh doanh</b> = tồn 0 và không bán suốt 90 ngày.
           <b> Tồn chết</b> gộp mã không bán gì suốt 90 ngày và mã còn đủ bán trên 180 ngày; mã ra mắt trong 90 ngày không bao giờ bị gọi là tồn chết.</p>
       </section>
-
-      <div ref={hoSo} className="sp-ho-so-neo">
-        {ma ? <HoSoSanPham ma={ma} dong={dong} onDong={() => chon(null, false)} />
-          : <div className="sp-chua-chon">Chọn một mã trong danh mục (hoặc ô "chọn nhanh" ở trên) để xem hồ sơ 360°: bán theo ngày, khách đang mua / đã bỏ, tồn theo kho{TN.bang_gia ? ", giá theo bậc" : ""}.</div>}
-      </div>
     </div>
   );
 }
 
-function Dong({ m, chon, onChon }: { m: MaHang; chon: boolean; onChon: () => void }) {
+function Dong({ m, onChon }: { m: MaHang; onChon: () => void }) {
   return (
-    <tr className={"sp-dong" + (chon ? " chon" : "")} onClick={e => { if (!(e.target as HTMLElement).closest("a")) onChon(); }}
-      aria-selected={chon}>
+    <tr className="sp-dong" onClick={e => { if (!(e.target as HTMLElement).closest("a")) onChon(); }}>
       <td className="sp-ten"><a href={`/san-pham/${encodeURIComponent(m.ma)}`} className="ten-jp"
-        onClick={e => { e.preventDefault(); onChon(); }}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></td>
+        onClick={e => { e.preventDefault(); onChon(); }}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code>
+        {m.ngung_ban && <> · <span className="nhan-vien canh" title="Đã ngừng kinh doanh (※終売※) — chỉ còn bán nốt tồn, không đặt thêm">bán nốt tồn</span></>}</div></td>
       <td className="sp-nhom ten-jp" title={m.nganh}>{m.nganh}</td>
       <td><span className={"nhan-vien " + m.mau}>{m.nhan_trang_thai}</span></td>
       <td className="so">{m.ton == null ? <span className="nhat-chu" title="chưa rõ tồn — không có dòng nào trong 在庫一覧">—</span> : soLuong(m.ton)}</td>

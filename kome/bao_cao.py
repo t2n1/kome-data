@@ -368,10 +368,12 @@ def tinh_bao_cao(conn, company_fy: int | None = None) -> BaoCao:
          "lai_gop": int(r[4]) if r[4] is not None else None,
          "ty_suat": float(r[5]) if r[5] is not None else None,
          "so_khach": r[6], "la_phi": r[7], "la_hang_tang": r[8],
-         "so_luong": float(r[9]) if r[9] is not None else None}
+         "so_luong": float(r[9]) if r[9] is not None else None,
+         "la_ngung_ban_het_ton": r[10]}
         for r in conn.execute(
             """SELECT product_code, ten_hang, food_category_name, doanh_thu_thuan,
-                      lai_gop, ty_suat, so_khach_mua, la_phi, la_hang_tang, so_luong
+                      lai_gop, ty_suat, so_khach_mua, la_phi, la_hang_tang, so_luong,
+                      la_ngung_ban_het_ton
                FROM mart.ban_theo_san_pham WHERE company_fy = %s""",
             (ky.company_fy,)).fetchall()]
     # `lai_gop` không nên bao giờ NULL (SUM trên ít nhất một dòng bán), nhưng
@@ -431,7 +433,8 @@ def tach_phi(hang_theo_nganh: list[dict], nganh_ky: list, nganh_thang: list):
     """Đưa phí & điều chỉnh (048) và hàng tặng POSM (049) ra khỏi phần SẢN PHẨM /
     NGÀNH của báo cáo. Mã: theo cột `la_phi` / `la_hang_tang` của mart; ngành: theo
     nhãn `NGANH_PHI` / `NGANH_HANG_TANG`. Tiền không mất — nó sang hai `NhomRieng`
-    để màn hình hiện khối riêng."""
+    để màn hình hiện khối riêng. Hàng ※終売※ hết tồn (050) thì KHÔNG tách ngành (nó
+    là thực phẩm thật) — chỉ gộp thành một dòng mỗi ngành (`gop_ngung_ban`)."""
     def nhom(cot: str, nhan: str) -> NhomRieng:
         dong = sorted((h for h in hang_theo_nganh if h.get(cot)),
                       key=lambda h: (abs(h["doanh_thu"] or 0), abs(h["lai_gop"] or 0)),
@@ -440,10 +443,35 @@ def tach_phi(hang_theo_nganh: list[dict], nganh_ky: list, nganh_thang: list):
         return NhomRieng(dong=dong, doanh_thu=tong.doanh_thu if tong else 0,
                          lai_gop=tong.lai_gop if tong else 0)
     rieng = (NGANH_PHI, NGANH_HANG_TANG)
-    return ([h for h in hang_theo_nganh if not (h.get("la_phi") or h.get("la_hang_tang"))],
+    return (gop_ngung_ban([h for h in hang_theo_nganh
+                           if not (h.get("la_phi") or h.get("la_hang_tang"))]),
             [n for n in nganh_ky if n.nganh not in rieng],
             [n for n in nganh_thang if n.nganh not in rieng],
             nhom("la_phi", NGANH_PHI), nhom("la_hang_tang", NGANH_HANG_TANG))
+
+
+def gop_ngung_ban(hang: list[dict]) -> list[dict]:
+    """Hàng ※終売※ đã hết tồn (050, cột `la_ngung_ban_het_ton` của mart) không được
+    hiện TỪNG MÃ — nhưng tiền của nó vẫn trong tổng ngành, nên danh sách mã phải vẫn
+    cộng bằng ngành (cây ô đối soát `doanh_thu_ve + khong_ve`). Gộp các mã đó thành
+    MỘT dòng mỗi ngành, `ma` rỗng (không có hồ sơ để mở). `top_lai_gop` bỏ dòng này."""
+    giu, gop = [], {}
+    for h in hang:
+        if not h.get("la_ngung_ban_het_ton"):
+            giu.append(h)
+            continue
+        g = gop.setdefault(h["nhom"], {"dt": None, "lg": None, "sl": None, "n": 0})
+        g["n"] += 1
+        for k, cot in (("dt", "doanh_thu"), ("lg", "lai_gop"), ("sl", "so_luong")):
+            if h.get(cot) is not None:
+                g[k] = (g[k] or 0) + h[cot]
+    for nhom, g in gop.items():
+        giu.append({"ma": "", "ten": f"Hàng đã ngừng kinh doanh ※終売※ ({g['n']} mã)",
+                    "nhom": nhom, "doanh_thu": g["dt"], "lai_gop": g["lg"],
+                    "ty_suat": (g["lg"] or 0) / g["dt"] if g["dt"] else None,
+                    "so_khach": None, "la_phi": False, "la_hang_tang": False,
+                    "so_luong": g["sl"], "la_ngung_ban_het_ton": True, "so_ma": g["n"]})
+    return giu
 
 
 def top_lai_gop(hang_theo_nganh: list[dict]) -> list[dict]:
@@ -451,7 +479,7 @@ def top_lai_gop(hang_theo_nganh: list[dict]) -> list[dict]:
     Khoảng (kome/ban_khoang.py). `lai_gop` None xếp SAU mọi giá trị đã biết,
     kể cả giá trị âm rất xấu ([Vòng soát cuối, M4]: `float('-inf')`, không
     phải `-1`)."""
-    return sorted(hang_theo_nganh,
+    return sorted((h for h in hang_theo_nganh if not h.get("la_ngung_ban_het_ton")),
                   key=lambda h: (h["lai_gop"] if h["lai_gop"] is not None
                                  else float("-inf")),
                   reverse=True)[:TOP]

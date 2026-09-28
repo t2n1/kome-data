@@ -27,6 +27,7 @@ const BaoCao = lazy(() => import("./bao_cao/BaoCao"));
 const DuBao = lazy(() => import("./du_bao/DuBao"));
 // Giai đoạn 4.
 const ManSanPham = lazy(() => import("./san_pham/ManSanPham"));
+const HoSoMa = lazy(() => import("./san_pham/ho_so/HoSoMa"));
 const KhoHang = lazy(() => import("./san_pham/KhoHang"));
 // Đợt 6.
 const ManCongNo = lazy(() => import("./cong_no/ManCongNo"));
@@ -51,7 +52,9 @@ function man(duong: string): (() => React.ReactElement) | null {
   if (duong === "/lien-he") return () => <LienHe />;
   if (duong === "/bao-cao") return () => <BaoCao />;
   if (duong === "/du-bao") return () => <DuBao />;
-  if (duong === "/san-pham" || /^\/san-pham\/[^/]+$/.test(duong)) return () => <ManSanPham />;
+  if (duong === "/san-pham") return () => <ManSanPham />;
+  const mSp = duong.match(/^\/san-pham\/([^/]+)$/);
+  if (mSp) { const ma = decodeURIComponent(mSp[1]); return () => <HoSoMa ma={ma} />; }
   if (duong === "/kho-hang") return () => <KhoHang />;
   if (duong === "/cong-no") return () => <ManCongNo />;
   if (KD.man != null) {

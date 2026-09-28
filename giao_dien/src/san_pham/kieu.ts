@@ -8,6 +8,8 @@ export type MaHang = {
   ton: number | null; toc_do_ngay: number | null; toc_do_ngay_theo_tuoi: number | null;
   du_ban_ngay: number | null; trang_thai: string; nhan_trang_thai: string; mau: string;
   so_khach: number; lan_dau: string | null; lan_cuoi: string | null;
+  // 050: mã ※終売※ còn tồn (hết tồn thì máy chủ đã bỏ khỏi danh mục) — bán nốt.
+  ngung_ban: boolean;
   dt_12t: number; lg_12t: number; ts_12t: number | null; thang_dt: number[]; thang_sl: (number | null)[];
   // Khoảng xem (đợt C) — ghép ở trình duyệt từ /api/san-pham/khoang (số của máy chủ).
   dt_khoang?: number; sl_khoang?: number | null; kh_khoang?: number; dt_ss?: number | null;
@@ -46,6 +48,16 @@ export type HoSoSpApi = {
     bac_gia: { bac: string; quy_cach: string; gia: number; tu_ngay: string | null }[];
   };
 };
+
+/** Kiểu `sp` dùng lại ở hồ sơ 360° trang riêng (san_pham/ho_so/kieu.ts). */
+export type SanPhamApi = HoSoSpApi["h"]["sp"];
+
+/** Một mã trong KHOẢNG XEM (/api/san-pham/{mã}/khoang — đợt C). */
+export type KhoangMaApi = {
+  khoang: import("../khung/khoang").KhoangMayChu; so_sanh: { ma: string; nhan: string; co: boolean; tu: string; den: string };
+  tong: { dt: number; lg: number; so_luong: number; so_khach: number }; dt_ss: number | null; tang: number | null;
+  khach: { ma: string; ten: string; doanh_thu: number; so_luong: number; so_ngay: number; lan_cuoi: string }[];
+} | null;
 
 export type NgayBan = { ngay: string; la_ngay_kd: boolean; so_luong: number; doanh_thu: number; lai_gop: number; so_khach: number };
 export type NgayApi = { thang: string; hom_nay: string | null; nay: NgayBan[]; truoc: NgayBan[] };

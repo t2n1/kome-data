@@ -9,6 +9,7 @@ JSON thay vì chuyển hướng). Kết quả đi qua ảnh chụp theo phiên b
 from __future__ import annotations
 
 import hashlib
+import json
 import traceback
 from datetime import date
 from urllib.parse import urlencode
@@ -170,6 +171,10 @@ def du_lieu_kho_hang(c, kho: str = "", loc: str = "") -> dict:
                        "loai_han": {a: list(b) for a, b in SP.LOAI_HAN.items()},
                        "can_han_ngay": SP.CAN_HAN_NGAY})
 
+
+# 050: dấu của hồ sơ mã ※終売※ đã hết tồn (ảnh chụp lưu chuỗi JSON, nên cần một giá trị
+# không trùng hình dạng hồ sơ thật).
+NGUNG_BAN = "ngung_ban_het_ton"
 
 # Khoá ảnh chụp danh mục sản phẩm — `anh_chup.lam_nong` làm nóng đúng khoá này.
 KHOA_DANH_MUC = "san-pham/danh-muc"
@@ -544,8 +549,8 @@ def tao_api(open_app_conn) -> APIRouter:
 
     @r.get("/san-pham/{ma}")
     def sp_ho_so(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
-        """Hồ sơ một mã: `SP.ho_so` (trần 5 lượt hỏi, bất biến đặc tả 4b §5.5; +1 đặt
-        mốc khi có khoảng xem — 040)."""
+        """Phần mở trang của Sản phẩm 360 (`SP360.ho_so`, 4 lượt hỏi, trần 5;
+        +1 đặt mốc khi có khoảng xem — 040)."""
         from kome import san_pham as SP
         try:
             ts = _ts(request, thang, ky, tu, den).chinh()
@@ -553,8 +558,12 @@ def tao_api(open_app_conn) -> APIRouter:
             return _loi(str(e), 400)
 
         def tinh_(c):
-            h = SP.ho_so(c, ma)
-            return None if h is None else thanh_json({"h": h, "quy_cach": SP.QUY_CACH})
+            from kome import san_pham_360 as SP360
+            h = SP360.ho_so(c, ma)
+            if h is None:
+                # 050: hàng ※終売※ hết tồn không phân tích — nói rõ, không "không có mã".
+                return NGUNG_BAN if SP.la_ma_ngung_ban_an(c, ma) else None
+            return thanh_json({"h": h, "quy_cach": SP.QUY_CACH})
         try:
             with open_app_conn() as conn:
                 du_lieu, pb = anh_chup.lay(conn, _khoa("san-pham/ho-so", ma=ma, **ts.khoa()),
@@ -564,6 +573,8 @@ def tao_api(open_app_conn) -> APIRouter:
             return _loi("Không đọc được hồ sơ mã hàng.")
         if du_lieu == "null":
             return _loi(f"Không có mã hàng {ma}.", 404)
+        if du_lieu == json.dumps(NGUNG_BAN):
+            return _loi(f"Mã {ma} đã ngừng kinh doanh (※終売※) và hết tồn — không còn phân tích.", 404)
         return _json(request, du_lieu, pb)
 
     @r.get("/san-pham/{ma}/ngay")
@@ -576,6 +587,58 @@ def tao_api(open_app_conn) -> APIRouter:
         return _chup(request, _khoa("san-pham/ngay", ma=ma, thang=thang),
                      lambda c: SP.ban_theo_ngay(c, ma, thang),
                      "Không đọc được lượng bán theo ngày.", chi_nap=True)
+
+    def _tab_sp(request: Request, ma: str, ten: str, thang: str, ky: str, tu: str, den: str):
+        """Một tab của Sản phẩm 360 — ảnh chụp riêng, tính đến MỐC của khoảng xem (040)."""
+        from kome import san_pham_360 as SP360
+        try:
+            ts = _ts(request, thang, ky, tu, den).chinh()
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        ham = {"khach": SP360.tab_khach, "thoi-gian": SP360.tab_thoi_gian,
+               "gia": SP360.tab_gia, "ban-them": SP360.tab_ban_them,
+               "nen-chao": SP360.tab_nen_chao}[ten]
+
+        def tinh_(c):
+            t = ham(c, ma)
+            return None if t is None else thanh_json({"t": t, "cach_tinh": SP360.CACH_TINH})
+        try:
+            with open_app_conn() as conn:
+                du_lieu, pb = anh_chup.lay(conn, _khoa(f"san-pham/tab-{ten}", ma=ma, **ts.khoa()),
+                                           _voi_moc(ts, tinh_), chi_nap=True)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được dữ liệu tab này.")
+        if du_lieu == "null":
+            return _loi(f"Không có mã hàng {ma}.", 404)
+        return _json(request, du_lieu, pb)
+
+    @r.get("/san-pham/{ma}/khach")
+    def sp_tab_khach(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Khách hàng của Sản phẩm 360. ≤ 3 lượt hỏi."""
+        return _tab_sp(request, ma, "khach", thang, ky, tu, den)
+
+    @r.get("/san-pham/{ma}/thoi-gian")
+    def sp_tab_thoi_gian(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Thời gian của Sản phẩm 360. ≤ 2 lượt hỏi."""
+        return _tab_sp(request, ma, "thoi-gian", thang, ky, tu, den)
+
+    @r.get("/san-pham/{ma}/gia")
+    def sp_tab_gia(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Giá & lãi của Sản phẩm 360. ≤ 2 lượt hỏi."""
+        return _tab_sp(request, ma, "gia", thang, ky, tu, den)
+
+    @r.get("/san-pham/{ma}/ban-them")
+    def sp_tab_ban_them(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Tồn & bán thêm của Sản phẩm 360. ≤ 2 lượt hỏi."""
+        return _tab_sp(request, ma, "ban-them", thang, ky, tu, den)
+
+    @r.get("/san-pham/{ma}/nen-chao")
+    def sp_nen_chao(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Khách nên chào mã này (≤ 50 + tổng) — cột trái "Việc với mã này" và tab Tồn & bán
+        thêm đọc CHUNG endpoint này. Tách khỏi `/san-pham/{ma}` vì `sp_khach_nen_chao` là câu nặng nhất
+        (~0,3 s sau 054; trước đó 8,7 s): trang mở không chờ nó. 1 lượt hỏi."""
+        return _tab_sp(request, ma, "nen-chao", thang, ky, tu, den)
 
     @r.get("/kho-hang")
     def kho_hang(request: Request, kho: str = "", loc: str = "",

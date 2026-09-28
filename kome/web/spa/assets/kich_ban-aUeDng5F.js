@@ -1,0 +1,2 @@
+var e=(e,t,n)=>`${e} (${t})${n?` ☎ `+n:``}`;function t(e){let t=[e.dau,e.ly_do];return e.ma.length&&t.push(e.tieu_de_ma,...e.ma.map(e=>`- ${e.ten} (${e.chi_tiet})`)),e.cuoi&&t.push(`Lần liên hệ trước (${e.cuoi.ngay}): ${e.cuoi.noi_dung}`),t.join(`
+`)}export{t as n,e as t};

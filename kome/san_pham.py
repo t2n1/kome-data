@@ -118,6 +118,9 @@ class SanPham:
     so_khach: int
     lan_dau: date | None
     lan_cuoi: date | None
+    # 050: mã ※終売※ (ngừng kinh doanh). Mã ※終売※ đã hết tồn không bao giờ tới
+    # đây (mart.san_pham_360 lọc bỏ), nên True = "còn tồn, bán nốt".
+    ngung_ban: bool = False
 
     @property
     def nhan_trang_thai(self) -> str:
@@ -140,16 +143,6 @@ class TrangSanPham:
     # Số mã theo từng trạng thái, cho dải chip lọc. CÓ theo `tim`, KHÔNG theo
     # `loc` — xem docstring của danh_sach().
     dem_trang_thai: dict[str, int] = field(default_factory=dict)
-
-
-@dataclass
-class HoSoSanPham:
-    sp: SanPham
-    thang: list[dict]
-    khach_mua: list[dict]
-    khach_ngung: list[dict]
-    ton: list[dict]
-    bac_gia: list[dict]
 
 
 @dataclass
@@ -202,7 +195,7 @@ _TU_LO = """FROM t
 
 _COT = """product_code, ten_hang, nhom, doanh_thu_thuan, lai_gop, ty_suat,
           so_luong_ban, ton, toc_do_ngay, toc_do_ngay_theo_tuoi, du_ban_ngay,
-          trang_thai, so_khach, lan_dau, lan_cuoi"""
+          trang_thai, so_khach, lan_dau, lan_cuoi, ngung_ban"""
 
 
 def _so(x) -> float | None:
@@ -224,7 +217,7 @@ def _sp(r) -> SanPham:
         so_luong_ban=_so(r[6]), ton=_so(r[7]),
         toc_do_ngay=_so(r[8]), toc_do_ngay_theo_tuoi=_so(r[9]),
         du_ban_ngay=_so(r[10]), trang_thai=r[11], so_khach=int(r[12] or 0),
-        lan_dau=r[13], lan_cuoi=r[14])
+        lan_dau=r[13], lan_cuoi=r[14], ngung_ban=bool(r[15]))
 
 
 def _dk_tim(tim: str = "") -> tuple[str, list]:
@@ -324,149 +317,12 @@ def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",
         dem_trang_thai=dem)
 
 
-def ho_so(conn, ma: str) -> HoSoSanPham | None:
-    """Hồ sơ một mã hàng. None nếu mã không tồn tại.
-
-    NGÂN SÁCH TRUY VẤN: đúng 5 lượt hỏi, và 5 là TRẦN (đặc tả 4b §5.5). Đo
-    thật 2026-09-22: một round-trip rỗng tới pooler Tokyo mất 47 ms, một lượt
-    hỏi thật ~260 ms. Có test canh — tests/test_san_pham.py::
-    test_ho_so_san_pham_khong_qua_5_truy_van. Khối thứ sáu muốn thêm thì phải
-    gộp vào một trong năm khối đã có, không nới trần.
-    """
-    r = conn.execute(
-        f"SELECT {_COT} FROM mart.san_pham_360 WHERE product_code = %s",
-        (ma,)).fetchone()
-    if r is None:
-        return None
-
-    thang = [dict(zip(("thang", "so_luong", "doanh_thu", "lai_gop"), t))
-             for t in conn.execute(
-        """SELECT thang, so_luong, doanh_thu_thuan, lai_gop
-           FROM mart.san_pham_theo_thang WHERE product_code = %s
-           ORDER BY thang""", (ma,)).fetchall()]
-
-    # Hai khối khách gộp làm MỘT lượt hỏi: cùng một view, cùng bộ cột, chỉ khác
-    # vị từ — đúng ca mà UNION ALL không phải đệm NULL cho nhánh nào.
-    #
-    # HAI KHỐI ĐỌC `trang_thai_cap` CỦA mart.khach_mat_hang (migration 024),
-    # không viết lại vị từ ở đây. Đó là định nghĩa DUY NHẤT của "cặp (khách,
-    # mã) đang ở trạng thái nào", dùng chung với hai khối của /khach-hang/{mã}
-    # — trước 024 hai màn có hai công thức và trả lời ngược nhau về cùng một
-    # cặp.
-    #
-    # Nhãn ba giá trị: `'khong_goi'` (khách bị OBC đánh dấu ※廃業※, xét trước
-    # hết), `'ngung'` (im lặng >= 2 × NHỊP RIÊNG của chính cặp đó), `'mua'`
-    # (còn lại). Không phải ngưỡng chung: đo thật, ngưỡng 90 ngày bỏ sót 49
-    # khách đang rời đi và báo động nhầm 34 khách vẫn mua bình thường. Khách
-    # mua 7 ngày/lần im 60 ngày đã rời đi từ lâu; khách mua 120 ngày/lần im
-    # 100 ngày vẫn đang mua bình thường.
-    #
-    # MỖI NHÁNH SO BẰNG VỚI ĐÚNG NHÃN CỦA MÌNH, KHÔNG NHÁNH NÀO DÙNG `NOT`.
-    # Hai khối này là DANH SÁCH BÁN HÀNG, nên cả hai đều không được chứa khách
-    # đã đóng cửa — và `'khong_goi'` là một giá trị RIÊNG nên nó tự rơi ra
-    # ngoài cả hai mà không nhánh nào phải biết ※廃業※ là gì. Bản trước của 024
-    # dùng boolean `ngung_mua` gói cổng ※廃業※ vào bên trong, nên `NOT
-    # ngung_mua` LUÔN đúng với một doanh nghiệp đã đóng cửa: họ trượt thẳng từ
-    # khối "đã ngừng" sang khối "ĐANG mua mã này" — trang khẳng định một công
-    # ty đã phá sản vẫn đang lấy hàng — và nhánh 'mua' phải tự JOIN lấy
-    # `k.da_ngung` để đắp lại. Nhãn dẹp chỗ đắp tay đó; `da_ngung` nay chỉ được
-    # đọc một lần, trong view.
-    #
-    # Sự thật lịch sử của cặp đó KHÔNG mất: view vẫn giữ đủ dòng, và hồ sơ của
-    # chính khách ※廃業※ vẫn hiện bảng top-15 mặt hàng như cũ.
-    #
-    # `xep` là hạng TRONG TỪNG NHÁNH, tính bằng row_number() theo đúng khoá mà
-    # nhánh đó dùng để cắt top-N. ORDER BY ở lớp NGOÀI đọc `xep` chứ không tin
-    # vào thứ tự dòng của nhánh — thứ tự đó không được bảo đảm qua UNION ALL,
-    # và đợt 4a đã dính đúng lỗi này. (ORDER BY … LIMIT trong nhánh vẫn cần,
-    # nhưng để CHỌN đúng top-N, không phải để giữ thứ tự.)
-    #
-    # LEFT JOIN khach_360 chứ không JOIN: một khách có dòng bán thì luôn có
-    # dòng ở khach_360 hôm nay, nhưng mất tên khách là mất cả DÒNG nếu dùng
-    # INNER — và đây là khối "ai đang mua mã này", nơi thiếu một khách nguy
-    # hiểm hơn nhiều so với hiện mã thay cho tên. khach_360 ở đây CHỈ để lấy
-    # TÊN: cờ ※廃業※ không còn được đọc ở chỗ này nữa, nó đã nằm trong nhãn.
-    #
-    # HAI CTE `AS MATERIALIZED`, ghi TƯỜNG MINH: cả hai nhánh đều đọc
-    # khach_mat_hang và khach_360, mà Postgres KHÔNG gộp hai truy vấn con
-    # giống nhau — mỗi lần tham chiếu là một lần dựng lại cả view (khach_360
-    # gộp toàn bộ mart.lan_mua). Vị từ `product_code = %s` nằm BÊN TRONG CTE
-    # nên vẫn đẩy xuống được; vật hoá ở đây chỉ bỏ đi lần dựng THỨ HAI.
-    khach = conn.execute(f"""
-        WITH h AS MATERIALIZED (
-            SELECT customer_code, doanh_thu_thuan, so_luong, so_lan, lan_cuoi,
-                   nhip_ngay, tre_ngay, trang_thai_cap
-              FROM mart.khach_mat_hang WHERE product_code = %s
-        ), k AS MATERIALIZED (
-            SELECT customer_code, ten FROM mart.khach_360
-        )
-        SELECT khoi, ma, ten, doanh_thu, so_luong, so_lan, lan_cuoi, nhip, tre
-        FROM (
-            (SELECT 'mua'::text AS khoi, h.customer_code AS ma,
-                    coalesce(nullif(k.ten, ''), h.customer_code) AS ten,
-                    h.doanh_thu_thuan AS doanh_thu, h.so_luong, h.so_lan,
-                    h.lan_cuoi, h.nhip_ngay AS nhip, h.tre_ngay AS tre,
-                    row_number() OVER (ORDER BY h.doanh_thu_thuan DESC NULLS LAST)
-                      AS xep
-               FROM h
-               LEFT JOIN k ON k.customer_code = h.customer_code
-              WHERE h.trang_thai_cap = 'mua'
-              ORDER BY h.doanh_thu_thuan DESC NULLS LAST
-              LIMIT 20)
-            UNION ALL
-            (SELECT 'ngung', h.customer_code,
-                    coalesce(nullif(k.ten, ''), h.customer_code),
-                    h.doanh_thu_thuan, h.so_luong, h.so_lan, h.lan_cuoi,
-                    h.nhip_ngay, h.tre_ngay,
-                    row_number() OVER (ORDER BY h.doanh_thu_thuan DESC NULLS LAST)
-               FROM h
-               LEFT JOIN k ON k.customer_code = h.customer_code
-              WHERE h.trang_thai_cap = 'ngung'
-              ORDER BY h.doanh_thu_thuan DESC NULLS LAST
-              LIMIT 10)
-        ) u ORDER BY khoi, xep
-    """, (ma,)).fetchall()
-
-    def _khach(r):
-        return {"ma": r[1], "ten": r[2], "doanh_thu": int(r[3] or 0),
-                "so_luong": _so(r[4]), "so_lan": r[5], "lan_cuoi": r[6],
-                "nhip": _so(r[7]), "tre": r[8]}
-
-    khach_mua = [_khach(r) for r in khach if r[0] == "mua"]
-    khach_ngung = [_khach(r) for r in khach if r[0] == "ngung"]
-
-    # `nhan_han`/`mau_han` là CHUỖI ở cả hai màn — xem ghi chú ở kho_hang::_dong.
-    ton = [{"kho": t[0], "ten_kho": t[1], "so_luong": _so(t[2]),
-            "gia_tri": int(t[3] or 0), "best_before": t[4], "loai_han": t[5],
-            "nhan_han": LOAI_HAN.get(t[5], (t[5] or "—", "nhat"))[0],
-            "mau_han": LOAI_HAN.get(t[5], (t[5] or "—", "nhat"))[1],
-            "han_con_lai": t[6], "vai_tro_lo": t[7],
-            "bat_dau_ban_sau": _so(t[8]), "ban_het_sau": _so(t[9]),
-            "khong_kip_ban": t[10]}
-           # 042: đọc mart.ton_theo_lo (lô đang xuất / lô chờ — CLAUDE.md bẫy #6),
-           # xếp theo THỨ TỰ BÁN của các lô, không theo mã kho.
-           for t in conn.execute(
-        """SELECT warehouse_code, ten_kho, so_luong, gia_tri, best_before,
-                  loai_han, han_con_lai, vai_tro_lo, bat_dau_ban_sau,
-                  ban_het_sau, khong_kip_ban
-           FROM mart.ton_theo_lo WHERE product_code = %s
-           ORDER BY thu_tu_lo""", (ma,)).fetchall()]
-
-    # DISTINCT ON (price_level, pack_code) … ORDER BY valid_from DESC:
-    # core.fact_price_list giữ LỊCH SỬ giá — kome/loaders/price.py ghi một dòng
-    # MỚI mỗi lần nạp master. Không lọc thì sau ba lần nạp, một bậc giá hiện ba
-    # con số khác nhau dưới nhãn "giá đáng lẽ phải bán", trên đúng màn hình
-    # người ta nhìn TRƯỚC KHI báo giá cho khách.
-    bac_gia = [{"bac": g[0], "quy_cach": QUY_CACH.get(g[1], g[1]),
-                "gia": int(g[2]), "tu_ngay": g[3]}
-               for g in conn.execute(
-        """SELECT DISTINCT ON (price_level, pack_code)
-                  price_level, pack_code, price_ex_tax, valid_from
-           FROM core.fact_price_list WHERE product_code = %s
-           ORDER BY price_level, pack_code, valid_from DESC""", (ma,)).fetchall()]
-
-    return HoSoSanPham(sp=_sp(r), thang=thang, khach_mua=khach_mua,
-                       khach_ngung=khach_ngung, ton=ton, bac_gia=bac_gia)
+def la_ma_ngung_ban_an(conn, ma: str) -> bool:
+    """Mã ※終売※ đã hết tồn tính đến mốc (050, `mart.ma_ngung_ban_an`) — để màn nói
+    "đã ngừng kinh doanh" thay vì "không có mã này". Chỉ chạy khi `ho_so` trả None,
+    nên không tính vào trần 5 lượt hỏi của hồ sơ."""
+    return conn.execute("SELECT EXISTS (SELECT 1 FROM mart.ma_ngung_ban_an WHERE product_code = %s)",
+                        (ma,)).fetchone()[0]
 
 
 def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
@@ -820,18 +676,18 @@ def danh_muc(conn) -> dict:
             thang.append(f"{y + yy:04d}-{mm + 1:02d}")
     ma = []
     for r in rows:
-        sp = _sp(r[:15])
-        chuoi = {t[0]: t for t in (r[17] or [])}
+        sp = _sp(r[:16])
+        chuoi = {t[0]: t for t in (r[18] or [])}
         ma.append({**sp.__dict__, "nhan_trang_thai": sp.nhan_trang_thai, "mau": sp.mau,
                    # NGÀNH hàng — cùng khái niệm "ngành" của /bao-cao. Rỗng -> ĐÚNG
                    # hằng NGANH_TRONG (bản chép bắt buộc ở tầng Python của biểu thức
                    # coalesce trong mart.ban_theo_nganh_thang — CLAUDE.md). `nhom`
                    # (kind_name) của san_pham_360 chỉ có 有形/無形, không lọc được.
-                   "nganh": r[18] or NGANH_TRONG,
-                   "dt_12t": int(r[15] or 0), "lg_12t": int(r[16] or 0),
+                   "nganh": r[19] or NGANH_TRONG,
+                   "dt_12t": int(r[16] or 0), "lg_12t": int(r[17] or 0),
                    # Tỷ số của các TỔNG (bất biến tỷ suất), NULL khi mẫu số 0 —
                    # cùng `nullif(sum(...), 0)` của mart.
-                   "ts_12t": (float(r[16] or 0) / float(r[15])) if r[15] else None,
+                   "ts_12t": (float(r[17] or 0) / float(r[16])) if r[16] else None,
                    # Tháng không có dòng bán = 0 yên ĐÃ BIẾT (không có phiếu), cùng
                    # ngoại lệ tiền của `_sp`.
                    "thang_dt": [int(chuoi[t][1] or 0) if t in chuoi else 0 for t in thang],

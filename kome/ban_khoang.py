@@ -102,10 +102,11 @@ def mat_hang(conn, kx: KhoangXem) -> list[dict]:
     """Mọi mã hàng của khoảng — cùng hình dạng `BaoCao.hang_theo_nganh`."""
     return [{"ma": r[0], "ten": r[1], "nhom": r[2], "doanh_thu": _i(r[3]), "lai_gop": _i(r[4]),
              "ty_suat": float(r[5]) if r[5] is not None else None, "so_khach": r[7],
-             "la_phi": r[8], "la_hang_tang": r[9], "so_luong": float(r[6]) if r[6] is not None else None}
+             "la_phi": r[8], "la_hang_tang": r[9], "so_luong": float(r[6]) if r[6] is not None else None,
+             "la_ngung_ban_het_ton": r[10]}
             for r in conn.execute(
                 """SELECT product_code, ten_hang, food_category_name, dt, lg, ty_suat, so_luong, so_khach,
-                          la_phi, la_hang_tang
+                          la_phi, la_hang_tang, la_ngung_ban_het_ton
                      FROM mart.mat_hang_khoang(%s, %s)""", (kx.tu, kx.den)).fetchall()]
 
 
@@ -206,7 +207,8 @@ def cua_khach(conn, kx: KhoangXem, ma: str) -> dict:
               (SELECT coalesce(json_agg(json_build_object('ma', m.product_code, 'ten', m.ten_hang,
                                   'doanh_thu', m.dt, 'lai_gop', m.lg, 'so_luong', m.so_luong,
                                   'so_ngay', m.so_ngay_mua, 'lan_cuoi', m.lan_cuoi,
-                                  'la_phi', m.la_phi, 'la_hang_tang', m.la_hang_tang)
+                                  'la_phi', m.la_phi, 'la_hang_tang', m.la_hang_tang,
+                                  'la_ngung_ban_het_ton', m.la_ngung_ban_het_ton)
                                   ORDER BY m.dt DESC NULLS LAST, m.product_code), '[]')
                  FROM mart.khach_mat_hang_khoang(%s, %s) m WHERE m.customer_code = %s),
               (SELECT coalesce(json_agg(json_build_object('ngay', l.sales_date, 'so_phieu', l.n,

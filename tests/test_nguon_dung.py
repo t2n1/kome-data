@@ -42,5 +42,7 @@ def test_giao_dien_doc_co_tinh_nang_cua_may_chu_khong_tu_chep():
     assert "export const TN" in kd and "KD.tinh_nang" in kd
     for f, dau_hieu in {"khung/muc.ts": "TN.cong_no", "tong_quan/khoi.tsx": "TN.cong_no && <OKpiCongNo",
                         "khach/HoSo.tsx": "TN.cong_no",
-                        "khach/DanhSach.tsx": "TN.cong_no", "san_pham/HoSoSanPham.tsx": "TN.bang_gia"}.items():
+                        "khach/DanhSach.tsx": "TN.cong_no",
+                        # TabGia.tsx tạo ở Task 7 (san-pham-360 §7) — cho tới lúc đó test này ĐỎ, có ý.
+                        "san_pham/ho_so/TabGia.tsx": "TN.bang_gia"}.items():
         assert dau_hieu in (src / f).read_text(encoding="utf-8"), f

@@ -110,8 +110,8 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/bao-cao` | **React** (giai đoạn 3, `/api/bao-cao?thang=` · `?ky=` · `?tu=&den=` — mặc định tháng hiện tại; dạng Kỳ = báo cáo theo kỳ cũ, không đổi số; hình học biểu đồ vẫn tính ở Python) Báo cáo bán hàng + (đợt 5b) ngành hàng lên/xuống · cây ô ngành → mã · bản đồ nhiệt ngành × tháng · Pareto tập trung khách | `mart.ban_theo_*`, `mart.ky_cung_ky`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.nganh_ky_cung_ky`, `mart.tap_trung_khach` |
 | `/du-bao` | **Dự báo doanh thu — React** (giai đoạn 3, `/api/du-bao`, đổi kịch bản ở trình duyệt) (đợt 8): chốt tháng (đường luỹ kế + khoảng sai số thật + theo người phụ trách) · 12 tháng tới (3 kịch bản) · đơn kỳ vọng 14 ngày · nguy cơ ngừng mua · dự báo đã chuẩn tới đâu. Toàn công ty, **3 truy vấn** | `mart.lich_kinh_doanh`, `mart.ban_theo_ngay`, `mart.tien_do_ngan_sach`, `mart.khach_360`, `mart.khoang_cach_mua` |
 | `/ngan-sach` | **React** (thiết kế lại 2026-09-25): 4 ô số + biểu đồ 12 tháng (ngân sách công ty · thực tế kỳ này · thực tế năm trước · tổng từng người, theo số ĐANG GÕ) · lưới XOAY (tháng là dòng) hai tab **Công ty** (doanh thu + lãi gộp nhập thẳng, cạnh cột năm trước) | **Từng người** (gạt doanh thu / lãi gộp; tổng từng người + phần chưa chia) · `⋯` đầu cột điền nhanh (chia đều · năm trước × % · lãi gộp = doanh thu × biên · điền ô trống · xoá cột) · dán khối Excel · thanh Lưu dính (vẫn MỘT `<form method="post">`). Người phụ trách **không bán 90 ngày tới mốc** (`ngan_sach.NGAY_CON_BAN`, đọc `mart.ban_den_moc`) tự ẩn — trừ khi đã có chỉ tiêu trong kỳ hoặc có bán trong chính kỳ đó; ô của người ẩn không gửi lên nên `luu()` không đụng. ≤ 4 lượt hỏi. **Cần cờ `duoc_sua_ngan_sach`** | `app.ngan_sach_cong_ty`, `app.ngan_sach`, `core.dim_salesperson`, `core.dim_date`, `mart.dong_ban_khoang`, `mart.ban_den_moc` |
-| `/san-pham` | **React** (giai đoạn 4, bám Sản phẩm.dc.html; khoảng xem: cột doanh thu / SL / khách trong khoảng từ `/api/san-pham/khoang`, ghép ở trình duyệt): MỘT trang — ô tổng quan · danh mục cả 232 mã (chip ngành / trạng thái, tìm, sắp — lọc ở trình duyệt trên MỘT ảnh chụp `/api/san-pham`, 1 lượt hỏi) · hồ sơ mã đang chọn ngay bên dưới | `mart.san_pham_360`, `mart.dong_ban`, `mart.moc_thoi_gian`, `core.dim_product` |
-| `/san-pham/{mã}` | Cùng màn Sản phẩm với một mã được chọn (`pushState`): khách mua trong khoảng xem (`/api/san-pham/{mã}/khoang`, 2 lượt), biểu đồ theo ngày mở đúng tháng đang xem · hồ sơ (`/api/san-pham/{mã}`, ≤ 5 lượt) · bán theo ngày + cùng ngày tháng trước (`/ngay?thang=`, 1 lượt) · khách đang mua / đã bỏ · tồn theo kho · giá theo bậc · xu hướng theo tháng | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_hien_tai`, `khach_mat_hang`, `khach_360`, `core.fact_price_list`, `mart.dong_ban`, `mart.lich_kinh_doanh` |
+| `/san-pham` | **React** (giai đoạn 4, bám Sản phẩm.dc.html; khoảng xem: cột doanh thu / SL / khách trong khoảng từ `/api/san-pham/khoang`, ghép ở trình duyệt): MỘT trang — ô tổng quan · danh mục cả 232 mã (chip ngành / trạng thái, tìm, sắp — lọc ở trình duyệt trên MỘT ảnh chụp `/api/san-pham`, 1 lượt hỏi) · bấm dòng mở trang riêng `/san-pham/{mã}` (nhớ thứ tự danh mục cho ‹ n/N ›, `sessionStorage`) | `mart.san_pham_360`, `mart.dong_ban`, `mart.moc_thoi_gian`, `core.dim_product` |
+| `/san-pham/{mã}` | **Sản phẩm 360 — trang riêng React** (2026-09-26, đặc tả `2026-09-26-san-pham-360-trang-rieng-design.md`): bố cục hồ sơ khách 360 — cột trái dính "Việc với mã này" (tồn + cảnh báo lô · khách đến ngày mua lại — CÙNG vị từ `ho_so_khach.lich_mua` · khách nên chào), cột phải 4 ô số + 24 tháng (cột mờ năm trước; bấm tháng → tab Thời gian) + 4 tab tải lười: Khách hàng (Pareto · 47 tỉnh · người phụ trách · mới/quay lại) · Thời gian (ngày · 26 tuần · nhịp · cỡ đơn) · Giá & lãi (đơn giá thực × quy cách · biên · khách giá/biên thấp · giá bậc) · Tồn & bán thêm (lô · mua kèm cùng phiếu · khách nên chào). `/api/san-pham/{mã}` (4 lượt, trần 5 — KHÔNG gồm khách nên chào) + `/khoang` (2) + `/nen-chao` (1; `mart.sp_khach_nen_chao` đo ~8,7 s nên tách khỏi đường mở trang — cột trái lấy 5 đầu, tab Tồn & bán thêm cả ≤ 50, CHUNG một truy vấn TanStack) + `/khach` (3) · `/thoi-gian` (2) · `/gia` (2) · `/ban-them` (2) · `/ngay` (1). `ho_so()` trả `dt_12t`/`lg_12t`/`bien_12t` và `bien` từng tháng (cùng cửa sổ 365 ngày với danh mục; biên tính ở máy chủ); thanh trên có ô tìm mã (lọc ảnh chụp danh mục) và ‹ n/N › rơi về thứ tự mặc định của danh mục khi không có sessionStorage; tab Thời gian giữ ô chọn tháng của biểu đồ theo ngày trên 24 tháng; biên theo từng người phụ trách tính sẵn ở máy chủ | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_theo_lo`, `khach_mat_hang`, `mart.sp_*` (051–053), `core.fact_price_list` |
 | `/kho-hang` | **React** (giai đoạn 4, bám Kho hàng.dc.html; `/api/kho-hang?kho=&loc=`, 2 lượt): tab Tồn hiện tại (5 ô · bảng tồn theo dòng + tìm + chip ngành (`?nganh=`, lọc ở trình duyệt) + CSV · quá hạn / sắp chuyển lô / không kịp bán trước hạn / cận hạn / giá trị theo ngành / theo lô) · Hàng đang về (chưa có dữ liệu) · Cần đặt (hết + sắp thiếu, KHÔNG đề xuất số lượng). "Kho" hiện là LÔ (bẫy #6, 042) | `mart.ton_hien_tai`, `mart.ton_theo_lo`, `san_pham_360`, `core.dim_warehouse`, `core.dim_product` (ngành), `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/cong-no` | **Công nợ & thu tiền — React** (đợt 6, bám Công nợ.dc.html; `/api/cong-no`, MỘT ảnh chụp 2 lượt hỏi, lọc ở trình duyệt): 6 ô tổng · tuổi nợ (bấm để lọc) · phiếu còn nợ (tab quá hạn / sắp đến hạn / không suy được hạn / theo bên nhận hoá đơn) · lịch thu 7 ngày sau mốc · việc nên làm. Mốc = cuối kỳ sổ mới nhất. Tab Công nợ của hồ sơ khách: `/api/cong-no/khach/{mã}` | `mart.cong_no_ben_tra`, `mart.cong_no_phieu` (← `core.fact_ar_ledger`, sổ `請求先元帳`) |
 | `/kho-du-lieu` | **Tổng quan độ phủ — React** (thiết kế lại 2026-09-25, đặc tả `2026-09-25-tong-quan-do-phu-luoi-design.md`; thanh trái chung `TabKho.tsx::KhungKho`; máy chủ tính sẵn vào `window.__KOME__.man`, vai trò NẠP): ô tóm tắt (mỗi nguồn lịch sử "có từ → đến, thiếu n ngày làm việc" + hôm nay x/3 file 13:30) · LƯỚI tháng × loại dữ liệu đang dùng (`coverage.tinh_luoi_phu`: lịch sử = ngày làm việc có ÷ ngày làm việc, bán hàng từ 売上明細表 vẽ sọc; nền = tháng có bản mới theo `data_date`; cột tình trạng từ `kho_du_lieu.nut_nguon`) · từng ngày của tháng đang chọn (mọi ngày đi cùng một lần tải; `?ngay_thang=YYYY-MM` chọn sẵn, KHÔNG `?thang=` — đó là khoảng xem chung) · sức khoẻ / loại chưa vào kho / hạn chế thu gọn cuối trang | `mart.lich_kinh_doanh`, `meta.ingest_batch`, `core.*` |
@@ -183,6 +183,46 @@ Phí xét TRƯỚC (`mart.la_dong_hang_tang`: một dòng không vừa phí vừ
 `'Hàng tặng (POSM)'` (`kome.bao_cao.NGANH_HANG_TANG` là bản chép bắt buộc); `tach_phi` đưa nó ra
 `BaoCao.hang_tang`. Ba danh sách giữ dòng kèm cột `la_hang_tang`. Có test canh:
 `tests/test_hang_tang.py`. **Migration 049 phải chạy TRƯỚC khi triển khai.**
+
+**Bất biến (050, hàng ※終売※ — chủ DN chốt 2026-09-26):** mã ngừng kinh doanh (hạng sản phẩm OBC
+`0999` HOẶC tên chứa `※終売※` — đo thật 29/232 mã, hai dấu khớp 29/29) **không phân tích, không
+hiện ở đâu — TRỪ khi còn tồn**. Định nghĩa ĐÚNG MỘT LẦN: `mart.la_ngung_ban(rank_code, product_name)`;
+tập bị ẨN = `mart.ma_ngung_ban_an` (ngừng kinh doanh VÀ tổng `mart.ton_hien_tai` ≤ 0 / không dòng,
+tính đến MỐC — xem lùi về lúc còn hàng thì mã hiện lại). Bị ẩn khỏi `mart.san_pham_360` (danh mục,
+hồ sơ `/san-pham/{mã}` trả 404 "đã ngừng kinh doanh") và `mart.khach_mat_hang` (mặt hàng / nhịp /
+"đã ngừng mua" / mã đến ngày mua lại / Nên chào); gợi ý hàng chưa mua bỏ MỌI mã ※終売※ kể cả còn
+tồn. Tiền VẪN trong mọi tổng và trong NGÀNH THẬT của nó (không phải phí, không tách ngành). Ba danh
+sách phải cộng bằng tổng mang cột `la_ngung_ban_het_ton`; `bao_cao.gop_ngung_ban` gộp thành MỘT dòng
+mỗi ngành (`ma` rỗng, `top_lai_gop` bỏ dòng đó), hồ sơ khách gộp một dòng. Mã ※終売※ còn tồn: hiện
+như hàng thường với `san_pham_360.ngung_ban = true` (nhãn "bán nốt tồn") và **không bao giờ**
+`'sap_thieu'` — không ai đặt thêm hàng đã ngừng kinh doanh. Tab Đơn hàng (phiếu thật), công nợ, Kho
+dữ liệu KHÔNG lọc. Có test canh: `tests/test_ngung_ban.py`. **Migration 050 phải chạy TRƯỚC khi
+triển khai.**
+
+**Bất biến (051–053, Sản phẩm 360 — 2026-09-26):** mười chỉ số của trang riêng là hàm
+`mart.sp_*(mã)` đọc `mart.ban_den_moc` (quay về theo mốc, bỏ mã nội bộ). Tập trung khách gộp
+theo KHÁCH; 47 tỉnh LEFT JOIN từ `dim_prefecture` (bậc 0 = đúng bằng 0); đơn giá thực = Σ DT
+thuần ÷ Σ qty (tỷ số các tổng, Σ qty ≤ 0 → NULL); cỡ đơn đếm dòng 赤伝 riêng; mua kèm bỏ phí /
+POSM / ※終売※ hết tồn; khách nên chào = khách `trang_thai_cap = 'mua'` với mã cùng ngành, chưa
+từng mua mã này, rỗng với mã ※終売※. "Khách đến ngày mua lại" dùng ĐÚNG vị từ của
+`kome/ho_so_khach.py::lich_mua` (có test canh hai chiều:
+`tests/test_san_pham_360.py::test_mua_lai_TRUNG_TAP_voi_lich_mua_cua_ho_so_khach`). Có test canh:
+`tests/test_mart_sp360.py`. **Migration 051–053 phải chạy TRƯỚC khi triển khai.**
+
+**Bất biến (054, nhãn cặp khách–mã lọc theo danh sách mã — 2026-09-27):** `mart.khoang_cach_mat_hang`,
+`mart.nhip_mat_hang`, `mart.khach_mat_hang` nay là `SELECT * FROM mart.<tên>_cua(NULL)`; THÂN định
+nghĩa nằm trong ba hàm `…_cua(p_mas text[])` (`LANGUAGE sql STABLE`, gộp vào câu gọi; NULL = mọi mã,
+kế hoạch y như view cũ — đo thật cùng chi phí). **Sửa công thức nhịp / nhãn thì sửa trong HÀM**, không
+thêm bản thứ hai. Cần nhãn của NHIỀU mã một lúc thì gọi `mart.khach_mat_hang_cua(danh sách)` với
+danh sách là HẰNG khi lập kế hoạch (tham số hay cột LATERAL = Postgres quét cả bảng bán): vì thế
+`mart.sp_khach_nen_chao` là PL/pgSQL dùng `EXECUTE format(%L)` — đo thật HAL04 8,7 s → ~0,3 s. Có test
+canh: `tests/test_mart_sp360.py::test_khach_mat_hang_cua_BANG_view_loc_theo_ma`,
+`::test_khach_nen_chao_054_GIONG_dinh_nghia_053`. Giá phải trả: THÊM CỘT vào một trong ba view nay phải
+`DROP VIEW` → `DROP FUNCTION …_cua` → tạo lại cả hai (chữ ký `RETURNS TABLE` không đổi được bằng
+`CREATE OR REPLACE`), và thân hàm SQL không được theo dõi phụ thuộc — xoá `ban_den_moc` /
+`dau_hieu_khach` / `ma_ngung_ban_an` sẽ không bị chặn mà chỉ nổ lúc chạy (cùng nếp các hàm `*_khoang`).
+`/lien-he` vẫn dùng LATERAL `= mã` trên view (≤ 3 mã mỗi khách, đã nhanh); cần nhiều mã thì dùng
+`khach_mat_hang_cua(danh sách)`. **Migration 054 phải chạy TRƯỚC khi triển khai.**
 
 **Bất biến (044, hạn trả):** `その都度請求` = trả trong **5 ngày làm việc sau ngày xuất
 hàng** (ngày phiếu), ngày làm việc = `mart.lich_kinh_doanh.la_ngay_kd` (chưa trừ ngày nghỉ
