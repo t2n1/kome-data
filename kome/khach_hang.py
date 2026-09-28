@@ -92,7 +92,10 @@ SAP_XEP = {
 
 # Giai đoạn 2: cột sắp xếp của bảng React -> (khoá trên dòng `danh_ba`, mặc
 # định giảm dần). Danh sách TRẮNG như SAP_XEP — khoá lạ rơi về doanh thu.
-_THU_HANG = {"S": 1, "A": 2, "B": 3, "C": 4, "D": 5}
+# Hạng OBC (055) — nhãn của `mart.hang_obc`, theo thứ tự hiển thị / sắp xếp.
+# Bản chép BẮT BUỘC của các nhãn trong hàm đó (có test canh: tests/test_hang_obc.py).
+THU_TU_HANG = ("S", "A", "B", "C", "D", "Z", "ZZ", "ZZZ", "キャンペーン不要", "対象外")
+_THU_HANG = {h: i for i, h in enumerate(THU_TU_HANG, 1)}
 COT_SAP = {
     "doanh_thu": (lambda k: k["doanh_thu"], True),
     "lai_gop": (lambda k: k["lai_gop"], True),
@@ -134,8 +137,11 @@ class Khach:
     ty_le_im_lang: float | None
     trang_thai: str
     dau_hieu_obc: str | None
-    # Giai đoạn 2 — chỉ danh_sach() điền (LEFT JOIN khach_thang_nay/hang_doanh_thu).
+    # Hạng OBC (得意先ランク, 055): nhãn ngắn + tên đầy đủ; `khong_goi` = cổng DUY NHẤT
+    # của danh sách gọi (※廃業※ hoặc hạng Z/ZZ/ZZZ — mart.dau_hieu_khach).
     hang: str | None = None
+    hang_ten: str | None = None
+    khong_goi: bool = False
     thang_nay: int | None = None
     thang_truoc_cung_ngay: int | None = None
     tb_3_thang: int | None = None
@@ -228,18 +234,19 @@ class HoSo:
 
 _COT = """customer_code, ten, prefecture, city, phone, salesperson_code,
           doanh_thu_thuan, lai_gop, ty_suat, lan_cuoi, so_ngay_im_lang,
-          nhip_ngay, ty_le_im_lang, trang_thai, dau_hieu_obc"""
+          nhip_ngay, ty_le_im_lang, trang_thai, dau_hieu_obc,
+          hang_obc, hang_obc_ten, khong_goi"""
 
 # Khối "chi tiết" của hồ sơ 360°: tên tiếng Việt cho các cột lấy thêm trong
 # CÙNG câu lệnh với `_COT` (xem ho_so()). Thứ tự ở đây PHẢI khớp thứ tự cột
 # trong câu lệnh đó.
 # 043 (mẫu 16 cột): bỏ phan_loai / bac_gia / vang_lai (cột đã bỏ khỏi bản xuất);
-# thêm toa_nha (ビル等), hang_obc (ランク名 — 得意先ランク của OBC, KHÁC `hang_dt`
-# là hạng theo doanh thu 12 tháng), tai_khoan_ck (振込専用口座番号１); `ngay_chot`
+# thêm toa_nha (ビル等), hang_obc (ランク名 — tên đầy đủ 得意先ランク; nhãn ngắn là
+# `Khach.hang`, 055), tai_khoan_ck (振込専用口座番号１); `ngay_chot`
 # là TÊN điều kiện chốt (請求締日名), rỗng thì rơi về mã.
 _COT_CHI_TIET = ("chi_nhanh", "buu_chinh", "dia_chi", "toa_nha", "hang", "hang_obc",
                  "ngay_chot", "tai_khoan_ck", "lan_dau", "so_lan_mua",
-                 "so_phieu", "gia_tri_tb", "hang_dt", "ten_phu_trach")
+                 "so_phieu", "gia_tri_tb", "ten_phu_trach")
 
 
 def _khach(r) -> Khach:
@@ -250,7 +257,8 @@ def _khach(r) -> Khach:
                  lan_cuoi=r[9], so_ngay_im_lang=r[10],
                  nhip_ngay=float(r[11]) if r[11] is not None else None,
                  ty_le_im_lang=float(r[12]) if r[12] is not None else None,
-                 trang_thai=r[13], dau_hieu_obc=r[14])
+                 trang_thai=r[13], dau_hieu_obc=r[14],
+                 hang=r[15], hang_ten=r[16], khong_goi=bool(r[17]))
 
 
 def _ds_hang(hang) -> list[str]:
@@ -258,7 +266,7 @@ def _ds_hang(hang) -> list[str]:
     if not hang:
         return []
     ds = hang if isinstance(hang, (list, tuple)) else str(hang).split(",")
-    return [h for h in (x.strip() for x in ds) if h in ("S", "A", "B", "C", "D")]
+    return [h for h in (x.strip() for x in ds) if h in THU_TU_HANG]
 
 
 # ---- Danh bạ: MỘT ảnh chụp, lọc bằng Python --------------------------------
@@ -292,12 +300,15 @@ def danh_ba(conn) -> dict:
                    coalesce(k.lai_gop, 0)::bigint AS lai_gop, k.ty_suat::float8 AS ty_suat,
                    k.lan_cuoi, k.so_ngay_im_lang, k.nhip_ngay::float8 AS nhip_ngay,
                    k.ty_le_im_lang::float8 AS ty_le_im_lang, k.trang_thai, k.dau_hieu_obc,
-                   k.address AS dia_chi, h.hang,
+                   k.address AS dia_chi, k.hang_obc AS hang, k.hang_obc_ten AS hang_ten,
+                   k.khong_goi,
                    -- 振込専用口座番号１ (043): sale có tiền về thì gõ số tài khoản
                    -- vào ô tìm để ra khách. Đọc thẳng dòng hiện hành (chưa có trong
                    -- khach_360); chỉ mục duy nhất theo is_current nên không nhân dòng.
                    dc.transfer_account AS tai_khoan,
-                   (CASE WHEN k.trang_thai = ANY(%s) THEN ARRAY['im'] ELSE ARRAY[]::text[] END)
+                   -- = nhánh 'im' của mart.khach_nhom_viec (055): trạng thái VÀ cổng khong_goi.
+                   (CASE WHEN k.trang_thai = ANY(%s) AND NOT k.khong_goi
+                         THEN ARRAY['im'] ELSE ARRAY[]::text[] END)
                      || coalesce(v.nhom, ARRAY[]::text[]) AS nhom,
                    t.nhan AS nhan_thang, t.dt_thang_nay::bigint AS thang_nay,
                    t.dt_thang_truoc_den_ngay::bigint AS thang_truoc_cung_ngay,
@@ -305,7 +316,6 @@ def danh_ba(conn) -> dict:
                    EXISTS (SELECT 1 FROM core.dim_salesperson ps
                             WHERE ps.salesperson_code = k.salesperson_code) AS co_pt
               FROM k
-              LEFT JOIN mart.hang_doanh_thu h ON h.customer_code = k.customer_code
               LEFT JOIN v ON v.customer_code = k.customer_code
               LEFT JOIN mart.khach_thang_nay t ON t.customer_code = k.customer_code
               LEFT JOIN core.dim_customer dc ON dc.customer_code = k.customer_code
@@ -349,7 +359,7 @@ def _khop(k: dict, *, tim: str = "", loc: str = "", sale: str | None = None,
       * sale — `PT_TRONG` = mã phụ trách không có trong core.dim_salesperson.
       * tinh — `TINH_TRONG` = tỉnh NULL/rỗng (nhãn "(không rõ)" chỉ là nhãn
         hiển thị, không nằm trong CSDL).
-      * hang — nhiều hạng (bật/tắt), hạng theo doanh thu 12 tháng.
+      * hang — nhiều hạng (bật/tắt), hạng OBC (得意先ランク, `THU_TU_HANG`).
       * thang — nhãn của mart.khach_thang_nay, SO BẰNG (không NOT)."""
     if tim:
         t = tim.strip().casefold()
@@ -410,6 +420,7 @@ def _thanh_khach(k: dict) -> "Khach":
                  so_ngay_im_lang=k["so_ngay_im_lang"], nhip_ngay=k["nhip_ngay"],
                  ty_le_im_lang=k["ty_le_im_lang"], trang_thai=k["trang_thai"],
                  dau_hieu_obc=k["dau_hieu_obc"], hang=k["hang"],
+                 hang_ten=k.get("hang_ten"), khong_goi=bool(k.get("khong_goi")),
                  thang_nay=k["thang_nay"], thang_truoc_cung_ngay=k["thang_truoc_cung_ngay"],
                  tb_3_thang=k["tb_3_thang"], nhan_thang=k["nhan_thang"],
                  dt_khoang=k.get("dt_khoang"), lg_khoang=k.get("lg_khoang"),
@@ -479,9 +490,6 @@ def ho_so(conn, ma: str) -> HoSo | None:
                    coalesce(nullif(x.closing_day_name, ''), closing_day_code),
                    x.transfer_account, lan_dau,
                    so_lan_mua, so_phieu, gia_tri_tb_moi_lan,
-                   -- Hạng theo doanh thu 12 tháng (KHÔNG phải rank_code OBC ở
-                   -- trên) — cột cuối, cùng lượt hỏi (giai đoạn 2).
-                   (SELECT hang FROM mart.hang_doanh_thu WHERE customer_code = %s),
                    -- Tên phụ trách: danh sách phụ trách trước; mã không có trong đó
                    -- (vd. 0000) thì lấy 売上主担当者名 đi kèm trong 得意先全情報.
                    coalesce((SELECT ps.ten FROM core.dim_salesperson ps
@@ -497,7 +505,7 @@ def ho_so(conn, ma: str) -> HoSo | None:
                   FROM core.dim_customer dc
                  WHERE dc.customer_code = mart.khach_360.customer_code AND dc.is_current
             ) x ON true
-            WHERE customer_code = %s""", (ma, ma)).fetchone()
+            WHERE customer_code = %s""", (ma,)).fetchone()
     if r is None:
         return None
     # `_khach` đọc 15 cột ĐẦU theo vị trí, phần đuôi cắt từ CUỐI lên theo số
@@ -744,15 +752,15 @@ def can_xu_ly(conn, gioi_han: int = 100, sale: str | None = None) -> list[Khach]
     tham_so = [list(TRANG_THAI_CAN_XU_LY)] + ([sale] if sale else []) + [gioi_han]
     return [_khach(r) for r in conn.execute(
         f"""SELECT {_COT} FROM mart.khach_360
-            WHERE trang_thai = ANY(%s) {dieu_kien}
+            WHERE trang_thai = ANY(%s) AND NOT khong_goi {dieu_kien}
             -- customer_code phân định khi hoà doanh thu: thiếu nó thì thứ tự (và khách
             -- nào lọt qua LIMIT) đổi giữa hai lần gọi — dem_va_can_xu_ly() phải khớp y hệt.
             ORDER BY doanh_thu_thuan DESC NULLS LAST, customer_code LIMIT %s""",
         tham_so).fetchall()]
 
 
-def dem_va_can_xu_ly(conn, gioi_han: int = 100,
-                      sale: str | None = None) -> tuple[dict[str, int], list[Khach]]:
+def dem_va_can_xu_ly(conn, gioi_han: int = 100, sale: str | None = None,
+                      chi_goi: bool = False) -> tuple[dict[str, int], list[Khach]]:
     """Bộ đếm trạng thái TOÀN CÔNG TY + danh sách "cần xử lý" của can_xu_ly(),
     ĐÚNG MỘT lượt hỏi — thay cho `count(*) GROUP BY trang_thai` riêng cộng
     can_xu_ly() riêng của kome.tong_quan.tong_quan().
@@ -773,18 +781,23 @@ def dem_va_can_xu_ly(conn, gioi_han: int = 100,
     (không khách nào khớp, kể cả CSDL trống) câu lệnh vẫn trả về đúng MỘT
     dòng với mọi cột của `c` là NULL; lọc chúng ra bằng cách kiểm tra
     `customer_code IS NOT NULL` trước khi coi một dòng là một Khach thật.
+
+    `chi_goi` (055): bộ đếm chỉ đếm khách ĐƯỢC gọi (bỏ `khong_goi` — ※廃業※, hạng OBC
+    Z/ZZ/ZZZ) — cho ô KPI "cần gọi". Mặc định đếm MỌI khách (thanh sức khoẻ). Danh sách
+    `c` luôn qua cổng khong_goi.
     """
     dieu_kien = "AND salesperson_code = %s" if sale else ""
-    tham_so = ([list(TRANG_THAI_CAN_XU_LY)]
+    tham_so = ([chi_goi, list(TRANG_THAI_CAN_XU_LY)]
                + ([sale] if sale else []) + [gioi_han])
     rows = conn.execute(f"""
         WITH k AS MATERIALIZED (SELECT {_COT} FROM mart.khach_360),
              d AS (
                  SELECT json_object_agg(trang_thai, n) AS dem
-                   FROM (SELECT trang_thai, count(*) AS n FROM k GROUP BY 1) x
+                   FROM (SELECT trang_thai, count(*) AS n FROM k
+                          WHERE NOT (%s AND khong_goi) GROUP BY 1) x
              ),
              c AS (
-                 SELECT * FROM k WHERE trang_thai = ANY(%s) {dieu_kien}
+                 SELECT * FROM k WHERE trang_thai = ANY(%s) AND NOT khong_goi {dieu_kien}
                  ORDER BY doanh_thu_thuan DESC NULLS LAST, customer_code LIMIT %s
              )
         SELECT d.dem, c.* FROM d LEFT JOIN c ON true
@@ -828,11 +841,6 @@ class TongQuan:
     # Khoảng xem (đợt B): số khách CÓ phiếu trong khoảng (theo `sale`, như
     # nhóm việc) — chip "Có mua trong khoảng".
     co_mua: int = 0
-
-
-# Thứ tự hiển thị của hạng. S trước D, không phải thứ tự bảng chữ cái ngẫu
-# nhiên mà Postgres trả về.
-THU_TU_HANG = ("S", "A", "B", "C", "D")
 
 
 def tong_quan(db: dict, sale: str | None = None, nhom: str | None = None,

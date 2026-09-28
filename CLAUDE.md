@@ -103,7 +103,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | Đường dẫn | Việc | Dữ liệu lấy từ |
 |---|---|---|
 | `/` | **Giao diện React** (2026-09-23, bám Dashboard.dc.html): 21 khối kéo thả / đổi cỡ / ẩn hiện, xem theo vai trò, chuông, ⌘K. Mỗi khối gọi `/api/tong-quan/<khối>` riêng (`kome/khoi_tong_quan.py`), qua ảnh chụp theo phiên bản dữ liệu; khối không có nguồn hiện khung "chưa có dữ liệu". Từ 2026-09-24 khối số bán hàng theo **khoảng xem** (`?thang=`/`?ky=`/`?tu=&den=`, mặc định tháng hiện tại) — xem bất biến "Khoảng xem" | như trên + `mart.ban_theo_thang_so_sanh`, `mart.ban_theo_nganh_thang_so_sanh`, `mart.tong_theo_ky`, `mart.uu_tien_lien_he`, `app.anh_chup_api` |
-| `/khach-hang` | **React** (giai đoạn 2, bám Customer 360.dc.html) tab **Danh sách**: KPI · 8 phân khúc (gồm "mua đều, tháng này chưa", "có mua trong khoảng") · doanh thu + so sánh theo **khoảng xem** (`?thang=`…, sắp mặc định `dt_khoang`; nhãn tháng lọc bằng `?nhan_thang=`) · lọc tìm/hạng (nhiều)/phụ trách/tỉnh/trạng thái/nhãn tháng · bảng sắp xếp máy chủ 50/100/200 dòng · xuất CSV dòng đã chọn · 3 khối phân tích. `/api/khach-hang/ds` — một ảnh chụp danh bạ (`KH.danh_ba`) lọc bằng Python | `mart.khach_360`, `khach_nhom_viec`, `hang_doanh_thu`, `khach_thang_nay`, `tai_nhan_vien` |
+| `/khach-hang` | **React** (giai đoạn 2, bám Customer 360.dc.html) tab **Danh sách**: KPI · 8 phân khúc (gồm "mua đều, tháng này chưa", "có mua trong khoảng") · doanh thu + so sánh theo **khoảng xem** (`?thang=`…, sắp mặc định `dt_khoang`; nhãn tháng lọc bằng `?nhan_thang=`) · lọc tìm/hạng (nhiều)/phụ trách/tỉnh/trạng thái/nhãn tháng · bảng sắp xếp máy chủ 50/100/200 dòng · xuất CSV dòng đã chọn · 3 khối phân tích. `/api/khach-hang/ds` — một ảnh chụp danh bạ (`KH.danh_ba`) lọc bằng Python | `mart.khach_360`, `khach_nhom_viec`, `khach_thang_nay`, `tai_nhan_vien` |
 | `/khach-hang/{mã}` | **Hồ sơ 360° React**: hai cột (thiết kế lại 2026-09-26, đặc tả `2026-09-26-ho-so-khach-360-thiet-ke-lai-design.md`): cột trái dính "Việc với khách này" (lý do · **"Mã đến ngày mua lại"** — KHÁC "Nên chào" của `/lien-he` · chép kịch bản `khach/kich_ban.ts` · lần liên hệ trước + ghi nhanh · công nợ), cột phải 4 ô số + biểu đồ 12 tháng + 4 tab (Mặt hàng · Đơn hàng · Công nợ · Hồ sơ và nhật ký; `#tong_quan`/`#san_pham` cũ → Mặt hàng); Ảnh cửa hàng / Chat Facebook là khối "sắp có" (`KhoiSapCo`); ô tổng, mặt hàng và đơn hàng theo khoảng xem qua `/api/khach-hang/{mã}/khoang` (2 lượt, ngoài trần 8 của hồ sơ), biểu đồ 12 tháng bấm tháng xem mặt hàng, lưới 26 tuần, giỏ theo ngành, lịch mua dự kiến, ghi tiếp xúc (`POST /api/khach-hang/{mã}/tiep-xuc`, chỉ JSON). `/api/khach-hang/{mã}` (+ `/dong?tu=&den=`) | `mart.khach_360`, `khach_mat_hang`, `khach_theo_thang`, `khach_thang_nay`, `lan_mua`, `dong_ban`, `ty_suat_mat_hang` |
 | `/lien-he` | **Cần liên hệ — React** (giai đoạn 3, bố cục CRM.dc.html; `/api/lien-he`) (đợt 7, thay `/can-xu-ly` — nay chỉ còn 301 về đây): cột theo lý do (lâu không mua · quá hạn · sắp đến hạn · mua đều tháng này chưa — 036) · hoạt động gần đây · hẹn gọi lại hôm nay · khách đang tạm ẩn. Ghi tiếp xúc ngay trên thẻ qua `POST /api/khach-hang/{mã}/tiep-xuc` (form cũ `POST /khach-hang/{mã}/tiep-xuc` vẫn còn). Ô chọn 担当者 (`?nv=`); mỗi cột một màu theo lý do (`.lh-m-<lý do>`, pha từ token); "Nên chào" ≤ 3 mã khách đã mua đều (`LH.goi_y_va_nhan_vien`, đọc `mart.khach_mat_hang`, LATERAL `= mã` — `= ANY` không đẩy xuống được qua `nhip_mat_hang`, đo thật 2 s → 0,1 s) + nút chép kịch bản gọi. KHÔNG in % chắc chắn. **4 truy vấn** | `mart.uu_tien_lien_he`, `mart.khach_thang_nay`, `mart.khach_mat_hang`, `app.nhat_ky_tiep_xuc` |
 | `/ban-do` | Tab **Bản đồ** của màn Khách hàng (React) — lưới 47 tỉnh tô theo chỉ số (số khách/doanh thu 12 tháng/cần gọi lại + doanh thu / khách có mua trong khoảng xem — `mart.tinh_khoang`), lọc theo người phụ trách; bấm ô → tab Danh sách lọc tỉnh đó. `/api/ban-do` | `core.dim_prefecture`, `mart.khach_theo_tinh` |
@@ -124,13 +124,21 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/cai-dat` | **Cài đặt** (màn 21): người dùng & ba cờ quyền (đổi được CHỈ khi có `duoc_quan_tri` VÀ máy có cổng đăng nhập) · ngày lễ sắp tới · quy tắc khách · nguồn · hiển thị. Không bao giờ nhận mật khẩu | `app.nguoi_dung`, `mart.lich_kinh_doanh` |
 | `/giao-dien` | Đổi chế độ sáng/tối/theo hệ thống/theo giờ, ghi cookie, chuyển hướng về trang đã gọi | không đọc CSDL — chỉ đọc/ghi cookie |
 
-**Bất biến:** `mart.hang_doanh_thu` là hạng **do ta tự tính theo doanh thu 12
-tháng**, KHÔNG phải `得意先ランク` của OBC. Từ 043 `得意先全情報` mang cả TÊN hạng OBC
-(`core.dim_customer.rank_name`, vd. `Cランク／年間粗利額 200,000以上`,
-`ZZZランク/電話禁止又は不要`) — nó CHỈ hiện ở tab Hồ sơ & liên hệ dưới nhãn
-"Hạng OBC (得意先ランク)", không bao giờ thay hạng theo doanh thu. Nhãn trên trang phải
-luôn đọc là "hạng theo doanh thu 12 tháng" — gọi tắt là "hạng" thì sẽ có người đối
-chiếu với OBC rồi thấy lệch và không biết tin cái nào.
+**Bất biến (055, hạng OBC — chủ DN chốt 2026-09-28):** hạng khách là **`得意先ランク` của
+OBC** (file `得意先全情報`, bản HIỆN HÀNH của `core.dim_customer` — không quay về theo mốc),
+KHÔNG tự tính. Hạng tự tính theo doanh thu 12 tháng (`mart.hang_doanh_thu`, cume_dist) đã BỎ —
+người ta đối chiếu với OBC (khách `000000000179`: OBC ZZZ, web ghi B). Nhãn ngắn định nghĩa ĐÚNG
+MỘT LẦN: `mart.hang_obc(rank_code, rank_name)` (`0001`–`0005` → S–D, `0006/0007/0008` → Z/ZZ/ZZZ,
+`0011` → キャンペーン不要, `0999` → 対象外, mã lạ → nguyên văn `rank_name`); `kome.khach_hang.THU_TU_HANG`
+là bản chép bắt buộc (có test canh). Nhãn trên trang là "Hạng OBC". Nhóm việc `'tut'` xét S/A
+của OBC. "Doanh thu 12 tháng" của khách nay ở `mart.doanh_thu_12t` (bản đồ đọc nó).
+**Khách hạng Z / ZZ / ZZZ không vào danh sách gọi**: cổng DUY NHẤT là
+`mart.dau_hieu_khach.khong_goi` (= `da_ngung` ※廃業※ HOẶC `mart.la_hang_khong_goi`), mang lại ở
+`mart.khach_360.khong_goi`; ba nhóm việc, `uu_tien_lien_he`, nhãn `'khong_goi'` của
+`khach_thang_nay` và `khach_mat_hang_cua.trang_thai_cap`, `can_xu_ly` / `dem_va_can_xu_ly` (ô KPI
+"cần gọi" gọi `chi_goi=True`), nhánh `'im'` của `danh_ba` đều đọc cờ đó. `trang_thai` của họ KHÔNG
+đổi (không thành 'ngung_giao_dich' — 583/604 khách ZZZ vẫn mua), thanh sức khoẻ và mọi tổng vẫn
+đếm họ. Có test canh: `tests/test_hang_obc.py`. **Migration 055 phải chạy TRƯỚC khi triển khai.**
 
 **Bất biến (043, 得意先全情報 mẫu 16 cột — chủ DN chốt 2026-09-25):** bản xuất BỎ
 `業種・カテゴリーコード`, `注文アプリコード`, `売価No.コード`, `請求先コード`,
@@ -296,7 +304,7 @@ hai chỗ tính khác nhau là hai con số cùng tên nói hai điều.
 **Bất biến:** trạng thái của một **cặp (khách, mã)** có **bốn** khối hiển thị và
 chỉ **một** định nghĩa: cột `mart.khach_mat_hang.trang_thai_cap` (migration `024`)
 — một **NHÃN ba giá trị**, xét theo đúng thứ tự này:
-`'khong_goi'` (khách bị OBC đánh dấu ※廃業※/※取引停止※ — xét **TRƯỚC**, cùng nếp
+`'khong_goi'` (khách bị OBC đánh dấu ※廃業※/※取引停止※ hoặc hạng Z/ZZ/ZZZ — cổng `khong_goi`, 055 — xét **TRƯỚC**, cùng nếp
 `'ngung_giao_dich'` của `016`) · `'ngung'` (im lặng **≥ 2× nhịp mua riêng của
 chính cặp đó**, `tre_ngay >= nhip_ngay`) · `'mua'` (còn lại, gồm cả cặp chưa đủ 3
 lần mua nên `nhip_ngay` NULL — đó là "chưa đủ dữ liệu", KHÔNG phải "đã ngừng").
@@ -820,7 +828,7 @@ kế, có ô nổi / bật tắt chú giải / bấm để lọc). Đặc tả:
   `2026-09-23-giai-doan-4-san-pham-kho-hang-design.md`: template Jinja đã xoá. Danh mục là MỘT
   ảnh chụp cả 232 mã (`SP.danh_muc`, 1 lượt hỏi) — lọc/sắp/đếm ở trình duyệt
   (`giao_dien/src/san_pham/loc.ts`), cùng luật bộ đếm "mọi bộ lọc trừ của chính nó".
-  "Doanh thu 12 tháng" của mã dùng ĐÚNG cửa sổ `mart.hang_doanh_thu`
+  "Doanh thu 12 tháng" của mã dùng ĐÚNG cửa sổ `mart.doanh_thu_12t`
   (`sales_date > hom_nay - 365`). Chip nhóm là NGÀNH (`food_category_name`, rỗng →
   `bao_cao.NGANH_TRONG`) — `san_pham_360.nhom` (`kind_name`) chỉ có 有形/無形 trên dữ liệu thật.
 - **Giai đoạn 5 (Kho dữ liệu · Nhật ký · Cài đặt · Ngân sách · Đăng nhập · trang thông

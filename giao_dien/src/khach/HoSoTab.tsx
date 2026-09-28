@@ -357,9 +357,9 @@ export { TabCongNo } from "../cong_no/CongNoKhach";
 
 // ============================================================ Hồ sơ & liên hệ
 // 043 (mẫu 16 cột): bỏ phân loại / bậc giá / vãng lai (cột đã bỏ khỏi bản xuất).
-// "Hạng OBC" là 得意先ランク của OBC — KHÁC hạng theo doanh thu 12 tháng ở đầu hồ sơ.
+// "Hạng OBC" là TÊN ĐẦY ĐỦ của 得意先ランク — nhãn ngắn của cùng hạng đó ở đầu hồ sơ (055).
 const NHAN_HO_SO: [string, string][] = [["chi_nhanh", "Chi nhánh"], ["buu_chinh", "Bưu chính"], ["dia_chi", "Địa chỉ"],
-  ["toa_nha", "Toà nhà / phòng"], ["ngay_dang_ky", "Ngày đăng ký (theo mã khách)"], ["hang_obc", "Hạng của OBC (得意先ランク — không phải hạng theo doanh thu 12 tháng)"], ["ngay_chot", "Điều kiện chốt công nợ"],
+  ["toa_nha", "Toà nhà / phòng"], ["ngay_dang_ky", "Ngày đăng ký (theo mã khách)"], ["hang_obc", "Hạng OBC (得意先ランク)"], ["ngay_chot", "Điều kiện chốt công nợ"],
   ["tai_khoan_ck", "TK chuyển khoản riêng (振込専用口座)"],
   ["lan_dau", "Mua lần đầu"], ["so_lan_mua", "Số ngày có mua"], ["so_phieu", "Số phiếu"],
   ["gia_tri_tb", "Giá trị TB mỗi lần"]];

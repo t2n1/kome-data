@@ -35,12 +35,13 @@ def _ho_so_khach(conn, batch, ma, ten, **kw):
         """INSERT INTO core.dim_customer
              (customer_code, valid_from, valid_to, is_current, customer_name,
               phone, prefecture, city, address, salesperson_code,
-              price_level_code, batch_id)
+              price_level_code, rank_code, rank_name, batch_id)
            VALUES (%s, '2025-01-01', '9999-12-31', true, %s, %s, %s, %s, %s, %s,
-                   %s, %s)""",
+                   %s, %s, %s, %s)""",
         (ma, ten, kw.get("phone", "080-0000-0000"), kw.get("prefecture", "東京都"),
          kw.get("city", "渋谷区"), kw.get("address", "1-1-1"),
-         kw.get("salesperson_code", "0104"), kw.get("price_level_code"), b))
+         kw.get("salesperson_code", "0104"), kw.get("price_level_code"),
+         kw.get("rank_code"), kw.get("rank_name"), b))
     conn.commit()
 
 
@@ -528,7 +529,7 @@ def test_tong_quan_danh_ba_chay_dung_MOT_truy_van(conn, batch, monkeypatch):
     assert dem["n"] == 1, f"chạy {dem['n']} truy vấn, phải đúng 1"
 
     assert tq.tong >= 1
-    assert [h[0] for h in tq.hang] == ["S", "A", "B", "C", "D"]
+    assert [h[0] for h in tq.hang] == list(KH.THU_TU_HANG)
     assert len(tq.nhan_vien) == 5
     assert set(tq.nhom) == {"im", "tut", "moi"}
     # [IMPORTANT] Bốn khẳng định trên chỉ canh CÁI KHOÁ — chúng đúng cả khi
@@ -537,8 +538,11 @@ def test_tong_quan_danh_ba_chay_dung_MOT_truy_van(conn, batch, monkeypatch):
     # vấn. Bù lại bằng khẳng định GIÁ TRỊ: mỗi khách trong danh bạ có ĐÚNG
     # một hạng, nên tổng số khách theo hạng phải khớp `tong` — sai điều kiện
     # JOIN ở khối 'hang' (vd JOIN thay vì LEFT JOIN, hay lệch cột) sẽ làm
-    # tổng này lệch ngay.
-    assert sum(n for _, n in tq.hang) == tq.tong
+    # tổng này lệch ngay. Từ 055 hạng là của OBC nên khách chưa có 得意先ランク
+    # không có hạng — so với số khách CÓ hạng của danh bạ.
+    monkeypatch.setattr(conn, "execute", that)
+    co_hang = sum(1 for k in KH.danh_ba(conn)["khach"] if k["hang"] in KH.THU_TU_HANG)
+    assert sum(n for _, n in tq.hang) == co_hang
     # Và một khách CỤ THỂ (TQ02) phải rơi đúng nhóm việc mong đợi — không chỉ
     # "có nhóm nào đó khác rỗng".
     assert tq.nhom["im"] == 1
@@ -648,16 +652,13 @@ def test_ba_bo_loc_moi_ket_hop_duoc_voi_nhau_va_voi_sale(conn, batch):
     riêng (`test_loc_theo_nhom_viec`) nên ở đây canh `tinh` và `hang`, cả hai
     kết hợp được với `sale` đã có từ đợt 3.
     """
-    # K0001 doanh thu lớn, K0002 doanh thu rất nhỏ, khách neo ở giữa -> ba mức
-    # doanh thu tách bạch cho ra ba hạng khác nhau (n=3: cume_dist 1/3 -> 'B',
-    # 2/3 -> 'C', 3/3 -> 'D') — đủ để phân biệt bộ lọc `hang` mà không cần
-    # đoán ngưỡng phần trăm chính xác.
+    # Hạng OBC (055) đọc từ core.dim_customer.rank_code: K0001 = B, K0002 = D.
     _ho_so_khach(conn, batch, "K0001", "Quán K lớn", salesperson_code="0104",
-                 prefecture="愛知県")
+                 prefecture="愛知県", rank_code="0003")
     _mua(conn, batch, "K0001", HOM_NAY - timedelta(days=3),
          tien=1_000_000, tax=100_000, gp=300_000)
     _ho_so_khach(conn, batch, "K0002", "Quán K nhỏ", salesperson_code="0104",
-                 prefecture="愛知県")
+                 prefecture="愛知県", rank_code="0005")
     _mua(conn, batch, "K0002", HOM_NAY - timedelta(days=3),
          tien=1_000, tax=100, gp=300)
     _neo(conn, batch)
@@ -876,7 +877,7 @@ def test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket(conn, batch, test_db_url):
     CÙNG tập khách với cùng bộ lọc.
 
     Test này PHẢI gieo dữ liệu (bản Jinja đầu tiên chạy trên CSDL rỗng nên
-    không kiểm gì): 40 khách nền để có hạng 'S', hai khách mục tiêu."""
+    không kiểm gì): 40 khách nền, hai khách mục tiêu mang hạng OBC 'S' (055)."""
     from fastapi.testclient import TestClient
     from kome.web.app import create_app
 
@@ -884,7 +885,7 @@ def test_trang_danh_sach_giu_bo_loc_moi_qua_lien_ket(conn, batch, test_db_url):
                [(f"F{i:03d}", HOM_NAY - timedelta(days=3), 1_100, "XT07")
                 for i in range(40)], ma_lo="F")
     for ma in ("A0001", "A0002"):
-        _ho_so_khach(conn, batch, ma, f"Quán {ma}", prefecture="愛知県")
+        _ho_so_khach(conn, batch, ma, f"Quán {ma}", prefecture="愛知県", rank_code="0001")
     _mua_nhieu(conn, batch,
                [(ma, HOM_NAY - timedelta(days=40 + i * 7), 5_000_000, "XT07")
                 for ma in ("A0001", "A0002") for i in range(6)], ma_lo="A")

@@ -624,7 +624,7 @@ def danh_muc(conn) -> dict:
 
     Hai thứ `san_pham_360` KHÔNG có, cùng câu lệnh:
       * `dt_12t`/`lg_12t` — doanh thu / lãi gộp **12 tháng**, đúng cửa sổ của
-        `mart.hang_doanh_thu` (`sales_date > hom_nay - 365`, mốc dữ liệu) —
+        `mart.doanh_thu_12t` (`sales_date > hom_nay - 365`, mốc dữ liệu) —
         một định nghĩa "12 tháng" cho cả dự án. `san_pham_360.doanh_thu_thuan`
         là LUỸ KẾ, hai cột cùng tồn tại và trang ghi rõ cột nào là cột nào.
       * `thang` — 12 THÁNG LỊCH gần nhất (tới tháng mốc) cho đường xu hướng.

@@ -2,6 +2,14 @@
 // mọi hàm chỉ đổi dạng số máy chủ đã tính (lich, ty_le_im_lang, trang_thai).
 import type { LichMa } from "./kieu";
 
+// Lớp màu của nhãn hạng OBC (055): S/A xanh, Z/ZZ/ZZZ (không gọi) nhạt đỏ, còn lại xám.
+// Chỉ là MÀU — nhãn và cổng "không gọi" do máy chủ quyết (mart.hang_obc / khong_goi).
+export function lopHang(hang: string | null): string {
+  if (hang === "S" || hang === "A") return "hS";
+  if (hang === "Z" || hang === "ZZ" || hang === "ZZZ") return "hZ";
+  return "";
+}
+
 export const TAB_HO_SO = [["mat_hang", "Mặt hàng"], ["don_hang", "Đơn hàng"], ["cong_no", "Công nợ"],
   ["ho_so", "Hồ sơ và nhật ký"]] as const;
 export type MaTabHoSo = typeof TAB_HO_SO[number][0];

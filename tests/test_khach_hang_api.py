@@ -108,7 +108,7 @@ def test_hang_nhieu_gia_tri_va_chua_ai_phu_trach(conn, batch):
     _ho_so_khach(conn, batch, "K9", "Quán không ai", salesperson_code=None)
     _mua(conn, batch, "K9", HOM_NAY)
     db = KH.danh_ba(conn)
-    hai = KH.trang_danh_sach(db, hang="S,A,B,C,D")
+    hai = KH.trang_danh_sach(db, hang=",".join(KH.THU_TU_HANG))
     assert hai.tong == len([k for k in db["khach"] if k["hang"]])
     t = KH.trang_danh_sach(db, sale=KH.PT_TRONG)
     assert "K9" in {k.ma for k in t.khach}

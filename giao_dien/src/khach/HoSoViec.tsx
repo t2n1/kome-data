@@ -23,6 +23,12 @@ export function HoSoViec({ h, moGhi, datMoGhi }: { h: HoSoApi; moGhi: boolean; d
           <h2>Tình hình</h2>
           <p>Khách đã ngừng giao dịch{k.dau_hieu_obc ? ` (※${k.dau_hieu_obc}※)` : ""} — không gọi.</p>
         </section>
+      ) : k.khong_goi ? (
+        <section className={"kh-the hs2-ly-do nhat"}>
+          <h2>Tình hình</h2>
+          <p>OBC xếp hạng {k.hang}{k.hang_ten ? ` (${k.hang_ten})` : ""} — không gọi. Khách không vào danh sách cần liên hệ.</p>
+          {h.dien_giai && <p className="phu">{h.dien_giai}</p>}
+        </section>
       ) : (
         <section className={"kh-the hs2-ly-do " + mau}>
           <h2>{laCanGoi(mau, h.thang_nay?.nhan) ? "Vì sao cần gọi" : "Tình hình"}</h2>
