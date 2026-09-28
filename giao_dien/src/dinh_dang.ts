@@ -1,7 +1,8 @@
-// Định dạng số theo gói thiết kế: ¥1.234.567 (chấm nghìn), ¥11,7M (phẩy
-// thập phân), 62,9%. Một chỗ — mọi khối dùng chung.
+// Định dạng số theo CHUẨN NHẬT (chủ DN chốt 2026-09-29, thay kiểu chấm-nghìn của gói thiết
+// kế): ¥1,234,567 (phẩy nghìn) · ¥1,170万 / ¥1.2億 (rút gọn theo 万/億) · 62.9% (chấm thập
+// phân). MỘT chỗ — mọi khối dùng chung; `thap_phan` cho mọi số lẻ khác (1.5× nhịp…).
 
-const NGHIN = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
+const NGHIN = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 });
 
 export function so(n: number | null | undefined): string {
   return n == null ? "—" : NGHIN.format(Math.round(n));
@@ -12,26 +13,31 @@ export function yen(n: number | null | undefined): string {
   return (n < 0 ? "−¥" : "¥") + NGHIN.format(Math.abs(Math.round(n)));
 }
 
-/** ¥11,7M · ¥980K · ¥1,2B — cho nhãn gọn trên biểu đồ và ô số lớn. */
+/** Số thập phân kiểu Nhật (dấu chấm), `chu_so` chữ số sau dấu chấm. */
+export function thap_phan(n: number, chu_so = 1): string {
+  return n.toFixed(chu_so);
+}
+
+/** ¥1.2億 · ¥1,170万 · ¥9.8万 · ¥8,500 — cho nhãn gọn trên biểu đồ và ô số lớn. */
 export function gon(n: number | null | undefined): string {
   if (n == null) return "—";
   const a = Math.abs(n), dau = n < 0 ? "−¥" : "¥";
-  const f = (x: number, d = 1) => x.toFixed(d).replace(".", ",");
-  if (a >= 1e9) return dau + f(a / 1e9) + "B";
-  if (a >= 1e6) return dau + f(a / 1e6) + "M";
-  if (a >= 1e4) return dau + f(a / 1e3, 0) + "K";
+  const bo0 = (x: string) => x.replace(/\.0$/, "");
+  if (a >= 1e8) return dau + bo0((a / 1e8).toFixed(a >= 1e10 ? 0 : 1)) + "億";
+  if (a >= 1e5) return dau + NGHIN.format(Math.round(a / 1e4)) + "万";
+  if (a >= 1e4) return dau + bo0((a / 1e4).toFixed(1)) + "万";
   return dau + NGHIN.format(Math.round(a));
 }
 
 export function pc(ty_le: number | null | undefined, chu_so = 1): string {
   if (ty_le == null || !isFinite(ty_le)) return "—";
-  return (ty_le * 100).toFixed(chu_so).replace(".", ",") + "%";
+  return (ty_le * 100).toFixed(chu_so) + "%";
 }
 
-/** ▲4,2% / ▼1,1% — tăng giảm có dấu, dùng kèm lớp màu tang/giam. */
+/** ▲4.2% / ▼1.1% — tăng giảm có dấu, dùng kèm lớp màu tang/giam. */
 export function thay_doi(ty_le: number | null | undefined, chu_so = 1): string {
   if (ty_le == null || !isFinite(ty_le)) return "—";
-  return (ty_le >= 0 ? "▲" : "▼") + Math.abs(ty_le * 100).toFixed(chu_so).replace(".", ",") + "%";
+  return (ty_le >= 0 ? "▲" : "▼") + Math.abs(ty_le * 100).toFixed(chu_so) + "%";
 }
 
 export function ngay(iso: string | null | undefined): string {
@@ -50,9 +56,9 @@ export function thang_nhan(t: string): string {
   return `T${+m}/${y.slice(2)}`;
 }
 
-/** Số lượng (CÓ phần thập phân: 83,75 ケース) — không làm tròn về số nguyên. */
+/** Số lượng (CÓ phần thập phân: 83.75 ケース) — không làm tròn về số nguyên. */
 export function so_luong(n: number | null | undefined, chu_so = 2): string {
-  return n == null ? "—" : n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: chu_so });
+  return n == null ? "—" : n.toLocaleString("ja-JP", { minimumFractionDigits: 0, maximumFractionDigits: chu_so });
 }
 
 const GIO_TOKYO = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit",

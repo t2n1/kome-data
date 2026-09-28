@@ -95,7 +95,7 @@ export default function CaiDat() {
                 <a key={ma} href={`/giao-dien?che_do=${ma}`} className={KD.che_do_giao_dien === ma ? "dang-xem" : undefined}
                   aria-current={KD.che_do_giao_dien === ma ? "true" : undefined}>{nhan}</a>))}
             </nav>
-            <p className="ghi-chu">Lưu trong cookie của trình duyệt này. Tiền in dạng ¥1.234.567 (chấm ngăn nghìn); kỳ kế toán của công ty chạy
+            <p className="ghi-chu">Lưu trong cookie của trình duyệt này. Số in theo chuẩn Nhật: ¥1,234,567 (phẩy ngăn nghìn), rút gọn ¥1,170万 · ¥1.2億, thập phân dấu chấm (62.9%); kỳ kế toán của công ty chạy
               1/8 → 31/7 (kỳ 2026 = 8/2025 → 7/2026).</p>
           </section>
         </div>

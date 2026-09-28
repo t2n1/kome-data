@@ -5,6 +5,7 @@ Chỉ TÍNH TOẠ ĐỘ, không định nghĩa chỉ số (công thức ở `kom
 """
 from __future__ import annotations
 
+from kome import dinh_dang as DD
 from kome.du_bao import ChotThang, MuoiHaiThang
 
 
@@ -22,7 +23,7 @@ def _bac(dinh: float, so_bac: int = 4) -> list[float]:
 
 
 def _trieu(v: float) -> str:
-    return f"¥{v / 1_000_000:.0f}M" if v >= 10_000_000 else f"¥{v / 1_000_000:.1f}M".replace(".", ",")
+    return DD.gon(v)
 
 
 def ve_chot_thang(c: ChotThang, rong: int = 960, cao: int = 280) -> dict:

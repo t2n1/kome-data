@@ -34,7 +34,7 @@ type DuBaoApi = {
   ve_chot: VeChot; ve_nam: Record<string, VeNam> | null;
 };
 
-const pct = (v: number) => (v >= 0 ? "+" : "") + (v * 100).toFixed(1).replace(".", ",") + "%";
+const pct = (v: number) => (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
 const tNhan = (t: string) => `${t.slice(5)}/${t.slice(0, 4)}`;
 
 export default function DuBao() {
@@ -129,7 +129,7 @@ export default function DuBao() {
         {m.du_bao.length > 0 && b ? <>
           <div className="the-so">
             <div><div className="nhan">Tổng {m.du_bao.length} tháng tới · {d.kich_ban[kbD]}</div><div className="gia">{yen(tong)}</div>
-              <div className="nhan">hệ số ×{heSo != null ? heSo.toFixed(3).replace(".", ",") : "—"} so cùng kỳ</div></div>
+              <div className="nhan">hệ số ×{heSo != null ? heSo.toFixed(3) : "—"} so cùng kỳ</div></div>
             <div><div className="nhan">So với cùng kỳ năm trước</div><div className="gia">{m.tong_cung_ky > 0 ? pct(tong / m.tong_cung_ky - 1) : "—"}</div>
               <div className="nhan">{yen(m.tong_cung_ky)} của cùng {m.du_bao.length} tháng năm trước</div></div>
             <div><div className="nhan">Tháng cao nhất</div><div className="gia">{tNhan(m.du_bao[iDinh].thang)}</div>
@@ -183,7 +183,7 @@ export default function DuBao() {
                   <span className="khong-ap-dung">im lặng {k.so_ngay_im_lang} ngày</span><strong className="so">{yen(k.doanh_thu)}</strong></div>
                 <div className={"thanh-nho " + (k.trang_thai === "da_roi_bo" ? "loi" : "canh")}><div className="thanh-nho-nen">
                   <div style={{ width: `${(Math.min(k.ty_le / 4, 1) * 100).toFixed(1)}%` }} /></div>
-                  <span className="khong-ap-dung">{k.ty_le.toFixed(1).replace(".", ",")}× nhịp mua riêng</span></div>
+                  <span className="khong-ap-dung">{k.ty_le.toFixed(1)}× nhịp mua riêng</span></div>
               </div>))}
             {!kh.nguy_co.length && <div className="dong-dc khong-ap-dung">Không khách nào đang im lặng quá 2 lần nhịp.</div>}
           </div>

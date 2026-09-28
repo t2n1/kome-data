@@ -31,7 +31,7 @@ type ChiSo = "doanh_thu" | "lai_gop";
 const TEN_CS: Record<ChiSo, string> = { doanh_thu: "Doanh thu", lai_gop: "Lãi gộp" };
 const HAI_CS: ChiSo[] = ["doanh_thu", "lai_gop"];
 
-const cham = (n: number) => n.toLocaleString("de-DE");
+const cham = (n: number) => n.toLocaleString("ja-JP");
 // Đọc thử ở trình duyệt — chỉ để tính tổng / đánh dấu ô sai TRƯỚC khi gửi. Máy chủ
 // (`ngan_sach.doc_so`) vẫn là trọng tài; hàm này chép CÙNG luật nhóm ba chữ số (`1.5` là
 // SAI chứ không phải 15), để ô Tổng không in một con số mà máy chủ sẽ từ chối.
@@ -197,7 +197,7 @@ export default function NganSach() {
             <button type="button" role="menuitem" onClick={() => dienXuong(l, c)}>Điền ô trống bằng ô phía trên</button>
             <button type="button" role="menuitem" className="giam" onClick={() => apDung(l, c, () => "")}>Xoá cả cột (thành chưa đặt)</button>
           </>}
-          {mo.kieu === "chia" && nhapSo(n => chiaDeu(l, c, n), "Tổng cả kỳ (¥)", "120.000.000")}
+          {mo.kieu === "chia" && nhapSo(n => chiaDeu(l, c, n), "Tổng cả kỳ (¥)", "120,000,000")}
           {mo.kieu === "nam_truoc" && nhapSo(n => theoNamTruoc(l, c, n), "Bằng bao nhiêu % năm trước", "105")}
           {mo.kieu === "bien" && nhapSo(n => theoBien(l, c, n), "Biên gộp (%)", "22")}
           {mo.kieu !== null && <p className="nhat-chu">Chỉ điền vào ô — chưa lưu cho tới khi bấm Lưu.

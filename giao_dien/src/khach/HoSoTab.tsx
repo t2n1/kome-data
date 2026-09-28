@@ -84,7 +84,7 @@ export function OSoSucKhoe({ h }: { h: HoSoApi }) {
       <div className="o-kpi" title="số ngày im lặng ÷ nhịp mua riêng của khách (trung vị khoảng cách giữa các lần mua)">
         <div className="nhan">Nhịp mua</div><div className="gia">{k.nhip_ngay == null ? "—" : `${Math.round(k.nhip_ngay)} ngày`}</div>
         <div className={"dong-phu " + (k.ty_le_im_lang == null ? "nhat-chu" : im >= 2 ? "giam" : im >= 1 ? "canh-chu" : "tang")}>
-          {k.nhip_ngay == null ? "chưa đủ 3 lần mua" : `im ${k.so_ngay_im_lang} ngày · ${im.toFixed(1).replace(".", ",")}× nhịp`}</div></div>
+          {k.nhip_ngay == null ? "chưa đủ 3 lần mua" : `im ${k.so_ngay_im_lang} ngày · ${im.toFixed(1)}× nhịp`}</div></div>
       <div className="o-kpi"><div className="nhan">Biên lãi gộp</div><div className="gia">{pc(k.ty_suat)}</div>
         <div className="dong-phu nhat-chu">lãi gộp ÷ doanh thu thuần, luỹ kế</div></div>
     </div>);

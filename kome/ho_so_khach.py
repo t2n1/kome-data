@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import date, timedelta
 
+from kome import dinh_dang as DD
 from kome import khach_hang as KH
 from kome import khach_thang as KT
 from kome import lien_he as LH
@@ -132,7 +133,7 @@ def dien_giai(h: KH.HoSo, lich: dict) -> str:
     if t.get("nhan") == "da_mua":
         so = t["dt_thang_truoc_den_ngay"]
         tang = _ty_so(t["dt_thang_nay"] - so, so) if so else None
-        cau.append(f"Tháng {_thang(t['thang'])} đã mua ¥{t['dt_thang_nay']:,}".replace(",", ".")
+        cau.append(f"Tháng {_thang(t['thang'])} đã mua {DD.yen(t['dt_thang_nay'])}"
                    + (f", {'hơn' if tang >= 0 else 'kém'} {abs(tang) * 100:.0f}% so tháng trước cùng ngày"
                       if tang is not None else ""))
     elif t.get("nhan") == "tre":
@@ -141,7 +142,7 @@ def dien_giai(h: KH.HoSo, lich: dict) -> str:
         cau.append(f"Tháng {_thang(t['thang'])} chưa có đơn — khách thường mua muộn hơn trong tháng")
     if k.trang_thai in KH.TRANG_THAI_CAN_XU_LY and k.so_ngay_im_lang is not None:
         cau.append(f"im lặng {k.so_ngay_im_lang} ngày"
-                   + (f" ({k.ty_le_im_lang:.1f}× nhịp {round(k.nhip_ngay)} ngày)".replace(".", ",")
+                   + (f" ({k.ty_le_im_lang:.1f}× nhịp {round(k.nhip_ngay)} ngày)"
                       if k.ty_le_im_lang and k.nhip_ngay else ""))
     ngung = sum(1 for m in h.tat_ca_mat_hang if m["trang_thai_cap"] == "ngung")
     if ngung:

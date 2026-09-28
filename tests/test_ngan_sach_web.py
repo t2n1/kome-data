@@ -163,9 +163,10 @@ def test_luu_roi_tai_lai_thi_thay_dung_so_vua_nhap(khach, conn, batch):
         "SELECT muc_tieu FROM app.ngan_sach").fetchone()[0] == 9_000_000
     m = _khoi_dau(c.get("/ngan-sach?ky=2026").text)["man"]
     assert m["o_txt"]["0104-doanh_thu-2026-05"] == 9_000_000
-    # Ô gõ lại in dấu CHẤM ngăn nghìn (quy ước Việt khi GÕ LẠI): cham() = de-DE.
+    # Ô gõ lại in dấu PHẨY ngăn nghìn (chuẩn Nhật, 2026-09-29): cham() = ja-JP. Máy chủ vẫn
+    # đọc cả dấu chấm lẫn dấu phẩy (doc_so) — bản cũ và Excel dán vào không hỏng.
     ns = (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
-    assert 'const cham = (n: number) => n.toLocaleString("de-DE");' in ns
+    assert 'const cham = (n: number) => n.toLocaleString("ja-JP");' in ns
     assert '= v != null ? cham(v) : "";' in ns
 
 
@@ -243,12 +244,11 @@ def test_o_chua_dat_hien_TRONG_khong_hien_0(khach, conn, batch):
     assert '= v != null ? cham(v) : "";' in (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
 
 
-def test_o_tong_dung_dau_CHAM_khop_bao_cao(khach, conn, batch):
+def test_o_tong_dung_CUNG_yen_voi_bao_cao(khach, conn, batch):
     """Ba ô TỔNG ("Cả kỳ"/"Cả nhóm") và /bao-cao phải nói CÙNG một số tiền theo
     CÙNG một cách. Giai đoạn 3: /bao-cao là React và in tiền bằng
-    `dinh_dang.ts::yen` — dấu CHẤM ngăn nghìn (¥9.000.000, định dạng của gói
-    thiết kế) — nên ô TỔNG ở đây cũng dấu chấm (trước đây là dấu phẩy để khớp
-    bản Jinja cũ của /bao-cao)."""
+    `dinh_dang.ts::yen` — từ 2026-09-29 theo chuẩn Nhật, dấu PHẨY ngăn nghìn
+    (¥9,000,000) — nên ô TỔNG ở đây đi qua CHÍNH hàm đó."""
     from pathlib import Path
     _ban(conn, batch)
     c = khach()
@@ -256,12 +256,12 @@ def test_o_tong_dung_dau_CHAM_khop_bao_cao(khach, conn, batch):
     m = _khoi_dau(c.get("/ngan-sach?ky=2026").text)["man"]
     assert m["o_txt"]["0104-doanh_thu-2026-05"] == 9_000_000
     ns = (NGUON / "he_thong" / "NganSach.tsx").read_text(encoding="utf-8")
-    # Ô TỔNG in bằng CHÍNH yen() của /bao-cao (dấu chấm) và "—" khi không ô nào đứng sau.
+    # Ô TỔNG in bằng CHÍNH yen() của /bao-cao và "—" khi không ô nào đứng sau.
     assert re.search(r'import \{[^}]*\byen\b[^}]*\} from "\.\./dinh_dang";', ns)
     assert 'const cong = (ds: number[]) => ds.reduce((s, v) => s + v, 0);' in ns
     assert 'const tong = (ds: number[]) => ds.length ? yen(cong(ds)) : "—";' in ns
     nguon = Path("giao_dien/src/dinh_dang.ts").read_text(encoding="utf-8")
-    assert 'new Intl.NumberFormat("de-DE"' in nguon, "yen() của React không còn dùng dấu chấm ngăn nghìn"
+    assert 'new Intl.NumberFormat("ja-JP"' in nguon, "yen() của React không còn theo chuẩn Nhật"
     assert 'import { gon, ngay, so, yen } from "../dinh_dang"' in Path(
         "giao_dien/src/bao_cao/BaoCao.tsx").read_text(encoding="utf-8")
 

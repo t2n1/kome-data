@@ -36,7 +36,7 @@ function noiKhuc(k: Khuc, pt: number, dinh_dang: (v: number) => string, don_vi: 
   return <>
     <strong>{k.nhan}</strong>
     <DongNoi mau={k.mau} nhan={don_vi || "Số"} gia={dinh_dang(k.dem)} />
-    <DongNoi nhan="Tỷ lệ" gia={`${pt.toFixed(1).replace(".", ",")}%`} />
+    <DongNoi nhan="Tỷ lệ" gia={`${pt.toFixed(1)}%`} />
     {k.chi_tiet}
   </>;
 }
@@ -103,7 +103,7 @@ export function SoLon({ gia, nhan, chi_tiet, href, lop, mau }: {
     : <ONoi href={href} className="so-lon" noi_dung={<><strong>{nhan}</strong>{chi_tiet}</>}>{than}</ONoi>;
 }
 
-/** Hàng số nhỏ thay cho lưới ô số: "Luỹ kế ¥188,2M · ▲1,4% so … · …". */
+/** Hàng số nhỏ thay cho lưới ô số: "Luỹ kế ¥1.9億 · ▲1.4% so … · …". */
 export function HangSo({ children }: { children: ReactNode }) {
   return <div className="hang-so">{children}</div>;
 }

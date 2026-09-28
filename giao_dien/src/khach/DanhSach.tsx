@@ -67,7 +67,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
     ...(TN.cong_no ? [{ ma: "no", ten: "Nợ quá hạn", mo: "cần thu trước khi giao đơn mới", so: null, bat: false, ap: null }] : []),
     { ma: "im", ten: "Im lặng ≥ 2× nhịp", mo: `đã quá chu kỳ mua thường lệ · ${nm}`, so: tq.nhom.im, bat: b.nhom === "im", ap: { nhom: "im", thang: "", co_mua: false } },
     { ma: "tut", ten: "Hạng S·A đang tụt", mo: "30 ngày < 80% TB ba kỳ 30 ngày trước", so: tq.nhom.tut, bat: b.nhom === "tut", ap: { nhom: "tut", thang: "", co_mua: false } },
-    { ma: "moi", ten: "Khách mới chưa quay lại", mo: "đơn đầu trong 90 ngày, đã im ≥ 1,2× nhịp", so: tq.nhom.moi, bat: b.nhom === "moi", ap: { nhom: "moi", thang: "", co_mua: false } },
+    { ma: "moi", ten: "Khách mới chưa quay lại", mo: "đơn đầu trong 90 ngày, đã im ≥ 1.2× nhịp", so: tq.nhom.moi, bat: b.nhom === "moi", ap: { nhom: "moi", thang: "", co_mua: false } },
     { ma: "thang", ten: "Mua đều, tháng này chưa", mo: `≥ 2/3 tháng trước có đơn đến ngày này · tính ${nm}`, so: tq.thang.tre ?? 0, bat: b.thang === "tre", ap: { thang: "tre", nhom: "", co_mua: false } },
     { ma: "chuapt", ten: "Chưa ai phụ trách", mo: "mã phụ trách không có trong danh sách 担当者 · cả công ty", so: tq.chua_pt, bat: b.nv === d.pt_trong, ap: { nv: d.pt_trong, nhom: "", thang: "", co_mua: false } },
   ];
@@ -268,7 +268,7 @@ function Dong({ k, d, tenNv, chon, datChon }: { k: KhachDong; d: DsApi; tenNv: R
       <td className="so">{k.tb_3_thang == null ? "—" : gon(k.tb_3_thang)}</td>
       <td className={"so " + ((k.ty_le_im_lang ?? 0) >= 3 ? "giam" : (k.ty_le_im_lang ?? 0) >= 1.5 ? "canh-chu" : "")}
         title={k.nhip_ngay ? `im ${k.so_ngay_im_lang} ngày · nhịp ${Math.round(k.nhip_ngay)} ngày` : "chưa đủ 3 lần mua để có nhịp"}>
-        {k.ty_le_im_lang == null ? "—" : `${k.ty_le_im_lang.toFixed(1).replace(".", ",")}×`}</td>
+        {k.ty_le_im_lang == null ? "—" : `${k.ty_le_im_lang.toFixed(1)}×`}</td>
       <td className="so nhat-chu">{k.so_ngay_im_lang == null ? "—" : `${k.so_ngay_im_lang}n`}</td>
       <td><span className={"nhan-vien " + (MAU_TT[k.trang_thai] ?? "nhat")}>{d.nhan_trang_thai[k.trang_thai] ?? k.trang_thai}</span>
         {k.nhan_thang === "tre" && <span className="nhan-vien canh kh-nhan-thang" title={d.nhan_thang.tre}>tháng này chưa</span>}</td>

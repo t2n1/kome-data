@@ -79,7 +79,7 @@ export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: 
             <strong className="ten-jp">{tro.ten}</strong> <span className="phu">{tro.vung}</span>
             <div>Số khách <b>{so(tro.so_khach)}</b></div>
             <div>Doanh thu 12 tháng <b>{yen(tro.doanh_thu)}</b></div>
-            <div>Cần gọi lại <b>{so(tro.can_goi)}</b>{tro.ty_le_can_goi != null && <> · {(tro.ty_le_can_goi * 100).toFixed(1).replace(".", ",")}%</>}</div>
+            <div>Cần gọi lại <b>{so(tro.can_goi)}</b>{tro.ty_le_can_goi != null && <> · {(tro.ty_le_can_goi * 100).toFixed(1)}%</>}</div>
             <div>Doanh thu · {nhanKx} <b>{yen(tro.dt_khoang)}</b></div>
             {ss && <div><MauSs />{ss.nhan} <b>{coSs && tro.dt_khoang_ss != null ? yen(tro.dt_khoang_ss) : "không có dữ liệu"}</b>
               {coSs && (() => { const v = tdSs(tro.dt_khoang, tro.dt_khoang_ss); return v != null && <> · <span className={v >= 0 ? "tang" : "giam"}>{dauPc(v)}</span></>; })()}</div>}
@@ -117,7 +117,7 @@ export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: 
             {(() => { const v = coSs ? tdSs(o.dt_khoang, o.dt_khoang_ss) : null;
               return <td className={"so " + (v == null ? "" : v >= 0 ? "tang" : "giam")}>{v == null ? "—" : dauPc(v)}</td>; })()}
             <td className="so">{so(o.can_goi)}</td>
-            <td className="so">{o.ty_le_can_goi == null ? "—" : `${(o.ty_le_can_goi * 100).toFixed(1).replace(".", ",")}%`}</td>
+            <td className="so">{o.ty_le_can_goi == null ? "—" : `${(o.ty_le_can_goi * 100).toFixed(1)}%`}</td>
           </tr>))}</tbody>
       </table></div>
       <p className="phu">Tỷ lệ cần gọi hiện "—" ở tỉnh chưa có khách — không phải 0%.</p>

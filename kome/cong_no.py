@@ -8,6 +8,8 @@ hôm nay — sổ nạp theo quý, nên màn hình phải luôn in "tính đến
 """
 from __future__ import annotations
 
+from kome import dinh_dang as DD
+
 # Câu in NGUYÊN VĂN dưới các khối — cách tính phải nói được bằng một câu.
 CACH_TINH = {
     "so_du": "Số dư là cột 残高 của sổ 請求先元帳 (OBC) ở dòng cuối của từng bên nhận hoá đơn.",
@@ -83,7 +85,7 @@ def tong_hop(ben: list[dict], phieu: list[dict]) -> dict:
 
 
 def _yen(n: int) -> str:
-    return "¥" + f"{n:,}".replace(",", ".")
+    return DD.yen(n)
 
 
 def _viec(ben: list[dict], phieu: list[dict], tq: dict) -> list[str]:

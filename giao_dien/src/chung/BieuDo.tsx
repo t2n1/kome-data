@@ -49,7 +49,7 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
   const daChon = useRef<number | null>(null);   // điểm đã hiện ô nổi trước lần chạm này
 
   const W = Math.max(rong, 200), H = cao;
-  const tr = 44, ph = chuoi.some(c => c.truc_phai && !tat[c.ten]) ? 40 : 10, tren = 10, duoi = 22;
+  const ph = chuoi.some(c => c.truc_phai && !tat[c.ten]) ? 40 : 10, tren = 10, duoi = 22;
   const n = nhan.length;
   const bat = chuoi.filter(c => !tat[c.ten]);
 
@@ -62,6 +62,9 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
   }, [bat]);
   const minT = useMemo(() => Math.min(0, ...bat.filter(c => !c.truc_phai).flatMap(c => c.gia_tri.filter((v): v is number => v != null))), [bat]);
 
+  const vach_luoi = [0, 0.25, 0.5, 0.75, 1].map(t => minT + (maxT - minT) * t);
+  // Lề trái theo nhãn trục DÀI NHẤT (¥1,170万 dài hơn ¥11,7M cũ): ~6px mỗi ký tự ở cỡ 10px.
+  const tr = Math.max(44, 10 + 6 * Math.max(...vach_luoi.map(v => (dinh_dang_truc ?? String)(v).length)));
   const x0 = tr, x1 = W - ph, bw = (x1 - x0) / Math.max(n, 1);
   const cx = (i: number) => x0 + bw * (i + 0.5);
   const yT = (v: number) => tren + (H - tren - duoi) * (1 - (v - minT) / (maxT - minT || 1));
@@ -73,7 +76,6 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
   const soCot = Math.max(cot.filter(c => c.kieu === "cot").length, 1);
   const bCot = Math.min(bw * 0.72, 38) / (cot.some(la_nen) ? 1 : soCot);
 
-  const vach_luoi = [0, 0.25, 0.5, 0.75, 1].map(t => minT + (maxT - minT) * t);
   const buoc = moi_nhan ?? Math.max(1, Math.ceil(n / Math.max(Math.floor((x1 - x0) / 64), 1)));
 
   const chon = (e: React.PointerEvent) => {
@@ -147,7 +149,7 @@ export function BieuDo({ nhan, nhan_day_du, chuoi, cao = 200, dinh_dang, dinh_da
           const td = ss && !tat[ss.ten] ? tang_giam(c.gia_tri[tro] ?? null, ss.gia_tri[tro] ?? null) : null;
           return <div key={c.ten}><i className={c.kieu} style={{ background: c.kieu.startsWith("duong") || c.kieu === "cot_ma" ? undefined : c.mau_tung_cot?.[tro] ?? c.mau, borderColor: c.mau }} />{c.ten}
             <b>{dinh_dang(c.gia_tri[tro] ?? null, c)}{td != null && <span className={"bd-td " + (td >= 0 ? "tang" : "giam")}>
-              {" "}{td >= 0 ? "▲" : "▼"}{Math.abs(td * 100).toFixed(1).replace(".", ",")}%</span>}</b></div>;
+              {" "}{td >= 0 ? "▲" : "▼"}{Math.abs(td * 100).toFixed(1)}%</span>}</b></div>;
         })}
         {them_noi?.(tro)}
         {onBam && <em>{kieu.current === "touch" ? "chạm lần nữa để xem chi tiết" : "bấm để xem chi tiết"}</em>}

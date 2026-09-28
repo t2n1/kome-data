@@ -815,6 +815,14 @@ endpoint / chỉ số mới; cách nào không có kỳ so thì nói ở `canh_b
 canh: `tests/test_bo_cuc.py`, `tests/test_cach_xem.py`, `luoi_logic.test.ts`. ⋯ của bảng nằm TRONG viên
 tab đang xem (chuột phải cũng mở). Đặc tả: `docs/superpowers/specs/2026-09-29-tong-quan-luoi-12-cot-design.md`.
 
+**Bất biến (định dạng số chuẩn Nhật — chủ DN chốt 2026-09-29):** mọi số trên web theo chuẩn Nhật:
+phẩy ngăn nghìn (¥1,234,567), chấm thập phân (62.9% · 1.5×), số tiền rút gọn theo **万/億** (¥9.8万 ·
+¥1,170万 · ¥1.2億 — KHÔNG K/M/B). MỘT chỗ mỗi tầng: `giao_dien/src/dinh_dang.ts` (`yen`/`gon`/`so`/`pc`/
+`thay_doi`/`so_luong`, `Intl` `ja-JP`) và bản chép bắt buộc `kome/dinh_dang.py` cho chữ máy chủ viết sẵn
+(câu tóm tắt, nhãn trục SVG của /du-bao). Không tự `toFixed().replace(".", ",")` hay `"de-DE"` ở đâu nữa.
+Ô nhập số (ngân sách) VẪN đọc cả chấm lẫn phẩy (`ngan_sach.doc_so`). Lề trái `BieuDo` co theo nhãn trục
+dài nhất. Có test canh: `tests/test_dinh_dang.py`, `giao_dien/src/dinh_dang.test.ts`.
+
 **Bất biến (Tổng quan ít chữ — chủ DN chốt 2026-09-28):** màn `/` là HÌNH + tối đa một số lớn mỗi
 khối; mọi chi tiết trong ô nổi `chung/ONoi.tsx` (chuột: rê hiện / bấm đi; chạm: lần 1 hiện, lần 2 đi;
 bàn phím: Tab hiện / Enter đi). Không bảng nào. Luật chữ: câu ĐỊNH NGHĨA cách tính vào `Khoi.cach_tinh`

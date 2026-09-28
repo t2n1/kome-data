@@ -71,11 +71,11 @@ type BaoCaoApi = {
   ngay_dau_du_lieu: string | null;
 };
 
-const p1 = (v: number) => (v * 100).toFixed(1).replace(".", ",") + "%";
+const p1 = (v: number) => (v * 100).toFixed(1) + "%";
 const hoa = (s: string) => s.replace(/^./, c => c.toUpperCase());
 /** % thay đổi so kỳ so — mẫu số ≤ 0 (赤伝) thì không tính được, không phải 0. */
 const tdSs = (a: number | null | undefined, b: number | null | undefined) => (a != null && b != null && b > 0 ? a / b - 1 : null);
-const dau = (v: number) => (v >= 0 ? "+" : "") + (v * 100).toFixed(1).replace(".", ",");
+const dau = (v: number) => (v >= 0 ? "+" : "") + (v * 100).toFixed(1);
 const mauTd = (tien_do: number | null, moc: number | null) =>
   tien_do == null ? "nhat-chu" : (moc ? tien_do / moc : tien_do) >= 1 ? "tang" : (moc ? tien_do / moc : tien_do) >= 0.85 ? "canh-chu" : "giam";
 
@@ -421,7 +421,7 @@ function NganSach({ td, phu: phuDt, lk: lkDt, phu_lg, lk_lg, nhan_ss, ss_nguoi }
             <div className="dong-phu nhat-chu">{phu?.thieu_moc != null && v.den ? `${p1(Math.abs(phu.thieu_moc) / v.den)} của mốc ${yen(v.den)}` : "—"}</div></div>
           <div className="o-kpi"><div className="nhan">{lg ? "Cần lãi gộp mỗi ngày" : "Cần bán mỗi ngày"}</div>
             <div className="gia canh-chu">{phu?.can_ban_moi_ngay != null ? yen(phu.can_ban_moi_ngay) : "—"}</div>
-            <div className="dong-phu nhat-chu">{phu ? `${phu.ngay_kd_con_lai} ngày còn lại` : ""}{phu?.can_ban_moi_ngay != null && phu.nhip_chuan ? ` · gấp ${(phu.can_ban_moi_ngay / phu.nhip_chuan).toFixed(2).replace(".", ",")}× nhịp chuẩn` : ""}</div></div>
+            <div className="dong-phu nhat-chu">{phu ? `${phu.ngay_kd_con_lai} ngày còn lại` : ""}{phu?.can_ban_moi_ngay != null && phu.nhip_chuan ? ` · gấp ${(phu.can_ban_moi_ngay / phu.nhip_chuan).toFixed(2)}× nhịp chuẩn` : ""}</div></div>
         </div>
         <div className="bc-ns-hai">
           <div>

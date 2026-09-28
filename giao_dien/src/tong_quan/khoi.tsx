@@ -242,7 +242,7 @@ export function KhoiNganSach(p: XemP) {
                   <DongNoi nhan="Ngân sách" gia={yen(d.muc_tieu)} />
                   <DongNoi nhan="Cần bán mỗi ngày" gia={yen(d.can_ban_moi_ngay)} />
                   {d.can_ban_moi_ngay != null && d.nhip_chuan
-                    ? <DongNoi nhan="So nhịp chuẩn" gia={`${(d.can_ban_moi_ngay / d.nhip_chuan).toFixed(2).replace(".", ",")}×`} />
+                    ? <DongNoi nhan="So nhịp chuẩn" gia={`${(d.can_ban_moi_ngay / d.nhip_chuan).toFixed(2)}×`} />
                     : <em>tháng đã hết ngày làm việc</em>}</>} />
             : <SoLon gia={gon(d.thuc_te)} nhan="đã bán tháng này"
                 chi_tiet={<><DongNoi nhan="Đã bán" gia={yen(d.thuc_te)} />
@@ -537,7 +537,7 @@ export function KhoiDanhSachKhach(p: XemP) {
     ? tatCa.filter(k => k.ty_le_im_lang != null).sort((a, b) => (b.ty_le_im_lang ?? 0) - (a.ty_le_im_lang ?? 0)).slice(0, SO_KHACH_GON)
     : [...tatCa].sort((a, b) => b.thang_nay - a.thang_nay).slice(0, SO_KHACH_GON);
   const coSs = !imLang && !!ss?.co;
-  const heSo = (v: number) => `${v.toFixed(1).replace(".", ",")}×`;
+  const heSo = (v: number) => `${v.toFixed(1)}×`;
   return (
     <Khoi tieu_de={imLang ? "Khách lớn đang im lặng" : "Khách lớn nhất"} phu={d ? <>{d.khoang?.nhan}{coSs ? <> · so {ss!.nhan}</> : null}</> : undefined}
       dang_tai={isLoading} loi={error?.message} lien_ket={{ href: "/khach-hang?tat_ca=1" }} cach_xem={cx}
@@ -555,7 +555,7 @@ export function KhoiDanhSachKhach(p: XemP) {
           <DongNoi nhan={d.khoang?.nhan ?? "Khoảng xem"} gia={yen(k.thang_nay)} />
           {ss?.co && <DongNoi nhan={hoa(ss.nhan)} gia={k.thang_truoc != null ? yen(k.thang_truoc) : "—"} />}
           <DongNoi nhan="Doanh thu 12 tháng" gia={gon(k.doanh_thu)} />
-          <DongNoi nhan="Im lặng" gia={k.ty_le_im_lang != null ? `${k.ty_le_im_lang.toFixed(1).replace(".", ",")}×${k.nhip_ngay ? ` (im ${k.so_ngay_im_lang} / nhịp ${Math.round(k.nhip_ngay)} ngày)` : ""}` : "—"} />
+          <DongNoi nhan="Im lặng" gia={k.ty_le_im_lang != null ? `${k.ty_le_im_lang.toFixed(1)}×${k.nhip_ngay ? ` (im ${k.so_ngay_im_lang} / nhịp ${Math.round(k.nhip_ngay)} ngày)` : ""}` : "—"} />
           <DongNoi nhan="Phụ trách" gia={tenNguoi(k.ten_sale, k.sale ?? "—")} />
           <DongNoi mau={MAU_TT[k.trang_thai]} nhan="Cần làm" gia={VIEC_TT[k.trang_thai] ?? d.nhan[k.trang_thai]} /></> }))} />}
     </Khoi>

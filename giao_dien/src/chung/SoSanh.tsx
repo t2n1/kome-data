@@ -10,7 +10,7 @@ export function MauSs({ lien = false }: { lien?: boolean }) {
 
 const hoa = (s: string) => s.replace(/^./, c => c.toUpperCase());
 
-/** Dòng so sánh của một ô số: "▲ 12,3% so ╌ Năm trước ¥14,1M". `ss` null khi
+/** Dòng so sánh của một ô số: "▲ 12.3% so ╌ Năm trước ¥1,410万". `ss` null khi
  *  kỳ so không có dữ liệu (`co` false) — in đúng câu đó, không in "—" trơn. */
 export function DongSoSanh({ nhan, co, nay, ss, dinh_dang, className = "dong-phu" }: {
   nhan: string; co: boolean; nay: number | null | undefined; ss: number | null | undefined;

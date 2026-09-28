@@ -290,7 +290,7 @@ export function NapDuLieu() {
   );
 }
 
-const MB = (b: number) => (b / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+const MB = (b: number) => (b / 1_000_000).toLocaleString("ja-JP", { maximumFractionDigits: 1 });
 
 // Câu chặn khi tổng cỡ vượt trần của bản web, null nếu gửi được (hoặc không có trần).
 function quaCo(files: FileList | null): string | null {

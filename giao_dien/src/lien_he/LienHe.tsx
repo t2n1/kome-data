@@ -178,7 +178,7 @@ function The({ t, d, gy, laThang, mo, datMo }: { t: The; d: LienHeApi; gy: GoiY[
         <b>{yen(t.doanh_thu)}/tháng</b><span className="phu">mua {t.so_thang}/3 tháng trước · tháng trước {yen(t.dt_thang_truoc ?? 0)}</span></> : <>
         <b>{yen(t.doanh_thu)}</b>
         <span className={(t.ty_le ?? 0) >= 4 ? "giam" : (t.ty_le ?? 0) >= 2 ? "canh-chu" : "phu"}>
-          im {t.so_ngay_im_lang} ngày{t.ty_le ? ` · ${t.ty_le.toFixed(1).replace(".", ",")}× nhịp ${Math.round(t.nhip_ngay ?? 0)} ngày` : ""}</span></>}</div>
+          im {t.so_ngay_im_lang} ngày{t.ty_le ? ` · ${t.ty_le.toFixed(1)}× nhịp ${Math.round(t.nhip_ngay ?? 0)} ngày` : ""}</span></>}</div>
       {t.dien_thoai && <div className="phu">☎ <a href={`tel:${t.dien_thoai}`}>{t.dien_thoai}</a></div>}
       {t.cuoi && <div className="lh-cuoi">Lần trước: {t.cuoi.icon} {ngay(t.cuoi.ngay)} · <span className={"nhan-vien " + t.cuoi.mau_ket_qua}>{t.cuoi.nhan_ket_qua}</span> {t.cuoi.noi_dung.slice(0, 60)}</div>}
       {gy.length > 0 && <div className="lh-goi-y" title={d.cach_tinh_goi_y}>
