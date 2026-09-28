@@ -877,7 +877,8 @@ gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hi�
   `kome/bao_cao.py`. Đẳng thức có test canh (`tests/test_mart_khoang.py`,
   `tests/test_ban_khoang.py`): tháng trọn = `mart.ban_theo_thang`; tháng hiện tại =
   `mart.thang_den_hom_nay`; Σ ngày = Σ ngành = tổng khoảng; dạng Kỳ của `/bao-cao` = đúng
-  số cũ (`BK.tinh_bao_cao` gọi thẳng `bao_cao.tinh_bao_cao`).
+  số cũ (`BK.tinh_bao_cao` gọi thẳng `bao_cao.tinh_bao_cao`; từ 2026-09-28 bảng người phụ
+  trách chỉ THÊM cột kỳ so `dt_ss`/`dt_nay_ss`).
 - **Số bán hàng đổi theo khoảng, và từ migration 040 MỌI THỨ quay về mốc của khoảng** (ngày
   cuối khoảng): hạng 12 tháng, trạng thái / nhịp mua, nhóm cần gọi, tồn, tốc độ, công nợ, dự
   báo — xem bất biến "Mốc thời gian dời được" bên dưới. Nhãn "hôm nay" đổi thành "đến
@@ -908,8 +909,12 @@ gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hi�
   số đó; None → không vẽ phép so và nói ra. Cách vẽ chung: kỳ so = NÉT ĐỨT (đường) · CỘT MA
   (`BieuDo` kiểu `cot_ma`, viền đứt, đè lên cột thật) · VẠCH ĐỨT (`chung/SoSanh.tsx::VachSoSanh`)
   — nét đứt KHÔNG dùng cho thứ gì khác (nhịp ngân sách là nét liền). Thanh chọn là hai thẻ ĐANG
-  XEM (viền liền) / SO VỚI (viền đứt). Test: `tests/test_khoang_xem.py`,
-  `tests/test_tong_quan_ky_so.py`. Đặc tả: `docs/superpowers/specs/2026-09-28-ky-so-sanh-toan-web-design.md`.
+  XEM (viền liền) / SO VỚI (viền đứt). `/bao-cao` (đợt 2) vẫn ≤ 11 lượt: phép so đi CHUNG
+  câu có sẵn — người phụ trách FULL JOIN hai dải `mart.sale_khoang` (`BK.sale`, câu (5) của
+  `bao_cao.tinh_bao_cao` khi có `ss`), ngành × tháng dời `lech_thang` (`BK.nganh_thang_ss`, mọi
+  tháng của kỳ trong dải dữ liệu, THAY `doc_nganh_thang` ở dạng Tháng / Khoảng), luỹ kế kỳ so
+  cộng từ số đã có (`api._luy_ke_ky_so`; thiếu số ở một tháng đã có thực tế ⇒ không vẽ). Test:
+  `tests/test_khoang_xem.py`, `tests/test_tong_quan_ky_so.py`, `tests/test_bao_cao_ky_so.py`. Đặc tả: `docs/superpowers/specs/2026-09-28-ky-so-sanh-toan-web-design.md`.
 Liên kết nội bộ giữ khoảng xem nhờ MỘT bộ viết lại `href` ở `document`
 (`khoang.ts::ganVietLaiLienKet`); mọi `history.pushState/replaceState` của từng màn đi
 qua `giuKhoang()` — thêm một màn có bộ lọc trên URL mà quên hàm đó là đổi bộ lọc xong mất

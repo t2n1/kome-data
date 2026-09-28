@@ -11427,6 +11427,8 @@
   ],
   "mart.ban_theo_nganh_thang": [
    "bao_cao",
+   "khach",
+   "san_pham",
    "tong_quan"
   ],
   "mart.ban_theo_nganh_thang_so_sanh": [

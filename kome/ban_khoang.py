@@ -74,12 +74,16 @@ def chuoi(conn, kx: KhoangXem) -> tuple[str, list[BC.O]]:
     ra = []
     for i, r in enumerate(nay):
         dt, lg = int(r[2]), int(r[3])
-        dt_ck = int(ck[i][2]) if i < len(ck) else None
+        c = ck[i] if i < len(ck) else None
+        dt_ck = int(c[2]) if c else None
+        lg_ck = int(c[3]) if c else None
         ra.append(BC.O(
             thang=r[1], doanh_thu=dt, lai_gop=lg, ty_suat=BC._SoCungKy._ty_suat(dt, lg),
             co_cung_ky=dt_ck is not None, tang_truong=BC._SoCungKy._tang(dt, dt_ck),
             la_thang_chot=kieu == "thang" and r[1].endswith("-07"),
-            so_phieu=r[4], so_khach=r[5], dt_cung_ky=dt_ck))
+            so_phieu=r[4], so_khach=r[5], dt_cung_ky=dt_ck,
+            lg_cung_ky=lg_ck, so_khach_cung_ky=c[5] if c else None,
+            ty_suat_cung_ky=BC._SoCungKy._ty_suat(dt_ck, lg_ck) if c else None))
     return kieu, ra
 
 
@@ -111,14 +115,73 @@ def mat_hang(conn, kx: KhoangXem) -> list[dict]:
 
 
 def sale(conn, kx: KhoangXem) -> list[dict]:
-    """Theo người phụ trách — cùng hình dạng `BaoCao.nhan_vien`."""
-    return [dict(zip(("ma", "doanh_thu", "lai_gop", "ty_suat", "so_khach", "so_phieu"),
+    """Theo người phụ trách — cùng hình dạng `BaoCao.nhan_vien`, kèm doanh thu KỲ SO
+    (`dt_ss`, dải `s.tu → s.den`) và phần khoảng xem đem so (`dt_nay_ss`) trong CÙNG
+    câu (FULL JOIN: người chỉ bán ở kỳ so vẫn có dòng). Kỳ so không có dữ liệu:
+    `dt_ss` None."""
+    s = kx.so_sanh[0] if kx.so_sanh else None
+    co = s is not None and s.co
+    rows = conn.execute(
+        """WITH a AS (SELECT * FROM mart.sale_khoang(%s, %s)),
+                s AS (SELECT salesperson_code, dt FROM mart.sale_khoang(%s, %s)),
+                n AS (SELECT salesperson_code, dt FROM mart.sale_khoang(%s, %s))
+           SELECT coalesce(a.salesperson_code, s.salesperson_code), a.dt, a.lg, a.ty_suat,
+                  a.so_khach, a.so_phieu, s.dt, n.dt
+             FROM a FULL JOIN s ON coalesce(s.salesperson_code, '') = coalesce(a.salesperson_code, '')
+             LEFT JOIN n ON coalesce(n.salesperson_code, '') = coalesce(a.salesperson_code, s.salesperson_code, '')
+            ORDER BY a.dt DESC NULLS LAST""",
+        (kx.tu, kx.den, s.tu if co else None, s.den if co else None,
+         s.tu_nay if co else None, s.den_nay if co else None)).fetchall()
+    return [dict(zip(("ma", "doanh_thu", "lai_gop", "ty_suat", "so_khach", "so_phieu", "dt_ss", "dt_nay_ss"),
                      (r[0], int(r[1] or 0), int(r[2] or 0),
-                      float(r[3]) if r[3] is not None else None, r[4], r[5])))
-            for r in conn.execute(
-                """SELECT salesperson_code, dt, lg, ty_suat, so_khach, so_phieu
-                     FROM mart.sale_khoang(%s, %s) ORDER BY dt DESC NULLS LAST""",
-                (kx.tu, kx.den)).fetchall()]
+                      float(r[3]) if r[3] is not None else None, r[4] or 0, r[5] or 0,
+                      int(r[6] or 0) if co else None, int(r[7] or 0) if co else None)))
+            for r in rows]
+
+
+def nganh_thang_ss(conn, kx: KhoangXem) -> list[BC.NganhThang]:
+    """Ngành × tháng của KỲ chứa ngày cuối khoảng, so với tháng dời `lech_thang` của
+    kỳ so đang bật — cho bản đồ nhiệt + luỹ kế kỳ so (đặc tả 2026-09-28). MỘT lượt
+    hỏi, thay `bao_cao.doc_nganh_thang` (cùng hình dạng + lãi gộp). Cùng hai luật của
+    `mart.ban_theo_nganh_thang_so_sanh`: FULL JOIN (ngành chỉ bán ở tháng so vẫn có
+    dòng doanh thu 0) và chỉ tháng của kỳ nằm trong dải dữ liệu; view đọc 2 lần nên vào CTE
+    MATERIALIZED. `co_cung_ky` = tháng dời nằm trong dải dữ liệu (tháng dời không có
+    phiếu mà vẫn trong dải = bán 0). Tăng trưởng = `_SoCungKy._tang` (mẫu số > 0).
+    Kỳ so không lệch tròn tháng: không so ô nào."""
+    s = kx.so_sanh[0] if kx.so_sanh else None
+    lech = s.lech_thang if s is not None and s.co else None
+    rows = conn.execute(
+        """WITH n AS MATERIALIZED (SELECT thang, company_fy, nganh, doanh_thu_thuan AS dt, lai_gop AS lg
+                                     FROM mart.ban_theo_nganh_thang),
+                -- Mọi tháng của kỳ trong DẢI DỮ LIỆU (tới mốc) — kể cả tháng không bán
+                -- gì: luỹ kế kỳ so cần đủ tháng, và tháng dời vẫn có thể có số.
+                th AS (SELECT DISTINCT to_char(date_key, 'YYYY-MM') AS thang FROM core.dim_date
+                        WHERE company_fy = %(fy)s
+                          AND date_key BETWEEN date_trunc('month', (SELECT min(sales_date) FROM core.fact_sales_line))
+                                           AND (SELECT hom_nay FROM mart.moc_thoi_gian)),
+                a AS (SELECT thang, nganh, dt, lg FROM n WHERE company_fy = %(fy)s),
+                b AS (SELECT to_char(to_date(thang, 'YYYY-MM') + make_interval(months => %(lech)s::int), 'YYYY-MM') AS thang,
+                             nganh, dt, lg FROM n WHERE %(lech)s::int IS NOT NULL)
+           SELECT coalesce(a.thang, b.thang), coalesce(a.nganh, b.nganh), a.dt, a.lg, b.dt, b.lg
+             FROM a FULL JOIN b ON b.thang = a.thang AND b.nganh = a.nganh
+            WHERE coalesce(a.thang, b.thang) IN (SELECT thang FROM th)
+            ORDER BY 2, 1""", {"fy": kx.company_fy, "lech": lech}).fetchall()
+    dau = kx.ngay_dau.strftime("%Y-%m")
+    ra = []
+    for r in rows:
+        dt = int(r[2] or 0)
+        co = lech is not None and _doi(r[0], -lech) >= dau
+        ck = int(r[4] or 0) if co else None
+        ra.append(BC.NganhThang(thang=r[0], nganh=r[1], doanh_thu=dt, dt_cung_ky=ck, co_cung_ky=co,
+                                tang_truong=BC._SoCungKy._tang(dt, ck) if co else None,
+                                lai_gop=int(r[3] or 0), lg_cung_ky=int(r[5] or 0) if co else None))
+    return ra
+
+
+def _doi(thang: str, n: int) -> str:
+    """'YYYY-MM' dời n tháng."""
+    t = int(thang[:4]) * 12 + int(thang[5:7]) - 1 + n
+    return f"{t // 12:04d}-{t % 12 + 1:02d}"
 
 
 def tap_trung(conn, kx: KhoangXem) -> BC.TapTrung | None:
@@ -147,21 +210,29 @@ def tinh_bao_cao(conn, kx: KhoangXem) -> BC.BaoCao:
     đúng kỳ đã chọn. Dạng Tháng / Khoảng: 7 lượt hỏi (tổng + so sánh · chuỗi · mặt
     hàng · người phụ trách · ngành × tháng · ngành so sánh · Pareto)."""
     if kx.loai == "ky" and not kx.tu_chon:
-        return BC.tinh_bao_cao(conn, kx.company_fy)
+        return BC.tinh_bao_cao(conn, kx.company_fy, kx.so_sanh[0] if kx.so_sanh else None)
     nay, ss = tong(conn, kx)
     ky = BC.Ky(company_fy=kx.company_fy or 0, so_ky=kx.so_ky or 0, nhan=kx.nhan,
                doanh_thu=nay["dt"], lai_gop=nay["lg"], ty_suat=nay["ty_suat"],
                so_khach=nay["so_khach"], so_phieu=nay["so_phieu"],
                so_thang=_so_thang(kx.tu, kx.den), ngay_dau=kx.tu, ngay_cuoi=kx.den)
     _, thang = chuoi(conn, kx)
+    nt = nganh_thang_ss(conn, kx) if kx.company_fy else []
+    # Tổng kỳ so theo tháng — cộng TRƯỚC khi tách phí / POSM (Σ ngành = tổng tháng).
+    thang_ss: dict[str, list] = {}
+    for n in nt:
+        if n.co_cung_ky:
+            t = thang_ss.setdefault(n.thang, [0, 0])
+            t[0] += n.dt_cung_ky or 0
+            t[1] += n.lg_cung_ky or 0
     hang_theo_nganh, nganh_ky, nganh_thang, phi, hang_tang = BC.tach_phi(
-        mat_hang(conn, kx), nganh(conn, kx),
-        BC.doc_nganh_thang(conn, kx.company_fy) if kx.company_fy else [])
+        mat_hang(conn, kx), nganh(conn, kx), nt)
     return BC.BaoCao(
         ky=ky, moi_ky=[], thang=thang, hang=BC.top_lai_gop(hang_theo_nganh),
         nhan_vien=sale(conn, kx), canh_bao=list(kx.ghi_chu), cung_ky=None,
         nganh_thang=nganh_thang, nganh_ky=nganh_ky, tap_trung=tap_trung(conn, kx),
-        hang_theo_nganh=hang_theo_nganh, so_sanh=ss, phi=phi, hang_tang=hang_tang)
+        hang_theo_nganh=hang_theo_nganh, so_sanh=ss, phi=phi, hang_tang=hang_tang,
+        thang_ss=thang_ss)
 
 
 # ---- Đợt B: Khách hàng -------------------------------------------------------

@@ -95,6 +95,51 @@ def thanh_json(o, bo: tuple[str, ...] = ()):
     return o
 
 
+def _luy_ke_ky_so(bc, td, kx) -> tuple[list | None, list | None]:
+    """Luỹ kế KỲ SO theo từng tháng của `td.luy_ke` (doanh thu, lãi gộp) — cộng từ số
+    đã có (0 lượt hỏi): dạng Kỳ từ `bc.thang[].dt_cung_ky` (cùng tháng năm trước;
+    không có lãi gộp cùng kỳ ⇒ đường lãi gộp không có); dạng Tháng / Khoảng từ
+    `bc.thang_ss` (tháng dời `lech_thang`). Tháng đang xem dở dang (dạng Tháng) dùng
+    tổng ĐÚNG dải so đã cắt cùng ngày (`bc.so_sanh[0]`), không trọn tháng dời. Chỉ
+    cộng tới tháng đã có thực tế; tháng không so được làm đường dừng (None)."""
+    if td is None or not kx.so_sanh or not kx.so_sanh[0].co:
+        return None, None
+    s = kx.so_sanh[0]
+    if bc.thang_ss or kx.loai != "ky" or kx.tu_chon:
+        thang = dict(bc.thang_ss)
+        if kx.loai == "thang" and not kx.tron_thang and bc.so_sanh and bc.so_sanh[0].dt_ck is not None:
+            thang[kx.thang] = [bc.so_sanh[0].dt_ck, bc.so_sanh[0].lg_ck]
+        co_lg = True
+    else:
+        thang = {o.thang: [o.dt_cung_ky, None] for o in bc.thang if o.co_cung_ky}
+        co_lg = False
+    if s.lech_thang is None:
+        return None, None
+    # Tháng dời nằm TRONG dải dữ liệu mà không có phiếu nào = bán 0 đồng (không phải
+    # "không biết") — không có dòng ngành × tháng nào để cộng.
+    dau = kx.ngay_dau.strftime("%Y-%m")
+    for m in td.luy_ke:
+        t = int(m.thang[:4]) * 12 + int(m.thang[5:7]) - 1 - s.lech_thang
+        if m.thuc_te is not None and m.thang not in thang and f"{t // 12:04d}-{t % 12 + 1:02d}" >= dau:
+            thang[m.thang] = [0, 0 if co_lg else None]
+    # Một tháng đã có thực tế mà không so được -> hai đường luỹ kế không cùng gốc:
+    # không vẽ còn hơn vẽ lệch (cùng luật khối ngân sách của Tổng quan).
+    if any(thang.get(m.thang) is None or thang[m.thang][0] is None
+                                   for m in td.luy_ke if m.thuc_te is not None):
+        return None, None
+    dt, lg, a, b = [], [], 0, 0
+    for m in td.luy_ke:
+        if m.thuc_te is None:
+            dt.append(None)
+            lg.append(None)
+            continue
+        a += thang[m.thang][0]
+        b += thang[m.thang][1] or 0
+        dt.append(a)
+        lg.append(b)
+    return dt, (lg if co_lg else None)
+
+
 def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
     """Dữ liệu màn /bao-cao theo khoảng xem: số + hình học biểu đồ (tính ở
     kome/bao_cao.py, kome/ban_khoang.py và kome/ve_phan_tich.py — bất biến đối
@@ -117,17 +162,21 @@ def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
     # Cùng cách dựng với route Jinja cũ (không hỏi CSDL thêm câu nào).
     thang_cuoi = kx.den.strftime("%Y-%m")
     thang_dau = kx.ngay_dau.strftime("%Y-%m")
+    s = kx.so_sanh[0] if kx.so_sanh else None
+    ss_dt, ss_lg = _luy_ke_ky_so(bc, td, kx)
     return thanh_json({
         "khoang": kx,
-        "bc": bc, "td": td, "bd": ve_bieu_do(bc.thang), "lk": ve_luy_ke(td),
-        "lk_lg": ve_luy_ke(td, lg=True),
-        "so_nho": {"dt": ve_duong_nho([o.doanh_thu for o in bc.thang]),
-                   "lg": ve_duong_nho([o.lai_gop for o in bc.thang]),
-                   "ts": ve_duong_nho([o.ty_suat for o in bc.thang]),
-                   "kh": ve_duong_nho([o.so_khach for o in bc.thang])},
+        "bc": bc, "td": td, "bd": ve_bieu_do(bc.thang), "lk": ve_luy_ke(td, ss=ss_dt),
+        "lk_lg": ve_luy_ke(td, lg=True, ss=ss_lg), "_lk_ss": ss_dt,
+        # Đường nhỏ kèm nét đứt KỲ SO cùng thang (đặc tả 2026-09-28).
+        "so_nho": {"dt": ve_duong_nho([o.doanh_thu for o in bc.thang], so_sanh=[o.dt_cung_ky for o in bc.thang]),
+                   "lg": ve_duong_nho([o.lai_gop for o in bc.thang], so_sanh=[o.lg_cung_ky for o in bc.thang]),
+                   "ts": ve_duong_nho([o.ty_suat for o in bc.thang], so_sanh=[o.ty_suat_cung_ky for o in bc.thang]),
+                   "kh": ve_duong_nho([o.so_khach for o in bc.thang], so_sanh=[o.so_khach_cung_ky for o in bc.thang])},
         "dg": ve_dong_gop(bc.nganh_ky),
         "co": ve_cay_o(nhom_theo_nganh(bc.nganh_ky, bc.hang_theo_nganh)),
-        "nh": ve_nhiet(bc.nganh_thang, thang_cua_ky(bc.ky.company_fy), thang_cuoi, thang_dau),
+        "nh": ve_nhiet(bc.nganh_thang, thang_cua_ky(bc.ky.company_fy), thang_cuoi, thang_dau,
+                       lech=(s.lech_thang if s is not None and s.lech_thang is not None else 12)),
         "pa": ve_pareto(bc.tap_trung),
         "ngay_dau_du_lieu": kx.ngay_dau,
         "td_phu": chi_so_phu(td) if td else None,

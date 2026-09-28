@@ -30,9 +30,15 @@ def _kx(conn, **ts):
 
 def test_bao_cao_ky_GIU_NGUYEN_so(conn, batch):
     _gieo(conn, batch)
-    a = BK.tinh_bao_cao(conn, _kx(conn, ky="2026"))
-    b = BC.tinh_bao_cao(conn, 2026)
-    assert asdict(a) == asdict(b)
+    kx = _kx(conn, ky="2026")
+    a = asdict(BK.tinh_bao_cao(conn, kx))
+    b = asdict(BC.tinh_bao_cao(conn, 2026))
+    # Mọi số của dạng Kỳ y như màn cũ; bảng người phụ trách chỉ THÊM doanh thu kỳ so
+    # (đặc tả 2026-09-28) — cùng người, cùng thứ tự, cùng doanh thu / lãi gộp.
+    nv_a, nv_b = a.pop("nhan_vien"), b.pop("nhan_vien")
+    assert a == b
+    assert [(n["ma"], n["doanh_thu"], n["lai_gop"]) for n in nv_a] ==         [(n["ma"], int(n["doanh_thu"]), int(n["lai_gop"])) for n in nv_b]
+    assert all("dt_ss" in n for n in nv_a)
 
 
 def test_bao_cao_thang_tong_BANG_ban_theo_thang(conn, batch):

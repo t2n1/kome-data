@@ -90,8 +90,17 @@ Hai thẻ cạnh nhau (xếp chồng khi hẹp):
 Tự đổi theo nhờ §4 (không sửa giao diện): các màn đã đọc `so_sanh` (Báo cáo dạng Tháng/Khoảng,
 danh sách khách, danh mục sản phẩm, ô DT·khoảng của hai hồ sơ).
 
-**Đợt 2 — Báo cáo**: dạng Kỳ theo kỳ so, bản đồ nhiệt, cây ô (câu ô nổi), luỹ kế ngân sách, bảng
-người phụ trách, sparks, chú giải biểu đồ chính.
+**Đợt 2 — Báo cáo** (≤ 11 lượt hỏi giữ nguyên — phép so đi chung câu có sẵn):
+
+| Khối | Thay đổi |
+|---|---|
+| 4 ô số | dòng so có mẫu ╌; đường nhỏ kèm nét đứt kỳ so (`O.lg_cung_ky`/`so_khach_cung_ky`/`ty_suat_cung_ky` từ câu chuỗi; dạng Kỳ: doanh thu + tỷ suất) |
+| Biểu đồ chính | nét đứt → CỘT MA (`ve_bieu_do.cot_ck`, cùng thang), có `<title>` |
+| Ngành kéo lên/xuống · cây ô | câu ô nổi theo nhãn kỳ so |
+| Bản đồ nhiệt | dạng Tháng / Khoảng: `BK.nganh_thang_ss` dời `lech_thang` (thay câu cũ); dạng Kỳ giữ view năm trước |
+| Luỹ kế ngân sách | nét đứt kỳ so (nhịp ngân sách thành nét liền); không cùng gốc ⇒ không vẽ, nói ra |
+| Người phụ trách | cột kỳ so + "So" (FULL JOIN hai dải trong câu người phụ trách); khối ngân sách dạng Tháng: vạch đứt trên thanh + bảng chi tiết theo kỳ so |
+| Bảng chi tiết · CSV | tiêu đề theo nhãn kỳ so |
 
 **Đợt 3 — Khách hàng & Sản phẩm**: bản đồ (Δ theo tỉnh), hồ sơ khách 12 tháng (qua `/khoang`,
 hồ sơ đã chạm trần 8), bảng mặt hàng, sản phẩm 360 (24 tháng, theo ngày theo khoảng xem, 26 tuần,
