@@ -89,7 +89,8 @@ export function KhoiKpi() {
           : <OKpi href={KD.hien_ngan_sach ? "/ngan-sach" : undefined} chua nhan="Ngân sách" gia="chưa đặt"
               chi_tiet={<div className="o-noi-chu">Chưa đặt chỉ tiêu tháng này — đặt ở màn Ngân sách.</div>} />}
         {TN.cong_no && <OKpiCongNo />}
-        <OKpi chua nhan="Phải trả 7 ngày" gia="chưa có" chi_tiet={<div className="o-noi-chu">{KD.chua_co.dong_tien ?? "Cần sổ phải trả."}</div>} />
+        {/* Ô chưa làm — ẩn theo công tắc kome/man_chua_co.py::HIEN (2026-09-28). */}
+        {KD.hien_chua_co && <OKpi chua nhan="Phải trả 7 ngày" gia="chưa có" chi_tiet={<div className="o-noi-chu">{KD.chua_co.dong_tien ?? "Cần sổ phải trả."}</div>} />}
         <OKpi href="/kho-hang" nhan="Kho cần xử lý" gia={so(d.kho.het_hang + d.kho.can_han + d.kho.qua_han)}
           lop={d.kho.het_hang + d.kho.qua_han ? "giam" : undefined}
           chi_tiet={<><DongNoi mau={LUC.do} nhan="Mã hết hàng" gia={so(d.kho.het_hang)} />

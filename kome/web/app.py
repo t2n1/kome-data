@@ -26,6 +26,7 @@ from kome.web import spa as SPA
 from kome.web import anh_chup
 from kome.web.api import tao_api
 from kome.khoi_tong_quan import CHUA_CO as KTQ_CHUA_CO
+from kome import man_chua_co as MCC
 from kome.nguon_dung import tinh_nang
 from ops.backup import backup_status
 
@@ -459,6 +460,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "danh_muc": BC.danh_muc(),
             "chua_co": KTQ_CHUA_CO,
             "tinh_nang": tinh_nang(),
+            "hien_chua_co": MCC.HIEN,
         }
 
     def _spa(request: Request, tuoi: bool = False, man=None, thong_bao: dict | None = None,

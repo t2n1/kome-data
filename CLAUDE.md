@@ -868,6 +868,12 @@ kế, có ô nổi / bật tắt chú giải / bấm để lọc). Đặc tả:
 - Thanh bên: sáu nhóm của gói thiết kế; màn chưa có hiện MỜ kèm "chưa có" (không giả
   vờ có); bốn màn bị cắt (lộ trình §4.2) không hiện; Kho dữ liệu / Ngân sách ẩn theo
   cờ quyền. Chuông chỉ báo thứ có nguồn thật (`khoi_tong_quan.thong_bao`).
+  **Từ 2026-09-28 (chủ DN chốt — "tạm ẩn cho bớt rối"):** màn / khối CHƯA LÀM không hiện
+  gì cả — MỘT công tắc `kome/man_chua_co.py::HIEN` (mặc định `False`): thanh bên bỏ mọi mục
+  `url: null` (nhóm hết mục thì bỏ luôn), Tổng quan bỏ khối trong `man_chua_co.KHOI` khỏi
+  danh mục (cùng nếp `KHOI_CAN`). Không xoá code: đặt `HIEN = True` là mọi khung "chưa có"
+  hiện lại. `man_chua_co.KHOI` = khoá của `khoi_tong_quan.CHUA_CO` (có test canh:
+  `tests/test_man_chua_co.py`). Làm xong một khối: bỏ nó khỏi CẢ HAI chỗ.
 
 **Bất biến (Khoảng xem, migration 039 — 2026-09-24):** cả website có MỘT khoảng xem,
 nằm TRÊN URL (`?thang=YYYY-MM` · `?ky=<company_fy>` · `?tu=&den=`; không tham số = tháng

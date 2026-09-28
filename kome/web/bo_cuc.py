@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from kome import man_chua_co as MCC
 from kome.nguon_dung import tinh_nang
 
 RONG_TOI_DA = 3   # số cột của lưới — đổi là đổi cả giao_dien/src/tong_quan/Luoi.tsx (RONG) và CSS .luoi-tq
@@ -66,7 +67,9 @@ _KHOI_DAY_DU = (
 # có nó thì `chuan_hoa` bỏ qua — bật lại nguồn là khối tự nối vào cuối.
 KHOI_CAN = {"cong_no": "cong_no"}
 _TN = tinh_nang()
-KHOI = tuple(k for k in _KHOI_DAY_DU if _TN.get(KHOI_CAN.get(k[0], ""), True))
+# Khối CHƯA LÀM (kome/man_chua_co.py) cũng rời danh mục khi công tắc tắt — cùng nếp trên.
+KHOI = tuple(k for k in _KHOI_DAY_DU if _TN.get(KHOI_CAN.get(k[0], ""), True)
+             and (MCC.HIEN or k[0] not in MCC.KHOI))
 _CO = {k[0] for k in KHOI}
 NHOM = (("tat_ca", "Tất cả"), ("tong_quan", "Tổng quan"), ("tien", "Tiền"),
         ("khach_hang", "Khách hàng"), ("hang_hoa", "Hàng hóa"), ("thi_truong", "Thị trường"))

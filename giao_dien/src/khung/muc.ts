@@ -2,7 +2,8 @@
 // kome-nav.js (gói thiết kế). `url: null` = màn chưa có (nhóm C / thiếu nguồn
 // dữ liệu, lộ trình §4.1): hiện mờ, không bấm được — không giả vờ có. Bốn màn
 // bị cắt khỏi phạm vi (lộ trình §4.2: web đặt hàng khách, mẫu chứng từ, thị
-// trường & đối thủ, sale mobile) KHÔNG hiện.
+// trường & đối thủ, sale mobile) KHÔNG hiện. Từ 2026-09-28 mục `url: null` cũng
+// KHÔNG hiện khi công tắc kome/man_chua_co.py::HIEN tắt (mặc định).
 import { KD, TN } from "../khoi_dau";
 
 export type Muc = { ma: string; nhan: string; url: string | null; icon: string; ly_do?: string };
@@ -47,7 +48,10 @@ export function nhomDieuHuong(): Nhom[] {
       { ma: "caidat", nhan: "Cài đặt", url: "/cai-dat", icon: "gear" },
     ] },
   ];
-  return nhom;
+  // Màn chưa làm tạm ẩn (kome/man_chua_co.py, chủ DN 2026-09-28): bỏ mục không có `url`,
+  // nhóm hết mục thì bỏ luôn. `hien_chua_co` thiếu (bản build cũ / test) = ẩn.
+  if (KD.hien_chua_co) return nhom;
+  return nhom.map(g => ({ ...g, muc: g.muc.filter(m => m.url) })).filter(g => g.muc.length);
 }
 
 /** Mục đang mở theo đường dẫn — dài nhất khớp trước ("/khach-hang/0001" -> kh360). */

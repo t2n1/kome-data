@@ -37,6 +37,8 @@ export type KhoiDau = {
   chua_co: Record<string, string>;
   // Tính năng sống nhờ một nguồn OBC công ty chưa dùng (kome/nguon_dung.py) — false = ẩn.
   tinh_nang?: { cong_no: boolean; bang_gia: boolean; nha_cung_cap: boolean };
+  // Màn / mục CHƯA LÀM (kome/man_chua_co.py::HIEN): false = thanh bên bỏ mọi mục "chưa có".
+  hien_chua_co?: boolean;
   // Giai đoạn 5 — màn do máy chủ tính sẵn (route cũ giữ nguyên truy vấn, chỉ đổi
   // cách vẽ): dữ liệu của màn đang mở, trang thông báo (lỗi / không có quyền /
   // bản chỉ-đọc), và cờ "vừa đăng nhập sai".

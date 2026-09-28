@@ -86,6 +86,8 @@ def test_danh_muc_bam_goi_thiet_ke():
     ma = {k["id"] for k in dm["khoi"]}
     du = {k[0] for k in BC._KHOI_DAY_DU}
     an = {k for k, tn in BC.KHOI_CAN.items() if not ND.tinh_nang()[tn]}
+    from kome import man_chua_co as MCC
+    an |= set() if MCC.HIEN else set(MCC.KHOI)   # khối chưa làm tạm ẩn (2026-09-28)
     assert len(du) == 23 and ma == du - an and len(dm["nhom"]) == 6 and len(dm["vai_tro"]) == 4
     assert all(set(v["khoi"]) <= ma for v in dm["vai_tro"])
     assert du == set(KTQ.KHOI) | set(KTQ.CHUA_CO)
