@@ -83,3 +83,91 @@ def test_moc_lui_cat_dung(conn, batch):
         conn.execute("SELECT set_config('kome.moc', '2026-07-10', true)")
         ngay = {r[0] for r in conn.execute("SELECT ngay FROM mart.mua_vu_ngay")}
     assert max(ngay) <= date(2026, 7, 10)
+
+
+from kome import mua_vu as MV
+
+
+def _web(test_db_url):
+    from fastapi.testclient import TestClient
+    from kome.web.app import create_app
+    return TestClient(create_app(db_url=test_db_url))
+
+
+def test_du_lieu_dang_cot_giu_so_0_dau_va_so_thap_phan(conn, batch):
+    _hang(conn, batch)
+    b = batch(778_202)
+    conn.execute("""INSERT INTO core.dim_product (product_code, product_name, kind_code,
+                      kind_name, food_category_name, batch_id)
+                    VALUES ('000123', 'Mã số 0 đầu', '0', '有形', '調味料_VNM', %s)""", (b,))
+    conn.commit()
+    _mua(conn, batch, KHACH, HOM_NAY - timedelta(days=3), hang="000123")
+    _mua(conn, batch, KHACH, HOM_NAY - timedelta(days=1), hang="FEE1")
+    _neo(conn, batch)
+    d = MV.du_lieu(conn)
+    ma = [m["ma"] for m in d["ma"]]
+    assert "000123" in ma and "__phi" in ma
+    assert d["phi"] == ma.index("__phi") and d["tang"] is None
+    k = ma.index("000123")
+    j = d["dong"]["i"].index(k)
+    assert d["dong"]["d"][j] == (HOM_NAY - timedelta(days=3) - date.fromisoformat(d["ngay_dau"])).days
+    assert isinstance(d["dong"]["sl"][j], float) and isinstance(d["dong"]["dt"][j], int)
+    m = d["ma"][k]
+    assert m["ten"] == "Mã số 0 đầu" and m["nganh"] == "調味料_VNM" and m["an"] is False
+    assert set(d["nganh"]) == {x["nganh"] for x in d["ma"] if x["nganh"]}   # mã giả: nganh ""
+    assert len(d["dong"]["i"]) == len(d["dong"]["dt"]) == len(d["dong"]["sl"])
+
+
+def test_du_lieu_ma_khong_co_master_van_co_ten_va_nganh(conn, batch):
+    _ho_so_khach(conn, batch, KHACH, "Quán A")
+    _mua(conn, batch, KHACH, HOM_NAY, hang="LA01")
+    d = MV.du_lieu(conn)
+    m = next(x for x in d["ma"] if x["ma"] == "LA01")
+    assert m["ten"] == "LA01" and m["nganh"] == "(chưa phân loại)"
+
+
+def test_du_lieu_kho_rong(conn):
+    d = MV.du_lieu(conn)
+    assert d["ngay_dau"] is None and d["ma"] == [] and d["dong"]["i"] == []
+
+
+def test_du_lieu_DUNG_MOT_luot_hoi(conn, batch, monkeypatch):
+    _hang(conn, batch)
+    _mua(conn, batch, KHACH, HOM_NAY, hang="XT07")
+    dem = {"n": 0}
+    that = conn.execute
+
+    def demo(*a, **k):
+        dem["n"] += 1
+        return that(*a, **k)
+    monkeypatch.setattr(conn, "execute", demo)
+    MV.du_lieu(conn)
+    assert dem["n"] == 1
+
+
+def test_trang_va_api_mo_duoc_va_ngan_sach_luot_hoi(conn, batch, test_db_url, monkeypatch):
+    import psycopg
+    _hang(conn, batch)
+    _mua(conn, batch, KHACH, HOM_NAY, hang="XT07")
+    c = _web(test_db_url)
+    r = c.get("/mua-vu")
+    assert r.status_code == 200 and 'id="goc"' in r.text
+    dem = {"n": 0}
+    that = psycopg.Connection.execute
+
+    def demo(self, *a, **k):
+        dem["n"] += 1
+        return that(self, *a, **k)
+    monkeypatch.setattr(psycopg.Connection, "execute", demo)
+    r = c.get("/api/mua-vu")
+    assert r.status_code == 200, r.text
+    assert r.json()["ma"][0]["ma"]
+    assert dem["n"] <= 2, f"/api/mua-vu chạy {dem['n']} lượt hỏi, trần 2"
+
+
+def test_api_chua_dang_nhap_thi_401_json(test_db_url, monkeypatch):
+    from fastapi.testclient import TestClient
+    from kome.web.app import create_app
+    monkeypatch.setenv("KOME_SESSION_SECRET", "bi-mat-thu-" + "x" * 32)
+    r = TestClient(create_app(db_url=test_db_url)).get("/api/mua-vu", follow_redirects=False)
+    assert r.status_code == 401 and r.headers["content-type"].startswith("application/json")

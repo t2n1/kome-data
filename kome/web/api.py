@@ -229,6 +229,7 @@ NGUNG_BAN = "ngung_ban_het_ton"
 KHOA_DANH_MUC = "san-pham/danh-muc"
 KHOA_DANH_MUC_KHOANG = "san-pham/khoang"
 KHOA_CONG_NO = "cong-no"
+KHOA_MUA_VU = "mua-vu"
 
 
 def _loi(thong_diep: str, ma: int = 500) -> JSONResponse:
@@ -704,6 +705,15 @@ def tao_api(open_app_conn) -> APIRouter:
     def sp_tab_ban_them(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         """Tab Tồn & bán thêm của Sản phẩm 360. ≤ 2 lượt hỏi."""
         return _tab_sp(request, ma, "ban-them", thang, ky, tu, den)
+
+    # ---- Mùa vụ sản phẩm (058) -----------------------------------------
+    # Không theo khoảng xem: thanh kéo là trục thời gian của chính màn. Chỉ đọc
+    # core/mart -> ảnh chụp theo phiên bản NẠP. Trúng: 1 lượt; trượt: 2.
+    @r.get("/mua-vu")
+    def mua_vu(request: Request):
+        from kome import mua_vu as MV
+        return _chup(request, KHOA_MUA_VU, MV.du_lieu,
+                     "Không đọc được dữ liệu mùa vụ.", chi_nap=True)
 
     @r.get("/san-pham/{ma}/nen-chao")
     def sp_nen_chao(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
