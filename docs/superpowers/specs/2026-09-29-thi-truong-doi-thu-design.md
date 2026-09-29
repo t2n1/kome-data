@@ -246,7 +246,7 @@ Hướng dẫn đọc (`HUONG_DAN.md` của phép thử) chuyển vào `docs/doi
 | Đợt | Gồm | Ghi chú |
 |---|---|---|
 | **1** | §4 toàn bộ bảng trừ `tiep_xuc_nhac` · bộ nạp + gói · `/doi-thu` bốn tab · khối Sản phẩm 360 · nạp tháng 8 thật | Lõi. Làm được ngay |
-| **1b** | Phần giao diện của Đợt 1 chưa làm (soát cuối 2026-09-29): form "Thêm hàng AI bỏ sót" và chọn nhóm khi ghép (§5.4) · màn tạo nhóm có tên và sửa quy cách KOME (§4.2 — API `/api/doi-thu/nhom`, `/quy-cach` ĐÃ có; 60/168 mã chưa tách được kg từ tên, phần lớn là đồ uống theo ml) · bấm ô lưới → So sánh lọc ngành + bên (§5.1) · lọc ngành / kênh-mức / tuổi quan sát (§5.2) · liên kết `&nhom=` từ Sản phẩm 360 (§5.5) | Làm trước Đợt 2 |
+| **1b** | Phần giao diện của Đợt 1 chưa làm (soát cuối 2026-09-29): form "Thêm hàng AI bỏ sót" và chọn nhóm khi ghép (§5.4) · màn tạo nhóm có tên và sửa quy cách KOME (§4.2 — API `/api/doi-thu/nhom`, `/quy-cach` ĐÃ có; 60/168 mã chưa tách được kg từ tên, phần lớn là đồ uống theo ml) · bấm ô lưới → So sánh lọc ngành + bên (§5.1) · lọc ngành / kênh-mức / tuổi quan sát (§5.2) · liên kết `&nhom=` từ Sản phẩm 360 (§5.5) | Làm trước Đợt 2. Phía máy chủ: migration 062 (cột `nganh` của `mart.so_sanh_nhom`), `/api/doi-thu/nhom-quy-cach`, `/nhom/them-ma`, `/nhom/bo-ma`. |
 | **2** | §6 tin hiện trường `@` · nối hồ sơ khách / `/lien-he` / hồ sơ đối thủ · hiện trường 30 ngày | Sau khi Đợt 1 có dữ liệu thật |
 | **3** | Ảnh: trang gốc cạnh dòng duyệt + ảnh bằng chứng sale đính kèm (nguồn loại 2, 3) | **Cần chọn chỗ lưu ảnh** — web hiện không có (chỉ `meta.nap_cho` bytea, 24 giờ). Mỗi tháng ~400 trang; Vercel 4,5 MB/yêu cầu. Đề xuất Supabase Storage; quyết định riêng |
 

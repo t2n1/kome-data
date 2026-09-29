@@ -736,6 +736,12 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import doi_thu as DT
         return _dt_doc(request, "doi-thu/so-sanh", DT.so_sanh, thang, ky, tu, den, "Không đọc được bảng so sánh.")
 
+    @r.get("/doi-thu/nhom-quy-cach")
+    def dt_nhom_quy_cach(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        from kome import doi_thu as DT
+        return _dt_doc(request, "doi-thu/nhom-quy-cach", DT.nhom_va_quy_cach, thang, ky, tu, den,
+                       "Không đọc được nhóm và quy cách.")
+
     @r.get("/doi-thu/ben/{ma}")
     def dt_ben(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         """Không có đối thủ này -> {"khong_co": true} (200), giao diện nói rõ; không để _chup biến nó thành 500."""
@@ -799,7 +805,28 @@ def tao_api(open_app_conn) -> APIRouter:
     @r.post("/doi-thu/nhom")
     async def dt_nhom(request: Request):
         from kome import doi_thu as DT
-        return await _dt_ghi(request, lambda c, b, n: {"id": DT.tao_nhom(c, str(b["ten"]), list(b.get("ma_kome") or []), n)})
+        def lam(c, b, n):
+            ma = b.get("ma_kome") or []
+            if not isinstance(ma, list):
+                raise DT.LoiNhap("Danh sách mã KOME phải là một danh sách.")
+            return {"id": DT.tao_nhom(c, str(b["ten"]), ma, n)}
+        return await _dt_ghi(request, lam)
+
+    @r.post("/doi-thu/nhom/them-ma")
+    async def dt_nhom_them_ma(request: Request):
+        from kome import doi_thu as DT
+
+        def lam(c, b, n):
+            ma = b["ma_kome"]
+            if not isinstance(ma, list):
+                raise DT.LoiNhap("Danh sách mã KOME phải là một danh sách.")
+            DT.them_ma_nhom(c, int(b["nhom_id"]), ma, n)
+        return await _dt_ghi(request, lam)
+
+    @r.post("/doi-thu/nhom/bo-ma")
+    async def dt_nhom_bo_ma(request: Request):
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.bo_ma_nhom(c, str(b["product_code"]), n))
 
     @r.post("/doi-thu/quy-cach")
     async def dt_quy_cach(request: Request):

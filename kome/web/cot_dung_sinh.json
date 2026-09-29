@@ -7270,7 +7270,7 @@
      "he": "kind_code",
      "ja": "種別コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 9 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 10 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -7305,6 +7305,7 @@
       "mart.mua_vu_ngay",
       "mart.nganh_ky_cung_ky",
       "mart.san_pham_360",
+      "mart.so_sanh_nhom",
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem"
      ]
@@ -7359,7 +7360,7 @@
      "he": "food_category_name",
      "ja": "食品分類名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 9 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 10 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -7394,6 +7395,7 @@
       "mart.mua_vu_ngay",
       "mart.nganh_ky_cung_ky",
       "mart.san_pham_360",
+      "mart.so_sanh_nhom",
       "mart.sp_khach_nen_chao",
       "mart.sp_mua_kem"
      ]

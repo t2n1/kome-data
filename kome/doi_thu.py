@@ -170,19 +170,68 @@ def dat_ghep(conn, ma_doi_thu: str, ma_hang_dt: str, product_code, nhom_id, nhan
                  {"product_code": product_code, "nhom_id": nhom_id, "nhan": nhan}, nguoi)
 
 
+def _kiem_ma_kome(conn, ma_kome) -> list[str]:
+    """Mọi mã phải có trong core.dim_product — mã gõ nhầm không được vào nhóm (nhóm rỗng lặng lẽ)."""
+    if not isinstance(ma_kome, (list, tuple)):
+        raise LoiNhap("Danh sách mã KOME phải là một danh sách.")
+    ma = [str(m).strip() for m in ma_kome]
+    if any(not m for m in ma):
+        raise LoiNhap("Có mã KOME để trống.")
+    ma = list(dict.fromkeys(ma))
+    if ma:
+        co = {r[0] for r in conn.execute("SELECT product_code FROM core.dim_product WHERE product_code = ANY(%s)", (ma,))}
+        for m in ma:
+            if m not in co:
+                raise LoiNhap(f"Không có mã KOME '{m}'.")
+    return ma
+
+
+def _nhom_cu(conn, ma: list[str]) -> dict:
+    """{mã: nhom_id} của những mã ĐANG thuộc một nhóm — cột `truoc` của nhật ký."""
+    if not ma:
+        return {}
+    return dict(conn.execute("SELECT product_code, nhom_id FROM app.nhom_so_sanh_ma WHERE product_code = ANY(%s)",
+                             (ma,)).fetchall())
+
+
 def tao_nhom(conn, ten: str, ma_kome: list[str], nguoi) -> int:
     ten = (ten or "").strip()
     if not 1 <= len(ten) <= 80:
         raise LoiNhap("Tên nhóm dài 1–80 ký tự.")
+    ma_kome = _kiem_ma_kome(conn, ma_kome)
     if conn.execute("SELECT 1 FROM app.nhom_so_sanh WHERE lower(btrim(ten)) = lower(%s)", (ten,)).fetchone():
         raise LoiNhap("Đã có nhóm tên này.")
+    cu = _nhom_cu(conn, ma_kome)
     nid = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES (%s) RETURNING id", (ten,)).fetchone()[0]
     with conn.cursor() as cur:
         cur.executemany("""INSERT INTO app.nhom_so_sanh_ma (product_code, nhom_id) VALUES (%s, %s)
                            ON CONFLICT (product_code) DO UPDATE SET nhom_id = EXCLUDED.nhom_id""",
                         [(m, nid) for m in ma_kome])
-    _ghi_nhat_ky(conn, "nhom", f"nhom:{nid}", None, {"ten": ten, "ma_kome": ma_kome}, nguoi)
+    _ghi_nhat_ky(conn, "nhom", f"nhom:{nid}", cu or None, {"ten": ten, "ma_kome": ma_kome}, nguoi)
     return nid
+
+
+def them_ma_nhom(conn, nhom_id: int, ma_kome: list[str], nguoi) -> None:
+    """Thêm mã vào một nhóm có sẵn; mã đang ở nhóm khác thì được CHUYỂN sang (mỗi mã một nhóm)."""
+    ten = conn.execute("SELECT ten FROM app.nhom_so_sanh WHERE id=%s", (nhom_id,)).fetchone()
+    if ten is None:
+        raise LoiNhap("Không có nhóm này.")
+    ma = _kiem_ma_kome(conn, ma_kome)
+    if not ma:
+        raise LoiNhap("Chọn ít nhất một mã KOME.")
+    cu = _nhom_cu(conn, ma)
+    with conn.cursor() as cur:
+        cur.executemany("""INSERT INTO app.nhom_so_sanh_ma (product_code, nhom_id) VALUES (%s, %s)
+                           ON CONFLICT (product_code) DO UPDATE SET nhom_id = EXCLUDED.nhom_id""",
+                        [(m, nhom_id) for m in ma])
+    _ghi_nhat_ky(conn, "nhom", f"nhom:{nhom_id}", cu or None, {"ten": ten[0], "ma_kome": ma}, nguoi)
+
+
+def bo_ma_nhom(conn, product_code: str, nguoi) -> None:
+    r = conn.execute("DELETE FROM app.nhom_so_sanh_ma WHERE product_code=%s RETURNING nhom_id", (product_code,)).fetchone()
+    if r is None:
+        raise LoiNhap("Mã này không thuộc nhóm nào.")
+    _ghi_nhat_ky(conn, "nhom", f"nhom:{r[0]}", {product_code: r[0]}, {"bo_ma": product_code}, nguoi)
 
 
 def sua_quy_cach(conn, product_code: str, kg_moi_goi, goi_moi_thung, kg_moi_thung, nguoi) -> None:
@@ -244,6 +293,7 @@ SELECT coalesce(json_agg(json_build_object(
          'nhom_khoa', s.nhom_khoa, 'ten_nhom', s.ten_nhom, 'don_vi_so', s.don_vi_so, 'ma_kome', s.ma_kome,
          'gia_kome', round(s.gia_kome), 'so_ben', s.so_ben, 'thap_nhat', round(s.thap_nhat), 'ben_thap_nhat', s.ben_thap_nhat,
          'trung_vi', round(s.trung_vi::numeric), 'cao_nhat', round(s.cao_nhat), 'ty_le_re_hon_kome', s.ty_le_re_hon_kome,
+         'nganh', s.nganh,
          'quan_sat', (SELECT coalesce(json_agg(to_json(h) ORDER BY h.yen_chuan NULLS LAST), '[]') FROM h
                       WHERE h.nhom_khoa = s.nhom_khoa AND h.don_vi_so = s.don_vi_so))
        ORDER BY s.so_ben DESC, s.ten_nhom), '[]')
@@ -253,6 +303,27 @@ FROM mart.so_sanh_nhom s
 
 def so_sanh(conn) -> dict:
     return {"nhom": conn.execute(_SO_SANH).fetchone()[0]}
+
+
+_NHOM_QUY_CACH = """
+SELECT json_build_object(
+  'nhom', (SELECT coalesce(json_agg(json_build_object('id', n.id, 'ten', n.ten, 'ma', coalesce(
+             (SELECT json_agg(json_build_object('ma', m.product_code, 'ten', p.product_name) ORDER BY m.product_code)
+              FROM app.nhom_so_sanh_ma m LEFT JOIN core.dim_product p USING (product_code)
+              WHERE m.nhom_id = n.id), '[]')) ORDER BY n.ten), '[]') FROM app.nhom_so_sanh n),
+  'quy_cach', (SELECT coalesce(json_agg(json_build_object('ma', z.product_code, 'ten', z.product_name, 'nganh', z.nganh,
+                 'kg_moi_goi', z.kg_moi_goi, 'goi_moi_thung', z.goi_moi_thung, 'kg_moi_thung', z.kg_moi_thung,
+                 'da_sua', z.da_sua) ORDER BY z.nganh, z.product_code), '[]')
+               FROM (SELECT p.product_code, p.product_name, mart.ten_nganh(p.food_category_name) AS nganh,
+                            q.kg_moi_goi, q.goi_moi_thung, q.kg_moi_thung, q.da_sua
+                     FROM core.dim_product p JOIN mart.quy_cach_kome q USING (product_code)
+                     WHERE NOT mart.khong_phai_hang(p.product_code, p.kind_code, p.food_category_name)) z))
+"""
+
+
+def nhom_va_quy_cach(conn) -> dict:
+    """Nhóm so sánh (kèm danh sách mã) + quy cách KOME của hàng thật (không phí, không POSM). MỘT lượt hỏi."""
+    return conn.execute(_NHOM_QUY_CACH).fetchone()[0]
 
 
 _HO_SO = f"""

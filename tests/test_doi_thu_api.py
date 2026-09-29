@@ -83,3 +83,51 @@ def test_khoi_san_pham_tra_nhom_theo_kg(conn, batch, test_db_url):
     d = _web(test_db_url).get("/api/san-pham/NT01/doi-thu").json()
     assert d["nhom"]["nhom_khoa"] == "ma:NT01" and d["nhom"]["so_ben"] == 3
     assert (_SRC / "san_pham" / "ho_so" / "KhoiDoiThu.tsx").exists()
+
+
+# ---------------------------------------------------------------- đợt 1b
+
+def test_nhom_quy_cach_ngan_sach_va_hinh_dang(conn, batch, test_db_url, monkeypatch):
+    _nen(conn, batch)
+    c = _web(test_db_url)
+    dem = {"n": 0}
+    that = psycopg.Connection.execute
+
+    def demo(self, *a, **k):
+        dem["n"] += 1
+        return that(self, *a, **k)
+    monkeypatch.setattr(psycopg.Connection, "execute", demo)
+    r = c.get("/api/doi-thu/nhom-quy-cach")
+    assert r.status_code == 200, r.text
+    assert dem["n"] <= 2 and set(r.json()) == {"nhom", "quy_cach"}
+    assert any(q["ma"] == "NT01" for q in r.json()["quy_cach"])
+
+
+@pytest.mark.parametrize("url", ["/api/doi-thu/nhom/them-ma", "/api/doi-thu/nhom/bo-ma"])
+def test_hai_post_moi_chi_nhan_json(conn, batch, test_db_url, url):
+    _nen(conn, batch)
+    assert _web(test_db_url).post(url, data={"product_code": "NT01"}).status_code == 415
+
+
+def test_them_ma_va_bo_ma_qua_api_va_loi_400(conn, batch, test_db_url):
+    _nen(conn, batch)
+    c = _web(test_db_url)
+    n = c.post("/api/doi-thu/nhom", json={"ten": "Basa", "ma_kome": []}).json()["id"]
+    r = c.post("/api/doi-thu/nhom/them-ma", json={"nhom_id": n, "ma_kome": ["NT0l"]})
+    assert r.status_code == 400 and "NT0l" in r.json()["loi"]
+    assert c.post("/api/doi-thu/nhom/them-ma", json={"nhom_id": n, "ma_kome": "NT01"}).status_code == 400
+    assert c.post("/api/doi-thu/nhom/them-ma", json={"nhom_id": n}).status_code == 400
+    assert c.post("/api/doi-thu/nhom/them-ma", json={"nhom_id": n, "ma_kome": ["NT01"]}).json()["ok"]
+    g = next(x for x in c.get("/api/doi-thu/nhom-quy-cach").json()["nhom"] if x["id"] == n)
+    assert [m["ma"] for m in g["ma"]] == ["NT01"]
+    r = c.post("/api/doi-thu/nhom/bo-ma", json={"product_code": "KHONGCO"})
+    assert r.status_code == 400 and r.json()["loi"]
+    assert c.post("/api/doi-thu/nhom/bo-ma", json={"product_code": "NT01"}).json()["ok"]
+    g = next(x for x in c.get("/api/doi-thu/nhom-quy-cach").json()["nhom"] if x["id"] == n)
+    assert g["ma"] == []
+
+
+def test_nhom_ma_kome_la_chuoi_thi_400(conn, batch, test_db_url):
+    _nen(conn, batch)
+    r = _web(test_db_url).post("/api/doi-thu/nhom", json={"ten": "X", "ma_kome": "NT01"})
+    assert r.status_code == 400 and r.json()["loi"]
