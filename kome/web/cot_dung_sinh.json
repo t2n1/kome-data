@@ -11333,7 +11333,7 @@
      "he": "ma_doi_thu",
      "ja": "ma_doi_thu",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_doi_thu_hien_hanh, mart.gia_doi_thu_quan_sat, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_doi_thu_hien_hanh, mart.gia_doi_thu_quan_sat, mart.nguon_quan_sat và 1 chỉ số khác",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py"
@@ -11345,6 +11345,7 @@
      "view": [
       "mart.gia_doi_thu_hien_hanh",
       "mart.gia_doi_thu_quan_sat",
+      "mart.nguon_quan_sat",
       "mart.so_sanh_nhom"
      ]
     },
@@ -12669,6 +12670,9 @@
    "bao_cao",
    "du_bao",
    "tong_quan"
+  ],
+  "mart.nguon_quan_sat": [
+   "doi_thu"
   ],
   "mart.nhip_mat_hang": [
    "ban_do",

@@ -813,6 +813,11 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import doi_thu as DT
         return await _dt_ghi(request, lambda c, b, n: {"id": DT.gia_moi(c, dict(b), n)})
 
+    @r.post("/doi-thu/thu-muc")
+    async def dt_thu_muc(request: Request):
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.dat_thu_muc(c, b.get("thang"), b.get("lien_ket"), n))
+
     @r.post("/doi-thu/ghep")
     async def dt_ghep(request: Request):
         from kome import doi_thu as DT

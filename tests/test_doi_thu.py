@@ -656,3 +656,65 @@ def test_khach_ke_gan_ma_roi_gan_nhom_MOT_dong_hien_hanh_la_gia_moi(conn, batch)
     _tin(conn, batch, "K0002", cau, _the_kep(cau, "THAK", nk), [_gia_ke("THAK", nk, 700)])
     assert conn.execute("""SELECT count(*) FROM mart.gia_doi_thu_hien_hanh
                            WHERE loai_nguon = 'khach_ke' AND nhom_khoa = %s""", (nk,)).fetchone()[0] == 2
+
+
+@pytest.mark.parametrize("lk", ["http://drive.google.com/x", "javascript:alert(1)", "https://a b", "https://x\n",
+                                 "https://\ud800", 5, ["https://x"], "https://" + "a" * 2000])
+def test_kiem_lien_ket_tu_choi_dang_sai(lk):
+    from kome import doi_thu as DT
+    with pytest.raises(DT.LoiNhap):
+        DT.kiem_lien_ket(lk, "Link")
+
+
+def test_kiem_lien_ket_rong_la_None_va_https_giu_nguyen():
+    from kome import doi_thu as DT
+    assert DT.kiem_lien_ket(None, "Link") is None and DT.kiem_lien_ket("", "Link") is None
+    assert DT.kiem_lien_ket("https://drive.google.com/x?id=1", "Link") == "https://drive.google.com/x?id=1"
+
+
+def test_dat_thu_muc_upsert_va_ghi_nhat_ky(conn):
+    from kome import doi_thu as DT
+    DT.dat_thu_muc(conn, "2026-08", "https://drive.google.com/a", None)
+    DT.dat_thu_muc(conn, "2026-08", "https://drive.google.com/b", None)
+    conn.commit()
+    assert conn.execute("SELECT thang::text, lien_ket FROM app.thu_muc_nguon").fetchall() == [("2026-08-01", "https://drive.google.com/b")]
+    nk = conn.execute("SELECT truoc, sau FROM app.doi_thu_nhat_ky WHERE loai = 'thu_muc' ORDER BY id").fetchall()
+    assert nk == [(None, {"lien_ket": "https://drive.google.com/a"}),
+                  ({"lien_ket": "https://drive.google.com/a"}, {"lien_ket": "https://drive.google.com/b"})]
+
+
+@pytest.mark.parametrize("thang", ["2026-13", "2026-8", "08-2026", "", None, 202608])
+def test_dat_thu_muc_thang_sai_dang(conn, thang):
+    from kome import doi_thu as DT
+    with pytest.raises(DT.LoiNhap):
+        DT.dat_thu_muc(conn, thang, "https://drive.google.com/a", None)
+
+
+def test_gia_moi_luu_link_bang_chung_va_tu_choi_link_sai(conn, batch):
+    from kome import doi_thu as DT
+    from tests.test_mart_doi_thu import _hang, _qs
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 540)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi",
+                            "lien_ket_bang_chung": "https://drive.google.com/anh"}, None)
+    conn.commit()
+    assert conn.execute("SELECT lien_ket_bang_chung FROM app.gia_doi_thu_tay WHERE id = %s", (tid,)).fetchone()[0] \
+        == "https://drive.google.com/anh"
+    with pytest.raises(DT.LoiNhap):
+        DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi",
+                          "lien_ket_bang_chung": "javascript:x"}, None)
+
+
+def test_cac_cau_doc_mang_4_khoa_nguon(conn, batch):
+    from kome import doi_thu as DT
+    from tests.test_mart_doi_thu import _hang, _qs
+    _hang(conn, batch)
+    for b, g in [("THAK", 540), ("HSC", 560), ("JVB", 580)]:
+        _qs(conn, batch, b, g)                                            # lô data_date 2026-07-20
+    DT.dat_thu_muc(conn, "2026-07", "https://drive.google.com/t7", None)
+    conn.commit()
+    qs = DT.so_sanh(conn)["nhom"][0]["quan_sat"] + DT.duyet(conn)["dong"] + DT.ho_so_ben(conn, "THAK")["quan_sat"]
+    assert qs and all({"thang_lo", "lien_ket_thu_muc", "web_ben", "lien_ket_bang_chung"} <= set(q) for q in qs)
+    thak = [q for q in DT.duyet(conn)["dong"] if q["ma_doi_thu"] == "THAK"][0]
+    assert (thak["thang_lo"], thak["lien_ket_thu_muc"], thak["web_ben"]) == ("2026-07-01", "https://drive.google.com/t7",
+                                                                             "https://thak.jp/")

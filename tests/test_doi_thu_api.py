@@ -229,3 +229,32 @@ def test_ho_so_ben_va_tong_quan_co_khoi_moi_qua_api(conn, batch, test_db_url):
     kh = c.get("/api/doi-thu/ben/THAK").json()["khach_dang_mua"]
     assert [x["ma_khach"] for x in kh] == ["K0001"]
     assert c.get("/api/doi-thu/tong-quan").json()["hien_truong"]["tong"] == 1
+
+
+def test_post_thu_muc_ghi_va_phien_ban_doi(conn, batch, test_db_url):
+    _nen(conn, batch)
+    c = _web(test_db_url)
+    r = c.post("/api/doi-thu/thu-muc", json={"thang": "2026-07", "lien_ket": "https://drive.google.com/t7"})
+    assert r.status_code == 200 and r.json()["ok"] is True
+    dong = c.get("/api/doi-thu/duyet").json()["dong"]
+    assert all(d["lien_ket_thu_muc"] == "https://drive.google.com/t7" for d in dong if d["nguon"] == "nap")
+
+
+@pytest.mark.parametrize("than", [{"thang": "2026-07", "lien_ket": "javascript:x"}, {"thang": "2026-7", "lien_ket": "https://a"},
+                                  {"lien_ket": "https://a"}, {"thang": "2026-07"}])
+def test_post_thu_muc_sai_tra_400(conn, batch, test_db_url, than):
+    c = _web(test_db_url)
+    r = c.post("/api/doi-thu/thu-muc", json=than)
+    assert r.status_code == 400 and "loi" in r.json()
+
+
+def test_post_thu_muc_chi_nhan_json(test_db_url):
+    c = _web(test_db_url)
+    assert c.post("/api/doi-thu/thu-muc", data="thang=2026-07").status_code == 415
+
+
+def test_nhat_ky_thao_tac_co_dong_dan_link_thu_muc(conn, batch):
+    from kome import doi_thu as DT, nhat_ky as NK
+    DT.dat_thu_muc(conn, "2026-07", "https://drive.google.com/t7", None)
+    conn.commit()
+    assert any(d.loai == "doi_thu" and "thư mục" in d.noi_dung.lower() for d in NK.dong_thoi_gian(conn))

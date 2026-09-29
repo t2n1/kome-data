@@ -34,3 +34,6 @@ UNION ALL
 SELECT 'tay'::text, t.id, NULL::date, NULL::text, d.web, t.lien_ket_bang_chung
 FROM app.gia_doi_thu_tay t
 LEFT JOIN app.doi_thu d ON d.ma = t.ma_doi_thu;
+
+GRANT SELECT ON mart.nguon_quan_sat TO kome_app, kome_report, kome_ingest;
+GRANT SELECT ON app.thu_muc_nguon TO kome_report, kome_ingest;
