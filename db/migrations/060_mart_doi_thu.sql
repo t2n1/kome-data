@@ -27,8 +27,8 @@ SELECT f.product_code,
 FROM mart.ban_den_moc f
 CROSS JOIN mart.moc_thoi_gian m
 JOIN mart.quy_cach_kome q ON q.product_code = f.product_code
-CROSS JOIN LATERAL (SELECT CASE WHEN f.pack_code = '02' THEN coalesce(q.kg_moi_thung, q.kg_moi_goi * q.goi_moi_thung)
-                                ELSE q.kg_moi_goi END AS kg) k
+CROSS JOIN LATERAL (SELECT CASE f.pack_code WHEN '02' THEN coalesce(q.kg_moi_thung, q.kg_moi_goi * q.goi_moi_thung)
+                                            WHEN '00' THEN q.kg_moi_goi END AS kg) k
 WHERE f.sales_date > m.hom_nay - 90 AND k.kg IS NOT NULL
 GROUP BY f.product_code;
 
@@ -63,9 +63,9 @@ nap AS (
     SELECT 'nap'::text AS nguon, f.id, f.batch_id, f.ma_doi_thu, f.ma_hang_dt, f.ngay_nguon, f.hinh_thuc_nguon,
            f.nguon_file, f.vi_tri,
            coalesce(p.ten_goc, f.ten_goc) AS ten_goc, coalesce(p.quy_cach_goc, f.quy_cach_goc) AS quy_cach_goc,
-           coalesce(nullif(p.gia_goc, '')::numeric, f.gia_goc) AS gia_goc,
+           coalesce(CASE WHEN p.gia_goc ~ '^\s*\d+(\.\d+)?\s*$' THEN p.gia_goc::numeric END, f.gia_goc) AS gia_goc,
            coalesce(p.don_vi_gia, f.don_vi_gia) AS don_vi_gia,
-           coalesce(nullif(p.kg, '')::numeric, f.kg_moi_don_vi_gia) AS kg_moi_don_vi_gia,
+           coalesce(CASE WHEN p.kg ~ '^\s*\d+(\.\d+)?\s*$' THEN p.kg::numeric END, f.kg_moi_don_vi_gia) AS kg_moi_don_vi_gia,
            coalesce(p.thue, f.thue) AS thue, coalesce(p.gom_ship, f.gom_ship) AS gom_ship,
            coalesce(p.kenh_gia, f.kenh_gia) AS kenh_gia, coalesce(p.muc_gia, f.muc_gia) AS muc_gia,
            f.gia_bac, f.gia_truoc_km, coalesce(p.trang_thai, f.trang_thai) AS trang_thai, f.khuyen_mai,
@@ -89,9 +89,9 @@ ghep AS (
                 WHEN g.nhan = 'khong' THEN NULL ELSE g.product_code END AS ma_kome,
            CASE WHEN g.ma_doi_thu IS NULL THEN a.nhan_de_xuat
                 WHEN g.nhan = 'khong' THEN NULL ELSE g.nhan END         AS nhan,
-           g.nhom_id AS nhom_ghep
+           CASE WHEN g.nhan = 'khong' THEN NULL ELSE g.nhom_id END AS nhom_ghep
     FROM tat a LEFT JOIN app.ghep_hang g USING (ma_doi_thu, ma_hang_dt)
-    WHERE mart.moc_lui() IS NULL OR a.ngay_nguon <= mart.moc_lui()
+    WHERE a.ngay_nguon <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))
 )
 SELECT x.nguon, x.id, x.batch_id, x.ma_doi_thu, d.ten AS ten_doi_thu, x.ma_hang_dt, x.ngay_nguon,
        x.hinh_thuc_nguon, x.nguon_file, x.vi_tri, x.ten_goc, x.quy_cach_goc, x.gia_goc, x.don_vi_gia,

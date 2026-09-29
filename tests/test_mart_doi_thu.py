@@ -40,7 +40,7 @@ def test_gia_kome_kg_la_TY_SO_CAC_TONG_doc_ban_den_moc(conn, batch):
     _hang(conn, batch)
     # _mua: pack_code '02', qty 6, amount 110.000, tax 10.000 → 100.000 ÷ (6 thùng × 20 × 0,5 kg) = ¥1.666,7/kg
     _mua(conn, batch, "202601010001", HOM_NAY, hang="NT01")
-    _mua(conn, batch, "009000000002", HOM_NAY, hang="NT01")     # mã nội bộ (044) — không được lọt
+    _mua(conn, batch, "009000000002", HOM_NAY, tien=550_000, tax=50_000, hang="NT01")     # mã nội bộ (044) — không được lọt
     y = conn.execute("SELECT yen_kg FROM mart.gia_kome_kg WHERE product_code='NT01'").fetchone()[0]
     assert float(y) == pytest.approx(100_000 / 60, rel=1e-6)
 
@@ -124,3 +124,31 @@ def test_ghep_cua_nguoi_thang_de_xuat_va_nhom_co_ten_gop_ma(conn, batch):
     r = dict(conn.execute("SELECT ma_doi_thu, (ma_kome, nhom_khoa, ten_nhom) FROM mart.gia_doi_thu_quan_sat").fetchall())
     assert r["A"][0] is None and r["A"][1] is None               # người nói "không ghép" → ra khỏi mọi nhóm
     assert r["B"][1] == f"n:{n}" and r["B"][2] == "Basa cắt khúc"
+
+
+def test_khong_ghep_go_khoi_ca_nhom_chon_tay(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "A", 500, hang="h1")
+    n = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Nhóm X') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO app.ghep_hang (ma_doi_thu, ma_hang_dt, product_code, nhom_id, nhan) "
+                 "VALUES ('A', 'h1', NULL, %s, 'khong')", (n,))
+    conn.commit()
+    assert conn.execute("SELECT nhom_khoa FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()[0] is None
+
+
+def test_dinh_chinh_khong_phai_so_khong_lam_hong_view(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "A", 850)
+    conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong, gia_tri_moi) VALUES (%s, 'gia_goc', '580円')", (fid,))
+    conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong, gia_tri_moi) VALUES (%s, 'kg_moi_don_vi_gia', 'abc')", (fid,))
+    conn.commit()
+    g, kg = conn.execute("SELECT gia_goc, kg_moi_don_vi_gia FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()
+    assert g == 850 and kg == 1
+
+
+def test_gia_kome_kg_chi_nhan_pack_00_va_02(conn, batch):
+    _hang(conn, batch)
+    _mua(conn, batch, "202601010001", HOM_NAY, hang="NT01")            # '02' → 60 kg
+    conn.execute("UPDATE core.fact_sales_line SET pack_code = '01' WHERE product_code = 'NT01'")
+    conn.commit()
+    assert conn.execute("SELECT count(*) FROM mart.gia_kome_kg WHERE product_code='NT01'").fetchone()[0] == 0
