@@ -221,11 +221,13 @@ Hôm nay `gia_bac` là chữ tự do (257 dòng tháng 8, mỗi bên một kiể
   (lỗi thấy ở Vietnam House, NEXT tháng 8).
 - `mart.gia_doi_thu_hien_hanh` thêm **`gia_1`, `gia_5`, `gia_10`, `gia_pallet`** (¥/kg chưa thuế tại số
   lượng đó). Giá tại N thùng = bậc rẻ nhất có `tu` ≤ N (quy `kg` → thùng bằng `kg_thung_dt`; `pallet` chỉ khi
-  bảng ghi rõ pallet — dòng `muc_gia = 'pallet'` hoặc bậc `don_vi_sl = 'pallet'`, KHÔNG đoán "1 pallet = 40
-  thùng"). Không có bậc nào áp → giá lẻ. Viết MỘT lần trong mart; trình duyệt chỉ chọn cột.
+  bảng ghi rõ pallet). `gia_pallet` CHỈ lấy từ bậc pallet tường minh — bậc `don_vi_sl = 'pallet'`, hoặc dòng
+  `muc_gia = 'pallet'` — không có thì NULL; KHÔNG đoán "1 pallet = 40 thùng", không suy từ bậc thùng / kg. Bậc theo
+  kg / gói mà thiếu quy cách thì không áp. Không có bậc nào áp → giá lẻ. Viết MỘT lần trong mart; trình duyệt chỉ chọn cột.
 - `gia_pallet` NULL mà vẫn chọn "1 pallet" → dùng giá lẻ, và ô nổi ghi "bên này không ghi giá pallet".
 - Sửa: `app.dinh_chinh_gia` với `truong = 'bac'`, `gia_tri_moi` = JSON. `doi_thu._kiem` kiểm đúng lược đồ
-  trên (≤ 10 bậc, `tu` > 0, `gia` > 0).
+  trên (≤ 10 bậc, `tu` > 0, `gia` > 0). Đó là cửa thật: view (067) chỉ tự vệ — bỏ qua đính chính `bac` sai lược đồ và
+  `so_goi_thung` ngoài khoảng (rơi về giá trị đã nạp) vì sổ chỉ thêm, một dòng hỏng là hỏng vĩnh viễn.
 - `trung_vi` / `thap_nhat` / `bat_thuong` của `mart.so_sanh_nhom` vẫn tính trên **giá lẻ** (`gia_1`), như cũ.
   "Khách mua" chỉ đổi cái được VẼ và % so KOME, không đổi thống kê nhóm (ⓘ nói ra).
 
@@ -237,9 +239,13 @@ Hôm nay `gia_bac` là chữ tự do (257 dòng tháng 8, mỗi bên một kiể
 - Mọi chỗ đọc `fact_price_list` theo 売価No phải lọc hoặc gắn nhãn `'std'`. Hôm nay có ba chỗ:
   `san_pham_360.py` (giá bậc, hiện nó là dòng đầu "標準価格"), `mart.sp_*` giá bậc, và khối cảnh báo bán dưới
   giá nếu có. Test canh: không chỗ nào hiện "売価No.std".
+- **Chỉ lần nạp MỚI NHẤT ≤ mốc của từng (mã, quy cách)** (`mart.gia_kome_bang`, và `san_pham_360.py::_bac_gia`
+  — bản chép Python của luật hai cột để hiện từng quy cách): bộ nạp bỏ bậc 0/0 nên khi 売価No.10 hết hạn không có
+  dòng nào ghi đè; đọc mọi lần nạp thì khuyến mãi đã kết thúc ở lại mãi.
 - `mart.gia_kome_chuan(ma)` → ¥/kg chưa thuế: giá chưa thuế nếu > 0, không thì giá gồm thuế ÷ 1,08, của
   pack thùng (`02`), ÷ kg/thùng từ `mart.quy_cach_kome`. Không có → NULL.
-- `mart.so_sanh_nhom` thêm `gia_kome_chuan` và `gia_kome_bang` (jsonb 売価No → ¥/kg, cho dải đỏ nhạt).
+- `mart.so_sanh_nhom` thêm `gia_kome_chuan` và `gia_kome_bang` (jsonb 売価No → ¥/kg, cho dải đỏ nhạt); nó đọc
+  `mart.gia_kome_bang` MỘT lần (CTE `AS MATERIALIZED`).
 - **売価No.10 = giá khuyến mãi của KOME** (chủ DN, 2026-09-29). Nó KHÔNG vào dải giá thường, và không bao giờ là
   mặc định. Ô chọn ghi "売価No.10 · khuyến mãi". Dòng KOME mang nhãn **KM** (như đối thủ) khi có giá No.10 > 0
   và thấp hơn 標準価格; ô nổi in giá đó. Định nghĩa MỘT lần: `mart.la_gia_km_kome(price_level)` (= `'10'`).
@@ -280,7 +286,11 @@ Hôm nay `core.fact_dieu_kien_doi_thu` là chữ tự do. Tab §4.5 cần số.
   phép đếm đó để ⓘ in ra.
 - **Sửa của sale**: `app.dinh_chinh_giao_hang` (`ma_doi_thu`, `lo_id`, `truong`, `gia_tri_moi`, người,
   lúc) — CHỈ THÊM (`REVOKE UPDATE, DELETE` khỏi `kome_app`). `mart.giao_hang_hien_hanh` = lô mới nhất của
-  bên + đính chính mới nhất từng trường. KOME đọc `app.giao_hang_kome`.
+  bên + đính chính mới nhất, xét THEO TỪNG TRƯỜNG: đính chính áp dụng nếu ghi SAU lúc nạp lô mới nhất (`loaded_at`)
+  HOẶC lô đó để trống trường ấy — điều được nói ra thắng im lặng (sale điền lại một trường lô mới bỏ trống thì
+  vẫn thấy). Đính chính không đọc được (hỏng) → dùng giá trị của lô; `''` = xoá → NULL. KOME đọc
+  `app.giao_hang_kome`; MỌI lần sửa dòng KOME đặt `da_xac_nhan = true` (một người đã đặt số), không riêng nút xác nhận.
+  `mart.giao_hang_kome_bang_chung` đếm trên doanh thu THUẦN (`amount - tax_amount`, bẫy #8).
 - **Phí của đơn mẫu**: MỘT thuật toán, hai bản (nếp `nen` / `squarify`): `kome/phi_giao.py::tinh` và
   `giao_dien/src/doi_thu/phi_giao.ts::tinh`, chạy CHUNG `tests/du_lieu/phi_giao_ca.json`. Vào: điều kiện
   một bên + (tiền, thùng, vùng, trả). Ra: `{ship, vung, daibiki, chua_ro: [...], khong_nhan}`. Luật:
@@ -320,11 +330,15 @@ thật hôm nay có 0 dòng, nên không có đính chính nào bị mồ côi.
   số lượng ≈ ¥6,266 mỗi đơn vị `00`, tức **một đơn vị `00` của các mã này là cả thùng**
   (80g × 20 × 4 = 6,4 kg → ≈ ¥979/kg, sát thị trường). Còn `mart.gia_kome_kg` đang coi `00` = 1 gói 80g.
 - Sửa:
-  1. `mart.quy_cach_kome` tách được dạng ba thừa số "80g x 20 packs × 4box" (`kg_moi_thung` =
-     80 × 20 × 4 g);
+  1. `mart.quy_cach_kome` tách được dạng ba thừa số "80g x 20 packs × 4box": `kg_moi_thung` =
+     `kg_moi_goi × goi_moi_thung × c` (80g × 20 × 4; dùng `kg_moi_goi` / `goi_moi_thung` đã qua người sửa; cả khi
+     `pack1_code` NULL);
   2. kg của MỘT đơn vị theo `pack_code` đọc từ 商品データ của OBC (`荷姿１..４－基準単位当り荷姿区分数` /
      `入数`), thay cho giả định "00 = 1 gói". Việc 2 cần đo file thật trước khi viết: cột có đủ và đúng
-     không. Không đủ thì dừng ở việc 1 + sửa tay;
+     không. Không đủ thì dừng ở việc 1 + sửa tay. **Đã đo và làm (066):** `pack1_code = ''` (mã không có 荷姿) → một `'00'`
+     là cả sản phẩm như tên ghi; `pack1_code = '02'` và `pack1_base_qty > 0` → `kg_02 = kg_moi_goi × pack1_base_qty`
+     LUÔN (荷姿 của OBC là sự thật; kg sai thì người sửa `kg_moi_goi`, không sửa kg thùng); `pack1_code` NULL (chưa nạp
+     lại 商品データ) → luật 060. Ô sửa quy cách coi ô bằng giá trị hiệu lực hiện tại là "không sửa";
   3. màn **Dữ liệu › Giá KOME lệch** liệt kê nhóm có giá KOME > 3× hoặc < ⅓ trung vị, kèm nút sửa quy cách
      (`/api/doi-thu/quy-cach` đã có).
 - Test canh: một mã bán bằng `00` = thùng ra đúng ¥/kg.

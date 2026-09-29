@@ -24,3 +24,15 @@ Mỗi luật: bên · điều gì · làm gì · nguồn (tháng, ai phát hiệ
 - VIETCOOK — ba mức: xanh "Giá tại kho" (`kenh_gia=tai_kho`), cam "khách Vietcook = Pallet" (`muc_gia=pallet`), xanh lá "khách ngoài" (`muc_gia=khach_ngoai`).
 - BOMPEX — có JAN; tem "Dự kiến tháng 9 / 19/8 xuất hàng" = `sap_ve`.
 - YUMI — footer "Kiện 28kg ghép 3 (hoặc 4) sản phẩm - bao thuế bao ship".
+
+## Luật đợt 4a (tháng 8, 2026-09-29) — quy cách gói, bậc, giao hàng
+- NEXT — bậc "5cs / 2cs" in cạnh giá → `bac` (`don_vi_sl: thung`). Kênh `tai_kho` / `gui` / `giao` là ba dòng. Phí gửi
+  "…円/cs + 冷蔵送料" không có số trọn → để trống số, ghi chữ vào `cach_gui`; `phi_ship` NULL.
+- Vietnam House — bậc theo kg (25 / 50 kg) → `bac` `don_vi_sl: kg`; `gia_goc` PHẢI là mức 25 kg (giá lẻ nhỏ nhất, không phải
+  mức 50 kg). Giao hàng: Hokkaido +¥1,200, Okinawa không nhận (`"khong_nhan"`); daibiki ¥330 (chuyển khoản trước không tính).
+- OBA — bậc "×24kg / ×48kg" → bậc 24 kg ¥530, 48 kg ¥510; `gia_goc` 530. Bán theo kg, không có thùng → `so_goi_thung` để trống.
+- ICHIBA — "Kiện 2 thùng Mix ok" → `thung_moi_kien` 2, `mien_ship_kien` 1, `thue = bao` (bao thuế).
+- IMAI — ¥605 mỗi thùng khi đơn dưới ¥20,000 (`phi_ship_theo = thung`, `mien_ship_tu` 20000); Tohoku ¥400, Hokkaido ¥800; daibiki ¥440.
+- BOMPEX — miễn ship và miễn daibiki từ ¥20,000; Okinawa có phụ thu nhưng số không ghi → để trống, KHÔNG ghi 0.
+- EIHATSU — vài mặt hàng in hai giá "Daibiki / CK" → hai dòng, `kenh_gia` khác nhau (giá daibiki vs giá chuyển khoản).
+- Chung — câu của người đọc (ví dụ "chép giá có thuế vào ghi_chu", "không in thông tin thuế") viết Ở ĐÂY, không vào `dieu_kien`.

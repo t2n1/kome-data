@@ -113,7 +113,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/san-pham` | **React** (giai đoạn 4, bám Sản phẩm.dc.html; khoảng xem: cột doanh thu / SL / khách trong khoảng từ `/api/san-pham/khoang`, ghép ở trình duyệt): MỘT trang — ô tổng quan · danh mục cả 232 mã (chip ngành / trạng thái, tìm, sắp — lọc ở trình duyệt trên MỘT ảnh chụp `/api/san-pham`, 1 lượt hỏi) · bấm dòng mở trang riêng `/san-pham/{mã}` (nhớ thứ tự danh mục cho ‹ n/N ›, `sessionStorage`) | `mart.san_pham_360`, `mart.dong_ban`, `mart.moc_thoi_gian`, `core.dim_product` |
 | `/san-pham/{mã}` | **Sản phẩm 360 — trang riêng React** (2026-09-26, đặc tả `2026-09-26-san-pham-360-trang-rieng-design.md`): bố cục hồ sơ khách 360 — cột trái dính "Việc với mã này" (tồn + cảnh báo lô · khách đến ngày mua lại — CÙNG vị từ `ho_so_khach.lich_mua` · khách nên chào), cột phải 4 ô số + 24 tháng (cột mờ năm trước; bấm tháng → tab Thời gian) + 4 tab tải lười: Khách hàng (Pareto · 47 tỉnh · người phụ trách · mới/quay lại) · Thời gian (ngày · 26 tuần · nhịp · cỡ đơn) · Giá & lãi (đơn giá thực × quy cách · biên · khách giá/biên thấp · giá bậc) · Tồn & bán thêm (lô · mua kèm cùng phiếu · khách nên chào). `/api/san-pham/{mã}` (4 lượt, trần 5 — KHÔNG gồm khách nên chào) + `/khoang` (2) + `/nen-chao` (1; `mart.sp_khach_nen_chao` đo ~8,7 s nên tách khỏi đường mở trang — cột trái lấy 5 đầu, tab Tồn & bán thêm cả ≤ 50, CHUNG một truy vấn TanStack) + `/khach` (3) · `/thoi-gian` (2) · `/gia` (2) · `/ban-them` (2) · `/ngay` (1). `ho_so()` trả `dt_12t`/`lg_12t`/`bien_12t` và `bien` từng tháng (cùng cửa sổ 365 ngày với danh mục; biên tính ở máy chủ); thanh trên có ô tìm mã (lọc ảnh chụp danh mục) và ‹ n/N › rơi về thứ tự mặc định của danh mục khi không có sessionStorage; tab Thời gian giữ ô chọn tháng của biểu đồ theo ngày trên 24 tháng; biên theo từng người phụ trách tính sẵn ở máy chủ | `mart.san_pham_360`, `san_pham_theo_thang`, `ton_theo_lo`, `khach_mat_hang`, `mart.sp_*` (051–053), `core.fact_price_list` |
 | `/mua-vu` | **Mùa vụ sản phẩm — React** (2026-09-29, đặc tả `2026-09-29-mua-vu-san-pham-design.md`): HAI tab. **"Theo mùa"** (MẶC ĐỊNH, không tham số): bản đồ nhiệt mã × tháng lịch (`BanDoNhiet.tsx`, logic `nhiet.ts`) — tô "Từng mã" / "Toàn bộ", xếp "Tháng cao điểm" (trung bình mỗi năm, chỉ tháng trọn; bắt đầu từ tháng 3) / "Tổng", tháng dở dang in nghiêng + nói trong cảnh báo, bấm ô → tab Ảnh chụp 30 ngày ở cuối tháng đó. **"Ảnh chụp"** (`?tab=anh`): treemap ngành → mã (mọi mã) theo doanh thu / lãi gộp / số lượng của cửa sổ 7/30/90 ngày (`?cs=` `?n=`) kết thúc ở ngày của thanh kéo theo NGÀY; ô nổi so cùng cửa sổ năm trước; dòng "Không vẽ" (phí · POSM · mã ≤ 0 · ngành tắt). KHÔNG theo khoảng xem. `/api/mua-vu` — MỘT ảnh chụp dạng cột (1 lượt hỏi), cửa sổ cộng ở trình duyệt | `mart.mua_vu_ngay` (058), `core.dim_product`, `mart.ma_ngung_ban_an` |
-| `/doi-thu` | **Thị trường & đối thủ — React** (2026-09-29, đặc tả `2026-09-29-thi-truong-doi-thu-design.md`): 4 tab (Tổng quan thị trường · So sánh giá theo nhóm · Hồ sơ đối thủ · Duyệt / sửa). Mọi người đăng nhập sửa được (ngoài `DUONG_KHO_DU_LIEU`). `/api/doi-thu/*` (mỗi GET 1 lượt + phiên bản), POST chỉ JSON. Khối "Đối thủ bán nhóm này" ở `/san-pham/{mã}` (`/api/san-pham/{mã}/doi-thu`) | `mart.gia_doi_thu_hien_hanh`, `mart.so_sanh_nhom`, `mart.gia_kome_kg`, `mart.nguon_quan_sat`, `core.fact_gia_doi_thu`, `core.fact_dieu_kien_doi_thu`, `app.*doi_thu*`, `app.thu_muc_nguon` |
+| `/doi-thu` | **Thị trường & đối thủ — React** (2026-09-29, đặc tả `2026-09-29-thi-truong-doi-thu-design.md`): 4 tab (Tổng quan thị trường · So sánh giá theo nhóm · Hồ sơ đối thủ · Duyệt / sửa). Mọi người đăng nhập sửa được (ngoài `DUONG_KHO_DU_LIEU`). `/api/doi-thu/*` (mỗi GET 1 lượt + phiên bản), POST chỉ JSON. Khối "Đối thủ bán nhóm này" ở `/san-pham/{mã}` (`/api/san-pham/{mã}/doi-thu`) | `mart.gia_doi_thu_hien_hanh`, `mart.so_sanh_nhom`, `mart.gia_kome_kg`, `mart.gia_kome_bang`, `mart.giao_hang_hien_hanh`, `mart.dieu_kien_hien_hanh`, `mart.nguon_quan_sat`, `core.fact_gia_doi_thu`, `core.fact_dieu_kien_doi_thu`, `core.fact_giao_hang_doi_thu`, `app.*doi_thu*`, `app.thu_muc_nguon` |
 | `/kho-hang` | **React** (giai đoạn 4, bám Kho hàng.dc.html; `/api/kho-hang?kho=&loc=`, 2 lượt): tab Tồn hiện tại (5 ô · bảng tồn theo dòng + tìm + chip ngành (`?nganh=`, lọc ở trình duyệt) + CSV · quá hạn / sắp chuyển lô / không kịp bán trước hạn / cận hạn / giá trị theo ngành / theo lô) · Hàng đang về (chưa có dữ liệu) · Cần đặt (hết + sắp thiếu, KHÔNG đề xuất số lượng). "Kho" hiện là LÔ (bẫy #6, 042) | `mart.ton_hien_tai`, `mart.ton_theo_lo`, `san_pham_360`, `core.dim_warehouse`, `core.dim_product` (ngành), `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/cong-no` | **Công nợ & thu tiền — React** (đợt 6, bám Công nợ.dc.html; `/api/cong-no`, MỘT ảnh chụp 2 lượt hỏi, lọc ở trình duyệt): 6 ô tổng · tuổi nợ (bấm để lọc) · phiếu còn nợ (tab quá hạn / sắp đến hạn / không suy được hạn / theo bên nhận hoá đơn) · lịch thu 7 ngày sau mốc · việc nên làm. Mốc = cuối kỳ sổ mới nhất. Tab Công nợ của hồ sơ khách: `/api/cong-no/khach/{mã}` | `mart.cong_no_ben_tra`, `mart.cong_no_phieu` (← `core.fact_ar_ledger`, sổ `請求先元帳`) |
 | `/kho-du-lieu` | **Tổng quan độ phủ — React** (thiết kế lại 2026-09-25, đặc tả `2026-09-25-tong-quan-do-phu-luoi-design.md`; thanh trái chung `TabKho.tsx::KhungKho`; máy chủ tính sẵn vào `window.__KOME__.man`, vai trò NẠP): ô tóm tắt (mỗi nguồn lịch sử "có từ → đến, thiếu n ngày làm việc" + hôm nay x/3 file 13:30) · LƯỚI tháng × loại dữ liệu đang dùng (`coverage.tinh_luoi_phu`: lịch sử = ngày làm việc có ÷ ngày làm việc, bán hàng từ 売上明細表 vẽ sọc; nền = tháng có bản mới theo `data_date`; cột tình trạng từ `kho_du_lieu.nut_nguon`) · từng ngày của tháng đang chọn (mọi ngày đi cùng một lần tải; `?ngay_thang=YYYY-MM` chọn sẵn, KHÔNG `?thang=` — đó là khoảng xem chung) · sức khoẻ / loại chưa vào kho / hạn chế thu gọn cuối trang | `mart.lich_kinh_doanh`, `meta.ingest_batch`, `core.*` |
@@ -1030,6 +1030,57 @@ LÔ, định nghĩa ĐÚNG MỘT LẦN ở `mart.nguon_quan_sat` (khoá `(nguon,
 noreferrer"` + `referrerPolicy="no-referrer"`. Nút "Tìm file trong Drive" dựng ở trình duyệt từ TÊN file. Có test canh:
 `tests/test_doi_thu_bang.py`, `tests/test_mart_doi_thu.py`, `tests/test_doi_thu.py`, `giao_dien/src/doi_thu/nguon.test.ts`.
 **Migration 064 phải chạy TRƯỚC khi triển khai.**
+
+**Bất biến (065–068, dữ liệu cho giao diện mới `/doi-thu` — chủ DN chốt 2026-09-29):**
+- **Quy cách gói và giá bậc của đối thủ.** `so_goi_thung`, `kl_goi_g`, `bac` (jsonb, lược đồ ở 065) nằm trên
+  `core.fact_gia_doi_thu` / `app.gia_doi_thu_tay`. Chữ `gia_bac` giữ làm nguyên văn.
+  - `gia_goc` = giá LẺ (gói kiểm, `scripts/goi_doi_thu.py`).
+  - Giá tại 1 / 5 / 10 thùng / pallet chỉ ở `mart.gia_doi_thu_quan_sat.gia_1/5/10/pallet`, qua MỘT hàm `mart.gia_bac_kg` (067).
+  - Bậc theo kg / gói mà thiếu quy cách thì KHÔNG áp. `gia_pallet` chỉ lấy từ bậc pallet ghi rõ (bậc `don_vi_sl = 'pallet'`
+    hoặc dòng `muc_gia = 'pallet'`), không có thì NULL — không "1 pallet = 40 thùng", không suy từ bậc thùng.
+  - Trung vị / bất thường / thấp / cao nhất của nhóm vẫn trên giá lẻ.
+  - View bỏ qua đính chính `bac` không đúng lược đồ và `so_goi_thung` ngoài khoảng (rơi về giá trị đã nạp); cửa thật là
+    kiểm ở Python (`doi_thu._kiem` / `kiem_bac_nhap`) — sổ đính chính chỉ thêm nên một dòng hỏng là hỏng vĩnh viễn.
+- **Sửa quy cách, bậc, khuyến mãi** đi qua `app.dinh_chinh_gia` (`doi_thu.TRUONG_SUA`). `''` / `[]` = xoá; chỉ
+  `TRUONG_XOA_DUOC` mới xoá được.
+- **kg KOME theo 荷姿 của OBC** (066). `core.dim_product.pack1_code`:
+  - NULL = chưa nạp bản có cột → luật 060;
+  - `''` = mã không có 荷姿 → một `'00'` là cả sản phẩm như tên ghi (xốt Barona / HVX: 80g × 20 × 4);
+  - `'02'` và `pack1_base_qty > 0` → `kg_02 = kg_moi_goi × pack1_base_qty` LUÔN (荷姿 của OBC là sự thật; kg sai thì người
+    sửa `kg_moi_goi` chứ không sửa kg thùng).
+  - Tên dạng ba thừa số "a g x b x c" cho `kg_moi_thung = kg_moi_goi × goi_moi_thung × c` (cả khi `pack1_code` NULL).
+  - `doi_thu.sua_quy_cach`: biểu mẫu gửi lại cả ba ô điền sẵn từ giá trị hiệu lực (gồm số suy ra), nên ô bằng giá trị hiệu lực
+    hiện tại = "không sửa" (giữ số người sửa đã có, không ghim số suy ra); chỉ ô đổi mới vào nhật ký; hàng người sửa
+    toàn NULL thì xoá.
+
+  Đo thật: đây là nguyên nhân 15 nhóm giá KOME > 3× thị trường.
+- **Bảng giá KOME** = `mart.gia_kome_bang` (¥/kg chưa thuế; luật hai cột: chưa thuế nếu > 0 và không mâu thuẫn,
+  không thì gồm thuế ÷ 1,08).
+  - CHỈ lần nạp MỚI NHẤT ≤ mốc của từng (mã, quy cách) — bộ nạp giá bỏ bậc 0/0 nên 売価No.10 hết hạn không có dòng nào
+    ghi đè; không giới hạn thì khuyến mãi đã kết thúc ở lại mãi. `kome/san_pham_360.py::_bac_gia` cùng luật đó và giữ
+    BẢN CHÉP Python của luật hai cột (hiện từng quy cách) — bản chép bắt buộc của 066, sửa một bên là sửa cả hai.
+  - 標準価格 = `price_level 'std'` (bộ nạp `tanka`); `mart.gia_kome_chuan`.
+  - 売価No.10 = KHUYẾN MÃI: `mart.la_gia_km_kome`. Không vào dải giá thường, không bao giờ mặc định.
+    `kome/san_pham_360.py::NHAN_BAC` là bản chép nhãn.
+  - "Vị trí KOME" của `mart.so_sanh_nhom` so với 標準価格 (không có thì thực bán 90 ngày). `so_sanh_nhom` đọc
+    `mart.gia_kome_bang` MỘT lần (CTE `AS MATERIALIZED`, bất biến CTE-trùng).
+- **Điều kiện giao hàng** = `mart.giao_hang_hien_hanh` (068).
+  - Đối thủ: lô mới nhất, mỗi TRƯỜNG một luật — đính chính của sale (sổ chỉ thêm `app.dinh_chinh_giao_hang`) áp nếu ghi
+    SAU lúc nạp lô đó HOẶC lô đó để trống trường đó ("điều được nói ra thắng im lặng"). Đính chính hỏng / không đọc được
+    → rơi về giá trị của lô; `''` = xoá → NULL.
+  - KOME: `app.giao_hang_kome`. Một dòng, sửa được; mặc định SUY từ phiếu bán, `suy = true` tới khi có người sửa hoặc
+    xác nhận (mọi lần sửa đều đặt `da_xac_nhan = true`). Bằng chứng: `mart.giao_hang_kome_bang_chung` đếm trên doanh thu
+    THUẦN `amount - tax_amount` (bẫy #8).
+  - Điều kiện bán = `mart.dieu_kien_hien_hanh`: bỏ loại `ghi_chu_doc` (câu của người đọc, không phải của bên).
+  - Mọi đường ghi (`kome/doi_thu_giao.py`) kiểm hữu hạn + trong cột đích rồi thêm dòng `app.doi_thu_nhat_ky` cùng giao dịch.
+    Hai sổ mới KHÔNG có trong `_PHIEN_BAN`.
+- **Phí của đơn mẫu**: MỘT thuật toán, hai bản — `kome/phi_giao.py` và `giao_dien/src/doi_thu/phi_giao.ts`. Chạy chung
+  `tests/du_lieu/phi_giao_ca.json`; sửa một bản là sửa cả hai. NULL cần tới → `chua_ro`, không cộng 0.
+
+Có test canh: `tests/test_doi_thu_bang.py`, `tests/test_mart_doi_thu.py`, `tests/test_doi_thu.py`,
+`tests/test_doi_thu_giao.py`, `tests/test_phi_giao.py`, `tests/test_goi_doi_thu.py`, `tests/test_nap_doi_thu.py`.
+**Migration 065–068 phải chạy TRƯỚC khi triển khai**. Sau đó nạp lại `商品データ` và `取引単価データ` mới nhất
+(để có 荷姿 / 標準価格).
 
 **Bất biến (Hình sản phẩm — chủ DN chốt 2026-09-29):** nguồn DUY NHẤT là `config/hinh_san_pham.csv`
 (`sku,imageUrl`, chủ DN gửi) → `kome/hinh_san_pham.py::doc` (mã là CHỮ, không ép số; CHỈ nhận `https://`;
