@@ -72,3 +72,26 @@ def test_ma_dong_duy_nhat_va_du_cot():
     gia, _, _ = G.dung_goi([_d(), _d(ten_goc="Khác")], [], date(2026, 8, 31))
     assert len({g["ma_dong"] for g in gia}) == 2
     assert all(list(g) == COT_GIA for g in gia)
+
+
+def test_web_api_co_word_boundary():
+    """API and Google Sheet must be word-bounded, not match inside longer words."""
+    gia, _, _ = G.dung_goi([_d(file="Tapioca-price.pdf", ten_goc="Item1"),
+                            _d(file="RAPID-list.pdf", ten_goc="Item2")], [], date(2026, 8, 31))
+    assert gia[0]["hinh_thuc_nguon"] == "file"
+    assert gia[1]["hinh_thuc_nguon"] == "file"
+    # But actual web sources should still match
+    gia2, _, _ = G.dung_goi([_d(file="tdmvn.shop (API, tải 2026-09-29)")], [], date(2026, 8, 31))
+    assert gia2[0]["hinh_thuc_nguon"] == "web"
+
+
+def test_sap_ve_chi_khi_het_hoac_khong_ro():
+    """sap_ve note only triggers sap_ve status if current status is het, khong_ro, or empty."""
+    # Current status "con" + future delivery note → stay "con"
+    assert G.suy_trang_thai(_d(trang_thai="con", ghi_chu="Dự kiến tháng 9 xuất hàng")) == "con"
+    # Current status "het" + future delivery note → sap_ve
+    assert G.suy_trang_thai(_d(trang_thai="het", ghi_chu="Dự kiến tháng 9 xuất hàng")) == "sap_ve"
+    # Current status "khong_ro" + future delivery note → sap_ve
+    assert G.suy_trang_thai(_d(trang_thai="khong_ro", ghi_chu="30/08入荷予定")) == "sap_ve"
+    # Empty/None status + future delivery note → sap_ve
+    assert G.suy_trang_thai(_d(trang_thai="", ghi_chu="sắp về")) == "sap_ve"

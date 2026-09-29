@@ -20,7 +20,7 @@ from kome.loaders.doi_thu import COT_GIA, COT_DIEU_KIEN  # noqa: E402
 from kome.ten_hang import chuan_ten  # noqa: E402
 
 GIA_THAP = 20          # giá < 20 yên (một gói / một kg) gần như chắc là lỗi của nguồn
-_WEB = re.compile(r"\.(jp|com|shop|asia|top)\b|Google Sheet|API", re.I)
+_WEB = re.compile(r"\.(jp|com|shop|asia|top)\b|\bGoogle Sheet\b|\bAPI\b")
 _NGAY = [re.compile(r"(20\d\d)[.\-/](\d{1,2})[.\-/](\d{1,2})"), re.compile(r"(20\d\d)(\d\d)(\d\d)")]
 _ID_BEN = re.compile(r"(?<![A-Za-z])(?:_id|id|mã SP|商品コード)\s*[:=]?\s*([A-Za-z0-9\-]{4,})")
 
@@ -55,11 +55,14 @@ def suy_ngay(file: str, mac_dinh: date) -> date:
 
 
 def suy_trang_thai(d: dict) -> str:
-    ghi = (d.get("ghi_chu") or "") + " " + (d.get("khuyen_mai") or "")
-    if re.search(r"dự kiến|入荷予定|sắp về", ghi, re.I):
-        return "sap_ve"
     t = d.get("trang_thai") or "khong_ro"
-    return t if t in ("con", "het", "sap_ve", "khong_ro") else "khong_ro"
+    t = t if t in ("con", "het", "sap_ve", "khong_ro") else "khong_ro"
+    # Only return "sap_ve" if status is het, khong_ro, or empty (not if con)
+    if t in ("het", "khong_ro"):
+        ghi = (d.get("ghi_chu") or "") + " " + (d.get("khuyen_mai") or "")
+        if re.search(r"dự kiến|入荷予定|sắp về", ghi, re.I):
+            return "sap_ve"
+    return t
 
 
 def suy_muc_gia(d: dict) -> str | None:
