@@ -184,6 +184,11 @@ Lưu ý:
 - **Migration luôn chạy bằng `postgres`**, không bao giờ bằng `kome_ingest_user`:
   `ALTER DEFAULT PRIVILEGES` trong migration không có `FOR ROLE`, chạy bằng vai
   trò khác thì quyền mặc định cho bảng mới sẽ âm thầm không áp dụng.
+- **Chạy migration qua SQL Editor của Supabase thì bảng mới bị tự bật RLS** (không có
+  policy nào → `kome_app`/`kome_ingest` thấy 0 dòng, không ghi được). Sau khi dán migration
+  có `CREATE TABLE`, chạy thêm `ALTER TABLE <bảng> DISABLE ROW LEVEL SECURITY;` cho từng bảng
+  mới (xem `db/migrations/061_*.sql`). `python db/migrate.py` không dính. Có test canh:
+  `tests/test_doi_thu_bang.py::test_khong_bang_nao_bat_RLS` (chỉ canh CSDL test).
 - Muốn đổi mật khẩu sau này: `ALTER USER kome_app_user PASSWORD '<mật khẩu mới>';`
   chạy tay trên SQL Editor, rồi cập nhật biến môi trường tương ứng.
 

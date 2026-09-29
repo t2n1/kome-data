@@ -47,3 +47,12 @@ def test_gia_tay_bat_buoc_loai_nguon_co_that(conn):
         conn.execute("""INSERT INTO app.gia_doi_thu_tay (ma_doi_thu, ma_hang_dt, ten_goc, loai_nguon)
                         VALUES ('THAK', 'x', 'x', 'bua')""")
     conn.rollback()
+
+
+def test_khong_bang_nao_bat_RLS(conn):
+    """Phân quyền theo vai trò (009), không theo RLS. Bảng tạo qua SQL Editor của Supabase bị tự bật
+    RLS mà không có policy → kome_app/kome_ingest thấy 0 dòng (sự cố thật 2026-09-29, migration 061)."""
+    bat = [r[0] for r in conn.execute(
+        """SELECT n.nspname || '.' || c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname IN ('core', 'app', 'meta', 'mart') AND c.relkind = 'r' AND c.relrowsecurity""")]
+    assert bat == []
