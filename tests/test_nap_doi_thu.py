@@ -83,6 +83,7 @@ def test_hoan_tac_giao_hang_xoa_sach_lo(conn, tmp_path):
     d = {c: None for c in COT_GIAO_HANG}
     d.update(ma_dong="YUMI-00001", ma_doi_thu="YUMI", ngay_nguon="2026-08-31", bao_ship="true")
     r = ingest(conn, _goi_giao_hang(tmp_path, [d]), tmp_path / "archive")
+    assert r.ok, r.blockers
     undo_batch(conn, r.batch_id)
     assert conn.execute("SELECT count(*) FROM core.fact_giao_hang_doi_thu").fetchone()[0] == 0
 
