@@ -342,7 +342,8 @@ def test_the_sai_bi_tu_choi_va_KHONG_de_lai_dong_tiep_xuc(conn, batch, lam_hong)
     assert _so_dong_tx(conn) == 0                                     # chưa rollback tay: hàm tự thu lại
 
 
-@pytest.mark.parametrize("khoa", ["ma:KHONG-CO", "n:999999", "nt01", "n:abc", "ma:", "n:", "x:NT01"])
+@pytest.mark.parametrize("khoa", ["ma:KHONG-CO", "n:999999", "nt01", "n:abc", "ma:", "n:", "x:NT01",
+                                  "n:5\n", "ma:NT01\n", " n:5", "ma:NT01 ", "ma:NT\t01", "n:5\x00"])
 def test_the_hang_khoa_sai_dinh_dang_hoac_khong_ton_tai(conn, batch, khoa):
     _nen_nhac(conn, batch)
     the = {"loai": "nhom", "khoa": khoa, "vi_tri_dau": CAU.index("@Basa"), "do_dai": 5}
@@ -456,3 +457,65 @@ def test_ghi_kem_nhac_dung_luot_hoi_canh_bao_MOT_cho_moi_gia(conn, batch, monkey
     monkeypatch.setattr(conn, "execute", demo)
     LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", cau, "", nhac, gia)
     assert dem["n"] == 1
+
+
+# ---- Vòng sửa 1: khoá fullmatch, kiểu dữ liệu, độ dài trước ---------------------------------------------
+
+@pytest.mark.parametrize("khoa", ["THAK\n", " THAK", "THAK ", "TH AK", "THAK\x00"])
+def test_the_doi_thu_khoa_co_khoang_trang_hoac_ky_tu_dieu_khien_bi_tu_choi(conn, batch, khoa):
+    _nen_nhac(conn, batch)
+    the = {"loai": "doi_thu", "khoa": khoa, "vi_tri_dau": CAU.index("@THAK"), "do_dai": 5}
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", [the], [])
+    assert _so_dong_tx(conn) == 0
+
+
+def test_gia_khach_ke_tu_choi_khoa_bien_the_xuong_dong(conn, batch):
+    from kome import doi_thu as DT
+    _nen_nhac(conn, batch)
+    tid = LH.ghi(conn, "K0001", None, "goi", "tot", "x")
+    for nk in ("n:5\n", "ma:NT01\n", " ma:NT01"):
+        with pytest.raises(DT.LoiNhap):
+            DT.gia_khach_ke(conn, "THAK", nk, "K0001", tid, 900, "kg", None)
+    with pytest.raises(DT.LoiNhap):
+        DT.gia_khach_ke(conn, "THAK\n", "ma:NT01", "K0001", tid, 900, "kg", None)
+
+
+@pytest.mark.parametrize("sai", [
+    {"ma_doi_thu": ["THAK"]}, {"nhom_khoa": ["ma:NT01"]}, {"ma_doi_thu": {"a": 1}}, {"nhom_khoa": 5},
+    {"ma_doi_thu": None}, {"gia_goc": [900]}, {"gia_goc": {"a": 1}}, {"don_vi_gia": ["kg"]}, {"don_vi_gia": {"a": 1}}])
+def test_gia_sai_kieu_du_lieu_la_LoiNhap_khong_phai_TypeError(conn, batch, sai):
+    _nen_nhac(conn, batch)
+    nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
+    g = {"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 900, "don_vi_gia": "kg", **sai}
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac, [g])
+    assert _so_dong_tx(conn) == 0
+
+
+@pytest.mark.parametrize("the", [
+    {"loai": ["doi_thu"], "khoa": "THAK", "vi_tri_dau": 10, "do_dai": 5},
+    {"loai": "doi_thu", "khoa": ["THAK"], "vi_tri_dau": 10, "do_dai": 5},
+    {"loai": "doi_thu", "khoa": {"a": 1}, "vi_tri_dau": 10, "do_dai": 5},
+    {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": [10], "do_dai": 5},
+    {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": "10", "do_dai": 5},
+    {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 10, "do_dai": None},
+    {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 10.5, "do_dai": 5}])
+def test_the_sai_kieu_du_lieu_la_LoiNhap(conn, batch, the):
+    _nen_nhac(conn, batch)
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", [the], [])
+    assert _so_dong_tx(conn) == 0
+
+
+def test_do_dai_cau_ghi_chu_duoc_kiem_TRUOC_khi_do_the(conn, batch, monkeypatch):
+    """Câu quá dài bị chặn ngay bằng lỗi độ dài — không mã hoá / dò thẻ, không hỏi CSDL về thẻ."""
+    _nen_nhac(conn, batch)
+    dai = "@THAK " + "x" * LH.DO_DAI_NOI_DUNG
+    hong = {"loai": "doi_thu", "khoa": "KHONG-CO", "vi_tri_dau": 0, "do_dai": 5}
+    goi = []
+    that = LH._kiem_the
+    monkeypatch.setattr(LH, "_kiem_the", lambda *a, **k: (goi.append(1), that(*a, **k))[1])
+    with pytest.raises(LH.LoiNhap, match="dài quá"):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", dai, "", [hong], [])
+    assert goi == [] and _so_dong_tx(conn) == 0

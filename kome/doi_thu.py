@@ -155,7 +155,10 @@ def gia_moi(conn, du_lieu: dict, nguoi) -> int:
 
 DON_VI_GIA_KE = ("kg", "tui", "goi", "con", "qua", "thung", "lon", "chai", "hop", "cay", "bao", "khac")
 GIA_KE_TOI_DA = Decimal("9999999")
-_NHOM_KHOA = re.compile(r"^(ma:.+|n:[0-9]{1,15})$")
+# Khoá của thẻ / giá: fullmatch (KHÔNG `$` — nó khớp trước dấu xuống dòng cuối) và không khoảng trắng /
+# ký tự điều khiển; sổ app.tiep_xuc_nhac chỉ-thêm nên một khoá bẩn ở lại vĩnh viễn.
+KHOA_SACH = re.compile(r"[^\s\x00-\x1f\x7f]+")
+KHOA_NHOM = re.compile(r"(ma:[^\s\x00-\x1f\x7f]+|n:[0-9]{1,15})")
 
 
 def gia_khach_ke(conn, ma_doi_thu: str, nhom_khoa: str, customer_code: str, tiep_xuc_id: int,
@@ -167,7 +170,7 @@ def gia_khach_ke(conn, ma_doi_thu: str, nhom_khoa: str, customer_code: str, tiep
     vào cột `nhom_khoa` — không qua bước ghép. `kg_moi_don_vi_gia` = 1 khi đơn vị là kg, NULL khi khác (máy không
     đoán kg của gói / thùng); thuế / ship `khong_ro`. Cùng giao dịch: thêm một dòng nhật ký 'gia_moi'.
     Người gọi chịu trách nhiệm chuyện thẻ `@` (xem `lien_he.ghi_kem_nhac`); ở đây chỉ kiểm chính dòng giá."""
-    if not isinstance(nhom_khoa, str) or not _NHOM_KHOA.match(nhom_khoa):
+    if not isinstance(nhom_khoa, str) or not KHOA_NHOM.fullmatch(nhom_khoa):
         raise LoiNhap("Nhóm hàng sai định dạng (ma:<mã> hoặc n:<số>).")
     gia = _so(gia_goc, "Giá", duong=True)
     if gia is None:
@@ -176,7 +179,8 @@ def gia_khach_ke(conn, ma_doi_thu: str, nhom_khoa: str, customer_code: str, tiep
         raise LoiNhap("Giá quá lớn — kiểm lại số.")
     if don_vi_gia not in DON_VI_GIA_KE:
         raise LoiNhap(f"Đơn vị giá chỉ nhận: {', '.join(DON_VI_GIA_KE)}.")
-    if conn.execute("SELECT 1 FROM app.doi_thu WHERE ma = %s", (ma_doi_thu,)).fetchone() is None:
+    if not isinstance(ma_doi_thu, str) or not KHOA_SACH.fullmatch(ma_doi_thu) or conn.execute(
+            "SELECT 1 FROM app.doi_thu WHERE ma = %s", (ma_doi_thu,)).fetchone() is None:
         raise LoiNhap(f"Không có đối thủ '{ma_doi_thu}'.")
     ten = conn.execute(
         """SELECT CASE WHEN left(%(k)s, 2) = 'n:'

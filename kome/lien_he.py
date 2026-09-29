@@ -20,6 +20,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
+from kome import doi_thu as DT
 from kome.tuoi_du_lieu import MUI_GIO
 
 # Ba kiểu tiếp xúc và ba mức kết quả — ĐÚNG từ vựng của gói thiết kế
@@ -372,7 +373,6 @@ def ghi(conn, ma: str, nguoi_id: int | None, kieu: str, ket_qua: str,
 # ---- Đợt 2 (063): tin hiện trường `@` -------------------------------------------------------------
 
 MAX_THE = 30                      # số thẻ / số giá tối đa mỗi lần ghi
-_KHOA_NHOM = re.compile(r"^(ma:.+|n:[0-9]{1,15})$")
 
 
 def _dict_list(v, ten: str) -> list[dict]:
@@ -407,9 +407,9 @@ def _kiem_the(conn, noi_dung: str, nhac: list[dict]) -> list[tuple]:
     ra: list[tuple] = []
     for t in nhac:
         loai, khoa = t.get("loai"), t.get("khoa")
-        if loai not in ("doi_thu", "nhom") or not isinstance(khoa, str) or not khoa:
+        if loai not in ("doi_thu", "nhom") or not isinstance(khoa, str) or not DT.KHOA_SACH.fullmatch(khoa):
             raise LoiNhap("Thẻ @ không hợp lệ: loại hoặc khoá sai.")
-        if loai == "nhom" and not _KHOA_NHOM.match(khoa):
+        if loai == "nhom" and not DT.KHOA_NHOM.fullmatch(khoa):
             raise LoiNhap(f"Thẻ hàng '{khoa}' sai định dạng (ma:<mã> hoặc n:<số>).")
         vt, dd = _int(t.get("vi_tri_dau"), "vi_tri_dau"), _int(t.get("do_dai"), "do_dai")
         if vt < 0 or dd < 2 or vt + dd > n_dv:
@@ -464,15 +464,17 @@ def ghi_kem_nhac(conn, ma: str, nguoi_id: int | None, kieu: str, ket_qua: str, n
 
     `canh_bao`: giá vừa ghi mà `mart.gia_doi_thu_hien_hanh` đánh cờ `bat_thuong` (> 2× hoặc < ½ trung vị
     của nhóm ≥ 3 bên) -> một câu nhắc kiểm lại đơn vị; KHÔNG chặn ghi. MỘT lượt hỏi cho mọi giá."""
-    from kome import doi_thu as DT
     from kome.dinh_dang import yen
 
+    # Kiểu / độ dài của chính câu ghi chú TRƯỚC (rẻ) — rồi mới mã hoá và dò từng thẻ.
+    doc_bieu_mau(kieu, ket_qua, noi_dung, hen_lai)
     nhac, gia = _dict_list(nhac, "nhac"), _dict_list(gia, "gia")
     cac_the = _kiem_the(conn, noi_dung, nhac)
     co_dt = {k for l, k, _, _ in cac_the if l == "doi_thu"}
     co_nhom = {k for l, k, _, _ in cac_the if l == "nhom"}
     for g in gia:
-        if g.get("ma_doi_thu") not in co_dt or g.get("nhom_khoa") not in co_nhom:
+        b, k = g.get("ma_doi_thu"), g.get("nhom_khoa")
+        if not isinstance(b, str) or not isinstance(k, str) or b not in co_dt or k not in co_nhom:
             raise LoiNhap("Giá phải đi kèm thẻ @đối thủ và thẻ @hàng tương ứng trong câu ghi chú.")
 
     conn.execute("SAVEPOINT ghi_kem_nhac")
