@@ -225,3 +225,83 @@
 .dt-ng .c-do{color:var(--do-chu)} .dt-ng .c-xanh{color:var(--ok-chu)} .dt-ng .c-xam{color:var(--chu-mo)}
 .o-noi .dt-ng .dt-ng-chu{margin-top:6px;color:var(--chu-nhat);font-size:.66rem}
 .o-noi .dt-ng .dt-ng-chu.vang{color:var(--canh-chu)}
+
+/* ---- Tab Tóm tắt (đợt 4b task 7; bản phác ca-trang-8.html tab Tóm tắt) ----
+   Màu: KOME so trung vị theo mau.ts::mauKomeSoTT (đỏ --do / xanh --ok-vien / xám --chu-mo); "đang hết" --canh-chu (vàng);
+   khuyến mãi --dt-km (tím); bóng --dt-cam. Token --dt-* khai ở khối So sánh giá bên trên (cả hai chế độ). */
+.dt-tt{display:flex;flex-direction:column;gap:14px;min-width:0;container-type:inline-size}
+.dt-tt .c-do{color:var(--do-chu)} .dt-tt .c-vang{color:var(--canh-chu)} .dt-tt .c-km{color:var(--dt-km)}
+.dt-tt-tim{position:relative}
+.dt-tt-tim input{width:100%;box-sizing:border-box;font:inherit;font-size:.9rem;padding:.6rem .9rem;border:1px solid var(--vien-dam);
+  border-radius:10px;background:var(--nen-the);color:var(--chu)}
+.dt-tt-goi-y{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;list-style:none;margin:0;padding:6px;background:var(--nen-the);
+  border:1px solid var(--vien);border-radius:10px;box-shadow:0 6px 20px color-mix(in srgb, var(--chu) 14%, transparent)}
+.dt-tt-goi-y li{display:flex;gap:8px;align-items:baseline;padding:.4rem .6rem;border-radius:6px;cursor:pointer;min-width:0}
+.dt-tt-goi-y li[aria-selected="true"]{background:var(--nen-phu)}
+.dt-tt-goi-y b{font-weight:600;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dt-tt-goi-y small{color:var(--chu-nhat);font-size:.72rem;white-space:nowrap}
+.dt-tt-loai{flex:none;font-size:.66rem;color:var(--chu-nhat);border:1px solid var(--vien-dam);border-radius:999px;padding:0 6px}
+.dt-tt-o4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@container (max-width:640px){.dt-tt-o4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dt-tt-o{background:var(--nen-the);border:1px solid var(--vien);border-radius:10px;padding:10px 12px;min-width:0}
+.dt-tt-o small{display:block;color:var(--chu-nhat);font-size:.72rem}
+.dt-tt-o b{font-size:1.6rem;font-weight:650;font-variant-numeric:tabular-nums}
+.dt-tt-o em{font-style:normal;color:var(--chu-mo);font-size:.72rem;margin-left:4px}
+.dt-tt-xem{font:inherit;font-size:.74rem;background:none;border:0;padding:0;color:var(--dt-cam);cursor:pointer}
+.dt-tt-xem:hover{text-decoration:underline}
+.dt-tt-hai{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+@container (min-width:1040px){.dt-tt-hai{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dt-svg-tt{width:100%;max-width:1100px;min-width:640px}
+.dt-svg-tt .dt-dich{stroke:var(--nen-the);stroke-width:.5}
+.dt-tt-thanh{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:8px 0 6px}
+.dt-tt-thanh i{display:block;min-width:0}
+.dt-tt-cg{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.74rem;color:var(--chu-nhat)}
+.dt-tt-cg span{display:inline-flex;gap:4px;align-items:center} .dt-tt-cg b{color:var(--chu)}
+.dt-tt-cg i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.dt-tt-cg .cg-xanh{background:var(--ok-vien)} .dt-tt-cg .cg-xam{background:var(--chu-mo)} .dt-tt-cg .cg-do{background:var(--do)}
+.dt-tt-cg .cg-trong{background:var(--vien)}
+.dt-tt-canh{display:block;width:100%;text-align:left;font:inherit;font-size:.76rem;margin-top:8px;padding:.4rem .7rem;border-radius:8px;
+  border:1px solid var(--do-nen);background:var(--do-nen);color:var(--do-chu);cursor:pointer}
+.dt-tt-canh:hover{border-color:var(--do)}
+.dt-tt-dais{list-style:none;margin:0;padding:0;container-type:inline-size}
+.dt-tt-dai{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(0,170px) 50px 90px;gap:8px;align-items:center;width:100%;
+  font:inherit;color:inherit;text-align:left;background:none;border:0;border-bottom:1px solid var(--vien-phu);padding:5px 4px;cursor:pointer}
+.dt-tt-dai:hover{background:var(--nen-phu)}
+.dt-tt-dai:focus-visible{outline:2px solid var(--do);outline-offset:-2px;border-radius:6px}
+@container (max-width:440px){.dt-tt-dai{grid-template-columns:34px minmax(0,1fr) 50px 84px}.dt-tt-dai-svg{display:none}}
+.dt-tt-dai .hinh-ma{border-radius:6px}
+.dt-tt-dt{min-width:0}
+.dt-tt-dt b{display:block;font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tt-dt small,.dt-tt-gia small{display:block;color:var(--chu-nhat);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tt-dai-svg{width:100%;height:auto;display:block}
+.dt-tt-dai-nen{stroke:var(--vien-dam)} .dt-tt-dai-tv{stroke:var(--chu)} .dt-tt-dai-kome{stroke:var(--nen-the)}
+.dt-tt-pc{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.dt-tt-gia{text-align:right;font-variant-numeric:tabular-nums;font-size:.8rem;white-space:nowrap}
+.dt-tt-chs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@container (max-width:760px){.dt-tt-chs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dt-tt-ch{background:var(--nen-phu);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.dt-tt-ch .hinh-ma{border-radius:8px}
+.dt-tt-ten{font:inherit;font-size:.78rem;font-weight:600;text-align:left;background:none;border:0;padding:0;color:var(--chu)}
+button.dt-tt-ten{cursor:pointer} button.dt-tt-ten:hover{text-decoration:underline}
+.dt-tt-ch small{color:var(--chu-nhat);font-size:.68rem}
+.dt-tt-chip{font:inherit;display:inline-block;margin:2px 3px 0 0;padding:1px 7px;border-radius:999px;border:1px solid transparent;
+  background:var(--canh-nen);color:var(--canh-chu);font-size:.66rem;cursor:pointer}
+.dt-tt-chip:hover,.dt-tt-chip:focus-visible{border-color:var(--canh-chu);outline:none}
+.dt-svg-bong{width:100%;max-width:820px}
+.dt-svg .dt-bong{fill:var(--dt-cam)}
+.dt-svg .t-ben{cursor:pointer;outline:none} .dt-svg .t-ben:hover,.dt-svg .t-ben:focus-visible{text-decoration:underline}
+.dt-tt-kmb{list-style:none;margin:0;padding:0}
+.dt-tt-kmb button{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 34px;gap:8px;align-items:center;width:100%;font:inherit;
+  font-size:.74rem;color:inherit;text-align:left;background:none;border:0;padding:2px 4px;border-radius:6px;cursor:pointer}
+.dt-tt-kmb button:hover{background:var(--nen-phu)}
+.dt-tt-kmb span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tt-kmb-o{display:block}
+.dt-tt-kmb i{display:block;height:10px;border-radius:5px;background:var(--dt-km);min-width:3px}
+.dt-tt-kmb b{text-align:right;font-variant-numeric:tabular-nums}
+.dt-tt-kms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.dt-tt-km{font:inherit;text-align:left;background:var(--nen-phu);border:1px solid transparent;border-radius:8px;padding:8px;cursor:pointer;
+  color:inherit;min-width:0}
+.dt-tt-km:hover,.dt-tt-km:focus-visible{border-color:var(--dt-km);outline:none}
+.dt-tt-km small{display:block;color:var(--chu-nhat);font-size:.66rem}
+.dt-tt-km b{display:block;font-size:.74rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tt-km span{color:var(--do-chu);font-weight:700;font-size:.8rem} .dt-tt-km s{color:var(--chu-mo);font-weight:400}

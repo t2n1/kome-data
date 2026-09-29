@@ -1,10 +1,10 @@
 // Màn "Thị trường & đối thủ" (/doi-thu). Thanh tab: Tóm tắt · So sánh giá · Đối thủ · Tin thị trường · Phí & giao hàng,
 // cộng menu "Dữ liệu ▾" ở phải (Duyệt / sửa · Nhóm & quy cách · Giá KOME lệch · Thư mục Drive). Trạng thái ở URL (url.ts);
 // ?nhom= (nhom_khoa mở sẵn của tab So sánh cũ) không thuộc url.ts nên được giữ / xoá riêng ở đây.
-// Các tab chưa làm lại (đợt 4b task sau) tạm vẽ thành phần cũ để trang không vỡ.
+// Các tab chưa làm lại (đợt 4b task sau: Tin thị trường, Phí & giao hàng, Giá KOME lệch) tạm hiện một dòng "đang được làm lại".
 import { useCallback, useEffect, useRef, useState } from "react";
 import { giuKhoang } from "../khung/khoang";
-import { TabTongQuan } from "./TabTongQuan";
+import { TabTomTat } from "./TabTomTat";
 import { TabSoSanh } from "./TabSoSanh";
 import { TabHoSo } from "./TabHoSo";
 import { TabDuyet } from "./TabDuyet";
@@ -105,15 +105,14 @@ export default function ManDoiThu() {
             </div>)}
         </div>
       </div>
-      {(t.tab === "tom_tat" || t.tab === "tin") && <TabTongQuan moBen={b => doi({ tab: "ben", ben: b })}
-        moSoSanh={(n, b) => doi({ tab: "so_sanh", nganh: n, ben: b, nhom: "" })}
-        moNhom={k => doi({ tab: "so_sanh", nganh: "", ben: "", nhom: k })} />}
-      {t.tab === "so_sanh" && <TabSoSanh sp={t.sp} sl={t.sl} xem={t.xem} gk={t.gk} cung={t.cung} nganh={t.nganh} nhom={t.nhom}
-        dat={doi} />}
+      {t.tab === "tom_tat" && <TabTomTat moBen={b => doi({ tab: "ben", ben: b })} moLech={() => doi({ tab: "lech" })}
+        moSoSanh={o => doi({ tab: "so_sanh", sp: o.sp ?? [], nganh: o.nganh ?? "", ben: o.ben ?? "", nhom: "" })} />}
+      {t.tab === "so_sanh" && <TabSoSanh sp={t.sp} sl={t.sl} xem={t.xem} gk={t.gk} cung={t.cung} nganh={t.nganh} ben={t.ben}
+        nhom={t.nhom} dat={doi} />}
       {t.tab === "ben" && <TabHoSo ben={t.ben} chonBen={b => doi({ ben: b })} />}
       {t.tab === "nhom" && <TabNhomQuyCach />}
       {t.tab === "duyet" && <TabDuyet ben={t.ben} boBen={() => doi({ ben: "" })} />}
-      {(t.tab === "giao_hang" || t.tab === "lech") && <p className="dt-nhat" role="status">Màn này đang được làm lại.</p>}
+      {(t.tab === "tin" || t.tab === "giao_hang" || t.tab === "lech") && <p className="dt-nhat" role="status">Màn này đang được làm lại.</p>}
     </div>
   );
 }

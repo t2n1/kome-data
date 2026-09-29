@@ -20,7 +20,7 @@ import { batTat, demThieu, khoaNhom, LUA_CHON_GK, locDanhSach, macDinhSp, NHAN_S
 import { SuaMatHang } from "./SuaMatHang";
 import { TOI_DA_SP, type TrangThaiUrl } from "./url";
 
-type Url = Pick<TrangThaiUrl, "sp" | "sl" | "xem" | "gk" | "cung" | "nganh">;
+type Url = Pick<TrangThaiUrl, "sp" | "sl" | "xem" | "gk" | "cung" | "nganh" | "ben">;
 type Props = Url & { nhom: string; dat: (moi: Partial<Url & { nhom: string }>) => void };
 
 const NHANH: [NutNhanh, string][] = [["", "Tất cả"], ["dat", "KOME đắt nhất"], ["het", "Đối thủ đang hết"], ["thieu", "Còn ô trống"]];
@@ -33,7 +33,7 @@ const CACH_TINH = <>
   trung vị giá lẻ của đối thủ — không đổi theo "Khách mua". Thu gọn: KOME + 5 mặt hàng rẻ nhất + mọi mặt hàng cùng
   thương hiệu. Giá khách kể không vẽ ở đây.</>;
 
-export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, nhom, dat }: Props) {
+export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, ben, nhom, dat }: Props) {
   const kx = chuoiKhoang(useKhoang());
   const q = useQuery({ queryKey: ["doi-thu", "so-sanh", kx],
     queryFn: () => lay<{ nhom: Nhom[] }>(`/api/doi-thu/so-sanh${kx ? "?" + kx : ""}`) });
@@ -48,8 +48,12 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, nhom, dat }: Props) {
   const daChon = useRef(sp.length > 0);
   const chonSp = useMemo(() => (sp.length || daChon.current ? sp : macDinhSp(tatCa ?? [])), [sp, tatCa]);
   const chon = useMemo(() => nhomChon(tatCa ?? [], chonSp), [tatCa, chonSp]);
-  const ds = useMemo(() => locDanhSach(tatCa ?? [], { nganh, tim, nhanh }), [tatCa, nganh, tim, nhanh]);
-  const dsNganh = useMemo(() => [...new Set((tatCa ?? []).map(n => n.nganh ?? ""))].sort((a, b) => a.localeCompare(b, "ja")), [tatCa]);
+  const ds = useMemo(() => locDanhSach(tatCa ?? [], { nganh, tim, nhanh, ben }), [tatCa, nganh, tim, nhanh, ben]);
+  // Một chip mỗi tên HIỂN THỊ (hai cách viết OBC của cùng ngành → một chip; locDanhSach so theo tên hiển thị).
+  const dsNganh = useMemo(() => [...new Map((tatCa ?? []).map(n => [tenNganh(n.nganh), n.nganh ?? ""])).values()]
+    .sort((a, b) => a.localeCompare(b, "ja")), [tatCa]);
+  const tenBen = useMemo(() => (ben ? (tatCa ?? []).flatMap(n => n.quan_sat).find(q => q.ma_doi_thu === ben)?.ten_doi_thu ?? ben : ""),
+    [tatCa, ben]);
   const thieu = useMemo(() => demThieu(chon, { chiCung: cung }), [chon, cung]);
   const mo: MoSua = (x, tru_o) => datSua({ nguon: x.nguon, id: x.id, tru_o });
 
@@ -96,9 +100,12 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, nhom, dat }: Props) {
             </div>
             <div className="dt-chips" role="group" aria-label="Ngành">
               <button type="button" className="chip" aria-pressed={!nganh} onClick={() => dat({ nganh: "" })}>Mọi ngành</button>
-              {dsNganh.filter(Boolean).map(g => <button key={g} type="button" className="chip" aria-pressed={nganh === g}
-                onClick={() => dat({ nganh: nganh === g ? "" : g })}>{tenNganh(g)}</button>)}
+              {dsNganh.filter(Boolean).map(g => { const on = !!nganh && tenNganh(nganh) === tenNganh(g); return (
+                <button key={g} type="button" className="chip" aria-pressed={on}
+                  onClick={() => dat({ nganh: on ? "" : g })}>{tenNganh(g)}</button>); })}
             </div>
+            {ben && <div className="dt-chips"><button type="button" className="chip" aria-pressed="true"
+              aria-label={`Bỏ lọc bên ${tenBen}`} onClick={() => dat({ ben: "" })}>Bên: {tenBen} ✕</button></div>}
             <p className="dt-toi-da" role="status">{toiDa ? `Tối đa ${TOI_DA_SP}` : ""}</p>
             <ul className="dt-mhs">
               {ds.map(n => {

@@ -2,6 +2,7 @@
 // Giá đã là ¥/kg chưa thuế; gia_1/5/10 máy chủ đã lấy min(giá lẻ, bậc áp dụng). Khách kể KHÔNG vẽ ở đây.
 import { boDau } from "./loc";
 import { NGAY_CU, phanTram } from "./mau";
+import { tenNganh } from "./nganh";
 import { so, so_luong } from "../dinh_dang";
 import { TOI_DA_SP } from "./url";
 import type { Bac, Nhom, QuanSat } from "./kieu";
@@ -106,12 +107,16 @@ export function demThieu(ds: Nhom[], o: { chiCung?: boolean } = {}):
 export type NutNhanh = "" | "dat" | "het" | "thieu";
 const soThieu = (n: Nhom) => n.quan_sat.filter(q => veDuoc(q) && thieuQuyCach(q)).length;
 
-/** Danh sách cột trái: lọc ngành (tên OBC), tìm (bỏ dấu, ten_nhom + ma_kome), nút nhanh; xếp so_ben giảm dần
+/** Danh sách cột trái: lọc ngành (URL mang tên OBC, so theo tên HIỂN THỊ `tenNganh` — hai cách viết "_" / "＿" của cùng
+ *  ngành là một), bên (`ben` = ma_doi_thu: nhóm có mặt hàng vẽ được của bên đó — từ bóng "Ai bán ngành nào" của Tóm tắt),
+ *  tìm (bỏ dấu, ten_nhom + ma_kome), nút nhanh; xếp so_ben giảm dần
  *  ("dat": KOME đắt hơn trung vị > 5%, xếp lệch giảm dần; "het": có mặt hàng hết; "thieu": có mặt hàng thiếu quy cách, xếp số thiếu giảm dần).
  *  Nhóm `gia_kome_lech` (giá KOME lệch bất thường — thường sai đơn vị) không hiện. */
-export function locDanhSach(ds: Nhom[], o: { nganh: string; tim: string; nhanh: NutNhanh }): Nhom[] {
+export function locDanhSach(ds: Nhom[], o: { nganh: string; tim: string; nhanh: NutNhanh; ben?: string }): Nhom[] {
   const t = boDau(o.tim.trim());
-  const r = ds.filter(n => !n.gia_kome_lech && (!o.nganh || n.nganh === o.nganh)
+  const g = o.nganh ? tenNganh(o.nganh) : "";
+  const r = ds.filter(n => !n.gia_kome_lech && (!g || tenNganh(n.nganh) === g)
+    && (!o.ben || n.quan_sat.some(q => veDuoc(q) && q.ma_doi_thu === o.ben))
     && (!t || boDau(`${n.ten_nhom ?? ""} ${(n.ma_kome ?? []).join(" ")}`).includes(t))
     && (o.nhanh === "" || (o.nhanh === "dat" ? (n.lech_trung_vi ?? 0) > 0.05
       : o.nhanh === "het" ? n.quan_sat.some(q => veDuoc(q) && q.trang_thai === "het") : soThieu(n) > 0)));

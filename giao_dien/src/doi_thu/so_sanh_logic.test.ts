@@ -184,6 +184,17 @@ describe("demThieu / locDanhSach", () => {
     expect(k({ tim: "nuoc mam" })).toEqual(["3"]);
     expect(k({ tim: "g01" })).toEqual(["1"]);
   });
+  it("ngành so theo tên HIỂN THỊ (hai cách viết OBC là một ngành); ?ben= giữ nhóm có mặt hàng của bên đó (không tính khách kể)", () => {
+    const d = [
+      nh({ nhom_khoa: "x", nganh: "調味料_VNM", so_ben: 3, quan_sat: [qs({ ma_doi_thu: "a" })] }),
+      nh({ nhom_khoa: "y", nganh: "調味料＿VNM", so_ben: 2, quan_sat: [qs({ ma_doi_thu: "b" })] }),
+      nh({ nhom_khoa: "z", nganh: "冷凍食品_VNM", so_ben: 1, quan_sat: [qs({ ma_doi_thu: "b", loai_nguon: "khach_ke" })] }),
+    ];
+    const l = (o: { nganh?: string; ben?: string }) => locDanhSach(d, { nganh: "", tim: "", nhanh: "", ...o }).map(n => n.nhom_khoa);
+    expect(l({ nganh: "調味料＿VNM" })).toEqual(["x", "y"]);
+    expect(l({ ben: "b" })).toEqual(["y"]);
+    expect(l({ ben: "b", nganh: "調味料_VNM" })).toEqual(["y"]);
+  });
   it("nút nhanh", () => {
     expect(k({ nhanh: "dat" })).toEqual(["1", "2"]);
     expect(k({ nhanh: "het" })).toEqual(["2"]);
