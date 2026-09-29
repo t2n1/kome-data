@@ -1,5 +1,6 @@
 """kome/doi_thu.py — đọc/ghi của màn /doi-thu (đặc tả §4, §5)."""
 from datetime import date
+from decimal import Decimal
 import pytest
 
 from kome import doi_thu as DT
@@ -82,3 +83,72 @@ def test_duyet_loc_bat_thuong(conn, batch):
     for ben, g in [("A", 540), ("B", 560), ("C", 580), ("D", 1400)]:
         _qs(conn, batch, ben, g)
     assert [d["ma_doi_thu"] for d in DT.duyet(conn, loc="bat_thuong")["dong"]] == ["D"]
+
+
+# ---------------------------------------------------------------- vòng sửa 1
+
+def test_duyet_chua_ghep_khong_giu_lai_dong_da_chon_khong_ghep(conn, batch):
+    _hang(conn, batch)
+    _qs(conn, batch, "A", 540, hang="hA")
+    _qs(conn, batch, "B", 560, hang="hB")
+    ma = lambda: {d["ma_hang_dt"] for d in DT.duyet(conn, loc="chua_ghep")["dong"]}
+    assert ma() == set() or ma() <= {"hA", "hB"}
+    DT.dat_ghep(conn, "A", "hA", None, None, "khong", None)
+    conn.commit()
+    assert "hA" not in ma()
+
+
+def test_duyet_chua_ghep_van_hien_dong_chua_ai_dung_toi(conn, batch):
+    _hang(conn, batch)
+    conn.execute("INSERT INTO core.fact_gia_doi_thu (batch_id, ma_dong, ma_doi_thu, ma_hang_dt, ngay_nguon, hinh_thuc_nguon,"
+                 " ten_goc, gia_goc, trang_thai, do_chac) VALUES (%s,'x-9','A','hZ',%s,'file','La',100,'con','chac')",
+                 (batch(9100), date(2026, 7, 20)))
+    conn.commit()
+    assert [d["ma_hang_dt"] for d in DT.duyet(conn, loc="chua_ghep")["dong"]] == ["hZ"]
+
+
+def _dk(conn, batch, bid, ngay, ben, loai, nd, ma_dong):
+    conn.execute("INSERT INTO core.fact_dieu_kien_doi_thu (batch_id, ma_dong, ma_doi_thu, ngay_nguon, loai, noi_dung)"
+                 " VALUES (%s,%s,%s,%s,%s,%s)", (batch(bid, ngay), ma_dong, ben, ngay, loai, nd))
+    conn.commit()
+
+
+def test_tong_quan_dieu_kien_chi_lay_goi_moi_nhat_cua_tung_ben(conn, batch):
+    _dk(conn, batch, 9201, date(2026, 8, 5), "THAK", "ship", "freeship >= 20,000", "d-1")
+    _dk(conn, batch, 9202, date(2026, 9, 5), "THAK", "ship", "freeship >= 30,000", "d-1")
+    _dk(conn, batch, 9202, date(2026, 9, 5), "THAK", "thanh_toan", "chuyen khoan", "d-2")
+    _dk(conn, batch, 9203, date(2026, 8, 9), "JVB", "ship", "mien phi tu 10,000", "d-1")
+    dk = {(d["ben"], d["loai"], d["noi_dung"]) for d in DT.tong_quan(conn)["dieu_kien"]}
+    assert dk == {("THAK", "ship", "freeship >= 30,000"), ("THAK", "thanh_toan", "chuyen khoan"),
+                  ("JVB", "ship", "mien phi tu 10,000")}
+
+
+def test_so_doc_phay_nghin_va_phay_thap_phan(conn, batch):
+    assert DT._so("0,5", "g") == Decimal("0.5")
+    assert DT._so("1,200", "g") == 1200
+    assert DT._so("12,345.6", "g") == Decimal("12345.6")
+    assert DT._so("12,75", "g") == Decimal("12.75")
+    for xau in ("nan", "inf", "1e3", "1,2,3", "abc"):
+        with pytest.raises(DT.LoiNhap):
+            DT._so(xau, "g")
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 850)
+    DT.sua(conn, fid, {"gia_goc": "1,200", "kg_moi_don_vi_gia": "0,5"}, None)
+    conn.commit()
+    r = conn.execute("SELECT gia_goc, kg_moi_don_vi_gia FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s",
+                     (fid,)).fetchone()
+    assert (float(r[0]), float(r[1])) == (1200.0, 0.5)
+
+
+def test_gia_moi_bat_buoc_gia_tru_khi_het(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 850, hang="h1")
+    with pytest.raises(DT.LoiNhap):
+        DT.gia_moi(conn, {"fact_goc_id": fid, "loai_nguon": "to_roi"}, None)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "loai_nguon": "to_roi", "trang_thai": "het"}, None)
+    assert tid
+
+
+def test_gia_moi_fact_goc_id_khong_phai_so_la_LoiNhap(conn, batch):
+    with pytest.raises(DT.LoiNhap):
+        DT.gia_moi(conn, {"fact_goc_id": "abc", "loai_nguon": "to_roi", "gia_goc": "5"}, None)
