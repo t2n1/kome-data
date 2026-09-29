@@ -107,7 +107,7 @@ khoảng).
   - 4 cột trước thanh: Đối thủ · Tên sản phẩm · gói / thùng · tịnh 1 gói.
   - Nhãn sau thanh: giá ¥/kg · % so KOME (màu §3.1) · "↓ từ ¥…" khi rẻ đi nhờ mua nhiều (khung viền
     đứt giữ độ dài giá 1 thùng) · "hết" · "KM".
-  - Dòng KOME: thanh đỏ, **dải đỏ nhạt** = khoảng 売価No.1–10, **vạch trắng** = thực bán 90 ngày (khi giá
+  - Dòng KOME: thanh đỏ, **dải đỏ nhạt** = khoảng 売価No.1–9 (giá thường, §5.3), nhãn **KM** + giá 売価No.10 khi KOME đang có khuyến mãi, **vạch trắng** = thực bán 90 ngày (khi giá
     đang chọn không phải thực bán).
   - **Thu gọn**: mặc định KOME + 5 mặt hàng rẻ nhất + mọi mặt hàng cùng thương hiệu. Còn lại gom vào
     "xem thêm n mặt hàng ▾".
@@ -240,10 +240,15 @@ Hôm nay `gia_bac` là chữ tự do (257 dòng tháng 8, mỗi bên một kiể
 - `mart.gia_kome_chuan(ma)` → ¥/kg chưa thuế: giá chưa thuế nếu > 0, không thì giá gồm thuế ÷ 1,08, của
   pack thùng (`02`), ÷ kg/thùng từ `mart.quy_cach_kome`. Không có → NULL.
 - `mart.so_sanh_nhom` thêm `gia_kome_chuan` và `gia_kome_bang` (jsonb 売価No → ¥/kg, cho dải đỏ nhạt).
+- **売価No.10 = giá khuyến mãi của KOME** (chủ DN, 2026-09-29). Nó KHÔNG vào dải giá thường, và không bao giờ là
+  mặc định. Ô chọn ghi "売価No.10 · khuyến mãi". Dòng KOME mang nhãn **KM** (như đối thủ) khi có giá No.10 > 0
+  và thấp hơn 標準価格; ô nổi in giá đó. Định nghĩa MỘT lần: `mart.la_gia_km_kome(price_level)` (= `'10'`).
   **"Vị trí KOME", `ty_le_re_hon_kome` và chấm "KOME đứng đâu" tính trên 標準価格, không có thì thực bán**
   (ⓘ nói ra). `gia_kome` (thực bán 90 ngày) giữ nguyên nghĩa.
 - Dữ liệu lạ để chủ DN kiểm ở OBC (không sửa ở đây): nhiều dòng 売価No có giá chưa thuế = 0; NT01 売価No.10
-  ghi chưa thuế ¥5,900 nhưng gồm thuế ¥4,900.
+  (giá khuyến mãi) ghi chưa thuế ¥5,900 nhưng gồm thuế ¥4,900 — có thể một cột chưa cập nhật khi đổi giá
+  khuyến mãi. Khi hai cột mâu thuẫn (gồm thuế < chưa thuế), màn dùng giá gồm thuế ÷ 1,08 và ô nổi ghi "bảng giá
+  OBC hai cột lệch nhau".
 
 ### 5.4 Điều kiện giao hàng có cấu trúc
 Hôm nay `core.fact_dieu_kien_doi_thu` là chữ tự do. Tab §4.5 cần số.
@@ -358,7 +363,8 @@ Test mới (tên rõ, mỗi bất biến một test):
   đúng một lần · `bac` sửa qua `dinh_chinh_gia` thắng bậc đã nạp.
 - Thống kê nhóm (`trung_vi`, `bat_thuong`) KHÔNG đổi theo số lượng (vẫn trên giá lẻ).
 - `gia_kome_chuan`: chưa thuế > 0 thắng · gồm thuế ÷ 1,08 · thiếu kg → NULL · `'std'` không lọt vào mọi
-  danh sách 売価No.
+  danh sách 売価No · 売価No.10 không vào dải giá thường, nhãn KM chỉ khi thấp hơn 標準価格 · hai cột mâu thuẫn →
+  gồm thuế ÷ 1,08.
 - `phi_giao`: hai bản cùng kết quả trên `phi_giao_ca.json` (miễn theo tiền / theo kiện, phụ phí vùng × kiện,
   không nhận, daibiki có ngưỡng, CK trước, NULL → `chua_ro` chứ không 0).
 - Chống sửa đè: sửa với `da_xem` cũ → 409 kèm người / lúc; `ghi_de` → ghi; không nhật ký → ghi.
