@@ -147,8 +147,12 @@ a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
 /* Thanh tải chung (ThanhTai.tsx) */
 .thanh-tai{position:fixed;top:0;left:0;right:0;z-index:70;pointer-events:none}
 .thanh-tai-vach{height:3px;background:var(--do);transition:width .15s ease-out}
-.thanh-tai-nhan{position:fixed;right:1rem;bottom:1rem;font-size:.75rem;font-weight:600;
-  font-variant-numeric:tabular-nums;padding:.3rem .65rem;border-radius:99px;
-  background:var(--nen-the);color:var(--chu-thuong);border:1px solid var(--vien);
-  box-shadow:0 2px 8px color-mix(in srgb, var(--chu) 12%, transparent)}
-@media (prefers-reduced-motion:reduce){.thanh-tai-vach{transition:none}}
+.thanh-tai-the{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(320px,calc(100vw - 32px));padding:1rem 1.25rem;border-radius:12px;
+  background:var(--nen-the);border:1px solid var(--vien);
+  box-shadow:0 8px 28px color-mix(in srgb, var(--chu) 18%, transparent)}
+.thanh-tai-nhan{font-size:.95rem;font-weight:600;color:var(--chu);text-align:center;
+  font-variant-numeric:tabular-nums;margin-bottom:.6rem}
+.thanh-tai-ray{height:6px;border-radius:99px;background:var(--vien);overflow:hidden}
+.thanh-tai-chay{height:100%;border-radius:99px;background:var(--do);transition:width .15s ease-out}
+@media (prefers-reduced-motion:reduce){.thanh-tai-vach,.thanh-tai-chay{transition:none}}

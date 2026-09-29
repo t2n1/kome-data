@@ -1,4 +1,6 @@
-// Thanh tải chung: vạch mảnh trên đầu trang + nhãn "Đang tải dữ liệu · 43%".
+// Thanh tải chung: vạch mảnh trên đầu trang + THẺ GIỮA TRANG "Đang tải dữ liệu · 43%"
+// kèm thanh chạy (chủ DN 2026-09-29: nhãn ở góc người ta không thấy — cho ra giữa
+// mọi lần tải). Thẻ không chặn chuột (`pointer-events: none`), trang vẫn bấm được.
 // Số lấy từ khung/tien_do.ts. Chỉ hiện khi đợt tải kéo dài quá 200 ms — dữ
 // liệu có sẵn (304 / ảnh chụp) về ngay thì không nháy thanh nào.
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -27,7 +29,10 @@ export function ThanhTai() {
     <div className="thanh-tai" role="progressbar" aria-label="Đang tải dữ liệu"
       aria-valuemin={0} aria-valuemax={100} aria-valuenow={so}>
       <div className="thanh-tai-vach" style={{ width: `${so}%` }} />
-      <div className="thanh-tai-nhan">Đang tải dữ liệu · {so}%</div>
+      <div className="thanh-tai-the">
+        <div className="thanh-tai-nhan">Đang tải dữ liệu · {so}%</div>
+        <div className="thanh-tai-ray"><div className="thanh-tai-chay" style={{ width: `${so}%` }} /></div>
+      </div>
     </div>
   );
 }
