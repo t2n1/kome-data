@@ -157,8 +157,8 @@ DON_VI_GIA_KE = ("kg", "tui", "goi", "con", "qua", "thung", "lon", "chai", "hop"
 GIA_KE_TOI_DA = Decimal("9999999")
 # Khoá của thẻ / giá: fullmatch (KHÔNG `$` — nó khớp trước dấu xuống dòng cuối) và không khoảng trắng /
 # ký tự điều khiển; sổ app.tiep_xuc_nhac chỉ-thêm nên một khoá bẩn ở lại vĩnh viễn.
-KHOA_SACH = re.compile(r"[^\s\x00-\x1f\x7f]+")
-KHOA_NHOM = re.compile(r"(ma:[^\s\x00-\x1f\x7f]+|n:[0-9]{1,15})")
+KHOA_SACH = re.compile(r"[^\s\x00-\x1f\x7f\ud800-\udfff]+")          # + surrogate lẻ (JSON "\ud800") -> 400, không 500
+KHOA_NHOM = re.compile(r"(ma:[^\s\x00-\x1f\x7f\ud800-\udfff]+|n:[0-9]{1,15})")
 
 
 def gia_khach_ke(conn, ma_doi_thu: str, nhom_khoa: str, customer_code: str, tiep_xuc_id: int,

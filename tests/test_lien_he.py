@@ -343,7 +343,7 @@ def test_the_sai_bi_tu_choi_va_KHONG_de_lai_dong_tiep_xuc(conn, batch, lam_hong)
 
 
 @pytest.mark.parametrize("khoa", ["ma:KHONG-CO", "n:999999", "nt01", "n:abc", "ma:", "n:", "x:NT01",
-                                  "n:5\n", "ma:NT01\n", " n:5", "ma:NT01 ", "ma:NT\t01", "n:5\x00"])
+                                  "n:5\n", "ma:NT01\n", " n:5", "ma:NT01 ", "ma:NT\t01", "n:5\x00", "ma:NT\ud80001"])
 def test_the_hang_khoa_sai_dinh_dang_hoac_khong_ton_tai(conn, batch, khoa):
     _nen_nhac(conn, batch)
     the = {"loai": "nhom", "khoa": khoa, "vi_tri_dau": CAU.index("@Basa"), "do_dai": 5}
