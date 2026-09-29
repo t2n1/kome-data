@@ -10,17 +10,23 @@ CREATE FUNCTION mart.gia_bac_kg(p_bac jsonb, p_sl numeric, p_pallet boolean, p_k
                                 p_kl_goi numeric, p_thue text) RETURNS numeric LANGUAGE sql IMMUTABLE AS $$
     SELECT min(b.gia_kg)
     FROM (
-        SELECT CASE e->>'don_vi_gia' WHEN 'kg'    THEN (e->>'gia')::numeric
-                                     WHEN 'thung' THEN (e->>'gia')::numeric / nullif(p_kg_thung, 0)
-                                     WHEN 'goi'   THEN (e->>'gia')::numeric / nullif(p_kl_goi / 1000, 0) END
+        SELECT CASE e->>'don_vi_gia' WHEN 'kg'    THEN c.gia
+                                     WHEN 'thung' THEN c.gia / nullif(p_kg_thung, 0)
+                                     WHEN 'goi'   THEN c.gia / nullif(p_kl_goi / 1000, 0) END
                / CASE WHEN p_thue = 'co' THEN 1.08 ELSE 1 END                                        AS gia_kg,
-               CASE e->>'don_vi_sl' WHEN 'thung' THEN (e->>'tu')::numeric
-                                    WHEN 'kg'    THEN (e->>'tu')::numeric / nullif(p_kg_thung, 0)
-                                    WHEN 'goi'   THEN (e->>'tu')::numeric / nullif(p_so_goi, 0) END  AS tu_thung,
+               CASE e->>'don_vi_sl' WHEN 'thung' THEN c.tu
+                                    WHEN 'kg'    THEN c.tu / nullif(p_kg_thung, 0)
+                                    WHEN 'goi'   THEN c.tu / nullif(p_so_goi, 0) END                 AS tu_thung,
                e->>'don_vi_sl' = 'pallet'                                                            AS la_pallet
-        FROM jsonb_array_elements(coalesce(p_bac, '[]'::jsonb)) e
+        FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_bac) = 'array' THEN p_bac ELSE '[]'::jsonb END) e
+        -- Phần tử hỏng (tu / gia không phải số JSON) → NULL, bị bỏ, không nổ. Ép kiểu nằm TRONG CASE: thứ tự đánh giá
+        -- của CASE được bảo đảm, của WHERE thì không.
+        CROSS JOIN LATERAL (SELECT CASE WHEN jsonb_typeof(e->'tu')  = 'number' THEN (e->>'tu')::numeric  END AS tu,
+                                   CASE WHEN jsonb_typeof(e->'gia') = 'number' THEN (e->>'gia')::numeric END AS gia) c
+        WHERE c.tu IS NOT NULL AND c.gia IS NOT NULL
     ) b
-    WHERE CASE WHEN p_pallet THEN b.la_pallet OR b.tu_thung IS NOT NULL
+    -- Pallet: CHỈ bậc ghi rõ 'pallet' — không giả định một pallet ≥ bậc thùng / kg nào (giá lẻ vẫn là least() ở view).
+    WHERE CASE WHEN p_pallet THEN b.la_pallet
                ELSE NOT b.la_pallet AND b.tu_thung <= p_sl END
 $$;
 
@@ -71,9 +77,13 @@ nap AS (
            CASE WHEN p.da_sua THEN 'da_sua' WHEN p.xac_nhan THEN 'da_xac_nhan'
                 WHEN f.do_chac = 'can_xem' THEN 'can_xem' ELSE 'ai_doc' END AS trang_thai_duyet,
            NULL::text AS nhom_ke,
-           coalesce(CASE WHEN p.so_goi_thung ~ '^\s*\d+\s*$' THEN p.so_goi_thung::int END, f.so_goi_thung) AS so_goi_thung,
+           coalesce(CASE WHEN p.so_goi_thung ~ '^\s*\d{1,9}\s*$' THEN p.so_goi_thung::int END, f.so_goi_thung) AS so_goi_thung,
            coalesce(CASE WHEN p.kl_goi_g ~ '^\s*\d+(\.\d+)?\s*$' THEN p.kl_goi_g::numeric END, f.kl_goi_g) AS kl_goi_g,
-           CASE WHEN p.bac IS NULL THEN f.bac ELSE p.bac::jsonb END AS bac
+           -- Đính chính bậc hỏng (không phải JSON / không phải mảng) → dùng bậc đã nạp: sổ đính chính chỉ thêm, một dòng
+           -- hỏng không được làm sập view cho mọi người (doi_thu._kiem vẫn là cổng chính).
+           -- (CASE lồng nhau chứ không AND: Postgres không hứa thứ tự của AND, còn CASE thì có.)
+           CASE WHEN p.bac IS NULL OR NOT pg_input_is_valid(p.bac, 'jsonb') THEN f.bac
+                WHEN jsonb_typeof(p.bac::jsonb) = 'array' THEN p.bac::jsonb ELSE f.bac END AS bac
     FROM core.fact_gia_doi_thu f LEFT JOIN p ON p.fact_id = f.id
 ),
 tay AS (
@@ -158,8 +168,10 @@ SELECT k.*,
             ELSE k.yen_chuan END                                                                     AS gia_10,
        CASE WHEN k.don_vi_so <> 'kg' THEN NULL
             WHEN k.muc_gia = 'pallet' THEN k.yen_chuan
-            WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(k.bac, '[]'::jsonb)) e WHERE e->>'don_vi_sl' = 'pallet')
-            THEN least(k.yen_chuan, mart.gia_bac_kg(k.bac, NULL, true, k.kg_thung_dt, k.so_goi_thung, k.kl_goi_g, k.thue))
+            -- bậc pallet ghi rõ VÀ quy được ra ¥/kg; không có → NULL (không lấy giá lẻ làm "giá pallet")
+            ELSE (SELECT least(k.yen_chuan, z.g)
+                  FROM (SELECT mart.gia_bac_kg(k.bac, NULL, true, k.kg_thung_dt, k.so_goi_thung, k.kl_goi_g, k.thue) AS g) z
+                  WHERE z.g IS NOT NULL)
        END                                                                                           AS gia_pallet
 FROM k;
 
@@ -196,9 +208,14 @@ thanh_vien AS (      -- mã KOME của từng nhóm: nhóm ngầm định = đú
     UNION
     SELECT 'n:' || nhom_id, product_code FROM app.nhom_so_sanh_ma
 ),
+-- mart.gia_kome_bang đọc ĐÚNG MỘT LẦN (bất biến CTE-trùng): cả giá chuẩn lẫn dải giá / khuyến mãi lấy từ kb. Không gọi
+-- mart.gia_kome_chuan(mã) ở đây — hàm SQL STABLE có FROM không gộp vào câu gọi, nên mỗi dòng thanh_vien sẽ dựng lại cả
+-- view. chuan = yen_kg của bậc 'std' = ĐÚNG thân của mart.gia_kome_chuan (066); sửa hàm đó thì sửa cả chỗ này.
+kb AS MATERIALIZED (SELECT product_code, price_level, yen_kg FROM mart.gia_kome_bang),
 tv_gia AS (
-    SELECT tv.nhom_khoa, tv.product_code, g.doanh_thu, g.kg_ban, mart.gia_kome_chuan(tv.product_code) AS chuan
+    SELECT tv.nhom_khoa, tv.product_code, g.doanh_thu, g.kg_ban, s.yen_kg AS chuan
     FROM thanh_vien tv LEFT JOIN mart.gia_kome_kg g USING (product_code)
+                       LEFT JOIN kb s ON s.product_code = tv.product_code AND s.price_level = 'std'
 ),
 chinh AS (      -- mã "chính" của nhóm: bán nhiều kg nhất (không ai bán → mã nhỏ nhất)
     SELECT DISTINCT ON (nhom_khoa) nhom_khoa, product_code FROM tv_gia
@@ -219,7 +236,7 @@ bang AS (
            jsonb_object_agg(b.price_level, round(b.yen_kg, 1))
              FILTER (WHERE b.price_level <> 'std' AND NOT mart.la_gia_km_kome(b.price_level))             AS gia_kome_bang,
            min(b.yen_kg) FILTER (WHERE mart.la_gia_km_kome(b.price_level))                                   AS km
-    FROM chinh c JOIN mart.gia_kome_bang b USING (product_code)
+    FROM chinh c JOIN kb b USING (product_code)
     GROUP BY c.nhom_khoa
 )
 SELECT h.nhom_khoa, max(h.ten_nhom) AS ten_nhom, h.don_vi_so, k.ma_kome,

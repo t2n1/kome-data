@@ -3935,7 +3935,6 @@
       "mart.gia_doi_thu_hien_hanh",
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.gia_kome_kg",
       "mart.khach_360",
       "mart.khach_khoang",
@@ -7226,7 +7225,6 @@
       "mart.gia_doi_thu_hien_hanh",
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.gia_kome_kg",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
@@ -7249,7 +7247,7 @@
      "he": "product_name",
      "ja": "商品名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.gia_doi_thu_hien_hanh, mart.gia_doi_thu_quan_sat và 13 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.gia_doi_thu_hien_hanh, mart.gia_doi_thu_quan_sat và 12 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
@@ -7280,7 +7278,6 @@
       "mart.gia_doi_thu_hien_hanh",
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.gia_kome_kg",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
@@ -7643,7 +7640,7 @@
      "he": "pack1_code",
      "ja": "荷姿１－荷姿区分コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.gia_kome_kg và 2 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_kg, mart.quy_cach_kome và 1 chỉ số khác",
      "ma": [
       "kome/doi_thu.py",
       "kome/khoi_tong_quan.py",
@@ -7661,7 +7658,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.gia_kome_kg",
       "mart.quy_cach_kome",
       "mart.so_sanh_nhom"
@@ -7672,7 +7668,7 @@
      "he": "pack1_base_qty",
      "ja": "荷姿１－基準単位当り荷姿区分数",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.gia_kome_kg và 2 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_kg, mart.quy_cach_kome và 1 chỉ số khác",
      "ma": [
       "kome/doi_thu.py",
       "kome/khoi_tong_quan.py",
@@ -7690,7 +7686,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.gia_kome_kg",
       "mart.quy_cach_kome",
       "mart.so_sanh_nhom"
@@ -9867,7 +9862,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -9889,7 +9883,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -9898,7 +9891,7 @@
      "he": "unit_cost",
      "ja": "単位原価",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -9911,7 +9904,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -9920,7 +9912,7 @@
      "he": "price_ex_01",
      "ja": "売価No.１（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -9933,7 +9925,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -9942,7 +9933,7 @@
      "he": "price_in_01",
      "ja": "売価No.１（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -9955,7 +9946,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -9964,7 +9954,7 @@
      "he": "price_ex_02",
      "ja": "売価No.２（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -9977,7 +9967,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -9986,7 +9975,7 @@
      "he": "price_in_02",
      "ja": "売価No.２（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -9999,7 +9988,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10008,7 +9996,7 @@
      "he": "price_ex_03",
      "ja": "売価No.３（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10021,7 +10009,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10030,7 +10017,7 @@
      "he": "price_in_03",
      "ja": "売価No.３（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10043,7 +10030,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10052,7 +10038,7 @@
      "he": "price_ex_04",
      "ja": "売価No.４（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10065,7 +10051,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10074,7 +10059,7 @@
      "he": "price_in_04",
      "ja": "売価No.４（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10087,7 +10072,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10096,7 +10080,7 @@
      "he": "price_ex_05",
      "ja": "売価No.５（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10109,7 +10093,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10118,7 +10101,7 @@
      "he": "price_in_05",
      "ja": "売価No.５（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10131,7 +10114,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10140,7 +10122,7 @@
      "he": "price_ex_06",
      "ja": "売価No.６（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10153,7 +10135,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10162,7 +10143,7 @@
      "he": "price_in_06",
      "ja": "売価No.６（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10175,7 +10156,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10184,7 +10164,7 @@
      "he": "price_ex_07",
      "ja": "売価No.７（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10197,7 +10177,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10206,7 +10185,7 @@
      "he": "price_in_07",
      "ja": "売価No.７（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10219,7 +10198,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10228,7 +10206,7 @@
      "he": "price_ex_08",
      "ja": "売価No.８（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10241,7 +10219,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10250,7 +10227,7 @@
      "he": "price_in_08",
      "ja": "売価No.８（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10263,7 +10240,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10272,7 +10248,7 @@
      "he": "price_ex_09",
      "ja": "売価No.９（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10285,7 +10261,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10294,7 +10269,7 @@
      "he": "price_in_09",
      "ja": "売価No.９（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10307,7 +10282,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10316,7 +10290,7 @@
      "he": "price_ex_10",
      "ja": "売価No.10（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10329,7 +10303,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10338,7 +10311,7 @@
      "he": "price_in_10",
      "ja": "売価No.10（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10351,7 +10324,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10360,7 +10332,7 @@
      "he": "price_ex_std",
      "ja": "標準価格（税抜）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10373,7 +10345,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10382,7 +10353,7 @@
      "he": "price_in_std",
      "ja": "標準価格（税込）",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.gia_kome_chuan, mart.so_sanh_nhom",
+     "ly_do": "màn hình đọc qua mart.gia_kome_bang, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/lien_he.py",
@@ -10395,7 +10366,6 @@
      ],
      "view": [
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.so_sanh_nhom"
      ]
     },
@@ -10727,7 +10697,6 @@
       "mart.gia_doi_thu_hien_hanh",
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_bang",
-      "mart.gia_kome_chuan",
       "mart.gia_kome_kg",
       "mart.khach_360",
       "mart.khach_khoang",
@@ -13060,10 +13029,6 @@
    "lien_he"
   ],
   "mart.gia_kome_bang": [
-   "doi_thu",
-   "lien_he"
-  ],
-  "mart.gia_kome_chuan": [
    "doi_thu",
    "lien_he"
   ],

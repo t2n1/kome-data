@@ -513,3 +513,33 @@ def test_067_so_sanh_nhom_mang_gia_kome_chuan_va_bang_va_km(conn, batch):
     assert set(r[1]) == {"01"}                          # std và 10 (khuyến mãi) KHÔNG vào dải giá thường
     assert float(r[2]) == pytest.approx(450)
     assert float(r[3]) == 0                             # A ¥540 không rẻ hơn chuẩn ¥453,7
+
+
+def test_067_pallet_chi_ap_bac_pallet_khong_ap_bac_thung_lon(conn, batch):
+    _hang(conn, batch)
+    # Bậc "từ 100 thùng" rẻ hơn cả bậc pallet — pallet KHÔNG được giả định ≥ 100 thùng.
+    fid = _qs_bac(conn, batch, "P1", 5400, "thung", 10,
+                  [{"tu": 100, "don_vi_sl": "thung", "gia": 4000, "don_vi_gia": "thung"},
+                   {"tu": 1, "don_vi_sl": "pallet", "gia": 4900, "don_vi_gia": "thung"}])
+    assert _gia(conn, fid)[3] == pytest.approx(490)
+    # Không có bậc pallet ghi rõ → gia_pallet NULL, dù có bậc thùng rất lớn.
+    fid2 = _qs_bac(conn, batch, "P2", 5400, "thung", 10,
+                   [{"tu": 100, "don_vi_sl": "thung", "gia": 4000, "don_vi_gia": "thung"}])
+    assert _gia(conn, fid2)[3] is None
+
+
+def test_067_dinh_chinh_bac_hong_khong_lam_sap_view_dung_bac_nap(conn, batch):
+    _hang(conn, batch)
+    fid = _qs_bac(conn, batch, "NEXT", 5500, "thung", 10,
+                  [{"tu": 5, "don_vi_sl": "thung", "gia": 5300, "don_vi_gia": "thung"}])
+    for v in ("khong phai json", '{"tu": 1}', '[{"tu": "x", "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "thung"}]'):
+        conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong, gia_tri_moi) VALUES (%s, 'bac', %s)", (fid, v))
+        conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong, gia_tri_moi) VALUES (%s, 'so_goi_thung', '99999999999')",
+                     (fid,))
+        conn.commit()
+        g = _gia(conn, fid)
+        if v.startswith("["):       # mảng hợp lệ mà phần tử hỏng → phần tử đó bị bỏ, không nổ; không bậc nào áp
+            assert g[:3] == (pytest.approx(550), pytest.approx(550), pytest.approx(550))
+        else:                       # không phải mảng JSON → dùng bậc đã nạp
+            assert g[:3] == (pytest.approx(550), pytest.approx(530), pytest.approx(530))
+        assert conn.execute("SELECT count(*) FROM mart.so_sanh_nhom").fetchone()[0] >= 0
