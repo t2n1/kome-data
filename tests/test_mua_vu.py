@@ -188,3 +188,27 @@ def test_api_chua_dang_nhap_thi_401_json(test_db_url, monkeypatch):
     monkeypatch.setenv("KOME_SESSION_SECRET", "bi-mat-thu-" + "x" * 32)
     r = TestClient(create_app(db_url=test_db_url)).get("/api/mua-vu", follow_redirects=False)
     assert r.status_code == 401 and r.headers["content-type"].startswith("application/json")
+
+
+def test_lam_nong_sau_nap_tinh_san_ANH_CHUP_mua_vu(monkeypatch):
+    """Đo thật ~10 s trên CSDL đầy: người mở /mua-vu đầu tiên sau 13:30 không được
+    phải chờ — lam_nong tính sẵn ĐÚNG khoá mà /api/mua-vu đọc, theo phiên bản NẠP."""
+    import contextlib
+    import threading
+    from kome.web import anh_chup, api, bao_mat
+
+    goi = []
+    monkeypatch.setattr(anh_chup, "lay", lambda c, khoa, tinh, *a, **k: goi.append((khoa, tinh, k)))
+    monkeypatch.setattr(anh_chup, "bat", lambda: True)
+    monkeypatch.setattr(bao_mat, "tren_mang", lambda: False)
+
+    class _Dong:
+        def __init__(self, target, **_):
+            self.target = target
+
+        def start(self):
+            self.target()
+    monkeypatch.setattr(threading, "Thread", _Dong)
+    anh_chup.lam_nong(lambda: contextlib.nullcontext(None))
+    mv = [g for g in goi if g[0] == api.KHOA_MUA_VU]
+    assert mv and mv[0][1] is MV.du_lieu and mv[0][2].get("chi_nap") is True

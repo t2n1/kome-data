@@ -222,6 +222,16 @@ def lam_nong(open_conn) -> None:
                 lay(c, "kho-hang", du_lieu_kho_hang, chi_nap=True)
         except Exception as e:         # noqa: BLE001
             print(f"[anh-chup] không làm nóng được sản phẩm / kho: {e!r}")
+        # Mùa vụ sản phẩm (058) — đo thật ~10 s trên CSDL đầy (mã × ngày, cả kỳ dữ
+        # liệu). Khoá khớp kome/web/api.py::KHOA_MUA_VU; màn không theo khoảng xem
+        # nên chỉ có MỘT khoá.
+        try:
+            from kome import mua_vu as MV
+            from kome.web.api import KHOA_MUA_VU
+            with open_conn() as c:
+                lay(c, KHOA_MUA_VU, MV.du_lieu, chi_nap=True)
+        except Exception as e:         # noqa: BLE001
+            print(f"[anh-chup] không làm nóng được mùa vụ: {e!r}")
         # Sổ công nợ (đợt 6) — khoá khớp kome/web/api.py::KHOA_CONG_NO. Công ty
         # chưa dùng công nợ (kome/nguon_dung.py) thì không tốn công làm nóng.
         from kome.nguon_dung import tinh_nang
