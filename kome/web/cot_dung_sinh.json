@@ -9871,10 +9871,14 @@
      "core": "core.fact_price_list.unit_cost",
      "he": "unit_cost",
      "ja": "単位原価",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
