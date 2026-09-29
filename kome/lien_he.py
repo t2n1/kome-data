@@ -16,9 +16,11 @@ Ngân sách truy vấn của `/lien-he`: đúng 4 lượt hỏi (danh sách, ho�
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
+from kome import doi_thu as DT
 from kome.tuoi_du_lieu import MUI_GIO
 
 # Ba kiểu tiếp xúc và ba mức kết quả — ĐÚNG từ vựng của gói thiết kế
@@ -342,6 +344,10 @@ def doc_bieu_mau(kieu: str, ket_qua: str, noi_dung: str, hen_lai: str) -> tuple:
         raise LoiNhap("Ghi lại nội dung trao đổi — một dòng trống không nói được gì cho người sau.")
     if len(noi_dung) > DO_DAI_NOI_DUNG:
         raise LoiNhap(f"Nội dung dài quá {DO_DAI_NOI_DUNG} ký tự.")
+    try:        # JSON cho phép nửa cặp UTF-16 lẻ loi (U+D800…U+DFFF) -> str không mã hoá UTF-8 được -> 500 ở psycopg
+        noi_dung.encode("utf-8")
+    except UnicodeEncodeError:
+        raise LoiNhap("Nội dung có ký tự không hợp lệ (nửa ký tự UTF-16) — gõ hoặc dán lại câu.") from None
     hen = None
     if hen_lai:
         try:
@@ -352,16 +358,164 @@ def doc_bieu_mau(kieu: str, ket_qua: str, noi_dung: str, hen_lai: str) -> tuple:
 
 
 def ghi(conn, ma: str, nguoi_id: int | None, kieu: str, ket_qua: str,
-        noi_dung: str, hen_lai: str = "") -> None:
-    """Thêm MỘT dòng nhật ký. Không commit — người gọi quyết định giao dịch."""
+        noi_dung: str, hen_lai: str = "") -> int:
+    """Thêm MỘT dòng nhật ký, trả `id` của nó (người gọi cũ bỏ qua giá trị trả).
+    Không commit — người gọi quyết định giao dịch."""
     kieu, ket_qua, noi_dung, hen = doc_bieu_mau(kieu, ket_qua, noi_dung, hen_lai)
     co = conn.execute(
         "SELECT 1 FROM core.dim_customer WHERE customer_code = %s AND is_current",
         (ma,)).fetchone()
     if co is None:
         raise LoiNhap(f"Không có khách mã {ma}.")
-    conn.execute(
+    return conn.execute(
         """INSERT INTO app.nhat_ky_tiep_xuc
              (customer_code, nguoi_dung_id, kieu, ket_qua, noi_dung, hen_lai)
-           VALUES (%s, %s, %s, %s, %s, %s)""",
-        (ma, nguoi_id, kieu, ket_qua, noi_dung, hen))
+           VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
+        (ma, nguoi_id, kieu, ket_qua, noi_dung, hen)).fetchone()[0]
+
+
+# ---- Đợt 2 (063): tin hiện trường `@` -------------------------------------------------------------
+
+MAX_THE = 30                      # số thẻ / số giá tối đa mỗi lần ghi
+
+
+def _dict_list(v, ten: str) -> list[dict]:
+    if v is None:
+        return []
+    if not isinstance(v, list) or not all(isinstance(x, dict) for x in v):
+        raise LoiNhap(f"'{ten}' phải là một danh sách các đối tượng.")
+    if len(v) > MAX_THE:
+        raise LoiNhap(f"Tối đa {MAX_THE} mục '{ten}' mỗi lần ghi.")
+    return v
+
+
+def _int(v, ten: str) -> int:
+    if isinstance(v, bool) or not isinstance(v, int):
+        raise LoiNhap(f"Thẻ: '{ten}' phải là số nguyên.")
+    return v
+
+
+def _kiem_the(conn, noi_dung: str, nhac: list[dict]) -> list[tuple]:
+    """Kiểm từng thẻ và đổi vị trí về ĐÚNG câu được lưu. Trả [(loai, khoa, vi_tri_dau, do_dai)].
+
+    Giao diện gửi vị trí theo chuỗi JS (đơn vị UTF-16) trên ô chữ CHƯA cắt khoảng trắng; máy chủ lưu câu
+    ĐÃ `strip()` và vị trí theo ký tự Unicode (Python) — hai bên chỉ khác nhau khi câu có khoảng trắng đầu
+    hoặc ký tự ngoài BMP (emoji), nên phải đổi ở đây chứ không tin thẳng con số."""
+    if not nhac:
+        return []
+    goc = noi_dung or ""
+    u16 = goc.encode("utf-16-le", "surrogatepass")
+    n_dv = len(u16) // 2
+    luu = goc.strip()
+    dau = len(goc) - len(goc.lstrip())
+    ra: list[tuple] = []
+    for t in nhac:
+        loai, khoa = t.get("loai"), t.get("khoa")
+        if loai not in ("doi_thu", "nhom") or not isinstance(khoa, str) or not DT.KHOA_SACH.fullmatch(khoa):
+            raise LoiNhap("Thẻ @ không hợp lệ: loại hoặc khoá sai.")
+        if loai == "nhom" and not DT.KHOA_NHOM.fullmatch(khoa):
+            raise LoiNhap(f"Thẻ hàng '{khoa}' sai định dạng (ma:<mã> hoặc n:<số>).")
+        vt, dd = _int(t.get("vi_tri_dau"), "vi_tri_dau"), _int(t.get("do_dai"), "do_dai")
+        if vt < 0 or dd < 2 or vt + dd > n_dv:
+            raise LoiNhap("Thẻ @ nằm ngoài câu ghi chú.")
+        if u16[2 * vt:2 * vt + 2] != b"@\x00":
+            raise LoiNhap("Thẻ @ lệch vị trí: chỗ đó trong câu không phải dấu @.")
+        try:
+            cp = len(u16[:2 * vt].decode("utf-16-le"))
+            dd_cp = len(u16[2 * vt:2 * (vt + dd)].decode("utf-16-le"))
+        except UnicodeDecodeError:
+            raise LoiNhap("Thẻ @ cắt ngang một ký tự.") from None
+        cp -= dau
+        if cp < 0 or cp + dd_cp > len(luu):
+            raise LoiNhap("Thẻ @ nằm ngoài câu ghi chú.")
+        ra.append((loai, khoa, cp, dd_cp))
+    ra.sort(key=lambda x: x[2])
+    for a, b in zip(ra, ra[1:]):
+        if a[2] + a[3] > b[2]:
+            raise LoiNhap("Hai thẻ @ chồng lên nhau.")
+    # Tồn tại: đối thủ trong app.doi_thu; nhóm 'ma:' trong core.dim_product, 'n:' trong app.nhom_so_sanh.
+    dt = sorted({k for l, k, _, _ in ra if l == "doi_thu"})
+    if dt:
+        co = {r[0] for r in conn.execute("SELECT ma FROM app.doi_thu WHERE ma = ANY(%s)", (dt,))}
+        for k in dt:
+            if k not in co:
+                raise LoiNhap(f"Không có đối thủ '{k}'.")
+    ma = sorted({k[3:] for l, k, _, _ in ra if l == "nhom" and k.startswith("ma:")})
+    if ma:
+        co = {r[0] for r in conn.execute("SELECT product_code FROM core.dim_product WHERE product_code = ANY(%s)", (ma,))}
+        for k in ma:
+            if k not in co:
+                raise LoiNhap(f"Không có mã KOME '{k}'.")
+    ns = sorted({int(k[2:]) for l, k, _, _ in ra if l == "nhom" and k.startswith("n:")})
+    if ns:
+        co = {r[0] for r in conn.execute("SELECT id FROM app.nhom_so_sanh WHERE id = ANY(%s)", (ns,))}
+        for k in ns:
+            if k not in co:
+                raise LoiNhap(f"Không có nhóm so sánh số {k}.")
+    return ra
+
+
+def ghi_kem_nhac(conn, ma: str, nguoi_id: int | None, kieu: str, ket_qua: str, noi_dung: str,
+                 hen_lai: str = "", nhac: list[dict] | None = None, gia: list[dict] | None = None) -> dict:
+    """Ghi MỘT lần tiếp xúc kèm thẻ `@` (`app.tiep_xuc_nhac`) và giá khách kể (`app.gia_doi_thu_tay`,
+    `loai_nguon = 'khach_ke'`) — CÙNG một giao dịch. Trả {"id", "canh_bao": [...]}. Không commit.
+
+    `nhac`: [{loai: 'doi_thu'|'nhom', khoa, vi_tri_dau, do_dai}] — `khoa` của nhóm là 'ma:<mã KOME>' hoặc
+    'n:<id>'; vị trí do giao diện gửi (xem `_kiem_the`). `gia`: [{ma_doi_thu, nhom_khoa, gia_goc, don_vi_gia}] —
+    mỗi giá PHẢI có thẻ đối thủ VÀ thẻ nhóm tương ứng trong chính `nhac` này (máy không tự đọc số trong
+    câu: giá chỉ đến từ ô giá). Sai gì cũng `LoiNhap` và KHÔNG để lại dòng nào — kể cả khi người gọi bắt lỗi
+    rồi vẫn commit (phần ghi nằm trong một SAVEPOINT).
+
+    `canh_bao`: giá vừa ghi mà `mart.gia_doi_thu_hien_hanh` đánh cờ `bat_thuong` (> 2× hoặc < ½ trung vị
+    của nhóm ≥ 3 bên) -> một câu nhắc kiểm lại đơn vị, in trung vị của `mart.so_sanh_nhom` (số tab So sánh giá
+    hiện); KHÔNG chặn ghi. MỘT lượt hỏi cho mọi giá."""
+    from kome.dinh_dang import yen
+
+    # Kiểu / độ dài của chính câu ghi chú TRƯỚC (rẻ) — rồi mới mã hoá và dò từng thẻ.
+    doc_bieu_mau(kieu, ket_qua, noi_dung, hen_lai)
+    nhac, gia = _dict_list(nhac, "nhac"), _dict_list(gia, "gia")
+    cac_the = _kiem_the(conn, noi_dung, nhac)
+    co_dt = {k for l, k, _, _ in cac_the if l == "doi_thu"}
+    co_nhom = {k for l, k, _, _ in cac_the if l == "nhom"}
+    for g in gia:
+        b, k = g.get("ma_doi_thu"), g.get("nhom_khoa")
+        if not isinstance(b, str) or not isinstance(k, str) or b not in co_dt or k not in co_nhom:
+            raise LoiNhap("Giá phải đi kèm thẻ @đối thủ và thẻ @hàng tương ứng trong câu ghi chú.")
+
+    conn.execute("SAVEPOINT ghi_kem_nhac")
+    try:
+        tid = ghi(conn, ma, nguoi_id, kieu, ket_qua, noi_dung, hen_lai)
+        if cac_the:
+            with conn.cursor() as cur:
+                cur.executemany(
+                    """INSERT INTO app.tiep_xuc_nhac (tiep_xuc_id, loai, khoa, vi_tri_dau, do_dai)
+                       VALUES (%s, %s, %s, %s, %s)""", [(tid, *t) for t in cac_the])
+        ids = []
+        for g in gia:
+            try:
+                ids.append(DT.gia_khach_ke(conn, g["ma_doi_thu"], g["nhom_khoa"], ma, tid,
+                                           g.get("gia_goc"), g.get("don_vi_gia"), nguoi_id))
+            except DT.LoiNhap as e:
+                raise LoiNhap(str(e)) from None
+        canh_bao = []
+        if ids:
+            # Số in ra là trung vị của `mart.so_sanh_nhom` — đúng số tab So sánh giá hiện (bỏ giá bất thường),
+            # KHÔNG phải `trung_vi_nhom` (trung vị dùng để BẮT bất thường, tính cả giá lệch): hai con số cùng
+            # tên "trung vị" trên hai màn là người đọc đi đối chiếu rồi không khớp.
+            for gia_goc, dv, dv_so, tv in conn.execute(
+                    """SELECT h.gia_goc, h.don_vi_gia, h.don_vi_so, s.trung_vi
+                       FROM mart.gia_doi_thu_hien_hanh h
+                       LEFT JOIN mart.so_sanh_nhom s ON s.nhom_khoa = h.nhom_khoa AND s.don_vi_so = h.don_vi_so
+                       WHERE h.nguon = 'tay' AND h.id = ANY(%s) AND h.bat_thuong ORDER BY h.id""",
+                    (ids,)).fetchall():
+                moc = (f"trung vị {yen(tv)}/{'kg' if dv_so == 'kg' else dv} của nhóm" if tv is not None
+                       else "giá các bên khác của nhóm")
+                canh_bao.append(f"Giá {yen(gia_goc)}/{dv} lệch xa {moc} — kiểm lại đơn vị?")
+        conn.execute("RELEASE SAVEPOINT ghi_kem_nhac")
+    except BaseException:
+        try:
+            conn.execute("ROLLBACK TO SAVEPOINT ghi_kem_nhac")
+        except Exception:      # noqa: BLE001 — kết nối đã hỏng: giao dịch của người gọi tự thu lại
+            pass
+        raise
+    return {"id": tid, "canh_bao": canh_bao}

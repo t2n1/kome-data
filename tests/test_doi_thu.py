@@ -301,3 +301,358 @@ def test_tao_nhom_ma_la_LoiNhap_va_nhat_ky_ghi_nhom_cu(conn, batch):
     conn.commit()
     truoc = conn.execute("SELECT truoc FROM app.doi_thu_nhat_ky WHERE doi_tuong=%s", (f"nhom:{b}",)).fetchone()[0]
     assert truoc == {"NT01": a}
+
+
+# ---- Đợt 2 (063): tin hiện trường `@` — các khối đọc ---------------------------------------------------
+
+def _tin(conn, batch, khach, cau, the, gia=(), cach_day=0):
+    """Ghi MỘT tin qua đường ghi thật (`ghi_kem_nhac`), commit, rồi (tuỳ chọn) lùi ngày của lần tiếp xúc."""
+    from kome import lien_he as LH
+    r = LH.ghi_kem_nhac(conn, khach, None, "goi", "tot", cau, "", list(the), list(gia))
+    if cach_day:
+        conn.execute("UPDATE app.nhat_ky_tiep_xuc SET thoi_diem = now() - make_interval(days => %s) WHERE id = %s",
+                     (cach_day, r["id"]))
+    conn.commit()
+    return r["id"]
+
+
+def _cau(ben):
+    return f"Khách nói @{ben} bán @Basa rẻ hơn mình"
+
+
+def _the_kep(cau, ben, nhom):
+    """Hai thẻ: `@<ben>` (đối thủ) rồi `@Basa` (nhóm)."""
+    from tests.test_lien_he import _the
+    return [_the(cau, "doi_thu", ben, "@" + ben), _the(cau, "nhom", nhom, "@Basa")]
+
+
+def _gia_ke(ben, nhom, gia, dv="kg"):
+    return {"ma_doi_thu": ben, "nhom_khoa": nhom, "gia_goc": gia, "don_vi_gia": dv}
+
+
+def _nen_tin(conn, batch):
+    from tests.test_khach_hang import _ho_so_khach
+    _hang(conn, batch)
+    _ho_so_khach(conn, batch, "K0001", "Quán một", prefecture="東京都")
+    _ho_so_khach(conn, batch, "K0002", "Quán hai", prefecture="大阪府")
+
+
+def test_goi_y_nhac_dung_mot_luot_va_dung_noi_dung(conn, batch, monkeypatch):
+    _hang(conn, batch)
+    b = batch(9002)
+    conn.execute("""INSERT INTO core.dim_product (product_code, product_name, kind_code, food_category_name, batch_id)
+                    VALUES ('FEE1', 'Phi giao hang', '1', '', %s)""", (b,))
+    n = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Nhóm cá') RETURNING id").fetchone()[0]
+    conn.execute("UPDATE app.doi_thu SET dang_theo_doi = false WHERE ma = 'YUMI'")
+    conn.commit()
+    dem = _dem(conn, monkeypatch)
+    r = DT.goi_y_nhac(conn)
+    assert dem["n"] == 1
+    ma = {x["ma"] for x in r["doi_thu"]}
+    assert "THAK" in ma and "YUMI" not in ma and set(r["doi_thu"][0]) == {"ma", "ten"}
+    hang = {x["khoa"]: x for x in r["hang"]}
+    assert hang[f"n:{n}"] == {"khoa": f"n:{n}", "ten": "Nhóm cá", "loai": "nhom"}
+    assert hang["ma:NT01"]["loai"] == "ma" and hang["ma:NT01"]["ten"].startswith("Ca Ba sa")
+    assert "ma:FEE1" not in hang                       # phí không phải hàng
+    assert r["hang"][0]["loai"] == "nhom"              # nhóm có tên đứng trước mã
+
+
+def test_khach_doi_thu_tin_90_ngay_dung_mot_luot(conn, batch, monkeypatch):
+    from datetime import timedelta
+    from kome.tuoi_du_lieu import hom_nay_o_nhat
+    _nen_tin(conn, batch)
+    cau = "Khách nói @THAK bán @Basa rẻ hơn mình"
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), [_gia_ke("THAK", "ma:NT01", 1200)], cach_day=12)
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), cach_day=100)     # ngoài 90 ngày
+    _tin(conn, batch, "K0002", _cau("ICHIBA"), _the_kep(_cau("ICHIBA"), "ICHIBA", "ma:NT01"))                # khách khác
+    from kome import lien_he as LH
+    LH.ghi(conn, "K0001", None, "goi", "tot", "không thẻ nào")                        # tin không thẻ: không vào
+    conn.commit()
+    dem = _dem(conn, monkeypatch)
+    r = DT.khach_doi_thu(conn, "K0001")
+    assert dem["n"] == 1
+    assert len(r["tin"]) == 1
+    t = r["tin"][0]
+    assert t["noi_dung"] == cau and t["ngay"] == (hom_nay_o_nhat() - timedelta(days=12)).isoformat()
+    assert t["doi_thu"] == [{"ma": "THAK", "ten": "THAK JSC"}]
+    assert t["nhom"] == [{"khoa": "ma:NT01", "ten": "Ca Ba sa cat khuc (500g x 20 packs)"}]
+    assert t["gia"] == [{"ma_doi_thu": "THAK", "ten_doi_thu": "THAK JSC", "nhom_khoa": "ma:NT01",
+                         "ten_nhom": "Ca Ba sa cat khuc (500g x 20 packs)", "gia_goc": 1200, "don_vi_gia": "kg"}]
+    assert {"tiep_xuc_id", "ngay", "nguoi"} <= set(t)
+    assert t["nhac"] == [{"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 10, "do_dai": 5},
+                         {"loai": "nhom", "khoa": "ma:NT01", "vi_tri_dau": 20, "do_dai": 5}]
+    assert r["ly_do_ngung"] == []
+
+
+def test_khach_doi_thu_nhac_theo_thu_tu_trong_cau_vi_tri_theo_ky_tu(conn, batch, monkeypatch):
+    """`nhac` sắp theo `vi_tri_dau` (thứ tự trong câu), KHÔNG theo thứ tự mảng gửi lên hay theo mã; vị trí là
+    KÝ TỰ Unicode như đã lưu (emoji đứng trước = 1, không phải 2 đơn vị UTF-16). Hai đối thủ trong một tin."""
+    def _the(cau, loai, khoa, nhan):      # đúng như giao diện gửi: chỉ số chuỗi JS (đơn vị UTF-16)
+        u16 = lambda x: len(x.encode("utf-16-le")) // 2
+        return {"loai": loai, "khoa": khoa, "vi_tri_dau": u16(cau[:cau.index(nhan)]), "do_dai": u16(nhan)}
+    _nen_tin(conn, batch)
+    _hang(conn, batch, "NT02", "Tom su dong lanh")
+    cau = "🐟 @THAK bán @Basa, còn @ICHIBA bán @Tom"
+    # Mảng gửi lên cố ý đảo: nhóm sau cùng trước, đối thủ sau trước đối thủ đầu.
+    the = [_the(cau, "nhom", "ma:NT02", "@Tom"), _the(cau, "doi_thu", "ICHIBA", "@ICHIBA"),
+           _the(cau, "nhom", "ma:NT01", "@Basa"), _the(cau, "doi_thu", "THAK", "@THAK")]
+    assert the[3]["vi_tri_dau"] == 3                       # UTF-16: emoji = 2 đơn vị + khoảng trắng
+    _tin(conn, batch, "K0001", cau, the)
+    dem = _dem(conn, monkeypatch)
+    t = DT.khach_doi_thu(conn, "K0001")["tin"][0]
+    assert dem["n"] == 1
+    assert t["nhac"] == [{"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 2, "do_dai": 5},
+                         {"loai": "nhom", "khoa": "ma:NT01", "vi_tri_dau": 12, "do_dai": 5},
+                         {"loai": "doi_thu", "khoa": "ICHIBA", "vi_tri_dau": 23, "do_dai": 7},
+                         {"loai": "nhom", "khoa": "ma:NT02", "vi_tri_dau": 35, "do_dai": 4}]
+    for z in t["nhac"]:                                    # vị trí ký tự khớp đúng chữ trong câu đã lưu
+        assert t["noi_dung"][z["vi_tri_dau"]] == "@"
+
+
+def test_ly_do_ngung_chi_ra_cap_da_ngung_mua_cung_nhom_duoc_nhac(conn, batch):
+    """[CRITICAL] Chỉ cặp (khách, mã) mà bất biến 024 xếp 'ngung' VÀ mã thuộc nhóm được nhắc trong 90 ngày."""
+    from datetime import timedelta
+    from tests.test_khach_hang import HOM_NAY, _mua, _neo
+    _nen_tin(conn, batch)
+    _hang(conn, batch, "NT02", "Tom su dong lanh")
+    _hang(conn, batch, "NT03", "Muc ong dong lanh")
+    _hang(conn, batch, "NT04", "Bach tuoc dong lanh")
+    n = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Nhóm hải sản') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO app.nhom_so_sanh_ma VALUES ('NT03', %s)", (n,))
+    conn.commit()
+    # NT01: mua đều 7 ngày/lần rồi im 40 ngày -> 'ngung' · NT03: như NT01 (thuộc nhóm có tên) · NT04: 'ngung' nhưng KHÔNG ai nhắc
+    # NT02: còn mua (lần cuối cách mốc 2 ngày) -> 'mua', dù được nhắc
+    for hang, im in (("NT01", 40), ("NT03", 40), ("NT04", 40), ("NT02", 2)):
+        for i in range(5):
+            _mua(conn, batch, "K0001", HOM_NAY - timedelta(days=im + i * 7), hang=hang)
+    _neo(conn, batch)
+    trang = dict(conn.execute("SELECT product_code, trang_thai_cap FROM mart.khach_mat_hang WHERE customer_code='K0001'").fetchall())
+    assert trang["NT01"] == trang["NT03"] == trang["NT04"] == "ngung" and trang["NT02"] == "mua"
+    cau = "@THAK @Basa @Tom @Muc"
+    the = [{"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 0, "do_dai": 5},
+           {"loai": "nhom", "khoa": "ma:NT01", "vi_tri_dau": 6, "do_dai": 5},
+           {"loai": "nhom", "khoa": "ma:NT02", "vi_tri_dau": 12, "do_dai": 4},
+           {"loai": "nhom", "khoa": f"n:{n}", "vi_tri_dau": 17, "do_dai": 4}]
+    _tin(conn, batch, "K0001", cau, the, cach_day=12)
+    ly = DT.khach_doi_thu(conn, "K0001")["ly_do_ngung"]
+    assert {x["ma"] for x in ly} == {"NT01", "NT03"}
+    x1 = next(x for x in ly if x["ma"] == "NT01")
+    assert x1["nhom_khoa"] == "ma:NT01" and x1["doi_thu"] == [{"ma": "THAK", "ten": "THAK JSC"}]
+    assert x1["ten"].startswith("Ca Ba sa") and x1["lan_cuoi"] == (HOM_NAY - timedelta(days=40)).isoformat()
+    assert x1["so_ngay"] == 40 and x1["tin_ngay"] and x1["tiep_xuc_id"]
+    x3 = next(x for x in ly if x["ma"] == "NT03")
+    assert x3["nhom_khoa"] == f"n:{n}" and x3["ten_nhom"] == "Nhóm hải sản"
+
+
+def test_ly_do_ngung_khong_co_tin_thi_rong_du_khach_da_ngung(conn, batch):
+    from datetime import timedelta
+    from tests.test_khach_hang import HOM_NAY, _mua, _neo
+    _nen_tin(conn, batch)
+    for i in range(5):
+        _mua(conn, batch, "K0001", HOM_NAY - timedelta(days=40 + i * 7), hang="NT01")
+    _neo(conn, batch)
+    assert DT.khach_doi_thu(conn, "K0001") == {"tin": [], "ly_do_ngung": []}
+
+
+def test_ho_so_ben_khach_dang_mua_tin_90_ngay_cua_dung_ben(conn, batch, monkeypatch):
+    _nen_tin(conn, batch)
+    cau = "Khách nói @THAK bán @Basa rẻ hơn mình"
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), [_gia_ke("THAK", "ma:NT01", 1200)], cach_day=3)
+    _tin(conn, batch, "K0002", cau, _the_kep(cau, "THAK", "ma:NT01"), cach_day=20)
+    _tin(conn, batch, "K0002", _cau("ICHIBA"), _the_kep(_cau("ICHIBA"), "ICHIBA", "ma:NT01"))                 # bên khác
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), cach_day=120)      # quá 90 ngày
+    dem = _dem(conn, monkeypatch)
+    r = DT.ho_so_ben(conn, "THAK")
+    assert dem["n"] == 1
+    kh = r["khach_dang_mua"]
+    assert [(x["ma_khach"], x["ten_khach"]) for x in kh] == [("K0001", "Quán một"), ("K0002", "Quán hai")]
+    assert kh[0]["nhom"] == [{"khoa": "ma:NT01", "ten": "Ca Ba sa cat khuc (500g x 20 packs)"}]
+    assert kh[0]["gia"] == [{"nhom_khoa": "ma:NT01", "ten_nhom": "Ca Ba sa cat khuc (500g x 20 packs)",
+                             "gia_goc": 1200, "don_vi_gia": "kg"}]
+    assert kh[1]["gia"] == [] and {"tiep_xuc_id", "ngay"} <= set(kh[0])
+    assert DT.ho_so_ben(conn, "KHONG-CO") is None
+
+
+def test_tong_quan_hien_truong_30_ngay_theo_ben_nhom_tinh(conn, batch, monkeypatch):
+    _nen_tin(conn, batch)
+    cau = "Khách nói @THAK bán @Basa rẻ hơn mình"
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), cach_day=2)
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), cach_day=9)
+    _tin(conn, batch, "K0002", _cau("ICHIBA"), _the_kep(_cau("ICHIBA"), "ICHIBA", "ma:NT01"))
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), cach_day=45)      # quá 30 ngày
+    dem = _dem(conn, monkeypatch)
+    h = DT.tong_quan(conn)["hien_truong"]
+    assert dem["n"] == 1
+    assert h["ngay"] == 30 and h["tong"] == 3
+    assert [(x["ma"], x["ten"], x["so_tin"]) for x in h["doi_thu"]] == [("THAK", "THAK JSC", 2), ("ICHIBA", "Ichiba Foods", 1)]
+    assert [(x["khoa"], x["so_tin"]) for x in h["nhom"]] == [("ma:NT01", 3)]
+    assert h["nhom"][0]["ten"].startswith("Ca Ba sa")
+    assert [(x["tinh"], x["so_tin"]) for x in h["tinh"]] == [("東京都", 2), ("大阪府", 1)]
+
+
+def test_tong_quan_hien_truong_rong_khi_chua_co_tin(conn, batch):
+    h = DT.tong_quan(conn)["hien_truong"]
+    assert h == {"ngay": 30, "tong": 0, "doi_thu": [], "nhom": [], "tinh": []}
+
+
+# ---- Final fix round: khoá nhóm HIỆN HÀNH (mart.nhom_cua_khoa, 063) · hàng Duyệt · 48 tỉnh -----------------
+
+def _nhom_co_ten(conn, batch):
+    """Nhóm có tên 'Nhóm cá' gồm NT01 + NT05; ba bên A/B/C chỉ bán NT05 (bảng giá) ở ¥540/560/580 /kg."""
+    from tests.test_mart_doi_thu import _qs
+    _nen_tin(conn, batch)
+    _hang(conn, batch, "NT05", "Ca tra phi le")
+    g = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Nhóm cá') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO app.nhom_so_sanh_ma VALUES ('NT01', %s), ('NT05', %s)", (g, g))
+    conn.commit()
+    for ben, gia in (("A", 540), ("B", 560), ("C", 580)):
+        _qs(conn, batch, ben, gia, ma="NT05")
+    return g
+
+
+def test_the_ma_cua_hang_thuoc_nhom_co_ten_VAO_nhom_do(conn, batch):
+    """[IMPORTANT] Thẻ `@<mã>` (khoá 'ma:NT01', lưu NGUYÊN như lúc ghi) của mã nằm trong nhóm có tên: giá khách kể
+    so với các bên CÙNG NHÓM (cảnh báo bật), lên So sánh giá trong nhóm đó, Hiện trường đếm MỘT nhóm, hồ sơ khách
+    / hồ sơ bên trả khoá nhóm."""
+    from kome import lien_he as LH
+    g = _nhom_co_ten(conn, batch)
+    nk = f"n:{g}"
+    cau = "Khách nói @THAK bán @Basa rẻ hơn mình"
+    r = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", cau, "", _the_kep(cau, "THAK", "ma:NT01"),
+                        [_gia_ke("THAK", "ma:NT01", 1400)])
+    conn.commit()
+    assert r["canh_bao"] == ["Giá ¥1,400/kg lệch xa trung vị ¥560/kg của nhóm — kiểm lại đơn vị?"]
+    # Sổ giữ nguyên chữ đã ghi.
+    assert conn.execute("SELECT nhom_khoa FROM app.gia_doi_thu_tay WHERE loai_nguon = 'khach_ke'").fetchone()[0] == "ma:NT01"
+    assert conn.execute("SELECT khoa FROM app.tiep_xuc_nhac WHERE loai = 'nhom'").fetchone()[0] == "ma:NT01"
+    # So sánh giá: trong nhóm có tên, có đúng một dòng khách kể; trung vị không đổi (khách kể ngoài trung vị).
+    ss = DT.so_sanh(conn)["nhom"]
+    nhom = [n for n in ss if n["nhom_khoa"] == nk and n["don_vi_so"] == "kg"]
+    assert len(nhom) == 1 and nhom[0]["ten_nhom"] == "Nhóm cá" and nhom[0]["trung_vi"] == 560
+    assert [q["ma_doi_thu"] for q in nhom[0]["quan_sat"] if q["loai_nguon"] == "khach_ke"] == ["THAK"]
+    assert not [n for n in ss if n["nhom_khoa"] == "ma:NT01"]
+    # Hiện trường: tin thứ hai gắn thẳng @Nhóm cá — hai tin, MỘT nhóm.
+    cau2 = "@ICHIBA có @Nhóm cá"
+    _tin(conn, batch, "K0002", cau2, [{"loai": "doi_thu", "khoa": "ICHIBA", "vi_tri_dau": 0, "do_dai": 7},
+                                      {"loai": "nhom", "khoa": nk, "vi_tri_dau": 11, "do_dai": 8}])
+    h = DT.tong_quan(conn)["hien_truong"]
+    assert h["nhom"] == [{"khoa": nk, "ten": "Nhóm cá", "so_tin": 2}]
+    # Hồ sơ khách + hồ sơ bên: khoá nhóm hiện hành ở cả thẻ, nhóm, giá.
+    t = DT.khach_doi_thu(conn, "K0001")["tin"][0]
+    assert t["nhom"] == [{"khoa": nk, "ten": "Nhóm cá"}]
+    assert [z["khoa"] for z in t["nhac"] if z["loai"] == "nhom"] == [nk]
+    assert (t["gia"][0]["nhom_khoa"], t["gia"][0]["ten_nhom"]) == (nk, "Nhóm cá")
+    kh = DT.ho_so_ben(conn, "THAK")["khach_dang_mua"][0]
+    assert kh["nhom"] == [{"khoa": nk, "ten": "Nhóm cá"}]
+    assert (kh["gia"][0]["nhom_khoa"], kh["gia"][0]["ten_nhom"]) == (nk, "Nhóm cá")
+
+
+def test_doi_thanh_vien_nhom_SAU_khi_ghi_moi_cho_di_theo(conn, batch):
+    """Giải lúc ĐỌC: thẻ 'ma:NT01' ghi khi NT01 còn lẻ; thêm NT01 vào nhóm sau đó -> mọi chỗ đọc theo nhóm mới."""
+    cau = "Khách nói @THAK bán @Basa rẻ hơn mình"
+    _nen_tin(conn, batch)
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), [_gia_ke("THAK", "ma:NT01", 900)])
+    assert DT.tong_quan(conn)["hien_truong"]["nhom"][0]["khoa"] == "ma:NT01"
+    g = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Nhóm cá') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO app.nhom_so_sanh_ma VALUES ('NT01', %s)", (g,))
+    conn.commit()
+    assert DT.tong_quan(conn)["hien_truong"]["nhom"][0]["khoa"] == f"n:{g}"
+    assert conn.execute("SELECT nhom_khoa FROM mart.gia_doi_thu_quan_sat WHERE loai_nguon = 'khach_ke'"
+                        ).fetchone()[0] == f"n:{g}"
+    assert conn.execute("SELECT mart.nhom_cua_khoa('ma:NT01'), mart.nhom_cua_khoa('ma:KHONG'), mart.nhom_cua_khoa('n:7')"
+                        ).fetchone() == (f"n:{g}", "ma:KHONG", "n:7")
+
+
+def test_ly_do_ngung_khop_the_ma_cua_hang_KHAC_cung_nhom(conn, batch):
+    """Mã ngừng mua NT05 thuộc 'Nhóm cá'; tin chỉ gắn '@<NT01>' (khoá 'ma:NT01', cùng nhóm) -> vẫn là lý do."""
+    from datetime import timedelta
+    from tests.test_khach_hang import HOM_NAY, _mua, _neo
+    g = _nhom_co_ten(conn, batch)
+    for i in range(5):
+        _mua(conn, batch, "K0001", HOM_NAY - timedelta(days=40 + i * 7), hang="NT05")
+    _neo(conn, batch)
+    cau = "Khách nói @THAK bán @Basa rẻ hơn mình"
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"))
+    ly = DT.khach_doi_thu(conn, "K0001")["ly_do_ngung"]
+    assert [(x["ma"], x["nhom_khoa"], x["ten_nhom"]) for x in ly] == [("NT05", f"n:{g}", "Nhóm cá")]
+
+
+def test_goi_y_nhac_ma_thuoc_nhom_goi_y_NHOM_kem_ten_hang(conn, batch):
+    _hang(conn, batch)
+    _hang(conn, batch, "NT05", "Ca tra phi le")
+    g = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Nhóm cá') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO app.nhom_so_sanh_ma VALUES ('NT05', %s)", (g,))
+    conn.commit()
+    hang = DT.goi_y_nhac(conn)["hang"]
+    assert hang[0] == {"khoa": f"n:{g}", "ten": "Nhóm cá", "loai": "nhom"}
+    ma = {x["ma"]: x for x in hang if x["loai"] == "ma"}
+    assert ma["NT05"] == {"khoa": f"n:{g}", "ten": "Ca tra phi le", "loai": "ma", "ma": "NT05", "ten_nhom": "Nhóm cá"}
+    assert ma["NT01"] == {"khoa": "ma:NT01", "ten": "Ca Ba sa cat khuc (500g x 20 packs)", "loai": "ma", "ma": "NT01"}
+
+
+def test_duyet_khach_ke_da_co_nhom_khong_vao_chua_ghep_va_cho_duyet_nhung_van_bat_thuong(conn, batch):
+    """[IMPORTANT] Giá khách kể mang sẵn nhóm: không có gì để ghép -> không vào 'chưa ghép' và không đếm 'chờ duyệt';
+    nhưng giá khách kể BẤT THƯỜNG vẫn thấy ở bộ lọc 'bất thường'."""
+    from kome import lien_he as LH
+    from tests.test_mart_doi_thu import _qs
+    _nhom_co_ten(conn, batch)
+    _qs(conn, batch, "D", 500, ma=None, hang="ten:la|D")               # bảng giá chưa ghép — vẫn phải hiện
+    cau = "Khách nói @THAK bán @Basa rẻ hơn mình"
+    r = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", cau, "", _the_kep(cau, "THAK", "ma:NT01"),
+                        [_gia_ke("THAK", "ma:NT01", 1400)])
+    conn.commit()
+    assert r["canh_bao"]                                               # khách kể này bất thường
+    chua = DT.duyet(conn, loc="chua_ghep")["dong"]
+    assert [x["ma_doi_thu"] for x in chua] == ["D"]
+    bt = DT.duyet(conn, loc="bat_thuong")["dong"]
+    assert [(x["ma_doi_thu"], x["loai_nguon"]) for x in bt] == [("THAK", "khach_ke")]
+    ben = {b["ma"]: b for b in DT.tong_quan(conn)["ben"]}
+    assert ben["THAK"]["cho_duyet"] == 0 and ben["THAK"]["so_dong"] == 1
+
+
+def test_hien_truong_du_48_dong_tinh_ke_ca_chua_ro(conn, batch):
+    from kome import lien_he as LH
+    ten = [r[0] for r in conn.execute("SELECT ten FROM core.dim_prefecture ORDER BY ma_jis")]
+    assert len(ten) == 47
+    b = batch(9003)
+    kh = [(f"P{i:04d}", t) for i, t in enumerate(ten + [""])]
+    with conn.cursor() as cur:
+        cur.executemany("""INSERT INTO core.dim_customer (customer_code, valid_from, valid_to, is_current, customer_name,
+                                                          prefecture, batch_id)
+                           VALUES (%s, '2025-01-01', '9999-12-31', true, %s, %s, %s)""",
+                        [(m, m, t, b) for m, t in kh])
+    for m, _ in kh:
+        LH.ghi_kem_nhac(conn, m, None, "goi", "tot", "@THAK", "",
+                        [{"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 0, "do_dai": 5}], [])
+    conn.commit()
+    tinh = DT.tong_quan(conn)["hien_truong"]["tinh"]
+    assert len(tinh) == 48 and "(chưa rõ)" in {x["tinh"] for x in tinh}
+
+
+def test_khach_ke_gan_ma_roi_gan_nhom_MOT_dong_hien_hanh_la_gia_moi(conn, batch):
+    """Cùng khách + cùng bên: lần đầu gắn `ma:NT01` (NT01 thuộc nhóm g), lần sau gắn `n:g` -> ĐÚNG MỘT dòng hiện hành
+    trong nhóm g và là giá MỚI. Khoá chuỗi dựng lúc đọc (063); cột lưu `ma_hang_dt` giữ nguyên chữ đã ghi."""
+    g = _nhom_co_ten(conn, batch)
+    nk = f"n:{g}"
+    cau = "Khách nói @THAK bán @Basa rẻ hơn mình"
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), [_gia_ke("THAK", "ma:NT01", 600)], cach_day=5)
+    conn.execute("UPDATE app.gia_doi_thu_tay SET luc = now() - interval '5 days' WHERE loai_nguon = 'khach_ke'")
+    conn.commit()
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", nk), [_gia_ke("THAK", nk, 620)])
+    assert sorted(r[0] for r in conn.execute("SELECT ma_hang_dt FROM app.gia_doi_thu_tay WHERE loai_nguon = 'khach_ke'")) \
+        == sorted(["ke:K0001:ma:NT01", f"ke:K0001:{nk}"])                        # sổ không đổi
+    hh = conn.execute("""SELECT gia_goc, ma_hang_dt FROM mart.gia_doi_thu_hien_hanh
+                         WHERE loai_nguon = 'khach_ke' AND nhom_khoa = %s""", (nk,)).fetchall()
+    assert [(float(a), b) for a, b in hh] == [(620.0, f"ke:K0001:{nk}")]
+    qs = DT.so_sanh(conn)["nhom"]
+    ke = [q for n in qs if n["nhom_khoa"] == nk for q in n["quan_sat"] if q["loai_nguon"] == "khach_ke"]
+    assert [q["gia_goc"] for q in ke] == [620]
+    # Hồ sơ đối thủ: cả hai lần là CÙNG một chuỗi (lịch sử theo ma_hang_dt + kênh + mức), đúng một dòng hiện hành.
+    ho = DT.ho_so_ben(conn, "THAK")["quan_sat"]
+    chuoi = [q for q in ho if q["loai_nguon"] == "khach_ke"]
+    assert {q["ma_hang_dt"] for q in chuoi} == {f"ke:K0001:{nk}"} and len(chuoi) == 2
+    assert [q["gia_goc"] for q in chuoi if q["hien_hanh"]] == [620]
+    # Khách khác vẫn là chuỗi riêng.
+    _tin(conn, batch, "K0002", cau, _the_kep(cau, "THAK", nk), [_gia_ke("THAK", nk, 700)])
+    assert conn.execute("""SELECT count(*) FROM mart.gia_doi_thu_hien_hanh
+                           WHERE loai_nguon = 'khach_ke' AND nhom_khoa = %s""", (nk,)).fetchone()[0] == 2

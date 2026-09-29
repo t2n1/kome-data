@@ -196,6 +196,28 @@ td.trong{text-align:center;padding:1.6rem}
 .hs-form-chip{display:flex;flex-wrap:wrap;gap:.3rem}
 .hs-form textarea{font:inherit;font-size:.84rem;padding:.5rem .6rem;border:1px solid var(--vien-dam);border-radius:8px;background:var(--nen);
   color:var(--chu);resize:vertical}
+/* Thẻ @ của ô ghi tiếp xúc (đợt 2 — tin hiện trường): danh sách gợi ý nằm TRONG dòng (không nổi — thẻ khách ở
+   /lien-he có thể cắt phần tràn), dòng giá khách kể dưới ô chữ, cảnh báo sau khi ghi. */
+.hs-nhac-ds{list-style:none;margin:0;padding:.2rem;max-height:220px;overflow:auto;border:1px solid var(--vien-dam);border-radius:8px;
+  background:var(--nen-the);font-size:.8rem}
+.hs-nhac-ds li{display:flex;align-items:baseline;gap:.4rem;padding:.3rem .45rem;border-radius:6px;cursor:pointer;min-width:0}
+.hs-nhac-ds li.sang{background:var(--nen-phu)}
+.hs-nhac-ds li .phu{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.hs-nhac-loai{font-size:.66rem;color:var(--chu-nhat);flex-shrink:0;width:3.6rem}
+.hs-nhac-trong{margin:0;font-size:.74rem}
+.hs-nhac-gia{display:flex;flex-direction:column;gap:.3rem;font-size:.76rem}
+.hs-nhac-dong{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .45rem;min-width:0}
+.hs-nhac-ten{font-weight:600;max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs-nhac-dong select,.hs-nhac-dong input{font:inherit;font-size:.76rem;padding:.15rem .3rem;border:1px solid var(--vien-dam);
+  border-radius:6px;background:var(--nen-the);color:var(--chu);min-width:0}
+.hs-nhac-dong input{width:6rem;text-align:right}
+.hs-nhac-canh{font-size:.76rem;color:var(--canh-chu);border:1px solid var(--canh-vien);border-radius:8px;padding:.45rem .6rem}
+.hs-nhac-canh p,.hs-nhac-canh ul{margin:0 0 .3rem}
+.hs-nhac-canh ul{padding-left:1.1rem}
+/* Khối "Đang mua của đối thủ" (cột trái hồ sơ 360°). */
+.hs2-doi-thu li{font-size:.8rem;padding:.25rem 0;border-top:1px solid var(--vien-phu)}
+.hs2-doi-thu li:first-child{border-top:0}
+.hs2-doi-thu .ngung{color:var(--do-chu)}
 .hs-form-cuoi{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;justify-content:space-between}
 .hs-form-cuoi input{font:inherit;font-size:.8rem;padding:.25rem .4rem;border:1px solid var(--vien-dam);border-radius:7px;background:var(--nen-the);color:var(--chu)}
 .hs-nk{list-style:none;margin:0;padding:0;max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:.5rem}

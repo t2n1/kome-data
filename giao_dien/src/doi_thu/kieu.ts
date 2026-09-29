@@ -22,6 +22,7 @@ export type TongQuan = {
   khuyen_mai: { ben: string; ten_goc: string; gia_goc: number | null; gia_truoc_km: number | null; khuyen_mai: string | null; ngay: string }[];
   dieu_kien: { ben: string; loai: string; noi_dung: string; ngay: string }[];
   het_hang: { ben: string; ten_goc: string; ma_kome: string; ten_nhom: string | null; trang_thai: string }[];
+  hien_truong?: HienTruong;
 };
 export const NHAN_DUYET: Record<QuanSat["trang_thai_duyet"], string> = {
   ai_doc: "AI đọc", can_xem: "Cần xem", da_xac_nhan: "Đã xác nhận", da_sua: "Đã sửa", nhap_tay: "Nhập tay" };
@@ -30,3 +31,33 @@ export type NhomCoTen = { id: number; ten: string; ma: { ma: string; ten: string
 export type QuyCach = { ma: string; ten: string | null; nganh: string; kg_moi_goi: number | null; goi_moi_thung: number | null;
                         kg_moi_thung: number | null; da_sua: boolean };
 export type NhomQuyCach = { nhom: NhomCoTen[]; quy_cach: QuyCach[] };
+
+// ---- Đợt 2 — tin hiện trường `@` (kome/doi_thu.py: goi_y_nhac, khach_doi_thu, ho_so_ben, tong_quan) ----
+/** GET /api/doi-thu/goi-y-nhac — đối thủ đang theo dõi + nhóm có tên (`n:<id>`) rồi mã KOME (`ma:<mã>`). */
+export type GoiYApi = { doi_thu: { ma: string; ten: string }[];
+                        // Mã (`loai = 'ma'`) mang `ma`; mã thuộc nhóm có tên có khoá NHÓM `n:<id>` + `ten_nhom` (mart.nhom_cua_khoa).
+                        hang: { khoa: string; ten: string; loai: "nhom" | "ma"; ma?: string; ten_nhom?: string }[] };
+export type GiaKhachKe = { ma_doi_thu: string; ten_doi_thu: string | null; nhom_khoa: string; ten_nhom: string | null;
+                           gia_goc: number; don_vi_gia: string };
+/** Đơn vị giá máy chủ nhận (kome/doi_thu.py, mã không dấu) → nhãn in ra. Dùng chung ô ghi tiếp xúc và các khối đọc. */
+export const DON_VI: Record<string, string> = {
+  kg: "kg", goi: "gói", thung: "thùng", tui: "túi", con: "con", qua: "quả", lon: "lon", chai: "chai", hop: "hộp",
+  cay: "cây", bao: "bao", khac: "khác" };
+export const nhanDonVi = (m: string) => DON_VI[m] ?? m;
+/** Thẻ của một tin đã lưu, sắp theo `vi_tri_dau`. Vị trí / độ dài theo KÝ TỰ Unicode (code point, như
+ *  app.tiep_xuc_nhac) — KHÁC đơn vị UTF-16 của POST; muốn tô chữ phải đổi (hiện không tô). */
+export type NhacDaLuu = { loai: "doi_thu" | "nhom"; khoa: string; vi_tri_dau: number; do_dai: number };
+/** Một lần tiếp xúc CÓ thẻ `@` (90 ngày); ghép cặp ở nhac.ts::ghepTin từ `nhac` (thứ tự trong câu). */
+export type TinDoiThu = { tiep_xuc_id: number; ngay: string; nguoi: string | null; noi_dung: string; nhac: NhacDaLuu[];
+                          doi_thu: { ma: string; ten: string }[]; nhom: { khoa: string; ten: string | null }[]; gia: GiaKhachKe[] };
+export type LyDoNgung = { ma: string; ten: string; nhom_khoa: string; ten_nhom: string | null; lan_cuoi: string; so_ngay: number;
+                          tiep_xuc_id: number; tin_ngay: string; doi_thu: { ma: string; ten: string }[] };
+/** GET /api/khach-hang/{ma}/doi-thu */
+export type KhachDoiThu = { tin: TinDoiThu[]; ly_do_ngung: LyDoNgung[] };
+/** `khach_dang_mua` của GET /api/doi-thu/ben/{ma} — mỗi phần tử một lần tiếp xúc nhắc bên này. */
+export type KhachDangMua = { tiep_xuc_id: number; ma_khach: string; ten_khach: string | null; ngay: string;
+                             nhom: { khoa: string; ten: string | null }[];
+                             gia: { nhom_khoa: string; ten_nhom: string | null; gia_goc: number; don_vi_gia: string }[] };
+/** `hien_truong` của GET /api/doi-thu/tong-quan — đếm SỐ TIN (không đếm thẻ). */
+export type HienTruong = { ngay: number; tong: number; doi_thu: { ma: string; ten: string; so_tin: number }[];
+                           nhom: { khoa: string; ten: string | null; so_tin: number }[]; tinh: { tinh: string; so_tin: number }[] };

@@ -265,3 +265,287 @@ def test_sidebar_tro_toi_lien_he(client, conn):
     assert "/can-xu-ly" not in muc
     assert 'aria-current={m.ma === dangMo ? "page" : undefined}' in         (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")
     assert "/can-xu-ly" not in (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")
+
+
+# ---- Đợt 2 (063): ghi kèm thẻ `@` + giá khách kể trong MỘT giao dịch ---------------------------------
+
+def _the(noi_dung, loai, khoa, nhan):
+    """Thẻ đúng như giao diện gửi: vị trí của `nhan` trong `noi_dung`."""
+    return {"loai": loai, "khoa": khoa, "vi_tri_dau": noi_dung.index(nhan), "do_dai": len(nhan)}
+
+
+CAU = "Khách nói @THAK bán @Basa rẻ hơn mình"
+
+
+def _nen_nhac(conn, batch):
+    from tests.test_mart_doi_thu import _hang
+    _ho_so_khach(conn, batch, "K0001", "Quán một")
+    _hang(conn, batch)          # NT01
+
+
+def _so_dong_tx(conn):
+    return conn.execute("SELECT count(*) FROM app.nhat_ky_tiep_xuc").fetchone()[0]
+
+
+def test_ghi_tra_id_dong_vua_them(conn, batch):
+    _nen(conn, batch)
+    i = LH.ghi(conn, "L0011", None, "goi", "tot", "x")
+    assert i == conn.execute("SELECT max(id) FROM app.nhat_ky_tiep_xuc").fetchone()[0]
+
+
+def test_ghi_kem_nhac_ghi_the_va_gia_khach_ke(conn, batch):
+    _nen_nhac(conn, batch)
+    nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
+    gia = [{"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": "1,200", "don_vi_gia": "kg"}]
+    r = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac, gia)
+    conn.commit()
+    assert r["canh_bao"] == [] and isinstance(r["id"], int)
+    assert conn.execute("SELECT noi_dung FROM app.nhat_ky_tiep_xuc WHERE id=%s", (r["id"],)).fetchone()[0] == CAU
+    assert conn.execute("SELECT loai, khoa, vi_tri_dau, do_dai FROM app.tiep_xuc_nhac WHERE tiep_xuc_id=%s ORDER BY vi_tri_dau",
+                        (r["id"],)).fetchall() == [("doi_thu", "THAK", 10, 5), ("nhom", "ma:NT01", 20, 5)]
+    g = conn.execute("""SELECT ma_doi_thu, ma_hang_dt, loai_nguon, customer_code, tiep_xuc_id, nhom_khoa, gia_goc, don_vi_gia,
+                               kg_moi_don_vi_gia, thue, gom_ship, ten_goc, trang_thai
+                        FROM app.gia_doi_thu_tay""").fetchall()
+    assert g == [("THAK", "ke:K0001:ma:NT01", "khach_ke", "K0001", r["id"], "ma:NT01", 1200, "kg", 1, "khong_ro",
+                  "khong_ro", "Ca Ba sa cat khuc (500g x 20 packs)", "con")]
+    assert conn.execute("SELECT loai FROM app.doi_thu_nhat_ky").fetchall() == [("gia_moi",)]
+
+
+def test_gia_khac_kg_thi_kg_null(conn, batch):
+    _nen_nhac(conn, batch)
+    nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
+    LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac,
+                    [{"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 3500, "don_vi_gia": "thung"}])
+    assert conn.execute("SELECT kg_moi_don_vi_gia, don_vi_gia FROM app.gia_doi_thu_tay").fetchone() == (None, "thung")
+
+
+def test_khong_the_khong_gia_van_ghi_nhu_cu(conn, batch):
+    _nen_nhac(conn, batch)
+    r = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", "gọi bình thường", "", None, None)
+    assert r["canh_bao"] == [] and _so_dong_tx(conn) == 1
+    assert conn.execute("SELECT count(*) FROM app.tiep_xuc_nhac").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("lam_hong", [
+    lambda c: {**c, "vi_tri_dau": c["vi_tri_dau"] + 1},               # không trỏ vào '@'
+    lambda c: {**c, "vi_tri_dau": 9999},                              # ngoài câu
+    lambda c: {**c, "do_dai": 9999},                                  # đoạn tràn khỏi câu
+    lambda c: {**c, "do_dai": 1},                                     # chỉ có '@'
+    lambda c: {**c, "khoa": "KHONG-CO"},                              # đối thủ không tồn tại
+    lambda c: {**c, "loai": "la"},
+])
+def test_the_sai_bi_tu_choi_va_KHONG_de_lai_dong_tiep_xuc(conn, batch, lam_hong):
+    _nen_nhac(conn, batch)
+    the = lam_hong(_the(CAU, "doi_thu", "THAK", "@THAK"))
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", [the], [])
+    assert _so_dong_tx(conn) == 0                                     # chưa rollback tay: hàm tự thu lại
+
+
+@pytest.mark.parametrize("khoa", ["ma:KHONG-CO", "n:999999", "nt01", "n:abc", "ma:", "n:", "x:NT01",
+                                  "n:5\n", "ma:NT01\n", " n:5", "ma:NT01 ", "ma:NT\t01", "n:5\x00", "ma:NT\ud80001"])
+def test_the_hang_khoa_sai_dinh_dang_hoac_khong_ton_tai(conn, batch, khoa):
+    _nen_nhac(conn, batch)
+    the = {"loai": "nhom", "khoa": khoa, "vi_tri_dau": CAU.index("@Basa"), "do_dai": 5}
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", [the], [])
+    assert _so_dong_tx(conn) == 0
+
+
+def test_the_nhom_co_ten_n_id_hop_le(conn, batch):
+    _nen_nhac(conn, batch)
+    n = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Nhóm cá') RETURNING id").fetchone()[0]
+    LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", [_the(CAU, "nhom", f"n:{n}", "@Basa")], [])
+    assert conn.execute("SELECT khoa FROM app.tiep_xuc_nhac").fetchone() == (f"n:{n}",)
+
+
+def test_hai_the_chong_len_nhau_bi_tu_choi(conn, batch):
+    _nen_nhac(conn, batch)
+    a = {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 10, "do_dai": 8}
+    b = {"loai": "nhom", "khoa": "ma:NT01", "vi_tri_dau": 14, "do_dai": 5}
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", [a, b], [])
+    assert _so_dong_tx(conn) == 0
+
+
+def test_vi_tri_tinh_theo_cau_goc_ke_ca_khoang_trang_dau_va_ky_tu_ngoai_BMP(conn, batch):
+    """Giao diện đếm theo JS (UTF-16) trên ô chữ CHƯA cắt khoảng trắng; máy chủ lưu câu đã cắt, vị trí theo ký tự."""
+    _nen_nhac(conn, batch)
+    cau = "  📞 nói @THAK rẻ"                    # 📞 = 2 đơn vị UTF-16, 1 ký tự
+    js = len("  📞 nói ".encode("utf-16-le")) // 2
+    the = {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": js, "do_dai": 5}
+    r = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", cau, "", [the], [])
+    luu = conn.execute("SELECT noi_dung FROM app.nhat_ky_tiep_xuc WHERE id=%s", (r["id"],)).fetchone()[0]
+    pos = conn.execute("SELECT vi_tri_dau, do_dai FROM app.tiep_xuc_nhac").fetchone()
+    assert luu == "📞 nói @THAK rẻ" and luu[pos[0]:pos[0] + pos[1]] == "@THAK"
+
+
+def test_gia_khong_co_the_tuong_ung_bi_tu_choi(conn, batch):
+    _nen_nhac(conn, batch)
+    g = {"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 900, "don_vi_gia": "kg"}
+    solo_dt = [_the(CAU, "doi_thu", "THAK", "@THAK")]
+    solo_hang = [_the(CAU, "nhom", "ma:NT01", "@Basa")]
+    for nhac in ([], solo_dt, solo_hang):
+        with pytest.raises(LH.LoiNhap):
+            LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac, [g])
+    both = solo_dt + solo_hang
+    for sai in ({**g, "ma_doi_thu": "ICHIBA"}, {**g, "nhom_khoa": "ma:KHAC"}):
+        with pytest.raises(LH.LoiNhap):
+            LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", both, [sai])
+    assert _so_dong_tx(conn) == 0
+
+
+@pytest.mark.parametrize("sai", [{"gia_goc": ""}, {"gia_goc": "abc"}, {"gia_goc": -5}, {"gia_goc": 0},
+                                 {"don_vi_gia": "met"}, {"don_vi_gia": ""}])
+def test_gia_sai_gia_tri_bi_tu_choi_va_khong_de_lai_gi(conn, batch, sai):
+    _nen_nhac(conn, batch)
+    nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
+    g = {"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 900, "don_vi_gia": "kg", **sai}
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac, [g])
+    assert _so_dong_tx(conn) == 0
+    assert conn.execute("SELECT count(*) FROM app.gia_doi_thu_tay").fetchone()[0] == 0
+
+
+def test_loi_giua_chung_thi_thu_lai_tat_ca_ke_ca_khi_nguoi_goi_van_commit(conn, batch, monkeypatch):
+    """[CRITICAL] Dòng tiếp xúc, thẻ và giá cùng sống hoặc cùng chết. Người gọi bắt lỗi rồi vẫn commit
+    cũng không được để lại nửa chừng."""
+    from kome import doi_thu as DT
+    _nen_nhac(conn, batch)
+    nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
+    g = {"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 900, "don_vi_gia": "kg"}
+
+    def hong(*a, **k):
+        raise RuntimeError("đứt giữa chừng")
+    monkeypatch.setattr(DT, "gia_khach_ke", hong)
+    with pytest.raises(RuntimeError):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac, [g])
+    conn.commit()
+    assert _so_dong_tx(conn) == 0
+    assert conn.execute("SELECT count(*) FROM app.tiep_xuc_nhac").fetchone()[0] == 0
+
+
+def test_canh_bao_khi_gia_lech_xa_trung_vi_nhom(conn, batch):
+    from tests.test_mart_doi_thu import _qs
+    _nen_nhac(conn, batch)
+    for ben, g in [("A", 540), ("B", 560), ("C", 580)]:
+        _qs(conn, batch, ben, g)
+    nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
+    r = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac,
+                        [{"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 1400, "don_vi_gia": "kg"}])
+    assert r["canh_bao"] == ["Giá ¥1,400/kg lệch xa trung vị ¥560/kg của nhóm — kiểm lại đơn vị?"]
+    ok =LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac,
+                         [{"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 600, "don_vi_gia": "kg"}])
+    assert ok["canh_bao"] == []
+
+
+def test_canh_bao_in_DUNG_trung_vi_cua_bang_so_sanh(conn, batch):
+    """Câu cảnh báo in trung vị của `mart.so_sanh_nhom` (bỏ giá bất thường) — đúng số người ta thấy ở tab
+    So sánh giá. Trung vị dùng để BẮT bất thường (`trung_vi_nhom`, tính cả giá lệch) là ¥570 ở đây: in số
+    đó là hai con số cùng tên "trung vị" trên hai màn."""
+    from tests.test_mart_doi_thu import _qs
+    _nen_nhac(conn, batch)
+    for ben, g in [("A", 540), ("B", 560), ("C", 580), ("D", 1400)]:
+        _qs(conn, batch, ben, g)
+    tv = conn.execute("SELECT trung_vi FROM mart.so_sanh_nhom WHERE nhom_khoa = 'ma:NT01'").fetchone()[0]
+    assert round(tv) == 560
+    nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
+    r = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac,
+                        [{"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 1400, "don_vi_gia": "kg"}])
+    assert r["canh_bao"] == ["Giá ¥1,400/kg lệch xa trung vị ¥560/kg của nhóm — kiểm lại đơn vị?"]
+
+
+def test_ghi_kem_nhac_dung_luot_hoi_canh_bao_MOT_cho_moi_gia(conn, batch, monkeypatch):
+    _nen_nhac(conn, batch)
+    cau = "@THAK @Basa và @ICHIBA @Basa"
+    nhac = [_the(cau, "doi_thu", "THAK", "@THAK"), {"loai": "nhom", "khoa": "ma:NT01", "vi_tri_dau": 6, "do_dai": 5},
+            {"loai": "doi_thu", "khoa": "ICHIBA", "vi_tri_dau": 15, "do_dai": 7},
+            {"loai": "nhom", "khoa": "ma:NT01", "vi_tri_dau": 23, "do_dai": 5}]
+    gia = [{"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 900, "don_vi_gia": "kg"},
+           {"ma_doi_thu": "ICHIBA", "nhom_khoa": "ma:NT01", "gia_goc": 950, "don_vi_gia": "kg"}]
+    dem = {"n": 0}
+    that = conn.execute
+
+    def demo(q, *a, **k):
+        if "gia_doi_thu_hien_hanh" in str(q):
+            dem["n"] += 1
+        return that(q, *a, **k)
+    monkeypatch.setattr(conn, "execute", demo)
+    LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", cau, "", nhac, gia)
+    assert dem["n"] == 1
+
+
+# ---- Vòng sửa 1: khoá fullmatch, kiểu dữ liệu, độ dài trước ---------------------------------------------
+
+@pytest.mark.parametrize("khoa", ["THAK\n", " THAK", "THAK ", "TH AK", "THAK\x00"])
+def test_the_doi_thu_khoa_co_khoang_trang_hoac_ky_tu_dieu_khien_bi_tu_choi(conn, batch, khoa):
+    _nen_nhac(conn, batch)
+    the = {"loai": "doi_thu", "khoa": khoa, "vi_tri_dau": CAU.index("@THAK"), "do_dai": 5}
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", [the], [])
+    assert _so_dong_tx(conn) == 0
+
+
+def test_gia_khach_ke_tu_choi_khoa_bien_the_xuong_dong(conn, batch):
+    from kome import doi_thu as DT
+    _nen_nhac(conn, batch)
+    tid = LH.ghi(conn, "K0001", None, "goi", "tot", "x")
+    for nk in ("n:5\n", "ma:NT01\n", " ma:NT01"):
+        with pytest.raises(DT.LoiNhap):
+            DT.gia_khach_ke(conn, "THAK", nk, "K0001", tid, 900, "kg", None)
+    with pytest.raises(DT.LoiNhap):
+        DT.gia_khach_ke(conn, "THAK\n", "ma:NT01", "K0001", tid, 900, "kg", None)
+
+
+@pytest.mark.parametrize("sai", [
+    {"ma_doi_thu": ["THAK"]}, {"nhom_khoa": ["ma:NT01"]}, {"ma_doi_thu": {"a": 1}}, {"nhom_khoa": 5},
+    {"ma_doi_thu": None}, {"gia_goc": [900]}, {"gia_goc": {"a": 1}}, {"don_vi_gia": ["kg"]}, {"don_vi_gia": {"a": 1}}])
+def test_gia_sai_kieu_du_lieu_la_LoiNhap_khong_phai_TypeError(conn, batch, sai):
+    _nen_nhac(conn, batch)
+    nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
+    g = {"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 900, "don_vi_gia": "kg", **sai}
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac, [g])
+    assert _so_dong_tx(conn) == 0
+
+
+@pytest.mark.parametrize("the", [
+    {"loai": ["doi_thu"], "khoa": "THAK", "vi_tri_dau": 10, "do_dai": 5},
+    {"loai": "doi_thu", "khoa": ["THAK"], "vi_tri_dau": 10, "do_dai": 5},
+    {"loai": "doi_thu", "khoa": {"a": 1}, "vi_tri_dau": 10, "do_dai": 5},
+    {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": [10], "do_dai": 5},
+    {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": "10", "do_dai": 5},
+    {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 10, "do_dai": None},
+    {"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 10.5, "do_dai": 5}])
+def test_the_sai_kieu_du_lieu_la_LoiNhap(conn, batch, the):
+    _nen_nhac(conn, batch)
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", [the], [])
+    assert _so_dong_tx(conn) == 0
+
+
+def test_do_dai_cau_ghi_chu_duoc_kiem_TRUOC_khi_do_the(conn, batch, monkeypatch):
+    """Câu quá dài bị chặn ngay bằng lỗi độ dài — không mã hoá / dò thẻ, không hỏi CSDL về thẻ."""
+    _nen_nhac(conn, batch)
+    dai = "@THAK " + "x" * LH.DO_DAI_NOI_DUNG
+    hong = {"loai": "doi_thu", "khoa": "KHONG-CO", "vi_tri_dau": 0, "do_dai": 5}
+    goi = []
+    that = LH._kiem_the
+    monkeypatch.setattr(LH, "_kiem_the", lambda *a, **k: (goi.append(1), that(*a, **k))[1])
+    with pytest.raises(LH.LoiNhap, match="dài quá"):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", dai, "", [hong], [])
+    assert goi == [] and _so_dong_tx(conn) == 0
+
+
+def test_noi_dung_co_nua_cap_UTF16_le_loi_bi_chan_bang_LoiNhap(conn, batch):
+    """JSON cho phép một nửa cặp UTF-16 lẻ (U+D800) -> str Python không mã hoá UTF-8 được -> psycopg nổ (500). Chặn ở
+    `doc_bieu_mau` — điểm kiểm DUY NHẤT (cả `ghi` lẫn `ghi_kem_nhac` đi qua nó), không ghi dòng nào."""
+    _nen_nhac(conn, batch)
+    le = "Khách nói " + chr(0xD800)
+    with pytest.raises(LH.LoiNhap, match="không hợp lệ"):
+        LH.doc_bieu_mau("goi", "tot", le, "")
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", le, "", [], [])
+    conn.commit()
+    assert _so_dong_tx(conn) == 0
+    LH.doc_bieu_mau("goi", "tot", "\U0001F41F cặp đủ vẫn nhận", "")     # emoji (cặp surrogate đủ) không bị chặn

@@ -56,3 +56,30 @@ def test_khong_bang_nao_bat_RLS(conn):
         """SELECT n.nspname || '.' || c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
            WHERE n.nspname IN ('core', 'app', 'meta', 'mart') AND c.relkind = 'r' AND c.relrowsecurity""")]
     assert bat == []
+
+
+def test_tiep_xuc_nhac_CHI_THEM_kome_app_khong_sua_khong_xoa_duoc(conn):
+    assert _quyen(conn, "kome_app", "app.tiep_xuc_nhac", "INSERT")
+    assert _quyen(conn, "kome_app", "app.tiep_xuc_nhac", "SELECT")
+    assert not _quyen(conn, "kome_app", "app.tiep_xuc_nhac", "UPDATE")
+    assert not _quyen(conn, "kome_app", "app.tiep_xuc_nhac", "DELETE")
+
+
+def test_tiep_xuc_nhac_kiem_loai_vi_tri_va_khoa_ngoai(conn):
+    import psycopg, pytest
+    tx = conn.execute("""INSERT INTO app.nhat_ky_tiep_xuc (customer_code, kieu, ket_qua, noi_dung)
+                         VALUES ('202601010001', 'goi', 'tot', 'nghe @THAK ban 700') RETURNING id""").fetchone()[0]
+    conn.execute("INSERT INTO app.tiep_xuc_nhac (tiep_xuc_id, loai, khoa, vi_tri_dau, do_dai) VALUES (%s,'doi_thu','THAK',5,5)", (tx,))
+    conn.commit()
+    for sql in ("INSERT INTO app.tiep_xuc_nhac (tiep_xuc_id, loai, khoa, vi_tri_dau, do_dai) VALUES ({tx},'bua','x',0,1)",
+                "INSERT INTO app.tiep_xuc_nhac (tiep_xuc_id, loai, khoa, vi_tri_dau, do_dai) VALUES ({tx},'nhom','x',-1,1)",
+                "INSERT INTO app.tiep_xuc_nhac (tiep_xuc_id, loai, khoa, vi_tri_dau, do_dai) VALUES ({tx},'nhom','x',0,0)",
+                "INSERT INTO app.tiep_xuc_nhac (tiep_xuc_id, loai, khoa, vi_tri_dau, do_dai) VALUES (999999,'nhom','x',0,1)"):
+        with pytest.raises((psycopg.errors.CheckViolation, psycopg.errors.ForeignKeyViolation)):
+            conn.execute(sql.format(tx=tx))
+        conn.rollback()
+
+
+def test_gia_tay_co_cot_nhom_khoa(conn):
+    assert conn.execute("""SELECT count(*) FROM information_schema.columns WHERE table_schema='app'
+                           AND table_name='gia_doi_thu_tay' AND column_name='nhom_khoa'""").fetchone()[0] == 1

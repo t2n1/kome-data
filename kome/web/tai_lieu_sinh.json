@@ -17,7 +17,8 @@
    "nhat_ky_tiep_xuc",
    "nhom_so_sanh",
    "nhom_so_sanh_ma",
-   "quy_cach_kome"
+   "quy_cach_kome",
+   "tiep_xuc_nhac"
   ],
   "core": [
    "dim_customer",

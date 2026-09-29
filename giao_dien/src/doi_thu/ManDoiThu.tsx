@@ -41,7 +41,8 @@ export default function ManDoiThu() {
           onClick={() => doi({ tab: t.ma })}>{t.nhan}</button>)}
       </div>
       {tab === "tong_quan" && <TabTongQuan moBen={b => doi({ tab: "ben", ben: b })}
-        moSoSanh={(n, b) => doi({ tab: "so_sanh", nganh: n, ben: b, nhom: "" })} />}
+        moSoSanh={(n, b) => doi({ tab: "so_sanh", nganh: n, ben: b, nhom: "" })}
+        moNhom={k => doi({ tab: "so_sanh", nganh: "", ben: "", nhom: k })} />}
       {tab === "so_sanh" && <TabSoSanh nganh={nganh} ben={ben} nhom={nhom}
         datNganh={n => doi({ nganh: n })} datBen={b => doi({ ben: b })} datNhom={k => doi({ nhom: k })} />}
       {tab === "ben" && <TabHoSo ben={ben} chonBen={b => doi({ ben: b })} />}

@@ -6,7 +6,8 @@ import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { TongQuan } from "./kieu";
 import { NHAN_TRANG_THAI } from "./kieu";
 
-export function TabTongQuan({ moBen, moSoSanh }: { moBen: (ma: string) => void; moSoSanh: (nganh: string, ben: string) => void }) {
+export function TabTongQuan({ moBen, moSoSanh, moNhom }: { moBen: (ma: string) => void; moSoSanh: (nganh: string, ben: string) => void;
+                              moNhom: (khoa: string) => void }) {
   const kx = chuoiKhoang(useKhoang());
   const q = useQuery({ queryKey: ["doi-thu", "tong-quan", kx],
     queryFn: () => lay<TongQuan>(`/api/doi-thu/tong-quan${kx ? "?" + kx : ""}`) });
@@ -14,6 +15,7 @@ export function TabTongQuan({ moBen, moSoSanh }: { moBen: (ma: string) => void; 
   const nganh = d ? [...new Set(d.luoi.map(x => x.nganh))].sort() : [];
   const o = (ben: string, n: string) => d?.luoi.find(x => x.ben === ben && x.nganh === n)?.so_ma ?? 0;
   const loi = q.error ? (q.error as Error).message : null;
+  const ht = d?.hien_truong;
   return (
     <div className="dt-luoi-khoi">
       <section className="dt-khoi dt-rong">
@@ -34,6 +36,29 @@ export function TabTongQuan({ moBen, moSoSanh }: { moBen: (ma: string) => void; 
                 </tr>))}</tbody>
             </table>
           </div>
+        </Khoi>
+      </section>
+      <section className="dt-khoi dt-rong">
+        <Khoi tieu_de={`Hiện trường ${ht?.ngay ?? 30} ngày`} dang_tai={q.isLoading}
+          cach_tinh="Đếm từ thẻ @đối thủ / @hàng trong các lần ghi tiếp xúc (đồng hồ thật, không theo khoảng xem). Mỗi đối thủ / hàng / tỉnh đếm số TIN nhắc tới nó — một tin nhắc hai lần vẫn là một."
+          phu={ht ? `${so(ht.tong)} tin có thẻ @` : undefined}>
+          {ht && !ht.tong ? <p className="dt-nhat">Chưa có tin hiện trường nào — sale gõ @đối thủ, @hàng khi ghi tiếp xúc với khách.</p> : ht && (
+            <div className="dt-hien-truong">
+              <div><h3>Đối thủ được nhắc</h3>
+                <table className="bang dt-bang"><thead><tr><th>Đối thủ</th><th>Số tin</th></tr></thead>
+                  <tbody>{ht.doi_thu.map(x => (
+                    <tr key={x.ma}><td><button type="button" className="lien-ket" onClick={() => moBen(x.ma)}>{x.ten}</button></td>
+                      <td>{so(x.so_tin)}</td></tr>))}</tbody></table></div>
+              <div><h3>Hàng được nhắc</h3>
+                <table className="bang dt-bang"><thead><tr><th>Nhóm</th><th>Số tin</th></tr></thead>
+                  <tbody>{ht.nhom.map(x => (
+                    <tr key={x.khoa}><td><button type="button" className="lien-ket" onClick={() => moNhom(x.khoa)}>{x.ten ?? x.khoa}</button></td>
+                      <td>{so(x.so_tin)}</td></tr>))}</tbody></table></div>
+              <div><h3>Theo tỉnh</h3>
+                <div className="dt-cuon dt-tinh">
+                  <table className="bang dt-bang"><thead><tr><th>Tỉnh</th><th>Số tin</th></tr></thead>
+                    <tbody>{ht.tinh.map(x => <tr key={x.tinh}><td>{x.tinh}</td><td>{so(x.so_tin)}</td></tr>)}</tbody></table></div></div>
+            </div>)}
         </Khoi>
       </section>
       <section className="dt-khoi">

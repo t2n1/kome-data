@@ -40,3 +40,7 @@
 .dt-so{width:5.5rem;text-align:right}
 @media (max-width:760px){.dt-duyet{grid-template-columns:minmax(0,1fr)}.dt-sua label,.dt-them label{grid-template-columns:minmax(0,1fr)}}
 .dt-an{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.dt-hien-truong{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:16px}
+.dt-hien-truong h3{margin:0 0 4px;font-size:.85rem}
+.dt-tinh{max-height:320px;overflow:auto}
+.dt-ke{display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;font-size:.72rem;background:var(--canh-nen);color:var(--canh-chu)}

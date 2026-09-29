@@ -5,6 +5,7 @@ import { ngay } from "../dinh_dang";
 import type { HoSoApi } from "./kieu";
 import { MAU_TT } from "./DanhSach";
 import { GhiTiepXuc } from "./GhiTiepXuc";
+import { DoiThuKhach } from "./DoiThuKhach";
 import { OCongNoGon } from "../cong_no/CongNoKhach";
 import { The } from "./HoSoTab";
 import { cauNhip, dongMuaLai, laCanGoi } from "./ho_so_logic";
@@ -36,6 +37,7 @@ export function HoSoViec({ h, moGhi, datMoGhi }: { h: HoSoApi; moGhi: boolean; d
           <p className="phu">{cauNhip(k.ty_le_im_lang)}</p>
         </section>)}
       {!ngung && <MaMuaLai h={h} />}
+      <DoiThuKhach ma={k.ma} />
       <LanTruoc h={h} moGhi={moGhi} datMoGhi={datMoGhi} />
       {TN.cong_no && <OCongNoGon ma={k.ma} />}
     </aside>);

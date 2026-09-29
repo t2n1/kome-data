@@ -2,12 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { lay } from "../api";
 import { Khoi } from "../chung/Khoi";
 import { ngay, so, yen } from "../dinh_dang";
-import { chuoiKhoang, useKhoang } from "../khung/khoang";
-import type { QuanSat, TongQuan } from "./kieu";
+import { chuoiKhoang, giuKhoang, useKhoang } from "../khung/khoang";
+import type { KhachDangMua, QuanSat, TongQuan } from "./kieu";
+import { nhanDonVi } from "./kieu";
 import { NHAN_TRANG_THAI } from "./kieu";
 
 type HoSo = { ben: { ma: string; ten: string; web: string | null; ghi_chu: string | null };
-              dieu_kien: { loai: string; noi_dung: string; ngay: string }[]; quan_sat: (QuanSat & { hien_hanh: boolean })[] };
+              dieu_kien: { loai: string; noi_dung: string; ngay: string }[]; quan_sat: (QuanSat & { hien_hanh: boolean })[];
+              khach_dang_mua?: KhachDangMua[] };
 type KetQua = HoSo | { khong_co: true };
 
 export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) => void }) {
@@ -37,6 +39,21 @@ export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) =
               <table className="bang dt-bang"><thead><tr><th>Ngành</th><th>Số mã</th></tr></thead>
                 <tbody>{manh.map(x => <tr key={x.nganh}><td>{x.nganh}</td><td>{so(x.so_ma)}</td></tr>)}</tbody></table>
             </div>) : tq.isSuccess ? <p className="dt-nhat">Chưa ghép được mặt hàng nào với ngành của KOME.</p> : null}
+          <h3>Khách đang mua của bên này ({hs.khach_dang_mua?.length ?? 0})</h3>
+          {hs.khach_dang_mua?.length ? (
+            <div className="dt-cuon">
+              <table className="bang dt-bang">
+                <caption className="dt-an">Các lần ghi tiếp xúc 90 ngày qua có gắn thẻ @{hs.ben.ma}, mới nhất trước</caption>
+                <thead><tr><th>Ngày</th><th>Khách</th><th>Hàng nhắc cùng</th><th>Giá khách kể</th></tr></thead>
+                <tbody>{hs.khach_dang_mua.map(k => (
+                  <tr key={k.tiep_xuc_id}>
+                    <td>{ngay(k.ngay)}</td>
+                    <td><a href={giuKhoang(`/khach-hang/${encodeURIComponent(k.ma_khach)}`)}>{k.ten_khach ?? k.ma_khach}</a>
+                      {" "}<span className="dt-nhat">{k.ma_khach}</span></td>
+                    <td>{k.nhom.map(n => n.ten ?? n.khoa).join(" · ") || "—"}</td>
+                    <td>{k.gia.map(g => `${g.ten_nhom ?? g.nhom_khoa}: ${yen(g.gia_goc)}/${nhanDonVi(g.don_vi_gia)}`).join(" · ") || "—"}</td>
+                  </tr>))}</tbody></table>
+            </div>) : <p className="dt-nhat">Chưa lần ghi tiếp xúc nào trong 90 ngày gắn thẻ @{hs.ben.ma}.</p>}
           <h3>Điều kiện</h3>
           <ul className="dt-ds">{hs.dieu_kien.map((k, i) => <li key={i}>{k.loai} · {k.noi_dung} · {ngay(k.ngay)}</li>)}</ul>
           <h3>Mặt hàng ({hien.length})</h3>
