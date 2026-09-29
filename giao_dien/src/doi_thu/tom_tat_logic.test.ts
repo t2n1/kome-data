@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Ben, Nhom, QuanSat, TongQuan } from "./kieu";
-import { bongNganh, coHoi, datNhat, diemVitri, goiY, kmNoiBat, kmTheoBen, nganhObc, nhomCuaO, reNhat, SO_COT, tiLe,
+import { bongNganh, coHoi, datNhat, diemVitri, goiY, kmNoiBat, kmTheoBen, mauTT, nganhObc, nhomCuaO, reNhat, SO_COT, tiLe,
   tongSo } from "./tom_tat_logic";
 
 let seq = 0;
@@ -44,6 +44,20 @@ describe("tiLe", () => {
       nh({ gia_kome_so: null, lech_trung_vi: null }), nh({ gia_kome_so: null, lech_trung_vi: null, don_vi_so: "goi" }),
       nh({ lech_trung_vi: 4, gia_kome_lech: true })];
     expect(tiLe(ss)).toEqual({ re: 1, ngang: 2, dat: 1, khongBan: 2, lech: 1, tong: 7 });
+  });
+  it("lệch đếm nhom_khoa khác nhau, không đếm dòng (một nhóm nhiều đơn vị so)", () => {
+    const ss = [nh({ nhom_khoa: "n:1", gia_kome_lech: true, lech_trung_vi: 4 }),
+      nh({ nhom_khoa: "n:1", don_vi_so: "goi", gia_kome_lech: true, lech_trung_vi: 4 }), nh({ gia_kome_lech: true, lech_trung_vi: 5 })];
+    expect(tiLe(ss).lech).toBe(2);
+  });
+});
+
+describe("mauTT", () => {
+  it("màu từ lech CHƯA làm tròn: 5,1% là đỏ (khớp danh sách đắt nhất) dù in ra +5%", () => {
+    expect(mauTT(nh({ lech_trung_vi: 0.051 }))).toBe("do");
+    expect(mauTT(nh({ lech_trung_vi: -0.051 }))).toBe("xanh");
+    expect(mauTT(nh({ lech_trung_vi: 0.05 }))).toBe("xam");
+    expect(mauTT(nh({ lech_trung_vi: null }))).toBe("xam");
   });
 });
 

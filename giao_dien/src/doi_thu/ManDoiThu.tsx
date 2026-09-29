@@ -85,7 +85,9 @@ export default function ManDoiThu() {
       <div className="dt-thanh">
         <div role="tablist" className="kh-tab" aria-label="Thị trường và đối thủ">
           {TAB.map(x => <button key={x.ma} role="tab" type="button" aria-selected={t.tab === x.ma}
-            onClick={() => doi({ tab: x.ma })}>{x.nhan}</button>)}
+            // Thanh tab vào So sánh KHÔNG mang bộ lọc bên theo (bên còn lại từ tab Đối thủ sẽ lặng lẽ lọc cột trái);
+            // chỉ bóng "Ai bán ngành nào" của Tóm tắt / liên kết tường minh đưa ?ben= vào So sánh.
+            onClick={() => doi(x.ma === "so_sanh" ? { tab: x.ma, ben: "" } : { tab: x.ma })}>{x.nhan}</button>)}
         </div>
         <div className="dt-menu-goc">
           <button ref={nut} type="button" className="dt-menu-nut" aria-haspopup="menu" aria-expanded={mo}
@@ -105,7 +107,7 @@ export default function ManDoiThu() {
             </div>)}
         </div>
       </div>
-      {t.tab === "tom_tat" && <TabTomTat moBen={b => doi({ tab: "ben", ben: b })} moLech={() => doi({ tab: "lech" })}
+      {t.tab === "tom_tat" && <TabTomTat moBen={b => doi({ tab: "ben", ben: b })} moLech={() => doi({ tab: "lech" })} moTin={() => doi({ tab: "tin" })}
         moSoSanh={o => doi({ tab: "so_sanh", sp: o.sp ?? [], nganh: o.nganh ?? "", ben: o.ben ?? "", nhom: "" })} />}
       {t.tab === "so_sanh" && <TabSoSanh sp={t.sp} sl={t.sl} xem={t.xem} gk={t.gk} cung={t.cung} nganh={t.nganh} ben={t.ben}
         nhom={t.nhom} dat={doi} />}

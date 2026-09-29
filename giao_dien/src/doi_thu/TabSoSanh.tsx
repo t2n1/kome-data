@@ -45,7 +45,8 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, ben, nhom, dat }: Prop
   const hen = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(hen.current), []);
   // Chưa ai chọn gì (?sp= trống) → 3 nhóm nhiều bên nhất, KHÔNG ghi lên URL. Bỏ chọn hết bằng tay thì là rỗng thật.
-  const daChon = useRef(sp.length > 0);
+  // Đến với ?ben= (bóng của Tóm tắt không tìm được nhóm nào) → rỗng thật: 3 nhóm mặc định không thuộc bên đó.
+  const daChon = useRef(sp.length > 0 || !!ben);
   const chonSp = useMemo(() => (sp.length || daChon.current ? sp : macDinhSp(tatCa ?? [])), [sp, tatCa]);
   const chon = useMemo(() => nhomChon(tatCa ?? [], chonSp), [tatCa, chonSp]);
   const ds = useMemo(() => locDanhSach(tatCa ?? [], { nganh, tim, nhanh, ben }), [tatCa, nganh, tim, nhanh, ben]);

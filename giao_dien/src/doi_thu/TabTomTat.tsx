@@ -10,14 +10,13 @@ import { DongNoi, ONoi } from "../chung/ONoi";
 import { so, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { Nhom, TongQuan } from "./kieu";
-import { mauKomeSoTT } from "./mau";
 import { pcDau } from "./so_sanh_logic";
 import { SuaMatHang } from "./SuaMatHang";
-import { bongNganh, coHoi, datNhat, diemVitri, goiY, kmNoiBat, kmTheoBen, nganhObc, nhomCuaO, P_CAO, P_THAP, reNhat, SO_COT,
+import { bongNganh, coHoi, datNhat, diemVitri, goiY, kmNoiBat, kmTheoBen, mauTT, nganhObc, nhomCuaO, P_CAO, P_THAP, reNhat, SO_COT,
   tiLe, tongSo, type GoiY } from "./tom_tat_logic";
 
 type MoSoSanh = (o: { sp?: string[]; nganh?: string; ben?: string }) => void;
-type Props = { moSoSanh: MoSoSanh; moBen: (ma: string) => void; moLech: () => void };
+type Props = { moSoSanh: MoSoSanh; moBen: (ma: string) => void; moLech: () => void; moTin: () => void };
 type Sua = { nguon: "nap" | "tay"; id: number };
 
 const MAU: Record<string, string> = { do: "var(--do)", xanh: "var(--ok-vien)", xam: "var(--chu-mo)" };
@@ -25,7 +24,7 @@ const pTT = (n: Nhom) => (n.lech_trung_vi == null ? null : Math.round(n.lech_tru
 const tenNhom = (n: Nhom) => n.ten_nhom ?? n.nhom_khoa;
 const khoa = (ds: Nhom[]) => [...new Set(ds.map(n => n.nhom_khoa))];
 
-export function TabTomTat({ moSoSanh, moBen, moLech }: Props) {
+export function TabTomTat({ moSoSanh, moBen, moLech, moTin }: Props) {
   const kx = chuoiKhoang(useKhoang());
   const qTq = useQuery({ queryKey: ["doi-thu", "tong-quan", kx],
     queryFn: () => lay<TongQuan>(`/api/doi-thu/tong-quan${kx ? "?" + kx : ""}`) });
@@ -86,7 +85,7 @@ export function TabTomTat({ moSoSanh, moBen, moLech }: Props) {
 
       <section className="dt-khoi">
         <Khoi tieu_de="Cơ hội — đối thủ đang hết hàng KOME có" dang_tai={qTq.isLoading} loi={loiTq}
-          phu={<button type="button" className="dt-tt-xem" onClick={() => moSoSanh({})}>xem tất cả →</button>}
+          phu={<button type="button" className="dt-tt-xem" onClick={moTin}>xem tất cả →</button>}
           cach_tinh="Theo bảng giá mới nhất của từng bên: mặt hàng ghép được với mã KOME mà bên đó ghi hết hàng. Xếp theo số bên đang hết. Bấm tên bên để sửa dòng đó.">
           {ch.length === 0 ? <p className="dt-nhat">Không bên nào đang hết hàng KOME có.</p> : (
             <div className="dt-tt-chs">{ch.map(c => {
@@ -114,6 +113,7 @@ export function TabTomTat({ moSoSanh, moBen, moLech }: Props) {
         </section>
         <section className="dt-khoi">
           <Khoi tieu_de="Khuyến mãi đang chạy" dang_tai={qTq.isLoading} loi={loiTq}
+            phu={<button type="button" className="dt-tt-xem" onClick={moTin}>xem tất cả →</button>}
             cach_tinh="Số dòng có khuyến mãi (ghi chú khuyến mãi hoặc giá trước KM) trong bảng giá hiện hành, theo bên — 8 bên nhiều nhất; bốn thẻ = giảm giá nhiều nhất theo %. Bấm thẻ để sửa.">
             {tq && <KhuyenMai tq={tq} tenBen={tenBen} moBen={moBen} moSua={moSua} />}
           </Khoi>
@@ -171,7 +171,6 @@ function ViTri({ ss, moNhom, moLech }: { ss: Nhom[]; moNhom: (k: string) => void
   const tl = useMemo(() => tiLe(ss), [ss]);
   const tang = Math.max(10, ...d.map(x => x.tang + 1));
   const day = TREN + tang * BUOC, H = day + 26;
-  const lech = ss.filter(n => n.gia_kome_lech);
   return (
     <>
       <div className="dt-cuon">
@@ -184,17 +183,17 @@ function ViTri({ ss, moNhom, moLech }: { ss: Nhom[]; moNhom: (k: string) => void
               <line x1={xP(p)} x2={xP(p)} y1={22} y2={day + 4} className="ke" strokeDasharray={p ? "2 3" : undefined} />
               <text x={xP(p)} y={day + 20} fontSize={10} textAnchor="middle" className="t-nhat">{pcDau(p)}</text>
             </Fragment>))}
-          {d.map(({ nhom, p, cot, tang: t }) => {
+          {d.map(({ nhom, cot, tang: t }) => {
             const that = pTT(nhom)!;
             return (
               <ONoi key={nhom.nhom_khoa + "|" + nhom.don_vi_so} svg nhan={`${tenNhom(nhom)}: KOME ${pcDau(that)} so trung vị`}
                 onBam={() => moNhom(nhom.nhom_khoa)} noi_dung={<>
                   <div className="o-noi-chu"><b>{tenNhom(nhom)}</b></div>
-                  <DongNoi nhan="KOME so trung vị" gia={pcDau(that)} mau={MAU[mauKomeSoTT(that)]} />
+                  <DongNoi nhan="KOME so trung vị" gia={pcDau(that)} mau={MAU[mauTT(nhom)]} />
                   <DongNoi nhan="Giá KOME" gia={`${yen(nhom.gia_kome_so)}/kg`} />
                   <DongNoi nhan={`Trung vị · ${so(nhom.so_ben)} bên`} gia={`${yen(nhom.trung_vi)}/kg`} />
                 </>}>
-                <circle className="dt-dich" cx={xCot(cot)} cy={day - 4 - t * BUOC} r={4} fill={MAU[mauKomeSoTT(p)]} />
+                <circle className="dt-dich" cx={xCot(cot)} cy={day - 4 - t * BUOC} r={4} fill={MAU[mauTT(nhom)]} />
               </ONoi>);
           })}
         </svg>
@@ -208,9 +207,9 @@ function ViTri({ ss, moNhom, moLech }: { ss: Nhom[]; moNhom: (k: string) => void
         <span><i className="cg-do" /><b>{so(tl.dat)}</b> đắt hơn</span>
         <span><i className="cg-trong" /><b>{so(tl.khongBan)}</b> nhóm KOME không bán</span>
       </div>
-      {lech.length > 0 && (
+      {tl.lech > 0 && (
         <button type="button" className="dt-tt-canh" onClick={moLech}>
-          ⚠ {so(lech.length)} nhóm có giá KOME lệch &gt; 3× — xem Dữ liệu › Giá KOME lệch</button>)}
+          ⚠ {so(tl.lech)} nhóm có giá KOME lệch &gt; 3× — xem Dữ liệu › Giá KOME lệch</button>)}
     </>
   );
 }
@@ -221,7 +220,7 @@ function DaiGia({ ds, tenBen, mo }: { ds: Nhom[]; tenBen: Map<string, string>; m
   if (!ds.length) return <p className="dt-nhat">Không có nhóm nào.</p>;
   return (
     <ul className="dt-tt-dais">{ds.map(n => {
-      const p = pTT(n), m = MAU[mauKomeSoTT(p)], k = n.gia_kome_so!;
+      const p = pTT(n), m = MAU[mauTT(n)], k = n.gia_kome_so!;
       const lo = Math.min(n.thap_nhat, k), hi = Math.max(n.cao_nhat, k);
       const x = (v: number) => (hi > lo ? 6 + (v - lo) / (hi - lo) * 228 : 120);
       return (

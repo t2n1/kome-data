@@ -3,7 +3,7 @@
 // (giá KOME để so ÷ trung vị − 1); gia_kome_lech (> 3× / < ⅓ trung vị) KHÔNG vẽ, chỉ đếm để trỏ sang Dữ liệu › Giá KOME lệch.
 import type { Ben, Nhom, TongQuan } from "./kieu";
 import { boDau } from "./loc";
-import { LECH_NGANG } from "./mau";
+import { LECH_NGANG, mauKomeSoTT, type MauLech } from "./mau";
 import { tenNganh } from "./nganh";
 
 const NGUONG = LECH_NGANG / 100;   // ±5% — cùng ngưỡng xám của mau.ts
@@ -24,7 +24,7 @@ export function tongSo(ss: Nhom[], tq: TongQuan): { coGia: number; datHon: numbe
 }
 
 /** Thanh tỉ lệ dưới biểu đồ: rẻ hơn / ngang (±5%) / đắt hơn trên nhóm có vị trí; `khongBan` = gia_kome_so null (mọi đơn vị);
- *  `lech` = gia_kome_lech; `tong` = mọi dòng nhóm. */
+ *  `lech` = số nhom_khoa KHÁC NHAU có gia_kome_lech (một nhóm nhiều đơn vị so vẫn là một); `tong` = mọi dòng nhóm. */
 export function tiLe(ss: Nhom[]): { re: number; ngang: number; dat: number; khongBan: number; lech: number; tong: number } {
   const co = ss.filter(coViTri);
   return {
@@ -32,10 +32,15 @@ export function tiLe(ss: Nhom[]): { re: number; ngang: number; dat: number; khon
     ngang: co.filter(n => Math.abs(n.lech_trung_vi) <= NGUONG).length,
     dat: co.filter(n => n.lech_trung_vi > NGUONG).length,
     khongBan: ss.filter(n => n.gia_kome_so == null).length,
-    lech: ss.filter(n => n.gia_kome_lech).length,
+    lech: new Set(ss.filter(n => n.gia_kome_lech).map(n => n.nhom_khoa)).size,
     tong: ss.length,
   };
 }
+
+/** Màu KOME so trung vị của một nhóm, tính từ lech_trung_vi CHƯA làm tròn — cùng ngưỡng > 5% / < −5% với datNhat / reNhat /
+ *  tiLe, nên nhóm nằm trong "đắt nhất" (5,1%) không bao giờ xám dù % in ra làm tròn thành +5%. */
+export const mauTT = (n: Pick<Nhom, "lech_trung_vi">): MauLech =>
+  mauKomeSoTT(n.lech_trung_vi == null ? null : n.lech_trung_vi * 100);
 
 export const P_THAP = -60, P_CAO = 70;
 /** Số cột của beeswarm trên dải [P_THAP, P_CAO] (~9 px một cột ở khung 1 100 px) — ít hơn 130 nên % liền nhau có thể chung cột. */
