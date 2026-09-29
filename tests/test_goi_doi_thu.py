@@ -95,3 +95,20 @@ def test_sap_ve_chi_khi_het_hoac_khong_ro():
     assert G.suy_trang_thai(_d(trang_thai="khong_ro", ghi_chu="30/08入荷予定")) == "sap_ve"
     # Empty/None status + future delivery note → sap_ve
     assert G.suy_trang_thai(_d(trang_thai="", ghi_chu="sắp về")) == "sap_ve"
+
+
+def test_chay_tren_console_khong_utf8_khong_vo(tmp_path):
+    """Console Windows cp1252: dòng tóm tắt tiếng Việt không được làm script nổ UnicodeEncodeError."""
+    import csv, os, subprocess, sys
+    vao = tmp_path / "vao"; vao.mkdir()
+    d = _d()
+    with open(vao / "spike_THAK.csv", "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(d)); w.writeheader(); w.writerow(d)
+    ra = tmp_path / "ra"
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONIOENCODING"}
+    env["PYTHONUTF8"] = "0"
+    r = subprocess.run([sys.executable, "scripts/goi_doi_thu.py", str(vao), "--ngay", "2026-08-31", "--ra", str(ra)],
+                       env=env, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
+    assert (ra / "doi_thu_gia_20260831.xlsx").exists()
+    assert (ra / "doi_thu_dieu_kien_20260831.xlsx").exists()
