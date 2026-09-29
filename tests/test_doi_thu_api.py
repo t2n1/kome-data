@@ -76,3 +76,10 @@ def test_nhat_ky_thao_tac_thay_sua_doi_thu(conn, batch):
     conn.commit()
     assert "doi_thu" in NK.LOAI
     assert any(d.loai == "doi_thu" for d in NK.dong_thoi_gian(conn))
+
+
+def test_khoi_san_pham_tra_nhom_theo_kg(conn, batch, test_db_url):
+    _nen(conn, batch)
+    d = _web(test_db_url).get("/api/san-pham/NT01/doi-thu").json()
+    assert d["nhom"]["nhom_khoa"] == "ma:NT01" and d["nhom"]["so_ben"] == 3
+    assert (_SRC / "san_pham" / "ho_so" / "KhoiDoiThu.tsx").exists()
