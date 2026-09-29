@@ -347,6 +347,13 @@ thật hôm nay có 0 dòng, nên không có đính chính nào bị mồ côi.
 
 ## 7. API và ngân sách lượt hỏi
 
+> **Đợt 4b đã làm** toàn bộ bảng dưới: `tong-quan`, `so-sanh`, `ben/{ma}` (kèm `gia_kome_lech`), `GET giao-hang`,
+> `GET lich-su`, `GET mat-hang/{nguon}/{id}` (nạp pop-up sửa), `POST sua-mat-hang` · `giao-hang` · `dieu-kien` · `ben` ·
+> `quy-cach`, chỉ mục `069`. **Lệch có chủ ý:** khoá nhật ký dùng chuỗi đã có sẵn trong sổ — `gia:<id>` (quan sát nạp),
+> `tay:<id>`, `<bên>/<hàng>` (ghép), cộng `giao:<bên>`, `dk:<fact_id>`, `dk:tay:<bên>`, `ben:<mã>` — thay cho `fact:` / `ghep:`
+> ghi ở §4.7 (sổ chỉ thêm, đổi khoá là mồ côi lịch sử cũ). Dòng bị thay đi qua `thay_cho_tay_id` / `fact_goc_id`, không qua
+> `hien_hanh`. 4c (§4.5, §5.5) cũng đã vào 4b (tab Phí & giao hàng, `?phi=1`).
+
 | Endpoint | Đổi | Trần |
 |---|---|---|
 | `GET /api/doi-thu/tong-quan` | + dữ liệu Tóm tắt (4 ô số, điểm "đứng đâu", cơ hội, khuyến mãi theo bên) | 1 lượt + phiên bản |

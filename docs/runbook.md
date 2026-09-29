@@ -258,12 +258,12 @@ thêm cột quyền nào** — chỉ thêm view mới trong `mart`, đã có s�
 cho cả ba vai trò ngay trong chính file migration. Không cần bước 2: chạy
 `python db/migrate.py` bằng vai trò `postgres` là đủ.
 
-### Triển khai đợt 4a của Thị trường & đối thủ (migration `065`–`068`)
+### Triển khai đợt 4a + 4b của Thị trường & đối thủ (migration `065`–`069`)
 
-Bốn migration này thêm quy cách gói / bậc giá / giao hàng cho đối thủ, kg KOME theo 荷姿 của OBC (`066`), bảng giá
+Năm migration này (`069` = chỉ mục sổ nhật ký theo đối tượng cho pop-up sửa / 409 của giao diện 4b — không đổi dữ liệu) thêm quy cách gói / bậc giá / giao hàng cho đối thủ, kg KOME theo 荷姿 của OBC (`066`), bảng giá
 KOME (`mart.gia_kome_bang`) và điều kiện giao hàng hiện hành (`068`). Làm ĐÚNG THỨ TỰ:
 
-1. `python db/migrate.py` **bằng vai trò `postgres`** — TRƯỚC khi push/Redeploy (code mới đọc các cột / view mới).
+1. `python db/migrate.py` **bằng vai trò `postgres`** — TRƯỚC khi push/Redeploy (code mới đọc các cột / view mới; giao diện 4b đọc `app.doi_thu_nhat_ky` theo `doi_tuong` nên cần cả `069`).
 2. Kiểm mẫu xuất OBC TRƯỚC khi nạp — thiếu cột đã khai trong `config/files.yml` là **cổng 2 chặn cả file**
    (`ColumnMismatch`):
    - `商品データ` phải có `荷姿１－荷姿区分コード` và `荷姿１－基準単位当り荷姿区分数`;
