@@ -113,6 +113,7 @@ def gia_moi(conn, du_lieu: dict, nguoi) -> int:
     ln = du_lieu.get("loai_nguon")
     if not ln or not conn.execute("SELECT 1 FROM app.loai_nguon WHERE ma=%s", (ln,)).fetchone():
         raise LoiNhap("Chọn loại nguồn của giá này.")
+    lk = kiem_lien_ket(du_lieu.get("lien_ket_bang_chung"), "Link bằng chứng")
     goc = None
     if du_lieu.get("fact_goc_id"):
         try:
@@ -142,14 +143,14 @@ def gia_moi(conn, du_lieu: dict, nguoi) -> int:
     tid = conn.execute(
         """INSERT INTO app.gia_doi_thu_tay (ma_doi_thu, ma_hang_dt, fact_goc_id, ten_goc, quy_cach_goc, gia_goc,
              don_vi_gia, kg_moi_don_vi_gia, thue, gom_ship, kenh_gia, muc_gia, trang_thai, loai_nguon,
-             ghi_chu_nguon, nguoi_dung_id)
+             ghi_chu_nguon, lien_ket_bang_chung, nguoi_dung_id)
            VALUES (%(ma_doi_thu)s, %(ma_hang_dt)s, %(fact_goc_id)s, %(ten_goc)s, %(quy_cach_goc)s, %(gia_goc)s,
              %(don_vi_gia)s, %(kg_moi_don_vi_gia)s, %(thue)s, %(gom_ship)s, %(kenh_gia)s, %(muc_gia)s,
-             %(trang_thai)s, %(loai_nguon)s, %(ghi_chu_nguon)s, %(nguoi)s) RETURNING id""",
+             %(trang_thai)s, %(loai_nguon)s, %(ghi_chu_nguon)s, %(lien_ket_bang_chung)s, %(nguoi)s) RETURNING id""",
         {**{x: v.get(x) for x in k}, "gia_goc": v.get("gia_goc"), "fact_goc_id": fact_goc if goc else None,
          "trang_thai": tt, "loai_nguon": ln, "ghi_chu_nguon": (du_lieu.get("ghi_chu_nguon") or "")[:DAI_TOI_DA] or None,
-         "nguoi": nguoi}).fetchone()[0]
-    _ghi_nhat_ky(conn, "gia_moi" if goc else "them", f"tay:{tid}", None, v | {"loai_nguon": ln}, nguoi)
+         "lien_ket_bang_chung": lk, "nguoi": nguoi}).fetchone()[0]
+    _ghi_nhat_ky(conn, "gia_moi" if goc else "them", f"tay:{tid}", None, v | {"loai_nguon": ln, "lien_ket_bang_chung": lk}, nguoi)
     return tid
 
 
@@ -159,6 +160,35 @@ GIA_KE_TOI_DA = Decimal("9999999")
 # ký tự điều khiển; sổ app.tiep_xuc_nhac chỉ-thêm nên một khoá bẩn ở lại vĩnh viễn.
 KHOA_SACH = re.compile(r"[^\s\x00-\x1f\x7f\ud800-\udfff]+")          # + surrogate lẻ (JSON "\ud800") -> 400, không 500
 KHOA_NHOM = re.compile(r"(ma:[^\s\x00-\x1f\x7f\ud800-\udfff]+|n:[0-9]{1,15})")
+
+LIEN_KET_TOI_DA = 2000
+_LIEN_KET = re.compile(r"https://[^\s\x00-\x1f\x7f\ud800-\udfff]+")
+_THANG = re.compile(r"(19|20)\d{2}-(0[1-9]|1[0-2])")  # Postgres không có năm 0; 1900–2099
+
+
+def kiem_lien_ket(v, ten: str):
+    """Link ra ngoài (Drive, ảnh bằng chứng): rỗng → None; chỉ https://, không khoảng trắng / ký tự điều khiển /
+    surrogate lẻ, ≤ LIEN_KET_TOI_DA. CHECK của 064 chặn lần nữa ở CSDL; giao diện kiểm lại lúc vẽ."""
+    if v is None or v == "":
+        return None
+    if not isinstance(v, str) or len(v) > LIEN_KET_TOI_DA or not _LIEN_KET.fullmatch(v):
+        raise LoiNhap(f"{ten} phải là một link https:// (dán nguyên link Google Drive).")
+    return v
+
+
+def dat_thu_muc(conn, thang, lien_ket, nguoi) -> None:
+    """Link thư mục Drive "Tháng N" (đặc tả §11). Sửa được; mỗi lần ghi thêm một dòng nhật ký trong CÙNG giao dịch."""
+    if not isinstance(thang, str) or not _THANG.fullmatch(thang):
+        raise LoiNhap("Tháng phải có dạng YYYY-MM.")
+    lk = kiem_lien_ket(lien_ket, "Link thư mục")
+    if lk is None:
+        raise LoiNhap("Dán link thư mục Google Drive của tháng.")
+    ngay = f"{thang}-01"
+    cu = conn.execute("SELECT lien_ket FROM app.thu_muc_nguon WHERE thang = %s", (ngay,)).fetchone()
+    conn.execute("""INSERT INTO app.thu_muc_nguon (thang, lien_ket, sua_luc, sua_boi) VALUES (%s, %s, now(), %s)
+                    ON CONFLICT (thang) DO UPDATE SET lien_ket = EXCLUDED.lien_ket, sua_luc = now(),
+                      sua_boi = EXCLUDED.sua_boi""", (ngay, lk, nguoi))
+    _ghi_nhat_ky(conn, "thu_muc", f"thang:{thang}", {"lien_ket": cu[0]} if cu else None, {"lien_ket": lk}, nguoi)
 
 
 def gia_khach_ke(conn, ma_doi_thu: str, nhom_khoa: str, customer_code: str, tiep_xuc_id: int,
@@ -304,7 +334,8 @@ def sua_quy_cach(conn, product_code: str, kg_moi_goi, goi_moi_thung, kg_moi_thun
 _COT_QS = """ma_doi_thu, ten_doi_thu, nguon, id, ma_hang_dt, ngay_nguon, hinh_thuc_nguon, nguon_file, vi_tri,
              ten_goc, quy_cach_goc, gia_goc, don_vi_gia, kg_moi_don_vi_gia, thue, gom_ship, kenh_gia, muc_gia,
              gia_bac, gia_truoc_km, trang_thai, khuyen_mai, loai_nguon, ghi_chu, ma_kome, nhan, nhom_khoa,
-             ten_nhom, trang_thai_duyet, round(yen_chuan) AS yen_chuan, don_vi_so, nen_gia, tuoi_ngay, bat_thuong"""
+             ten_nhom, trang_thai_duyet, round(yen_chuan) AS yen_chuan, don_vi_so, nen_gia, tuoi_ngay, bat_thuong,
+             thang_lo, lien_ket_thu_muc, web_ben, lien_ket_bang_chung"""
 
 NGAY_HIEN_TRUONG = 30       # cửa sổ "hiện trường" của Tổng quan
 NGAY_TIN_KHACH = 90         # cửa sổ tin của khách / của đối thủ (mặc định của đặc tả §6: "chỉ tính 90 ngày")
@@ -380,7 +411,8 @@ def tong_quan(conn, hom_nay=None) -> dict:
 
 
 _SO_SANH = f"""
-WITH h AS MATERIALIZED (SELECT {_COT_QS} FROM mart.gia_doi_thu_hien_hanh WHERE nhom_khoa IS NOT NULL)
+WITH h AS MATERIALIZED (SELECT {_COT_QS} FROM mart.gia_doi_thu_hien_hanh LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
+                      WHERE nhom_khoa IS NOT NULL)
 SELECT coalesce(json_agg(json_build_object(
          'nhom_khoa', s.nhom_khoa, 'ten_nhom', s.ten_nhom, 'don_vi_so', s.don_vi_so, 'ma_kome', s.ma_kome,
          'gia_kome', round(s.gia_kome), 'so_ben', s.so_ben, 'thap_nhat', round(s.thap_nhat), 'ben_thap_nhat', s.ben_thap_nhat,
@@ -424,7 +456,7 @@ SELECT (SELECT to_json(d) FROM app.doi_thu d WHERE d.ma = %(ma)s),
                 ORDER BY ngay_nguon DESC), '[]') FROM core.fact_dieu_kien_doi_thu WHERE ma_doi_thu = %(ma)s
                 AND (mart.moc_lui() IS NULL OR ngay_nguon <= mart.moc_lui())),
        (SELECT coalesce(json_agg(to_json(q) ORDER BY q.ten_goc, q.ngay_nguon DESC), '[]')
-          FROM (SELECT {_COT_QS.replace(', bat_thuong', '')}, hien_hanh FROM mart.gia_doi_thu_quan_sat
+          FROM (SELECT {_COT_QS.replace(', bat_thuong', '')}, hien_hanh FROM mart.gia_doi_thu_quan_sat LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
                 WHERE ma_doi_thu = %(ma)s) q),
        (SELECT coalesce(json_agg(json_build_object(
                   'tiep_xuc_id', t.id, 'ma_khach', t.customer_code, 'ten_khach', t.ten_khach, 'ngay', t.ngay,
@@ -458,7 +490,7 @@ def ho_so_ben(conn, ma: str, hom_nay=None) -> dict | None:
 
 _DUYET = f"""
 SELECT coalesce(json_agg(to_json(h) ORDER BY h.bat_thuong DESC, h.trang_thai_duyet, h.ma_doi_thu, h.ten_goc), '[]')
-FROM (SELECT {_COT_QS} FROM mart.gia_doi_thu_hien_hanh h
+FROM (SELECT {_COT_QS} FROM mart.gia_doi_thu_hien_hanh h LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
       WHERE (%(ben)s = '' OR ma_doi_thu = %(ben)s)
         AND CASE %(loc)s WHEN 'can_xem' THEN trang_thai_duyet = 'can_xem'
                          WHEN 'bat_thuong' THEN bat_thuong

@@ -243,6 +243,7 @@ nguồn (web/file, ngày) · (Đợt 2) khách đang mua của bên này.
 3. `scripts/goi_doi_thu.py` gộp kết quả thành gói `.xlsx` chuẩn (sinh `ma_hang_dt`, kiểm cột,
    lọc trang trùng, gộp cặp chưa thuế/có thuế).
 4. Nạp qua `/kho-du-lieu/nap` (người có cờ `duoc_vao_kho_du_lieu`); sale duyệt ở `/doi-thu`.
+   Dán link thư mục Google Drive "Tháng N" ở đầu tab Duyệt (§11) — Claude nhắc nếu tháng đó chưa có.
 5. Lần đọc sau: Claude đọc `app.dinh_chinh_gia` của các lô trước → cập nhật sổ tay theo bên; báo
    **tỉ lệ sửa theo bên** (đây là phép đo độ chính xác liên tục).
 
@@ -255,7 +256,7 @@ Hướng dẫn đọc (`HUONG_DAN.md` của phép thử) chuyển vào `docs/doi
 | **1** | §4 toàn bộ bảng trừ `tiep_xuc_nhac` · bộ nạp + gói · `/doi-thu` bốn tab · khối Sản phẩm 360 · nạp tháng 8 thật | Lõi. Làm được ngay |
 | **1b** | Phần giao diện của Đợt 1 chưa làm (soát cuối 2026-09-29): form "Thêm hàng AI bỏ sót" và chọn nhóm khi ghép (§5.4) · màn tạo nhóm có tên và sửa quy cách KOME (§4.2 — API `/api/doi-thu/nhom`, `/quy-cach` ĐÃ có; 60/168 mã chưa tách được kg từ tên, phần lớn là đồ uống theo ml) · bấm ô lưới → So sánh lọc ngành + bên (§5.1) · lọc ngành / kênh-mức / tuổi quan sát (§5.2) · liên kết `&nhom=` từ Sản phẩm 360 (§5.5) | Làm trước Đợt 2. Phía máy chủ: migration 062 (cột `nganh` của `mart.so_sanh_nhom`), `/api/doi-thu/nhom-quy-cach`, `/nhom/them-ma`, `/nhom/bo-ma`. |
 | **2** | §6 tin hiện trường `@` · nối hồ sơ khách / `/lien-he` / hồ sơ đối thủ · hiện trường 30 ngày | Sau khi Đợt 1 có dữ liệu thật |
-| **3** | Ảnh: trang gốc cạnh dòng duyệt + ảnh bằng chứng sale đính kèm (nguồn loại 2, 3) | **Cần chọn chỗ lưu ảnh** — web hiện không có (chỉ `meta.nap_cho` bytea, 24 giờ). Mỗi tháng ~400 trang; Vercel 4,5 MB/yêu cầu. Đề xuất Supabase Storage; quyết định riêng |
+| **3** | §11 liên kết nguồn: thư mục Drive mỗi tháng + tìm file trong Drive cạnh dòng duyệt · link bằng chứng tuỳ chọn cho giá sale nhập | Chủ DN chốt 2026-09-29: **KHÔNG lưu ảnh** (không Supabase Storage, không bytea) — file gốc đã nằm trên Google Drive dùng chung, web chỉ trỏ tới. Thay cho đề xuất cũ "trang gốc + ảnh đính kèm" |
 
 ## 9. Kiểm thử và ngân sách
 
@@ -282,3 +283,52 @@ Hướng dẫn đọc (`HUONG_DAN.md` của phép thử) chuyển vào `docs/doi
 - Không in "% khả năng" hay dự đoán đối thủ sẽ làm gì.
 - Không tự đề xuất giá bán cho KOME — màn chỉ đặt số cạnh nhau, quyết định là của người.
 - Không dùng `core.dim_product.compete_code` (独占or競合商品コード) cho tới khi chủ DN nói nó nghĩa là gì.
+- Không lưu ảnh / file gốc trên web, không gọi Google Drive API, không đọc nội dung Drive (§11).
+
+## 11. Liên kết nguồn (Đợt 3 — chủ DN chốt 2026-09-29)
+
+**Quyết định:** không lưu ảnh. File gốc (bảng giá, ảnh chụp) nằm trên **Google Drive dùng chung** theo cây
+`Bang-gia-doi-thu/Tháng N/<bên>/`; web chỉ TRỎ tới. `core.fact_gia_doi_thu.nguon_file` chỉ có TÊN file (đo
+2026-09-29: 93 tên file khác nhau cho tháng 8, không kèm thư mục bên), `vi_tri` là chữ tự do ("tr2, dòng 6…").
+
+### 11.1 Dữ liệu (migration 064)
+
+- `app.thu_muc_nguon (thang date PRIMARY KEY CHECK (extract(day FROM thang) = 1), lien_ket text NOT NULL
+  CHECK (lien_ket ~ '^https://[^[:space:]]+$' AND length(lien_ket) <= 2000), sua_luc timestamptz, sua_boi bigint → app.nguoi_dung)` — MỘT link thư mục
+  Drive "Tháng N" mỗi tháng. Sửa được (thay link sai); mỗi lần ghi thêm một dòng `app.doi_thu_nhat_ky`
+  (`loai = 'thu_muc'` — CHECK của bảng đó mở thêm giá trị này), nên `anh_chup._PHIEN_BAN` và `/nhat-ky` không
+  cần nhánh mới.
+- `app.gia_doi_thu_tay.lien_ket_bang_chung text CHECK (lien_ket_bang_chung ~ '^https://')` — tuỳ chọn. Bảng
+  vẫn chỉ thêm.
+- **Tháng của một dòng nạp = tháng của `meta.ingest_batch.data_date`** của lô (gói tháng 8 dựng với
+  `--ngay 2026-08-31`) — đúng thư mục "Tháng N" mà sale thả file, KHÔNG theo `ngay_nguon` (ngày trên từng file
+  có thể là đầu tháng hay tháng trước).
+- Không đổi `core`, bộ nạp, `files.yml`, mẫu gói; hoàn tác lô không đổi.
+
+### 11.2 Màn hình
+
+- **Tab Duyệt / sửa, đầu tab:** "Thư mục Drive tháng 8: [dán link] Lưu" khi chưa có; có rồi → "Mở thư mục ↗ ·
+  đổi". Tháng hiện là tháng của lô đang duyệt (nhiều tháng → một dòng mỗi tháng có dòng chờ).
+- **Dòng từ file** (`hinh_thuc_nguon = 'file'`): "Nguồn: <tên file> · <vị trí>" + **"Mở thư mục tháng ↗"**
+  (khi tháng đó có link) + **"Tìm file trong Drive ↗"** = `https://drive.google.com/drive/search?q=<tên file>`
+  (dựng ở trình duyệt, `encodeURIComponent`; không cần dán gì — cùng tên ở nhiều tháng thì Drive ra nhiều kết
+  quả, người chọn).
+- **Dòng từ web** (`hinh_thuc_nguon = 'web'`): "Mở trang của bên ↗" = `app.doi_thu.web` (khi có).
+- **Form "Giá đã đổi":** thêm ô "Link bằng chứng (tuỳ chọn)" — ảnh sale chụp bỏ lên Drive rồi dán link. Để
+  trống vẫn lưu. Sai dạng (không `https://`) → 400 kèm câu.
+- **Chỗ hiện nguồn:** dòng duyệt, ô trạng thái (luôn hiện) của dòng chi tiết So sánh giá — KHÔNG trong ô nổi (ô nổi
+  đóng khi rời chuột, link trong đó không bấm được), bảng mặt hàng ở Hồ sơ đối thủ. Giá nhập tay có link →
+  "bằng chứng ↗"; không có link mà loại nguồn `chung_tu` / `to_roi` → chữ mờ "chưa có bằng chứng".
+- Mọi liên kết ra ngoài: `target="_blank" rel="noopener noreferrer"` + `referrerPolicy="no-referrer"`
+  (không gửi địa chỉ trang nội bộ sang Google). Chỉ hiện link `https://` (máy chủ đã chặn lúc ghi; giao diện
+  kiểm lại lúc vẽ — dữ liệu cũ hay sửa tay không mở được `javascript:`).
+
+### 11.3 API và ngân sách
+
+- `GET /api/doi-thu/duyet` và các GET đang trả quan sát mang thêm `thang_lo` (tháng của lô), `lien_ket_thu_muc`,
+  `web_ben`, `lien_ket_bang_chung` — trong CÙNG câu (vẫn 1 lượt).
+- `POST /api/doi-thu/thu-muc` `{thang: "YYYY-MM", lien_ket}` (chỉ JSON; ghi + nhật ký một giao dịch; mọi người
+  đăng nhập làm được — cùng nếp quyết định A của §2). `POST /api/doi-thu/gia-moi` nhận thêm `lien_ket_bang_chung`.
+- Test: dạng link (`https://` mới nhận; `javascript:`, `http://`, chuỗi rỗng khi bắt buộc → 400); tháng ≠ mùng 1
+  bị CHECK chặn; đổi link ghi nhật ký và phiên bản ảnh chụp đổi; tháng của dòng = tháng `data_date` của lô;
+  ngân sách lượt hỏi các GET không đổi.

@@ -786,6 +786,8 @@ def tao_api(open_app_conn) -> APIRouter:
             b = await request.json()
         except Exception:
             return _loi("Thân yêu cầu không phải JSON.", 400)
+        if not isinstance(b, dict):
+            return _loi("Thân yêu cầu phải là một đối tượng JSON.", 400)
         nguoi = getattr(request.state, "nguoi", None)
         try:
             with open_app_conn() as conn:
@@ -812,6 +814,11 @@ def tao_api(open_app_conn) -> APIRouter:
     async def dt_gia_moi(request: Request):
         from kome import doi_thu as DT
         return await _dt_ghi(request, lambda c, b, n: {"id": DT.gia_moi(c, dict(b), n)})
+
+    @r.post("/doi-thu/thu-muc")
+    async def dt_thu_muc(request: Request):
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.dat_thu_muc(c, b.get("thang"), b.get("lien_ket"), n))
 
     @r.post("/doi-thu/ghep")
     async def dt_ghep(request: Request):

@@ -1,4 +1,7 @@
 """Migration 059 — bảng Thị trường & đối thủ (đặc tả 2026-09-29-thi-truong-doi-thu-design.md §4)."""
+import psycopg
+import pytest
+
 
 
 def _quyen(conn, vai, bang, q):
@@ -83,3 +86,27 @@ def test_tiep_xuc_nhac_kiem_loai_vi_tri_va_khoa_ngoai(conn):
 def test_gia_tay_co_cot_nhom_khoa(conn):
     assert conn.execute("""SELECT count(*) FROM information_schema.columns WHERE table_schema='app'
                            AND table_name='gia_doi_thu_tay' AND column_name='nhom_khoa'""").fetchone()[0] == 1
+
+
+def test_064_thu_muc_nguon_chi_nhan_mung_1_va_https(conn):
+    conn.execute("INSERT INTO app.thu_muc_nguon (thang, lien_ket) VALUES ('2026-08-01', 'https://drive.google.com/x')")
+    conn.commit()
+    for thang, lk in [("2026-08-02", "https://drive.google.com/y"), ("2026-09-01", "http://drive.google.com/y"),
+                      ("2026-09-01", "javascript:alert(1)")]:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            conn.execute("INSERT INTO app.thu_muc_nguon (thang, lien_ket) VALUES (%s, %s)", (thang, lk))
+        conn.rollback()
+
+
+def test_064_lien_ket_bang_chung_chi_https_va_bang_van_chi_them(conn):
+    with pytest.raises(psycopg.errors.CheckViolation):
+        conn.execute("""INSERT INTO app.gia_doi_thu_tay (ma_doi_thu, ma_hang_dt, ten_goc, trang_thai, loai_nguon,
+                          lien_ket_bang_chung) VALUES ('THAK', 'ten:x|', 'x', 'het', 'chung_tu', 'ftp://a')""")
+    conn.rollback()
+    for quyen in ("UPDATE", "DELETE"):
+        assert not conn.execute("SELECT has_table_privilege('kome_app', 'app.gia_doi_thu_tay', %s)", (quyen,)).fetchone()[0]
+
+
+def test_064_nhat_ky_nhan_loai_thu_muc(conn):
+    conn.execute("INSERT INTO app.doi_thu_nhat_ky (loai, doi_tuong) VALUES ('thu_muc', 'thang:2026-08')")
+    conn.commit()

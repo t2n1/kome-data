@@ -7,6 +7,7 @@ import { ngay, so, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { Nhom } from "./kieu";
 import { NHAN_DUYET } from "./kieu";
+import { NguonDong } from "./NguonDong";
 import { BO_LOC_TRONG, dangLocDong, locNhom, locQuanSat, dongMoSan, kemGiaTri, luaChonLoc, viTriKome, type BoLoc } from "./loc";
 
 // Giá khách kể (tin hiện trường @, 063): đã có trong quan_sat của nhóm nhưng KHÔNG vào thấp nhất / trung vị / cao nhất
@@ -96,7 +97,7 @@ export function TabSoSanh({ nganh, ben, nhom, datNganh, datBen, datNhom }: Props
                       {x.yen_chuan != null ? yen(x.yen_chuan) : "—"}</ONoi></td>
                     <td>{x.gia_goc != null ? `${yen(x.gia_goc)}/${x.don_vi_gia ?? "?"}` : "—"}</td>
                     <td>{x.nhan === "cung_hang" ? "cùng hàng" : "thay thế"}</td>
-                    <td>{NHAN_DUYET[x.trang_thai_duyet]}{x.bat_thuong ? " · bất thường" : ""}</td>
+                    <td>{NHAN_DUYET[x.trang_thai_duyet]}{x.bat_thuong ? " · bất thường" : ""} <NguonDong q={x} /></td>
                   </tr>))}
               </Fragment>); })}</tbody>
           </table>

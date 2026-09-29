@@ -6,6 +6,8 @@ import { chuoiKhoang, giuKhoang, useKhoang } from "../khung/khoang";
 import type { KhachDangMua, QuanSat, TongQuan } from "./kieu";
 import { nhanDonVi } from "./kieu";
 import { NHAN_TRANG_THAI } from "./kieu";
+import { NguonDong, Ra } from "./NguonDong";
+import { lienKetAnToan } from "./nguon";
 
 type HoSo = { ben: { ma: string; ten: string; web: string | null; ghi_chu: string | null };
               dieu_kien: { loai: string; noi_dung: string; ngay: string }[]; quan_sat: (QuanSat & { hien_hanh: boolean })[];
@@ -31,7 +33,7 @@ export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) =
           {tq.data?.ben.map(b => <option key={b.ma} value={b.ma}>{b.ten}</option>)}
         </select>
         {khongCo && <p>Không có đối thủ này.</p>}
-        {hs?.ben.web && <p><a href={hs.ben.web} rel="noreferrer" target="_blank">{hs.ben.web}</a></p>}
+        {lienKetAnToan(hs?.ben.web) && <p><Ra href={lienKetAnToan(hs?.ben.web)!}>{hs!.ben.web}</Ra></p>}
         {hs && <>
           <h3>Mạnh ở ngành nào</h3>
           {manh.length ? (
@@ -58,7 +60,7 @@ export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) =
           <ul className="dt-ds">{hs.dieu_kien.map((k, i) => <li key={i}>{k.loai} · {k.noi_dung} · {ngay(k.ngay)}</li>)}</ul>
           <h3>Mặt hàng ({hien.length})</h3>
           <div className="dt-cuon">
-            <table className="bang dt-bang"><thead><tr><th>Hàng</th><th>Giá</th><th>¥ quy đổi</th><th>Trạng thái</th><th>Ghép KOME</th><th>Lịch sử</th></tr></thead>
+            <table className="bang dt-bang"><thead><tr><th>Hàng</th><th>Giá</th><th>¥ quy đổi</th><th>Trạng thái</th><th>Ghép KOME</th><th>Lịch sử</th><th>Nguồn</th></tr></thead>
               <tbody>{hien.map(x => (
                 <tr key={x.nguon + x.id}>
                   <td>{x.ten_goc} <span className="dt-nhat">{x.quy_cach_goc}</span></td>
@@ -67,6 +69,7 @@ export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) =
                   <td>{NHAN_TRANG_THAI[x.trang_thai]}</td>
                   <td>{x.ma_kome ? <a href={`/san-pham/${encodeURIComponent(x.ma_kome)}`}>{x.ma_kome}</a> : ""}</td>
                   <td>{lich_su(x).map(y => `${ngay(y.ngay_nguon)} ${y.gia_goc != null ? yen(y.gia_goc) : "—"}`).join(" · ")}</td>
+                  <td><NguonDong q={x} /></td>
                 </tr>))}</tbody></table>
           </div>
         </>}

@@ -18,6 +18,7 @@
    "nhom_so_sanh",
    "nhom_so_sanh_ma",
    "quy_cach_kome",
+   "thu_muc_nguon",
    "tiep_xuc_nhac"
   ],
   "core": [
@@ -75,6 +76,7 @@
    "ngan_sach_thang",
    "nganh_ky_cung_ky",
    "ngay_kinh_doanh",
+   "nguon_quan_sat",
    "nhip_mat_hang",
    "nhip_mua",
    "quy_cach_kome",

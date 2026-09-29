@@ -9,6 +9,8 @@ export type QuanSat = {
   nhan: "cung_hang" | "thay_the" | null; nhom_khoa: string | null; ten_nhom: string | null;
   trang_thai_duyet: "ai_doc" | "can_xem" | "da_xac_nhan" | "da_sua" | "nhap_tay";
   yen_chuan: number | null; don_vi_so: string; nen_gia: string; tuoi_ngay: number | null; bat_thuong?: boolean;
+  // Liên kết nguồn (đợt 3, đặc tả §11): dòng `tay` có `thang_lo`/`lien_ket_thu_muc` = null.
+  thang_lo: string | null; lien_ket_thu_muc: string | null; web_ben: string | null; lien_ket_bang_chung: string | null;
 };
 export type Nhom = {
   nhom_khoa: string; ten_nhom: string | null; nganh: string | null; don_vi_so: string; ma_kome: string[] | null; gia_kome: number | null;

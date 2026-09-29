@@ -103,7 +103,8 @@ class Dong:
         if self.loai == "doi_thu":
             viec = {"sua": "Sửa giá", "xac_nhan": "Xác nhận giá", "gia_moi": "Cập nhật giá mới",
                     "them": "Thêm hàng", "ghep": "Ghép hàng", "nhom": "Tạo nhóm so sánh",
-                    "quy_cach": "Sửa quy cách KOME", "doi_thu": "Sửa đối thủ"}
+                    "quy_cach": "Sửa quy cách KOME", "doi_thu": "Sửa đối thủ",
+                    "thu_muc": "Dán link thư mục Drive"}
             return f"{viec.get(self.chi_tiet, self.chi_tiet)} · {self.doi_tuong}"
         if self.loai == "quyen":
             return f"Quyền {TEN_CO.get(self.chi_tiet, self.chi_tiet)} của {self.doi_tuong}"

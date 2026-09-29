@@ -58,3 +58,6 @@ name_ja, food_category_name, barcode (JAN), unit, case_qty.
 
 ## Kết thúc
 Báo lại: số dòng, số dòng `can_xem`, và những khó khăn riêng của file này (ngắn gọn, 5–8 dòng).
+
+## Sau khi nạp
+Sau khi nạp: mở `/doi-thu` › Duyệt / sửa, dán link thư mục Google Drive 'Tháng N' ở đầu tab (một lần mỗi tháng).
