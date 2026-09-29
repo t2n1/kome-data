@@ -1020,6 +1020,16 @@ Khối mới đi endpoint riêng 1 lượt (`/api/khach-hang/{mã}/doi-thu`, `/a
 canh: `tests/test_lien_he.py`, `tests/test_doi_thu.py`, `tests/test_mart_doi_thu.py`, `giao_dien/src/khach/nhac.test.ts`.
 **Migration 063 phải chạy TRƯỚC khi triển khai.**
 
+**Bất biến (064, liên kết nguồn — chủ DN chốt 2026-09-29):** web KHÔNG lưu ảnh / file gốc và không gọi Google Drive API —
+file gốc nằm trên Drive dùng chung (`Bang-gia-doi-thu/Tháng N/<bên>/`), web chỉ TRỎ tới. Một link thư mục mỗi tháng
+(`app.thu_muc_nguon`, sửa được, mỗi lần ghi một dòng `app.doi_thu_nhat_ky` loai `thu_muc` cùng giao dịch); link bằng chứng
+tuỳ chọn ở `app.gia_doi_thu_tay.lien_ket_bang_chung` (bảng vẫn chỉ thêm). Tháng của một dòng nạp = tháng `data_date` của
+LÔ, định nghĩa ĐÚNG MỘT LẦN ở `mart.nguon_quan_sat` (khoá `(nguon, id)`), KHÔNG theo `ngay_nguon`. Chỉ `https://` (CHECK
+ở CSDL + `doi_thu.kiem_lien_ket` + `doi_thu/nguon.ts::lienKetAnToan` lúc vẽ); mọi link ra ngoài `rel="noopener
+noreferrer"` + `referrerPolicy="no-referrer"`. Nút "Tìm file trong Drive" dựng ở trình duyệt từ TÊN file. Có test canh:
+`tests/test_doi_thu_bang.py`, `tests/test_mart_doi_thu.py`, `tests/test_doi_thu.py`, `giao_dien/src/doi_thu/nguon.test.ts`.
+**Migration 064 phải chạy TRƯỚC khi triển khai.**
+
 **Bất biến (Hình sản phẩm — chủ DN chốt 2026-09-29):** nguồn DUY NHẤT là `config/hinh_san_pham.csv`
 (`sku,imageUrl`, chủ DN gửi) → `kome/hinh_san_pham.py::doc` (mã là CHỮ, không ép số; CHỈ nhận `https://`;
 nhớ theo mtime; file thiếu → `{}`) → `window.__KOME__.hinh` (`app.py::_khoi_dau`, 0 truy vấn; trang đăng
