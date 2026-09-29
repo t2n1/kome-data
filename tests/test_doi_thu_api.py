@@ -16,7 +16,8 @@ def _nen(conn, batch):
 
 @pytest.mark.parametrize("url, tran", [("/api/doi-thu/tong-quan", 2), ("/api/doi-thu/so-sanh", 2),
                                         ("/api/doi-thu/ben/A", 2), ("/api/doi-thu/duyet?loc=bat_thuong", 2),
-                                        ("/api/san-pham/NT01/doi-thu", 2)])
+                                        ("/api/san-pham/NT01/doi-thu", 2), ("/api/doi-thu/goi-y-nhac", 2),
+                                        ("/api/khach-hang/K0001/doi-thu", 2)])
 def test_ngan_sach_luot_hoi(conn, batch, test_db_url, monkeypatch, url, tran):
     _nen(conn, batch)
     c = _web(test_db_url)
@@ -131,3 +132,100 @@ def test_nhom_ma_kome_la_chuoi_thi_400(conn, batch, test_db_url):
     _nen(conn, batch)
     r = _web(test_db_url).post("/api/doi-thu/nhom", json={"ten": "X", "ma_kome": "NT01"})
     assert r.status_code == 400 and r.json()["loi"]
+
+
+# ---- Đợt 2 (063): tin hiện trường `@` qua API ----------------------------------------------------------
+
+CAU = "Khách nói @THAK bán @Basa rẻ hơn mình"
+
+
+def _the(loai, khoa, nhan):
+    return {"loai": loai, "khoa": khoa, "vi_tri_dau": CAU.index(nhan), "do_dai": len(nhan)}
+
+
+def _than(**them):
+    return {"kieu": "goi", "ket_qua": "tot", "noi_dung": CAU,
+            "nhac": [_the("doi_thu", "THAK", "@THAK"), _the("nhom", "ma:NT01", "@Basa")], **them}
+
+
+def _nen_khach(conn, batch):
+    from tests.test_khach_hang import _ho_so_khach
+    _hang(conn, batch)
+    _ho_so_khach(conn, batch, "K0001", "Quán một")
+
+
+def test_post_tiep_xuc_kem_the_va_gia_tra_id_va_canh_bao(conn, batch, test_db_url):
+    _nen_khach(conn, batch)
+    c = _web(test_db_url)
+    r = c.post("/api/khach-hang/K0001/tiep-xuc", json=_than(gia=[
+        {"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 1200, "don_vi_gia": "kg"}]))
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["ok"] is True and isinstance(j["id"], int) and j["canh_bao"] == []
+    assert conn.execute("SELECT count(*) FROM app.tiep_xuc_nhac").fetchone()[0] == 2
+    assert conn.execute("SELECT gia_goc, loai_nguon FROM app.gia_doi_thu_tay").fetchone() == (1200, "khach_ke")
+
+
+def test_post_tiep_xuc_cu_khong_nhac_khong_gia_van_chay_va_tra_canh_bao_rong(conn, batch, test_db_url):
+    _nen_khach(conn, batch)
+    r = _web(test_db_url).post("/api/khach-hang/K0001/tiep-xuc",
+                               json={"kieu": "goi", "ket_qua": "tot", "noi_dung": "gọi thường"})
+    assert r.status_code == 200 and r.json()["ok"] is True and r.json()["canh_bao"] == []
+    assert conn.execute("SELECT count(*) FROM app.tiep_xuc_nhac").fetchone()[0] == 0
+
+
+def test_post_the_lech_vi_tri_tra_400_va_khong_de_lai_dong_tiep_xuc(conn, batch, test_db_url):
+    """[CRITICAL] Lỗi ở thẻ -> không có dòng tiếp xúc nào (cùng một giao dịch)."""
+    _nen_khach(conn, batch)
+    b = _than()
+    b["nhac"][1]["vi_tri_dau"] += 1
+    r = _web(test_db_url).post("/api/khach-hang/K0001/tiep-xuc", json=b)
+    assert r.status_code == 400 and "@" in r.json()["loi"]
+    assert conn.execute("SELECT count(*) FROM app.nhat_ky_tiep_xuc").fetchone()[0] == 0
+
+
+def test_post_gia_khong_co_the_tuong_ung_tra_400(conn, batch, test_db_url):
+    _nen_khach(conn, batch)
+    b = _than(gia=[{"ma_doi_thu": "ICHIBA", "nhom_khoa": "ma:NT01", "gia_goc": 900, "don_vi_gia": "kg"}])
+    r = _web(test_db_url).post("/api/khach-hang/K0001/tiep-xuc", json=b)
+    assert r.status_code == 400
+    assert conn.execute("SELECT count(*) FROM app.nhat_ky_tiep_xuc").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("them", [{"nhac": "THAK"}, {"nhac": [1]}, {"gia": {"a": 1}}, {"gia": ["x"]}])
+def test_post_nhac_gia_sai_kieu_tra_400_khong_500(conn, batch, test_db_url, them):
+    _nen_khach(conn, batch)
+    r = _web(test_db_url).post("/api/khach-hang/K0001/tiep-xuc", json=_than(**them))
+    assert r.status_code == 400
+    assert conn.execute("SELECT count(*) FROM app.nhat_ky_tiep_xuc").fetchone()[0] == 0
+
+
+def test_post_canh_bao_khi_gia_lech_xa(conn, batch, test_db_url):
+    _nen(conn, batch)                    # A B C = 540 560 580, D = 1400 (cùng nhóm ma:NT01)
+    from tests.test_khach_hang import _ho_so_khach
+    _ho_so_khach(conn, batch, "K0001", "Quán một")
+    r = _web(test_db_url).post("/api/khach-hang/K0001/tiep-xuc", json=_than(gia=[
+        {"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 2500, "don_vi_gia": "kg"}]))
+    assert r.status_code == 200 and len(r.json()["canh_bao"]) == 1 and "kiểm lại đơn vị" in r.json()["canh_bao"][0]
+
+
+def test_goi_y_nhac_va_khach_doi_thu_qua_api(conn, batch, test_db_url, monkeypatch):
+    monkeypatch.setenv("KOME_ANH_CHUP", "1")            # ảnh chụp BẬT: ghi tiếp xúc phải làm nó cũ đi
+    _nen_khach(conn, batch)
+    c = _web(test_db_url)
+    g = c.get("/api/doi-thu/goi-y-nhac").json()
+    assert {x["ma"] for x in g["doi_thu"]} >= {"THAK", "ICHIBA"}
+    assert any(x["khoa"] == "ma:NT01" and x["loai"] == "ma" for x in g["hang"])
+    assert c.get("/api/khach-hang/K0001/doi-thu").json() == {"tin": [], "ly_do_ngung": []}
+    assert c.post("/api/khach-hang/K0001/tiep-xuc", json=_than()).status_code == 200
+    t = c.get("/api/khach-hang/K0001/doi-thu").json()["tin"]
+    assert len(t) == 1 and t[0]["doi_thu"][0]["ma"] == "THAK" and t[0]["noi_dung"] == CAU
+
+
+def test_ho_so_ben_va_tong_quan_co_khoi_moi_qua_api(conn, batch, test_db_url):
+    _nen_khach(conn, batch)
+    c = _web(test_db_url)
+    assert c.post("/api/khach-hang/K0001/tiep-xuc", json=_than()).status_code == 200
+    kh = c.get("/api/doi-thu/ben/THAK").json()["khach_dang_mua"]
+    assert [x["ma_khach"] for x in kh] == ["K0001"]
+    assert c.get("/api/doi-thu/tong-quan").json()["hien_truong"]["tong"] == 1

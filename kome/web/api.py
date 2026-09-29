@@ -306,10 +306,10 @@ def tao_api(open_app_conn) -> APIRouter:
     # Ngân sách lượt hỏi của màn danh sách = 3 (bất biến /khach-hang): tong-quan
     # 1 + ds 2. Hồ sơ <= 8 (bất biến ho_so). Bản đồ 2 (bất biến /ban-do).
 
-    def _chup(request, khoa, tinh, loi, chi_nap=False):
+    def _chup(request, khoa, tinh, loi, chi_nap=False, theo_ngay=False):
         try:
             with open_app_conn() as conn:
-                du_lieu, pb = anh_chup.lay(conn, khoa, tinh, chi_nap=chi_nap)
+                du_lieu, pb = anh_chup.lay(conn, khoa, tinh, theo_ngay=theo_ngay, chi_nap=chi_nap)
         except KX.LoiKhoang as e:
             # Tháng / kỳ ngoài dải dữ liệu — chỉ biết được sau khi đọc dải.
             return _loi(str(e), 400)
@@ -455,16 +455,25 @@ def tao_api(open_app_conn) -> APIRouter:
         nguoi = getattr(request.state, "nguoi", None)
         try:
             with open_app_conn() as conn:
-                LH.ghi(conn, ma, nguoi.id if nguoi else None, str(b.get("kieu", "")),
-                       str(b.get("ket_qua", "")), str(b.get("noi_dung", "")),
-                       str(b.get("hen_lai", "") or ""))
+                # `nhac` / `gia` (đợt 2, 063) tuỳ chọn: không có -> như cũ. Cùng MỘT giao dịch với dòng tiếp xúc.
+                ra = LH.ghi_kem_nhac(conn, ma, nguoi.id if nguoi else None, str(b.get("kieu", "")),
+                                     str(b.get("ket_qua", "")), str(b.get("noi_dung", "")),
+                                     str(b.get("hen_lai", "") or ""), b.get("nhac"), b.get("gia"))
                 conn.commit()
         except LH.LoiNhap as e:
             return _loi(str(e), 400)
         except Exception:
             traceback.print_exc()
             return _loi("Không ghi được lần tiếp xúc.")
-        return JSONResponse({"ok": True})
+        return JSONResponse({"ok": True, "id": ra["id"], "canh_bao": ra["canh_bao"]})
+
+    @r.get("/khach-hang/{ma}/doi-thu")
+    def kh_doi_thu(request: Request, ma: str):
+        """Khối "Đang mua của đối thủ" của hồ sơ khách (tin `@` 90 ngày + lý do ngừng mua). Endpoint RIÊNG
+        (`ho_so()` giữ trần 8 lượt). 1 lượt hỏi. Cửa sổ 90 ngày theo đồng hồ thật giờ Tokyo -> ảnh chụp theo ngày."""
+        from kome import doi_thu as DT
+        return _chup(request, _khoa("khach-hang/doi-thu", ma=ma), lambda c: DT.khach_doi_thu(c, ma),
+                     "Không đọc được tin đối thủ của khách.", theo_ngay=True)
 
     # ---- Giai đoạn 3: Báo cáo · Dự báo · Cần liên hệ ------------------
     # Hình học biểu đồ vẫn tính ở kome/ve_phan_tich.py, kome/bao_cao.py,
@@ -719,17 +728,19 @@ def tao_api(open_app_conn) -> APIRouter:
 
     # ---- Thị trường & đối thủ (059–060) --------------------------------
     # Đọc app (đính chính, giá tay, ghép) -> phiên bản ĐẦY ĐỦ (không chi_nap). Theo mốc của khoảng xem.
-    def _dt_doc(request, goc, tinh, thang, ky, tu, den, loi, **them):
+    def _dt_doc(request, goc, tinh, thang, ky, tu, den, loi, theo_ngay=False, **them):
+        # theo_ngay: khối có cửa sổ "N ngày qua" theo đồng hồ thật (tin hiện trường `@`, đợt 2) — sang ngày là tính lại.
         try:
             ts = _ts(request, thang, ky, tu, den).chinh()
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
-        return _chup(request, _khoa(goc, **them, **ts.khoa()), _voi_moc(ts, tinh), loi)
+        return _chup(request, _khoa(goc, **them, **ts.khoa()), _voi_moc(ts, tinh), loi, theo_ngay=theo_ngay)
 
     @r.get("/doi-thu/tong-quan")
     def dt_tong_quan(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         from kome import doi_thu as DT
-        return _dt_doc(request, "doi-thu/tong-quan", DT.tong_quan, thang, ky, tu, den, "Không đọc được tổng quan thị trường.")
+        return _dt_doc(request, "doi-thu/tong-quan", DT.tong_quan, thang, ky, tu, den, "Không đọc được tổng quan thị trường.",
+                       theo_ngay=True)
 
     @r.get("/doi-thu/so-sanh")
     def dt_so_sanh(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
@@ -747,7 +758,13 @@ def tao_api(open_app_conn) -> APIRouter:
         """Không có đối thủ này -> {"khong_co": true} (200), giao diện nói rõ; không để _chup biến nó thành 500."""
         from kome import doi_thu as DT
         return _dt_doc(request, "doi-thu/ben", lambda c: DT.ho_so_ben(c, ma) or {"khong_co": True},
-                       thang, ky, tu, den, "Không đọc được hồ sơ đối thủ.", ma=ma)
+                       thang, ky, tu, den, "Không đọc được hồ sơ đối thủ.", theo_ngay=True, ma=ma)
+
+    @r.get("/doi-thu/goi-y-nhac")
+    def dt_goi_y_nhac(request: Request):
+        """Gợi ý cho ô `@` của ô ghi tiếp xúc: đối thủ đang theo dõi + nhóm có tên + mã KOME hàng thật. 1 lượt hỏi."""
+        from kome import doi_thu as DT
+        return _chup(request, _khoa("doi-thu/goi-y-nhac"), DT.goi_y_nhac, "Không đọc được danh sách gợi ý.")
 
     @r.get("/doi-thu/duyet")
     def dt_duyet(request: Request, ben: str = "", loc: str = "", thang: str = "", ky: str = "", tu: str = "", den: str = ""):
