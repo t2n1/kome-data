@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Nhom, QuanSat } from "./kieu";
-import { LUA_CHON_GK, NHAN_SL, demThieu, dongCot, giaKome, giaTai, locDanhSach, oNhiet, thieuQuyCach } from "./so_sanh_logic";
+import { LUA_CHON_GK, NHAN_SL, bangBac, batTat, demThieu, dongCot, giaBacKg, giaKome, giaTai, locDanhSach, macDinhSp, matHangCuaBen,
+  nhanBac, nhanKlGoi, nhomChon, oNhiet, pcDau, soMatHang, thieuQuyCach } from "./so_sanh_logic";
 
 let seq = 0;
 const qs = (o: Partial<QuanSat>): QuanSat => ({
@@ -171,5 +172,65 @@ describe("demThieu / locDanhSach", () => {
     expect(k({ nhanh: "dat" })).toEqual(["1", "2"]);
     expect(k({ nhanh: "het" })).toEqual(["2"]);
     expect(k({ nhanh: "thieu" })).toEqual(["3"]);
+  });
+});
+
+describe("phụ trợ thành phần (task 6)", () => {
+  it("soMatHang bỏ khách kể; pcDau; nhanKlGoi", () => {
+    expect(soMatHang(mau())).toBe(8);
+    expect([pcDau(12), pcDau(-8), pcDau(0), pcDau(null)]).toEqual(["+12%", "−8%", "0%", "—"]);
+    expect([nhanKlGoi(250), nhanKlGoi(1000), nhanKlGoi(1500), nhanKlGoi(null)]).toEqual(["250 g", "1 kg", "1.5 kg", null]);
+    expect(nhanKlGoi(333.3333)).toBe("333.3 g");
+  });
+  it("macDinhSp = 3 nhóm nhiều bên nhất (bỏ nhóm lệch); nhomChon giữ thứ tự sp", () => {
+    const ds = [nh({ nhom_khoa: "a", so_ben: 1 }), nh({ nhom_khoa: "b", so_ben: 7 }), nh({ nhom_khoa: "c", so_ben: 3 }),
+      nh({ nhom_khoa: "d", so_ben: 5 }), nh({ nhom_khoa: "x", so_ben: 99, gia_kome_lech: true })];
+    expect(macDinhSp(ds)).toEqual(["b", "d", "c"]);
+    expect(nhomChon(ds, ["c", "zz", "a"]).map(n => n.nhom_khoa)).toEqual(["c", "a"]);
+  });
+  it("batTat: tối đa 8", () => {
+    expect(batTat(["a"], "b")).toEqual({ sp: ["a", "b"], day: false });
+    expect(batTat(["a", "b"], "a")).toEqual({ sp: ["b"], day: false });
+    const tam = ["1", "2", "3", "4", "5", "6", "7", "8"];
+    expect(batTat(tam, "9")).toEqual({ sp: tam, day: true });
+    expect(batTat(tam, "3").sp).toHaveLength(7);
+  });
+  it("matHangCuaBen: một bên, rẻ trước, bỏ khách kể, theo chiCung", () => {
+    const n = nh({ quan_sat: [qs({ ten_goc: "A2", ten_doi_thu: "A", gia_1: 900, nhan: "cung_hang" }), qs({ ten_goc: "A1", ten_doi_thu: "A", gia_1: 300 }),
+      qs({ ten_goc: "B", ten_doi_thu: "B", gia_1: 1 }), qs({ ten_goc: "K", ten_doi_thu: "A", gia_1: 1, loai_nguon: "khach_ke" })] });
+    expect(matHangCuaBen(n, "A", { sl: "1", chiCung: false }).map(q => q.ten_goc)).toEqual(["A1", "A2"]);
+    expect(matHangCuaBen(n, "A", { sl: "1", chiCung: true }).map(q => q.ten_goc)).toEqual(["A2"]);
+  });
+  it("giaBacKg = công thức mart.gia_bac_kg (067)", () => {
+    const q = { kg_thung_dt: 10, kl_goi_g: 500, thue: "chua" };
+    expect(giaBacKg({ tu: 5, don_vi_sl: "thung", gia: 5300, don_vi_gia: "thung" }, q)).toBe(530);
+    expect(giaBacKg({ tu: 5, don_vi_sl: "thung", gia: 300, don_vi_gia: "goi" }, q)).toBe(600);
+    expect(giaBacKg({ tu: 20, don_vi_sl: "kg", gia: 530, don_vi_gia: "kg" }, q)).toBe(530);
+    expect(giaBacKg({ tu: 20, don_vi_sl: "kg", gia: 540, don_vi_gia: "kg" }, { ...q, thue: "co" })).toBeCloseTo(500);
+    expect(giaBacKg({ tu: 5, don_vi_sl: "thung", gia: 5300, don_vi_gia: "thung" }, { ...q, kg_thung_dt: null })).toBeNull();
+    expect(nhanBac({ tu: 24, don_vi_sl: "kg", gia: 1, don_vi_gia: "kg" })).toBe("từ 24 kg");
+    expect(nhanBac({ tu: 5, don_vi_sl: "thung", gia: 1, don_vi_gia: "kg" })).toBe("từ 5 thùng");
+    expect(nhanBac({ tu: 1, don_vi_sl: "pallet", gia: 1, don_vi_gia: "kg" })).toBe("giá pallet");
+  });
+  it("bangBac: không bậc → một dòng 'mọi số lượng' tô đậm", () => {
+    const r = bangBac(qs({ yen_chuan: 600, gia_1: 600, kg_thung_dt: 10 }), "5", 500);
+    expect(r.coBac).toBe(false); expect(r.toiThieu).toBeNull();
+    expect(r.dong).toEqual([{ nhan: "mọi số lượng", kg: 600, goi: 300, thung: 6000, p: 20, dang: true, re: false }]);
+  });
+  it("bangBac: bậc áp dụng tô đậm theo giá máy chủ; rẻ hơn dòng trên; đặt tối thiểu", () => {
+    const bac = [{ tu: 20, don_vi_sl: "kg" as const, gia: 530, don_vi_gia: "kg" as const },
+                 { tu: 40, don_vi_sl: "kg" as const, gia: 510, don_vi_gia: "kg" as const }];
+    const q = qs({ yen_chuan: 530, gia_1: 530, gia_5: 510, gia_10: 510, kg_thung_dt: 10, bac });
+    const a = bangBac(q, "1", 500);
+    expect(a.dong.map(d => d.nhan)).toEqual(["giá lẻ", "từ 20 kg", "từ 40 kg"]);
+    expect(a.dong.map(d => d.dang)).toEqual([true, false, false]);
+    expect(a.dong.map(d => d.re)).toEqual([false, false, true]);
+    expect(a.toiThieu).toBe("20 kg");
+    expect(bangBac(q, "5", 500).dong.map(d => d.dang)).toEqual([false, false, true]);
+    // Bậc đầu rẻ hơn giá lẻ = giảm giá, không phải đặt tối thiểu.
+    const q2 = qs({ yen_chuan: 550, gia_1: 550, gia_5: 530, kg_thung_dt: 10,
+      bac: [{ tu: 5, don_vi_sl: "thung", gia: 5300, don_vi_gia: "thung" }] });
+    expect(bangBac(q2, "5", 500).toiThieu).toBeNull();
+    expect(bangBac(q2, "5", 500).dong[1]).toMatchObject({ kg: 530, thung: 5300, dang: true, re: true, p: 6 });
   });
 });

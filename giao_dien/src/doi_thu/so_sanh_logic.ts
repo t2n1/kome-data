@@ -2,7 +2,9 @@
 // Giá đã là ¥/kg chưa thuế; gia_1/5/10 máy chủ đã lấy min(giá lẻ, bậc áp dụng). Khách kể KHÔNG vẽ ở đây.
 import { boDau } from "./loc";
 import { NGAY_CU, phanTram } from "./mau";
-import type { Nhom, QuanSat } from "./kieu";
+import { so, so_luong } from "../dinh_dang";
+import { TOI_DA_SP } from "./url";
+import type { Bac, Nhom, QuanSat } from "./kieu";
 
 export type SoLuong = "1" | "5" | "10" | "pallet";
 export const NHAN_SL: Record<SoLuong, string> = { "1": "1 thùng", "5": "5 thùng", "10": "10 thùng", pallet: "1 pallet" };
@@ -107,4 +109,88 @@ export function locDanhSach(ds: Nhom[], o: { nganh: string; tim: string; nhanh: 
       : o.nhanh === "het" ? n.quan_sat.some(q => veDuoc(q) && q.trang_thai === "het") : soThieu(n) > 0)));
   return r.sort((a, b) => o.nhanh === "dat" ? (b.lech_trung_vi ?? 0) - (a.lech_trung_vi ?? 0)
     : o.nhanh === "thieu" ? soThieu(b) - soThieu(a) || b.so_ben - a.so_ben : b.so_ben - a.so_ben);
+}
+
+// ---- Đợt 4b task 6 — phụ trợ thuần cho thành phần của tab So sánh (TabSoSanh, BieuDo*, ONoiGia) ----
+
+/** Số mặt hàng đối thủ VẼ được của nhóm (không tính khách kể) — "n mặt hàng đối thủ" ở cột trái. */
+export const soMatHang = (n: Nhom) => n.quan_sat.filter(veDuoc).length;
+
+/** "+12%" · "−8%" · "0%"; null → "—". Dấu trừ là "−" (U+2212), cùng nếp `yen` của dinh_dang.ts. */
+export const pcDau = (p: number | null | undefined) =>
+  p == null ? "—" : `${p > 0 ? "+" : p < 0 ? "−" : ""}${so(Math.abs(p))}%`;
+
+/** Tịnh 1 gói: gam → "250 g" / "1.5 kg" (từ 1.000 g). null → null (thành phần in "?"). */
+export const nhanKlGoi = (g: number | null | undefined) =>
+  g == null ? null : g >= 1000 ? `${so_luong(g / 1000)} kg` : `${so_luong(g, 1)} g`;
+
+/** Nhóm mặc định khi `?sp=` trống: 3 nhóm nhiều bên nhất (cùng thứ tự "Tất cả" của cột trái). */
+export const macDinhSp = (ds: Nhom[]) =>
+  [...new Set(locDanhSach(ds, { nganh: "", tim: "", nhanh: "" }).map(n => n.nhom_khoa))].slice(0, 3);
+
+/** Bật / tắt một nhóm trong danh sách chọn. Đã đủ TOI_DA_SP mà bật thêm → giữ nguyên, `day` = true (nháy "Tối đa 8"). */
+export function batTat(sp: string[], khoa: string): { sp: string[]; day: boolean } {
+  if (sp.includes(khoa)) return { sp: sp.filter(k => k !== khoa), day: false };
+  if (sp.length >= TOI_DA_SP) return { sp, day: true };
+  return { sp: [...sp, khoa], day: false };
+}
+
+/** Nhóm đang chọn theo đúng thứ tự `sp` (một khoá có thể ứng nhiều đơn vị so — giữ hết). */
+export const nhomChon = (ds: Nhom[], sp: string[]) => sp.flatMap(k => ds.filter(n => n.nhom_khoa === k));
+
+/** Mọi mặt hàng (vẽ được) của MỘT bên trong một nhóm — ô nổi của bảng nhiệt liệt kê hết; rẻ trước (giá tại `sl`). */
+export function matHangCuaBen(n: Nhom, ben: string, o: { sl: SoLuong; chiCung: boolean }): QuanSat[] {
+  return n.quan_sat.filter(q => veDuoc(q) && tenBen(q) === ben && (!o.chiCung || q.nhan === "cung_hang"))
+    .sort((a, b) => theoGia(giaTai(a, o.sl).gia, giaTai(b, o.sl).gia));
+}
+
+/** Tiền (¥/kg chưa thuế) của MỘT bậc giá — BẢN HIỂN THỊ của `mart.gia_bac_kg` (migration 067), chỉ cho bảng bậc
+ *  của ô nổi (biểu đồ dùng gia_1/5/10/pallet máy chủ đã tính). Cùng công thức: đơn vị giá thùng ÷ kg_thung_dt,
+ *  gói ÷ (kl_goi_g / 1000), kg giữ nguyên; ÷ 1,08 khi thue = 'co'. Thiếu quy cách → null (không đoán). */
+export function giaBacKg(b: Bac, q: Pick<QuanSat, "kg_thung_dt" | "kl_goi_g" | "thue">): number | null {
+  const chia = b.don_vi_gia === "kg" ? 1 : b.don_vi_gia === "thung" ? q.kg_thung_dt : q.kl_goi_g == null ? null : q.kl_goi_g / 1000;
+  if (!chia) return null;
+  return b.gia / chia / (q.thue === "co" ? 1.08 : 1);
+}
+
+/** Một bậc quy ra số thùng (cùng `tu_thung` của mart.gia_bac_kg); pallet → Infinity; thiếu quy cách → null. */
+function tuThung(b: Bac, q: QuanSat): number | null {
+  if (b.don_vi_sl === "pallet") return Infinity;
+  if (b.don_vi_sl === "thung") return b.tu;
+  const chia = b.don_vi_sl === "kg" ? q.kg_thung_dt : q.so_goi_thung;
+  return chia ? b.tu / chia : null;
+}
+
+/** Nhãn bậc đúng như bảng giá ghi: "từ 24 kg" · "từ 5 thùng" · "từ 40 gói" · "giá pallet". */
+export const nhanBac = (b: Bac) => b.don_vi_sl === "pallet" ? "giá pallet"
+  : `từ ${so_luong(b.tu)} ${b.don_vi_sl === "thung" ? "thùng" : b.don_vi_sl === "goi" ? "gói" : "kg"}`;
+
+export type DongBac = { nhan: string; kg: number | null; goi: number | null; thung: number | null; p: number | null;
+  dang: boolean; re: boolean };
+
+/** Bảng bậc của ô nổi: dòng "giá lẻ" (yen_chuan) rồi từng bậc theo thứ tự bảng giá ghi; không có bậc → MỘT dòng
+ *  "mọi số lượng". ¥/gói = ¥/kg × kl_goi_g/1000, ¥/thùng = ¥/kg × kg_thung_dt (thiếu quy cách → null).
+ *  `dang` = dòng ứng với giá máy chủ đã chọn cho `sl` (giaTai; lệch ≤ ¥1 vì làm tròn — trùng giá thì dòng đầu).
+ *  `re` = rẻ hơn dòng trên. `toiThieu` = nhãn bậc đầu khi bậc đầu > 1 thùng mà KHÔNG rẻ hơn giá lẻ (tức giá lẻ chỉ bán
+ *  từ số lượng đó — "530¥/kg x 20kg"); bậc đầu rẻ hơn giá lẻ là giảm giá, không phải đặt tối thiểu. */
+export function bangBac(q: QuanSat, sl: SoLuong, gK: number | null):
+  { dong: DongBac[]; coBac: boolean; toiThieu: string | null } {
+  const le = q.yen_chuan ?? q.gia_1;
+  const dong1 = (nhan: string, kg: number | null) => ({ nhan, kg,
+    goi: kg == null || q.kl_goi_g == null ? null : kg * q.kl_goi_g / 1000,
+    thung: kg == null || q.kg_thung_dt == null ? null : kg * q.kg_thung_dt,
+    p: phanTram(kg, gK), dang: false, re: false });
+  const bac = q.bac ?? [];
+  if (!bac.length) return { dong: [{ ...dong1("mọi số lượng", q.gia_1 ?? le), dang: true }], coBac: false, toiThieu: null };
+  const dong: DongBac[] = [dong1("giá lẻ", le), ...bac.map(b => dong1(nhanBac(b), giaBacKg(b, q)))];
+  dong.forEach((d, i) => { const t = dong[i - 1]?.kg; d.re = i > 0 && d.kg != null && t != null && d.kg < t - 0.5; });
+  const muc = giaTai(q, sl).gia;
+  if (muc != null) {
+    let tot = -1, lech = Infinity;
+    dong.forEach((d, i) => { if (d.kg != null && Math.abs(d.kg - muc) < lech - 1e-9) { lech = Math.abs(d.kg - muc); tot = i; } });
+    if (tot >= 0 && lech <= 1) dong[tot].dang = true;
+  }
+  const dau = bac[0], tu = tuThung(dau, q), gDau = giaBacKg(dau, q);
+  const toiThieu = dau.don_vi_sl !== "pallet" && tu != null && tu > 1 && gDau != null && le != null && gDau >= le - 0.5 ? nhanBac(dau).replace(/^từ /, "") : null;
+  return { dong, coBac: true, toiThieu };
 }

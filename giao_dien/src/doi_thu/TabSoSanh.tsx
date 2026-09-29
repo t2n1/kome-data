@@ -1,108 +1,158 @@
+// Tab "So sánh giá" (đợt 4b task 6; đặc tả §4.2, bản phác ca-trang-8.html): cột trái chọn tối đa 8 nhóm · thanh điều
+// khiển (Khách mua · Cách vẽ · Chỉ cùng thương hiệu · Giá KOME — tất cả trên URL qua url.ts ở ManDoiThu) · dòng đếm ô
+// trống · A Cột (BieuDoCot) / B Chấm (BieuDoCham) / C Bảng nhiệt (BangNhiet) · bấm → SuaMatHang. Mọi luật ở
+// so_sanh_logic.ts; ở đây chỉ nối. "Tính cả phí giao" chưa có (task 9) — ẩn hẳn.
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { lay } from "../api";
+import { HinhMa } from "../chung/HinhMa";
 import { Khoi } from "../chung/Khoi";
-import { ONoi } from "../chung/ONoi";
-import { ngay, so, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
+import { BangNhiet, ChuGiaiNhiet } from "./BangNhiet";
+import { BieuDoCham, ChuGiaiCham } from "./BieuDoCham";
+import { BieuDoCot, ChuGiaiCot, type MoSua } from "./BieuDoCot";
 import type { Nhom } from "./kieu";
-import { NHAN_DUYET } from "./kieu";
-import { NguonDong } from "./NguonDong";
-import { BO_LOC_TRONG, dangLocDong, locNhom, locQuanSat, dongMoSan, kemGiaTri, luaChonLoc, viTriKome, type BoLoc } from "./loc";
+import { mauKomeSoTT } from "./mau";
+import { tenNganh } from "./nganh";
+import { batTat, demThieu, LUA_CHON_GK, locDanhSach, macDinhSp, NHAN_SL, nhomChon, pcDau, soMatHang,
+  type NutNhanh, type SoLuong } from "./so_sanh_logic";
+import { SuaMatHang } from "./SuaMatHang";
+import { TOI_DA_SP, type TrangThaiUrl } from "./url";
 
-// Giá khách kể (tin hiện trường @, 063): đã có trong quan_sat của nhóm nhưng KHÔNG vào thấp nhất / trung vị / cao nhất
-// (mart 060) — ở đây chỉ gắn nhãn và đếm số dòng, không phải chỉ số mới. Đếm trên ĐÚNG các dòng chi tiết đang hiện
-// (`locQuanSat` với bộ lọc hiện tại), để "khách kể: n tin" khớp số dòng mang nhãn khi mở nhóm.
-const KHACH_KE = "khach_ke";
-const keCua = (n: Nhom, l: BoLoc) => locQuanSat(n.quan_sat, l).filter(x => x.loai_nguon === KHACH_KE).length;
-const TUOI = [[null, "Mọi tuổi"], [30, "≤ 30 ngày"], [90, "≤ 90 ngày"], [180, "≤ 180 ngày"]] as const;
-type Props = {
-  nganh: string; ben: string; nhom: string;   // đọc từ URL (?nganh= ?ben= ?nhom=) ở ManDoiThu
-  datNganh: (n: string) => void; datBen: (b: string) => void; datNhom: (khoa: string) => void;
-};
+type Url = Pick<TrangThaiUrl, "sp" | "sl" | "xem" | "gk" | "cung" | "nganh">;
+type Props = Url & { nhom: string; dat: (moi: Partial<Url & { nhom: string }>) => void };
 
-export function TabSoSanh({ nganh, ben, nhom, datNganh, datBen, datNhom }: Props) {
+const NHANH: [NutNhanh, string][] = [["", "Tất cả"], ["dat", "KOME đắt nhất"], ["het", "Đối thủ đang hết"], ["thieu", "Còn ô trống"]];
+const XEM: [TrangThaiUrl["xem"], string][] = [["cot", "A · Cột"], ["cham", "B · Chấm"], ["nhiet", "C · Bảng nhiệt"]];
+const SL: SoLuong[] = ["1", "5", "10", "pallet"];
+const CACH_TINH = <>
+  Giá quy về ¥/kg chưa thuế (÷ 1,08 khi bảng giá ghi đã gồm thuế; thuế không rõ tính như chưa thuế). "Khách mua" lấy bậc
+  giá rẻ nhất bên đó ghi cho số lượng ấy; bên không ghi giá pallet thì dùng giá lẻ. % = giá đối thủ so với giá KOME đang
+  chọn: đỏ = đối thủ rẻ hơn KOME quá 5%, xanh = KOME rẻ hơn quá 5%, xám = ngang. "KOME ±x%" ở cột trái = 標準価格 so với
+  trung vị giá lẻ của đối thủ — không đổi theo "Khách mua". Thu gọn: KOME + 5 mặt hàng rẻ nhất + mọi mặt hàng cùng
+  thương hiệu. Giá khách kể không vẽ ở đây.</>;
+
+export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, nhom, dat }: Props) {
   const kx = chuoiKhoang(useKhoang());
   const q = useQuery({ queryKey: ["doi-thu", "so-sanh", kx],
     queryFn: () => lay<{ nhom: Nhom[] }>(`/api/doi-thu/so-sanh${kx ? "?" + kx : ""}`) });
-  const [rieng, datRieng] = useState({ tim: "", chi_cung_hang: false, chi_xac_nhan: false, kenh: "", tuoi: null as number | null });
-  const l: BoLoc = { ...BO_LOC_TRONG, ...rieng, nganh, ben };
-  const datL = (moi: Partial<BoLoc>) => {
-    const { nganh: n, ben: b, ...con } = moi;
-    if (n !== undefined) datNganh(n);
-    if (b !== undefined) datBen(b);
-    if (Object.keys(con).length) datRieng({ ...rieng, ...con });
-  };
-  const [mo, datMo] = useState<string | null>(null);
   const tatCa = q.data?.nhom;
-  const chon = useMemo(() => luaChonLoc(tatCa ?? []), [tatCa]);
-  const dsBen = chon.ben.some(b => b.ma === ben) || !ben ? chon.ben : [...chon.ben, { ma: ben, ten: ben }];
-  const ds = locNhom(tatCa ?? [], l);
-  // ?nhom=<nhom_khoa>: mở sẵn nhóm đó rồi cuộn tới nó (một lần cho mỗi giá trị của tham số).
-  const dong = useRef<Record<string, HTMLElement | null>>({});
-  const daMo = useRef("");
-  useEffect(() => {
-    if (!nhom || daMo.current === nhom || !tatCa) return;
-    const k = dongMoSan(ds, nhom);
-    if (!k) return;
-    daMo.current = nhom;
-    const khoa = k.nhom_khoa + "|" + k.don_vi_so;
-    datMo(khoa);
-    requestAnimationFrame(() => dong.current[khoa]?.scrollIntoView?.({ block: "start" }));
-  });
-  // ?nhom= trỏ tới nhóm KHÔNG có dòng so sánh (vd chỉ có giá khách kể — mart 060 không tính chúng; hay đi từ
-  // "Hàng được nhắc" ở Tổng quan): nói ra, không để bảng lặng lẽ không mở gì.
+  const [tim, datTim] = useState("");
+  const [nhanh, datNhanh] = useState<NutNhanh>("");
+  const [sua, datSua] = useState<{ nguon: "nap" | "tay"; id: number; tru_o?: string } | null>(null);
+  const [toiDa, datToiDa] = useState(false);
+  const hen = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(hen.current), []);
+  // Chưa ai chọn gì (?sp= trống) → 3 nhóm nhiều bên nhất, KHÔNG ghi lên URL. Bỏ chọn hết bằng tay thì là rỗng thật.
+  const daChon = useRef(sp.length > 0);
+  const chonSp = useMemo(() => (sp.length || daChon.current ? sp : macDinhSp(tatCa ?? [])), [sp, tatCa]);
+  const chon = useMemo(() => nhomChon(tatCa ?? [], chonSp), [tatCa, chonSp]);
+  const ds = useMemo(() => locDanhSach(tatCa ?? [], { nganh, tim, nhanh }), [tatCa, nganh, tim, nhanh]);
+  const dsNganh = useMemo(() => [...new Set((tatCa ?? []).map(n => n.nganh ?? ""))].sort((a, b) => a.localeCompare(b, "ja")), [tatCa]);
+  const thieu = useMemo(() => demThieu(chon), [chon]);
+  const mo: MoSua = (x, tru_o) => datSua({ nguon: x.nguon, id: x.id, tru_o });
+
+  const batTatNhom = (khoa: string) => {
+    const r = batTat(chonSp, khoa);
+    if (r.day) {
+      datToiDa(true); clearTimeout(hen.current); hen.current = setTimeout(() => datToiDa(false), 1800);
+      return;
+    }
+    daChon.current = true;
+    dat({ sp: r.sp });
+  };
+
+  // ?nhom=<nhom_khoa> (từ Tóm tắt / tab khác): đưa nhóm đó lên đầu danh sách chọn, cuộn tới, rồi bỏ tham số.
+  // Trỏ tới nhóm KHÔNG có dòng so sánh (vd chỉ có giá khách kể — mart 060 không tính chúng): giữ tham số và nói ra.
+  const neo = useRef<Record<string, HTMLElement | null>>({});
+  const cuonToi = useRef("");
   const khongDong = !!nhom && !!tatCa && !tatCa.some(n => n.nhom_khoa === nhom);
-  const donVi = (n: Nhom) => (n.don_vi_so === "kg" ? "/kg" : `/${n.don_vi_so.replace("don_vi:", "")}`);
+  useEffect(() => {
+    if (!nhom || !tatCa || khongDong) return;
+    daChon.current = true;
+    cuonToi.current = nhom;
+    dat({ sp: [nhom, ...chonSp.filter(k => k !== nhom)].slice(0, TOI_DA_SP), nhom: "" });
+  }, [nhom, tatCa, khongDong]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const k = cuonToi.current;
+    if (!k) return;
+    cuonToi.current = "";
+    requestAnimationFrame(() => neo.current[k]?.scrollIntoView?.({ block: "start" }));
+  }, [chon]);
+
+  const ve = { sl, gk, chiCung: cung, mo };
   return (
     <section className="dt-khoi">
-      <Khoi tieu_de="So sánh giá theo nhóm" dang_tai={q.isLoading} loi={q.error ? (q.error as Error).message : null}
-        cach_tinh="Giá quy về chưa thuế (giá có thuế ÷ 1,08) và về ¥/kg khi biết khối lượng. Giá KOME = đơn giá thực 90 ngày (Σ doanh thu thuần ÷ Σ kg đã bán). Không tính hàng hết, giá khách kể và giá bất thường (> 2× hoặc < ½ trung vị khi nhóm có ≥ 3 bên). Số của nhóm gồm cả hàng cùng hàng và hàng thay thế."
-        canh_bao={dangLocDong(l) ? "Bộ lọc chỉ ẩn dòng chi tiết — số của nhóm (thấp nhất, trung vị, cao nhất, vị trí KOME) vẫn tính trên mọi hàng, cả cùng hàng lẫn thay thế." : null}>
-        <div className="dt-loc">
-          <select aria-label="Ngành" value={nganh} onChange={e => datL({ nganh: e.target.value })}>
-            <option value="">Mọi ngành</option>{kemGiaTri(chon.nganh, nganh).map(n => <option key={n} value={n}>{n}</option>)}</select>
-          <select aria-label="Bên" value={ben} onChange={e => datL({ ben: e.target.value })}>
-            <option value="">Mọi bên</option>{dsBen.map(b => <option key={b.ma} value={b.ma}>{b.ten}</option>)}</select>
-          <select aria-label="Kênh hoặc mức giá" value={rieng.kenh} onChange={e => datL({ kenh: e.target.value })}>
-            <option value="">Mọi kênh / mức</option>{chon.kenh.map(k => <option key={k} value={k}>{k}</option>)}</select>
-          <select aria-label="Tuổi quan sát" value={rieng.tuoi ?? ""} onChange={e => datL({ tuoi: e.target.value === "" ? null : Number(e.target.value) })}>
-            {TUOI.map(([v, t]) => <option key={t} value={v ?? ""}>{t}</option>)}</select>
-          <input type="search" placeholder="Tìm nhóm / mã KOME" aria-label="Tìm nhóm hoặc mã KOME" value={l.tim} onChange={e => datL({ tim: e.target.value })} />
-          <label><input type="checkbox" checked={l.chi_cung_hang} onChange={e => datL({ chi_cung_hang: e.target.checked })} /> Chỉ cùng hàng</label>
-          <label><input type="checkbox" checked={l.chi_xac_nhan} onChange={e => datL({ chi_xac_nhan: e.target.checked })} /> Chỉ số đã xác nhận</label>
-        </div>
-        {khongDong && <p className="dt-nhat" role="status">Chưa có giá từ bảng giá cho nhóm này — chỉ có tin khách kể (xem Tổng quan › Hiện trường)</p>}
-        <div className="dt-cuon">
-          <table className="bang dt-bang">
-            <thead><tr><th>Nhóm</th><th>KOME</th><th>Thấp nhất</th><th>Trung vị</th><th>Cao nhất</th><th>Số bên</th><th>Vị trí KOME</th></tr></thead>
-            <tbody>{ds.map(n => { const k = n.nhom_khoa + "|" + n.don_vi_so; return (
-              <Fragment key={k}>
-                <tr className="dt-dong" ref={el => { dong.current[k] = el; }}>
-                  <th><button type="button" className="lien-ket" aria-expanded={mo === k}
-                    onClick={() => { daMo.current = mo === k ? "" : n.nhom_khoa; datMo(mo === k ? null : k); datNhom(daMo.current); }}>{n.ten_nhom ?? n.nhom_khoa}</button>
-                    {keCua(n, l) > 0 && <span className="dt-nhat"> · khách kể: {so(keCua(n, l))} tin</span>}</th>
-                  <td>{n.gia_kome != null ? yen(n.gia_kome) + donVi(n) : "—"}</td>
-                  <td>{yen(n.thap_nhat)}{donVi(n)} <span className="dt-nhat">{n.ben_thap_nhat}</span></td>
-                  <td>{yen(n.trung_vi)}{donVi(n)}</td>
-                  <td>{yen(n.cao_nhat)}{donVi(n)}</td>
-                  <td>{n.so_ben}</td>
-                  <td>{viTriKome(n) ?? "—"}</td>
-                </tr>
-                {mo === k && locQuanSat(n.quan_sat, l).map(x => (
-                  <tr key={x.nguon + x.id} className={"dt-con" + (x.bat_thuong ? " bat-thuong" : "")}>
-                    <td>{x.ten_doi_thu ?? x.ma_doi_thu}{x.loai_nguon === KHACH_KE && <span className="dt-ke">khách kể</span>}</td>
-                    <td colSpan={2}>{x.ten_goc} <span className="dt-nhat">{x.quy_cach_goc}</span></td>
-                    <td><ONoi noi_dung={<div className="o-noi-chu">{x.nen_gia}<br />Nguồn: {x.nguon_file ?? x.loai_nguon} · {ngay(x.ngay_nguon)}{x.vi_tri ? ` · ${x.vi_tri}` : ""}</div>}>
-                      {x.yen_chuan != null ? yen(x.yen_chuan) : "—"}</ONoi></td>
-                    <td>{x.gia_goc != null ? `${yen(x.gia_goc)}/${x.don_vi_gia ?? "?"}` : "—"}</td>
-                    <td>{x.nhan === "cung_hang" ? "cùng hàng" : "thay thế"}</td>
-                    <td>{NHAN_DUYET[x.trang_thai_duyet]}{x.bat_thuong ? " · bất thường" : ""} <NguonDong q={x} /></td>
-                  </tr>))}
-              </Fragment>); })}</tbody>
-          </table>
+      <Khoi tieu_de="So sánh giá" dang_tai={q.isLoading} loi={q.error ? (q.error as Error).message : null} cach_tinh={CACH_TINH}>
+        {khongDong && <p className="dt-nhat" role="status">Chưa có giá từ bảng giá cho nhóm này — chỉ có tin khách kể (xem Tin thị trường)</p>}
+        <div className="dt-ss">
+          <aside className="dt-ss-trai" aria-label="Chọn nhóm để so">
+            <input type="search" placeholder="🔍 Tìm sản phẩm KOME…" aria-label="Tìm nhóm hoặc mã KOME" value={tim}
+              onChange={e => datTim(e.target.value)} />
+            <div className="dt-chips" role="group" aria-label="Chọn nhanh">
+              {NHANH.map(([m, t]) => <button key={m || "tat"} type="button" className="chip" aria-pressed={nhanh === m}
+                onClick={() => datNhanh(m)}>{t}</button>)}
+            </div>
+            <div className="dt-chips" role="group" aria-label="Ngành">
+              <button type="button" className="chip" aria-pressed={!nganh} onClick={() => dat({ nganh: "" })}>Mọi ngành</button>
+              {dsNganh.filter(Boolean).map(g => <button key={g} type="button" className="chip" aria-pressed={nganh === g}
+                onClick={() => dat({ nganh: nganh === g ? "" : g })}>{tenNganh(g)}</button>)}
+            </div>
+            <p className="dt-toi-da" role="status">{toiDa ? `Tối đa ${TOI_DA_SP}` : ""}</p>
+            <ul className="dt-mhs">
+              {ds.map(n => {
+                const on = chonSp.includes(n.nhom_khoa);
+                const p = n.lech_trung_vi == null ? null : Math.round(n.lech_trung_vi * 100);
+                const ten = n.ten_nhom ?? n.nhom_khoa;
+                return (
+                  <li key={n.nhom_khoa + n.don_vi_so}>
+                    <label className={"dt-mh" + (on ? " chon" : "")}>
+                      <input type="checkbox" checked={on} onChange={() => batTatNhom(n.nhom_khoa)} />
+                      <HinhMa ma={n.ma_kome?.[0]} ten={ten} co={34} trang_tri />
+                      <span>
+                        <b><i className={"dt-cham " + mauKomeSoTT(p)} aria-hidden="true" />{ten}</b>
+                        <small>KOME {pcDau(p)} · {soMatHang(n)} mặt hàng đối thủ</small>
+                      </span>
+                    </label>
+                  </li>);
+              })}
+              {tatCa && ds.length === 0 && <li className="dt-nhat">Không có nhóm nào khớp.</li>}
+            </ul>
+          </aside>
+
+          <div className="dt-ss-phai">
+            <div className="dt-dk">
+              <span className="dt-dk-nhom" role="group" aria-label="Khách mua">
+                <span className="dt-dk-nhan">Khách mua:</span>
+                {SL.map(s => <button key={s} type="button" className="chip" aria-pressed={sl === s} onClick={() => dat({ sl: s })}>{NHAN_SL[s]}</button>)}
+              </span>
+              <span className="dt-dk-nhom" role="group" aria-label="Cách vẽ">
+                <span className="dt-dk-nhan">Cách vẽ:</span>
+                {XEM.map(([m, t]) => <button key={m} type="button" className="chip" aria-pressed={xem === m} onClick={() => dat({ xem: m })}>{t}</button>)}
+              </span>
+              <label><input type="checkbox" checked={cung} onChange={e => dat({ cung: e.target.checked })} /> Chỉ cùng thương hiệu</label>
+              <label>Giá KOME:
+                <select value={gk} onChange={e => dat({ gk: e.target.value })}>
+                  {LUA_CHON_GK.map(x => <option key={x.ma} value={x.ma}>{x.nhan}</option>)}
+                  {!LUA_CHON_GK.some(x => x.ma === gk) && <option value={gk}>{gk}</option>}
+                </select>
+              </label>
+            </div>
+            {thieu.so > 0 && thieu.dau && (
+              <p className="dt-thieu">✎ {thieu.so} mặt hàng còn thiếu gói / thùng hoặc tịnh 1 gói — <button type="button"
+                onClick={() => mo(thieu.dau!, thieu.truong ?? undefined)}>bấm để điền cái đầu tiên</button></p>)}
+            {chon.length === 0 ? <p className="dt-nhat">Chọn ít nhất một nhóm ở cột trái.</p>
+              : xem === "cot" ? <>
+                  {chon.map(n => <BieuDoCot key={n.nhom_khoa + n.don_vi_so} n={n} {...ve}
+                    neo={e => { neo.current[n.nhom_khoa] = e; }} />)}
+                  <ChuGiaiCot />
+                </>
+              : xem === "cham" ? <><BieuDoCham ds={chon} {...ve} /><ChuGiaiCham /></>
+              : <><BangNhiet ds={chon} {...ve} /><ChuGiaiNhiet /></>}
+          </div>
         </div>
       </Khoi>
+      {sua && <SuaMatHang nguon={sua.nguon} id={sua.id} tru_o={sua.tru_o} dong={() => datSua(null)} xong={() => datSua(null)} />}
     </section>
   );
 }
