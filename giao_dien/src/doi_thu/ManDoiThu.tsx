@@ -1,7 +1,6 @@
 // Màn "Thị trường & đối thủ" (/doi-thu). Thanh tab: Tóm tắt · So sánh giá · Đối thủ · Tin thị trường · Phí & giao hàng,
 // cộng menu "Dữ liệu ▾" ở phải (Duyệt / sửa · Nhóm & quy cách · Giá KOME lệch · Thư mục Drive). Trạng thái ở URL (url.ts);
 // ?nhom= (nhom_khoa mở sẵn của tab So sánh cũ) không thuộc url.ts nên được giữ / xoá riêng ở đây.
-// Các tab chưa làm lại (đợt 4b task sau: Phí & giao hàng, Giá KOME lệch) tạm hiện một dòng "đang được làm lại".
 import { useCallback, useEffect, useRef, useState } from "react";
 import { giuKhoang } from "../khung/khoang";
 import { TabTomTat } from "./TabTomTat";
@@ -9,6 +8,8 @@ import { TabSoSanh } from "./TabSoSanh";
 import { TabHoSo } from "./TabHoSo";
 import { TabTin } from "./TabTin";
 import { TabDuyet } from "./TabDuyet";
+import { TabGiaKomeLech } from "./TabGiaKomeLech";
+import { TabGiaoHang } from "./TabGiaoHang";
 import { TabNhomQuyCach } from "./TabNhomQuyCach";
 import { docUrl, vietUrl, type Tab, type TrangThaiUrl } from "./url";
 import "./doi_thu.css";
@@ -111,14 +112,15 @@ export default function ManDoiThu() {
       {t.tab === "tom_tat" && <TabTomTat moBen={b => doi({ tab: "ben", ben: b })} moLech={() => doi({ tab: "lech" })} moTin={() => doi({ tab: "tin" })}
         moSoSanh={o => doi({ tab: "so_sanh", sp: o.sp ?? [], nganh: o.nganh ?? "", ben: o.ben ?? "", nhom: "" })} />}
       {t.tab === "so_sanh" && <TabSoSanh sp={t.sp} sl={t.sl} xem={t.xem} gk={t.gk} cung={t.cung} nganh={t.nganh} ben={t.ben}
-        nhom={t.nhom} dat={doi} />}
+        phi={t.phi} nhom={t.nhom} dat={doi} />}
       {t.tab === "ben" && <TabHoSo ben={t.ben} chonBen={b => doi({ ben: b })} moDuyet={b => doi({ tab: "duyet", ben: b })}
         moLech={() => doi({ tab: "lech" })} />}
       {t.tab === "tin" && <TabTin moBen={b => doi({ tab: "ben", ben: b })}
         moSoSanh={sp => doi({ tab: "so_sanh", sp, nganh: "", ben: "", nhom: "" })} />}
       {t.tab === "nhom" && <TabNhomQuyCach />}
       {t.tab === "duyet" && <TabDuyet ben={t.ben} boBen={() => doi({ ben: "" })} />}
-      {(t.tab === "giao_hang" || t.tab === "lech") && <p className="dt-nhat" role="status">Màn này đang được làm lại.</p>}
+      {t.tab === "giao_hang" && <TabGiaoHang />}
+      {t.tab === "lech" && <TabGiaKomeLech />}
     </div>
   );
 }

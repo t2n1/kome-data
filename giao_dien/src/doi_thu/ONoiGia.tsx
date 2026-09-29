@@ -5,7 +5,8 @@
 import { ngay, so_luong, yen } from "../dinh_dang";
 import { NHAN_GHEP, type Nhom, type QuanSat } from "./kieu";
 import { mauLech, NGAY_CU } from "./mau";
-import { bangBac, giaKome, giaTai, LUA_CHON_GK, nhanKlGoi, pcDau, type SoLuong } from "./so_sanh_logic";
+import { bangBac, giaKome, giaTai, LUA_CHON_GK, nhanKlGoi, pcDau, phiKome, phiMatHang, type PhiNoi, type PhiSoSanh,
+  type SoLuong } from "./so_sanh_logic";
 
 const kgChu = (v: number | null | undefined) => (v == null ? null : `${so_luong(v, 1)} kg`);
 
@@ -15,8 +16,19 @@ function O({ nhan, gia, kome }: { nhan: string; gia: string | null; kome: string
   );
 }
 
+/** Dòng "kèm phí giao" (chỉ khi bật "Tính cả phí giao" và áp được). */
+function DongPhi({ p }: { p: PhiNoi | null }) {
+  if (!p) return null;
+  if (p.hoi) return <p className="dt-ng-chu vang">? Phí giao chưa cộng — {p.hoi === "kg" ? "thiếu kg / thùng"
+    : p.r?.chua_ro.length ? `chưa rõ ${p.r.chua_ro.join(", ")}` : "chưa có điều kiện giao hàng"}</p>;
+  const r = p.r!;
+  return (
+    <p className="dt-ng-chu">Kèm phí giao (đơn {p.thung} thùng, Kanto, daibiki): <b>{yen(p.gia)}/kg</b> — ship {yen(r.ship)}
+      {r.vung ? ` · vùng ${yen(r.vung)}` : ""} · daibiki {yen(r.daibiki)}</p>);
+}
+
 /** Nội dung ô nổi của MỘT mặt hàng. */
-export function NoiGia({ n, q, sl, gk }: { n: Nhom; q: QuanSat; sl: SoLuong; gk: string }) {
+export function NoiGia({ n, q, sl, gk, phi }: { n: Nhom; q: QuanSat; sl: SoLuong; gk: string; phi?: PhiSoSanh | null }) {
   const gK = giaKome(n, gk);
   const { khongGhiPallet } = giaTai(q, sl);
   const b = bangBac(q, sl, gK);
@@ -64,6 +76,7 @@ export function NoiGia({ n, q, sl, gk }: { n: Nhom; q: QuanSat; sl: SoLuong; gk:
       {cu && <p className="dt-ng-chu vang">Bảng giá đã {q.tuoi_ngay} ngày</p>}
       {sl === "pallet" && khongGhiPallet && <p className="dt-ng-chu">Bên này không ghi giá pallet — đang dùng giá lẻ</p>}
       {q.gom_ship === "co" && <p className="dt-ng-chu">🚚 Giá đã gồm ship</p>}
+      <DongPhi p={phiMatHang(n, q, sl, phi)} />
       <p className="dt-ng-chu">
         Giá gốc {q.gia_goc == null ? "?" : `${yen(q.gia_goc)}/${q.don_vi_gia ?? "?"}`}
         {q.gia_bac ? ` · bậc ghi: “${q.gia_bac}”` : ""}{q.kenh_gia ? ` · ${q.kenh_gia}` : ""} · {ngay(q.ngay_nguon)}
@@ -73,7 +86,7 @@ export function NoiGia({ n, q, sl, gk }: { n: Nhom; q: QuanSat; sl: SoLuong; gk:
 }
 
 /** Ô nổi của dòng KOME (biểu đồ cột): giá đang chọn, thực bán, 標準価格, bảng 売価No. */
-export function NoiKome({ n, gk }: { n: Nhom; gk: string }) {
+export function NoiKome({ n, gk, sl = "1", phi }: { n: Nhom; gk: string; sl?: SoLuong; phi?: PhiSoSanh | null }) {
   const bang = Object.entries(n.gia_kome_bang ?? {}).sort(([a], [b]) => a.localeCompare(b));
   return (
     <div className="dt-ng">
@@ -86,6 +99,7 @@ export function NoiKome({ n, gk }: { n: Nhom; gk: string }) {
       </tbody></table>
       {gk === "chuan" && n.gia_kome_chuan == null && <p className="dt-ng-chu vang">Chưa có 標準価格 — đang dùng thực bán 90 ngày</p>}
       {gk !== "chuan" && gk !== "thuc" && giaKome(n, gk) == null && <p className="dt-ng-chu vang">Mã này không có 売価No.{gk}</p>}
+      <DongPhi p={phiKome(n, gk, sl, phi)} />
     </div>
   );
 }

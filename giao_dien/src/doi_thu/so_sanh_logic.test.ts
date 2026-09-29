@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Nhom, QuanSat } from "./kieu";
 import { LUA_CHON_GK, khoaNhom, khoaONhiet, NHAN_SL, bangBac, batTat, demThieu, dongCot, giaBacKg, giaKome, giaTai, locDanhSach, macDinhSp, matHangCuaBen,
-  nhanBac, nhanKlGoi, nhomChon, oNhiet, pcDau, soMatHang, thieuQuyCach } from "./so_sanh_logic";
+  nhanBac, nhanKlGoi, nhomChon, oNhiet, pcDau, soMatHang, thieuQuyCach, giaCoPhi, apPhi, type PhiSoSanh } from "./so_sanh_logic";
+import type { DieuKienGiao } from "./phi_giao";
 
 let seq = 0;
 const qs = (o: Partial<QuanSat>): QuanSat => ({
@@ -259,5 +260,96 @@ describe("phụ trợ thành phần (task 6)", () => {
       bac: [{ tu: 5, don_vi_sl: "thung", gia: 5300, don_vi_gia: "thung" }] });
     expect(bangBac(q2, "5", 500).toiThieu).toBeNull();
     expect(bangBac(q2, "5", 500).dong[1]).toMatchObject({ kg: 530, thung: 5300, dang: true, re: true, p: 6 });
+  });
+});
+
+// ---- Đợt 4b task 9 — "Tính cả phí giao" (đặc tả §5.5) ----
+const dk = (o: Partial<DieuKienGiao> = {}): DieuKienGiao => ({
+  bao_ship: false, phi_ship: 500, phi_ship_theo: "don", mien_ship_tu: 20000, mien_ship_kien: null, thung_moi_kien: null,
+  phu_phi: null, phi_daibiki: 330, daibiki_tu: 20000, daibiki_sau: 300, ck_mien_daibiki: null, kien_toi_da_kg: null,
+  ghep_kien: null, thue: "chua", cach_gui: null, ...o });
+
+describe("giaCoPhi", () => {
+  it("cộng (ship + vùng + daibiki) ÷ kg của đơn", () => {
+    expect(giaCoPhi(500, 10, { ship: 500, vung: 0, daibiki: 330, chua_ro: [] })).toEqual({ gia: 583, chuaRo: false });
+    expect(giaCoPhi(500, 50, { ship: 0, vung: 200, daibiki: 300, chua_ro: [] })).toEqual({ gia: 510, chuaRo: false });
+  });
+  it("phí 0 → giữ nguyên giá, không cờ", () => {
+    expect(giaCoPhi(700, 20, { ship: 0, vung: 0, daibiki: 0, chua_ro: [] })).toEqual({ gia: 700, chuaRo: false });
+  });
+  it("chua_ro không rỗng → trả giá gốc kèm cờ, KHÔNG cộng phần đã biết", () => {
+    expect(giaCoPhi(500, 10, { ship: 500, vung: 0, daibiki: 0, chua_ro: ["daibiki"] })).toEqual({ gia: 500, chuaRo: true });
+  });
+  it("kg của đơn ≤ 0 / không hữu hạn → cờ, không chia", () => {
+    expect(giaCoPhi(500, 0, { ship: 500, vung: 0, daibiki: 0, chua_ro: [] })).toEqual({ gia: 500, chuaRo: true });
+    expect(giaCoPhi(500, Number.NaN, { ship: 500, vung: 0, daibiki: 0, chua_ro: [] })).toEqual({ gia: 500, chuaRo: true });
+  });
+});
+
+describe("apPhi", () => {
+  it("đơn = số thùng × kg/thùng, Kanto, trả daibiki; tiền mặc định = giá × kg", () => {
+    // 520 ¥/kg × 10 kg × 1 thùng = ¥5,200 < 20,000 → ship 500 + daibiki 330
+    expect(apPhi(520, { dk: dk(), thung: 1, kgThung: 10 })).toMatchObject({ gia: 603, hoi: null });
+    // 5 thùng = ¥26,000 → miễn ship, daibiki 300 → +300 / 50 kg
+    expect(apPhi(520, { dk: dk(), thung: 5, kgThung: 10 })).toMatchObject({ gia: 526, hoi: null });
+  });
+  it("tiền truyền vào (gia_thung × thùng) quyết định ngưỡng miễn", () => {
+    expect(apPhi(500, { dk: dk(), thung: 1, kgThung: 10, tien: 25000 })).toMatchObject({ gia: 530, hoi: null });
+  });
+  it("bao ship: không cộng ship, vẫn cộng daibiki", () => {
+    expect(apPhi(500, { dk: dk({ bao_ship: true, phi_daibiki: 440, daibiki_tu: null }), thung: 1, kgThung: 10 }))
+      .toMatchObject({ gia: 544, hoi: null });
+  });
+  it("thiếu kg/thùng → '?' kg, không cộng; thiếu điều kiện → '?' dk; chưa rõ một phần → '?' dk kèm phần đó", () => {
+    expect(apPhi(500, { dk: dk(), thung: 1, kgThung: null })).toMatchObject({ gia: 500, hoi: "kg" });
+    expect(apPhi(500, { dk: null, thung: 1, kgThung: 10 })).toMatchObject({ gia: 500, hoi: "dk" });
+    const r = apPhi(500, { dk: dk({ phi_ship: null }), thung: 1, kgThung: 10 });
+    expect(r).toMatchObject({ gia: 500, hoi: "dk" }); expect(r.phi?.chua_ro).toEqual(["ship"]);
+  });
+  it("chưa có giá → null, không cờ", () => {
+    expect(apPhi(null, { dk: dk(), thung: 1, kgThung: 10 })).toMatchObject({ gia: null, hoi: null });
+  });
+});
+
+describe("dongCot / oNhiet có phí giao", () => {
+  const phi: PhiSoSanh = { kome: dk(), ben: new Map([
+    ["a", dk({ bao_ship: true, phi_daibiki: 440, daibiki_tu: null })],
+    ["d", dk({ phi_ship: null })],
+  ]) };
+  const n = () => nh({ quan_sat: [
+    qs({ ten_goc: "A", gia_1: 500, yen_chuan: 500, kg_thung_dt: 10, gia_thung: 5000, ma_doi_thu: "a", ten_doi_thu: "Bên A" }),
+    qs({ ten_goc: "B", gia_1: 450, yen_chuan: 450, kg_thung_dt: 10, gia_thung: 4500, ma_doi_thu: "b", ten_doi_thu: "Bên B" }),
+    qs({ ten_goc: "C", gia_1: 400, yen_chuan: 400, kg_thung_dt: null, ma_doi_thu: "c", ten_doi_thu: "Bên C" }),
+    qs({ ten_goc: "D", gia_1: 480, yen_chuan: 480, kg_thung_dt: 10, gia_thung: 4800, ma_doi_thu: "d", ten_doi_thu: "Bên D" }),
+  ] });
+  it("KOME và đối thủ cộng phí; % so với KOME ĐÃ cộng phí; '?' khi không cộng được", () => {
+    const { dong } = dongCot(n(), { sl: "1", gk: "chuan", chiCung: false, moRong: true, phi });
+    const kome = dong.find(d => d.kome)!;
+    expect(kome).toMatchObject({ gia: 603, phiHoi: null });           // 520 + 830/10
+    const a = dong.find(d => d.ten === "A")!;
+    expect(a).toMatchObject({ gia: 544, phiHoi: null, p: -10 });      // bao ship: chỉ daibiki 440
+    expect(dong.find(d => d.ten === "B")).toMatchObject({ gia: 450, phiHoi: "dk", p: -25 });
+    expect(dong.find(d => d.ten === "C")).toMatchObject({ gia: 400, phiHoi: "kg" });
+    expect(dong.find(d => d.ten === "D")).toMatchObject({ gia: 480, phiHoi: "dk" });
+    // giá mua 1 thùng (đuôi đứt) cũng kèm phí của đơn 1 thùng
+    expect(a.giaLe).toBe(544);
+  });
+  it("tắt phí (hoặc pallet, hoặc nhóm không so theo kg) → y như cũ", () => {
+    const cu = dongCot(n(), { sl: "1", gk: "chuan", chiCung: false, moRong: true }).dong;
+    expect(cu.find(d => d.kome)).toMatchObject({ gia: 520, phiHoi: null });
+    const pallet = dongCot(n(), { sl: "pallet", gk: "chuan", chiCung: false, moRong: true, phi }).dong;
+    expect(pallet.map(d => d.gia)).toEqual(dongCot(n(), { sl: "pallet", gk: "chuan", chiCung: false, moRong: true }).dong.map(d => d.gia));
+    expect(pallet.every(d => d.phiHoi == null)).toBe(true);
+    const khongKg = { ...n(), don_vi_so: "con" };
+    expect(dongCot(khongKg, { sl: "1", gk: "chuan", chiCung: false, moRong: true, phi }).dong.every(d => d.phiHoi == null)).toBe(true);
+  });
+  it("5 thùng: ngưỡng miễn ship tính theo tiền của cả đơn", () => {
+    const { dong } = dongCot(n(), { sl: "5", gk: "chuan", chiCung: false, moRong: true, phi });
+    expect(dong.find(d => d.kome)!.gia).toBe(526);                    // ¥26,000 → miễn ship, daibiki 300 / 50 kg
+  });
+  it("oNhiet dùng cùng giá kèm phí và mang cờ", () => {
+    const r = oNhiet([n()], { sl: "1", gk: "chuan", chiCung: false, phi });
+    expect(r.o.get(khoaONhiet(n(), "Bên A"))).toMatchObject({ p: -10, hoi: null });
+    expect(r.o.get(khoaONhiet(n(), "Bên B"))).toMatchObject({ p: -25, hoi: "dk" });
   });
 });

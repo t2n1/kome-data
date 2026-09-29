@@ -67,6 +67,8 @@
    --lam-nen:#E8F0F7; --lam-chu:#1B5E8C;
    /* Màn /doi-thu (doi_thu.css): thanh khác thương hiệu, "?" thiếu (cam), khuyến mãi (tím), vạch thực bán. */
    --dt-khac:#6E6A63; --dt-khac-chu:#FFFFFF; --dt-cam:#C2620E; --dt-km:#6B4FB8; --dt-vach:#FFFFFF;
+   /* Tab Phí & giao hàng: phần phụ phí vùng (vàng) và daibiki (tím) của thanh ghép; phần ship dùng --dt-cam. */
+   --dt-vung:#B8860B; --dt-dai:#7B5CC4;
    /* Màu theo lý do của /lien-he — mỗi cột đặt lại ba biến này (lien_he.css,
       .lh-m-<lý do>); đây là giá trị khi phần tử không thuộc cột nào. Chỉ
       tham chiếu token; khối tối chép lại y hệt cho test canh bảng tối. */
@@ -183,6 +185,7 @@
    --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
    --lam-nen:#172633; --lam-chu:#7FB3D9;
    --dt-khac:#4A433B; --dt-khac-chu:#D6CFC2; --dt-cam:#F0A05A; --dt-km:#B39AE8; --dt-vach:#FFFFFF;
+   --dt-vung:#E3B34F; --dt-dai:#8E6BD8;
    --lh-mau:var(--vien); --lh-mau-chu:var(--chu-nhat); --lh-mau-nen:var(--nen-phu);
    --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
    /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
@@ -228,6 +231,7 @@
    --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
    --lam-nen:#172633; --lam-chu:#7FB3D9;
    --dt-khac:#4A433B; --dt-khac-chu:#D6CFC2; --dt-cam:#F0A05A; --dt-km:#B39AE8; --dt-vach:#FFFFFF;
+   --dt-vung:#E3B34F; --dt-dai:#8E6BD8;
    --lh-mau:var(--vien); --lh-mau-chu:var(--chu-nhat); --lh-mau-nen:var(--nen-phu);
    --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
    /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt

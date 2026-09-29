@@ -6,15 +6,16 @@ import { ONoi } from "../chung/ONoi";
 import type { Nhom } from "./kieu";
 import { mauLech } from "./mau";
 import { NoiGia } from "./ONoiGia";
-import { giaTai, khoaNhom, khoaONhiet, matHangCuaBen, oNhiet, pcDau, type SoLuong } from "./so_sanh_logic";
+import { giaTai, khoaNhom, khoaONhiet, matHangCuaBen, oNhiet, pcDau, type PhiSoSanh, type SoLuong } from "./so_sanh_logic";
 import type { MoSua } from "./BieuDoCot";
 
 const CW = 62, LW = 200, RH = 32, TH = 72, DAM_TOI_DA = 40;
 const MAU: Record<string, string> = { do: "var(--do)", xanh: "var(--ok-vien)", xam: "var(--chu-mo)" };
 const ngan = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
 
-export function BangNhiet({ ds, sl, gk, chiCung, mo }: { ds: Nhom[]; sl: SoLuong; gk: string; chiCung: boolean; mo: MoSua }) {
-  const { ben, o } = oNhiet(ds, { sl, gk, chiCung });
+export function BangNhiet({ ds, sl, gk, chiCung, mo, phi }: { ds: Nhom[]; sl: SoLuong; gk: string; chiCung: boolean; mo: MoSua;
+  phi?: PhiSoSanh | null }) {
+  const { ben, o } = oNhiet(ds, { sl, gk, chiCung, phi });
   const W = LW + CW * Math.max(1, ben.length) + 4, H = TH + RH * ds.length + 4;
   return (
     <div className="dt-nhiet-khung">
@@ -34,20 +35,21 @@ export function BangNhiet({ ds, sl, gk, chiCung, mo }: { ds: Nhom[]; sl: SoLuong
                 const dam = (0.2 + 0.7 * t) * (c.cung ? 1 : 0.45);
                 const het = c.q.trang_thai === "het";
                 const cx = LW + i * CW;
-                const tatCa = matHangCuaBen(n, b, { sl, chiCung });
+                const tatCa = matHangCuaBen(n, b, { sl, chiCung, phi });
                 // p chưa biết: mặt hàng chưa có giá → "?" cam, pop-up mở ở ô giá; thiếu giá KOME → "?" cam, pop-up mở thường.
                 const thieuGia = giaTai(c.q, sl).gia == null;
                 return (
-                  <ONoi key={b} svg nhan={`${n.ten_nhom ?? n.nhom_khoa} · ${b}: ${pcDau(c.p)} so KOME${c.so > 1 ? `, ${c.so} mặt hàng` : ""}`}
+                  <ONoi key={b} svg nhan={`${n.ten_nhom ?? n.nhom_khoa} · ${b}: ${pcDau(c.p)} so KOME${c.so > 1 ? `, ${c.so} mặt hàng` : ""}${c.hoi ? ", phí giao chưa cộng" : ""}`}
                     onBam={() => mo(c.q, thieuGia ? "gia_goc" : undefined)}
-                    noi_dung={<>{tatCa.map(q => <NoiGia key={`${q.nguon}${q.id}`} n={n} q={q} sl={sl} gk={gk} />)}</>}>
+                    noi_dung={<>{tatCa.map(q => <NoiGia key={`${q.nguon}${q.id}`} n={n} q={q} sl={sl} gk={gk} phi={phi} />)}</>}>
                     <rect className="dt-dich" x={cx + 2} y={y + 2} width={CW - 4} height={RH - 4} rx={4}
                       fill={MAU[mauLech(c.p)]} fillOpacity={dam}
                       stroke={het ? "var(--canh-chu)" : c.cung ? "none" : "var(--chu-mo)"} strokeWidth={het ? 2 : 1}
                       strokeDasharray={!het && !c.cung ? "3 2" : undefined} />
                     <text x={cx + CW / 2} y={y + 20} fontSize={10.5} textAnchor="middle" pointerEvents="none"
                       style={{ fill: c.p == null ? "var(--dt-cam)" : dam >= 0.6 ? "var(--dt-vach)" : "var(--chu)" }}>
-                      {c.cung ? "" : "≈"}{c.p == null ? <tspan fontWeight={700}>?</tspan> : pcDau(c.p)}{c.so > 1 ? ` ·${c.so}` : ""}</text>
+                      {c.cung ? "" : "≈"}{c.p == null ? <tspan fontWeight={700}>?</tspan> : pcDau(c.p)}{c.so > 1 ? ` ·${c.so}` : ""}
+                      {c.hoi && c.p != null && <tspan className="t-cam-nhat" fontWeight={700}> ?</tspan>}</text>
                   </ONoi>);
               })}
             </g>);

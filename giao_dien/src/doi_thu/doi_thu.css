@@ -368,3 +368,44 @@ button.dt-tt-ten{cursor:pointer} button.dt-tt-ten:hover{text-decoration:underlin
 @container (max-width:760px){.dt-tin-ht{grid-template-columns:minmax(0,1fr)}}
 .dt-tin-ht h3{margin:0 0 6px;font-size:.84rem}
 .dt-hs-chua{display:block;margin-top:6px;font-size:.76rem}
+
+/* ---- Tab Phí & giao hàng (đợt 4b task 9) — thanh ghép ship --dt-cam · vùng --dt-vung · daibiki --dt-dai (kome.css) ---- */
+.dt-phi{display:grid;gap:12px;min-width:0}
+.dt-phi-dk{background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:10px 14px;margin:0}
+.dt-svg-phi{width:100%;max-width:860px;min-width:640px}
+.dt-svg .dt-phi-hoi{outline:none}
+.dt-svg .dt-phi-hoi:focus-visible rect{stroke:var(--dt-cam);stroke-width:2}
+.dt-chu-giai .cg-ship{background:var(--dt-cam)} .dt-chu-giai .cg-vung{background:var(--dt-vung)}
+.dt-chu-giai .cg-dai-phi{background:var(--dt-dai)} .dt-chu-giai .cg-kome-vien{border:1.5px solid var(--do)}
+.dt-bang-giao{font-size:.8rem;border-collapse:collapse}
+.dt-bang-giao th,.dt-bang-giao td{white-space:nowrap;padding:4px 6px}
+.dt-bang-giao tr.kome td{background:var(--do-nen)}
+.dt-bang-giao tr.kome .dt-giao-ben{color:var(--do-chu);font-weight:700}
+.dt-bang-giao .dt-giao-ben{cursor:pointer}
+.dt-giao-o{font:inherit;color:inherit;background:none;border:0;padding:2px 4px;border-radius:4px;cursor:pointer;text-align:left}
+.dt-giao-o:hover,.dt-giao-o:focus-visible{background:var(--nen-phu);outline:none}
+.dt-giao-o.cam{color:var(--dt-cam);font-weight:700;text-decoration:underline}
+.dt-giao-o.vang{color:var(--canh-chu);font-weight:700}
+.dt-giao-o.c-do{color:var(--do-chu)} .dt-giao-o.c-xanh{color:var(--ok-chu)}
+
+/* ---- Dữ liệu › Giá KOME lệch (đợt 4b task 9) ---- */
+.dt-bang-lech{font-size:.8rem}
+.dt-bang-lech th,.dt-bang-lech td{white-space:nowrap;padding:4px 8px;vertical-align:middle}
+.dt-bang-lech .r{text-align:right}
+.dt-bang-lech .dt-lech-o{font-weight:600}
+.dt-bang-lech .c-do{color:var(--do-chu)} .dt-bang-lech .t-dam{font-weight:700}
+.dt-lech-ten{display:inline-flex;gap:8px;align-items:center}
+.dt-lech-ten .hinh-ma{border-radius:6px}
+
+/* ---- Duyệt / sửa một cột (đợt 4b task 9): bấm dòng mở SuaMatHang, "Đúng rồi" trên dòng ---- */
+.dt-duyet.dt-duyet-mot{grid-template-columns:minmax(0,1fr)}
+.dt-duyet-ds li{display:flex;gap:8px;align-items:center}
+.dt-duyet-ds li>button:first-child{flex:1;min-width:0}
+.dt-duyet-ds li>button:first-child:hover,.dt-duyet-ds li>button:first-child:focus-visible{background:var(--nen-phu);outline:none}
+.dt-duyet-ds .dt-dung{flex:none;width:auto;font-size:.72rem;padding:.15rem .55rem;border:1px solid var(--vien-dam);border-radius:999px}
+/* "?" phí giao chưa cộng (Tính cả phí giao — tab So sánh). */
+.dt-svg .dt-hoi-phi{outline:none}
+.dt-svg .dt-hoi-phi circle{fill:var(--nen-the);stroke:var(--dt-cam)}
+.dt-svg .dt-hoi-phi text{fill:var(--dt-cam);font-weight:700}
+.dt-svg .dt-hoi-phi:focus-visible circle{stroke-width:2.5}
+.dt-svg .t-cam-nhat{fill:var(--dt-cam)}

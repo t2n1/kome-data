@@ -7,7 +7,7 @@ import { yen } from "../dinh_dang";
 import type { Nhom } from "./kieu";
 import { mauLech, phanTram } from "./mau";
 import { NoiGia } from "./ONoiGia";
-import { dongCot, khoaNhom, giaKome, pcDau, type SoLuong } from "./so_sanh_logic";
+import { dongCot, khoaNhom, pcDau, type PhiSoSanh, type SoLuong } from "./so_sanh_logic";
 import type { MoSua } from "./BieuDoCot";
 
 const W = 760, LW = 200, RH = 50, TREN = 30, LO = -60, HI = 60;
@@ -15,7 +15,8 @@ const MAU: Record<string, string> = { do: "var(--do)", xanh: "var(--ok-vien)", x
 const x = (p: number) => LW + (Math.max(LO, Math.min(HI, p)) - LO) / (HI - LO) * (W - LW - 20);
 const ngan = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
 
-export function BieuDoCham({ ds, sl, gk, chiCung, mo }: { ds: Nhom[]; sl: SoLuong; gk: string; chiCung: boolean; mo: MoSua }) {
+export function BieuDoCham({ ds, sl, gk, chiCung, mo, phi }: { ds: Nhom[]; sl: SoLuong; gk: string; chiCung: boolean; mo: MoSua;
+  phi?: PhiSoSanh | null }) {
   const H = TREN + ds.length * RH + 22;
   return (
     <div className="dt-cuon">
@@ -30,8 +31,10 @@ export function BieuDoCham({ ds, sl, gk, chiCung, mo }: { ds: Nhom[]; sl: SoLuon
         <text x={x(-40)} y={12} fontSize={11} className="t-do">◀ đối thủ rẻ hơn KOME</text>
         <text x={x(40)} y={12} fontSize={11} textAnchor="end" className="t-xanh">KOME rẻ hơn ▶</text>
         {ds.map((n, i) => {
-          const y = TREN + i * RH + RH / 2, gK = giaKome(n, gk);
-          const hang = dongCot(n, { sl, gk, chiCung, moRong: true }).dong.filter(d => !d.kome);
+          const y = TREN + i * RH + RH / 2;
+          const tat = dongCot(n, { sl, gk, chiCung, moRong: true, phi }).dong;
+          const gK = tat.find(d => d.kome)?.gia ?? null;   // kèm phí khi bật "Tính cả phí giao"
+          const hang = tat.filter(d => !d.kome);
           const thieu = hang.filter(d => d.gia == null);   // thiếu giá của MẶT HÀNG (thiếu giá KOME đã nói ở nhãn hàng)
           return (
             <g key={khoaNhom(n)}>
@@ -51,11 +54,13 @@ export function BieuDoCham({ ds, sl, gk, chiCung, mo }: { ds: Nhom[]; sl: SoLuon
                         <line x1={x(p1)} x2={x(d.p)} y1={yy} y2={yy} stroke="var(--chu-mo)" strokeDasharray="2 2" />
                         <circle cx={x(p1)} cy={yy} r={2.5} fill="var(--chu-mo)" />
                       </g>)}
-                    <ONoi svg nhan={`${d.ben} · ${d.ten}: ${yen(d.gia)}, ${pcDau(d.p)} so KOME`} onBam={() => mo(q)}
-                      noi_dung={<NoiGia n={n} q={q} sl={sl} gk={gk} />}>
+                    <ONoi svg nhan={`${d.ben} · ${d.ten}: ${yen(d.gia)}, ${pcDau(d.p)} so KOME${d.phiHoi ? ", phí giao chưa cộng" : ""}`}
+                      onBam={() => mo(q)} noi_dung={<NoiGia n={n} q={q} sl={sl} gk={gk} phi={phi} />}>
                       <circle className="dt-dich" cx={x(d.p)} cy={yy} r={d.cung ? 7 : 6} fill={d.cung ? m : "var(--nen-the)"}
                         fillOpacity={d.cung ? 0.85 : 1} stroke={d.het ? "var(--canh-chu)" : m} strokeWidth={d.het || !d.cung ? 2 : 1} />
                     </ONoi>
+                    {d.phiHoi && <text x={x(d.p) + 8} y={yy - 5} fontSize={9.5} className="t-cam t-dam" aria-hidden="true"
+                      pointerEvents="none">?</text>}
                   </g>);
               })}
               {thieu.length > 0 && (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boDau, tachMa, viTriKome, dongMoSan, nhomIdHopLe } from "./loc";
+import { boDau, tachMa, viTriKome, dongMoSan } from "./loc";
 import type { Nhom, QuanSat } from "./kieu";
 
 const qs = (o: Partial<QuanSat>): QuanSat => ({ nhan: "thay_the", trang_thai_duyet: "ai_doc", ...o } as QuanSat);
@@ -30,12 +30,5 @@ describe("phụ trợ /doi-thu", () => {
     expect(dongMoSan([a, b, c], "ma:NT01")).toBe(b);
     expect(dongMoSan([a, c], "ma:NT01")).toBe(a);
     expect(dongMoSan([a, b, c], "ma:XX")).toBeNull();
-  });
-  it("nhomIdHopLe: id không nằm trong danh sách nhóm đã tải thì về rỗng", () => {
-    const ds = [{ id: 3 }, { id: 7 }];
-    expect(nhomIdHopLe(ds, "7")).toBe("7");
-    expect(nhomIdHopLe(ds, "9")).toBe("");
-    expect(nhomIdHopLe([], "7")).toBe("");
-    expect(nhomIdHopLe(ds, "")).toBe("");
   });
 });

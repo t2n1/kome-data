@@ -26,5 +26,3 @@ export function dongMoSan(ds: Nhom[], khoa: string): Nhom | null {
   return c.find(n => n.don_vi_so === "kg") ?? c[0] ?? null;
 }
 
-/** id nhóm đang chọn chỉ hợp lệ khi có trong danh sách nhóm đã tải — không thì "" (không bao giờ gửi nhóm mà ô chọn không hiện). */
-export const nhomIdHopLe = (ds: { id: number }[], id: string): string => (ds.some(g => String(g.id) === id) ? id : "");

@@ -6,6 +6,7 @@ import { tenNganh } from "./nganh";
 import { so, so_luong } from "../dinh_dang";
 import { TOI_DA_SP } from "./url";
 import type { Bac, Nhom, QuanSat } from "./kieu";
+import { tinh, type DieuKienGiao, type KetQuaPhi } from "./phi_giao";
 
 export type SoLuong = "1" | "5" | "10" | "pallet";
 export const NHAN_SL: Record<SoLuong, string> = { "1": "1 thùng", "5": "5 thùng", "10": "10 thùng", pallet: "1 pallet" };
@@ -32,9 +33,62 @@ export const LUA_CHON_GK: { ma: string; nhan: string }[] = [
   { ma: "05", nhan: "売価No.05" }, { ma: "09", nhan: "売価No.09" }, { ma: "10", nhan: "売価No.10 · khuyến mãi" },
 ];
 
+/** `phiHoi` (chỉ khi bật "Tính cả phí giao"): phí KHÔNG cộng được — "kg" = thiếu kg / thùng, "dk" = thiếu điều kiện giao
+ *  hàng hoặc một phần chưa rõ (`phi.chua_ro`). `phi` = kết quả phi_giao.tinh của đơn (null khi không tính). */
 export type Dong = { kome: boolean; q?: QuanSat; ben: string; ten: string; gia: number | null; giaLe: number | null;
   p: number | null; cung: boolean; soGoi: number | null; klGoi: number | null; thieu: boolean; cu: boolean;
-  thueKhongRo: boolean; gomShip: boolean; het: boolean; km: boolean; khongGhiPallet: boolean };
+  thueKhongRo: boolean; gomShip: boolean; het: boolean; km: boolean; khongGhiPallet: boolean;
+  phiHoi: LyDoHoiPhi | null; phi: KetQuaPhi | null };
+
+// ---- "Tính cả phí giao" (đặc tả §5.5, đợt 4b task 9) ----
+export type PhiDon = Pick<KetQuaPhi, "ship" | "vung" | "daibiki" | "chua_ro">;
+export type LyDoHoiPhi = "kg" | "dk";
+/** Điều kiện giao hàng đã nạp: theo ma_doi_thu, và dòng KOME. Không có → null (tắt "Tính cả phí giao"). */
+export type PhiSoSanh = { ben: Map<string, DieuKienGiao>; kome: DieuKienGiao | null };
+
+/** Giá (¥/kg) cộng phí của một đơn: gia + (ship + vùng + daibiki) ÷ kg của đơn. Có phần chưa rõ (hoặc kg của đơn không
+ *  dương) → giữ `gia`, cờ `chuaRo` — KHÔNG cộng phần đã biết (cộng nửa vời là con số không ai trả). */
+export function giaCoPhi(gia: number, kgDon: number, phi: PhiDon): { gia: number; chuaRo: boolean } {
+  if (phi.chua_ro.length || !(kgDon > 0) || !Number.isFinite(kgDon)) return { gia, chuaRo: true };
+  return { gia: gia + (phi.ship + phi.vung + phi.daibiki) / kgDon, chuaRo: false };
+}
+
+/** Phí của đơn `thung` thùng (Kanto, trả daibiki — đặc tả §5.5) cộng vào giá ¥/kg. `tien` = tiền hàng của đơn
+ *  (mặc định giá × kg của đơn) — quyết định ngưỡng miễn ship / daibiki. Bao ship: phi_giao.tinh không cộng ship. */
+export function apPhi(gia: number | null, o: { dk: DieuKienGiao | null | undefined; thung: number; kgThung: number | null; tien?: number | null }):
+  { gia: number | null; hoi: LyDoHoiPhi | null; phi: KetQuaPhi | null } {
+  if (gia == null) return { gia, hoi: null, phi: null };
+  if (o.kgThung == null || !(o.kgThung > 0)) return { gia, hoi: "kg", phi: null };
+  if (!o.dk) return { gia, hoi: "dk", phi: null };
+  const kgDon = o.kgThung * o.thung;
+  const r = tinh(o.dk, { tien: o.tien ?? gia * kgDon, thung: o.thung, vung: "kanto", tra: "daibiki" });
+  const g = giaCoPhi(gia, kgDon, r);
+  return { gia: g.gia, hoi: g.chuaRo ? "dk" : null, phi: r };
+}
+
+/** Phí chỉ áp khi bật, nhóm so theo kg và khách mua theo THÙNG (pallet: không áp — không đoán số thùng một pallet). */
+export const phiCua = (n: Pick<Nhom, "don_vi_so">, sl: SoLuong, phi: PhiSoSanh | null | undefined) =>
+  phi && sl !== "pallet" && n.don_vi_so === "kg" ? phi : null;
+
+/** Giá một mặt hàng tại `sl` (+ giá 1 thùng) — kèm phí khi `phi` (đã qua phiCua). Giá 1 thùng = đơn 1 thùng. */
+function giaMH(q: QuanSat, sl: SoLuong, phi: PhiSoSanh | null) {
+  const t = giaTai(q, sl), le = giaTai(q, "1").gia;
+  if (!phi) return { ...t, giaLe: le, hoi: null as LyDoHoiPhi | null, phi: null as KetQuaPhi | null };
+  const dk = phi.ben.get(q.ma_doi_thu), thung = Number(sl);
+  const a = apPhi(t.gia, { dk, thung, kgThung: q.kg_thung_dt, tien: q.gia_thung == null ? null : q.gia_thung * thung });
+  const l = apPhi(le, { dk, thung: 1, kgThung: q.kg_thung_dt, tien: q.gia_thung });
+  return { gia: a.gia, khongGhiPallet: t.khongGhiPallet, giaLe: l.hoi ? le : l.gia, hoi: a.hoi, phi: a.phi };
+}
+
+/** Giá KOME để so (giaKome) — kèm phí khi `phi` áp được: đơn = số thùng × kome_kg_thung, tiền = giá × kg của đơn. */
+export function giaKomePhi(n: Nhom, gk: string, sl: SoLuong, phi?: PhiSoSanh | null):
+  { gia: number | null; giaLe: number | null; hoi: LyDoHoiPhi | null; phi: KetQuaPhi | null } {
+  const gK = giaKome(n, gk), p = phiCua(n, sl, phi);
+  if (!p) return { gia: gK, giaLe: gK, hoi: null, phi: null };
+  const a = apPhi(gK, { dk: p.kome, thung: Number(sl), kgThung: n.kome_kg_thung });
+  const l = apPhi(gK, { dk: p.kome, thung: 1, kgThung: n.kome_kg_thung });
+  return { gia: a.gia, giaLe: l.hoi ? gK : l.gia, hoi: a.hoi, phi: a.phi };
+}
 
 export const thieuQuyCach = (q: QuanSat) => q.so_goi_thung == null || q.kl_goi_g == null;
 const veDuoc = (q: QuanSat) => q.loai_nguon !== "khach_ke";
@@ -42,9 +96,9 @@ const tenBen = (q: QuanSat) => q.ten_doi_thu ?? q.ma_doi_thu;
 /** So giá tăng dần, null xếp cuối (ổn định). */
 const theoGia = (a: number | null, b: number | null) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : a - b);
 
-function dongTu(q: QuanSat, sl: SoLuong, gK: number | null): Dong {
-  const { gia, khongGhiPallet } = giaTai(q, sl);
-  return { kome: false, q, ben: tenBen(q), ten: q.ten_goc, gia, giaLe: giaTai(q, "1").gia, p: phanTram(gia, gK),
+function dongTu(q: QuanSat, sl: SoLuong, gK: number | null, phi: PhiSoSanh | null): Dong {
+  const { gia, khongGhiPallet, giaLe, hoi, phi: r } = giaMH(q, sl, phi);
+  return { kome: false, q, ben: tenBen(q), ten: q.ten_goc, gia, giaLe, p: phanTram(gia, gK), phiHoi: hoi, phi: r,
     cung: q.nhan === "cung_hang", soGoi: q.so_goi_thung, klGoi: q.kl_goi_g, thieu: thieuQuyCach(q),
     cu: (q.tuoi_ngay ?? 0) > NGAY_CU, thueKhongRo: q.thue === "khong_ro", gomShip: q.gom_ship === "co",
     het: q.trang_thai === "het", km: !!q.khuyen_mai || q.gia_truoc_km != null, khongGhiPallet };
@@ -52,13 +106,15 @@ function dongTu(q: QuanSat, sl: SoLuong, gK: number | null): Dong {
 
 /** Dòng của biểu đồ cột một nhóm: KOME + mọi mặt hàng (bỏ khách kể; bất thường vẫn vẽ, cờ ở `q.bat_thuong`), lọc chiCung,
  *  xếp giá tăng (null cuối); chưa mở rộng thì giữ KOME + 5 hàng rẻ nhất + mọi cùng thương hiệu. `an` = số dòng bị ẩn. */
-export function dongCot(n: Nhom, o: { sl: SoLuong; gk: string; chiCung: boolean; moRong: boolean }): { dong: Dong[]; an: number } {
-  const gK = giaKome(n, o.gk);
-  const kome: Dong = { kome: true, ben: "KOME", ten: "KOME", gia: gK, giaLe: gK, p: null, cung: false,
+export function dongCot(n: Nhom, o: { sl: SoLuong; gk: string; chiCung: boolean; moRong: boolean; phi?: PhiSoSanh | null }):
+  { dong: Dong[]; an: number } {
+  const p = phiCua(n, o.sl, o.phi);
+  const k = giaKomePhi(n, o.gk, o.sl, p), gK = k.gia;
+  const kome: Dong = { kome: true, ben: "KOME", ten: "KOME", gia: gK, giaLe: k.giaLe, p: null, cung: false,
     soGoi: n.kome_goi_thung, klGoi: n.kome_kg_goi == null ? null : n.kome_kg_goi * 1000, thieu: false, cu: false,
-    thueKhongRo: false, gomShip: false, het: false, km: false, khongGhiPallet: false };
+    thueKhongRo: false, gomShip: false, het: false, km: false, khongGhiPallet: false, phiHoi: k.hoi, phi: k.phi };
   const hang = n.quan_sat.filter(q => veDuoc(q) && (!o.chiCung || q.nhan === "cung_hang"))
-    .map(q => dongTu(q, o.sl, gK)).sort((a, b) => theoGia(a.gia, b.gia));
+    .map(q => dongTu(q, o.sl, gK, p)).sort((a, b) => theoGia(a.gia, b.gia));
   const giu = o.moRong ? null : new Set([...hang.slice(0, 5), ...hang.filter(d => d.cung)]);
   const hien = giu ? hang.filter(d => giu.has(d)) : hang;
   return { dong: [kome, ...hien].sort((a, b) => theoGia(a.gia, b.gia)), an: hang.length - hien.length };
@@ -71,12 +127,14 @@ export const khoaONhiet = (n: Pick<Nhom, "nhom_khoa" | "don_vi_so">, ben: string
 /** Ô bảng nhiệt: mỗi (nhóm, bên) — mặt hàng cùng thương hiệu rẻ nhất, không có thì khác thương hiệu rẻ nhất.
  *  `ben` = tên hiển thị (ten_doi_thu ?? ma_doi_thu), xếp theo số nhóm có mặt giảm dần; khoá ô = `khoaONhiet(n, ben)`
  *  (`${nhom_khoa}|${don_vi_so}|${ben}` — một nhom_khoa có thể có nhiều dòng, mỗi don_vi_so một dòng). */
-export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolean }):
-  { ben: string[]; o: Map<string, { q: QuanSat; p: number | null; so: number; cung: boolean }> } {
-  const ket = new Map<string, { q: QuanSat; p: number | null; so: number; cung: boolean }>();
+export type ONhiet = { q: QuanSat; p: number | null; so: number; cung: boolean; hoi: LyDoHoiPhi | null };
+export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolean; phi?: PhiSoSanh | null }):
+  { ben: string[]; o: Map<string, ONhiet> } {
+  const ket = new Map<string, ONhiet>();
   const soNhom = new Map<string, number>();
   for (const n of ds) {
-    const gK = giaKome(n, o.gk);
+    const p = phiCua(n, o.sl, o.phi);
+    const gK = giaKomePhi(n, o.gk, o.sl, p).gia;
     const theoBen = new Map<string, QuanSat[]>();
     for (const q of n.quan_sat) {
       if (!veDuoc(q) || (o.chiCung && q.nhan !== "cung_hang")) continue;
@@ -85,8 +143,8 @@ export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolea
     }
     for (const [b, ds2] of theoBen) {
       const cung = ds2.filter(q => q.nhan === "cung_hang");
-      const chon = (cung.length ? cung : ds2).map(q => ({ q, gia: giaTai(q, o.sl).gia })).sort((x, y) => theoGia(x.gia, y.gia))[0];
-      ket.set(khoaONhiet(n, b), { q: chon.q, p: phanTram(chon.gia, gK), so: ds2.length, cung: cung.length > 0 });
+      const chon = (cung.length ? cung : ds2).map(q => ({ q, g: giaMH(q, o.sl, p) })).sort((x, y) => theoGia(x.g.gia, y.g.gia))[0];
+      ket.set(khoaONhiet(n, b), { q: chon.q, p: phanTram(chon.g.gia, gK), so: ds2.length, cung: cung.length > 0, hoi: chon.g.hoi });
       soNhom.set(b, (soNhom.get(b) ?? 0) + 1);
     }
   }
@@ -152,9 +210,10 @@ export function batTat(sp: string[], khoa: string): { sp: string[]; day: boolean
 export const nhomChon = (ds: Nhom[], sp: string[]) => sp.flatMap(k => ds.filter(n => n.nhom_khoa === k));
 
 /** Mọi mặt hàng (vẽ được) của MỘT bên trong một nhóm — ô nổi của bảng nhiệt liệt kê hết; rẻ trước (giá tại `sl`). */
-export function matHangCuaBen(n: Nhom, ben: string, o: { sl: SoLuong; chiCung: boolean }): QuanSat[] {
+export function matHangCuaBen(n: Nhom, ben: string, o: { sl: SoLuong; chiCung: boolean; phi?: PhiSoSanh | null }): QuanSat[] {
+  const p = phiCua(n, o.sl, o.phi);
   return n.quan_sat.filter(q => veDuoc(q) && tenBen(q) === ben && (!o.chiCung || q.nhan === "cung_hang"))
-    .sort((a, b) => theoGia(giaTai(a, o.sl).gia, giaTai(b, o.sl).gia));
+    .sort((a, b) => theoGia(giaMH(a, o.sl, p).gia, giaMH(b, o.sl, p).gia));
 }
 
 /** Tiền (¥/kg chưa thuế) của MỘT bậc giá — BẢN HIỂN THỊ của `mart.gia_bac_kg` (migration 067), chỉ cho bảng bậc
@@ -206,4 +265,18 @@ export function bangBac(q: QuanSat, sl: SoLuong, gK: number | null):
   const dau = bac[0], tu = tuThung(dau, q), gDau = giaBacKg(dau, q);
   const toiThieu = dau.don_vi_sl !== "pallet" && tu != null && tu > 1 && gDau != null && le != null && gDau >= le - 0.5 ? nhanBac(dau).replace(/^từ /, "") : null;
   return { dong, coBac: true, toiThieu };
+}
+
+/** Phần "phí giao" của ô nổi (null khi không áp: tắt, pallet, nhóm không so theo kg). */
+export type PhiNoi = { gia: number | null; hoi: LyDoHoiPhi | null; r: KetQuaPhi | null; thung: number };
+export function phiMatHang(n: Nhom, q: QuanSat, sl: SoLuong, phi: PhiSoSanh | null | undefined): PhiNoi | null {
+  const p = phiCua(n, sl, phi);
+  if (!p) return null;
+  const g = giaMH(q, sl, p);
+  return { gia: g.gia, hoi: g.hoi, r: g.phi, thung: Number(sl) };
+}
+export function phiKome(n: Nhom, gk: string, sl: SoLuong, phi: PhiSoSanh | null | undefined): PhiNoi | null {
+  if (!phiCua(n, sl, phi)) return null;
+  const k = giaKomePhi(n, gk, sl, phi);
+  return { gia: k.gia, hoi: k.hoi, r: k.phi, thung: Number(sl) };
 }

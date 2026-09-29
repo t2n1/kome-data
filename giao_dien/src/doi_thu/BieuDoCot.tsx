@@ -8,10 +8,12 @@ import { so_luong, yen } from "../dinh_dang";
 import type { Nhom, QuanSat } from "./kieu";
 import { mauLech } from "./mau";
 import { NoiGia, NoiKome } from "./ONoiGia";
-import { dongCot, giaKome, NHAN_SL, nhanKlGoi, pcDau, type Dong, type SoLuong } from "./so_sanh_logic";
+import { dongCot, giaKome, NHAN_SL, nhanKlGoi, pcDau, phiCua, type Dong, type PhiSoSanh, type SoLuong } from "./so_sanh_logic";
 
 export type MoSua = (q: QuanSat, tru_o?: string) => void;
-type Chung = { sl: SoLuong; gk: string; chiCung: boolean; mo: MoSua };
+/** "?" phí giao: `d` = dòng (KOME hoặc mặt hàng) mà phí không cộng được — nơi gọi mở đúng pop-up (quy cách / giao hàng). */
+export type MoPhi = (n: Nhom, d: Dong) => void;
+type Chung = { sl: SoLuong; gk: string; chiCung: boolean; mo: MoSua; phi?: PhiSoSanh | null; moPhi?: MoPhi };
 
 const W = 960, LW = 440, PHAI = 170, RH = 26, TOP = 18;
 const X_TEN = 128, C1 = 350, C2 = 410;           // mép phải cột gói / thùng và tịnh 1 gói
@@ -40,14 +42,17 @@ export function DauNhom({ n, sl, neo }: { n: Nhom; sl: SoLuong; neo?: (e: HTMLEl
   );
 }
 
-export function BieuDoCot({ n, sl, gk, chiCung, mo, neo }: Chung & { n: Nhom; neo?: (e: HTMLElement | null) => void }) {
+export function BieuDoCot({ n, sl, gk, chiCung, mo, neo, phi, moPhi }: Chung & { n: Nhom; neo?: (e: HTMLElement | null) => void }) {
   const [moRong, datMoRong] = useState(false);
-  const { dong, an } = dongCot(n, { sl, gk, chiCung, moRong });
-  const gK = giaKome(n, gk);
+  const { dong, an } = dongCot(n, { sl, gk, chiCung, moRong, phi });
+  // Bật "Tính cả phí giao" (áp được): thanh KOME = giá KOME + phí; dải bảng giá / vạch thực bán / KM là giá TRẦN nên không vẽ.
+  const coPhi = !!phiCua(n, sl, phi);
+  const gK = coPhi ? dong.find(d => d.kome)?.gia ?? null : giaKome(n, gk);
   // Dải bảng giá KOME = 売価No. thường (bỏ No.10 khuyến mãi — §5.3); vạch trắng = thực bán khi giá đang chọn không phải nó.
-  const dai = Object.entries(n.gia_kome_bang ?? {}).filter(([m]) => m !== "10").map(([, g]) => g);
-  const thuc = gk !== "thuc" ? n.gia_kome : null;
-  const mx = Math.max(1, ...dong.flatMap(d => [d.gia ?? 0, d.giaLe ?? 0]), ...dai, thuc ?? 0, n.gia_kome_km ?? 0) * 1.1;
+  const dai = coPhi ? [] : Object.entries(n.gia_kome_bang ?? {}).filter(([m]) => m !== "10").map(([, g]) => g);
+  const thuc = gk !== "thuc" && !coPhi ? n.gia_kome : null;
+  const km = coPhi ? null : n.gia_kome_km;
+  const mx = Math.max(1, ...dong.flatMap(d => [d.gia ?? 0, d.giaLe ?? 0]), ...dai, thuc ?? 0, km ?? 0) * 1.1;
   const x = (v: number) => LW + Math.max(0, v) / mx * (W - LW - PHAI);
   const H = TOP + dong.length * RH + 14;
   return (
@@ -67,7 +72,11 @@ export function BieuDoCot({ n, sl, gk, chiCung, mo, neo }: Chung & { n: Nhom; ne
             const re = d.gia != null && d.giaLe != null && d.gia < d.giaLe;
             const lopTen = d.kome ? "t-kome" : d.cung ? "t-dam" : "t-khac";
             const soGoi = d.soGoi == null ? null : so_luong(d.soGoi), kl = nhanKlGoi(d.klGoi);
-            const cuoi = d.gia == null ? LW : x(Math.max(d.gia, re ? d.giaLe! : 0));
+            const cuoi0 = d.gia == null ? LW : x(Math.max(d.gia, re ? d.giaLe! : 0));
+            // "?" phí giao chưa cộng: ô tròn cam ngay sau thanh; chữ giá dời sang phải.
+            const hoiPhi = d.gia != null && d.phiHoi != null;
+            const cuoi = hoiPhi ? cuoi0 + 18 : cuoi0;
+            const bamPhi = () => moPhi?.(n, d);
             return (
               <g key={d.kome ? "kome" : `${q!.nguon}${q!.id}`}>
                 <text x={4} y={y + 16} fontSize={11.5} className={lopTen} opacity={d.cu ? 0.5 : 1}>{d.kome ? "KOME" : ngan(d.ben, 18)}</text>
@@ -84,15 +93,15 @@ export function BieuDoCot({ n, sl, gk, chiCung, mo, neo }: Chung & { n: Nhom; ne
                     fill="var(--do)" fillOpacity={0.16} />)}
                 {re && <rect x={LW} y={y + 4} width={x(d.giaLe!) - LW} height={15} rx={3} fill="none" stroke="var(--chu-mo)" strokeDasharray="3 2" />}
                 {d.kome
-                  ? <ONoi svg nhan={`KOME: ${yen(gK)}`} noi_dung={<NoiKome n={n} gk={gk} />}>
+                  ? <ONoi svg nhan={`KOME: ${yen(gK)}`} noi_dung={<NoiKome n={n} gk={gk} sl={sl} phi={phi} />}>
                       {gK != null ? <rect className="dt-dich" x={LW} y={y + 4} width={Math.max(2, x(gK) - LW)} height={15} rx={3} fill="var(--do)" />
                         : <text x={LW + 2} y={y + 16} fontSize={12} className="t-mo">?</text>}
                     </ONoi>
                   : d.gia == null
-                    ? <ONoi svg nhan={`${nhanDong(d)} — điền giá`} onBam={() => mo(q!, "gia_goc")} noi_dung={<NoiGia n={n} q={q!} sl={sl} gk={gk} />}>
+                    ? <ONoi svg nhan={`${nhanDong(d)} — điền giá`} onBam={() => mo(q!, "gia_goc")} noi_dung={<NoiGia n={n} q={q!} sl={sl} gk={gk} phi={phi} />}>
                         <text x={LW + 2} y={y + 16} fontSize={12} className="t-cam t-dam">?</text>
                       </ONoi>
-                    : <ONoi svg nhan={nhanDong(d)} onBam={() => mo(q!)} noi_dung={<NoiGia n={n} q={q!} sl={sl} gk={gk} />}>
+                    : <ONoi svg nhan={nhanDong(d)} onBam={() => mo(q!)} noi_dung={<NoiGia n={n} q={q!} sl={sl} gk={gk} phi={phi} />}>
                         <rect className="dt-dich" x={LW} y={y + 4} width={Math.max(2, x(d.gia) - LW)} height={15} rx={3}
                           fill={d.cung ? "var(--lam-chu)" : "var(--dt-khac)"} opacity={d.cu ? 0.4 : 1}
                           stroke={d.het ? "var(--canh-chu)" : undefined} strokeWidth={d.het ? 2 : undefined} />
@@ -108,9 +117,16 @@ export function BieuDoCot({ n, sl, gk, chiCung, mo, neo }: Chung & { n: Nhom; ne
                     <circle cx={Math.max(LW + 8, x(d.gia) - 8)} cy={y + 11.5} r={6} />
                     <text x={Math.max(LW + 8, x(d.gia) - 8)} y={y + 15.5} fontSize={10} textAnchor="middle">?</text>
                   </g>)}
+                {hoiPhi && (
+                  <g className="dt-hoi-phi" role="button" tabIndex={0}
+                    aria-label={`${d.kome ? "KOME" : `${d.ben} · ${d.ten}`}: phí giao chưa cộng (${d.phiHoi === "kg" ? "thiếu kg / thùng" : "thiếu điều kiện giao hàng"}) — điền`}
+                    onClick={bamPhi} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); bamPhi(); } }}>
+                    <circle cx={cuoi0 + 10} cy={y + 11.5} r={6.5} />
+                    <text x={cuoi0 + 10} y={y + 15.5} fontSize={10} textAnchor="middle">?</text>
+                  </g>)}
                 <text x={cuoi + 6} y={y + 16} fontSize={11.5} opacity={d.cu ? 0.5 : 1}>
                   {d.kome
-                    ? <>{gK == null ? "" : yen(gK)}{n.gia_kome_km != null && <tspan className="t-km t-dam"> KM {yen(n.gia_kome_km)}</tspan>}</>
+                    ? <>{gK == null ? "" : yen(gK)}{km != null && <tspan className="t-km t-dam"> KM {yen(km)}</tspan>}</>
                     : d.gia == null ? null
                     : <>{yen(d.gia)} <tspan className={"t-dam t-" + mauLech(d.p)}>{pcDau(d.p)}</tspan>
                       {re && <tspan className="t-nhat"> ↓ từ {yen(d.giaLe)}</tspan>}
@@ -129,9 +145,10 @@ export function BieuDoCot({ n, sl, gk, chiCung, mo, neo }: Chung & { n: Nhom; ne
 }
 
 /** Chú giải dưới biểu đồ cột. */
-export function ChuGiaiCot() {
+export function ChuGiaiCot({ phi = false }: { phi?: boolean }) {
   return (
     <div className="dt-chu-giai">
+      {phi && <span><b className="cg-cam">?</b>phí giao chưa cộng — bấm để điền</span>}
       <span><i className="cg-kome" />KOME</span><span><i className="cg-cung" />cùng thương hiệu</span>
       <span><i className="cg-khac" />khác thương hiệu</span><span><i className="cg-dai" />dải bảng giá KOME</span>
       <span><i className="cg-le" />giá mua 1 thùng</span><span><i className="cg-het" />đang hết</span>
