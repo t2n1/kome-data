@@ -1,6 +1,7 @@
 # kome/loaders/price.py
 #
-# 取引単価データ có 20 cột giá NẰM NGANG (売価No.１(税抜)..売価No.10(税込)) trên mỗi
+# 取引単価データ có 20 cột giá NẰM NGANG (売価No.１(税抜)..売価No.10(税込)) + 2 cột 標準価格
+# (税抜/税込 → price_level = 'std') trên mỗi
 # dòng nguồn (khoá 商品コード + 荷姿区分コード). Bảng đích core.fact_price_list là
 # DỌC — mỗi mức giá một dòng, khoá (product_code, pack_code, price_level, valid_from).
 # reader.read() chỉ đổi tên cột theo config/files.yml (spec "tanka"), KHÔNG xoay
@@ -10,11 +11,11 @@ from datetime import date
 import pandas as pd
 import psycopg
 
-PRICE_LEVELS = [f"{i:02d}" for i in range(1, 11)]  # '01'..'10' ứng với 売価No.1..10
+PRICE_LEVELS = [f"{i:02d}" for i in range(1, 11)] + ["std"]   # '01'..'10' = 売価No.1..10 · 'std' = 標準価格
 
 def load(conn: psycopg.Connection, df: pd.DataFrame,
          valid_from: date, batch_id: int) -> int:
-    """Xoay 10 mức giá của mỗi dòng nguồn thành tối đa 10 dòng đích.
+    """Xoay 10 mức giá + 標準価格 của mỗi dòng nguồn thành tối đa 11 dòng đích.
 
     Bỏ qua mức giá trống (cả 税抜 và 税込 đều 0 sau khi reader ép kiểu tiền) —
     nhiều sản phẩm chỉ dùng vài mức trong 10 mức. Không giữ lịch sử theo

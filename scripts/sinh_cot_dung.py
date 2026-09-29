@@ -84,7 +84,9 @@ MAN = {
 LUU_RIENG: dict[str, dict[str, str | None]] = {
     "zaiko": {"warehouse_name": "core.dim_warehouse.warehouse_name", "pack_name": None},
     "tanka": {**{f"price_ex_{i:02d}": "core.fact_price_list.price_ex_tax" for i in range(1, 11)},
-              **{f"price_in_{i:02d}": "core.fact_price_list.price_in_tax" for i in range(1, 11)}},
+              **{f"price_in_{i:02d}": "core.fact_price_list.price_in_tax" for i in range(1, 11)},
+              # 標準価格 → price_level = 'std' (kome/loaders/price.py)
+              "price_ex_std": "core.fact_price_list.price_ex_tax", "price_in_std": "core.fact_price_list.price_in_tax"},
     # row_title: dòng 【合計】/【繰越】 — kome/so_cai.py đọc để tách dòng tổng, không lưu.
     "seikyu_motocho": {"row_title": None},
 }

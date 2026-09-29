@@ -2,7 +2,7 @@
 from datetime import date
 import pandas as pd
 
-from kome.loaders.doi_thu import COT_GIA, COT_DIEU_KIEN
+from kome.loaders.doi_thu import COT_GIA, COT_DIEU_KIEN, COT_GIAO_HANG
 from kome.pipeline import ingest, undo_batch
 
 
@@ -48,6 +48,45 @@ def test_dieu_kien_nap_rieng(conn, tmp_path):
     assert conn.execute("SELECT loai FROM core.fact_dieu_kien_doi_thu").fetchone()[0] == "ship"
 
 
-def test_mot_o_nap_nhan_ca_hai_loai_file():
+def test_nap_gia_mang_quy_cach_goi_va_bac_la_json(conn, tmp_path):
+    bac = '[{"tu": 5, "don_vi_sl": "thung", "gia": 5300, "don_vi_gia": "thung"}]'
+    p = _goi_gia(tmp_path, [_dong(1, so_goi_thung="20", kl_goi_g="500", bac=bac), _dong(2)])
+    r = ingest(conn, p, tmp_path / "archive")
+    assert r.ok, r.blockers
+    rows = conn.execute("SELECT so_goi_thung, kl_goi_g, bac FROM core.fact_gia_doi_thu ORDER BY ma_dong").fetchall()
+    assert rows[0][0] == 20 and float(rows[0][1]) == 500
+    assert rows[0][2] == [{"tu": 5, "don_vi_sl": "thung", "gia": 5300, "don_vi_gia": "thung"}]
+    assert rows[1] == (None, None, None)          # trống = NULL, không phải 0
+
+
+def _goi_giao_hang(tmp_path, dong, ngay="20260831"):
+    p = tmp_path / f"doi_thu_giao_hang_{ngay}.xlsx"
+    pd.DataFrame(dong, columns=COT_GIAO_HANG).to_excel(p, sheet_name="giao_hang", index=False)
+    return p
+
+
+def test_nap_giao_hang_NULL_la_khong_ghi_va_phu_phi_la_json(conn, tmp_path):
+    d = {c: None for c in COT_GIAO_HANG}
+    d.update(ma_dong="IMAI-00001", ma_doi_thu="IMAI", ngay_nguon="2026-08-31", bao_ship="false", phi_ship="605",
+             phi_ship_theo="thung", mien_ship_tu="20000", phu_phi='{"tohoku": 400, "hokkaido": 800}', phi_daibiki="440",
+             nguon_chu="Free delivery for over ¥20,000")
+    r = ingest(conn, _goi_giao_hang(tmp_path, [d]), tmp_path / "archive")
+    assert r.ok, r.blockers
+    row = conn.execute("""SELECT bao_ship, phi_ship, phi_ship_theo, mien_ship_tu, phu_phi, phi_daibiki, daibiki_tu, thue
+                          FROM core.fact_giao_hang_doi_thu""").fetchone()
+    assert row[0] is False and row[1] == 605 and row[2] == "thung" and row[3] == 20000
+    assert row[4] == {"tohoku": 400, "hokkaido": 800} and row[5] == 440
+    assert row[6] is None and row[7] is None       # không ghi → NULL
+
+
+def test_hoan_tac_giao_hang_xoa_sach_lo(conn, tmp_path):
+    d = {c: None for c in COT_GIAO_HANG}
+    d.update(ma_dong="YUMI-00001", ma_doi_thu="YUMI", ngay_nguon="2026-08-31", bao_ship="true")
+    r = ingest(conn, _goi_giao_hang(tmp_path, [d]), tmp_path / "archive")
+    undo_batch(conn, r.batch_id)
+    assert conn.execute("SELECT count(*) FROM core.fact_giao_hang_doi_thu").fetchone()[0] == 0
+
+
+def test_mot_o_nap_nhan_ca_ba_loai_file():
     from kome.kho_du_lieu import O_CUA
-    assert O_CUA["doi_thu"]["specs"] == ["doi_thu_gia", "doi_thu_dieu_kien"]
+    assert O_CUA["doi_thu"]["specs"] == ["doi_thu_gia", "doi_thu_dieu_kien", "doi_thu_giao_hang"]

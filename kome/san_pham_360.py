@@ -171,20 +171,30 @@ def _khach_dang_ngung(conn, ma: str) -> tuple[list[dict], list[dict]]:
     return khach_mua, khach_ngung
 
 
+NHAN_BAC = {"std": "標準価格", "10": "10 · khuyến mãi"}   # 売価No.10 = giá khuyến mãi (chủ DN 2026-09-29) — cùng luật mart.la_gia_km_kome
+
+
 def _bac_gia(conn, ma: str) -> list[dict]:
-    """Giá theo bậc — dòng MỚI NHẤT mỗi (bậc, quy cách). 1 lượt hỏi. (Chuyển từ SP.ho_so cũ.)"""
+    """Giá theo bậc — dòng MỚI NHẤT mỗi (bậc, quy cách). 1 lượt hỏi. 標準価格 đứng đầu.
+    Giá chưa thuế: cột chưa thuế nếu > 0 và không mâu thuẫn cột gồm thuế; không thì gồm thuế ÷ 1,08
+    (cùng luật mart.gia_kome_bang, 066)."""
     # DISTINCT ON (price_level, pack_code) … ORDER BY valid_from DESC:
     # core.fact_price_list giữ LỊCH SỬ giá — kome/loaders/price.py ghi một dòng
     # MỚI mỗi lần nạp master. Không lọc thì sau ba lần nạp, một bậc giá hiện ba
     # con số khác nhau dưới nhãn "giá đáng lẽ phải bán", trên đúng màn hình
     # người ta nhìn TRƯỚC KHI báo giá cho khách.
-    return [{"bac": g[0], "quy_cach": QUY_CACH.get(g[1], g[1]), "pack_code": g[1],
-             "gia": int(g[2]), "tu_ngay": g[3]}
-            for g in conn.execute(
+    rows = conn.execute(
         """SELECT DISTINCT ON (price_level, pack_code)
-                  price_level, pack_code, price_ex_tax, valid_from
+                  price_level, pack_code, price_ex_tax, price_in_tax, valid_from
            FROM core.fact_price_list WHERE product_code = %s
-           ORDER BY price_level, pack_code, valid_from DESC""", (ma,)).fetchall()]
+           ORDER BY price_level, pack_code, valid_from DESC""", (ma,)).fetchall()
+
+    def gia(ex, inc):
+        return int(ex) if ex > 0 and not (0 < inc < ex) else round(inc / 1.08)
+
+    ra = [{"bac": NHAN_BAC.get(g[0], g[0]), "quy_cach": QUY_CACH.get(g[1], g[1]), "pack_code": g[1],
+           "gia": gia(g[2], g[3]), "tu_ngay": g[4]} for g in rows]
+    return sorted(ra, key=lambda x: (x["bac"] != "標準価格",))
 
 
 def ho_so(conn, ma: str) -> dict | None:

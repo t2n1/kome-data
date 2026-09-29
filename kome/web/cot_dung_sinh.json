@@ -7633,6 +7633,48 @@
      "view": []
     },
     {
+     "core": "core.dim_product.pack1_code",
+     "he": "pack1_code",
+     "ja": "荷姿１－荷姿区分コード",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/khoi_tong_quan.py, kome/mua_vu.py và 1 chỉ số khác",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/khoi_tong_quan.py",
+      "kome/mua_vu.py",
+      "kome/san_pham.py"
+     ],
+     "man": [
+      "doi_thu",
+      "kho_hang",
+      "mua_vu",
+      "san_pham",
+      "tong_quan"
+     ],
+     "view": []
+    },
+    {
+     "core": "core.dim_product.pack1_base_qty",
+     "he": "pack1_base_qty",
+     "ja": "荷姿１－基準単位当り荷姿区分数",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/khoi_tong_quan.py, kome/mua_vu.py và 1 chỉ số khác",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/khoi_tong_quan.py",
+      "kome/mua_vu.py",
+      "kome/san_pham.py"
+     ],
+     "man": [
+      "doi_thu",
+      "kho_hang",
+      "mua_vu",
+      "san_pham",
+      "tong_quan"
+     ],
+     "view": []
+    },
+    {
      "core": null,
      "he": null,
      "ja": "インデックス",
@@ -7845,16 +7887,6 @@
     {
      "core": null,
      "he": null,
-     "ja": "荷姿１－荷姿区分コード",
-     "loai": "khong_nap",
-     "ly_do": "có trong file nhưng kho không nạp",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": null,
-     "he": null,
      "ja": "荷姿１－荷姿区分名",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
@@ -7876,16 +7908,6 @@
      "core": null,
      "he": null,
      "ja": "荷姿１－基準荷姿区分名",
-     "loai": "khong_nap",
-     "ly_do": "có trong file nhưng kho không nạp",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": null,
-     "he": null,
-     "ja": "荷姿１－基準単位当り荷姿区分数",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
      "ma": [],
@@ -9861,10 +9883,14 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_01",
      "ja": "売価No.１（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -9885,10 +9911,14 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_02",
      "ja": "売価No.２（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -9909,10 +9939,14 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_03",
      "ja": "売価No.３（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -9933,10 +9967,14 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_04",
      "ja": "売価No.４（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -9957,10 +9995,14 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_05",
      "ja": "売価No.５（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -9981,10 +10023,14 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_06",
      "ja": "売価No.６（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -10005,10 +10051,14 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_07",
      "ja": "売価No.７（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -10029,10 +10079,14 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_08",
      "ja": "売価No.８（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -10053,10 +10107,14 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_09",
      "ja": "売価No.９（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -10077,10 +10135,42 @@
      "core": "core.fact_price_list.price_in_tax",
      "he": "price_in_10",
      "ja": "売価No.10（税込）",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
+     "view": []
+    },
+    {
+     "core": "core.fact_price_list.price_ex_tax",
+     "he": "price_ex_std",
+     "ja": "標準価格（税抜）",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
+     "view": []
+    },
+    {
+     "core": "core.fact_price_list.price_in_tax",
+     "he": "price_in_std",
+     "ja": "標準価格（税込）",
+     "loai": "man",
+     "ly_do": "màn hình đọc qua kome/san_pham_360.py",
+     "ma": [
+      "kome/san_pham_360.py"
+     ],
+     "man": [
+      "san_pham"
+     ],
      "view": []
     },
     {
@@ -10247,26 +10337,6 @@
      "core": null,
      "he": null,
      "ja": "単価小数桁",
-     "loai": "khong_nap",
-     "ly_do": "có trong file nhưng kho không nạp",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": null,
-     "he": null,
-     "ja": "標準価格（税抜）",
-     "loai": "khong_nap",
-     "ly_do": "có trong file nhưng kho không nạp",
-     "ma": [],
-     "man": [],
-     "view": []
-    },
-    {
-     "core": null,
-     "he": null,
-     "ja": "標準価格（税込）",
      "loai": "khong_nap",
      "ly_do": "có trong file nhưng kho không nạp",
      "ma": [],
@@ -11828,6 +11898,36 @@
       "mart.gia_doi_thu_quan_sat",
       "mart.so_sanh_nhom"
      ]
+    },
+    {
+     "core": "core.fact_gia_doi_thu.so_goi_thung",
+     "he": "so_goi_thung",
+     "ja": "so_goi_thung",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.kl_goi_g",
+     "he": "kl_goi_g",
+     "ja": "kl_goi_g",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.bac",
+     "he": "bac",
+     "ja": "bac",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
     }
    ],
    "ja": "Bảng giá đối thủ",
@@ -11939,6 +12039,214 @@
    "ja": "Điều kiện bán của đối thủ",
    "mau": null,
    "ten": "doi_thu_dieu_kien"
+  },
+  {
+   "core_table": "core.fact_giao_hang_doi_thu",
+   "cot": [
+    {
+     "core": "core.fact_giao_hang_doi_thu.ma_dong",
+     "he": "ma_dong",
+     "ja": "ma_dong",
+     "loai": "nap",
+     "ly_do": "khoá của file",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.ma_doi_thu",
+     "he": "ma_doi_thu",
+     "ja": "ma_doi_thu",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.ngay_nguon",
+     "he": "ngay_nguon",
+     "ja": "ngay_nguon",
+     "loai": "nap",
+     "ly_do": "ngày bắt buộc đọc được (cổng 3)",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.bao_ship",
+     "he": "bao_ship",
+     "ja": "bao_ship",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.phi_ship",
+     "he": "phi_ship",
+     "ja": "phi_ship",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.phi_ship_theo",
+     "he": "phi_ship_theo",
+     "ja": "phi_ship_theo",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.mien_ship_tu",
+     "he": "mien_ship_tu",
+     "ja": "mien_ship_tu",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.mien_ship_kien",
+     "he": "mien_ship_kien",
+     "ja": "mien_ship_kien",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.thung_moi_kien",
+     "he": "thung_moi_kien",
+     "ja": "thung_moi_kien",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.phu_phi",
+     "he": "phu_phi",
+     "ja": "phu_phi",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.phi_daibiki",
+     "he": "phi_daibiki",
+     "ja": "phi_daibiki",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.daibiki_tu",
+     "he": "daibiki_tu",
+     "ja": "daibiki_tu",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.daibiki_sau",
+     "he": "daibiki_sau",
+     "ja": "daibiki_sau",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.ck_mien_daibiki",
+     "he": "ck_mien_daibiki",
+     "ja": "ck_mien_daibiki",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.kien_toi_da_kg",
+     "he": "kien_toi_da_kg",
+     "ja": "kien_toi_da_kg",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.ghep_kien",
+     "he": "ghep_kien",
+     "ja": "ghep_kien",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.thue",
+     "he": "thue",
+     "ja": "thue",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.cach_gui",
+     "he": "cach_gui",
+     "ja": "cach_gui",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.nguon_chu",
+     "he": "nguon_chu",
+     "ja": "nguon_chu",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_giao_hang_doi_thu.nguon_file",
+     "he": "nguon_file",
+     "ja": "nguon_file",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    }
+   ],
+   "ja": "Điều kiện giao hàng của đối thủ",
+   "mau": null,
+   "ten": "doi_thu_giao_hang"
   }
  ],
  "khoa": {
@@ -12150,6 +12458,36 @@
      "ma_dong"
     ],
     "ten": "core.fact_gia_doi_thu"
+   },
+   {
+    "cot": [
+     "id",
+     "batch_id",
+     "ma_dong",
+     "ma_doi_thu",
+     "ngay_nguon",
+     "bao_ship",
+     "phi_ship",
+     "phi_ship_theo",
+     "mien_ship_tu",
+     "mien_ship_kien",
+     "thung_moi_kien",
+     "phu_phi",
+     "phi_daibiki",
+     "daibiki_tu",
+     "daibiki_sau",
+     "ck_mien_daibiki",
+     "kien_toi_da_kg",
+     "ghep_kien",
+     "thue",
+     "cach_gui",
+     "nguon_chu",
+     "nguon_file"
+    ],
+    "khoa": [
+     "ma_dong"
+    ],
+    "ten": "core.fact_giao_hang_doi_thu"
    },
    {
     "cot": [

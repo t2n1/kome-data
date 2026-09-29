@@ -147,7 +147,7 @@ def dung_goi(gia: list[dict], dk: list[dict], ngay: date) -> tuple[list[dict], l
             "nhan_de_xuat": d.get("nhan_ghep") if d.get("nhan_ghep") in ("cung_hang", "thay_the") else None,
             "ly_do_ghep": d.get("ly_do_ghep"), "do_chac": do_chac, "ghi_chu": ghi or None,
         }
-        ra.append({c: o[c] for c in COT_GIA})
+        ra.append({c: o.get(c) for c in COT_GIA})   # 3 cột mới (so_goi_thung, kl_goi_g, bac): Task 3 điền
     dk_ra, dem_dk = [], {}
     for d in dk:
         ben = d["ben"]

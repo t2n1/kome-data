@@ -453,6 +453,19 @@ def test_bac_gia_chi_hien_dong_MOI_NHAT_cua_tung_quy_cach(conn, batch):
         [(SP.QUY_CACH["02"], 5250), (SP.QUY_CACH["00"], 460)])
 
 
+def test_bac_gia_ghi_nhan_tieu_chuan_va_khuyen_mai_va_luat_hai_cot(conn, batch):
+    b = batch(1)
+    conn.execute("INSERT INTO core.dim_product (product_code, product_name, batch_id) VALUES ('NT01', 'x', %s)", (b,))
+    for lv, ex, inc in (("std", 0, 4900), ("01", 5130, 5540), ("10", 5900, 4900)):
+        conn.execute("""INSERT INTO core.fact_price_list (product_code, pack_code, price_level, valid_from, price_ex_tax,
+                          price_in_tax, unit_cost, batch_id) VALUES ('NT01', '02', %s, '2026-09-08', %s, %s, 0, %s)""",
+                     (lv, ex, inc, b))
+    conn.commit()
+    g = {x["bac"]: x["gia"] for x in SP360._bac_gia(conn, "NT01")}
+    assert g == {"標準価格": round(4900 / 1.08), "01": 5130, "10 · khuyến mãi": round(4900 / 1.08)}
+    assert [x["bac"] for x in SP360._bac_gia(conn, "NT01")][0] == "標準価格"      # tiêu chuẩn đứng đầu
+
+
 def test_khach_ngung_mua_ma_nay_so_voi_NHIP_RIENG_khong_nguong_chung(conn, batch):
     """[CRITICAL] Bất biến của cả dự án: trạng thái quan hệ so với nhịp mua
     RIÊNG, không với một ngưỡng chung. Đo thật (đợt 3): ngưỡng chung 90 ngày bỏ

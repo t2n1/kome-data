@@ -75,6 +75,7 @@ BANG_THEO_LOAI = {
     "seikyu_motocho": ["core.fact_ar_ledger"],
     "doi_thu_gia": ["core.fact_gia_doi_thu"],
     "doi_thu_dieu_kien": ["core.fact_dieu_kien_doi_thu"],
+    "doi_thu_giao_hang": ["core.fact_giao_hang_doi_thu"],
 }
 
 # Tên bảng bằng tiếng Việt cho người vận hành. Không in tên bảng SQL lên màn
@@ -94,6 +95,7 @@ TEN_BANG_VI = {
     "seikyu_motocho": "sổ công nợ",
     "doi_thu_gia": "bảng giá đối thủ",
     "doi_thu_dieu_kien": "điều kiện bán của đối thủ",
+    "doi_thu_giao_hang": "điều kiện giao hàng của đối thủ",
 }
 
 

@@ -25,7 +25,8 @@ LOADERS = {
         "core.dim_product", ["product_code"],
         ["product_code", "product_name", "name_ja", "kind_code", "kind_name",
          "food_category_code", "food_category_name", "rank_code", "rank_name",
-         "compete_code", "barcode", "unit", "case_qty", "shelf_code", "introduced_on"]),
+         "compete_code", "barcode", "unit", "case_qty", "shelf_code", "introduced_on",
+         "pack1_code", "pack1_base_qty"]),
     "shiiresaki": master.make_loader(
         "core.dim_supplier", ["supplier_code"], ["supplier_code", "supplier_name"]),
     "chokusousaki": master.make_loader(
@@ -36,6 +37,7 @@ LOADERS = {
     "seikyu_motocho": so_cai.load,
     "doi_thu_gia": doi_thu.load_gia,
     "doi_thu_dieu_kien": doi_thu.load_dieu_kien,
+    "doi_thu_giao_hang": doi_thu.load_giao_hang,
 }
 
 # Bảng nào cần dọn khi hoàn tác một lô, theo từng loại file.
@@ -52,6 +54,7 @@ UNDO_TABLES = {
     "seikyu_motocho": ["core.fact_ar_ledger"],
     "doi_thu_gia": ["core.fact_gia_doi_thu"],
     "doi_thu_dieu_kien": ["core.fact_dieu_kien_doi_thu"],
+    "doi_thu_giao_hang": ["core.fact_giao_hang_doi_thu"],
 }
 
 # Bảng SCD2: hoàn tác phải mở lại phiên bản trước đó, không chỉ xoá phiên bản
