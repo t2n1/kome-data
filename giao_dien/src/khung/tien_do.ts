@@ -4,7 +4,9 @@
 // đầu khi không còn yêu cầu nào đang chạy). Mỗi yêu cầu có hai pha:
 //  - chờ máy chủ (chưa có header): tiến dần theo thời gian tới 30% — máy chủ
 //    không báo nó đã tính tới đâu, nên pha này là ước lượng;
-//  - nhận thân: 30% → 100% theo byte đã nhận / Content-Length (số THẬT).
+//  - nhận thân: 30% → 100% theo byte đã nhận / độ dài (số THẬT): X-Do-Dai (độ dài
+//    gốc do api._json gửi — phản hồi đã nén gzip thì Content-Length là cỡ SAU nén,
+//    còn body đọc ra là byte ĐÃ giải nén), không có thì Content-Length khi không nén.
 //    Không có Content-Length thì tiếp tục ước theo thời gian, dừng ở 95%.
 // Con số hiển thị chỉ tăng, không lùi (thêm yêu cầu giữa đợt không kéo nó xuống).
 
@@ -74,7 +76,8 @@ export function batDau() {
 
 /** Đọc thân phản hồi theo từng khúc để đếm byte, rồi parse JSON. */
 export async function docJson(r: Response, td: ReturnType<typeof batDau>): Promise<unknown> {
-  const dai = Number(r.headers.get("Content-Length"));
+  const goc = r.headers.get("X-Do-Dai");
+  const dai = Number(goc ?? (r.headers.get("Content-Encoding") ? null : r.headers.get("Content-Length")));
   td.header(Number.isFinite(dai) && dai > 0 ? dai : null);
   if (!r.body) return r.json();
   const doc = r.body.getReader();

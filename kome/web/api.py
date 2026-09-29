@@ -28,7 +28,9 @@ def _json(request: Request, du_lieu: str, phien_ban: str) -> Response:
     etag = f'W/"{phien_ban}"' if phien_ban else None
     if etag and request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
-    h = {"Cache-Control": "private, no-cache"}
+    # X-Do-Dai = độ dài GỐC: GZipMiddleware (app.py) đổi Content-Length thành cỡ sau
+    # nén, còn thanh tải (giao_dien/src/khung/tien_do.ts) đếm byte đã giải nén.
+    h = {"Cache-Control": "private, no-cache", "X-Do-Dai": str(len(du_lieu.encode("utf-8")))}
     if etag:
         h["ETag"] = etag
     return Response(du_lieu, media_type="application/json", headers=h)

@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 from kome import khach_hang as KH
 from kome.db import connect
 from kome.env import nap_env
@@ -167,6 +168,11 @@ def _in(thong_diep: str) -> None:
 def create_app(db_url: str | None = None, db_url_app: str | None = None) -> FastAPI:
     """db_url=None => lấy DATABASE_URL. Test LUÔN truyền DATABASE_URL_TEST."""
     app = FastAPI(title="KOME — dữ liệu")
+    # Nén gzip mọi phản hồi >= 1 KB khi trình duyệt nhận (có sẵn trong Starlette —
+    # không thêm gói nào). Lý do chính: trần phản hồi 4,5 MB của Vercel — /api/mua-vu
+    # ~1,5 MB thô và lớn thêm ~1 MB mỗi năm. Thanh tải đọc `X-Do-Dai` (api._json) vì
+    # Content-Length lúc này là cỡ SAU nén.
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
     # Phục vụ CSS và font từ đĩa. Dùng StaticFiles có sẵn trong FastAPI —
     # KHÔNG thêm gói nào vào requirements.txt (bản Vercel cố ý mỏng).
     app.mount(

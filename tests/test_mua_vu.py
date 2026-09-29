@@ -212,3 +212,24 @@ def test_lam_nong_sau_nap_tinh_san_ANH_CHUP_mua_vu(monkeypatch):
     anh_chup.lam_nong(lambda: contextlib.nullcontext(None))
     mv = [g for g in goi if g[0] == api.KHOA_MUA_VU]
     assert mv and mv[0][1] is MV.du_lieu and mv[0][2].get("chi_nap") is True
+
+
+def test_api_nen_gzip_va_bao_do_dai_goc_cho_thanh_tai(conn, batch, test_db_url):
+    """/api/mua-vu ~1,5 MB thô, lớn thêm ~1 MB mỗi năm — trần phản hồi Vercel 4,5 MB.
+    Nén gzip khi trình duyệt nhận; `X-Do-Dai` = độ dài GỐC (chưa nén) vì thanh tải
+    (khung/tien_do.ts) đếm byte ĐÃ giải nén, còn Content-Length là cỡ sau nén."""
+    _hang(conn, batch)
+    for i in range(40):
+        _mua(conn, batch, KHACH, HOM_NAY - timedelta(days=i), hang="XT07")
+    c = _web(test_db_url)
+    r = c.get("/api/mua-vu", headers={"Accept-Encoding": "gzip"})
+    assert r.status_code == 200
+    assert r.headers.get("content-encoding") == "gzip"
+    assert int(r.headers["x-do-dai"]) == len(r.content)          # httpx đã giải nén
+    r2 = c.get("/api/mua-vu", headers={"Accept-Encoding": "identity"})
+    assert "content-encoding" not in r2.headers and r2.json() == r.json()
+
+
+def test_thanh_tai_doc_do_dai_goc_truoc_content_length():
+    src = (_SRC / "khung" / "tien_do.ts").read_text(encoding="utf-8")
+    assert "X-Do-Dai" in src and src.index("X-Do-Dai") < src.index("Content-Length\")")
