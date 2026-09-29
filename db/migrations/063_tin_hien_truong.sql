@@ -7,8 +7,9 @@
 --     (nap: NULL, tay: mart.nhom_cua_khoa(t.nhom_khoa) — xem (4)) và (b) `nhom_khoa` = coalesce(nhom_ke, biểu thức cũ), `ten_nhom` của nhom_ke lấy
 --     tên nhóm có tên hoặc tên hàng KOME. Danh sách/thứ tự cột RA không đổi (CREATE OR REPLACE VIEW), nên
 --     mart.gia_doi_thu_hien_hanh / so_sanh_nhom (060, 062) đọc lại được không cần tạo lại.
---     Tin khách kể vẫn ngoài trung vị (`loai_nguon <> 'khach_ke'` ở 060/062) và ma_hang_dt = 'ke:<khách>:<nhóm>'
---     nên phân vùng `hien_hanh` của 060 tách theo (khách, bên, nhóm): tin trùng → mới nhất; hai khách không đè nhau.
+--     Tin khách kể vẫn ngoài trung vị (`loai_nguon <> 'khach_ke'` ở 060/062) và ma_hang_dt RA = 'ke:<khách>:<nhóm HIỆN
+--     HÀNH>' (dựng lúc đọc, xem nhánh `tay`) nên phân vùng `hien_hanh` của 060 tách theo (khách, bên, nhóm): tin trùng
+--     → mới nhất; hai khách không đè nhau.
 -- (4) mart.nhom_cua_khoa(khoa): khoá nhóm HIỆN HÀNH của một khoá đã lưu — 'ma:<mã>' mà mã đó nằm trong một
 --     nhóm có tên (app.nhom_so_sanh_ma) -> 'n:<nhóm>'; còn lại giữ nguyên. Giải LÚC ĐỌC (thẻ và giá đã lưu giữ
 --     nguyên như lúc ghi — sổ chỉ thêm), nên đổi thành viên nhóm sau này thì mọi chỗ đi theo. ĐỊNH NGHĨA MỘT LẦN:
@@ -78,7 +79,14 @@ nap AS (
     FROM core.fact_gia_doi_thu f LEFT JOIN p ON p.fact_id = f.id
 ),
 tay AS (
-    SELECT 'tay'::text, t.id, NULL::bigint, t.ma_doi_thu, t.ma_hang_dt, (t.luc AT TIME ZONE 'Asia/Tokyo')::date,
+    -- Giá khách kể: khoá chuỗi (ma_hang_dt) dựng LÚC ĐỌC từ nhóm HIỆN HÀNH — 'ke:<khách>:<nhom_cua_khoa(khoá đã ghi)>'
+    -- — để "tin mới nhất của (khách, bên, nhóm) là hiện trạng" đúng cả khi cùng hàng được gắn lúc 'ma:<mã>', lúc
+    -- 'n:<nhóm>' (hay mã được thêm vào nhóm sau). Cột lưu app.gia_doi_thu_tay.ma_hang_dt giữ nguyên (sổ chỉ thêm).
+    SELECT 'tay'::text, t.id, NULL::bigint, t.ma_doi_thu,
+           CASE WHEN t.loai_nguon = 'khach_ke' AND t.nhom_khoa IS NOT NULL AND t.customer_code IS NOT NULL
+                THEN 'ke:' || t.customer_code || ':' || mart.nhom_cua_khoa(t.nhom_khoa)
+                ELSE t.ma_hang_dt END,
+           (t.luc AT TIME ZONE 'Asia/Tokyo')::date,
            'tay'::text, NULL::text, NULL::text, t.ten_goc, t.quy_cach_goc, t.gia_goc, t.don_vi_gia,
            t.kg_moi_don_vi_gia, t.thue, t.gom_ship, t.kenh_gia, t.muc_gia, NULL::text, NULL::numeric,
            t.trang_thai, NULL::text, t.loai_nguon, t.ghi_chu_nguon,

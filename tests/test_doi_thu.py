@@ -627,3 +627,32 @@ def test_hien_truong_du_48_dong_tinh_ke_ca_chua_ro(conn, batch):
     conn.commit()
     tinh = DT.tong_quan(conn)["hien_truong"]["tinh"]
     assert len(tinh) == 48 and "(chưa rõ)" in {x["tinh"] for x in tinh}
+
+
+def test_khach_ke_gan_ma_roi_gan_nhom_MOT_dong_hien_hanh_la_gia_moi(conn, batch):
+    """Cùng khách + cùng bên: lần đầu gắn `ma:NT01` (NT01 thuộc nhóm g), lần sau gắn `n:g` -> ĐÚNG MỘT dòng hiện hành
+    trong nhóm g và là giá MỚI. Khoá chuỗi dựng lúc đọc (063); cột lưu `ma_hang_dt` giữ nguyên chữ đã ghi."""
+    g = _nhom_co_ten(conn, batch)
+    nk = f"n:{g}"
+    cau = "Khách nói @THAK bán @Basa rẻ hơn mình"
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", "ma:NT01"), [_gia_ke("THAK", "ma:NT01", 600)], cach_day=5)
+    conn.execute("UPDATE app.gia_doi_thu_tay SET luc = now() - interval '5 days' WHERE loai_nguon = 'khach_ke'")
+    conn.commit()
+    _tin(conn, batch, "K0001", cau, _the_kep(cau, "THAK", nk), [_gia_ke("THAK", nk, 620)])
+    assert sorted(r[0] for r in conn.execute("SELECT ma_hang_dt FROM app.gia_doi_thu_tay WHERE loai_nguon = 'khach_ke'")) \
+        == sorted(["ke:K0001:ma:NT01", f"ke:K0001:{nk}"])                        # sổ không đổi
+    hh = conn.execute("""SELECT gia_goc, ma_hang_dt FROM mart.gia_doi_thu_hien_hanh
+                         WHERE loai_nguon = 'khach_ke' AND nhom_khoa = %s""", (nk,)).fetchall()
+    assert [(float(a), b) for a, b in hh] == [(620.0, f"ke:K0001:{nk}")]
+    qs = DT.so_sanh(conn)["nhom"]
+    ke = [q for n in qs if n["nhom_khoa"] == nk for q in n["quan_sat"] if q["loai_nguon"] == "khach_ke"]
+    assert [q["gia_goc"] for q in ke] == [620]
+    # Hồ sơ đối thủ: cả hai lần là CÙNG một chuỗi (lịch sử theo ma_hang_dt + kênh + mức), đúng một dòng hiện hành.
+    ho = DT.ho_so_ben(conn, "THAK")["quan_sat"]
+    chuoi = [q for q in ho if q["loai_nguon"] == "khach_ke"]
+    assert {q["ma_hang_dt"] for q in chuoi} == {f"ke:K0001:{nk}"} and len(chuoi) == 2
+    assert [q["gia_goc"] for q in chuoi if q["hien_hanh"]] == [620]
+    # Khách khác vẫn là chuỗi riêng.
+    _tin(conn, batch, "K0002", cau, _the_kep(cau, "THAK", nk), [_gia_ke("THAK", nk, 700)])
+    assert conn.execute("""SELECT count(*) FROM mart.gia_doi_thu_hien_hanh
+                           WHERE loai_nguon = 'khach_ke' AND nhom_khoa = %s""", (nk,)).fetchone()[0] == 2

@@ -165,8 +165,9 @@ def gia_khach_ke(conn, ma_doi_thu: str, nhom_khoa: str, customer_code: str, tiep
                  gia_goc, don_vi_gia: str, nguoi) -> int:
     """Giá khách kể (tin hiện trường `@`, đợt 2 — 063): một dòng `app.gia_doi_thu_tay` `loai_nguon='khach_ke'`.
 
-    `ma_hang_dt` = 'ke:<khách>:<nhóm_khoa>' -> phân vùng `hien_hanh` (060) tách theo (khách, bên, nhóm): tin trùng
-    thì mới nhất là hiện trạng, hai khách khác nhau không đè nhau. `nhom_khoa` ('ma:<mã KOME>' | 'n:<id>') đi thẳng
+    `ma_hang_dt` LƯU = 'ke:<khách>:<nhóm_khoa đã ghi>'; view 063 dựng lại khoá chuỗi LÚC ĐỌC theo nhóm HIỆN HÀNH
+    ('ke:<khách>:<mart.nhom_cua_khoa(...)>') -> phân vùng `hien_hanh` tách theo (khách, bên, nhóm thật): tin trùng
+    thì mới nhất là hiện trạng (kể cả lần gắn `ma:<mã>` rồi lần gắn `n:<nhóm>`), hai khách khác nhau không đè nhau. `nhom_khoa` ('ma:<mã KOME>' | 'n:<id>') đi thẳng
     vào cột `nhom_khoa` — không qua bước ghép. `kg_moi_don_vi_gia` = 1 khi đơn vị là kg, NULL khi khác (máy không
     đoán kg của gói / thùng); thuế / ship `khong_ro`. Cùng giao dịch: thêm một dòng nhật ký 'gia_moi'.
     Người gọi chịu trách nhiệm chuyện thẻ `@` (xem `lien_he.ghi_kem_nhac`); ở đây chỉ kiểm chính dòng giá."""
