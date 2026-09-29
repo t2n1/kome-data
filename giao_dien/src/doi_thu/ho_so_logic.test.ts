@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Ben, GiaoHang, TongQuan } from "./kieu";
-import { benMacDinh, chipBen, dauBen, dongSoKome, giaoTrong, lichSuThang, nganhBen, ngoaiBieuDo, o4, soMaTrung, thuGon, tomTatGiao,
+import { benMacDinh, chipBen, daBoCuaBen, dauBen, dongSoKome, giaoTrong, lichSuThang, nganhBen, ngoaiBieuDo, o4, soMaTrung, thuGon, tomTatGiao,
   type QsHs }
   from "./ho_so_logic";
 
@@ -130,5 +130,18 @@ describe("giá KOME lệch / chưa so được / thu gọn", () => {
     expect(thuGon(d, 3)).toEqual({ hien: [{ p: -50 }, { p: 40 }, { p: 10 }], an: 3 });
     expect(thuGon(d, 6)).toEqual({ hien: d, an: 0 });
     expect(thuGon([{ p: null }, { p: 1 }], 1).hien).toEqual([{ p: 1 }]);
+  });
+});
+
+
+describe("daBoCuaBen (B15)", () => {
+  it("chỉ dòng hiện hành có bo_nhom, theo tên nhóm rồi tên hàng", () => {
+    const ds = daBoCuaBen([
+      q({ ten_goc: "b", sua_cuoi: 5, bo_nhom: { nhom_khoa: "ma:X", ten_nhom: "Xoài", nhan_cu: "cung_hang" } }),
+      q({ ten_goc: "a", sua_cuoi: 2, bo_nhom: { nhom_khoa: "n:1", ten_nhom: "Cá", nhan_cu: "thay_the" } }),
+      q({ ten_goc: "c", hien_hanh: false, bo_nhom: { nhom_khoa: "n:1", ten_nhom: "Cá", nhan_cu: "thay_the" } }),
+      q({ ten_goc: "d", bo_nhom: null }),
+    ]);
+    expect(ds.map(x => [x.ten_goc, x.nhom_khoa, x.nhan_cu, x.sua_cuoi])).toEqual([["a", "n:1", "thay_the", 2], ["b", "ma:X", "cung_hang", 5]]);
   });
 });

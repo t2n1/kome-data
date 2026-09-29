@@ -65,8 +65,8 @@
    --canh-nen:#FFF9E8;--canh-vien:#E6D08A;--canh-chu:#8A5E06;
    /* Xanh lam của gói thiết kế (tầng core, kiểu nạp "snapshot" — Kho dữ liệu.dc.html). */
    --lam-nen:#E8F0F7; --lam-chu:#1B5E8C;
-   /* Màn /doi-thu (doi_thu.css): thanh khác thương hiệu, "?" thiếu (cam), khuyến mãi (tím), vạch thực bán. */
-   --dt-khac:#6E6A63; --dt-khac-chu:#FFFFFF; --dt-cam:#C2620E; --dt-km:#6B4FB8; --dt-vach:#FFFFFF;
+   /* Màn /doi-thu (doi_thu.css): thanh khác thương hiệu, "?" thiếu (cam — ≥ 4,9:1 trên cả ba nền sáng; bản tối #F0A05A ≥ 7,5:1), khuyến mãi (tím), vạch thực bán. */
+   --dt-khac:#6E6A63; --dt-khac-chu:#FFFFFF; --dt-cam:#A65309; --dt-km:#6B4FB8; --dt-vach:#FFFFFF;
    /* Tab Phí & giao hàng: phần phụ phí vùng (vàng) và daibiki (tím) của thanh ghép; phần ship dùng --dt-cam. */
    --dt-vung:#B8860B; --dt-dai:#7B5CC4;
    /* Màu theo lý do của /lien-he — mỗi cột đặt lại ba biến này (lien_he.css,

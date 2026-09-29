@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Nhom, QuanSat } from "./kieu";
 import { LUA_CHON_GK, khoaNhom, khoaONhiet, NHAN_SL, bangBac, batTat, demThieu, dongCot, giaBacKg, giaKome, giaTai, locDanhSach, macDinhSp, matHangCuaBen,
-  nhanBac, nhanKlGoi, nhomChon, oNhiet, pcDau, soMatHang, thieuQuyCach, giaCoPhi, apPhi, type PhiSoSanh } from "./so_sanh_logic";
+  nhanBac, nhanKlGoi, nhomChon, oNhiet, pcDau, soMatHang, thieuQuyCach, giaCoPhi, apPhi, bamONhiet, phiChuONhiet,
+  type PhiSoSanh } from "./so_sanh_logic";
 import type { DieuKienGiao } from "./phi_giao";
 
 let seq = 0;
@@ -361,5 +362,25 @@ describe("dongCot / oNhiet có phí giao", () => {
     expect(oNhiet([khongKg], { sl: "1", gk: "chuan", chiCung: false, phi }).o.get(khoaONhiet(khongKg, "Bên A"))).toMatchObject({ p: null });
     const khongDk = dongCot(n(), { sl: "1", gk: "chuan", chiCung: false, moRong: true, phi: { ...phi, kome: null } }).dong;
     expect(khongDk.filter(d => !d.kome).every(d => d.p == null)).toBe(true);
+  });
+  it("bấm ô nhiệt: '?' phí mở hộp của ĐÚNG bên thiếu — mặt hàng hay KOME; nhãn nói 'phí giao chưa cộng'", () => {
+    const r = oNhiet([n()], { sl: "1", gk: "chuan", chiCung: false, phi });
+    const b = r.o.get(khoaONhiet(n(), "Bên B"))!;
+    const hb = bamONhiet(b, "1");
+    expect(hb.loai).toBe("phi");
+    expect(hb.loai === "phi" && hb.dong).toMatchObject({ kome: false, phiHoi: "dk", ben: "Bên B" });
+    expect(phiChuONhiet(b)).toBe(", phí giao chưa cộng");
+    expect(bamONhiet(r.o.get(khoaONhiet(n(), "Bên A"))!, "1")).toEqual({ loai: "sua" });
+    // chỉ KOME thiếu (không có kg thùng KOME): ô của bên A (đã cộng được phí) mở hộp của KOME
+    const khongKg = { ...n(), kome_kg_thung: null };
+    const a = oNhiet([khongKg], { sl: "1", gk: "chuan", chiCung: false, phi }).o.get(khoaONhiet(khongKg, "Bên A"))!;
+    expect(a).toMatchObject({ hoi: null, komeHoi: "kg" });
+    const ha = bamONhiet(a, "1");
+    expect(ha.loai === "phi" && ha.dong).toMatchObject({ kome: true, phiHoi: "kg" });
+    expect(phiChuONhiet(a)).toContain("phí giao chưa cộng");
+    // mặt hàng chưa có giá → ô giá, trước mọi thứ khác
+    const chuaGia = nh({ quan_sat: [qs({ ten_doi_thu: "X", ma_doi_thu: "x", gia_1: null })] });
+    expect(bamONhiet(oNhiet([chuaGia], { sl: "1", gk: "chuan", chiCung: false }).o.get(khoaONhiet(chuaGia, "X"))!, "1"))
+      .toEqual({ loai: "gia" });
   });
 });

@@ -16,10 +16,12 @@ import { mauLech } from "./mau";
 import { Ra } from "./NguonDong";
 import { lienKetAnToan } from "./nguon";
 import { pcDau } from "./so_sanh_logic";
+import { daSua } from "./sua_logic";
 import { SuaMatHang } from "./SuaMatHang";
 import { SuaBen, SuaDieuKien, SuaGiaoHang } from "./SuaNho";
 import { ThanhDem } from "./TabTin";
-import { benMacDinh, chipBen, dauBen, dongSoKome, giaoTrong, lichSuThang, nganhBen, ngoaiBieuDo, o4, thuGon, tomTatGiao, type DongHs,
+import { DaBoNhom } from "./DaBoNhom";
+import { benMacDinh, chipBen, daBoCuaBen, dauBen, dongSoKome, giaoTrong, lichSuThang, nganhBen, ngoaiBieuDo, o4, thuGon, tomTatGiao, type DongHs,
   type QsHs }
   from "./ho_so_logic";
 
@@ -81,6 +83,7 @@ function HoSoBen({ hs, tq, moSua, moDuyet, moLech }: {
   const dong = useMemo(() => dongSoKome(hs.quan_sat), [hs]);
   const nganh = useMemo(() => nganhBen(tq, hs.ben.ma), [tq, hs]);
   const ngoai = useMemo(() => ngoaiBieuDo(hs.quan_sat), [hs]);
+  const daBo = useMemo(() => daBoCuaBen(hs.quan_sat), [hs]);
   const web = lienKetAnToan(hs.ben.web);
   const giao = tomTatGiao(hs.giao_hang);
   return (
@@ -111,6 +114,7 @@ function HoSoBen({ hs, tq, moSua, moDuyet, moLech }: {
             cach_tinh="Mỗi thanh = một mặt hàng hiện hành của bên này ghép được với nhóm có giá KOME; dài = giá ¥/kg chưa thuế của bên so với giá KOME của nhóm (標準価格, thiếu thì thực bán 90 ngày). Trái = bên này rẻ hơn KOME. Tên là tên nhóm KOME; tên gốc trong ô nổi. Ngoài ±60% vẽ ở mép. Bấm thanh để sửa.">
             {dong.length ? <><BieuDoLech dong={dong} qs={hs.quan_sat} mo={(x, t) => moSua({ loai: "mh", q: x, tru_o: t })} /><ChuGiai /></>
               : <p className="dt-nhat">Chưa mặt hàng nào của bên này ghép được với nhóm có giá KOME.</p>}
+            <DaBoNhom ds={daBo} ben={false} />
             {ngoai.lech > 0 && (
               <button type="button" className="dt-tt-canh" onClick={moLech}>
                 ⚠ {so(ngoai.lech)} mặt hàng có giá KOME lệch — xem Dữ liệu › Giá KOME lệch</button>)}
@@ -197,13 +201,14 @@ function BieuDoLech({ dong: tatCa, qs, mo }: { dong: DongHs[]; qs: QsHs[]; mo: (
         <text x={xP(58)} y={11} fontSize={10.5} textAnchor="end" className="t-xanh">KOME rẻ hơn ▶</text>
         {dong.map((d, i) => {
           const y = TREN + i * RH, q = d.q, ten = q.ten_nhom ?? q.ten_goc;
-          const nhan = `${ten} (${q.ten_goc}): ${d.p == null ? "chưa có giá để so" : `${pcDau(d.p)} so KOME`} — sửa`;
+          const nhan = `${ten} (${q.ten_goc})${daSua(q) ? " (đã sửa)" : ""}: ${d.p == null ? "chưa có giá để so" : `${pcDau(d.p)} so KOME`} — sửa`;
           const dx = d.p == null ? x0 : xP(d.p), trai = d.p != null && d.p < 0;
           // Nhãn % cạnh đầu thanh; thanh trái sát mép (không đủ chỗ trước cột tên) thì nhãn sang nửa phải (trống) của dòng.
           const chatTrai = trai && dx - LW < 58, xn = trai ? (chatTrai ? x0 + 6 : dx - 4) : dx + 4;
           return (
             <g key={`${q.nguon}${q.id}`} opacity={d.cu ? 0.5 : 1}>
-              <text x={LW - 8} y={y + 12} fontSize={11} textAnchor="end" className={d.cung ? "" : "t-khac"}>{ngan(ten, 32)}</text>
+              <text x={LW - 8} y={y + 12} fontSize={11} textAnchor="end" className={d.cung ? "" : "t-khac"}>
+                {daSua(q) && <tspan className="t-nhat">✎ </tspan>}{ngan(ten, 32)}</text>
               {d.p == null
                 ? <ONoi svg nhan={nhan} onBam={() => mo(q, d.tro)} noi_dung={<NoiHs d={d} qs={qs} />}>
                     <text x={x0 + 4} y={y + 13} fontSize={12} className="t-cam t-dam">?</text>
@@ -243,7 +248,8 @@ function NoiHs({ d, qs }: { d: DongHs; qs: QsHs[] }) {
   const q = d.q, ls = lichSuThang(qs, q), dv = q.don_vi_so === "kg" ? "kg" : nhanDonVi(q.don_vi_so);
   const co = [q.nhan ? NHAN_GHEP[q.nhan] : null, q.trang_thai !== "con" ? NHAN_TRANG_THAI[q.trang_thai] ?? q.trang_thai : null,
     d.km ? `KM${q.khuyen_mai ? ": " + q.khuyen_mai : ""}` : null, d.gomShip ? "gồm ship 🚚" : null,
-    d.thueKhongRo ? "thuế không rõ" : null, d.cu ? `giá ${so(q.tuoi_ngay)} ngày tuổi` : null].filter(Boolean);
+    d.thueKhongRo ? "thuế không rõ" : null, d.cu ? `giá ${so(q.tuoi_ngay)} ngày tuổi` : null,
+    daSua(q) ? "✎ đã sửa" : null].filter(Boolean);
   return (
     <>
       <div className="o-noi-chu"><b>{q.ten_goc}</b>{[q.quy_cach_goc, q.kenh_gia, q.muc_gia].filter(Boolean).map(t => ` · ${t}`).join("")}</div>

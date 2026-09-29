@@ -7,6 +7,7 @@ import { yen } from "../dinh_dang";
 import type { Nhom } from "./kieu";
 import { mauLech, phanTram } from "./mau";
 import { NoiGia } from "./ONoiGia";
+import { daSua } from "./sua_logic";
 import { dongCot, khoaNhom, pcDau, type PhiSoSanh, type SoLuong } from "./so_sanh_logic";
 import type { MoPhi, MoSua } from "./BieuDoCot";
 
@@ -58,7 +59,7 @@ export function BieuDoCham({ ds, sl, gk, chiCung, mo, phi, moPhi }: { ds: Nhom[]
                         <line x1={x(p1)} x2={x(d.p)} y1={yy} y2={yy} stroke="var(--chu-mo)" strokeDasharray="2 2" />
                         <circle cx={x(p1)} cy={yy} r={2.5} fill="var(--chu-mo)" />
                       </g>)}
-                    <ONoi svg nhan={`${d.ben} · ${d.ten}: ${yen(d.gia)}, ${pcDau(d.p)} so KOME${d.phiHoi ? ", phí giao chưa cộng" : ""}`}
+                    <ONoi svg nhan={`${d.ben} · ${d.ten}${daSua(q) ? " (đã sửa)" : ""}: ${yen(d.gia)}, ${pcDau(d.p)} so KOME${d.phiHoi ? ", phí giao chưa cộng" : ""}`}
                       onBam={() => mo(q)} noi_dung={<NoiGia n={n} q={q} sl={sl} gk={gk} phi={phi} />}>
                       <circle className="dt-dich" cx={x(d.p)} cy={yy} r={d.cung ? 7 : 6} fill={d.cung ? m : "var(--nen-the)"}
                         fillOpacity={d.cung ? 0.85 : 1} stroke={d.het ? "var(--canh-chu)" : m} strokeWidth={d.het || !d.cung ? 2 : 1} />

@@ -9,6 +9,7 @@ import type { Nhom, QuanSat } from "./kieu";
 import { mauLech } from "./mau";
 import { NoiGia, NoiKome } from "./ONoiGia";
 import { dongCot, giaKome, NHAN_SL, nhanKlGoi, pcDau, phiCua, type Dong, type PhiSoSanh, type SoLuong } from "./so_sanh_logic";
+import { daSua } from "./sua_logic";
 
 export type MoSua = (q: QuanSat, tru_o?: string) => void;
 /** "?" phí giao: `d` = dòng (KOME hoặc mặt hàng) mà phí không cộng được — nơi gọi mở đúng pop-up (quy cách / giao hàng). */
@@ -18,7 +19,7 @@ type Chung = { sl: SoLuong; gk: string; chiCung: boolean; mo: MoSua; phi?: PhiSo
 const W = 960, LW = 440, PHAI = 170, RH = 26, TOP = 18;
 const X_TEN = 128, C1 = 350, C2 = 410;           // mép phải cột gói / thùng và tịnh 1 gói
 const ngan = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
-const nhanDong = (d: Dong) => `${d.ben} · ${d.ten}: ${d.gia == null ? "chưa có giá" : yen(d.gia)}${d.p == null ? "" : `, ${pcDau(d.p)} so KOME`}`;
+const nhanDong = (d: Dong) => `${d.ben} · ${d.ten}${daSua(d.q) ? " (đã sửa)" : ""}: ${d.gia == null ? "chưa có giá" : yen(d.gia)}${d.p == null ? "" : `, ${pcDau(d.p)} so KOME`}`;
 
 /** Chữ "?" cam bấm được (ô thiếu dữ liệu) — mở pop-up với con trỏ ở đúng ô. */
 function Hoi({ x, y, neo = "end", nhan, bam }: { x: number; y: number; neo?: "end" | "start"; nhan: string; bam: () => void }) {
@@ -81,7 +82,7 @@ export function BieuDoCot({ n, sl, gk, chiCung, mo, neo, phi, moPhi }: Chung & {
               <g key={d.kome ? "kome" : `${q!.nguon}${q!.id}`}>
                 <text x={4} y={y + 16} fontSize={11.5} className={lopTen} opacity={d.cu ? 0.5 : 1}>{d.kome ? "KOME" : ngan(d.ben, 18)}</text>
                 <text x={X_TEN} y={y + 16} fontSize={11.5} className={d.kome ? "t-kome" : d.cung ? "" : "t-khac"} opacity={d.cu ? 0.5 : 1}>
-                  {ngan(d.kome ? n.ten_nhom ?? n.nhom_khoa : d.ten, 28)}</text>
+                  {ngan(d.kome ? n.ten_nhom ?? n.nhom_khoa : d.ten, 28)}{!d.kome && daSua(q) && <tspan className="t-nhat"> ✎</tspan>}</text>
                 {soGoi != null ? <text x={C1} y={y + 16} fontSize={12} textAnchor="end">{soGoi}</text>
                   : d.kome ? <text x={C1} y={y + 16} fontSize={12} textAnchor="end" className="t-mo">?</text>
                   : <Hoi x={C1} y={y + 16} nhan={`${d.ben} · ${d.ten}: thiếu số gói / thùng — điền`} bam={() => mo(q!, "so_goi_thung")} />}

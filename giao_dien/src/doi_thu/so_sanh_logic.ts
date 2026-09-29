@@ -108,15 +108,20 @@ function dongTu(q: QuanSat, sl: SoLuong, gK: number | null, phi: PhiSoSanh | nul
     het: q.trang_thai === "het", km: !!q.khuyen_mai || q.gia_truoc_km != null, khongGhiPallet };
 }
 
+/** Dòng KOME của một nhóm (biểu đồ cột; bảng nhiệt dùng nó để mở hộp phí / quy cách KOME khi "?" phí là của KOME). */
+function dongKome(n: Nhom, k: ReturnType<typeof giaKomePhi>): Dong {
+  return { kome: true, ben: "KOME", ten: "KOME", gia: k.gia, giaLe: k.giaLe, p: null, cung: false,
+    soGoi: n.kome_goi_thung, klGoi: n.kome_kg_goi == null ? null : n.kome_kg_goi * 1000, thieu: false, cu: false,
+    thueKhongRo: false, gomShip: false, het: false, km: false, khongGhiPallet: false, phiHoi: k.hoi, phi: k.phi };
+}
+
 /** Dòng của biểu đồ cột một nhóm: KOME + mọi mặt hàng (bỏ khách kể; bất thường vẫn vẽ, cờ ở `q.bat_thuong`), lọc chiCung,
  *  xếp giá tăng (null cuối); chưa mở rộng thì giữ KOME + 5 hàng rẻ nhất + mọi cùng thương hiệu. `an` = số dòng bị ẩn. */
 export function dongCot(n: Nhom, o: { sl: SoLuong; gk: string; chiCung: boolean; moRong: boolean; phi?: PhiSoSanh | null }):
   { dong: Dong[]; an: number } {
   const p = phiCua(n, o.sl, o.phi);
   const k = giaKomePhi(n, o.gk, o.sl, p), gK = k.gia;
-  const kome: Dong = { kome: true, ben: "KOME", ten: "KOME", gia: gK, giaLe: k.giaLe, p: null, cung: false,
-    soGoi: n.kome_goi_thung, klGoi: n.kome_kg_goi == null ? null : n.kome_kg_goi * 1000, thieu: false, cu: false,
-    thueKhongRo: false, gomShip: false, het: false, km: false, khongGhiPallet: false, phiHoi: k.hoi, phi: k.phi };
+  const kome = dongKome(n, k);
   const hang = n.quan_sat.filter(q => veDuoc(q) && (!o.chiCung || q.nhan === "cung_hang"))
     .map(q => dongTu(q, o.sl, gK, p, k.hoi)).sort((a, b) => theoGia(a.gia, b.gia));
   const giu = o.moRong ? null : new Set([...hang.slice(0, 5), ...hang.filter(d => d.cung)]);
@@ -131,7 +136,10 @@ export const khoaONhiet = (n: Pick<Nhom, "nhom_khoa" | "don_vi_so">, ben: string
 /** Ô bảng nhiệt: mỗi (nhóm, bên) — mặt hàng cùng thương hiệu rẻ nhất, không có thì khác thương hiệu rẻ nhất.
  *  `ben` = tên hiển thị (ten_doi_thu ?? ma_doi_thu), xếp theo số nhóm có mặt giảm dần; khoá ô = `khoaONhiet(n, ben)`
  *  (`${nhom_khoa}|${don_vi_so}|${ben}` — một nhom_khoa có thể có nhiều dòng, mỗi don_vi_so một dòng). */
-export type ONhiet = { q: QuanSat; p: number | null; so: number; cung: boolean; hoi: LyDoHoiPhi | null };
+/** `hoi` = "?" phí của MẶT HÀNG; `komeHoi` = "?" phí của KOME (nhóm đó) — ô bấm mở đúng hộp của bên thiếu (`dong` /
+ *  `dongKome` là dòng mà MoPhi của BieuDoCot nhận). */
+export type ONhiet = { q: QuanSat; p: number | null; so: number; cung: boolean; hoi: LyDoHoiPhi | null;
+  komeHoi: LyDoHoiPhi | null; dong: Dong; dongKome: Dong };
 export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolean; phi?: PhiSoSanh | null }):
   { ben: string[]; o: Map<string, ONhiet> } {
   const ket = new Map<string, ONhiet>();
@@ -148,13 +156,27 @@ export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolea
     for (const [b, ds2] of theoBen) {
       const cung = ds2.filter(q => q.nhan === "cung_hang");
       const chon = (cung.length ? cung : ds2).map(q => ({ q, g: giaMH(q, o.sl, p) })).sort((x, y) => theoGia(x.g.gia, y.g.gia))[0];
-      ket.set(khoaONhiet(n, b), { q: chon.q, p: pSo(chon.g.gia, gK, chon.g.hoi, k.hoi), so: ds2.length, cung: cung.length > 0, hoi: chon.g.hoi });
+      ket.set(khoaONhiet(n, b), { q: chon.q, p: pSo(chon.g.gia, gK, chon.g.hoi, k.hoi), so: ds2.length, cung: cung.length > 0,
+        hoi: chon.g.hoi, komeHoi: k.hoi, dong: dongTu(chon.q, o.sl, gK, p, k.hoi), dongKome: dongKome(n, k) });
       soNhom.set(b, (soNhom.get(b) ?? 0) + 1);
     }
   }
   const ben = [...soNhom.keys()].sort((a, b) => soNhom.get(b)! - soNhom.get(a)! || a.localeCompare(b, "vi"));
   return { ben, o: ket };
 }
+
+/** Bấm một ô bảng nhiệt: mặt hàng chưa có giá → pop-up ở ô giá; "?" phí của mặt hàng → hộp phí / quy cách của BÊN đó;
+ *  "?" phí chỉ của KOME → hộp phí / quy cách của KOME (cùng MoPhi với biểu đồ cột); còn lại → pop-up mặt hàng. `phiChu` =
+ *  đuôi của nhãn đọc màn hình. */
+export function bamONhiet(c: ONhiet, sl: SoLuong):
+  { loai: "gia" } | { loai: "phi"; dong: Dong } | { loai: "sua" } {
+  if (giaTai(c.q, sl).gia == null) return { loai: "gia" };
+  if (c.hoi) return { loai: "phi", dong: c.dong };
+  if (c.komeHoi) return { loai: "phi", dong: c.dongKome };
+  return { loai: "sua" };
+}
+export const phiChuONhiet = (c: ONhiet) =>
+  (c.hoi ? ", phí giao chưa cộng" : c.komeHoi ? ", phí giao chưa cộng (KOME thiếu điều kiện / quy cách)" : "");
 
 /** Đếm mặt hàng thiếu quy cách (không tính khách kể; `chiCung` = chỉ đếm hàng cùng thương hiệu — đúng những dòng đang vẽ):
  *  số lượng, mặt hàng đầu tiên, và trường thiếu của nó (để mở pop-up đúng ô). */

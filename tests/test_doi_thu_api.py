@@ -438,3 +438,34 @@ def test_4b2_dong_bi_thay_van_doc_duoc_qua_mat_hang(conn, batch, test_db_url):
     r = _web(test_db_url).get(f"/api/doi-thu/mat-hang/nap/{fid}")
     assert r.status_code == 200 and r.json()["quan_sat"]["hien_hanh"] is False
 
+
+
+def test_4b_ra_dong_bi_thay_409_kem_thay_boi_va_mat_hang_mang_thay_boi(conn, batch, test_db_url):
+    """B14 qua API: sửa dòng đã bị thay → 409 cùng dạng, thêm `thay_boi` {nguon, id} (cả trong xung_dot); ghi_de
+    không lách được; GET /mat-hang mang thay_boi để pop-up khoá Lưu ngay lúc mở."""
+    from kome import doi_thu as DT
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 540)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.commit()
+    c = _web(test_db_url)
+    for ghi_de in (False, True):
+        r = c.post("/api/doi-thu/sua-mat-hang", json={"nguon": "nap", "id": fid, "da_xem": _max_nk(conn), "ghi_de": ghi_de,
+                                                        "thay_doi": {"so_goi_thung": "20"}})
+        assert r.status_code == 409, r.text
+        j = r.json()
+        assert j["thay_boi"] == {"nguon": "tay", "id": tid} == j["xung_dot"]["thay_boi"]
+        assert j["loi"] == "Dòng này đã có bản mới."
+    assert conn.execute("SELECT count(*) FROM app.dinh_chinh_gia").fetchone()[0] == 0
+    r = c.get(f"/api/doi-thu/mat-hang/nap/{fid}")
+    assert r.status_code == 200 and r.json()["quan_sat"]["thay_boi"] == {"nguon": "tay", "id": tid}
+    assert c.get(f"/api/doi-thu/mat-hang/tay/{tid}").json()["quan_sat"]["thay_boi"] is None
+
+
+def test_4b_ra_so_sanh_mang_da_bo(conn, batch, test_db_url):
+    fid = _nen(conn, batch)[0]
+    c = _web(test_db_url)
+    assert c.post("/api/doi-thu/sua-mat-hang", json={"nguon": "nap", "id": fid, "da_xem": 0, "nhan": "khong"}).status_code == 200
+    j = c.get("/api/doi-thu/so-sanh").json()
+    assert [(x["id"], x["nhom_khoa"], x["nhan_cu"]) for x in j["da_bo"]] == [(fid, "ma:NT01", "thay_the")]
+    assert all(q["id"] != fid for n in j["nhom"] for q in n["quan_sat"])

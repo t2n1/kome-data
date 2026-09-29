@@ -17,7 +17,17 @@ export type QuanSat = {
   gia_pallet: number | null; sua_cuoi: number; gia_kome_so?: number | null;
   // Chỉ /ben/{ma}: cờ "giá KOME của nhóm lệch > 3× / < ⅓ trung vị" (mart.so_sanh_nhom) — dòng đó không vẽ như giá thật.
   gia_kome_lech?: boolean;
+  // Chỉ /ben/{ma} (B15): dòng hiện hành đang bị "bỏ khỏi nhóm" → nhóm nó rời + nhãn để hoàn tác; còn lại null.
+  bo_nhom?: { nhom_khoa: string; ten_nhom: string | null; nhan_cu: "cung_hang" | "thay_the" } | null;
+  // Chỉ /mat-hang (pop-up): dòng app.ghep_hang (kể cả nhãn 'khong') và bản MỚI NHẤT đã thay dòng này (B14).
+  ma_ghep?: string | null; nhom_ghep?: number | null; thay_boi?: ThayBoi | null;
 };
+/** Bản mới đã thay một quan sát (dòng tay qua thay_cho_tay_id, dòng nạp qua fact_goc_id) — pop-up mở bản này. */
+export type ThayBoi = { nguon: "nap" | "tay"; id: number };
+/** `da_bo` của GET /api/doi-thu/so-sanh (B15): mặt hàng hiện hành đang bị "Không liên quan — bỏ khỏi nhóm". */
+export type DaBo = { nguon: "nap" | "tay"; id: number; ma_doi_thu: string; ten_doi_thu: string | null; ten_goc: string;
+  don_vi_so?: string; nhom_khoa: string; ten_nhom: string | null; nhan_cu: "cung_hang" | "thay_the"; sua_cuoi: number };
+export type SoSanhApi = { nhom: Nhom[]; da_bo?: DaBo[] };
 export type Bac = { tu: number; don_vi_sl: "thung" | "kg" | "goi" | "pallet"; gia: number; don_vi_gia: "thung" | "kg" | "goi" };
 export type Nhom = {
   nhom_khoa: string; ten_nhom: string | null; nganh: string | null; don_vi_so: string; ma_kome: string[] | null; gia_kome: number | null;
@@ -88,7 +98,7 @@ export type GiaoHang = { ma_doi_thu: string; ten: string | null; bao_ship: boole
 /** Nhãn hiển thị ↔ mã CSDL (mã KHÔNG đổi): một chỗ duy nhất cho chữ "cùng / khác thương hiệu". */
 export const NHAN_GHEP: Record<"cung_hang" | "thay_the", string> = { cung_hang: "cùng thương hiệu", thay_the: "khác thương hiệu" };
 /** Thân 409 của mọi POST sửa: người khác vừa sửa dòng này. `sua_cuoi` = dấu phiên bản mới để "Ghi đè". */
-export type XungDot = { ai: string | null; luc: string; sau: unknown; sua_cuoi: number };
+export type XungDot = { ai: string | null; luc: string; sau: unknown; sua_cuoi: number; thay_boi?: ThayBoi | null };
 /** Loại nguồn của giá tay (`app.loai_nguon`, mã không đổi) → nhãn. Dùng chung màn Duyệt và pop-up sửa. */
 export const LOAI_NGUON: [string, string][] = [["bang_gia", "Bảng giá / web"], ["chung_tu", "Chứng từ khách đưa"],
   ["to_roi", "Tờ rơi / tin nhắn"], ["khach_ke", "Khách kể"], ["khac", "Nghe nói / khác"]];

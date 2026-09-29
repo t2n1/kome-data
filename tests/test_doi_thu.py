@@ -1316,3 +1316,161 @@ def test_4b2_nhan_ghep_khong_ma_kome_va_khach_ke_bo_ghep_la_LoiNhap(conn, batch)
     conn.rollback()
     assert _nk(conn) == 0 and conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0
 
+
+
+# ---------------------------------------------------------------- đợt 4b rà cuối: B13 ghép mã / nhóm, B14 dòng bị thay,
+# B15 "đã bỏ khỏi nhóm", giá đã đổi không mang link cũ
+
+def _nhom_ten(conn, ten="Nhóm cá"):
+    i = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES (%s) RETURNING id", (ten,)).fetchone()[0]
+    conn.commit()
+    return i
+
+
+def _nk_max(conn, fid, khoa_ghep):
+    return conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong IN (%s, %s)",
+                        (f"gia:{fid}", khoa_ghep)).fetchone()[0]
+
+
+def test_4b_ra_ghep_dong_CHUA_GHEP_voi_ma_roi_doi_ma_roi_dat_nhom(conn, batch):
+    """B13: dòng Duyệt › Chưa ghép (AI không đề xuất mã) ghép được ngay trong pop-up; ghép sai đổi sang mã khác; nhóm có
+    tên chọn tường minh rồi bỏ về 'theo mã KOME'. Mỗi lần một dòng nhật ký ghép trên '<bên>/<hàng>'."""
+    _hang(conn, batch)
+    _hang(conn, batch, "NT02", "Ca X (500g x 20 packs)")
+    fid = _qs(conn, batch, "THAK", 540, hang="hX", ma=None, nhan=None)
+    assert _qs_dong(conn, "nap", fid)[:3] == (None, None, None)
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "ma_kome": " NT01 ", "nhan": "cung_hang"}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[:3] == ("ma:NT01", "cung_hang", "NT01")
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": ra["sua_cuoi"], "ma_kome": "NT02"}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[:3] == ("ma:NT02", "cung_hang", "NT02")     # nhãn giữ, mã đổi
+    g = _nhom_ten(conn)
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": ra["sua_cuoi"], "nhom_id": g}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[:3] == (f"n:{g}", "cung_hang", "NT02")
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": ra["sua_cuoi"], "nhom_id": None}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[0] == "ma:NT02"
+    assert _nk(conn, "THAK/hX") == 4 and _nk(conn) == 4
+    assert ra["sua_cuoi"] == _max_nk(conn)
+    q = DT.mat_hang(conn, "nap", fid)["quan_sat"]
+    assert (q["ma_ghep"], q["nhom_ghep"], q["thay_boi"]) == ("NT02", None, None)
+
+
+def test_4b_ra_ghep_ma_nhom_sai_va_ma_moi_khong_nhan_la_LoiNhap_khong_ghi_gi(conn, batch):
+    from tests.test_mart_doi_thu import _ke
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 540, hang="hX", ma=None, nhan=None)
+    ke = _ke(conn, "202601010001", "ma:NT01", 700)
+    for b, loi in (({"ma_kome": "KHONG-CO", "nhan": "cung_hang"}, "Không có mã KOME"),
+                   ({"ma_kome": "NT01", "nhan": "cung_hang", "nhom_id": 987654}, "nhóm so sánh"),
+                   ({"ma_kome": "NT01"}, "cùng thương hiệu hoặc khác thương hiệu"),
+                   ({"ma_kome": 5, "nhan": "cung_hang"}, "Mã KOME"),
+                   ({"nhom_id": "abc"}, "Nhóm so sánh"),
+                   ({"ma_kome": "NT01", "nhan": "khong", "thay_doi": {"so_goi_thung": "20"}}, "cùng thương hiệu")):
+        with pytest.raises(DT.LoiNhap, match=loi):
+            DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0} | b, None)
+        conn.rollback()
+    with pytest.raises(DT.LoiNhap, match="khách kể"):
+        DT.sua_mat_hang(conn, {"nguon": "tay", "id": ke, "da_xem": 0, "ma_kome": "NT01"}, None)
+    conn.rollback()
+    assert _nk(conn) == 0 and conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0
+    assert conn.execute("SELECT count(*) FROM app.dinh_chinh_gia").fetchone()[0] == 0
+
+
+def test_4b_ra_doi_ma_van_qua_chong_sua_de_khoa_ghep(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 540, hang="hX", ma=None, nhan=None)
+    DT.dat_ghep(conn, "THAK", "hX", "NT01", None, "thay_the", _nguoi(conn))
+    conn.commit()
+    with pytest.raises(DT.XungDot) as e:
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "ma_kome": "", "nhan": "khong"}, None)
+    conn.rollback()
+    assert e.value.ai == "lan" and e.value.thay_boi is None
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "ma_kome": "", "nhan": "khong", "ghi_de": True}, None)
+    conn.commit()
+    assert conn.execute("SELECT product_code, nhan FROM app.ghep_hang").fetchone() == (None, "khong")
+
+
+def test_4b_ra_dong_tay_DA_BI_THAY_khong_sua_duoc_ke_ca_ghi_de_va_tro_ban_moi_nhat(conn, batch):
+    """B14: A mở tay:5 (cache cũ), B sửa → tay:6 thay tay:5; A lưu tay:5 thì bị từ chối, trỏ bản mới — cả khi da_xem
+    đã gồm lần sửa của B (đọc tươi) và cả khi ghi_de. Chuỗi thay lần tới CUỐI."""
+    fid, fid2, _ = _ba_ben(conn, batch)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.commit()
+    moi = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "vi_sao_gia": "doc_sai",
+                                 "thay_doi": {"gia_goc": "525"}}, _nguoi(conn))["id"]
+    conn.commit()
+    truoc = (_nk(conn), conn.execute("SELECT count(*) FROM app.gia_doi_thu_tay").fetchone()[0])
+    for ghi_de in (False, True):
+        with pytest.raises(DT.XungDot) as e:
+            DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "ghi_de": ghi_de,
+                                   "vi_sao_gia": "doc_sai", "thay_doi": {"gia_goc": "530"}}, None)
+        conn.rollback()
+        assert e.value.thay_boi == {"nguon": "tay", "id": moi} and e.value.ai == "lan"
+    assert (_nk(conn), conn.execute("SELECT count(*) FROM app.gia_doi_thu_tay").fetchone()[0]) == truoc
+    assert DT.mat_hang(conn, "tay", tid)["quan_sat"]["thay_boi"] == {"nguon": "tay", "id": moi}
+    assert DT.mat_hang(conn, "tay", moi)["quan_sat"]["thay_boi"] is None
+    moi2 = DT.sua_mat_hang(conn, {"nguon": "tay", "id": moi, "da_xem": _max_nk(conn), "thay_doi": {"so_goi_thung": "20"}},
+                           None)["id"]
+    conn.commit()
+    assert DT.mat_hang(conn, "tay", tid)["quan_sat"]["thay_boi"] == {"nguon": "tay", "id": moi2}
+    # dòng NẠP đã có "giá đã đổi" (fact_goc_id) cũng vậy — trỏ tới cuối chuỗi
+    assert DT.mat_hang(conn, "nap", fid)["quan_sat"]["thay_boi"] == {"nguon": "tay", "id": moi2}
+    with pytest.raises(DT.XungDot) as e:
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": _max_nk(conn), "thay_doi": {"so_goi_thung": "20"}}, None)
+    conn.rollback()
+    assert e.value.thay_boi == {"nguon": "tay", "id": moi2}
+    assert conn.execute("SELECT count(*) FROM app.dinh_chinh_gia").fetchone()[0] == 0
+    # dòng chưa bị thay vẫn sửa được
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid2, "da_xem": _max_nk(conn), "thay_doi": {"so_goi_thung": "20"}}, None)
+
+
+def test_4b_ra_gia_da_doi_dong_tay_KHONG_chep_link_bang_chung_cu(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi",
+                            "lien_ket_bang_chung": "https://drive.google.com/cu"}, None)
+    conn.commit()
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "vi_sao_gia": "da_doi",
+                                "loai_nguon": "chung_tu", "thay_doi": {"gia_goc": "510"}}, None)
+    conn.commit()
+    assert conn.execute("SELECT lien_ket_bang_chung FROM app.gia_doi_thu_tay WHERE id=%s", (ra["id"],)).fetchone()[0] is None
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": ra["id"], "da_xem": _max_nk(conn), "vi_sao_gia": "da_doi",
+                                "loai_nguon": "chung_tu", "lien_ket_bang_chung": "https://drive.google.com/moi",
+                                "thay_doi": {"gia_goc": "505"}}, None)
+    conn.commit()
+    assert conn.execute("SELECT lien_ket_bang_chung FROM app.gia_doi_thu_tay WHERE id=%s",
+                        (ra["id"],)).fetchone()[0] == "https://drive.google.com/moi"
+    # "Đọc sai" vẫn là CÙNG quan sát → giữ link của nó
+    ra2 = DT.sua_mat_hang(conn, {"nguon": "tay", "id": ra["id"], "da_xem": _max_nk(conn), "thay_doi": {"so_goi_thung": "20"}},
+                          None)
+    assert conn.execute("SELECT lien_ket_bang_chung FROM app.gia_doi_thu_tay WHERE id=%s",
+                        (ra2["id"],)).fetchone()[0] == "https://drive.google.com/moi"
+
+
+def test_4b_ra_so_sanh_va_ho_so_ben_mang_DA_BO_KHOI_NHOM_va_hoan_tac(conn, batch, monkeypatch):
+    """B15: bỏ khỏi nhóm → /so-sanh `da_bo` (nhóm rời + nhãn cũ + sua_cuoi) và /ben `bo_nhom`; hoàn tác = ghi lại nhãn
+    cũ qua CÙNG đường lưu → dòng về nhóm, da_bo rỗng. Vẫn MỘT lượt hỏi."""
+    fid, fid2, _ = _ba_ben(conn, batch)
+    assert DT.so_sanh(conn)["da_bo"] == []
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "nhan": "cung_hang"}, None)
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": ra["sua_cuoi"], "nhan": "khong"}, None)
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid2, "da_xem": _max_nk(conn), "nhan": "khong"}, None)   # nhãn AI
+    conn.commit()
+    dem = _dem(conn, monkeypatch)
+    db = {x["id"]: x for x in DT.so_sanh(conn)["da_bo"]}
+    assert dem["n"] == 1
+    assert set(db) == {fid, fid2}
+    x = db[fid]
+    assert (x["nguon"], x["ma_doi_thu"], x["nhom_khoa"], x["nhan_cu"], x["don_vi_so"]) == \
+        ("nap", "THAK", "ma:NT01", "cung_hang", "kg")
+    assert x["ten_nhom"] and x["ten_goc"] == "Basa" and x["sua_cuoi"] == _nk_max(conn, fid, "THAK/hTHAK")
+    assert db[fid2]["nhan_cu"] == "thay_the"                              # không có nhãn cũ trong nhật ký → nhãn AI
+    hs = {q["id"]: q for q in DT.ho_so_ben(conn, "THAK")["quan_sat"]}
+    assert hs[fid]["bo_nhom"]["nhan_cu"] == "cung_hang" and hs[fid]["bo_nhom"]["nhom_khoa"] == "ma:NT01"
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": x["sua_cuoi"], "nhan": x["nhan_cu"]}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[:2] == ("ma:NT01", "cung_hang")
+    assert [x["id"] for x in DT.so_sanh(conn)["da_bo"]] == [fid2]
+    assert DT.ho_so_ben(conn, "THAK")["quan_sat"][0]["bo_nhom"] is None

@@ -39,11 +39,13 @@ class LoiNhap(Exception):
 class XungDot(Exception):
     """Có người ghi vào mục này SAU lúc pop-up mở (đợt 4b) — route trả 409 {loi, xung_dot: {ai, luc, sau}}.
     `ai` = tên người phụ trách / tên đăng nhập (None = script, máy không cổng đăng nhập); `luc` = ISO;
-    `sau` = cột `sau` của dòng nhật ký đó; `id` = id nhật ký đó (sua_cuoi mới)."""
+    `sau` = cột `sau` của dòng nhật ký đó; `id` = id nhật ký đó (sua_cuoi mới). `thay_boi` (đợt 4b, B14) = {nguon, id}
+    của bản MỚI NHẤT đã thay dòng này (dòng tay qua thay_cho_tay_id, dòng nạp qua fact_goc_id): dòng đã bị thay thì không
+    sửa được nữa, kể cả với ghi_de — pop-up mở bản mới."""
 
-    def __init__(self, ai, luc: str, sau, id: int):
-        super().__init__("Có người vừa sửa mục này.")
-        self.ai, self.luc, self.sau, self.id = ai, luc, sau, id
+    def __init__(self, ai, luc: str, sau, id: int, thay_boi: dict | None = None):
+        super().__init__("Dòng này đã có bản mới." if thay_boi else "Có người vừa sửa mục này.")
+        self.ai, self.luc, self.sau, self.id, self.thay_boi = ai, luc, sau, id, thay_boi
 
 
 _PHAY_NGHIN = re.compile(r"^-?\d{1,3}(,\d{3})+(\.\d+)?$")
@@ -558,8 +560,9 @@ def sua_tay(conn, tay_id: int, thay_doi: dict, nguoi, *, nguon: dict | None = No
     `thay_cho_tay_id` = dòng cũ — mart.gia_doi_thu_quan_sat (067) không bao giờ cho dòng bị thay hiện hành, kể cả khi
     dòng mới sang phân vùng khác (sửa kênh / mức giá). "Đọc sai" (mặc định) giữ `luc` của dòng cũ (ngày nguồn / tuổi
     không đổi — vẫn là quan sát đó); `nguon` (đường 'Giá đã đổi' của pop-up) = now(), loai_nguon bắt buộc,
-    lien_ket_bang_chung / ghi_chu_nguon ghi đè khi CÓ khoá. Nhật ký HAI dòng — khoá 'tay:<cũ>' và 'tay:<mới>' — để
-    sua_cuoi của cả hai khớp (pop-up cũ của dòng cũ bị 409). Trả id mới."""
+    lien_ket_bang_chung = đúng link gửi kèm (không gửi = không có — KHÔNG chép link của giá cũ), ghi_chu_nguon ghi đè
+    khi CÓ khoá. Nhật ký HAI dòng — khoá 'tay:<cũ>' và 'tay:<mới>' — để sua_cuoi của cả hai khớp (pop-up cũ của dòng
+    cũ bị 409). Trả id mới."""
     thay_doi = thay_doi or {}
     if not isinstance(thay_doi, dict):
         raise LoiNhap("Trường sửa phải là một đối tượng.")
@@ -583,12 +586,12 @@ def sua_tay(conn, tay_id: int, thay_doi: dict, nguoi, *, nguon: dict | None = No
     doi = list(sach)
     if nguon:
         v["loai_nguon"] = _kiem_loai_nguon(conn, nguon.get("loai_nguon"))
-        if "lien_ket_bang_chung" in nguon:
-            v["lien_ket_bang_chung"] = kiem_lien_ket(nguon.get("lien_ket_bang_chung"), "Link bằng chứng")
+        # Link bằng chứng thuộc về NGUỒN của giá: giá mới không mang link của giá cũ — không gửi = không có.
+        v["lien_ket_bang_chung"] = kiem_lien_ket(nguon.get("lien_ket_bang_chung"), "Link bằng chứng")
         if "ghi_chu_nguon" in nguon:
             g = nguon.get("ghi_chu_nguon")
             v["ghi_chu_nguon"] = (g.strip()[:DAI_TOI_DA] if isinstance(g, str) else "") or None
-        doi += [k for k in _NGUON_TAY if k in nguon or k == "loai_nguon"]
+        doi += [k for k in _NGUON_TAY if k in nguon or k in ("loai_nguon", "lien_ket_bang_chung")]
     if v["gia_goc"] is None and v["trang_thai"] != "het":
         raise LoiNhap("Nhập giá (chỉ được bỏ trống khi ghi hàng đã hết).")
     moi = conn.execute(
@@ -607,14 +610,30 @@ TRUONG_GIA = frozenset({"gia_goc", "don_vi_gia", "thue", "bac"})
 VI_SAO_GIA = ("doc_sai", "da_doi")
 
 
+def _doc_ma_kome(v):
+    """Ô "Mã KOME" của pop-up: None / "" = bỏ mã; chữ (strip) ≤ DAI_TOI_DA; kiểu khác -> LoiNhap."""
+    if v is None or v == "":
+        return None
+    if not isinstance(v, str) or len(v.strip()) > DAI_TOI_DA:
+        raise LoiNhap("Mã KOME không hợp lệ.")
+    return v.strip() or None
+
+
 def sua_mat_hang(conn, b: dict, nguoi) -> dict:
-    """MỘT lần bấm Lưu ở pop-up mặt hàng: nhãn ghép + sửa trường, CÙNG giao dịch (route commit một lần; lỗi ở bước
-    nào thì không bước nào vào). Mọi phép kiểm đầu vào đã biết — trường, vì sao, loại nguồn, link / ghi chú nguồn, "có
-    giá trừ khi hết", mã KOME và loại dòng của nhãn — chạy TRƯỚC lần ghi đầu tiên; sau đó chỉ còn lỗi CSDL ngoài dự
+    """MỘT lần bấm Lưu ở pop-up mặt hàng: ghép + sửa trường, CÙNG giao dịch (route commit một lần; lỗi ở bước nào thì
+    không bước nào vào). Mọi phép kiểm đầu vào đã biết — trường, vì sao, loại nguồn, link / ghi chú nguồn, "có giá trừ
+    khi hết", mã KOME / nhóm và loại dòng của ghép — chạy TRƯỚC lần ghi đầu tiên; sau đó chỉ còn lỗi CSDL ngoài dự
     kiến (khi ấy vẫn không commit). `b`:
       nguon 'nap'|'tay', id, da_xem (sua_cuoi lúc mở), ghi_de, nhan ('cung_hang'|'thay_the'|'khong'|null),
-      thay_doi {TRUONG_SUA: giá trị}, vi_sao_gia ('doc_sai'|'da_doi'|null — bắt buộc khi thay_doi có TRUONG_GIA),
-      loai_nguon / lien_ket_bang_chung / ghi_chu_nguon (đường 'da_doi').
+      ma_kome (CÓ khoá = đổi mã KOME của ghép; null / "" = bỏ mã), nhom_id (CÓ khoá = đổi nhóm ghép tường minh; null =
+      theo mã KOME), thay_doi {TRUONG_SUA: giá trị}, vi_sao_gia ('doc_sai'|'da_doi'|null — bắt buộc khi thay_doi có
+      TRUONG_GIA), loai_nguon / lien_ket_bang_chung / ghi_chu_nguon (đường 'da_doi').
+    Ghép (B13, thay khung "Ghép với KOME" cũ của Duyệt — cùng luật `dat_ghep` của /ghep): mã phải có trong
+    core.dim_product, nhóm trong app.nhom_so_sanh; nhãn khác 'khong' cần mã; đổi sang mã MỚI thì phải chọn cùng / khác
+    thương hiệu (không lặng lẽ cất mã mới dưới nhãn 'khong'); giá khách kể đã mang nhóm (thẻ @hàng) không ghép lại ở
+    đây. Khoá nhật ký / 409 = '<bên>/<hàng>' như cũ.
+    Dòng ĐÃ BỊ THAY (B14 — dòng tay có bản sửa, dòng nạp có "giá đã đổi") -> XungDot(thay_boi=bản mới nhất), kể cả
+    ghi_de: sửa bản cũ là tách nhánh lặng lẽ đè bản của người khác.
     doc_sai: dòng nạp -> app.dinh_chinh_gia (`sua`), dòng tay -> dòng tay mới (`sua_tay`). da_doi: dòng nạp ->
     `gia_moi` (fact_goc_id; giá / trạng thái hiện hành làm nền để đổi mỗi thuế / đơn vị vẫn ghi được) + một dòng nhật
     ký 'gia:<id>' (pop-up cũ của dòng nạp đó bị 409 — nó không còn là hiện hành); dòng tay -> `sua_tay` với loại nguồn
@@ -630,6 +649,9 @@ def sua_mat_hang(conn, b: dict, nguoi) -> dict:
     nhan = b.get("nhan") or None
     if nhan is not None and nhan not in NHAN:
         raise LoiNhap("Nhãn ghép chỉ nhận cùng hàng / thay thế / không ghép.")
+    co_ma, co_nhom = "ma_kome" in b, "nhom_id" in b
+    ma_vao = _doc_ma_kome(b.get("ma_kome")) if co_ma else None
+    nhom_vao = (None if b.get("nhom_id") in (None, "") else doc_id(b.get("nhom_id"), "Nhóm so sánh")) if co_nhom else None
     thay_doi = b.get("thay_doi") or {}
     if not isinstance(thay_doi, dict):
         raise LoiNhap("Trường sửa phải là một đối tượng.")
@@ -649,23 +671,49 @@ def sua_mat_hang(conn, b: dict, nguoi) -> dict:
         if b.get("ghi_chu_nguon") is not None and not isinstance(b.get("ghi_chu_nguon"), str):
             raise LoiNhap("Ghi chú nguồn phải là chữ.")
 
-    r = conn.execute("""SELECT q.ma_doi_thu, q.ma_hang_dt, q.ma_kome, q.nhan, q.gia_goc, q.trang_thai,
-                               g.product_code, g.nhom_id, q.loai_nguon, q.nhom_khoa
-                        FROM mart.gia_doi_thu_quan_sat q LEFT JOIN app.ghep_hang g USING (ma_doi_thu, ma_hang_dt)
-                        WHERE q.nguon = %s AND q.id = %s""", (nguon, id_)).fetchone()
+    r = conn.execute(f"""SELECT q.ma_doi_thu, q.ma_hang_dt, q.ma_kome, q.nhan, q.gia_goc, q.trang_thai,
+                                g.product_code, g.nhom_id, q.loai_nguon, q.nhom_khoa, {_thay_boi_sql('q.nguon', 'q.id')}
+                         FROM mart.gia_doi_thu_quan_sat q LEFT JOIN app.ghep_hang g USING (ma_doi_thu, ma_hang_dt)
+                         WHERE q.nguon = %s AND q.id = %s""", (nguon, id_)).fetchone()
     if r is None:
         raise LoiNhap("Không tìm thấy dòng giá này (có thể lô đã bị hoàn tác).")
-    ben, hang, ma_kome, nhan_cu, gia_cu, trang_thai_cu, ghep_ma, ghep_nhom, loai_nguon_cu, nhom_khoa_cu = r
+    ben, hang, ma_kome, nhan_cu, gia_cu, trang_thai_cu, ghep_ma, ghep_nhom, loai_nguon_cu, nhom_khoa_cu, thay_boi = r
     khoa_dong = f"{'gia' if nguon == 'nap' else 'tay'}:{id_}"
     khoa_ghep = f"{ben}/{hang}"
+    if thay_boi is not None:
+        # ai / lúc / đổi gì: lần ghi mới nhất trên khoá của dòng cũ (sua_tay / 'giá đã đổi' ghi cả nó), không có (giá mới
+        # ghi từ đường cũ /gia-moi) thì trên khoá của bản mới.
+        nk = conn.execute("""SELECT nk.id, nk.luc, nk.sau, coalesce(sp.ten, nd.ten_dang_nhap)
+                             FROM app.doi_thu_nhat_ky nk
+                             LEFT JOIN app.nguoi_dung nd ON nd.id = nk.nguoi_dung_id
+                             LEFT JOIN core.dim_salesperson sp ON sp.salesperson_code = nd.salesperson_code
+                             WHERE nk.doi_tuong = ANY(%s)
+                             ORDER BY (nk.doi_tuong = %s) DESC, nk.id DESC LIMIT 1""",
+                          ([khoa_dong, f"tay:{thay_boi['id']}"], khoa_dong)).fetchone()
+        raise XungDot(nk[3] if nk else None, nk[1].isoformat() if nk else "", nk[2] if nk else None,
+                      sua_cuoi_cua(conn, [khoa_dong, khoa_ghep]), thay_boi=thay_boi)
+    ke_da_nhom = loai_nguon_cu == "khach_ke" and nhom_khoa_cu is not None
+    ma_hien = ma_kome if ma_kome is not None else ghep_ma      # mã đang dùng / mã đã nhớ ở lần bỏ nhóm trước
+    ma_moi = ma_vao if co_ma else ma_hien
+    nhom_moi = nhom_vao if co_nhom else ghep_nhom
+    doi_ma, doi_nhom = ma_moi != ma_hien, nhom_moi != ghep_nhom
     doi_nhan = nhan is not None and nhan != nhan_cu
-    if not doi_nhan and not thay_doi:
+    nhan_moi = nhan if nhan is not None else (nhan_cu or "khong")
+    doi_ghep = doi_nhan or doi_ma or doi_nhom
+    if not doi_ghep and not thay_doi:
         raise LoiNhap("Không có gì để sửa.")
-    ma_ghep = ma_kome if ma_kome is not None else ghep_ma
-    if doi_nhan and nhan == "khong" and loai_nguon_cu == "khach_ke" and nhom_khoa_cu is not None:
-        raise LoiNhap("Giá khách kể không bỏ ghép được ở đây.")     # nhóm của nó là thẻ @hàng (nhom_ke), không phải ghép
-    if doi_nhan and nhan != "khong" and ma_ghep is None:
+    if ke_da_nhom and (doi_ma or doi_nhom or (doi_nhan and nhan == "khong")):
+        raise LoiNhap("Giá khách kể không bỏ ghép / ghép lại được ở đây.")   # nhóm của nó là thẻ @hàng (nhom_ke)
+    if doi_ghep and nhan_moi != "khong" and ma_moi is None:
         raise LoiNhap("Chọn mã KOME trước.")
+    if doi_ma and ma_moi is not None and nhan_moi == "khong":
+        raise LoiNhap("Ghép với mã mới: chọn cùng thương hiệu hoặc khác thương hiệu.")
+    if doi_ma and ma_moi is not None and conn.execute(
+            "SELECT 1 FROM core.dim_product WHERE product_code=%s", (ma_moi,)).fetchone() is None:
+        raise LoiNhap(f"Không có mã KOME '{ma_moi}'.")
+    if doi_nhom and nhom_moi is not None and conn.execute(
+            "SELECT 1 FROM app.nhom_so_sanh WHERE id=%s", (nhom_moi,)).fetchone() is None:
+        raise LoiNhap("Không có nhóm so sánh này (có thể vừa bị xoá).")
     if thay_doi and (nguon == "tay" or vi_sao == "da_doi"):          # đường thêm dòng app.gia_doi_thu_tay
         gia = _kiem("gia_goc", thay_doi["gia_goc"]) if "gia_goc" in thay_doi else gia_cu
         tt = thay_doi.get("trang_thai", trang_thai_cu) or "con"
@@ -673,10 +721,10 @@ def sua_mat_hang(conn, b: dict, nguoi) -> dict:
             raise LoiNhap("Nhập giá (chỉ được bỏ trống khi ghi hàng đã hết).")
     kiem_xung_dot(conn, [khoa_dong, khoa_ghep], da_xem, ghi_de)
 
-    if doi_nhan:
-        # Mã KOME hiện hành (hoặc mã đã lưu ở lần ghép 'khong' trước — bỏ nhóm rồi ghép lại vẫn nhớ mã); nhóm ghép
-        # tường minh giữ nguyên, nhóm ngầm định (mã thuộc nhóm có tên) đi theo mã như cũ.
-        dat_ghep(conn, ben, hang, ma_ghep, ghep_nhom, nhan, nguoi)
+    if doi_ghep:
+        # Không gửi mã / nhóm: mã hiện hành (hoặc mã đã lưu ở lần 'khong' trước — bỏ nhóm rồi ghép lại vẫn nhớ mã), nhóm
+        # ghép tường minh giữ nguyên; nhóm ngầm định (mã thuộc nhóm có tên) đi theo mã như cũ.
+        dat_ghep(conn, ben, hang, ma_moi, nhom_moi, nhan_moi, nguoi)
     nguon_ra, id_ra = nguon, id_
     if thay_doi:
         if vi_sao == "da_doi":
@@ -719,6 +767,42 @@ assert "bat_thuong" not in _COT_QS_KHONG_BT
 def _sua_cuoi(khoa_sql: str) -> str:
     """Biểu thức SQL: max(id) nhật ký của MỘT khoá (0 khi chưa có) — khoá viết đủ bí danh, không dùng tên trần."""
     return f"coalesce((SELECT max(nkx_.id) FROM app.doi_thu_nhat_ky nkx_ WHERE nkx_.doi_tuong = {khoa_sql}), 0)"
+
+
+def _thay_boi_sql(nguon: str, id_: str) -> str:
+    """Biểu thức SQL (json | NULL): {nguon:'tay', id} = bản MỚI NHẤT đã thay quan sát (`nguon`, `id_` — biểu thức SQL đủ
+    bí danh). Bước đầu: dòng tay có thay_cho_tay_id = id (quan sát tay) / fact_goc_id = id (quan sát nạp); rồi lần theo
+    thay_cho_tay_id tới cuối chuỗi (≤ 50 bước). Hai bản cùng thay một dòng (sửa đè cũ) → id lớn hơn, đúng luật hien_hanh
+    của 067. KHÔNG theo mốc: dòng đã bị thay NGOÀI ĐỜI thì không sửa tiếp được, dù đang xem lùi (B14)."""
+    return f"""(WITH RECURSIVE c_(id, buoc) AS (
+                  SELECT (SELECT max(t_.id) FROM app.gia_doi_thu_tay t_
+                          WHERE ({nguon} = 'tay' AND t_.thay_cho_tay_id = {id_})
+                             OR ({nguon} = 'nap' AND t_.fact_goc_id = {id_})), 1
+                  UNION ALL
+                  SELECT (SELECT max(t_.id) FROM app.gia_doi_thu_tay t_ WHERE t_.thay_cho_tay_id = c_.id), c_.buoc + 1
+                  FROM c_ WHERE c_.id IS NOT NULL AND c_.buoc < 50)
+                SELECT json_build_object('nguon', 'tay', 'id', c_.id) FROM c_ WHERE c_.id IS NOT NULL
+                ORDER BY c_.buoc DESC LIMIT 1)"""
+
+
+def _bo_nhom_sql(ben: str, hang: str, nguon: str, id_: str) -> str:
+    """Biểu thức SQL (json | NULL): quan sát (`ben`, `hang`, `nguon`, `id_` — biểu thức đủ bí danh) đang bị "Không liên
+    quan — bỏ khỏi nhóm" (app.ghep_hang.nhan = 'khong') -> {nhan_cu, nhom_khoa, ten_nhom}: nhóm nó RỜI (nhóm ghép tường
+    minh, không thì nhóm HIỆN HÀNH của mã đã nhớ qua mart.nhom_cua_khoa — cùng thứ tự với nhom_khoa của 067) và nhãn để
+    "hoàn tác" (nhãn `truoc` của lần bỏ gần nhất trong nhật ký; không có thì nhãn AI đề xuất; không có nữa thì
+    thay_the). Mã / nhóm không còn biết (lần bỏ cũ gửi product_code null) -> NULL: không có nhóm nào để quay về."""
+    return f"""(SELECT json_build_object('nhom_khoa', k_.khoa, 'ten_nhom', {_ten_nhom('k_.khoa')}, 'nhan_cu', coalesce(
+                  (SELECT nk_.truoc->>'nhan' FROM app.doi_thu_nhat_ky nk_
+                   WHERE nk_.doi_tuong = {ben} || '/' || {hang} AND nk_.loai = 'ghep' AND nk_.sau->>'nhan' = 'khong'
+                     AND nk_.truoc->>'nhan' IN ('cung_hang', 'thay_the') ORDER BY nk_.id DESC LIMIT 1),
+                  (SELECT f_.nhan_de_xuat FROM core.fact_gia_doi_thu f_
+                   WHERE {nguon} = 'nap' AND f_.id = {id_} AND f_.nhan_de_xuat IN ('cung_hang', 'thay_the')),
+                  'thay_the'))
+                FROM app.ghep_hang g_
+                CROSS JOIN LATERAL (SELECT CASE WHEN g_.nhom_id IS NOT NULL THEN 'n:' || g_.nhom_id
+                                                WHEN g_.product_code IS NOT NULL
+                                                THEN mart.nhom_cua_khoa('ma:' || g_.product_code) END AS khoa) k_
+                WHERE g_.ma_doi_thu = {ben} AND g_.ma_hang_dt = {hang} AND g_.nhan = 'khong' AND k_.khoa IS NOT NULL)"""
 
 
 def _dieu_kien_json(a: str) -> str:
@@ -803,10 +887,20 @@ def tong_quan(conn, hom_nay=None) -> dict:
     return conn.execute(_TONG_QUAN, {"hom_nay": hom_nay or hom_nay_o_nhat()}).fetchone()[0]
 
 
+# Hiện hành đọc MỘT lần (hh MATERIALIZED) cho cả hai nhánh: quan sát của nhóm (h) và "đã bỏ khỏi nhóm" (b — dòng hiện
+# hành đang mang ghép 'khong', kèm nhóm nó rời + nhãn để hoàn tác; _bo_nhom_sql). Bất biến CTE-trùng.
 _SO_SANH = f"""
-WITH h AS MATERIALIZED (SELECT {_COT_QS} FROM mart.gia_doi_thu_hien_hanh LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
-                      WHERE nhom_khoa IS NOT NULL)
-SELECT coalesce(json_agg(json_build_object(
+WITH hh AS MATERIALIZED (SELECT * FROM mart.gia_doi_thu_hien_hanh),
+h AS MATERIALIZED (SELECT {_COT_QS} FROM hh LEFT JOIN mart.nguon_quan_sat USING (nguon, id) WHERE nhom_khoa IS NOT NULL),
+b AS MATERIALIZED (
+    SELECT x.*, coalesce((SELECT max(nk2_.id) FROM app.doi_thu_nhat_ky nk2_
+                          WHERE nk2_.doi_tuong IN (CASE x.nguon WHEN 'nap' THEN 'gia:' ELSE 'tay:' END || x.id,
+                                                   x.ma_doi_thu || '/' || x.ma_hang_dt)), 0) AS sua_cuoi
+    FROM (SELECT hh.nguon, hh.id, hh.ma_doi_thu, hh.ten_doi_thu, hh.ma_hang_dt, hh.ten_goc, hh.don_vi_so,
+                 {_bo_nhom_sql('hh.ma_doi_thu', 'hh.ma_hang_dt', 'hh.nguon', 'hh.id')} AS bo
+          FROM hh WHERE hh.nhom_khoa IS NULL AND hh.loai_nguon <> 'khach_ke') x
+    WHERE x.bo IS NOT NULL)
+SELECT (SELECT coalesce(json_agg(json_build_object(
          'nhom_khoa', s.nhom_khoa, 'ten_nhom', s.ten_nhom, 'don_vi_so', s.don_vi_so, 'ma_kome', s.ma_kome,
          'gia_kome', round(s.gia_kome), 'so_ben', s.so_ben, 'thap_nhat', round(s.thap_nhat), 'ben_thap_nhat', s.ben_thap_nhat,
          'trung_vi', round(s.trung_vi::numeric), 'cao_nhat', round(s.cao_nhat), 'ty_le_re_hon_kome', s.ty_le_re_hon_kome,
@@ -817,12 +911,21 @@ SELECT coalesce(json_agg(json_build_object(
          'quan_sat', (SELECT coalesce(json_agg(to_json(h) ORDER BY h.yen_chuan NULLS LAST), '[]') FROM h
                       WHERE h.nhom_khoa = s.nhom_khoa AND h.don_vi_so = s.don_vi_so))
        ORDER BY s.so_ben DESC, s.ten_nhom), '[]')
-FROM mart.so_sanh_nhom s
+        FROM mart.so_sanh_nhom s),
+       (SELECT coalesce(json_agg(json_build_object(
+         'nguon', b.nguon, 'id', b.id, 'ma_doi_thu', b.ma_doi_thu, 'ten_doi_thu', b.ten_doi_thu, 'ten_goc', b.ten_goc,
+         'don_vi_so', b.don_vi_so, 'nhom_khoa', b.bo->>'nhom_khoa', 'ten_nhom', b.bo->>'ten_nhom',
+         'nhan_cu', b.bo->>'nhan_cu', 'sua_cuoi', b.sua_cuoi) ORDER BY b.bo->>'nhom_khoa', b.ma_doi_thu, b.ten_goc, b.id), '[]')
+        FROM b)
 """
 
 
 def so_sanh(conn) -> dict:
-    return {"nhom": conn.execute(_SO_SANH).fetchone()[0]}
+    """{nhom, da_bo}. `da_bo` (đợt 4b, B15): mặt hàng HIỆN HÀNH đang bị "Không liên quan — bỏ khỏi nhóm", mỗi phần tử
+    mang nhóm nó rời (`nhom_khoa`, `ten_nhom`) và `nhan_cu` để hoàn tác (POST /sua-mat-hang nhan = nhan_cu, da_xem =
+    sua_cuoi). Dòng bị bỏ khi chưa biết mã / nhóm (ghép 'khong' không mã) không có ở đây. MỘT lượt hỏi."""
+    nhom, da_bo = conn.execute(_SO_SANH).fetchone()
+    return {"nhom": nhom, "da_bo": da_bo}
 
 
 _NHOM_QUY_CACH = """
@@ -854,7 +957,10 @@ SELECT (SELECT to_json(d) FROM app.doi_thu d WHERE d.ma = %(ma)s),
           FROM mart.dieu_kien_hien_hanh d WHERE d.ma_doi_thu = %(ma)s),
        (SELECT coalesce(json_agg(to_json(q) ORDER BY q.ten_goc, q.ngay_nguon DESC), '[]')
           FROM (SELECT {_COT_QS_KHONG_BT}, hien_hanh, round(ss.gia_kome_so) AS gia_kome_so,
-                       coalesce(ss.gia_kome_lech, false) AS gia_kome_lech
+                       coalesce(ss.gia_kome_lech, false) AS gia_kome_lech,
+                       CASE WHEN hien_hanh AND nhom_khoa IS NULL AND loai_nguon <> 'khach_ke'
+                            THEN {_bo_nhom_sql('gia_doi_thu_quan_sat.ma_doi_thu', 'gia_doi_thu_quan_sat.ma_hang_dt',
+                                               'gia_doi_thu_quan_sat.nguon', 'gia_doi_thu_quan_sat.id')} END AS bo_nhom
                 FROM mart.gia_doi_thu_quan_sat LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
                 LEFT JOIN ss USING (nhom_khoa, don_vi_so)
                 WHERE ma_doi_thu = %(ma)s) q),
@@ -891,7 +997,8 @@ def ho_so_ben(conn, ma: str, hom_nay=None) -> dict | None:
     `gia_kome_so` của nhóm nó (null nếu không có); `giao_hang` = dòng mart.giao_hang_hien_hanh của bên (kèm sua_cuoi
     theo khoá 'giao:<bên>') hoặc null; `sua_cuoi_ben` = max nhật ký 'ben:<mã>' (0 = chưa sửa). Mỗi quan sát còn mang
     `gia_kome_lech` của nhóm nó (mart.so_sanh_nhom: giá KOME > 3× / < ⅓ trung vị; không có nhóm → false) — màn không vẽ
-    những dòng đó như giá thật."""
+    những dòng đó như giá thật. `bo_nhom` (B15) = {nhom_khoa, ten_nhom, nhan_cu} của dòng hiện hành đang bị "bỏ khỏi
+    nhóm" (_bo_nhom_sql), còn lại null — dải "Đã bỏ khỏi nhóm … hoàn tác" của tab Đối thủ."""
     ben, dk, qs, kh, gh, scb = conn.execute(_HO_SO, {"ma": ma, "hom_nay": hom_nay or hom_nay_o_nhat()}).fetchone()
     return None if ben is None else {"ben": ben, "dieu_kien": dk, "quan_sat": qs, "khach_dang_mua": kh,
                                      "giao_hang": gh, "sua_cuoi_ben": scb}
@@ -931,7 +1038,10 @@ WITH q AS MATERIALIZED (
 SELECT (SELECT to_json(x) FROM (
           SELECT q.*, CASE WHEN q.hien_hanh THEN coalesce((SELECT h.bat_thuong FROM mart.gia_doi_thu_hien_hanh h
                                                            WHERE h.nguon = q.nguon AND h.id = q.id), false)
-                           ELSE false END AS bat_thuong FROM q) x),
+                           ELSE false END AS bat_thuong,
+                 g.product_code AS ma_ghep, g.nhom_id AS nhom_ghep,
+                 {_thay_boi_sql('q.nguon', 'q.id')} AS thay_boi
+          FROM q LEFT JOIN app.ghep_hang g ON g.ma_doi_thu = q.ma_doi_thu AND g.ma_hang_dt = q.ma_hang_dt) x),
        {_lich_su_sql("ARRAY(SELECT v.k FROM q CROSS JOIN LATERAL (VALUES "
                      "(CASE q.nguon WHEN 'nap' THEN 'gia:' ELSE 'tay:' END || q.id), "
                      "(q.ma_doi_thu || '/' || q.ma_hang_dt)) v(k))")}
@@ -940,7 +1050,9 @@ SELECT (SELECT to_json(x) FROM (
 
 def mat_hang(conn, nguon: str, id: int) -> dict | None:
     """{"quan_sat", "lich_su"} của MỘT quan sát (nguồn 'nap' | 'tay'); None = không có (hoặc sau mốc). MỘT lượt hỏi.
-    Lịch sử theo khoá của chính dòng: 'gia:<id>' / 'tay:<id>' và '<bên>/<hàng>' (ghép)."""
+    Lịch sử theo khoá của chính dòng: 'gia:<id>' / 'tay:<id>' và '<bên>/<hàng>' (ghép). Quan sát mang thêm `ma_ghep` /
+    `nhom_ghep` (dòng app.ghep_hang, kể cả khi nhãn 'khong' — ô "Mã KOME" / "Nhóm" của pop-up) và `thay_boi` ({nguon,
+    id} bản mới nhất đã thay dòng này, null = chưa bị thay — B14: pop-up khoá Lưu và mời mở bản mới)."""
     if nguon not in ("nap", "tay"):
         raise LoiNhap("Nguồn chỉ nhận nap / tay.")
     if not 0 < int(id) < 2 ** 63:                            # ngoài bigint: không có dòng nào (không để CSDL nổ 500)

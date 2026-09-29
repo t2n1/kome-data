@@ -76,22 +76,32 @@ export function SuaDieuKien({ ben, dk, dong, xong }: {
   // chính mình. Ref cho phần async, state để vẽ lại (nút Lưu bật, ô "bỏ đi" tắt).
   const daBoRef = useRef(false);
   const [daBo, datDaBo] = useState(false);
+  const qc = useQueryClient();
   const g = useGhi(xong, dong);
   const doi = !dk || daBo || bo || loai !== dk.loai || nd.trim() !== dk.noi_dung;
   const hopLe = (bo && !daBo) || (nd.trim().length >= 1 && nd.trim().length <= 300);
-  const luu = (ghi_de = false) => g.chay(async () => {
-    const goc = { ma_doi_thu: ben.ma, da_xem: dk?.sua_cuoi ?? 0, ghi_de };
-    const them = () => gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: null, loai, noi_dung: nd.trim(), bo: false });
-    if (!dk) return them();
-    if (!dk.them_tay) return gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: dk.fact_id, loai, noi_dung: nd.trim(), bo });
-    if (!daBoRef.current) {
-      await gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: null, loai: dk.loai, noi_dung: dk.noi_dung, bo: true });
-      daBoRef.current = true; datDaBo(true);
-    }
-    if (bo && !daBo) return;
-    try { return await them(); }
-    catch { throw new Error("Đã bỏ điều kiện cũ nhưng chưa thêm được điều kiện mới — bấm Lưu lại."); }
-  });
+  // "Ghi đè" cũng đi qua đây (luu(true)) → cùng phép kiểm hopLe: không bao giờ bỏ dòng cũ khi chưa chắc thêm được dòng mới.
+  const luu = (ghi_de = false) => {
+    if (!hopLe) return g.datLoi("Nội dung điều kiện cần 1–300 ký tự.");
+    const chiBo = bo && !daBo;
+    g.chay(async () => {
+      const goc = { ma_doi_thu: ben.ma, da_xem: dk?.sua_cuoi ?? 0, ghi_de };
+      const them = () => gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: null, loai, noi_dung: nd.trim(), bo: false });
+      if (!dk) return them();
+      if (!dk.them_tay) return gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: dk.fact_id, loai, noi_dung: nd.trim(), bo });
+      if (!daBoRef.current) {
+        await gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: null, loai: dk.loai, noi_dung: dk.noi_dung, bo: true });
+        daBoRef.current = true; datDaBo(true);
+        qc.invalidateQueries({ queryKey: ["doi-thu"] });   // bước 1 đã vào CSDL: danh sách phải thôi hiện dòng cũ ngay
+      }
+      if (chiBo) return;
+      try { return await them(); }
+      catch (e) {
+        const vi = e instanceof Error ? e.message : String(e);
+        throw new Error(`Đã bỏ điều kiện cũ, nhưng chưa thêm được điều kiện mới: ${vi} — sửa lại rồi bấm Lưu.`);
+      }
+    });
+  };
   return (
     <HopThoai tieu_de={`${dk ? "Sửa" : "Thêm"} điều kiện bán · ${ben.ten ?? ben.ma}`} dong={dong} rong={480}>
       <div className="dt-nho">

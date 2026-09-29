@@ -410,3 +410,11 @@ button.dt-tt-ten{cursor:pointer} button.dt-tt-ten:hover{text-decoration:underlin
 .dt-svg .dt-hoi-phi circle{fill:var(--nen-the);stroke:var(--dt-cam)}
 .dt-svg .dt-hoi-phi text{fill:var(--dt-cam);font-weight:700}
 .dt-svg .dt-hoi-phi:focus-visible circle{stroke-width:2.5}
+
+/* ---- Rà cuối 4b: dấu ✎ (đã sửa) · dải "Đã bỏ khỏi nhóm … hoàn tác" (DaBoNhom.tsx) ---- */
+.dt-nh.sua{border:1px solid var(--vien);color:var(--chu)}
+.dt-da-bo{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;font-size:.78rem;margin:.5rem 0 0;
+  padding:.4rem .6rem;border:1px dashed var(--vien);border-radius:8px}
+.dt-da-bo-mh{white-space:normal}
+.dt-da-bo .lien-ket{font-size:inherit}
+.dt-da-bo .dt-loi{flex-basis:100%;margin:0}

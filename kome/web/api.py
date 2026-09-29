@@ -839,8 +839,12 @@ def tao_api(open_app_conn) -> APIRouter:
         except DT.XungDot as e:
             # Đợt 4b: có người ghi vào mục này sau lúc pop-up mở — không ghi gì (giao dịch không commit); pop-up hỏi
             # "Ghi đè / Giữ bản kia" rồi gửi lại với ghi_de = true. `sua_cuoi` = mốc mới nếu người dùng chọn đọc lại.
-            return JSONResponse({"loi": "Có người vừa sửa mục này.",
-                                 "xung_dot": {"ai": e.ai, "luc": e.luc, "sau": e.sau, "sua_cuoi": e.id}}, status_code=409)
+            # Dòng đã bị thay (B14): cùng dạng 409, thêm `thay_boi` {nguon, id} — pop-up mở bản mới, không cho Ghi đè.
+            x = {"ai": e.ai, "luc": e.luc, "sau": e.sau, "sua_cuoi": e.id}
+            if e.thay_boi:
+                x["thay_boi"] = e.thay_boi
+            return JSONResponse({"loi": str(e), "xung_dot": x, **({"thay_boi": e.thay_boi} if e.thay_boi else {})},
+                                status_code=409)
         except (DT.LoiNhap, KeyError, TypeError, ValueError) as e:
             return _loi(str(e) if isinstance(e, DT.LoiNhap) else "Thiếu hoặc sai trường dữ liệu.", 400)
         except Exception:
@@ -924,8 +928,8 @@ def tao_api(open_app_conn) -> APIRouter:
 
     @r.post("/doi-thu/sua-mat-hang")
     async def dt_sua_mat_hang(request: Request):
-        """{nguon, id, da_xem, ghi_de, nhan, thay_doi, vi_sao_gia, loai_nguon, lien_ket_bang_chung, ghi_chu_nguon}
-        -> {ok, nguon, id, sua_cuoi} (DT.sua_mat_hang)."""
+        """{nguon, id, da_xem, ghi_de, nhan, ma_kome?, nhom_id?, thay_doi, vi_sao_gia, loai_nguon, lien_ket_bang_chung,
+        ghi_chu_nguon} -> {ok, nguon, id, sua_cuoi} (DT.sua_mat_hang). Dòng đã bị thay -> 409 kèm thay_boi."""
         from kome import doi_thu as DT
         return await _dt_ghi(request, lambda c, b, n: DT.sua_mat_hang(c, b, n))
 

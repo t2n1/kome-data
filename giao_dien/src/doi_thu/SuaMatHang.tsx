@@ -2,15 +2,15 @@
 // quy cách · giá như bảng in (+ bậc, "vì sao đổi giá") · lịch sử sửa. MỘT nút Lưu → POST /api/doi-thu/sua-mat-hang
 // (một giao dịch ở máy chủ). Thân POST dựng ở sua_logic.ts (chỉ trường đã đổi); 409 → khung Ghi đè / Giữ bản kia.
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { gui, lay } from "../api";
 import { ngay, so_luong } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import { HopThoai } from "./HopThoai";
-import { DON_VI, LOAI_NGUON, NHAN_GHEP, NHAN_TRANG_THAI, type Bac, type LichSu, type QuanSat } from "./kieu";
+import { DON_VI, LOAI_NGUON, NHAN_GHEP, NHAN_TRANG_THAI, type Bac, type GoiYApi, type LichSu, type QuanSat, type ThayBoi } from "./kieu";
 import { NguonDong } from "./NguonDong";
 import { KhungXungDot, NutLuu, useGhi } from "./SuaNho";
-import { doiGi, formTu, kgThung, kiemForm, lucNgan, payload, type BacNhap, type FormMatHang } from "./sua_logic";
+import { doiGi, formTu, kgThung, kiemForm, lucNgan, moTaThayBoi, payload, type BacNhap, type FormMatHang } from "./sua_logic";
 
 type MatHang = { quan_sat: QuanSat & { hien_hanh?: boolean }; lich_su: LichSu[] };
 
@@ -27,6 +27,15 @@ const BAC_TRONG: BacNhap = { tu: "", don_vi_sl: "thung", gia: "", don_vi_gia: "t
 export function SuaMatHang({ nguon, id, tru_o, dong, xong }: {
   nguon: "nap" | "tay"; id: number; tru_o?: string; dong: () => void; xong: () => void;
 }) {
+  // "Mở bản mới" (B14): dòng đang mở đã bị thay → chuyển pop-up sang bản mới nhất (tải lại từ đầu, form dựng lại).
+  const [dich, datDich] = useState<ThayBoi & { tru_o?: string }>({ nguon, id, tru_o });
+  return <TaiMatHang key={`${dich.nguon}:${dich.id}`} nguon={dich.nguon} id={dich.id} tru_o={dich.tru_o} dong={dong} xong={xong}
+    moBanMoi={t => datDich({ ...t, tru_o: undefined })} />;
+}
+
+function TaiMatHang({ nguon, id, tru_o, dong, xong, moBanMoi }: {
+  nguon: "nap" | "tay"; id: number; tru_o?: string; dong: () => void; xong: () => void; moBanMoi: (t: ThayBoi) => void;
+}) {
   const kx = chuoiKhoang(useKhoang());
   // Form chỉ dựng từ dữ liệu tải SAU lúc mở (`isFetchedAfterMount`), và bộ nhớ đệm bỏ ngay khi đóng (gcTime 0):
   // mở lại một dòng vừa lưu mà dùng bản đệm cũ thì form hiện số cũ và lần Lưu sau 409 với chính mình.
@@ -42,9 +51,11 @@ export function SuaMatHang({ nguon, id, tru_o, dong, xong }: {
   const qs = moi ? q.data?.quan_sat : undefined;
   return (
     <HopThoai tieu_de={qs ? `Sửa: ${qs.ten_doi_thu ?? qs.ma_doi_thu} · ${qs.ten_goc}` : "Sửa mặt hàng"} dong={dong} rong={680}>
-      {!moi || q.isPending ? <div className="dt-giu-cho" aria-busy="true"><span /><span /><span /></div>
-        : q.isError ? <p role="alert" className="dt-loi">{q.error.message}</p>
-        : <FormSua key={`${q.data.quan_sat.nguon}:${q.data.quan_sat.id}`} d={q.data} tru_o={tru_o} dong={dong} xong={xong} />}
+      {/* Đã có dữ liệu thì LUÔN giữ form (lần tải lại nền lỗi không gỡ form đang gõ); lỗi chỉ hiện khi chưa có gì. */}
+      {moi && q.data ? <FormSua key={`${q.data.quan_sat.nguon}:${q.data.quan_sat.id}`} d={q.data} tru_o={tru_o} dong={dong}
+          xong={xong} moBanMoi={moBanMoi} />
+        : moi && q.isError ? <p role="alert" className="dt-loi">{q.error.message}</p>
+        : <div className="dt-giu-cho" aria-busy="true"><span /><span /><span /></div>}
     </HopThoai>
   );
 }
@@ -60,7 +71,22 @@ function Vien({ name, value, chon, dat, nhan, tat, tieu, focus, roi }: {
   );
 }
 
-function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: () => void; xong: () => void }) {
+/** Gợi ý của ô "Mã KOME" và danh sách nhóm có tên — CHUNG ảnh chụp với ô `@` của ghi tiếp xúc (goi-y-nhac, 1 lượt). */
+function useGoiY() {
+  const gy = useQuery({ queryKey: ["doi-thu", "goi-y-nhac"], staleTime: 5 * 60_000,
+    queryFn: () => lay<GoiYApi>("/api/doi-thu/goi-y-nhac") });
+  return useMemo(() => {
+    const hang = gy.data?.hang ?? [];
+    return {
+      ma: hang.filter(h => h.loai === "ma" && h.ma).map(h => ({ ma: h.ma!, ten: h.ten, ten_nhom: h.ten_nhom ?? null })),
+      nhom: hang.filter(h => h.loai === "nhom" && /^n:\d+$/.test(h.khoa)).map(h => ({ id: h.khoa.slice(2), ten: h.ten })),
+    };
+  }, [gy.data]);
+}
+
+function FormSua({ d, tru_o, dong, xong, moBanMoi }: {
+  d: MatHang; tru_o?: string; dong: () => void; xong: () => void; moBanMoi: (t: ThayBoi) => void;
+}) {
   // Chụp quan sát lúc MỞ: `sua_cuoi` gửi lên là của lần đọc này (truy vấn chạy lại cũng không nới chống sửa đè).
   const [q] = useState(d.quan_sat);
   const [f, datF] = useState<FormMatHang>(() => formTu(q));
@@ -72,6 +98,12 @@ function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: (
   const p = payload(q, f, false);
   const kg = kgThung(f.so_goi_thung, f.kl_goi_g);
   const keKhongBo = q.loai_nguon === "khach_ke" && q.nhom_khoa != null;
+  const gy = useGoiY();
+  const maChon = gy.ma.find(m => m.ma === f.ma_kome.trim());
+  const nhomDs = f.nhom_id && !gy.nhom.some(n => n.id === f.nhom_id)
+    ? [...gy.nhom, { id: f.nhom_id, ten: q.ten_nhom ?? `nhóm ${f.nhom_id}` }] : gy.nhom;   // ô chọn không nói dối
+  // Dòng đã bị thay (B14): lúc mở (q.thay_boi) hoặc do 409 lúc lưu (g.xung.thay_boi) → khoá Lưu, mời mở bản mới.
+  const thay = g.xung?.thay_boi ?? q.thay_boi ?? null;
 
   // Nội dung về SAU lúc HopThoai dựng (đang tải) → tự đưa con trỏ vào ô `tru_o` (hoặc ô đầu tiên của form).
   useEffect(() => {
@@ -101,14 +133,34 @@ function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: (
         {d.quan_sat.hien_hanh === false && <> · <b>bản cũ</b></>} <NguonDong q={q} />
       </p>
 
+      {thay && <div className="dt-xung" role="alert">
+        <p>{moTaThayBoi(g.xung?.thay_boi ? g.xung : null)}</p>
+        <div className="dt-nut">
+          <button type="button" className="nut-chinh" onClick={() => moBanMoi(thay)}>Mở bản mới</button>
+        </div>
+      </div>}
+
       <fieldset><legend>So với {nhom} là</legend>
+        <div className="dt-hang">
+          <label>Mã&nbsp;KOME <input type="text" list={`${ma}-ma`} className={lop("dt-rong-o", "ma_kome")} placeholder="vd: NT01"
+            value={f.ma_kome} disabled={keKhongBo} onChange={e => dat("ma_kome", e.target.value)} {...o("ma_kome")} /></label>
+          <datalist id={`${ma}-ma`}>
+            {gy.ma.map(m => <option key={m.ma} value={m.ma}>{m.ten}{m.ten_nhom ? ` · ${m.ten_nhom}` : ""}</option>)}
+          </datalist>
+          <label>Nhóm&nbsp;so&nbsp;sánh <select value={f.nhom_id} disabled={keKhongBo} onChange={e => dat("nhom_id", e.target.value)}>
+            <option value="">— theo mã KOME —</option>
+            {nhomDs.map(n => <option key={n.id} value={n.id}>{n.ten}</option>)}</select></label>
+        </div>
+        {f.ma_kome.trim() && <p className="dt-goi-y">{maChon ? `${maChon.ten}${maChon.ten_nhom ? ` · nhóm ${maChon.ten_nhom}` : ""}`
+          : "Mã này không có trong danh sách gợi ý — máy chủ sẽ kiểm lại khi lưu."}</p>}
         <div className="dt-hang">
           {NHAN.map(([m, n], i) => <Vien key={m} name={`${ma}-nhan`} value={m} chon={f.nhan} dat={v => dat("nhan", v as FormMatHang["nhan"])}
             nhan={n} focus={tro === "nhan" && (f.nhan === m || (i === 0 && !NHAN.some(([x]) => x === f.nhan)))}
             roi={() => datTro(null)} tat={m === "khong" && keKhongBo} tieu={m === "khong" && keKhongBo ? "Giá khách kể không bỏ ghép được ở đây." : undefined} />)}
         </div>
         {keKhongBo && <p className="dt-goi-y">Giá khách kể không bỏ ghép được ở đây.</p>}
-        {q.ma_kome == null && q.nhan == null && <p className="dt-goi-y">Mặt hàng này chưa ghép mã KOME nào — ghép ở màn Dữ liệu › Duyệt.</p>}
+        {q.ma_kome == null && q.ma_ghep == null && !keKhongBo &&
+          <p className="dt-goi-y">Mặt hàng này chưa ghép mã KOME nào — nhập mã KOME rồi chọn cùng / khác thương hiệu.</p>}
       </fieldset>
 
       <fieldset><legend>Tình trạng & khuyến mãi</legend>
@@ -199,8 +251,8 @@ function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: (
         </ul>
       </details>
 
-      {g.xung && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={() => luu(true)} giu={g.giu} />}
-      <NutLuu luu={() => luu()} dong={dong} tat={p.rong} dang={g.dang} loi={g.loi} chu="Bản gốc máy đọc vẫn giữ; lần sửa ghi vào Nhật ký" />
+      {g.xung && !thay && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={() => luu(true)} giu={g.giu} />}
+      <NutLuu luu={() => luu()} dong={dong} tat={p.rong || !!thay} dang={g.dang} loi={g.loi} chu="Bản gốc máy đọc vẫn giữ; lần sửa ghi vào Nhật ký" />
     </div>
   );
 }

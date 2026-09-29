@@ -2,7 +2,7 @@
 // (ho_so_logic.test.ts). Dữ liệu: /api/doi-thu/ben/{ma} (quan_sat gồm cả dòng lịch sử, hien_hanh đánh dấu dòng hiện hành)
 // + /api/doi-thu/tong-quan (danh sách bên, lưới ngành). Không định nghĩa chỉ số mới: % = mau.ts::phanTram.
 import { yen, so } from "../dinh_dang";
-import type { GiaoHang, QuanSat, TongQuan } from "./kieu";
+import type { DaBo, GiaoHang, QuanSat, TongQuan } from "./kieu";
 import { LECH_NGANG, NGAY_CU, phanTram } from "./mau";
 import { tenNganh } from "./nganh";
 import { lienKetAnToan, timTrongDrive } from "./nguon";
@@ -56,6 +56,15 @@ export function dongSoKome(qs: QsHs[]): DongHs[] {
 const demKhac = (qs: QsHs[], f: (q: QsHs) => boolean) => new Set(qs.filter(q => cuaBang(q) && f(q)).map(q => q.nguon + q.id)).size;
 /** Số mặt hàng (dòng hiện hành, không khách kể) KHÔNG lên biểu đồ: `lech` = nhóm có giá KOME lệch (→ Dữ liệu › Giá KOME
  *  lệch); `chuaSo` = không thuộc nhóm nào có giá KOME (chưa ghép, hoặc KOME không bán — → Duyệt / sửa của bên). */
+/** Dải "Đã bỏ khỏi nhóm" của tab Đối thủ (B15): dòng hiện hành máy chủ gắn `bo_nhom` → DaBo (cùng dạng `da_bo` của
+ *  /so-sanh), theo tên nhóm rồi tên hàng. */
+export function daBoCuaBen(qs: QsHs[]): DaBo[] {
+  return qs.filter(q => q.hien_hanh && q.bo_nhom)
+    .map(q => ({ nguon: q.nguon, id: q.id, ma_doi_thu: q.ma_doi_thu, ten_doi_thu: q.ten_doi_thu, ten_goc: q.ten_goc,
+      nhom_khoa: q.bo_nhom!.nhom_khoa, ten_nhom: q.bo_nhom!.ten_nhom, nhan_cu: q.bo_nhom!.nhan_cu, sua_cuoi: q.sua_cuoi }))
+    .sort((a, b) => (a.ten_nhom ?? a.nhom_khoa).localeCompare(b.ten_nhom ?? b.nhom_khoa, "vi") || a.ten_goc.localeCompare(b.ten_goc, "vi"));
+}
+
 export const ngoaiBieuDo = (qs: QsHs[]) => ({
   lech: demKhac(qs, q => q.gia_kome_so != null && !!q.gia_kome_lech),
   chuaSo: demKhac(qs, q => q.gia_kome_so == null),

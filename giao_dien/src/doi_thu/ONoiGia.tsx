@@ -5,6 +5,7 @@
 import { ngay, so_luong, yen } from "../dinh_dang";
 import { NHAN_GHEP, type Nhom, type QuanSat } from "./kieu";
 import { mauLech, NGAY_CU } from "./mau";
+import { daSua } from "./sua_logic";
 import { bangBac, giaKome, giaTai, LUA_CHON_GK, nhanKlGoi, pcDau, phiKome, phiMatHang, type PhiNoi, type PhiSoSanh,
   type SoLuong } from "./so_sanh_logic";
 
@@ -47,6 +48,7 @@ export function NoiGia({ n, q, sl, gk, phi }: { n: Nhom; q: QuanSat; sl: SoLuong
         {q.nhan && <span className={"dt-nh " + (q.nhan === "cung_hang" ? "cung" : "khac")}>{NHAN_GHEP[q.nhan]}</span>}
         {q.trang_thai === "het" && <span className="dt-nh het">đang hết</span>}
         {km && <span className="dt-nh km">khuyến mãi{q.khuyen_mai ? `: ${q.khuyen_mai}` : ""}</span>}
+        {daSua(q) && <span className="dt-nh sua">✎ đã sửa</span>}
       </p>
       <div className="dt-ng-o3">
         <O nhan="gói / thùng" gia={q.so_goi_thung == null ? null : so_luong(q.so_goi_thung)}

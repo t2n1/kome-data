@@ -14,7 +14,8 @@ import { BieuDoCham, ChuGiaiCham } from "./BieuDoCham";
 import { BieuDoCot, ChuGiaiCot, type MoPhi, type MoSua } from "./BieuDoCot";
 import { phiSoSanh } from "./giao_hang_logic";
 import { giaoTrong } from "./ho_so_logic";
-import type { GiaoHang, Nhom } from "./kieu";
+import { DaBoNhom } from "./DaBoNhom";
+import type { GiaoHang, Nhom, SoSanhApi } from "./kieu";
 import { dongMoSan } from "./loc";
 import { mauKomeSoTT } from "./mau";
 import { tenNganh } from "./nganh";
@@ -49,7 +50,7 @@ const truOPhi = (g: GiaoHang | undefined, phan: string | undefined) =>
 export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, ben, phi, nhom, dat }: Props) {
   const kx = chuoiKhoang(useKhoang());
   const q = useQuery({ queryKey: ["doi-thu", "so-sanh", kx],
-    queryFn: () => lay<{ nhom: Nhom[] }>(`/api/doi-thu/so-sanh${kx ? "?" + kx : ""}`) });
+    queryFn: () => lay<SoSanhApi>(`/api/doi-thu/so-sanh${kx ? "?" + kx : ""}`) });
   const tatCa = q.data?.nhom;
   const [tim, datTim] = useState("");
   const [nhanh, datNhanh] = useState<NutNhanh>("");
@@ -73,6 +74,8 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, ben, phi, nhom, dat }:
   const tenBen = useMemo(() => (ben ? (tatCa ?? []).flatMap(n => n.quan_sat).find(q => q.ma_doi_thu === ben)?.ten_doi_thu ?? ben : ""),
     [tatCa, ben]);
   const thieu = useMemo(() => demThieu(chon, { chiCung: cung }), [chon, cung]);
+  // "Đã bỏ khỏi nhóm" của các nhóm ĐANG CHỌN (kể cả nhóm vừa mất mặt hàng cuối cùng — vẫn còn trên ?sp=).
+  const daBo = useMemo(() => (q.data?.da_bo ?? []).filter(x => chonSp.includes(x.nhom_khoa)), [q.data, chonSp]);
   const mo: MoSua = (x, tru_o) => datSua({ nguon: x.nguon, id: x.id, tru_o });
   // "?" phí giao: thiếu kg / thùng → quy cách (KOME: hộp sửa quy cách mã KOME); thiếu điều kiện → SuaGiaoHang của bên đó.
   const moPhi: MoPhi = (n, d) => {
@@ -190,6 +193,7 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, ben, phi, nhom, dat }:
                 </>
               : xem === "cham" ? <><BieuDoCham ds={chon} {...ve} /><ChuGiaiCham /></>
               : <><BangNhiet ds={chon} {...ve} /><ChuGiaiNhiet /></>}
+            <DaBoNhom ds={daBo} />
           </div>
         </div>
       </Khoi>

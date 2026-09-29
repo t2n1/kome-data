@@ -13,6 +13,7 @@ import { LOAI_NGUON, NHAN_DUYET } from "./kieu";
 import { Ra } from "./NguonDong";
 import { cacThangCho, lienKetAnToan, nhanThang, thangCua } from "./nguon";
 import { SuaMatHang } from "./SuaMatHang";
+import { daSua } from "./sua_logic";
 
 const LOC = [["", "Tất cả"], ["can_xem", "Cần xem"], ["bat_thuong", "Bất thường"], ["chua_xac_nhan", "Chưa ai xác nhận"], ["chua_ghep", "Chưa ghép"]];
 // Ô chọn của form "Thêm hàng AI bỏ sót" (khớp CHECK của bảng).
@@ -66,7 +67,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const [loc, datLoc] = useState("can_xem");
   const url = `/api/doi-thu/duyet?${new URLSearchParams({ ben, loc })}${kx ? "&" + kx : ""}`;
   const q = useQuery({ queryKey: ["doi-thu", "duyet", ben, loc, kx], queryFn: () => lay<{ dong: QuanSat[] }>(url) });
-  const [sua, datSua] = useState<{ nguon: "nap" | "tay"; id: number } | null>(null);
+  const [sua, datSua] = useState<{ nguon: "nap" | "tay"; id: number; tru_o?: string } | null>(null);
   const [loi, datLoi] = useState<string | null>(null);          // lỗi của nút "Đúng rồi" trên dòng
   const [loiThem, datLoiThem] = useState<string | null>(null);  // lỗi của form thêm hàng
   const [dang_gui, datDangGui] = useState(false);
@@ -125,8 +126,12 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
             </fieldset>)}
           <ul className="dt-ds dt-chon dt-duyet-ds">{q.data?.dong.map(x => (
             <li key={x.nguon + x.id}>
-              <button type="button" aria-label={`Sửa ${x.ma_doi_thu} · ${x.ten_goc}`} onClick={() => datSua({ nguon: x.nguon, id: x.id })}>
-                <b>{x.ma_doi_thu}</b> · {x.ten_goc} · {x.gia_goc != null ? yen(x.gia_goc) : "—"}/{x.don_vi_gia ?? "?"} ·{" "}
+              {/* Chưa ghép → con trỏ vào ô Mã KOME; chưa có giá → ô giá (cùng "?" cam như mọi chỗ khác). */}
+              <button type="button" aria-label={`Sửa ${x.ma_doi_thu} · ${x.ten_goc}${x.gia_goc == null ? " (chưa có giá)" : ""}${daSua(x) ? " (đã sửa)" : ""}`}
+                onClick={() => datSua({ nguon: x.nguon, id: x.id,
+                  tru_o: x.gia_goc == null ? "gia_goc" : x.ma_kome == null && x.nhom_khoa == null ? "ma_kome" : undefined })}>
+                <b>{x.ma_doi_thu}</b> · {x.ten_goc}{daSua(x) && <span className="dt-nhat" aria-hidden="true"> ✎</span>} ·{" "}
+                {x.gia_goc != null ? yen(x.gia_goc) : <span className="dt-hoi-cam" aria-hidden="true">?</span>}/{x.don_vi_gia ?? "?"} ·{" "}
                 {NHAN_DUYET[x.trang_thai_duyet]}{x.bat_thuong ? " · bất thường" : ""}</button>
               {x.nguon === "nap" && x.trang_thai_duyet !== "da_xac_nhan" && (
                 <button type="button" className="chip dt-dung" disabled={dang_gui} aria-label={`Đúng rồi: ${x.ma_doi_thu} · ${x.ten_goc}`}
@@ -136,7 +141,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
           </ul>
         </Khoi>
       </section>
-      {sua && <SuaMatHang nguon={sua.nguon} id={sua.id} dong={() => datSua(null)} xong={() => datSua(null)} />}
+      {sua && <SuaMatHang nguon={sua.nguon} id={sua.id} tru_o={sua.tru_o} dong={() => datSua(null)} xong={() => datSua(null)} />}
     </div>
   );
 }

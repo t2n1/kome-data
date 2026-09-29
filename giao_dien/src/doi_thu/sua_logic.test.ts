@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { GiaoHang, QuanSat } from "./kieu";
+import type { DaBo, GiaoHang, QuanSat } from "./kieu";
 import {
-  docSoNhap, docXungDot, doiGi, formGiao, formTu, kgThung, kiemForm, lucNgan, payload, payloadGiao,
+  daSua, docSoNhap, docXungDot, doiGi, formGiao, formTu, kgThung, kiemForm, lucNgan, moTaThayBoi, payload, payloadGiao,
+  thanHoanTac,
 } from "./sua_logic";
 
 function qs(o: Partial<QuanSat> = {}): QuanSat {
@@ -134,9 +135,9 @@ describe("kiemForm", () => {
 describe("xung đột", () => {
   it("docXungDot đọc thân 409", () => {
     const e = { ma: 409, du_lieu: { loi: "x", xung_dot: { ai: "lan", luc: "2026-09-30T05:02:00+00:00", sau: { gia_goc: "1" }, sua_cuoi: 50 } } };
-    expect(docXungDot(e)).toEqual({ ai: "lan", luc: "2026-09-30T05:02:00+00:00", sau: { gia_goc: "1" }, sua_cuoi: 50 });
+    expect(docXungDot(e)).toEqual({ ai: "lan", luc: "2026-09-30T05:02:00+00:00", sau: { gia_goc: "1" }, sua_cuoi: 50, thay_boi: null });
     expect(docXungDot({ ma: 400, du_lieu: {} })).toBeNull(); expect(docXungDot(new Error("x"))).toBeNull();
-    expect(docXungDot({ ma: 409 })).toEqual({ ai: null, luc: "", sau: null, sua_cuoi: 0 });
+    expect(docXungDot({ ma: 409 })).toEqual({ ai: null, luc: "", sau: null, sua_cuoi: 0, thay_boi: null });
   });
   it("lucNgan = giờ:phút dd/mm giờ Tokyo", () => expect(lucNgan("2026-09-30T05:02:00+00:00")).toBe("14:02 30/09"));
   it("doiGi liệt kê khoá của sau (nhãn Việt), bỏ khoá kỹ thuật", () => {
@@ -212,5 +213,62 @@ describe("vòng sửa 1", () => {
     expect(kiemForm(q, { ...f, gia_goc: "", vi_sao_gia: "doc_sai" })).toMatch(/Để trống/);
     expect(kiemForm(q, { ...f, gia_goc: "", vi_sao_gia: "da_doi", loai_nguon: "khac" }) ?? "").not.toMatch(/Để trống/);
     const t = qs({ nguon: "tay" }); expect(kiemForm(t, { ...formTu(t), so_goi_thung: "" })).toBeNull();
+  });
+});
+
+
+describe("ghép mã KOME / nhóm trong pop-up (B13)", () => {
+  const chuaGhep = () => qs({ ma_kome: null, nhan: null, nhom_khoa: null, ten_nhom: null, ma_ghep: null, nhom_ghep: null });
+  it("formTu: mã hiện hành, không thì mã đã nhớ ở lần bỏ nhóm; nhóm ghép tường minh", () => {
+    expect(formTu(qs()).ma_kome).toBe("ST25");
+    expect(formTu(qs({ ma_kome: null, ma_ghep: "NT01", nhan: null })).ma_kome).toBe("NT01");
+    expect(formTu(qs({ nhom_ghep: 9 })).nhom_id).toBe("9");
+    expect(formTu(chuaGhep())).toMatchObject({ ma_kome: "", nhom_id: "", nhan: "khong" });
+  });
+  it("dòng chưa ghép: gõ mã + chọn nhãn → gửi ma_kome + nhan; không đổi thì không gửi khoá", () => {
+    const q = chuaGhep();
+    const p = payload(q, { ...formTu(q), ma_kome: " NT01 ", nhan: "cung_hang" }, false);
+    expect(p.rong).toBe(false);
+    expect(p.body).toMatchObject({ ma_kome: "NT01", nhan: "cung_hang" });
+    expect("nhom_id" in p.body).toBe(false);
+    const k = payload(qs(), formTu(qs()), false).body;
+    expect("ma_kome" in k || "nhom_id" in k).toBe(false);
+  });
+  it("đổi mã sai sang mã khác (nhãn giữ) · chọn nhóm · bỏ nhóm về theo mã", () => {
+    const q = qs({ nhom_ghep: 3 });
+    expect(payload(q, { ...formTu(q), ma_kome: "NT02" }, false).body).toMatchObject({ ma_kome: "NT02" });
+    expect("nhan" in payload(q, { ...formTu(q), ma_kome: "NT02" }, false).body).toBe(false);
+    expect(payload(q, { ...formTu(q), nhom_id: "5" }, false).body).toMatchObject({ nhom_id: 5 });
+    expect(payload(q, { ...formTu(q), nhom_id: "" }, false).body).toMatchObject({ nhom_id: null });
+    expect(payload(q, { ...formTu(q), ma_kome: "" , nhan: "khong" }, false).body).toMatchObject({ ma_kome: null, nhan: "khong" });
+  });
+  it("kiemForm: mã mới mà vẫn 'không liên quan' / nhãn ghép mà không có mã → câu lỗi", () => {
+    const q = chuaGhep();
+    expect(kiemForm(q, { ...formTu(q), ma_kome: "NT01" })).toMatch(/cùng thương hiệu hoặc khác thương hiệu/);
+    expect(kiemForm(q, { ...formTu(q), nhan: "thay_the" })).toMatch(/mã KOME/);
+    expect(kiemForm(q, { ...formTu(q), ma_kome: "NT01", nhan: "thay_the" })).toBeNull();
+    expect(kiemForm(qs(), { ...formTu(qs()), ma_kome: "", nhan: "khong" })).toBeNull();   // bỏ ghép hẳn
+  });
+});
+
+describe("dòng đã bị thay (B14) · ✎ · hoàn tác (B15)", () => {
+  it("docXungDot đọc thay_boi; 409 thường thì null", () => {
+    const e = { ma: 409, du_lieu: { xung_dot: { ai: "Hải", luc: "2026-09-30T05:02:00+00:00", sau: {}, sua_cuoi: 9,
+      thay_boi: { nguon: "tay", id: 12 } } } };
+    expect(docXungDot(e)?.thay_boi).toEqual({ nguon: "tay", id: 12 });
+    expect(docXungDot({ ma: 409, du_lieu: { xung_dot: { ai: null } } })?.thay_boi).toBeNull();
+    expect(docXungDot({ ma: 409, du_lieu: { xung_dot: { thay_boi: { nguon: "x", id: "1" } } } })?.thay_boi).toBeNull();
+  });
+  it("moTaThayBoi có / không có người sửa", () => {
+    expect(moTaThayBoi(null)).toMatch(/đã có bản mới/);
+    expect(moTaThayBoi({ ai: "Hải", luc: "2026-09-30T05:02:00+00:00" })).toMatch(/Hải sửa lúc 14:02 30\/09/);
+  });
+  it("daSua = sua_cuoi > 0", () => {
+    expect(daSua(qs({ sua_cuoi: 0 }))).toBe(false); expect(daSua(qs({ sua_cuoi: 3 }))).toBe(true); expect(daSua(undefined)).toBe(false);
+  });
+  it("thanHoanTac ghi lại nhãn cũ, chống sửa đè bằng sua_cuoi", () => {
+    const x: DaBo = { nguon: "nap", id: 4, ma_doi_thu: "THAK", ten_doi_thu: null, ten_goc: "Basa", nhom_khoa: "ma:NT01",
+      ten_nhom: "Basa", nhan_cu: "cung_hang", sua_cuoi: 17 };
+    expect(thanHoanTac(x)).toEqual({ nguon: "nap", id: 4, da_xem: 17, ghi_de: false, nhan: "cung_hang" });
   });
 });

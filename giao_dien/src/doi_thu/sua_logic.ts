@@ -2,10 +2,13 @@
 // Máy chủ (kome/doi_thu.py::sua_mat_hang, kome/doi_thu_giao.py) vẫn là trọng tài: ở đây chỉ dựng thân POST gồm
 // ĐÚNG những trường đã đổi so với lúc mở, và chặn sớm vài lỗi hiển nhiên để khỏi mất một lượt gửi.
 import { gio_tokyo } from "../dinh_dang";
-import type { Bac, GiaoHang, QuanSat, XungDot } from "./kieu";
+import type { Bac, DaBo, GiaoHang, QuanSat, ThayBoi, XungDot } from "./kieu";
 
 export type BacNhap = { tu: string; don_vi_sl: Bac["don_vi_sl"]; gia: string; don_vi_gia: Bac["don_vi_gia"] };
-export type FormMatHang = { nhan: "cung_hang" | "thay_the" | "khong"; trang_thai: string; khuyen_mai: string;
+/** `ma_kome` / `nhom_id`: ô "Mã KOME" và "Nhóm so sánh" của phần So với (B13 — thay khung "Ghép với KOME" cũ của Duyệt);
+ *  `nhom_id` "" = theo mã KOME (không nhóm ghép tường minh). */
+export type FormMatHang = { nhan: "cung_hang" | "thay_the" | "khong"; ma_kome: string; nhom_id: string;
+  trang_thai: string; khuyen_mai: string;
   gia_truoc_km: string; so_goi_thung: string; kl_goi_g: string; gia_goc: string; don_vi_gia: string; thue: string; bac: BacNhap[];
   vi_sao_gia: "" | "doc_sai" | "da_doi"; loai_nguon: string; lien_ket_bang_chung: string };
 
@@ -33,7 +36,8 @@ const chu = (n: number | null | undefined) => (n == null ? "" : String(n));
 
 export function formTu(q: QuanSat): FormMatHang {
   return {
-    nhan: q.nhan ?? "khong", trang_thai: q.trang_thai, khuyen_mai: q.khuyen_mai ?? "",
+    nhan: q.nhan ?? "khong", ma_kome: q.ma_kome ?? q.ma_ghep ?? "", nhom_id: q.nhom_ghep == null ? "" : String(q.nhom_ghep),
+    trang_thai: q.trang_thai, khuyen_mai: q.khuyen_mai ?? "",
     gia_truoc_km: chu(q.gia_truoc_km),
     so_goi_thung: chu(q.so_goi_thung), kl_goi_g: chu(q.kl_goi_g), gia_goc: chu(q.gia_goc),
     don_vi_gia: q.don_vi_gia ?? "", thue: q.thue ?? "",
@@ -78,12 +82,21 @@ function thayDoi(q: QuanSat, f: FormMatHang): Record<string, unknown> {
   return d;
 }
 
+/** Phần ghép đã đổi so với lúc mở: nhãn · mã KOME · nhóm ghép tường minh. */
+function doiGhep(q: QuanSat, f: FormMatHang) {
+  const g = formTu(q);
+  return { nhan: f.nhan !== g.nhan, ma: f.ma_kome.trim() !== g.ma_kome.trim(), nhom: f.nhom_id !== g.nhom_id };
+}
+
 export function payload(q: QuanSat, f: FormMatHang, ghi_de: boolean): { body: object; doi_gia: boolean; rong: boolean } {
   const thay_doi = thayDoi(q, f);
   const doi_gia = TRUONG_GIA.some(k => k in thay_doi);
-  const doi_nhan = f.nhan !== (q.nhan ?? "khong");
+  const gh = doiGhep(q, f);
   const body: Record<string, unknown> = { nguon: q.nguon, id: q.id, da_xem: q.sua_cuoi, ghi_de };
-  if (doi_nhan) body.nhan = f.nhan;
+  if (gh.nhan) body.nhan = f.nhan;
+  // Gửi khoá CHỈ khi đổi (máy chủ: có khoá = đổi; không khoá = giữ mã / nhóm đang có). "" / null = bỏ.
+  if (gh.ma) body.ma_kome = f.ma_kome.trim() || null;
+  if (gh.nhom) body.nhom_id = f.nhom_id ? Number(f.nhom_id) : null;
   body.thay_doi = thay_doi;
   if (doi_gia && f.vi_sao_gia) {
     body.vi_sao_gia = f.vi_sao_gia;
@@ -98,7 +111,7 @@ export function payload(q: QuanSat, f: FormMatHang, ghi_de: boolean): { body: ob
       if (f.lien_ket_bang_chung.trim()) body.lien_ket_bang_chung = f.lien_ket_bang_chung.trim();
     }
   }
-  return { body, doi_gia, rong: !doi_nhan && Object.keys(thay_doi).length === 0 };
+  return { body, doi_gia, rong: !gh.nhan && !gh.ma && !gh.nhom && Object.keys(thay_doi).length === 0 };
 }
 
 /** "→ 1 thùng = … kg": số gói × tịnh 1 gói (g) ÷ 1000; thiếu / sai / ≤ 0 → null (in "?", không in 0). */
@@ -110,6 +123,9 @@ export const kgThung = (so_goi: string, kl_goi_g: string): number | null => {
 
 /** Lỗi hiển nhiên trước khi gửi (máy chủ vẫn kiểm lại hết); null = gửi được. Chỉ xét trường ĐÃ ĐỔI. */
 export function kiemForm(q: QuanSat, f: FormMatHang): string | null {
+  const gh = doiGhep(q, f);
+  if (gh.ma && f.ma_kome.trim() && f.nhan === "khong") return "Ghép với mã mới: chọn cùng thương hiệu hoặc khác thương hiệu.";
+  if ((gh.nhan || gh.ma || gh.nhom) && f.nhan !== "khong" && !f.ma_kome.trim()) return "Nhập mã KOME trước.";
   const d = thayDoi(q, f);
   const daDoi = f.vi_sao_gia === "da_doi" && TRUONG_GIA.some(k => k in d);
   if (q.nguon === "nap" && !daDoi && (["so_goi_thung", "kl_goi_g", "gia_goc"] as const).some(k => k in d && !f[k].trim()))
@@ -156,11 +172,27 @@ export function kiemForm(q: QuanSat, f: FormMatHang): string | null {
 export function docXungDot(e: unknown): XungDot | null {
   if (!e || typeof e !== "object" || (e as { ma?: unknown }).ma !== 409) return null;
   const x = ((e as { du_lieu?: unknown }).du_lieu as { xung_dot?: Partial<XungDot> } | null | undefined)?.xung_dot;
+  const tb = x?.thay_boi;
   return {
     ai: typeof x?.ai === "string" ? x.ai : null, luc: typeof x?.luc === "string" ? x.luc : "",
     sau: x?.sau ?? null, sua_cuoi: typeof x?.sua_cuoi === "number" ? x.sua_cuoi : 0,
+    thay_boi: tb && (tb.nguon === "tay" || tb.nguon === "nap") && typeof tb.id === "number" ? { nguon: tb.nguon, id: tb.id } : null,
   };
 }
+
+/** Dấu ✎ (đặc tả §4.7 "dòng đó mang dấu ✎"): mặt hàng đã có ít nhất một lần ghi nhật ký (sửa / xác nhận / ghép). */
+export const daSua = (q: Pick<QuanSat, "sua_cuoi"> | null | undefined) => (q?.sua_cuoi ?? 0) > 0;
+
+/** "Hoàn tác" của dải "Đã bỏ khỏi nhóm" (B15): ghi lại nhãn cũ qua CÙNG đường lưu của pop-up (POST /sua-mat-hang),
+ *  chống sửa đè bằng sua_cuoi lúc đọc. */
+export const thanHoanTac = (x: DaBo) => ({ nguon: x.nguon, id: x.id, da_xem: x.sua_cuoi, ghi_de: false, nhan: x.nhan_cu });
+
+/** Câu của khung "dòng này đã có bản mới" (B14). */
+export function moTaThayBoi(x: Pick<XungDot, "ai" | "luc"> | null): string {
+  if (!x || (!x.ai && !x.luc)) return "Dòng này đã có bản mới — sửa trên bản mới.";
+  return `Dòng này đã có bản mới (${x.ai || "ai đó"} sửa${x.luc ? ` lúc ${lucNgan(x.luc)}` : ""}) — sửa trên bản mới.`;
+}
+export type { ThayBoi };
 
 /** "14:02 30/09" (giờ Tokyo). */
 export function lucNgan(iso: string | null | undefined): string {
