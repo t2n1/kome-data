@@ -6,7 +6,8 @@ import { chuoiKhoang, giuKhoang, useKhoang } from "../khung/khoang";
 import type { KhachDangMua, QuanSat, TongQuan } from "./kieu";
 import { nhanDonVi } from "./kieu";
 import { NHAN_TRANG_THAI } from "./kieu";
-import { NguonDong } from "./NguonDong";
+import { NguonDong, Ra } from "./NguonDong";
+import { lienKetAnToan } from "./nguon";
 
 type HoSo = { ben: { ma: string; ten: string; web: string | null; ghi_chu: string | null };
               dieu_kien: { loai: string; noi_dung: string; ngay: string }[]; quan_sat: (QuanSat & { hien_hanh: boolean })[];
@@ -32,7 +33,7 @@ export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) =
           {tq.data?.ben.map(b => <option key={b.ma} value={b.ma}>{b.ten}</option>)}
         </select>
         {khongCo && <p>Không có đối thủ này.</p>}
-        {hs?.ben.web && <p><a href={hs.ben.web} rel="noreferrer" target="_blank">{hs.ben.web}</a></p>}
+        {lienKetAnToan(hs?.ben.web) && <p><Ra href={lienKetAnToan(hs?.ben.web)!}>{hs!.ben.web}</Ra></p>}
         {hs && <>
           <h3>Mạnh ở ngành nào</h3>
           {manh.length ? (

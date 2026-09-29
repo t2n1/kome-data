@@ -294,7 +294,7 @@ Hướng dẫn đọc (`HUONG_DAN.md` của phép thử) chuyển vào `docs/doi
 ### 11.1 Dữ liệu (migration 064)
 
 - `app.thu_muc_nguon (thang date PRIMARY KEY CHECK (extract(day FROM thang) = 1), lien_ket text NOT NULL
-  CHECK (lien_ket ~ '^https://'), sua_luc timestamptz, sua_boi bigint → app.nguoi_dung)` — MỘT link thư mục
+  CHECK (lien_ket ~ '^https://[^[:space:]]+$' AND length(lien_ket) <= 2000), sua_luc timestamptz, sua_boi bigint → app.nguoi_dung)` — MỘT link thư mục
   Drive "Tháng N" mỗi tháng. Sửa được (thay link sai); mỗi lần ghi thêm một dòng `app.doi_thu_nhat_ky`
   (`loai = 'thu_muc'` — CHECK của bảng đó mở thêm giá trị này), nên `anh_chup._PHIEN_BAN` và `/nhat-ky` không
   cần nhánh mới.
@@ -316,7 +316,8 @@ Hướng dẫn đọc (`HUONG_DAN.md` của phép thử) chuyển vào `docs/doi
 - **Dòng từ web** (`hinh_thuc_nguon = 'web'`): "Mở trang của bên ↗" = `app.doi_thu.web` (khi có).
 - **Form "Giá đã đổi":** thêm ô "Link bằng chứng (tuỳ chọn)" — ảnh sale chụp bỏ lên Drive rồi dán link. Để
   trống vẫn lưu. Sai dạng (không `https://`) → 400 kèm câu.
-- **Chỗ hiện nguồn:** dòng duyệt, ô nổi của So sánh giá, bảng mặt hàng ở Hồ sơ đối thủ. Giá nhập tay có link →
+- **Chỗ hiện nguồn:** dòng duyệt, ô trạng thái (luôn hiện) của dòng chi tiết So sánh giá — KHÔNG trong ô nổi (ô nổi
+  đóng khi rời chuột, link trong đó không bấm được), bảng mặt hàng ở Hồ sơ đối thủ. Giá nhập tay có link →
   "bằng chứng ↗"; không có link mà loại nguồn `chung_tu` / `to_roi` → chữ mờ "chưa có bằng chứng".
 - Mọi liên kết ra ngoài: `target="_blank" rel="noopener noreferrer"` + `referrerPolicy="no-referrer"`
   (không gửi địa chỉ trang nội bộ sang Google). Chỉ hiện link `https://` (máy chủ đã chặn lúc ghi; giao diện

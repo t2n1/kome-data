@@ -100,7 +100,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
           {ben && <p className="dt-ben"><button type="button" className="chip" aria-label={`Bỏ lọc đối thủ ${tenBen}`} onClick={boBen}>
             Đối thủ: {tenBen} ✕</button></p>}
           {cacThangCho(q.data?.dong ?? []).map(t => (
-            <ThuMucThang key={t} thang={t} xong={() => qc.invalidateQueries({ queryKey: ["doi-thu"] })}
+            <ThuMucThang key={t} thang={t} xong={() => { datChon(null); qc.invalidateQueries({ queryKey: ["doi-thu"] }); }}
               hien={lienKetAnToan(q.data?.dong.find(d => thangCua(d.thang_lo) === t && d.lien_ket_thu_muc)?.lien_ket_thu_muc)} />))}
           <div className="dt-loc" role="group" aria-label="Lọc">
             {LOC.map(([m, n]) => <button key={m} type="button" className="chip" aria-pressed={loc === m} onClick={() => datLoc(m)}>{n}</button>)}
