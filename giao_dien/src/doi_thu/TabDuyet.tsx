@@ -7,12 +7,11 @@ import { Khoi } from "../chung/Khoi";
 import { ngay, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { QuanSat } from "./kieu";
-import { NHAN_DUYET } from "./kieu";
+import { LOAI_NGUON, NHAN_DUYET } from "./kieu";
 import { NguonDong, Ra } from "./NguonDong";
 import { cacThangCho, lienKetAnToan, nhanThang, thangCua } from "./nguon";
 
 const LOC = [["", "Tất cả"], ["can_xem", "Cần xem"], ["bat_thuong", "Bất thường"], ["chua_xac_nhan", "Chưa ai xác nhận"], ["chua_ghep", "Chưa ghép"]];
-const LOAI_NGUON = [["bang_gia", "Bảng giá / web"], ["chung_tu", "Chứng từ khách đưa"], ["to_roi", "Tờ rơi / tin nhắn"], ["khach_ke", "Khách kể"], ["khac", "Nghe nói / khác"]];
 // Trường có tập giá trị đóng (khớp CHECK của bảng) là ô chọn; còn lại là ô gõ.
 const CHON: Partial<Record<keyof QuanSat, string[][]>> = {
   thue: [["chua", "Chưa thuế"], ["co", "Đã gồm thuế"], ["khong_ro", "Không rõ"]],

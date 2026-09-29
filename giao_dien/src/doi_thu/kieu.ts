@@ -87,3 +87,9 @@ export type GiaoHang = { ma_doi_thu: string; ten: string | null; bao_ship: boole
 export const NHAN_GHEP: Record<"cung_hang" | "thay_the", string> = { cung_hang: "cùng thương hiệu", thay_the: "khác thương hiệu" };
 /** Thân 409 của mọi POST sửa: người khác vừa sửa dòng này. `sua_cuoi` = dấu phiên bản mới để "Ghi đè". */
 export type XungDot = { ai: string | null; luc: string; sau: unknown; sua_cuoi: number };
+/** Loại nguồn của giá tay (`app.loai_nguon`, mã không đổi) → nhãn. Dùng chung màn Duyệt và pop-up sửa. */
+export const LOAI_NGUON: [string, string][] = [["bang_gia", "Bảng giá / web"], ["chung_tu", "Chứng từ khách đưa"],
+  ["to_roi", "Tờ rơi / tin nhắn"], ["khach_ke", "Khách kể"], ["khac", "Nghe nói / khác"]];
+/** Loại điều kiện bán (`kome.doi_thu_giao.LOAI_DK`) → nhãn, theo thứ tự hiện ở ô chọn. */
+export const LOAI_DK: [string, string][] = [["ship", "Ship"], ["thue", "Thuế"], ["thanh_toan", "Thanh toán"],
+  ["khuyen_mai", "Khuyến mãi chung"], ["khac", "Khác"]];
