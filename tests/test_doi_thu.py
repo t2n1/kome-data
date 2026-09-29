@@ -379,7 +379,34 @@ def test_khach_doi_thu_tin_90_ngay_dung_mot_luot(conn, batch, monkeypatch):
     assert t["gia"] == [{"ma_doi_thu": "THAK", "ten_doi_thu": "THAK JSC", "nhom_khoa": "ma:NT01",
                          "ten_nhom": "Ca Ba sa cat khuc (500g x 20 packs)", "gia_goc": 1200, "don_vi_gia": "kg"}]
     assert {"tiep_xuc_id", "ngay", "nguoi"} <= set(t)
+    assert t["nhac"] == [{"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 10, "do_dai": 5},
+                         {"loai": "nhom", "khoa": "ma:NT01", "vi_tri_dau": 20, "do_dai": 5}]
     assert r["ly_do_ngung"] == []
+
+
+def test_khach_doi_thu_nhac_theo_thu_tu_trong_cau_vi_tri_theo_ky_tu(conn, batch, monkeypatch):
+    """`nhac` sắp theo `vi_tri_dau` (thứ tự trong câu), KHÔNG theo thứ tự mảng gửi lên hay theo mã; vị trí là
+    KÝ TỰ Unicode như đã lưu (emoji đứng trước = 1, không phải 2 đơn vị UTF-16). Hai đối thủ trong một tin."""
+    def _the(cau, loai, khoa, nhan):      # đúng như giao diện gửi: chỉ số chuỗi JS (đơn vị UTF-16)
+        u16 = lambda x: len(x.encode("utf-16-le")) // 2
+        return {"loai": loai, "khoa": khoa, "vi_tri_dau": u16(cau[:cau.index(nhan)]), "do_dai": u16(nhan)}
+    _nen_tin(conn, batch)
+    _hang(conn, batch, "NT02", "Tom su dong lanh")
+    cau = "🐟 @THAK bán @Basa, còn @ICHIBA bán @Tom"
+    # Mảng gửi lên cố ý đảo: nhóm sau cùng trước, đối thủ sau trước đối thủ đầu.
+    the = [_the(cau, "nhom", "ma:NT02", "@Tom"), _the(cau, "doi_thu", "ICHIBA", "@ICHIBA"),
+           _the(cau, "nhom", "ma:NT01", "@Basa"), _the(cau, "doi_thu", "THAK", "@THAK")]
+    assert the[3]["vi_tri_dau"] == 3                       # UTF-16: emoji = 2 đơn vị + khoảng trắng
+    _tin(conn, batch, "K0001", cau, the)
+    dem = _dem(conn, monkeypatch)
+    t = DT.khach_doi_thu(conn, "K0001")["tin"][0]
+    assert dem["n"] == 1
+    assert t["nhac"] == [{"loai": "doi_thu", "khoa": "THAK", "vi_tri_dau": 2, "do_dai": 5},
+                         {"loai": "nhom", "khoa": "ma:NT01", "vi_tri_dau": 12, "do_dai": 5},
+                         {"loai": "doi_thu", "khoa": "ICHIBA", "vi_tri_dau": 23, "do_dai": 7},
+                         {"loai": "nhom", "khoa": "ma:NT02", "vi_tri_dau": 35, "do_dai": 4}]
+    for z in t["nhac"]:                                    # vị trí ký tự khớp đúng chữ trong câu đã lưu
+        assert t["noi_dung"][z["vi_tri_dau"]] == "@"
 
 
 def test_ly_do_ngung_chi_ra_cap_da_ngung_mua_cung_nhom_duoc_nhac(conn, batch):

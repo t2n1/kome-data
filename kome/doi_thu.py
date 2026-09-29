@@ -534,6 +534,9 @@ ly AS (         -- mỗi mã ngừng mua: tin MỚI NHẤT nhắc nhóm của n�
 SELECT json_build_object(
   'tin', (SELECT coalesce(json_agg(json_build_object(
              'tiep_xuc_id', tx.id, 'ngay', tx.ngay, 'nguoi', tx.nguoi, 'noi_dung', tx.noi_dung,
+             'nhac', (SELECT coalesce(json_agg(json_build_object('loai', z.loai, 'khoa', z.khoa,
+                             'vi_tri_dau', z.vi_tri_dau, 'do_dai', z.do_dai) ORDER BY z.vi_tri_dau), '[]')
+                      FROM app.tiep_xuc_nhac z WHERE z.tiep_xuc_id = tx.id),
              'doi_thu', (SELECT coalesce(json_agg(json_build_object('ma', d.ma, 'ten', d.ten) ORDER BY d.ma), '[]')
                          FROM dt d WHERE d.tiep_xuc_id = tx.id),
              'nhom', (SELECT coalesce(json_agg(json_build_object('khoa', h.khoa, 'ten', h.ten) ORDER BY h.khoa), '[]')
@@ -559,7 +562,10 @@ def khach_doi_thu(conn, ma_khach: str, hom_nay=None) -> dict:
     """Khối "Đang mua của đối thủ" của hồ sơ khách 360 — MỘT lượt hỏi (hồ sơ `ho_so()` giữ trần 8 nên khối này
     đi endpoint riêng). NGAY_TIN_KHACH ngày qua theo ĐỒNG HỒ THẬT giờ Tokyo (`hom_nay_o_nhat`; xem `tong_quan`).
 
-    `tin`: mỗi lần tiếp xúc có thẻ `@` — đối thủ, nhóm (khoá + tên), giá khách kể kèm theo, ngày, người ghi, câu gốc.
+    `tin`: mỗi lần tiếp xúc có thẻ `@` — đối thủ, nhóm (khoá + tên), giá khách kể kèm theo, ngày, người ghi, câu gốc,
+    và `nhac` = MỌI thẻ theo thứ tự trong câu (`vi_tri_dau` tăng dần; vị trí/độ dài theo KÝ TỰ Unicode như đã lưu ở
+    `app.tiep_xuc_nhac` — giao diện đổi sang UTF-16 nếu cần tô chữ). Giao diện ghép "đối thủ gần nhất đứng trước"
+    từ đúng danh sách này (cùng vòng lặp lúc ghi), không dò chữ trong câu.
     `ly_do_ngung`: các cặp (khách, mã) `mart.khach_mat_hang.trang_thai_cap = 'ngung'` (bất biến 024) mà nhóm của mã —
     thẻ `ma:<mã>` hoặc `n:<nhóm có tên chứa mã>` — được nhắc trong các tin trên; mỗi mã một dòng, tin MỚI NHẤT nhắc
     nhóm đó, kèm các đối thủ được nhắc CÙNG lần tiếp xúc ấy."""

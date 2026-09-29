@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { LoaiThe } from "./nhac";
 import {
-  chenThe, dongDangMua, dongNgungMua, dsGoiY, doLai, ghepCap, ghepTin, locGoiY, thanhGia, thanhNhac, tuDangGo,
+  chenThe, dongDangMua, dongNgungMua, dsGoiY, doLai, ghepCap, ghepTin, locGoiY, thanGhi, thanhGia, thanhNhac, tuDangGo,
   type GoiYApi, type The, type TinDoiThu,
 } from "./nhac";
 
@@ -142,10 +143,18 @@ describe("ghepCap / thanhGia — mỗi thẻ hàng ghép đối thủ gần nh�
   });
 });
 
+// Thẻ đã lưu như GET trả (vị trí theo ký tự; ở đây toàn chữ BMP nên trùng chỉ số JS).
+const luu = (cau: string, ...the: [LoaiThe, string, string][]) =>
+  the.map(([loai, khoa, chu]) => ({ loai, khoa, vi_tri_dau: cau.indexOf(chu), do_dai: chu.trimEnd().length }))
+     .sort((a, b) => a.vi_tri_dau - b.vi_tri_dau);
+const CAU_TIN = "@VIFO bán @Nhóm cá, còn @THAK bán @Ca Ba sa rẻ";
+
 describe("ghepTin / dòng hiển thị của hồ sơ khách", () => {
   const tin: TinDoiThu = {
     tiep_xuc_id: 1, ngay: "2026-09-12", nguoi: null,
-    noi_dung: "@VIFO bán @Nhóm cá, còn @THAK bán @Ca Ba sa rẻ",
+    noi_dung: CAU_TIN,
+    nhac: luu(CAU_TIN, ["doi_thu", "VIFO", "@VIFO"], ["nhom", "n:5", "@Nhóm cá"], ["doi_thu", "THAK", "@THAK"],
+              ["nhom", "ma:NT01", "@Ca Ba sa"]),
     doi_thu: [{ ma: "THAK", ten: "THAK JSC" }, { ma: "VIFO", ten: "Việt Foods" }],
     nhom: [{ khoa: "n:5", ten: "Nhóm cá" }, { khoa: "ma:NT01", ten: "Ca Ba sa" }],
     gia: [{ ma_doi_thu: "THAK", ten_doi_thu: "THAK JSC", nhom_khoa: "ma:NT01", ten_nhom: "Ca Ba sa", gia_goc: 1200.0, don_vi_gia: "kg" }],
@@ -154,11 +163,30 @@ describe("ghepTin / dòng hiển thị của hồ sơ khách", () => {
     expect(ghepTin(tin).map(d => [d.doi_thu?.ma ?? null, d.nhom?.khoa ?? null, d.gia?.gia_goc ?? null])).toEqual([
       ["THAK", "ma:NT01", 1200], ["VIFO", "n:5", null]]);
   });
-  it("một đối thủ duy nhất: nhóm không tìm thấy trong câu vẫn ghép với nó; đối thủ không nhóm vẫn có dòng", () => {
-    const t1: TinDoiThu = { ...tin, noi_dung: "đổi tên", gia: [], doi_thu: [{ ma: "THAK", ten: "THAK JSC" }], nhom: [{ khoa: "n:5", ten: "Nhóm cá" }] };
+  it("hàng đứng trước đối thủ DUY NHẤT của câu vẫn ghép với nó (cùng ghepCap lúc ghi); đối thủ không nhóm vẫn có dòng", () => {
+    const cau = "@Nhóm cá lấy của @THAK";
+    const t1: TinDoiThu = { ...tin, noi_dung: cau, gia: [], doi_thu: [{ ma: "THAK", ten: "THAK JSC" }],
+      nhom: [{ khoa: "n:5", ten: "Nhóm cá" }], nhac: luu(cau, ["nhom", "n:5", "@Nhóm cá"], ["doi_thu", "THAK", "@THAK"]) };
     expect(ghepTin(t1).map(d => [d.doi_thu?.ma, d.nhom?.khoa])).toEqual([["THAK", "n:5"]]);
-    const t2: TinDoiThu = { ...t1, nhom: [] };
+    expect(ghepCap(t1.nhac).map(c => c.doi_thu)).toEqual(["THAK"]);   // cùng một định nghĩa lúc ghi
+    const t2: TinDoiThu = { ...t1, nhom: [], nhac: t1.nhac.filter(z => z.loai === "doi_thu") };
     expect(ghepTin(t2).map(d => [d.doi_thu?.ma, d.nhom])).toEqual([["THAK", null]]);
+  });
+  it("mã đối thủ là tiền tố của mã khác (VI / VIFO): ghép theo vị trí thẻ, không dò chữ", () => {
+    const cau = "@VIFO bán @Basa, @VI bán @Tom";
+    const t: TinDoiThu = { tiep_xuc_id: 2, ngay: "2026-09-12", nguoi: null, noi_dung: cau, gia: [],
+      doi_thu: [{ ma: "VI", ten: "Vi" }, { ma: "VIFO", ten: "Việt Foods" }],
+      nhom: [{ khoa: "ma:NT01", ten: "Basa" }, { khoa: "ma:NT02", ten: "Tom" }],
+      nhac: luu(cau, ["doi_thu", "VIFO", "@VIFO"], ["nhom", "ma:NT01", "@Basa"], ["doi_thu", "VI", "@VI "], ["nhom", "ma:NT02", "@Tom"]) };
+    expect(ghepTin(t).map(d => [d.doi_thu?.ma, d.nhom?.khoa])).toEqual([["VIFO", "ma:NT01"], ["VI", "ma:NT02"]]);
+  });
+  it("nhóm / đối thủ đã đổi tên sau khi ghi: cặp vẫn đúng, in tên HIỆN HÀNH", () => {
+    const cau = "@VIFO bán @Tom, @THAK bán @Basa";           // chữ trong câu là tên CŨ của n:9
+    const t: TinDoiThu = { tiep_xuc_id: 3, ngay: "2026-09-12", nguoi: null, noi_dung: cau, gia: [],
+      doi_thu: [{ ma: "THAK", ten: "THAK Holdings" }, { ma: "VIFO", ten: "Việt Foods" }],
+      nhom: [{ khoa: "ma:NT02", ten: "Tom" }, { khoa: "n:9", ten: "Cá basa (mới)" }],
+      nhac: luu(cau, ["doi_thu", "VIFO", "@VIFO"], ["nhom", "ma:NT02", "@Tom"], ["doi_thu", "THAK", "@THAK"], ["nhom", "n:9", "@Basa"]) };
+    expect(dongDangMua([t])).toEqual(["đang mua @VIFO: Tom (12/09)", "đang mua @THAK: Cá basa (mới) (12/09)"]);
   });
   it("câu 'đang mua @THAK: Basa (¥1,200/kg, 12/09)', bỏ trùng cặp giữ tin mới nhất", () => {
     const cu: TinDoiThu = { ...tin, tiep_xuc_id: 0, ngay: "2026-08-01" };
@@ -172,5 +200,24 @@ describe("ghepTin / dòng hiển thị của hồ sơ khách", () => {
     expect(dongNgungMua({ ma: "NT01", ten: "Basa", nhom_khoa: "ma:NT01", ten_nhom: "Basa", lan_cuoi: "2026-06-21", so_ngay: 40,
       tiep_xuc_id: 1, tin_ngay: "2026-09-12", doi_thu: [] }))
       .toBe("Đã ngừng mua Basa — tin 12/09 có nhắc tới mã này");
+  });
+});
+
+describe("thanGhi — thân POST", () => {
+  it("không có @: ĐÚNG bốn khoá cũ, không nhac / gia", () => {
+    const r = thanGhi("goi", "tot", "Gọi lại tuần sau", "2026-10-01", [], { "ma:NT01": { gia: "100", don_vi: "kg" } });
+    expect(r.loi).toBeNull();
+    expect(r.than).toEqual({ kieu: "goi", ket_qua: "tot", noi_dung: "Gọi lại tuần sau", hen_lai: "2026-10-01" });
+    expect(Object.keys(r.than!)).toEqual(["kieu", "ket_qua", "noi_dung", "hen_lai"]);
+  });
+  it("có thẻ không giá: thêm nhac, không có khoá gia", () => {
+    const r = thanGhi("goi", "tot", "@THAK ", "", [dt("THAK", 0)], {});
+    expect(r.than).toEqual({ kieu: "goi", ket_qua: "tot", noi_dung: "@THAK ", hen_lai: "",
+      nhac: [{ loai: "doi_thu", khoa: "THAK", vi_tri_dau: 0, do_dai: 5 }] });
+  });
+  it("giá thiếu đối thủ: loi, không có thân", () => {
+    const r = thanGhi("goi", "tot", "@Basa", "", [nh("ma:NT01", "Basa", 0)], { "ma:NT01": { gia: "1", don_vi: "kg" } });
+    expect(r.than).toBeNull();
+    expect(r.loi).toContain("Basa");
   });
 });

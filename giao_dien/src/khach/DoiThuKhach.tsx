@@ -8,8 +8,12 @@ import { The } from "./HoSoTab";
 import { dongDangMua, dongNgungMua } from "./nhac";
 
 export function DoiThuKhach({ ma }: { ma: string }) {
-  const { data } = useQuery({ queryKey: ["kh-doi-thu", ma],
+  const { data, error } = useQuery({ queryKey: ["kh-doi-thu", ma],
     queryFn: () => lay<KhachDoiThu>(`/api/khach-hang/${encodeURIComponent(ma)}/doi-thu`) });
+  // Lỗi ≠ "không có tin": lỗi thì một dòng nhỏ nói ra; rỗng thì ẩn hẳn khối.
+  if (error) return (
+    <section className="kh-the hs2-viec hs2-doi-thu"><h2>Đang mua của đối thủ</h2>
+      <p className="khoi-loi" role="alert">Không tải được tin đối thủ: {(error as Error).message}</p></section>);
   if (!data || (!data.tin.length && !data.ly_do_ngung.length)) return null;
   const mua = dongDangMua(data.tin);
   return (

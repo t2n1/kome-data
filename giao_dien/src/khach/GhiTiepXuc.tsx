@@ -4,10 +4,11 @@
 // Đợt 2 (tin hiện trường): gõ `@` mở danh sách gợi ý (đối thủ trước, rồi hàng = nhóm so sánh);
 // mỗi thẻ hàng có một dòng giá khách kể tuỳ chọn. Logic thẻ ở nhac.ts. Không có `@` → y như cũ.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gui, lay } from "../api";
+import { DON_VI } from "../doi_thu/kieu";
 import {
-  chenThe, DON_VI, DON_VI_CHON, doLai, dsGoiY, ghepCap, locGoiY, thanhGia, thanhNhac, tuDangGo,
+  chenThe, DON_VI_CHON, doLai, dsGoiY, ghepCap, locGoiY, thanGhi, tuDangGo,
   type DongGia, type GoiYApi, type MucGoiY, type The,
 } from "./nhac";
 
@@ -29,6 +30,11 @@ export function GhiTiepXuc({ ma, kieu_tx, ket_qua_tx, lam_moi, id, gon = false, 
   const [canhBao, datCanhBao] = useState<string[]>([]);
   const o = useRef<HTMLTextAreaElement>(null);
   const choConTro = useRef<number | null>(null);
+  // Làm mới dữ liệu bị HOÃN khi có cảnh báo: ở /lien-he `lam_moi` gồm ["lien-he"], làm mới ngay là khách vừa liên
+  // hệ bị tạm ẩn, thẻ (và form này) tháo ra trước khi cảnh báo kịp hiện. Chạy khi bấm "Đã hiểu", lần ghi sau, hay tháo form.
+  const hoan = useRef<(() => Promise<unknown>) | null>(null);
+  const chayHoan = () => { const f = hoan.current; hoan.current = null; return f ? f() : Promise.resolve(); };
+  useEffect(() => () => { void chayHoan(); }, []);
   const uid = useId(), idDs = `${uid}-goi-y`;
 
   const dangGo = tuDangGo(noi, conTro, the);
@@ -72,14 +78,9 @@ export function GhiTiepXuc({ ma, kieu_tx, ket_qua_tx, lam_moi, id, gon = false, 
     datDongGia(d => ({ ...d, [khoa]: { ...(d[khoa] ?? { gia: "", don_vi: "kg" }), ...moi } }));
 
   const them = async (e: React.FormEvent) => {
-    e.preventDefault(); datLoi(""); datCanhBao([]);
-    const than: Record<string, unknown> = { kieu, ket_qua: kq, noi_dung: noi, hen_lai: hen };
-    if (the.length) {
-      const g = thanhGia(the, dongGia);
-      if (g.loi) { datLoi(g.loi); return; }
-      than.nhac = thanhNhac(the);
-      if (g.gia.length) than.gia = g.gia;
-    }
+    e.preventDefault(); datLoi(""); datCanhBao([]); void chayHoan();
+    const { than, loi: loiGia } = thanGhi(kieu, kq, noi, hen, the, dongGia);
+    if (!than) { datLoi(loiGia ?? ""); return; }
     datDang(true);
     try {
       const r = await gui<{ ok: boolean; id?: number; canh_bao?: string[] }>(
@@ -87,9 +88,11 @@ export function GhiTiepXuc({ ma, kieu_tx, ket_qua_tx, lam_moi, id, gon = false, 
       const coThe = the.length > 0;
       datNoi(""); datHen(""); datThe([]); datDongGia({}); datDaDong(null);
       const k = [...lam_moi, ...(coThe ? [["kh-doi-thu", ma], ["doi-thu"]] : [])];
-      await Promise.all(k.map(q => qc.invalidateQueries({ queryKey: q })));
-      // Cảnh báo (giá lệch xa trung vị…) không chặn ghi — nhưng phải đọc được trước khi form đóng.
-      if (r.canh_bao?.length) datCanhBao(r.canh_bao); else xong?.();
+      const lamMoi = () => Promise.all(k.map(q => qc.invalidateQueries({ queryKey: q })));
+      // Cảnh báo (giá lệch xa trung vị…) không chặn ghi — nhưng phải đọc được trước khi form đóng / thẻ bị ẩn:
+      // hiện cảnh báo TRƯỚC, hoãn làm mới + xong() tới khi bấm "Đã hiểu". Không cảnh báo -> y như cũ.
+      if (r.canh_bao?.length) { hoan.current = lamMoi; datCanhBao(r.canh_bao); }
+      else { await lamMoi(); xong?.(); }
     } catch (x) { datLoi((x as Error).message); } finally { datDang(false); }
   };
   return (
@@ -152,7 +155,7 @@ export function GhiTiepXuc({ ma, kieu_tx, ket_qua_tx, lam_moi, id, gon = false, 
         <div className="hs-nhac-canh" role="status">
           <p>Đã ghi. Cần xem lại:</p>
           <ul>{canhBao.map((c, i) => <li key={i}>{c}</li>)}</ul>
-          {xong && <button type="button" className="nut-nho" onClick={() => { datCanhBao([]); xong(); }}>Đã hiểu</button>}
+          <button type="button" className="nut-nho" onClick={async () => { datCanhBao([]); await chayHoan(); xong?.(); }}>Đã hiểu</button>
         </div>)}
     </form>
   );

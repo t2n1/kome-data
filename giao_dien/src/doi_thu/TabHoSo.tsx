@@ -3,8 +3,8 @@ import { lay } from "../api";
 import { Khoi } from "../chung/Khoi";
 import { ngay, so, yen } from "../dinh_dang";
 import { chuoiKhoang, giuKhoang, useKhoang } from "../khung/khoang";
-import { DON_VI } from "../khach/nhac";
 import type { KhachDangMua, QuanSat, TongQuan } from "./kieu";
+import { nhanDonVi } from "./kieu";
 import { NHAN_TRANG_THAI } from "./kieu";
 
 type HoSo = { ben: { ma: string; ten: string; web: string | null; ghi_chu: string | null };
@@ -51,7 +51,7 @@ export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) =
                     <td><a href={giuKhoang(`/khach-hang/${encodeURIComponent(k.ma_khach)}`)}>{k.ten_khach ?? k.ma_khach}</a>
                       {" "}<span className="dt-nhat">{k.ma_khach}</span></td>
                     <td>{k.nhom.map(n => n.ten ?? n.khoa).join(" · ") || "—"}</td>
-                    <td>{k.gia.map(g => `${g.ten_nhom ?? g.nhom_khoa}: ${yen(g.gia_goc)}/${DON_VI[g.don_vi_gia] ?? g.don_vi_gia}`).join(" · ") || "—"}</td>
+                    <td>{k.gia.map(g => `${g.ten_nhom ?? g.nhom_khoa}: ${yen(g.gia_goc)}/${nhanDonVi(g.don_vi_gia)}`).join(" · ") || "—"}</td>
                   </tr>))}</tbody></table>
             </div>) : <p className="dt-nhat">Chưa lần ghi tiếp xúc nào trong 90 ngày gắn thẻ @{hs.ben.ma}.</p>}
           <h3>Điều kiện</h3>

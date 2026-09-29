@@ -2,11 +2,12 @@
 // `@<đối thủ>` (khoá = app.doi_thu.ma, nhãn = mã) và `@<hàng>` — LUÔN là một nhóm so sánh (R-A): khoá
 // `n:<id>` (nhóm có tên) hoặc `ma:<mã KOME>` (nhóm ngầm định theo mã), nhãn = tên.
 // Vị trí thẻ là chỉ số chuỗi JS (đơn vị UTF-16) trên câu CHƯA cắt khoảng trắng — đúng đơn vị POST nhận
-// (kome/lien_he.py::_kiem_the tự đổi sang ký tự Unicode và trừ khoảng trắng đầu). Các GET đọc KHÔNG trả vị
-// trí, nên ghép cặp khi hiển thị (ghepTin) dò lại thẻ trong câu bằng chữ.
+// (kome/lien_he.py::_kiem_the tự đổi sang ký tự Unicode và trừ khoảng trắng đầu). GET trả lại thẻ đã lưu
+// (`tin.nhac`, vị trí theo KÝ TỰ, sắp theo vị trí) — ghép cặp khi hiển thị đi qua CHÍNH `ghepCap` như lúc ghi,
+// chỉ cần thứ tự nên không đổi đơn vị; KHÔNG dò chữ trong câu (mã tiền tố VI/VIFO, đổi tên nhóm làm dò sai).
 import { ngay_ngan, yen } from "../dinh_dang";
 import { boDau } from "../doi_thu/loc";
-import type { GoiYApi, LyDoNgung, TinDoiThu } from "../doi_thu/kieu";
+import { nhanDonVi, type GoiYApi, type LyDoNgung, type TinDoiThu } from "../doi_thu/kieu";
 
 export type { GoiYApi, LyDoNgung, TinDoiThu };
 
@@ -16,10 +17,7 @@ export type MucGoiY = { loai: LoaiThe; khoa: string; nhan: string; phu: string; 
 /** Một thẻ đã chọn trong câu: chữ trong câu là "@" + nhan, bắt đầu ở vi_tri_dau (UTF-16). */
 export type The = { loai: LoaiThe; khoa: string; nhan: string; vi_tri_dau: number };
 
-/** Đơn vị giá máy chủ nhận (kome/doi_thu.py, mã không dấu) → nhãn in ra. Ô chọn chỉ mời ba đơn vị đầu. */
-export const DON_VI: Record<string, string> = {
-  kg: "kg", goi: "gói", thung: "thùng", tui: "túi", con: "con", qua: "quả", lon: "lon", chai: "chai", hop: "hộp",
-  cay: "cây", bao: "bao", khac: "khác" };
+/** Ô chọn đơn vị giá chỉ mời ba đơn vị (bảng nhãn đầy đủ: doi_thu/kieu.ts::DON_VI). */
 export const DON_VI_CHON = ["kg", "goi", "thung"] as const;
 
 const DAI = (t: The) => t.nhan.length + 1;
@@ -99,13 +97,20 @@ export function thanhNhac(the: The[]) {
   return the.map(t => ({ loai: t.loai, khoa: t.khoa, vi_tri_dau: t.vi_tri_dau, do_dai: DAI(t) }));
 }
 
-/** Mỗi thẻ hàng (mỗi khoá một lần — lần xuất hiện đầu) ghép với đối thủ gần nhất đứng TRƯỚC nó trong câu. */
-export function ghepCap(the: The[]): { nhom: The; doi_thu: string | null }[] {
-  const ra: { nhom: The; doi_thu: string | null }[] = [];
+type CoViTri = { loai: LoaiThe; khoa: string; vi_tri_dau: number };
+
+/** Ghép cặp — ĐỊNH NGHĨA DUY NHẤT, dùng cả lúc ghi (điền sẵn ô đối thủ) lẫn lúc đọc (ghepTin): mỗi thẻ hàng (mỗi
+ *  khoá một lần — lần xuất hiện đầu) ghép với đối thủ gần nhất đứng TRƯỚC nó trong câu; hàng đứng trước mọi đối
+ *  thủ thì ghép với đối thủ DUY NHẤT của câu nếu câu chỉ có một ("@Basa lấy của @THAK"), không thì null. Chỉ đọc
+ *  thứ tự `vi_tri_dau` nên đơn vị (UTF-16 lúc ghi, ký tự lúc đọc) không quan trọng. */
+export function ghepCap<T extends CoViTri>(the: T[]): { nhom: T; doi_thu: string | null }[] {
+  const ra: { nhom: T; doi_thu: string | null }[] = [];
+  const cacDt = new Set(the.filter(t => t.loai === "doi_thu").map(t => t.khoa));
+  const duyNhat = cacDt.size === 1 ? [...cacDt][0] : null;
   let dt: string | null = null;
   for (const t of [...the].sort((x, y) => x.vi_tri_dau - y.vi_tri_dau)) {
     if (t.loai === "doi_thu") dt = t.khoa;
-    else if (!ra.some(c => c.nhom.khoa === t.khoa)) ra.push({ nhom: t, doi_thu: dt });
+    else if (!ra.some(c => c.nhom.khoa === t.khoa)) ra.push({ nhom: t, doi_thu: dt ?? duyNhat });
   }
   return ra;
 }
@@ -128,13 +133,26 @@ export function thanhGia(the: The[], dong: Record<string, DongGia>) {
   return { loi: null as string | null, gia };
 }
 
+/** Thân POST /api/khach-hang/{mã}/tiep-xuc. KHÔNG có thẻ → ĐÚNG bốn khoá cũ {kieu, ket_qua, noi_dung, hen_lai}
+ *  (hành vi trước đợt 2); có thẻ → thêm `nhac`, và `gia` khi có dòng giá. Lỗi dòng giá → `loi`, không gửi. */
+export function thanGhi(kieu: string, ket_qua: string, noi_dung: string, hen_lai: string, the: The[],
+                        dong: Record<string, DongGia>): { than: Record<string, unknown> | null; loi: string | null } {
+  const than: Record<string, unknown> = { kieu, ket_qua, noi_dung, hen_lai };
+  if (!the.length) return { than, loi: null };
+  const g = thanhGia(the, dong);
+  if (g.loi) return { than: null, loi: g.loi };
+  than.nhac = thanhNhac(the);
+  if (g.gia.length) than.gia = g.gia;
+  return { than, loi: null };
+}
+
 // ---- Hiển thị (hồ sơ khách) --------------------------------------------------------------------
 export type DongTin = { ngay: string; doi_thu: { ma: string; ten: string } | null; nhom: { khoa: string; ten: string } | null;
                         gia: { gia_goc: number; don_vi_gia: string } | null };
 
-/** Một tin → các cặp (đối thủ, nhóm). Giá ghi rõ cặp của nó; nhóm không giá ghép với đối thủ gần nhất đứng
- *  trước trong câu (dò `@<mã>` / `@<tên>` bằng chữ — GET không trả vị trí); không dò được thì ghép với đối thủ
- *  duy nhất của tin nếu chỉ có một. Đối thủ không đi với nhóm nào vẫn có một dòng. */
+/** Một tin → các cặp (đối thủ, nhóm). Giá ghi rõ cặp của nó (người ghi đã chọn); nhóm không giá ghép bằng CHÍNH
+ *  `ghepCap` trên `t.nhac` (thứ tự trong câu). Tên lấy theo KHOÁ từ `t.doi_thu` / `t.nhom` (tên hiện hành — đổi tên
+ *  không làm lệch cặp). Đối thủ không đi với dòng nào vẫn có một dòng. */
 export function ghepTin(t: TinDoiThu): DongTin[] {
   const ra: DongTin[] = [];
   const ten_dt = (ma: string) => t.doi_thu.find(d => d.ma === ma) ?? { ma, ten: ma };
@@ -142,20 +160,17 @@ export function ghepTin(t: TinDoiThu): DongTin[] {
   for (const g of t.gia)
     ra.push({ ngay: t.ngay, doi_thu: ten_dt(g.ma_doi_thu), nhom: ten_nh(g.nhom_khoa, g.ten_nhom),
               gia: { gia_goc: g.gia_goc, don_vi_gia: g.don_vi_gia } });
-  const vt_dt = t.doi_thu.map(d => ({ d, vt: t.noi_dung.indexOf("@" + d.ma) })).filter(x => x.vt >= 0);
-  for (const n of t.nhom) {
-    if (ra.some(r => r.nhom?.khoa === n.khoa)) continue;
-    const vt = n.ten ? t.noi_dung.indexOf("@" + n.ten) : -1;
-    const truoc = vt >= 0 ? vt_dt.filter(x => x.vt < vt).sort((a, b) => b.vt - a.vt)[0]?.d : undefined;
-    const dt = truoc ?? (t.doi_thu.length === 1 ? t.doi_thu[0] : null);
-    ra.push({ ngay: t.ngay, doi_thu: dt, nhom: ten_nh(n.khoa, n.ten), gia: null });
+  for (const c of ghepCap(t.nhac)) {
+    if (ra.some(r => r.nhom?.khoa === c.nhom.khoa)) continue;
+    ra.push({ ngay: t.ngay, doi_thu: c.doi_thu ? ten_dt(c.doi_thu) : null, nhom: ten_nh(c.nhom.khoa), gia: null });
   }
-  for (const d of t.doi_thu)
-    if (!ra.some(r => r.doi_thu?.ma === d.ma)) ra.push({ ngay: t.ngay, doi_thu: d, nhom: null, gia: null });
+  const dsDt = [...new Set(t.nhac.filter(z => z.loai === "doi_thu").map(z => z.khoa))];
+  for (const ma of dsDt)
+    if (!ra.some(r => r.doi_thu?.ma === ma)) ra.push({ ngay: t.ngay, doi_thu: ten_dt(ma), nhom: null, gia: null });
   return ra;
 }
 
-const donVi = (m: string) => DON_VI[m] ?? m;
+const donVi = nhanDonVi;
 
 export function cauDong(d: DongTin): string {
   const ngoac = [d.gia ? `${yen(d.gia.gia_goc)}/${donVi(d.gia.don_vi_gia)}` : "", ngay_ngan(d.ngay)].filter(Boolean).join(", ");
