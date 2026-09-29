@@ -74,3 +74,13 @@ def test_bon_cho_hien_dung_HinhMa_khong_tu_viet_img():
         assert not re.search(r"<img\b", s), p
     # Chỉ thành phần chung được đọc bản đồ hình.
     assert "hinhCua" in nguon("chung", "HinhMa.tsx")
+
+
+def test_vo_spa_khong_gui_referer_sang_nguon_khac_nhung_giu_cung_nguon():
+    """SVG <image> không có referrerpolicy -> chính sách của trang quyết định. same-origin: ảnh
+    ngoài không nhận Referer, còn /giao-dien (đọc Referer cùng nguồn) vẫn quay về đúng trang."""
+    from pathlib import Path
+    goc = Path(__file__).resolve().parents[1]
+    for f in (goc / "giao_dien" / "index.html", goc / "kome" / "web" / "spa" / "index.html"):
+        s = f.read_text(encoding="utf-8")
+        assert '<meta name="referrer" content="same-origin">' in s, f

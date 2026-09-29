@@ -14,9 +14,13 @@ const nghe = new Set<() => void>();
 const datMo = (id: string | null) => { dangMo = id; nghe.forEach(f => f()); };
 const theoDoi = (f: () => void) => { nghe.add(f); return () => { nghe.delete(f); }; };
 
-export function ONoi({ noi_dung, href, onBam, children, className, style, nhan, svg }: {
+export function ONoi({ noi_dung, href, onBam, children, className, style, nhan, svg, tabIndex, data_o }: {
   noi_dung: ReactNode; href?: string; onBam?: () => void; children: ReactNode;
   className?: string; style?: CSSProperties; nhan?: string;
+  // Roving tabindex (lưới nhiều ô — một điểm dừng Tab): bỏ trống = như cũ (0 khi không href).
+  tabIndex?: number;
+  // `data-o` gắn lên chính phần tử nhận focus — để lưới tìm lại ô mà `.focus()`.
+  data_o?: string;
   // true khi bọc quanh phần tử SVG (<g>, <rect>…): một `<span>` không href
   // là phần tử SVG LẠ, trình duyệt coi cả cây con "không vẽ" — ép dùng `<a>`
   // (hợp lệ trong SVG dù không có href) để con vẫn hiện ra bình thường.
@@ -58,7 +62,8 @@ export function ONoi({ noi_dung, href, onBam, children, className, style, nhan, 
     ref: (e: HTMLElement | null) => { goc.current = e; },
     className: "o-noi-goc" + (className ? " " + className : ""),
     style,
-    tabIndex: href ? undefined : 0,
+    tabIndex: tabIndex ?? (href ? undefined : 0),
+    "data-o": data_o,
     role: href ? undefined : onBam ? "button" : undefined,
     "aria-label": nhan,
     "aria-describedby": mo ? id : undefined,

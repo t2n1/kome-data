@@ -65,10 +65,15 @@
 .mv-nh-chu-giai{display:inline-flex;align-items:center;gap:3px;font-size:.72rem;color:var(--chu-mo);margin-left:auto}
 .mv-nh-chu-giai i{display:inline-block;width:14px;height:10px;border-radius:2px}
 .mv-nh-chu-giai i.mv-nh-b0{margin-left:8px;border:1px solid var(--vien)}
-.mv-nh-cuon{width:100%;overflow-x:auto;overscroll-behavior-x:contain}
-.mv-nh-bang{display:flex}
+/* Bảng cuộn TRONG khung (cả hai chiều): nhờ vậy dải tháng dính trên (sticky top trong khung — không
+   đụng thanh trên dính của ứng dụng) và cột tên dính trái cùng lúc. */
+.mv-nh-cuon{width:100%;overflow:auto;max-height:max(320px,calc(100vh - 170px));overscroll-behavior-x:contain}
+.mv-nh-bang{display:block}
+.mv-nh-dau{display:flex;position:sticky;top:0;z-index:2}
+.mv-nh-than{display:flex}
 .mv-nh-bang svg{display:block;flex:none}
 .mv-nh-trai{position:sticky;left:0;z-index:1}
+.mv-nh-phim{margin:0 0 6px;font-size:.72rem;color:var(--chu-mo)}
 .mv-nh-nen-nhan{fill:var(--nen-the)}
 .mv-nh-nhan text{font-size:11px;fill:var(--chu)}
 .mv-nh-nhan:hover .mv-nh-nen-nhan{fill:var(--nen-phu)}

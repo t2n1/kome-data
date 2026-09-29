@@ -83,3 +83,41 @@ export function cungThangNamTruoc(thang: Thang[], k: number, ngay_dau: string):
   // Năm trước phải có TRỌN dải đó (tháng j dở dang ở phần giao thì không so).
   return a < thang[j].a || b > thang[j].b || a < 0 ? null : { a, b, cung_dai_ngay: true };
 }
+
+/** Roving focus của lưới hàng × cột (MỘT điểm dừng Tab): phím → ô mới, hoặc null nếu phím không
+ *  thuộc lưới. ←→ trong hàng, ↑↓ giữa hàng, Home/End = hai đầu hàng, PageUp/PageDown = ±10 hàng.
+ *  Luôn kẹp vào lưới (không vòng). */
+export function buocPhim(phim: string, r: number, c: number, so_hang: number, so_cot: number): [number, number] | null {
+  if (so_hang <= 0 || so_cot <= 0) return null;
+  const kep = (x: number, n: number) => Math.max(0, Math.min(n - 1, x));
+  switch (phim) {
+    case "ArrowLeft": return [kep(r, so_hang), kep(c - 1, so_cot)];
+    case "ArrowRight": return [kep(r, so_hang), kep(c + 1, so_cot)];
+    case "ArrowUp": return [kep(r - 1, so_hang), kep(c, so_cot)];
+    case "ArrowDown": return [kep(r + 1, so_hang), kep(c, so_cot)];
+    case "Home": return [kep(r, so_hang), 0];
+    case "End": return [kep(r, so_hang), so_cot - 1];
+    case "PageUp": return [kep(r - 10, so_hang), kep(c, so_cot)];
+    case "PageDown": return [kep(r + 10, so_hang), kep(c, so_cot)];
+    default: return null;
+  }
+}
+
+// Chữ toàn khổ (CJK, kana, dấu toàn khổ ※…) rộng ≈ 1,7 chữ Latin ở cỡ chữ nhãn.
+const TOAN_KHO = /[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦※]/u;
+export const doRongChu = (ch: string) => (TOAN_KHO.test(ch) ? 1.7 : 1);
+
+/** Cắt tên cho vừa `toi_da` đơn vị chữ Latin; bị cắt thì kết thúc bằng "…" (tính 1 đơn vị). */
+export function catTen(ten: string, toi_da: number): string {
+  const chu = Array.from(ten);
+  let w = 0;
+  for (const ch of chu) w += doRongChu(ch);
+  if (w <= toi_da) return ten;
+  let kq = "", dung = 0;
+  for (const ch of chu) {
+    const d = doRongChu(ch);
+    if (dung + d > toi_da - 1) break;
+    kq += ch; dung += d;
+  }
+  return (kq || chu[0]) + "…";
+}

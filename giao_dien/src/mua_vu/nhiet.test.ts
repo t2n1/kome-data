@@ -113,3 +113,39 @@ describe("cungThangNamTruoc", () => {
     expect(r.b).toBe(di("2025-04-10", "2025-03-01"));
   });
 });
+
+import { buocPhim, catTen } from "./nhiet";
+
+describe("buocPhim (roving focus)", () => {
+  it("mũi tên đi một ô và kẹp ở mép", () => {
+    expect(buocPhim("ArrowRight", 2, 3, 10, 5)).toEqual([2, 4]);
+    expect(buocPhim("ArrowRight", 2, 4, 10, 5)).toEqual([2, 4]);
+    expect(buocPhim("ArrowLeft", 2, 0, 10, 5)).toEqual([2, 0]);
+    expect(buocPhim("ArrowUp", 0, 1, 10, 5)).toEqual([0, 1]);
+    expect(buocPhim("ArrowDown", 9, 1, 10, 5)).toEqual([9, 1]);
+  });
+  it("Home/End = hai đầu hàng; PageUp/PageDown = ±10 hàng", () => {
+    expect(buocPhim("Home", 4, 3, 10, 5)).toEqual([4, 0]);
+    expect(buocPhim("End", 4, 0, 10, 5)).toEqual([4, 4]);
+    expect(buocPhim("PageDown", 4, 2, 30, 5)).toEqual([14, 2]);
+    expect(buocPhim("PageDown", 25, 2, 30, 5)).toEqual([29, 2]);
+    expect(buocPhim("PageUp", 4, 2, 30, 5)).toEqual([0, 2]);
+  });
+  it("phím khác / lưới rỗng → null; ô cũ ngoài lưới bị kẹp lại", () => {
+    expect(buocPhim("Enter", 0, 0, 10, 5)).toBeNull();
+    expect(buocPhim("ArrowDown", 0, 0, 0, 5)).toBeNull();
+    expect(buocPhim("ArrowLeft", 50, 9, 10, 5)).toEqual([9, 4]);
+  });
+});
+
+describe("catTen", () => {
+  it("tên vừa thì giữ nguyên, dài thì kết thúc bằng …", () => {
+    expect(catTen("Ngo nep", 10)).toBe("Ngo nep");
+    expect(catTen("Banh dua nuong dang tui", 10)).toBe("Banh dua …");
+  });
+  it("chữ toàn khổ tính ≈ 1,7 chữ Latin", () => {
+    const t = catTen("※終売※Banh dua nuong", 10);
+    expect(t.endsWith("…")).toBe(true);
+    expect(t).toBe("※終売※Ba…");   // 4 × 1,7 + 2 = 8,8 ≤ 10 − 1 (chỗ cho "…")
+  });
+});

@@ -180,13 +180,14 @@ a.tng-dong:hover,.tng-dong:focus-visible{background:var(--nen-phu)}
 .kh-tab button[aria-selected="true"],.hs-tab button[aria-selected="true"]{color:var(--do-chu);border-bottom-color:var(--do);font-weight:600}
 .kh-tab button:hover,.hs-tab button:hover{color:var(--chu)}
 
-/* Hình sản phẩm (chung/HinhMa.tsx). Nền trắng cố định: ảnh sản phẩm chụp nền trắng, `contain` để
-   lộ nền — viền mảnh để ô không tan vào nền sáng. */
+/* Hình sản phẩm (chung/HinhMa.tsx). `#fff` CỐ Ý, không phải token (cả ở chế độ tối): ảnh sản phẩm
+   chụp trên nền trắng và `contain` để lộ phần nền — nền token tối sẽ thành viền đen quanh ảnh trắng.
+   Viền mảnh để ô không tan vào nền sáng. */
 .hinh-ma{display:inline-block;flex:none;box-sizing:border-box;object-fit:contain;background:#fff;
   border:1px solid var(--vien);border-radius:6px;vertical-align:middle}
 .hinh-ma-cho{display:inline-flex;align-items:center;justify-content:center;background:var(--nen-phu);
   color:var(--chu-mo);font-weight:600;line-height:1;user-select:none}
-.hinh-ma-svg-nen{fill:#fff;stroke:var(--vien)}
+.hinh-ma-svg-nen{fill:#fff;stroke:var(--vien)}   /* #fff cố ý — xem trên */
 .hinh-ma-svg-cho rect{fill:var(--nen-phu);stroke:var(--vien)}
 .hinh-ma-svg-cho text{fill:var(--chu-mo);font-weight:600}
 /* Ô nổi có ảnh: ảnh bên trái, chữ bên phải. */

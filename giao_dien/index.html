@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<!-- same-origin: gửi Referer ĐẦY ĐỦ cho yêu cầu cùng nguồn (/giao-dien đọc Referer để quay về đúng
+     trang + bộ lọc — bao_mat.duong_dan_an_toan), KHÔNG gửi gì sang nguồn khác (ảnh sản phẩm ở
+     cos.ec-design.co.jp, kể cả <image> trong SVG vốn không có thuộc tính referrerpolicy). -->
+<meta name="referrer" content="same-origin">
 <title>KOME</title>
 <link rel="icon" href="/static/kome-logo.png">
 <!-- Token màu / font dùng CHUNG với các trang Jinja chưa chuyển: một file, một nhà. -->

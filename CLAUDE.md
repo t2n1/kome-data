@@ -996,7 +996,10 @@ nhớ theo mtime; file thiếu → `{}`) → `window.__KOME__.hinh` (`app.py::_k
 nhập / thông báo mang `{}`) → `giao_dien/src/chung/hinh_ma.ts::hinhCua` → `chung/HinhMa.tsx` (`HinhMa` cho
 HTML, `HinhMaSvg` cho treemap / bản đồ nhiệt; không hình hoặc ảnh lỗi → ô giữ chỗ chữ cái đầu). Cập nhật =
 THAY FILE (không bảng, không migration, không vào ảnh chụp API). Không màn nào tự viết `<img src=`. Ảnh tải
-từ máy chủ NGOÀI (`cos.ec-design.co.jp`, `referrerPolicy="no-referrer"`). Có test canh:
+từ máy chủ NGOÀI (`cos.ec-design.co.jp`) và KHÔNG gửi Referer sang đó: `<img>` mang `referrerPolicy="no-referrer"`,
+còn `<image>` của SVG (không có thuộc tính đó) dựa vào `<meta name="referrer" content="same-origin">` của vỏ
+`giao_dien/index.html` — KHÔNG đổi thành `no-referrer`: `/giao-dien` đọc Referer cùng nguồn để quay về đúng trang
+và bộ lọc. Bản đồ nhiệt `/mua-vu` chỉ vẽ `<image>` cho hàng trong khung cuộn ± 20 hàng (SVG không lazy). Có test canh:
 `tests/test_hinh_san_pham.py`, `giao_dien/src/chung/hinh_ma.test.ts`.
 
 **Bất biến (Đợt 6, migration 038):** công nợ đọc sổ `請求先元帳` (spec `seikyu_motocho`
