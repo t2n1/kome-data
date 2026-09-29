@@ -39,3 +39,4 @@
 .dt-tao-nhom{border:1px solid var(--vien);border-radius:8px;margin:10px 0 0;padding:.5rem .7rem;display:grid;gap:6px;min-width:0}
 .dt-so{width:5.5rem;text-align:right}
 @media (max-width:760px){.dt-duyet{grid-template-columns:minmax(0,1fr)}.dt-sua label,.dt-them label{grid-template-columns:minmax(0,1fr)}}
+.dt-an{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

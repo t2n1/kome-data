@@ -20,7 +20,8 @@ export function TabNhomQuyCach() {
   const q = useQuery({ queryKey: ["doi-thu", "nhom-quy-cach", kx],
     queryFn: () => lay<NhomQuyCach>(`/api/doi-thu/nhom-quy-cach${kx ? "?" + kx : ""}`) });
   const d = q.data;
-  const [loi, datLoi] = useState<string | null>(null);
+  const [loi, datLoi] = useState<string | null>(null);      // lỗi của khối Nhóm
+  const [loiQc, datLoiQc] = useState<string | null>(null);  // lỗi của khối Quy cách (lưu một dòng)
   const [dang_gui, datDangGui] = useState(false);
   const [tenMoi, datTenMoi] = useState("");
   const [maMoi, datMaMoi] = useState("");
@@ -29,12 +30,12 @@ export function TabNhomQuyCach() {
   const [chiThieuKg, datChiThieuKg] = useState(false);
   const [sua, datSua] = useState<Record<string, Sua>>({});
   // Chống bấm đúp: mọi nút ghi khoá tới khi yêu cầu xong (thành công hay lỗi).
-  const lam = (gui_di: () => Promise<unknown>, sau?: () => void) => {
+  const lam = (gui_di: () => Promise<unknown>, sau?: () => void, datL = datLoi) => {
     if (dang_gui) return;
     datDangGui(true);
-    datLoi(null);
+    datL(null);
     gui_di().then(() => { sau?.(); qc.invalidateQueries({ queryKey: ["doi-thu"] }); })
-      .catch((e: Error) => datLoi(e.message)).finally(() => datDangGui(false));
+      .catch((e: Error) => datL(e.message)).finally(() => datDangGui(false));
   };
   const t = boDau(tim.trim());
   const qcLoc = (d?.quy_cach ?? []).filter(x => (!chiThieuKg || chuaCoKg(x)) && (!t || boDau(`${x.ma} ${x.ten ?? ""} ${x.nganh}`).includes(t)));
@@ -75,7 +76,7 @@ export function TabNhomQuyCach() {
         </Khoi>
       </section>
       <section className="dt-khoi">
-        <Khoi tieu_de="Quy cách KOME" dang_tai={q.isLoading} loi={loiKhoi}
+        <Khoi tieu_de="Quy cách KOME" dang_tai={q.isLoading} loi={loiKhoi} canh_bao={loiQc}
           cach_tinh="Có kg thì giá KOME mới tính được ¥/kg (đơn giá thực 90 ngày).">
           <div className="dt-loc">
             <button type="button" className="chip" aria-pressed={chiThieuKg} onClick={() => datChiThieuKg(!chiThieuKg)}>
@@ -84,7 +85,7 @@ export function TabNhomQuyCach() {
           </div>
           <div className="dt-cuon">
             <table className="bang dt-bang">
-              <thead><tr><th>Mã</th><th>Tên</th><th>Ngành</th><th>kg/gói</th><th>gói/thùng</th><th>kg/thùng</th><th>Nguồn</th><th /></tr></thead>
+              <thead><tr><th>Mã</th><th>Tên</th><th>Ngành</th><th>kg/gói</th><th>gói/thùng</th><th>kg/thùng</th><th>Nguồn</th><th><span className="dt-an">Thao tác</span></th></tr></thead>
               <tbody>{qcLoc.map(x => {
                 const goc = cuaDong(x), gt = sua[x.ma] ?? goc;
                 const doi = (k: keyof Sua, v: string) => { const { [x.ma]: _b, ...con } = sua; const moi = { ...gt, [k]: v };
@@ -98,7 +99,7 @@ export function TabNhomQuyCach() {
                     <td>{x.da_sua ? "người sửa" : "tự tách từ tên"}</td>
                     <td><button type="button" className="chip" disabled={dang_gui || !sua[x.ma]} aria-label={`Lưu quy cách ${x.ma}`}
                       onClick={() => lam(() => gui("/api/doi-thu/quy-cach", { product_code: x.ma, ...gt }),
-                        () => { const { [x.ma]: _b, ...con } = sua; datSua(con); })}>Lưu</button></td>
+                        () => { const { [x.ma]: _b, ...con } = sua; datSua(con); }, datLoiQc)}>Lưu</button></td>
                   </tr>);
               })}</tbody>
             </table>

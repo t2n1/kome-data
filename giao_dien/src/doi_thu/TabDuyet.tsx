@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { gui, lay } from "../api";
 import type { NhomQuyCach, TongQuan } from "./kieu";
+import { nhomIdHopLe } from "./loc";
 import { Khoi } from "../chung/Khoi";
 import { ngay, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
@@ -35,7 +36,8 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const [sua, datSua] = useState<Record<string, string>>({});
   const [nguon, datNguon] = useState({ loai_nguon: "", ghi_chu_nguon: "" });
   const [maKome, datMaKome] = useState("");
-  const [loi, datLoi] = useState<string | null>(null);
+  const [loi, datLoi] = useState<string | null>(null);          // lỗi của khung sửa / ghép dòng đang chọn
+  const [loiThem, datLoiThem] = useState<string | null>(null);  // lỗi của form thêm hàng
   const [dang_gui, datDangGui] = useState(false);
   const [nhomId, datNhomId] = useState("");
   const [moThem, datMoThem] = useState(false);
@@ -45,13 +47,14 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const nq = useQuery({ queryKey: ["doi-thu", "nhom-quy-cach", kx], enabled: !!chon && chon.nguon === "nap",
     queryFn: () => lay<NhomQuyCach>(`/api/doi-thu/nhom-quy-cach${kx ? "?" + kx : ""}`) });
   const nhomCoTen = nq.data?.nhom ?? [];
+  const nhomChon = nhomIdHopLe(nhomCoTen, nhomId);  // chỉ nhóm CÓ trong ô chọn mới được gửi
   const tenBen = tq.data?.ben.find(b => b.ma === ben)?.ten ?? ben;
   const xong = () => { datChon(null); datSua({}); datLoi(null); datMaKome(""); datNhomId(""); qc.invalidateQueries({ queryKey: ["doi-thu"] }); };
   // Chống bấm đúp: mọi nút ghi khoá tới khi yêu cầu xong (thành công hay lỗi).
-  const lam = (gui_di: () => Promise<unknown>, sau: () => void = xong) => {
+  const lam = (gui_di: () => Promise<unknown>, sau: () => void = xong, datL = datLoi) => {
     if (dang_gui) return;
     datDangGui(true);
-    gui_di().then(sau).catch((e: Error) => datLoi(e.message)).finally(() => datDangGui(false));
+    gui_di().then(sau).catch((e: Error) => datL(e.message)).finally(() => datDangGui(false));
   };
   return (
     <div className="dt-duyet">
@@ -62,7 +65,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
           <div className="dt-loc" role="group" aria-label="Lọc">
             {LOC.map(([m, n]) => <button key={m} type="button" className="chip" aria-pressed={loc === m} onClick={() => datLoc(m)}>{n}</button>)}
           </div>
-          <p><button type="button" className="chip" aria-expanded={moThem} onClick={() => { datMoThem(!moThem); datLoi(null); }}>
+          <p><button type="button" className="chip" aria-expanded={moThem} onClick={() => { datMoThem(!moThem); datLoiThem(null); }}>
             Thêm hàng AI bỏ sót</button></p>
           {moThem && (
             <fieldset className="dt-them" aria-label="Thêm hàng AI bỏ sót">
@@ -79,14 +82,14 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
               <label>Loại nguồn<select value={moi.loai_nguon} onChange={e => datMoi({ ...moi, loai_nguon: e.target.value })}>
                 <option value="">— loại nguồn (bắt buộc) —</option>
                 {LOAI_NGUON.map(([m, n]) => <option key={m} value={m}>{n}</option>)}</select></label>
-              {loi && <p role="alert" className="dt-loi">{loi}</p>}
+              {loiThem && <p role="alert" className="dt-loi">{loiThem}</p>}
               <div className="dt-nut">
                 <button type="button" className="chip"
                   disabled={dang_gui || !moi.ma_doi_thu || !moi.ten_goc.trim() || !moi.loai_nguon || (moi.trang_thai !== "het" && !moi.gia_goc.trim())}
                   title="Cần: đối thủ, tên hàng, loại nguồn và giá (trừ khi hàng đã hết)"
-                  onClick={() => lam(() => gui("/api/doi-thu/gia-moi", moi), () => { datMoThem(false); datMoi(HANG_MOI_TRONG); datLoi(null); qc.invalidateQueries({ queryKey: ["doi-thu"] }); })}>
+                  onClick={() => lam(() => gui("/api/doi-thu/gia-moi", moi), () => { datMoThem(false); datMoi(HANG_MOI_TRONG); datLoiThem(null); qc.invalidateQueries({ queryKey: ["doi-thu"] }); }, datLoiThem)}>
                   Thêm hàng</button>
-                <button type="button" className="chip" onClick={() => { datMoThem(false); datLoi(null); }}>Đóng</button>
+                <button type="button" className="chip" onClick={() => { datMoThem(false); datLoiThem(null); }}>Đóng</button>
               </div>
             </fieldset>)}
           <ul className="dt-ds dt-chon">{q.data?.dong.map(x => (
@@ -127,7 +130,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
             </fieldset>
             <fieldset><legend>Ghép với KOME</legend>
               <input placeholder="Mã KOME (trống = không ghép)" aria-label="Mã KOME" value={maKome} onChange={e => datMaKome(e.target.value)} />
-              <select aria-label="Nhóm so sánh" value={nhomId} onChange={e => datNhomId(e.target.value)}>
+              <select aria-label="Nhóm so sánh" value={nhomChon} onChange={e => datNhomId(e.target.value)}>
                 <option value="">— theo mã KOME —</option>
                 {nhomCoTen.map(g => <option key={g.id} value={String(g.id)}>{g.ten}</option>)}</select>
               {(["cung_hang", "thay_the", "khong"] as const).map(n => (
@@ -137,7 +140,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
                   const ma = maKome.trim();
                   lam(() => gui("/api/doi-thu/ghep", { ma_doi_thu: chon.ma_doi_thu, ma_hang_dt: chon.ma_hang_dt,
                     product_code: n === "khong" ? null : ma || null,
-                    nhom_id: n === "khong" || !nhomId ? null : Number(nhomId), nhan: n }));
+                    nhom_id: n === "khong" || !nhomChon ? null : Number(nhomChon), nhan: n }));
                 }}>{n === "cung_hang" ? "Cùng hàng" : n === "thay_the" ? "Thay thế" : "Không ghép"}</button>))}
             </fieldset>
           </Khoi>

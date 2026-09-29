@@ -7,7 +7,7 @@ import { ngay, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { Nhom } from "./kieu";
 import { NHAN_DUYET } from "./kieu";
-import { BO_LOC_TRONG, dangLocDong, locNhom, locQuanSat, luaChonLoc, viTriKome, type BoLoc } from "./loc";
+import { BO_LOC_TRONG, dangLocDong, locNhom, locQuanSat, dongMoSan, kemGiaTri, luaChonLoc, viTriKome, type BoLoc } from "./loc";
 
 const TUOI = [[null, "Mọi tuổi"], [30, "≤ 30 ngày"], [90, "≤ 90 ngày"], [180, "≤ 180 ngày"]] as const;
 type Props = {
@@ -37,7 +37,7 @@ export function TabSoSanh({ nganh, ben, nhom, datNganh, datBen, datNhom }: Props
   const daMo = useRef("");
   useEffect(() => {
     if (!nhom || daMo.current === nhom || !tatCa) return;
-    const k = ds.find(n => n.nhom_khoa === nhom);
+    const k = dongMoSan(ds, nhom);
     if (!k) return;
     daMo.current = nhom;
     const khoa = k.nhom_khoa + "|" + k.don_vi_so;
@@ -52,7 +52,7 @@ export function TabSoSanh({ nganh, ben, nhom, datNganh, datBen, datNhom }: Props
         canh_bao={dangLocDong(l) ? "Bộ lọc chỉ ẩn dòng chi tiết — số của nhóm (thấp nhất, trung vị, cao nhất, vị trí KOME) vẫn tính trên mọi hàng, cả cùng hàng lẫn thay thế." : null}>
         <div className="dt-loc">
           <select aria-label="Ngành" value={nganh} onChange={e => datL({ nganh: e.target.value })}>
-            <option value="">Mọi ngành</option>{chon.nganh.map(n => <option key={n} value={n}>{n}</option>)}</select>
+            <option value="">Mọi ngành</option>{kemGiaTri(chon.nganh, nganh).map(n => <option key={n} value={n}>{n}</option>)}</select>
           <select aria-label="Bên" value={ben} onChange={e => datL({ ben: e.target.value })}>
             <option value="">Mọi bên</option>{dsBen.map(b => <option key={b.ma} value={b.ma}>{b.ten}</option>)}</select>
           <select aria-label="Kênh hoặc mức giá" value={rieng.kenh} onChange={e => datL({ kenh: e.target.value })}>

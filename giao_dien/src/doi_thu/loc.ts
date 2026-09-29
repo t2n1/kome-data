@@ -61,3 +61,15 @@ export const tachMa = (s: string): string[] => [...new Set(s.split(/[\s,;、，]
 
 /** Quy cách chưa có kg nào (cả kg/gói lẫn kg/thùng) — chip "Chưa có kg". */
 export const chuaCoKg = (q: { kg_moi_goi: number | null; kg_moi_thung: number | null }) => q.kg_moi_goi == null && q.kg_moi_thung == null;
+
+/** Dòng nhóm để mở sẵn cho ?nhom=<nhom_khoa>: một nhom_khoa có thể có nhiều dòng (mỗi don_vi_so một dòng) — ưu tiên 'kg'. */
+export function dongMoSan(ds: Nhom[], khoa: string): Nhom | null {
+  const c = ds.filter(n => n.nhom_khoa === khoa);
+  return c.find(n => n.don_vi_so === "kg") ?? c[0] ?? null;
+}
+
+/** Danh sách giá trị của ô chọn + giá trị đang chọn trên URL nếu dữ liệu không có (ô chọn không nói dối "Mọi …"). */
+export const kemGiaTri = (ds: string[], v: string): string[] => (!v || ds.includes(v) ? ds : [...ds, v]);
+
+/** id nhóm đang chọn chỉ hợp lệ khi có trong danh sách nhóm đã tải — không thì "" (không bao giờ gửi nhóm mà ô chọn không hiện). */
+export const nhomIdHopLe = (ds: { id: number }[], id: string): string => (ds.some(g => String(g.id) === id) ? id : "");
