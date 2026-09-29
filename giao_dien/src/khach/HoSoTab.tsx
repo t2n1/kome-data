@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { lay } from "../api";
 import { BieuDo } from "../chung/BieuDo";
+import { HinhMa } from "../chung/HinhMa";
 import { DongSoSanh, MauSs } from "../chung/SoSanh";
 
 import { gon, ngay, pc, so, thay_doi, yen } from "../dinh_dang";
@@ -150,7 +151,7 @@ function MatHangThang({ ma, thang, dong }: { ma: string; thang: string; dong: ()
         <div className="bang-cuon"><table className="bang">
           <thead><tr><th>Mã</th><th>Tên hàng</th><th>Quy cách</th><th className="so">Số lượng</th><th className="so">Số ngày mua</th><th className="so">Doanh thu</th></tr></thead>
           <tbody>{gop.map(x => (
-            <tr key={x.ma}><td><code>{x.ma}</code></td><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(x.ma)}`}>{x.ten}</a></td>
+            <tr key={x.ma}><td><code>{x.ma}</code></td><td className="ten-jp"><TenHinh ma={x.ma} ten={x.ten}><a href={`/san-pham/${encodeURIComponent(x.ma)}`}>{x.ten}</a></TenHinh></td>
               <td className="phu">{[...x.quy_cach].join(", ")}</td><td className="so">{so(x.so_luong)}</td>
               <td className="so">{x.lan.size}</td><td className="so">{yen(x.doanh_thu)}</td></tr>))}</tbody>
         </table></div>}
@@ -237,7 +238,7 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
         {coSsMh && <><th className="so"><MauSs />{kh.so_sanh[0].nhan}</th><th className="so">So</th></>}
         <th className="so">Lãi gộp</th><th className="so">Số lượng</th><th className="so">Số ngày mua</th><th className="so">Mua cuối</th></tr></thead>
         <tbody>{hang.map(m => (
-          <tr key={m.ma}><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></td>
+          <tr key={m.ma}><td className="ten-jp"><TenHinh ma={m.ma} ten={m.ten}><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></TenHinh></td>
             <td className="so">{yen(m.doanh_thu)}</td>
             {coSsMh && (() => { const v = m.dt_ss ? m.doanh_thu / m.dt_ss - 1 : null; return <>
               <td className="so nhat-chu">{m.dt_ss ? yen(m.dt_ss) : "không mua"}</td>
@@ -264,7 +265,7 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
       <div className="hs-top">{top.map((m, i) => (
         <div key={m.ma} className="hs-top-dong">
           <span className="hs-top-so">{i + 1}</span>
-          <span><a className="ten-jp" href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code> · {m.nganh}</div></span>
+          <TenHinh ma={m.ma} ten={m.ten}><a className="ten-jp" href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code> · {m.nganh}</div></TenHinh>
           <span><span className="kh-td-thanh"><i style={{ width: `${Math.max(0, m.doanh_thu) / mx * 100}%` }} /></span>
             <span className="ma-nho">{yen(m.doanh_thu)} · {so(m.so_lan)} lần · nhịp {m.nhip ? Math.round(m.nhip) + " ngày" : "—"} · cuối {ngay(m.lan_cuoi)}</span></span>
           <span className="hs-top-nhan">{badgeDeXuat(lichDu[m.ma])}</span>
@@ -278,7 +279,7 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
         {!h.da_ngung_mua.length ? <p className="phu">Không có sản phẩm nào bị bỏ quên.</p> :
         <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th><th className="so">Trễ</th><th className="so">Nhịp</th><th className="so">Mua cuối</th><th className="so">Doanh thu</th></tr></thead>
           <tbody>{h.da_ngung_mua.map(m => (
-            <tr key={m.ma}><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></td>
+            <tr key={m.ma}><td className="ten-jp"><TenHinh ma={m.ma} ten={m.ten}><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></TenHinh></td>
               <td className="so giam">{m.tre != null ? `${m.tre} ngày` : "—"}</td><td className="so">{m.nhip ? Math.round(m.nhip) + " ngày" : "—"}</td>
               <td className="so">{ngay(m.lan_cuoi)}</td><td className="so">{yen(m.doanh_thu)}</td></tr>))}</tbody></table></div>}
       </The>
@@ -288,8 +289,8 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
         <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th>{thang.map((t, i) =>
           <th key={t} className="so">Tháng {+t.slice(5)}{i === 2 ? " (đến nay)" : ""}</th>)}</tr></thead>
           <tbody>{h.chua_mua_thang.map(c => { const m = mhTheoMa[c.ma]; return (
-            <tr key={c.ma}><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(c.ma)}`}>{c.ten}</a>
-              <div className="ma-nho"><code>{c.ma}</code> · trễ {c.tre ?? "—"} ngày</div></td>
+            <tr key={c.ma}><td className="ten-jp"><TenHinh ma={c.ma} ten={c.ten}><a href={`/san-pham/${encodeURIComponent(c.ma)}`}>{c.ten}</a>
+              <div className="ma-nho"><code>{c.ma}</code> · trễ {c.tre ?? "—"} ngày</div></TenHinh></td>
               <td className="so">{m ? gon(m.t2) : "—"}</td><td className="so">{m ? gon(m.t1) : "—"}</td>
               <td className={"so " + (m && !m.t0 ? "giam" : "")}><b>{m ? (m.t0 ? gon(m.t0) : "0") : "—"}</b></td></tr>); })}</tbody></table></div>}
       </The>
@@ -304,8 +305,8 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
       {!h.goi_y.length ? <p className="phu">Không có gợi ý.</p> :
       <div className="bang-cuon"><table className="bang"><thead><tr><th>#</th><th>Mặt hàng</th><th className="so">Tỷ suất lãi gộp</th></tr></thead>
         <tbody>{h.goi_y.map((g, i) => (
-          <tr key={g.ma}><td className="nhat-chu">{i + 1}</td><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(g.ma)}`}>{g.ten}</a>
-            <div className="ma-nho"><code>{g.ma}</code></div></td><td className="so">{pc(g.ty_suat)}</td></tr>))}</tbody></table></div>}
+          <tr key={g.ma}><td className="nhat-chu">{i + 1}</td><td className="ten-jp"><TenHinh ma={g.ma} ten={g.ten}><a href={`/san-pham/${encodeURIComponent(g.ma)}`}>{g.ten}</a>
+            <div className="ma-nho"><code>{g.ma}</code></div></TenHinh></td><td className="so">{pc(g.ty_suat)}</td></tr>))}</tbody></table></div>}
     </The>
 
     <The tieu_de={`Tất cả mặt hàng (${h.mat_hang.length})`} cach_tinh="mọi mã khách từng mua · 3 cột tháng gần nhất để thấy ngay tháng nào vắng"
@@ -315,6 +316,11 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
   </>);
 }
 
+/** Ô tên mặt hàng có ảnh nhỏ đầu dòng (chung/HinhMa.tsx) — tên đã in ngay cạnh nên ảnh là trang trí. */
+function TenHinh({ ma, ten, children }: { ma: string; ten: string; children: React.ReactNode }) {
+  return <div className="ten-hinh"><HinhMa ma={ma} ten={ten} co={28} trang_tri /><div>{children}</div></div>;
+}
+
 function BangMatHang({ ds, thang }: { ds: MatHang[]; thang: string[] }) {
   const NHAN: Record<string, [string, string]> = { mua: ["đang mua", "ok"], ngung: ["đã ngừng", "do"], khong_goi: ["khách ngừng GD", "nhat"] };
   return (
@@ -322,7 +328,7 @@ function BangMatHang({ ds, thang }: { ds: MatHang[]; thang: string[] }) {
       <thead><tr><th>Mặt hàng</th><th>Ngành</th>{thang.map(t => <th key={t} className="so">T{+t.slice(5)}</th>)}
         <th className="so">Luỹ kế</th><th className="so">Lần</th><th className="so">Nhịp</th><th>Trạng thái</th></tr></thead>
       <tbody>{ds.map(m => (
-        <tr key={m.ma}><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></td>
+        <tr key={m.ma}><td className="ten-jp"><TenHinh ma={m.ma} ten={m.ten}><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></TenHinh></td>
           <td className="phu ten-jp">{m.nganh}</td>
           {[m.t2, m.t1, m.t0].map((v, i) => <td key={i} className={"so" + (v ? "" : " nhat-chu")}>{v ? gon(v) : "·"}</td>)}
           <td className="so">{gon(m.doanh_thu)}</td><td className="so">{so(m.so_lan)}</td>

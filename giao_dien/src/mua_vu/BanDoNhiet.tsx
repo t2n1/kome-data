@@ -4,6 +4,7 @@
 import { memo, useEffect, useMemo, useRef } from "react";
 import { useRong } from "../chung/hooks";
 import { Khoi } from "../chung/Khoi";
+import { HinhMa, HinhMaSvg } from "../chung/HinhMa";
 import { DongNoi, ONoi } from "../chung/ONoi";
 import { ngay_ngan, pc, thang_nhan } from "../dinh_dang";
 import { CAU_SO_LUONG, MUA, inSo, ngayCua, type ChiSo, type DuLieuMV, type LuyKe } from "./du_lieu";
@@ -13,6 +14,7 @@ export type KieuTo = "ma" | "bang";
 const CAO_HANG = 16;
 const DAU = 36;          // dải mùa + năm + số tháng
 const MUA_CAO = 6;
+const ANH = CAO_HANG - 2;   // ảnh nhỏ ở cột nhãn — bằng cao hàng
 const TEN_THANG = ["", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
 type Bang = {
@@ -88,14 +90,17 @@ export function BanDoNhiet({ dl, L, cs, nganhCua, tat, danhDau, to, datTo, kieu,
               const nt = cungThangNamTruoc(thang, k, dl.ngay_dau!);
               return (
                 <ONoi key={k} svg nhan={`${ma.ten} · ${thang_nhan(t.thang)}`} onBam={() => onChon(t.b)}
-                  noi_dung={<>
-                    <b>{ma.ten}</b> <span className="mo">{ma.ma}</span>
-                    <DongNoi nhan={thang_nhan(t.thang) + (t.do_dang ? " (dở dang)" : "")} gia={inSo(cs, v)} />
-                    <DongNoi nhan="So tháng cao nhất của mã" gia={mh > 0 ? pc(v / mh) : "—"} />
-                    <DongNoi nhan={nt?.cung_dai_ngay ? "Cùng dải ngày năm trước" : "Cùng tháng năm trước"}
-                      gia={nt ? inSo(cs, L.tong(cs, m, nt.a, nt.b)) : "—"} />
-                    <div className="mo">Bấm để xem ảnh chụp 30 ngày cuối tháng này</div>
-                  </>}>
+                  noi_dung={<div className="o-noi-hinh">
+                    <HinhMa ma={ma.ma} ten={ma.ten} co={64} trang_tri />
+                    <div>
+                      <b>{ma.ten}</b> <span className="mo">{ma.ma}</span>
+                      <DongNoi nhan={thang_nhan(t.thang) + (t.do_dang ? " (dở dang)" : "")} gia={inSo(cs, v)} />
+                      <DongNoi nhan="So tháng cao nhất của mã" gia={mh > 0 ? pc(v / mh) : "—"} />
+                      <DongNoi nhan={nt?.cung_dai_ngay ? "Cùng dải ngày năm trước" : "Cùng tháng năm trước"}
+                        gia={nt ? inSo(cs, L.tong(cs, m, nt.a, nt.b)) : "—"} />
+                      <div className="mo">Bấm để xem ảnh chụp 30 ngày cuối tháng này</div>
+                    </div>
+                  </div>}>
                   <rect x={k * CW} y={DAU + i * CAO_HANG} width={CW - 1} height={CAO_HANG - 1}
                     className={"mv-nh-o mv-nh-b" + b} />
                 </ONoi>);
@@ -109,19 +114,23 @@ export function BanDoNhiet({ dl, L, cs, nganhCua, tat, danhDau, to, datTo, kieu,
     <>
       {bang.hien.map((m, i) => {
         const ma = dl.ma[m], y = DAU + i * CAO_HANG, cd = bang.cao_diem[i];
-        const toiDa = Math.floor((NHAN - 16) / 6.4);
+        const toiDa = Math.floor((NHAN - 19 - ANH) / 6.4);
         return (
           <ONoi key={ma.ma} svg nhan={ma.ten}
-            noi_dung={<>
-              <b>{ma.ten}</b> <span className="mo">{ma.ma}</span>
-              <DongNoi nhan="Ngành" gia={ma.nganh} />
-              <DongNoi nhan="Tổng cả kỳ" gia={inSo(cs, bang.tong[i])} />
-              <DongNoi nhan="Tháng cao điểm" gia={cd === null ? "—" : `tháng ${cd}`} />
-            </>}>
+            noi_dung={<div className="o-noi-hinh">
+              <HinhMa ma={ma.ma} ten={ma.ten} co={64} trang_tri />
+              <div>
+                <b>{ma.ten}</b> <span className="mo">{ma.ma}</span>
+                <DongNoi nhan="Ngành" gia={ma.nganh} />
+                <DongNoi nhan="Tổng cả kỳ" gia={inSo(cs, bang.tong[i])} />
+                <DongNoi nhan="Tháng cao điểm" gia={cd === null ? "—" : `tháng ${cd}`} />
+              </div>
+            </div>}>
             <g className="mv-nh-nhan">
               <rect x={0} y={y} width={NHAN} height={CAO_HANG} className="mv-nh-nen-nhan" />
               <rect x={4} y={y + 4} width={8} height={8} rx={2} className={"mv-n" + (nganhCua[m] % 12)} />
-              <text x={16} y={y + 12}>{ma.ten.length > toiDa ? ma.ten.slice(0, Math.max(1, toiDa - 1)) + "…" : ma.ten}</text>
+              <HinhMaSvg ma={ma.ma} ten={ma.ten} x={15} y={y + 1} co={ANH} />
+              <text x={16 + ANH + 3} y={y + 12}>{ma.ten.length > toiDa ? ma.ten.slice(0, Math.max(1, toiDa - 1)) + "…" : ma.ten}</text>
             </g>
           </ONoi>);
       })}

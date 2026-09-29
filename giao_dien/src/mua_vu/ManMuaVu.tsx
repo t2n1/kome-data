@@ -10,6 +10,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { lay } from "../api";
 import { useRong } from "../chung/hooks";
 import { Khoi } from "../chung/Khoi";
+import { HinhMa, HinhMaSvg } from "../chung/HinhMa";
 import { DongNoi, ONoi } from "../chung/ONoi";
 import { ngay, pc } from "../dinh_dang";
 import { giuKhoang } from "../khung/khoang";
@@ -177,18 +178,27 @@ export default function ManMuaVu() {
                     return (
                       <ONoi key={m.ma} svg href={m.an ? undefined : giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)}
                         nhan={m.ten}
-                        noi_dung={<>
-                          <b>{m.ten}</b> <span className="mo">{m.ma}</span>
-                          <DongNoi nhan="Ngành" gia={m.nganh} />
-                          <DongNoi nhan={`${n} ngày này`} gia={inSo(cs, o.v)} />
-                          <DongNoi nhan="Cùng kỳ năm trước" gia={nt === null ? "—" : inSo(cs, nt)} />
-                          <DongNoi nhan="Hạng trong ngành" gia={`${hang}/${g.ma.length} · ${pc(o.v / g.v)}`} />
-                          {m.an && <div className="mo">Đã ngừng kinh doanh — không có trang sản phẩm.</div>}
-                        </>}>
+                        noi_dung={<div className="o-noi-hinh">
+                          <HinhMa ma={m.ma} ten={m.ten} co={64} trang_tri />
+                          <div>
+                            <b>{m.ten}</b> <span className="mo">{m.ma}</span>
+                            <DongNoi nhan="Ngành" gia={m.nganh} />
+                            <DongNoi nhan={`${n} ngày này`} gia={inSo(cs, o.v)} />
+                            <DongNoi nhan="Cùng kỳ năm trước" gia={nt === null ? "—" : inSo(cs, nt)} />
+                            <DongNoi nhan="Hạng trong ngành" gia={`${hang}/${g.ma.length} · ${pc(o.v / g.v)}`} />
+                            {m.an && <div className="mo">Đã ngừng kinh doanh — không có trang sản phẩm.</div>}
+                          </div>
+                        </div>}>
                         <g className={"mv-o-ma" + (o.m === danhDau ? " danh-dau" : "")}>
                           <rect x={o.x} y={o.y} width={o.w} height={o.h} />
                           {o.w >= 54 && o.h >= 22 && <text x={o.x + 3} y={o.y + 13} className="mv-chu-ma">
                             {m.ten.length > o.w / 7 ? m.ten.slice(0, Math.max(1, Math.floor(o.w / 7) - 1)) + "…" : m.ten}</text>}
+                          {o.w >= 64 && o.h >= 64 && (() => {
+                            // Góc DƯỚI-phải, dưới dòng tên (tên ở y+3…y+17) — không che chữ.
+                            const co = Math.round(Math.min(48, o.w * 0.4, o.h - 26));
+                            return <HinhMaSvg ma={m.ma} ten={m.ten} cho={false}
+                              x={o.x + o.w - co - 4} y={o.y + o.h - co - 4} co={co} />;
+                          })()}
                         </g>
                       </ONoi>);
                   })}

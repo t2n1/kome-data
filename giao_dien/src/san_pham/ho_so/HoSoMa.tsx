@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { lay } from "../../api";
 import { BieuDo } from "../../chung/BieuDo";
+import { HinhMa } from "../../chung/HinhMa";
 import { DongSoSanh } from "../../chung/SoSanh";
 import { The } from "../../khach/HoSoTab";
 import { chuoiKhoang, giuKhoang, useKhoang, useNhanMoc, voiKhoang } from "../../khung/khoang";
@@ -70,13 +71,15 @@ export default function HoSoMa({ ma }: { ma: string }) {
   return (
     <div className="kh hs hs2 sp3">
       {thanhTren}
-      <header className="hs2-dau"><div className="hs2-dau-chu">
+      <header className="hs2-dau"><div className="sp3-dau-trai">
+        <HinhMa ma={sp.ma} ten={sp.ten} co={112} className="sp3-hinh" />
+        <div className="hs2-dau-chu">
         <h1><span className="ten-jp">{sp.ten}</span>
           <span className="nhan-vien nhat">{h.nganh}</span>
           {h.ngung_ban && <span className="nhan-vien canh">bán nốt tồn</span>}</h1>
         <div className="phu"><code>{sp.ma}</code> · bán lần đầu {ngay(sp.lan_dau)} · lần cuối {ngay(sp.lan_cuoi)}
           {h.hom_nay && <> · dữ liệu {nhanMoc} {ngay(h.hom_nay)}</>}</div>
-      </div></header>
+      </div></div></header>
       <div className="hs2-luoi">
         <ViecVoiMa h={h} moTab={chonTab} />
         <div className="hs2-phai">

@@ -1,6 +1,7 @@
 // Màn "Sản phẩm" (Sản phẩm.dc.html): /san-pham là danh mục; bấm một dòng mở
 // trang riêng /san-pham/{mã} (ho_so/HoSoMa.tsx). Cả danh mục là MỘT ảnh chụp
 // (/api/san-pham), nên lọc / sắp / tìm chạy ở trình duyệt, không hỏi lại máy chủ.
+import { HinhMa } from "../chung/HinhMa";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
@@ -175,9 +176,10 @@ export default function ManSanPham() {
 function Dong({ m, onChon }: { m: MaHang; onChon: () => void }) {
   return (
     <tr className="sp-dong" onClick={e => { if (!(e.target as HTMLElement).closest("a")) onChon(); }}>
-      <td className="sp-ten"><a href={`/san-pham/${encodeURIComponent(m.ma)}`} className="ten-jp"
+      <td className="sp-ten"><div className="sp-ten-hang"><HinhMa ma={m.ma} ten={m.ten} co={32} trang_tri />
+        <div className="sp-ten-chu"><a href={`/san-pham/${encodeURIComponent(m.ma)}`} className="ten-jp"
         onClick={e => { e.preventDefault(); onChon(); }}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code>
-        {m.ngung_ban && <> · <span className="nhan-vien canh" title="Đã ngừng kinh doanh (※終売※) — chỉ còn bán nốt tồn, không đặt thêm">bán nốt tồn</span></>}</div></td>
+        {m.ngung_ban && <> · <span className="nhan-vien canh" title="Đã ngừng kinh doanh (※終売※) — chỉ còn bán nốt tồn, không đặt thêm">bán nốt tồn</span></>}</div></div></div></td>
       <td className="sp-nhom ten-jp" title={m.nganh}>{m.nganh}</td>
       <td><span className={"nhan-vien " + m.mau}>{m.nhan_trang_thai}</span></td>
       <td className="so">{m.ton == null ? <span className="nhat-chu" title="chưa rõ tồn — không có dòng nào trong 在庫一覧">—</span> : soLuong(m.ton)}</td>

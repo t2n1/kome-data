@@ -260,3 +260,7 @@ td.trong{text-align:center;padding:1.6rem}
 }
 @media (max-width:560px){ .hs2-dau{flex-direction:column} .hs2-dau .nut-chinh{width:100%} }
 .hs2 .hs-dl{grid-template-columns:minmax(0,2fr) minmax(0,3fr)}
+
+/* Ô tên mặt hàng có ảnh nhỏ (HoSoTab.tsx::TenHinh). */
+.ten-hinh{display:flex;align-items:center;gap:.45rem;min-width:0}
+.ten-hinh > div{min-width:0}

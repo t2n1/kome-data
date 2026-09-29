@@ -39,7 +39,8 @@ button.o-kpi{font:inherit;text-align:left;cursor:pointer}
 .lh-goi-y{margin:.4rem 0 .1rem;padding:.4rem .5rem;border-radius:7px;background:var(--ok-nen)}
 .lh-goi-y-dau{font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ok-chu);margin-bottom:.15rem}
 .lh-goi-y ul{list-style:none;margin:0;padding:0}
-.lh-goi-y li{display:flex;flex-direction:column;padding:.15rem 0;font-size:.76rem;line-height:1.3}
+.lh-goi-y li{display:flex;align-items:center;gap:.45rem;padding:.15rem 0;font-size:.76rem;line-height:1.3}
+.lh-goi-y li > div{display:flex;flex-direction:column;min-width:0}
 .lh-goi-y li + li{border-top:1px dashed color-mix(in srgb,var(--ok-vien) 30%,transparent)}
 .lh-goi-y a{color:var(--chu);font-weight:600;text-decoration:none}.lh-goi-y a:hover{text-decoration:underline}
 .lh-goi-y .phu{font-size:.68rem}

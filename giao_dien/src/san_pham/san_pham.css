@@ -28,6 +28,8 @@ table.kho-bang{min-width:880px}
 .sp-dong.chon td{background:var(--do-nen)}
 .sp-dong.chon td:first-child{box-shadow:inset 3px 0 0 var(--do)}
 .sp-ten{max-width:300px}
+.sp-ten-hang{display:flex;align-items:center;gap:.5rem;min-width:0}
+.sp-ten-chu{min-width:0;flex:1}
 .sp-ten a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82rem}
 .sp-nhom{font-size:.78rem;color:var(--chu-thuong);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ma-nho{font-size:.7rem;color:var(--chu-nhat)}

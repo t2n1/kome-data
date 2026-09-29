@@ -28,6 +28,7 @@ from kome.web import anh_chup
 from kome.web.api import tao_api
 from kome.khoi_tong_quan import CHUA_CO as KTQ_CHUA_CO
 from kome import man_chua_co as MCC
+from kome import hinh_san_pham as HSP
 from kome.nguon_dung import tinh_nang
 from ops.backup import backup_status
 
@@ -467,6 +468,10 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             "chua_co": KTQ_CHUA_CO,
             "tinh_nang": tinh_nang(),
             "hien_chua_co": MCC.HIEN,
+            # Hình sản phẩm (config/hinh_san_pham.csv, 0 truy vấn, ~13 KB) — chỉ
+            # cho người đã qua cổng (hoặc máy không có cổng); trang đăng nhập /
+            # thông báo bỏ nó ở `_spa`.
+            "hinh": HSP.doc() if (nguoi is not None or not bi_mat) else {},
         }
 
     def _spa(request: Request, tuoi: bool = False, man=None, thong_bao: dict | None = None,
@@ -478,8 +483,10 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             kd["man"] = _json_man(man)
         if thong_bao is not None:
             kd["thong_bao"] = thong_bao
+            kd["hinh"] = {}
         if dang_nhap_sai:
             kd["dang_nhap_sai"] = True
+            kd["hinh"] = {}
         if tuoi:
             # Ô "hôm nay đã có dữ liệu chưa" (kome/tuoi_du_lieu.py) — ĐỒNG HỒ
             # THẬT (ngoại lệ của bất biến mốc thời gian), nên KHÔNG qua ảnh

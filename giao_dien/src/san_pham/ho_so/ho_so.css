@@ -6,3 +6,7 @@
 .sp3-thanh { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr) auto; gap: .5rem; align-items: center; }
 .sp3-thanh i { display: block; height: .6rem; border-radius: 3px; background: var(--ok-vien); }
 @media (max-width: 900px) { .sp3-luoi-2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* Ảnh sản phẩm đầu trang (chung/HinhMa.tsx) — cạnh tên mã. */
+.sp3-dau-trai{display:flex;align-items:center;gap:.9rem;min-width:0}
+@media (max-width:560px){ .sp3-dau-trai .sp3-hinh{width:72px!important;height:72px!important} }

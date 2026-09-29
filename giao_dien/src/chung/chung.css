@@ -179,3 +179,17 @@ a.tng-dong:hover,.tng-dong:focus-visible{background:var(--nen-phu)}
   padding:.5rem .8rem;color:var(--chu-nhat);cursor:pointer;white-space:nowrap;position:relative;margin-bottom:-1px}
 .kh-tab button[aria-selected="true"],.hs-tab button[aria-selected="true"]{color:var(--do-chu);border-bottom-color:var(--do);font-weight:600}
 .kh-tab button:hover,.hs-tab button:hover{color:var(--chu)}
+
+/* Hình sản phẩm (chung/HinhMa.tsx). Nền trắng cố định: ảnh sản phẩm chụp nền trắng, `contain` để
+   lộ nền — viền mảnh để ô không tan vào nền sáng. */
+.hinh-ma{display:inline-block;flex:none;box-sizing:border-box;object-fit:contain;background:#fff;
+  border:1px solid var(--vien);border-radius:6px;vertical-align:middle}
+.hinh-ma-cho{display:inline-flex;align-items:center;justify-content:center;background:var(--nen-phu);
+  color:var(--chu-mo);font-weight:600;line-height:1;user-select:none}
+.hinh-ma-svg-nen{fill:#fff;stroke:var(--vien)}
+.hinh-ma-svg-cho rect{fill:var(--nen-phu);stroke:var(--vien)}
+.hinh-ma-svg-cho text{fill:var(--chu-mo);font-weight:600}
+/* Ô nổi có ảnh: ảnh bên trái, chữ bên phải. */
+.o-noi-hinh{display:flex;gap:.55rem;align-items:flex-start}
+.bd-noi .o-noi-hinh > div{display:block;flex:1;min-width:0}
+.bd-noi .o-noi-hinh{align-items:flex-start}

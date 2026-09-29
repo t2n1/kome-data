@@ -990,6 +990,15 @@ tổng các ngày của tháng, không chỉ số mới (đối soát Σ cột c
 ánh xạ tháng → mùa là MỘT hằng `du_lieu.ts::MUA`. Có test canh: `tests/test_mua_vu.py`, `tests/test_squarify_ca.py`.
 **Migration 058 phải chạy TRƯỚC khi triển khai.**
 
+**Bất biến (Hình sản phẩm — chủ DN chốt 2026-09-29):** nguồn DUY NHẤT là `config/hinh_san_pham.csv`
+(`sku,imageUrl`, chủ DN gửi) → `kome/hinh_san_pham.py::doc` (mã là CHỮ, không ép số; CHỈ nhận `https://`;
+nhớ theo mtime; file thiếu → `{}`) → `window.__KOME__.hinh` (`app.py::_khoi_dau`, 0 truy vấn; trang đăng
+nhập / thông báo mang `{}`) → `giao_dien/src/chung/hinh_ma.ts::hinhCua` → `chung/HinhMa.tsx` (`HinhMa` cho
+HTML, `HinhMaSvg` cho treemap / bản đồ nhiệt; không hình hoặc ảnh lỗi → ô giữ chỗ chữ cái đầu). Cập nhật =
+THAY FILE (không bảng, không migration, không vào ảnh chụp API). Không màn nào tự viết `<img src=`. Ảnh tải
+từ máy chủ NGOÀI (`cos.ec-design.co.jp`, `referrerPolicy="no-referrer"`). Có test canh:
+`tests/test_hinh_san_pham.py`, `giao_dien/src/chung/hinh_ma.test.ts`.
+
 **Bất biến (Đợt 6, migration 038):** công nợ đọc sổ `請求先元帳` (spec `seikyu_motocho`
 → `core.fact_ar_ledger`), mỗi lô là ẢNH CHỤP một kỳ (kỳ đọc từ dòng 集計期間), mart đọc lô
 có kỳ kết thúc muộn nhất (`mart.so_cong_no_moi_nhat`). Ba luật:

@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { lay } from "../api";
+import { HinhMa } from "../chung/HinhMa";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { ngay, so, yen } from "../dinh_dang";
 import { KD } from "../khoi_dau";
@@ -183,8 +184,9 @@ function The({ t, d, gy, laThang, mo, datMo }: { t: The; d: LienHeApi; gy: GoiY[
       {t.cuoi && <div className="lh-cuoi">Lần trước: {t.cuoi.icon} {ngay(t.cuoi.ngay)} · <span className={"nhan-vien " + t.cuoi.mau_ket_qua}>{t.cuoi.nhan_ket_qua}</span> {t.cuoi.noi_dung.slice(0, 60)}</div>}
       {gy.length > 0 && <div className="lh-goi-y" title={d.cach_tinh_goi_y}>
         <div className="lh-goi-y-dau">Nên chào</div>
-        <ul>{gy.map(g => <li key={g.ma}><a href={`/san-pham/${encodeURIComponent(g.ma)}`} className="ten-jp">{g.ten}</a>
-          <span className="phu">{nhip(g)}</span></li>)}</ul></div>}
+        <ul>{gy.map(g => <li key={g.ma}><HinhMa ma={g.ma} ten={g.ten} co={28} trang_tri />
+          <div><a href={`/san-pham/${encodeURIComponent(g.ma)}`} className="ten-jp">{g.ten}</a>
+          <span className="phu">{nhip(g)}</span></div></li>)}</ul></div>}
       <div className="lh-nut">
         <button type="button" className="nut-nho" aria-expanded={mo} onClick={() => datMo(!mo)}>{mo ? "Đóng" : "✏️ Ghi liên hệ"}</button>
         <button type="button" className="nut-nho" onClick={chep}>{daChep ? "✓ Đã chép" : "📋 Chép kịch bản"}</button>
