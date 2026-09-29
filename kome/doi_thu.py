@@ -31,13 +31,16 @@ _PHAY_THAP_PHAN = re.compile(r"^-?\d+,\d+$")
 _SO_THUONG = re.compile(r"^-?\d+(\.\d+)?$")
 
 
-def _so(v, ten, duong=False):
+def _so(v, ten, duong=False, phay_la_thap_phan=False):
     """Đọc số người gõ. '1,234' / '12,345.6' = phẩy nghìn; '0,5' / '12,75' = phẩy thập phân;
+    phay_la_thap_phan=True (ô kg — không ai gõ hàng nghìn kg): dấu phẩy LUÔN là thập phân ('1,500' = 1.5);
     'nan' / 'inf' / '1e3' và mọi thứ khác không phải số thường -> LoiNhap."""
     if v in (None, ""):
         return None
     t = str(v).strip()
-    if _PHAY_NGHIN.match(t):
+    if phay_la_thap_phan and _PHAY_THAP_PHAN.match(t):
+        t = t.replace(",", ".")
+    elif _PHAY_NGHIN.match(t):
         t = t.replace(",", "")
     elif _PHAY_THAP_PHAN.match(t):
         t = t.replace(",", ".")
@@ -49,8 +52,8 @@ def _so(v, ten, duong=False):
     return x
 
 
-def _chuoi_so(v, ten, duong=False):
-    x = _so(v, ten, duong)
+def _chuoi_so(v, ten, duong=False, phay_la_thap_phan=False):
+    x = _so(v, ten, duong, phay_la_thap_phan)
     return None if x is None else format(x, "f")
 
 
@@ -60,7 +63,7 @@ def _kiem(truong: str, v):
     if truong == "gia_goc":
         return _chuoi_so(v, "Giá")
     if truong == "kg_moi_don_vi_gia":
-        return _chuoi_so(v, "Số kg", True)
+        return _chuoi_so(v, "Số kg", True, True)
     for ten, tap in (("thue", THUE), ("gom_ship", SHIP), ("trang_thai", TRANG_THAI)):
         if truong == ten and v not in tap:
             raise LoiNhap(f"{ten} chỉ nhận {', '.join(tap)}.")
@@ -80,6 +83,8 @@ def _ghi_nhat_ky(conn, loai, doi_tuong, truoc, sau, nguoi):
 # ---------------------------------------------------------------- ghi
 
 def xac_nhan(conn, fact_id: int, nguoi) -> None:
+    if conn.execute("SELECT 1 FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s", (fact_id,)).fetchone() is None:
+        raise LoiNhap("Không tìm thấy dòng giá này (có thể lô đã bị hoàn tác).")
     conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong, nguoi_dung_id) VALUES (%s, 'xac_nhan', %s)",
                  (fact_id, nguoi))
     _ghi_nhat_ky(conn, "xac_nhan", f"gia:{fact_id}", None, None, nguoi)
@@ -88,6 +93,9 @@ def xac_nhan(conn, fact_id: int, nguoi) -> None:
 def sua(conn, fact_id: int, thay_doi: dict, nguoi) -> None:
     if not thay_doi:
         raise LoiNhap("Không có gì để sửa.")
+    for k, v in thay_doi.items():
+        if v is None or not str(v).strip():
+            raise LoiNhap("Để trống không xoá được giá trị AI đã đọc — nhập giá trị đúng, hoặc dùng 'Giá đã đổi'.")
     sach = {k: _kiem(k, v) for k, v in thay_doi.items()}
     cu = conn.execute(f"SELECT {', '.join(sach)} FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s",
                       (fact_id,)).fetchone()
@@ -126,7 +134,7 @@ def gia_moi(conn, du_lieu: dict, nguoi) -> int:
     if not v.get("ma_doi_thu") or not v.get("ten_goc"):
         raise LoiNhap("Thiếu đối thủ hoặc tên hàng.")
     if not v.get("ma_hang_dt"):
-        v["ma_hang_dt"] = "tay:" + chuan_ten(v["ten_goc"]) + "|" + chuan_ten(v.get("quy_cach_goc") or "")
+        v["ma_hang_dt"] = "ten:" + chuan_ten(v["ten_goc"]) + "|" + chuan_ten(v.get("quy_cach_goc") or "")
     tt = _kiem("trang_thai", du_lieu.get("trang_thai") or "con")
     if v.get("gia_goc") is None and tt != "het":
         raise LoiNhap("Nhập giá (chỉ được bỏ trống khi ghi hàng đã hết).")
@@ -147,6 +155,9 @@ def gia_moi(conn, du_lieu: dict, nguoi) -> int:
 def dat_ghep(conn, ma_doi_thu: str, ma_hang_dt: str, product_code, nhom_id, nhan: str, nguoi) -> None:
     if nhan not in NHAN:
         raise LoiNhap("Nhãn ghép chỉ nhận cùng hàng / thay thế / không ghép.")
+    if product_code is not None and product_code != "" and conn.execute(
+            "SELECT 1 FROM core.dim_product WHERE product_code=%s", (product_code,)).fetchone() is None:
+        raise LoiNhap(f"Không có mã KOME '{product_code}'.")
     cu = conn.execute("SELECT product_code, nhom_id, nhan FROM app.ghep_hang WHERE ma_doi_thu=%s AND ma_hang_dt=%s",
                       (ma_doi_thu, ma_hang_dt)).fetchone()
     conn.execute("""INSERT INTO app.ghep_hang (ma_doi_thu, ma_hang_dt, product_code, nhom_id, nhan, nguoi_dung_id)
@@ -175,8 +186,8 @@ def tao_nhom(conn, ten: str, ma_kome: list[str], nguoi) -> int:
 
 
 def sua_quy_cach(conn, product_code: str, kg_moi_goi, goi_moi_thung, kg_moi_thung, nguoi) -> None:
-    v = (_so(kg_moi_goi, "Kg mỗi gói", True), _so(goi_moi_thung, "Gói mỗi thùng", True),
-         _so(kg_moi_thung, "Kg mỗi thùng", True))
+    v = (_so(kg_moi_goi, "Kg mỗi gói", True, True), _so(goi_moi_thung, "Gói mỗi thùng", True),
+         _so(kg_moi_thung, "Kg mỗi thùng", True, True))
     cu = conn.execute("SELECT kg_moi_goi, goi_moi_thung, kg_moi_thung FROM mart.quy_cach_kome WHERE product_code=%s",
                       (product_code,)).fetchone()
     if cu is None:

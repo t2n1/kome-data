@@ -1,11 +1,11 @@
 -- 060 — Chỉ số Thị trường & đối thủ (đặc tả 2026-09-29-thi-truong-doi-thu-design.md §4.4).
 -- Mọi quy đổi / ghép / nhóm / bất thường viết ĐÚNG MỘT LẦN ở đây. kome/doi_thu.py chỉ hỏi.
 
--- Quy cách KOME: tách từ product_name "(500g x 20 packs)" / "(10kg/case)"; app.quy_cach_kome (người sửa) thắng.
+-- Quy cách KOME: tách từ product_name "(500g x 20 packs)" / "（200g x 30 packs）" / "400g *30packs" / "(10kg/case)"; app.quy_cach_kome (người sửa) thắng.
 CREATE VIEW mart.quy_cach_kome AS
 WITH t AS (
     SELECT p.product_code,
-           regexp_match(p.product_name, '\(\s*(\d+(?:[.,]\d+)?)\s*(kg|gr|g)\s*[x×]\s*(\d+)', 'i') AS m1,
+           regexp_match(p.product_name, '(\d+(?:[.,]\d+)?)\s*(kg|gr|g)\s*[x×*]\s*(\d+)', 'i') AS m1,
            regexp_match(p.product_name, '(\d+(?:[.,]\d+)?)\s*kg\s*/\s*case', 'i')             AS m2
     FROM core.dim_product p
 )

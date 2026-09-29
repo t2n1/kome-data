@@ -36,6 +36,21 @@ def test_quy_cach_tach_tu_ten_va_nguoi_sua_thang(conn, batch):
     assert float(conn.execute("SELECT kg_moi_goi FROM mart.quy_cach_kome WHERE product_code='NT01'").fetchone()[0]) == 0.45
 
 
+def test_quy_cach_ngoac_toan_khoa_dau_sao_va_khong_ngoac(conn, batch):
+    for ma, ten in (("Q1", "Vo ram Ha Tinh（200g x 30 packs）"), ("Q2", "Pho duy anh 4mm 400g *30packs"),
+                    ("Q3", "Bun gao 1mm 400g 400g *30packs"), ("Q4", "Nuoc mam (500ml x 12 bottles)"),
+                    ("Q5", "Gao thom (1.5kg x 8)")):
+        _hang(conn, batch, ma, ten)
+    q = {r[0]: (None if r[1] is None else float(r[1]), None if r[2] is None else float(r[2]))
+         for r in conn.execute("SELECT product_code, kg_moi_goi, goi_moi_thung FROM mart.quy_cach_kome "
+                               "WHERE product_code LIKE 'Q%'")}
+    assert q["Q1"] == (pytest.approx(0.2), 30)
+    assert q["Q2"] == (pytest.approx(0.4), 30)
+    assert q["Q3"] == (pytest.approx(0.4), 30)
+    assert q["Q4"] == (None, None)                 # ml không phải kg
+    assert q["Q5"] == (pytest.approx(1.5), 8)
+
+
 def test_gia_kome_kg_la_TY_SO_CAC_TONG_doc_ban_den_moc(conn, batch):
     _hang(conn, batch)
     # _mua: pack_code '02', qty 6, amount 110.000, tax 10.000 → 100.000 ÷ (6 thùng × 20 × 0,5 kg) = ¥1.666,7/kg

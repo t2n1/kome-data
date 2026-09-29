@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { locNhom, locQuanSat, viTriKome } from "./loc";
+import { dangLocDong, locNhom, locQuanSat, viTriKome } from "./loc";
 import type { Nhom, QuanSat } from "./kieu";
 
 const qs = (o: Partial<QuanSat>): QuanSat => ({ nhan: "thay_the", trang_thai_duyet: "ai_doc", ...o } as QuanSat);
@@ -7,6 +7,12 @@ const nhom = (o: Partial<Nhom>): Nhom => ({ ten_nhom: "Ca Ba sa cat khuc", ma_ko
 const L = { tim: "", chi_cung_hang: false, chi_xac_nhan: false };
 
 describe("lọc so sánh", () => {
+  it("dangLocDong bật khi một trong hai bộ lọc dòng bật (tìm chữ thì không)", () => {
+    expect(dangLocDong(L)).toBe(false);
+    expect(dangLocDong({ ...L, tim: "basa" })).toBe(false);
+    expect(dangLocDong({ ...L, chi_cung_hang: true })).toBe(true);
+    expect(dangLocDong({ ...L, chi_xac_nhan: true })).toBe(true);
+  });
   it("chỉ cùng hàng ẩn hàng thay thế", () => {
     expect(locQuanSat([qs({ nhan: "cung_hang" }), qs({})], { ...L, chi_cung_hang: true })).toHaveLength(1);
   });

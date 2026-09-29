@@ -7,7 +7,7 @@ import { ngay, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { Nhom } from "./kieu";
 import { NHAN_DUYET } from "./kieu";
-import { locNhom, locQuanSat, viTriKome, type BoLoc } from "./loc";
+import { dangLocDong, locNhom, locQuanSat, viTriKome, type BoLoc } from "./loc";
 
 export function TabSoSanh() {
   const kx = chuoiKhoang(useKhoang());
@@ -20,7 +20,8 @@ export function TabSoSanh() {
   return (
     <section className="dt-khoi">
       <Khoi tieu_de="So sánh giá theo nhóm" dang_tai={q.isLoading} loi={q.error ? (q.error as Error).message : null}
-        cach_tinh="Giá quy về chưa thuế (giá có thuế ÷ 1,08) và về ¥/kg khi biết khối lượng. Giá KOME = đơn giá thực 90 ngày (Σ doanh thu thuần ÷ Σ kg đã bán). Không tính hàng hết, giá khách kể và giá bất thường (> 2× hoặc < ½ trung vị khi nhóm có ≥ 3 bên).">
+        cach_tinh="Giá quy về chưa thuế (giá có thuế ÷ 1,08) và về ¥/kg khi biết khối lượng. Giá KOME = đơn giá thực 90 ngày (Σ doanh thu thuần ÷ Σ kg đã bán). Không tính hàng hết, giá khách kể và giá bất thường (> 2× hoặc < ½ trung vị khi nhóm có ≥ 3 bên). Số của nhóm gồm cả hàng cùng hàng và hàng thay thế."
+        canh_bao={dangLocDong(l) ? "Bộ lọc chỉ ẩn dòng chi tiết — số của nhóm (thấp nhất, trung vị, cao nhất, vị trí KOME) vẫn tính trên mọi hàng, cả cùng hàng lẫn thay thế." : null}>
         <div className="dt-loc">
           <input type="search" placeholder="Tìm nhóm / mã KOME" aria-label="Tìm nhóm hoặc mã KOME" value={l.tim} onChange={e => datL({ ...l, tim: e.target.value })} />
           <label><input type="checkbox" checked={l.chi_cung_hang} onChange={e => datL({ ...l, chi_cung_hang: e.target.checked })} /> Chỉ cùng hàng</label>

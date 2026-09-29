@@ -52,6 +52,7 @@ def test_gia_moi_bat_buoc_loai_nguon(conn, batch):
 
 
 def test_dat_ghep_ghi_de_va_nhat_ky(conn, batch):
+    _hang(conn, batch)
     DT.dat_ghep(conn, "THAK", "h1", "NT01", None, "cung_hang", None)
     DT.dat_ghep(conn, "THAK", "h1", None, None, "khong", None)
     conn.commit()
@@ -152,3 +153,72 @@ def test_gia_moi_bat_buoc_gia_tru_khi_het(conn, batch):
 def test_gia_moi_fact_goc_id_khong_phai_so_la_LoiNhap(conn, batch):
     with pytest.raises(DT.LoiNhap):
         DT.gia_moi(conn, {"fact_goc_id": "abc", "loai_nguon": "to_roi", "gia_goc": "5"}, None)
+
+
+def test_xac_nhan_kiem_id_la_dong_DA_NAP(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 850, hang="h1")
+    DT.xac_nhan(conn, fid, None)
+    assert conn.execute("SELECT count(*) FROM app.dinh_chinh_gia WHERE fact_id=%s AND truong='xac_nhan'",
+                        (fid,)).fetchone()[0] == 1
+    # dòng tay dùng bộ đếm id riêng: id của nó có thể TRÙNG số với một dòng core — nhưng không phải dòng đã nạp
+    tid = DT.gia_moi(conn, {"ma_doi_thu": "THAK", "ten_goc": "Hang moi", "gia_goc": "5", "loai_nguon": "to_roi"}, None)
+    while conn.execute("SELECT 1 FROM core.fact_gia_doi_thu WHERE id=%s", (tid,)).fetchone():
+        tid = DT.gia_moi(conn, {"ma_doi_thu": "THAK", "ten_goc": "Hang moi", "gia_goc": "5", "loai_nguon": "to_roi"}, None)
+    n_nhat_ky = conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky WHERE loai='xac_nhan'").fetchone()[0]
+    with pytest.raises(DT.LoiNhap):
+        DT.xac_nhan(conn, tid, None)
+    with pytest.raises(DT.LoiNhap):
+        DT.xac_nhan(conn, 987654321, None)
+    assert conn.execute("SELECT count(*) FROM app.dinh_chinh_gia WHERE fact_id IN (%s, 987654321)", (tid,)).fetchone()[0] == 0
+    assert conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky WHERE loai='xac_nhan'").fetchone()[0] == n_nhat_ky
+
+
+def test_dat_ghep_ma_kome_go_nham_la_LoiNhap(conn, batch):
+    _hang(conn, batch)
+    with pytest.raises(DT.LoiNhap, match="NT0l"):
+        DT.dat_ghep(conn, "THAK", "h1", "NT0l", None, "cung_hang", None)
+    assert conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0
+    DT.dat_ghep(conn, "THAK", "h1", "NT01", None, "cung_hang", None)          # mã thật: qua
+    DT.dat_ghep(conn, "THAK", "h1", None, None, "khong", None)                # không mã: qua
+
+
+def test_kg_dau_phay_LUON_la_thap_phan_con_gia_giu_luat_nghin(conn, batch):
+    assert DT._so("1,500", "k", True, True) == Decimal("1.5")
+    assert DT._so("0,5", "k", True, True) == Decimal("0.5")
+    assert DT._so("1.5", "k", True, True) == Decimal("1.5")
+    assert DT._so("1,500", "g") == 1500
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 850)
+    DT.sua(conn, fid, {"kg_moi_don_vi_gia": "1,500"}, None)
+    conn.commit()
+    assert float(conn.execute("SELECT kg_moi_don_vi_gia FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s",
+                              (fid,)).fetchone()[0]) == 1.5
+    assert DT._chuoi_so("1,500", "Giá") == "1500"
+
+
+def test_sua_tu_choi_gia_tri_trong(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 850)
+    for v in ("", "   ", None):
+        with pytest.raises(DT.LoiNhap, match="Để trống"):
+            DT.sua(conn, fid, {"quy_cach_goc": v}, None)
+    with pytest.raises(DT.LoiNhap, match="Để trống"):
+        DT.sua(conn, fid, {"gia_goc": "5", "thue": ""}, None)
+    assert conn.execute("SELECT count(*) FROM app.dinh_chinh_gia WHERE fact_id=%s", (fid,)).fetchone()[0] == 0
+
+
+def test_gia_moi_hang_moi_co_khoa_GIONG_goi_doi_thu(conn, batch):
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("goi", Path("scripts/goi_doi_thu.py"))
+    G = importlib.util.module_from_spec(spec); spec.loader.exec_module(G)
+    tid = DT.gia_moi(conn, {"ma_doi_thu": "THAK", "ten_goc": "Bột Năng  Tài Ký 400g", "quy_cach_goc": "400g x 24",
+                            "gia_goc": "180", "loai_nguon": "to_roi"}, None)
+    khoa = conn.execute("SELECT ma_hang_dt FROM app.gia_doi_thu_tay WHERE id=%s", (tid,)).fetchone()[0]
+    assert khoa == G.ma_hang_dt({"ten_goc": "Bột Năng  Tài Ký 400g", "quy_cach_goc": "400g x 24"})
+    assert khoa.startswith("ten:")
+    tid2 = DT.gia_moi(conn, {"ma_doi_thu": "THAK", "ten_goc": "Hang khong quy cach", "gia_goc": "5",
+                             "loai_nguon": "to_roi"}, None)
+    khoa2 = conn.execute("SELECT ma_hang_dt FROM app.gia_doi_thu_tay WHERE id=%s", (tid2,)).fetchone()[0]
+    assert khoa2 == G.ma_hang_dt({"ten_goc": "Hang khong quy cach", "quy_cach_goc": ""})

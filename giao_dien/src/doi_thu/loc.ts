@@ -6,6 +6,9 @@ export type BoLoc = { tim: string; chi_cung_hang: boolean; chi_xac_nhan: boolean
 // \p{M} = mọi dấu kết hợp (thanh, mũ, móc…) sau NFD; "đ" không phân rã nên đổi riêng (hạ chữ thường TRƯỚC để "Đ" hoa cũng khớp).
 const bo_dau = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d");
 
+/** Bộ lọc dòng (cùng hàng / đã xác nhận) đang bật — chỉ ẩn dòng chi tiết, số nhóm vẫn của mọi hàng. */
+export const dangLocDong = (l: BoLoc) => l.chi_cung_hang || l.chi_xac_nhan;
+
 /** Quan sát còn lại của một nhóm sau bộ lọc (không đổi số của máy chủ — chỉ ẩn dòng). */
 export function locQuanSat(ds: QuanSat[], l: BoLoc): QuanSat[] {
   return ds.filter(q => (!l.chi_cung_hang || q.nhan === "cung_hang")
