@@ -1,6 +1,7 @@
 """kome/doi_thu.py — đọc/ghi của màn /doi-thu (đặc tả §4, §5)."""
 from datetime import date
 from decimal import Decimal
+import json
 import pytest
 
 from kome import doi_thu as DT
@@ -109,8 +110,13 @@ def test_duyet_chua_ghep_van_hien_dong_chua_ai_dung_toi(conn, batch):
 
 
 def _dk(conn, batch, bid, ngay, ben, loai, nd, ma_dong):
+    # Cùng (bid, ngày) = CÙNG một lô (một file nạp) — mart.dieu_kien_hien_hanh (068) lấy LÔ mới nhất của bên, nên hai
+    # dòng của một gói phải chung batch_id như lúc nạp thật (fixture `batch` tạo lô mới mỗi lần gọi).
+    lo = batch.__dict__.setdefault("_lo_dk", {})
+    if (bid, ngay) not in lo:
+        lo[(bid, ngay)] = batch(bid, ngay)
     conn.execute("INSERT INTO core.fact_dieu_kien_doi_thu (batch_id, ma_dong, ma_doi_thu, ngay_nguon, loai, noi_dung)"
-                 " VALUES (%s,%s,%s,%s,%s,%s)", (batch(bid, ngay), ma_dong, ben, ngay, loai, nd))
+                 " VALUES (%s,%s,%s,%s,%s,%s)", (lo[(bid, ngay)], ma_dong, ben, ngay, loai, nd))
     conn.commit()
 
 
@@ -718,3 +724,767 @@ def test_cac_cau_doc_mang_4_khoa_nguon(conn, batch):
     thak = [q for q in DT.duyet(conn)["dong"] if q["ma_doi_thu"] == "THAK"][0]
     assert (thak["thang_lo"], thak["lien_ket_thu_muc"], thak["web_ben"]) == ("2026-07-01", "https://drive.google.com/t7",
                                                                              "https://thak.jp/")
+
+
+# ---------------------------------------------------------------- sua_quy_cach: ô bằng số hiệu lực = không sửa (066)
+
+def _ovr(conn, ma):
+    return conn.execute("SELECT kg_moi_goi, goi_moi_thung, kg_moi_thung FROM app.quy_cach_kome WHERE product_code=%s",
+                        (ma,)).fetchone()
+
+
+def _kg00(conn, ma):
+    return float(conn.execute("SELECT kg_00 FROM mart.quy_cach_kome WHERE product_code=%s", (ma,)).fetchone()[0])
+
+
+def test_sua_quy_cach_o_bang_so_hieu_luc_khong_ghim_so_suy_ra(conn, batch):
+    from tests.test_mart_doi_thu import _hang_pack
+    _hang_pack(conn, batch, "BA02", "Xot Barona thit nuong sa (80g x 20 packs×4box)", "")
+    # đúng những gì biểu mẫu gửi lại: kg_moi_goi đã sửa, hai ô còn lại là giá trị hiệu lực (suy ra từ tên) 20 / 6.4
+    DT.sua_quy_cach(conn, "BA02", "0.082", "20", "6.4", None)
+    conn.commit()
+    assert _ovr(conn, "BA02") == (Decimal("0.082"), None, None)
+    assert _kg00(conn, "BA02") == pytest.approx(0.082 * 20 * 4)
+    n = conn.execute("SELECT truoc, sau FROM app.doi_thu_nhat_ky WHERE loai='quy_cach'").fetchall()
+    assert len(n) == 1 and set(n[0][1]) == {"kg_moi_goi"}                 # chỉ ghi ô thật sự đổi
+
+
+def test_sua_quy_cach_khong_doi_gi_thi_khong_tao_dong_khong_ghi_nhat_ky(conn, batch):
+    from tests.test_mart_doi_thu import _hang_pack
+    _hang_pack(conn, batch, "BA02", "Xot Barona thit nuong sa (80g x 20 packs×4box)", "")
+    DT.sua_quy_cach(conn, "BA02", "0.08", "20", "6.4", None)
+    conn.commit()
+    assert _ovr(conn, "BA02") is None
+    assert conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky WHERE loai='quy_cach'").fetchone()[0] == 0
+
+
+def test_sua_quy_cach_gui_so_khac_thi_luu_va_de_trong_thi_xoa(conn, batch):
+    from tests.test_mart_doi_thu import _hang_pack
+    _hang_pack(conn, batch, "BA02", "Xot Barona thit nuong sa (80g x 20 packs×4box)", "")
+    DT.sua_quy_cach(conn, "BA02", "0.08", "20", "7", None)
+    conn.commit()
+    assert _ovr(conn, "BA02") == (None, None, Decimal("7"))
+    assert _kg00(conn, "BA02") == pytest.approx(7)
+    DT.sua_quy_cach(conn, "BA02", "0.08", "20", "7", None)                 # gửi lại đúng số hiệu lực (7): giữ nguyên
+    conn.commit()
+    assert _ovr(conn, "BA02") == (None, None, Decimal("7"))
+    DT.sua_quy_cach(conn, "BA02", "0.08", "20", "", None)                  # để trống = xoá số người sửa
+    conn.commit()
+    assert _ovr(conn, "BA02") is None                                       # hết số người sửa nào thì bỏ hẳn dòng
+    assert _kg00(conn, "BA02") == pytest.approx(6.4)
+
+
+# ---------------------------------------------------------------- 4a: sửa gói/thùng, gram/gói, bậc, khuyến mãi
+
+def test_sua_quy_cach_goi_va_bac_va_khuyen_mai(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {"so_goi_thung": "20", "kl_goi_g": "500",
+                       "bac": [{"tu": 5, "don_vi_sl": "thung", "gia": "5,300", "don_vi_gia": "thung"}],
+                       "khuyen_mai": "mua 10 tặng 1"}, None)
+    conn.commit()
+    r = conn.execute("SELECT so_goi_thung, kl_goi_g, bac, khuyen_mai FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()
+    assert r[0] == 20 and float(r[1]) == 500 and r[2] == [{"tu": 5, "don_vi_sl": "thung", "gia": 5300, "don_vi_gia": "thung"}]
+    assert r[3] == "mua 10 tặng 1"
+
+
+def test_xoa_khuyen_mai_va_bac_duoc_nhung_khong_xoa_gia(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {"khuyen_mai": "", "bac": []}, None)
+    conn.commit()
+    km, bac = conn.execute("SELECT khuyen_mai, bac FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()
+    assert km is None and bac == []
+    with pytest.raises(DT.LoiNhap):
+        DT.sua(conn, fid, {"gia_goc": ""}, None)
+    for t in ("so_goi_thung", "kl_goi_g"):                                   # hai trường này KHÔNG xoá được
+        with pytest.raises(DT.LoiNhap):
+            DT.sua(conn, fid, {t: ""}, None)
+
+
+def test_xoa_gia_truoc_km_duoc(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {"gia_truoc_km": "600"}, None)
+    conn.commit()
+    assert conn.execute("SELECT gia_truoc_km FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()[0] == 600
+    DT.sua(conn, fid, {"gia_truoc_km": ""}, None)
+    conn.commit()
+    assert conn.execute("SELECT gia_truoc_km FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()[0] is None
+
+
+@pytest.mark.parametrize("truong,v", [
+    ("so_goi_thung", "0"), ("so_goi_thung", "2.5"), ("so_goi_thung", "100001"),
+    ("kl_goi_g", "0"), ("kl_goi_g", "30001"),
+    ("bac", [{"tu": 0, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}]),
+    ("bac", [{"tu": 1, "don_vi_sl": "hop", "gia": 1, "don_vi_gia": "kg"}]),
+    ("bac", [{"tu": 1, "don_vi_sl": "thung", "gia": 0, "don_vi_gia": "kg"}]),
+    ("bac", [{"tu": 1, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "pallet"}]),
+    ("bac", [{"tu": 1, "don_vi_sl": "thung", "gia": 1}]),
+    ("bac", ["x"]), ("bac", {"tu": 1}), ("bac", 5),
+    ("bac", "khong phai json"), ("bac", [{"tu": 1, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}] * 11),
+    ("bac", [{"tu": "1" + "0" * 400, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}]),
+    ("gia_truoc_km", "-1"), ("gia_truoc_km", "abc"), ("gia_truoc_km", "99999999999"),
+])
+def test_truong_moi_kiem_dau_vao(conn, batch, truong, v):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    with pytest.raises(DT.LoiNhap):
+        DT.sua(conn, fid, {truong: v}, None)
+
+
+def test_bac_nhap_chu_json_chuan_hoa_va_bo_trong_la_xoa():
+    assert json.loads(DT.kiem_bac_nhap('[{"tu": "5", "don_vi_sl": "kg", "gia": "1,200", "don_vi_gia": "kg"}]')) == \
+        [{"tu": 5, "don_vi_sl": "kg", "gia": 1200, "don_vi_gia": "kg"}]
+    assert DT.kiem_bac_nhap("") == "[]" and DT.kiem_bac_nhap([]) == "[]" and DT.kiem_bac_nhap(None) == "[]"
+
+
+def test_gia_moi_mang_quy_cach_va_bac(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {"so_goi_thung": "20", "kl_goi_g": "500"}, None)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "5200", "loai_nguon": "to_roi",
+                            "bac": [{"tu": 5, "don_vi_sl": "thung", "gia": 5000, "don_vi_gia": "thung"}]}, None)
+    conn.commit()
+    r = conn.execute("SELECT so_goi_thung, kl_goi_g, bac FROM app.gia_doi_thu_tay WHERE id=%s", (tid,)).fetchone()
+    assert r[0] == 20 and float(r[1]) == 500 and r[2][0]["gia"] == 5000
+
+
+def test_gia_moi_khuyen_mai_gia_truoc_km_va_bo_trong_la_null(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "500", "loai_nguon": "to_roi",
+                            "khuyen_mai": "giảm 50", "gia_truoc_km": "550", "bac": []}, None)
+    tid2 = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "500", "loai_nguon": "to_roi",
+                             "khuyen_mai": "", "gia_truoc_km": "", "bac": ""}, None)
+    conn.commit()
+    r = conn.execute("SELECT khuyen_mai, gia_truoc_km, bac FROM app.gia_doi_thu_tay WHERE id=%s", (tid,)).fetchone()
+    assert r[0] == "giảm 50" and r[1] == 550 and r[2] is None
+    assert conn.execute("SELECT khuyen_mai, gia_truoc_km, bac FROM app.gia_doi_thu_tay WHERE id=%s", (tid2,)).fetchone() \
+        == (None, None, None)
+
+
+# ---------------------------------------------------------------- chuẩn hoá kl_goi_g / gia_truoc_km (soát cuối đợt 4a)
+
+@pytest.mark.parametrize("truong,nhap,mong", [
+    ("kl_goi_g", "500.1234567", Decimal("500.12")), ("kl_goi_g", "0.005", Decimal("0.01")),
+    ("gia_truoc_km", "-0", Decimal("0")), ("gia_truoc_km", "550.1234567", Decimal("550.12"))])
+def test_sua_va_gia_moi_luu_CUNG_mot_so_da_lam_tron(conn, batch, truong, nhap, mong):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {truong: nhap}, None)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "500", "loai_nguon": "to_roi", truong: nhap}, None)
+    conn.commit()
+    assert conn.execute(f"SELECT {truong} FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s", (fid,)).fetchone()[0] == mong
+    assert conn.execute(f"SELECT {truong} FROM app.gia_doi_thu_tay WHERE id=%s", (tid,)).fetchone()[0] == mong
+
+
+@pytest.mark.parametrize("nhap", ["0.001", "0.004"])
+def test_kl_goi_g_lam_tron_ve_0_la_LoiNhap_ca_hai_duong(conn, batch, nhap):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    with pytest.raises(DT.LoiNhap):
+        DT.sua(conn, fid, {"kl_goi_g": nhap}, None)
+    with pytest.raises(DT.LoiNhap):
+        DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "500", "loai_nguon": "to_roi", "kl_goi_g": nhap}, None)
+
+
+
+# ---------------------------------------------------------------- đợt 4b — dữ liệu đọc cho màn mới
+
+_QS_4B = {"so_goi_thung", "kl_goi_g", "bac", "kg_thung_dt", "gia_goi", "gia_thung", "gia_1", "gia_5", "gia_10",
+          "gia_pallet", "sua_cuoi"}
+_NHOM_4B = {"gia_kome_chuan", "gia_kome_bang", "gia_kome_km", "gia_kome_so", "lech_trung_vi", "gia_kome_lech",
+            "kome_kg_goi", "kome_goi_thung", "kome_kg_thung"}
+
+
+def _ba_ben(conn, batch):
+    _hang(conn, batch)
+    return [_qs(conn, batch, b, g, hang=f"h{b}") for b, g in [("THAK", 540), ("HSC", 560), ("JVB", 580)]]
+
+
+def _nguoi(conn, ten="lan"):
+    i = conn.execute("INSERT INTO app.nguoi_dung (ten_dang_nhap, mat_khau_hash, mat_khau_salt) VALUES (%s, %s, %s)"
+                     " RETURNING id", (ten, b"\x00", b"\x00")).fetchone()[0]
+    conn.commit()
+    return i
+
+
+def test_4b_so_sanh_mang_khoa_nhom_moi_va_quan_sat_moi(conn, batch):
+    _ba_ben(conn, batch)
+    n = DT.so_sanh(conn)["nhom"][0]
+    assert _NHOM_4B <= set(n)
+    assert n["gia_kome_lech"] is False and n["gia_kome_so"] is None
+    assert all(_QS_4B <= set(q) for q in n["quan_sat"])
+    q = n["quan_sat"][0]
+    assert q["gia_1"] == 540 and q["sua_cuoi"] == 0                      # làm tròn yên, chưa ai sửa = 0
+
+
+def test_4b_sua_cuoi_theo_khoa_gia_va_khoa_ghep(conn, batch):
+    fid, fid2, _ = _ba_ben(conn, batch)
+    sc = lambda: next(q for q in DT.so_sanh(conn)["nhom"][0]["quan_sat"] if q["id"] == fid)["sua_cuoi"]
+    assert sc() == 0
+    DT.sua(conn, fid, {"gia_goc": "545"}, None)
+    conn.commit()
+    k1 = conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong=%s", (f"gia:{fid}",)).fetchone()[0]
+    assert sc() == k1
+    DT.sua(conn, fid2, {"gia_goc": "561"}, None)                           # sửa dòng KHÁC không đổi sua_cuoi
+    conn.commit()
+    assert sc() == k1
+    DT.dat_ghep(conn, "THAK", "hTHAK", "NT01", None, "cung_hang", None)
+    conn.commit()
+    k2 = conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong='THAK/hTHAK'").fetchone()[0]
+    assert k2 > k1 and sc() == k2
+
+
+def test_4b_duyet_va_ho_so_ben_mang_cot_quan_sat_moi(conn, batch):
+    _ba_ben(conn, batch)
+    assert all(_QS_4B <= set(q) for q in DT.duyet(conn)["dong"])
+    assert all(_QS_4B <= set(q) for q in DT.ho_so_ben(conn, "THAK")["quan_sat"])
+
+
+def test_4b_tong_quan_khuyen_mai_het_hang_mang_khoa_mat_hang(conn, batch):
+    _hang(conn, batch)
+    km = _qs(conn, batch, "THAK", 540, hang="hkm")
+    het = _qs(conn, batch, "HSC", 560, hang="hhet", trang="het")
+    DT.sua(conn, km, {"khuyen_mai": "mua 10 tặng 1"}, None)
+    conn.commit()
+    t = DT.tong_quan(conn)
+    k = t["khuyen_mai"][0]
+    assert (k["nguon"], k["id"], k["ma_hang_dt"], k["ma_doi_thu"], k["ben"]) == ("nap", km, "hkm", "THAK", "THAK")
+    h = t["het_hang"][0]
+    assert (h["nguon"], h["id"], h["ma_hang_dt"], h["ma_doi_thu"], h["ten_doi_thu"]) == \
+        ("nap", het, "hhet", "HSC", "HSC Station")
+
+
+def test_4b_tong_quan_dieu_kien_doc_hien_hanh_bo_ghi_chu_doc_ap_dinh_chinh(conn, batch):
+    from kome import doi_thu_giao as G
+    _dk(conn, batch, 9301, date(2026, 9, 5), "THAK", "ship", "freeship >= 30,000", "d-1")
+    _dk(conn, batch, 9301, date(2026, 9, 5), "THAK", "ghi_chu_doc", "chép vào ghi_chu", "d-2")
+    _dk(conn, batch, 9301, date(2026, 9, 5), "THAK", "khac", "nghỉ Obon", "d-3")
+    fid = conn.execute("SELECT id FROM core.fact_dieu_kien_doi_thu WHERE ma_dong='d-1'").fetchone()[0]
+    G.sua_dieu_kien(conn, fact_id=fid, ma_doi_thu="THAK", loai="ship", noi_dung="freeship >= 25,000", bo=False, nguoi=None)
+    G.sua_dieu_kien(conn, fact_id=None, ma_doi_thu="THAK", loai="thanh_toan", noi_dung="Chuyển khoản", bo=False, nguoi=None)
+    conn.commit()
+    dk = {d["noi_dung"]: d for d in DT.tong_quan(conn)["dieu_kien"]}
+    assert set(dk) == {"freeship >= 25,000", "Chuyển khoản"}               # bỏ ghi_chu_doc (068) và 'khac' (Tổng quan)
+    s = dk["freeship >= 25,000"]
+    assert (s["id"], s["fact_id"], s["them_tay"], s["ben"], s["loai"]) == (fid, fid, False, "THAK", "ship")
+    nk = dict(conn.execute("SELECT doi_tuong, max(id) FROM app.doi_thu_nhat_ky GROUP BY 1").fetchall())
+    assert s["sua_cuoi"] == nk[f"dk:{fid}"]
+    tay = dk["Chuyển khoản"]
+    assert tay["them_tay"] is True and tay["fact_id"] is None and tay["id"] < 0 and tay["sua_cuoi"] == nk["dk:tay:THAK"]
+
+
+def test_4b_ho_so_ben_giao_hang_sua_cuoi_ben_dieu_kien_va_gia_kome_so(conn, batch):
+    from tests.test_mart_doi_thu import _bang_gia
+    from tests.test_doi_thu_giao import _nap
+    from kome import doi_thu_giao as G
+    _ba_ben(conn, batch)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)                        # NT01 chưa 荷姿: kg_02 = 20 × 0,5 = 10 kg
+    _nap(conn, batch, "THAK", phi_ship=605)
+    _dk(conn, batch, 9302, date(2026, 9, 5), "THAK", "khac", "nghỉ Obon", "d-1")
+    h = DT.ho_so_ben(conn, "THAK")
+    assert h["giao_hang"]["ma_doi_thu"] == "THAK" and h["giao_hang"]["phi_ship"] == 605
+    assert h["sua_cuoi_ben"] == 0
+    assert [(d["loai"], d["noi_dung"], d["them_tay"]) for d in h["dieu_kien"]] == [("khac", "nghỉ Obon", False)]
+    assert isinstance(h["dieu_kien"][0]["id"], int) and h["dieu_kien"][0]["sua_cuoi"] == 0
+    assert h["quan_sat"] and all(q["gia_kome_so"] == round(4900 / 1.08 / 10) for q in h["quan_sat"])
+    G.sua_giao_hang(conn, "THAK", {"phi_ship": "600"}, None)
+    conn.execute("INSERT INTO app.doi_thu_nhat_ky (loai, doi_tuong) VALUES ('doi_thu', 'ben:THAK')")
+    conn.commit()
+    h = DT.ho_so_ben(conn, "THAK")
+    assert h["sua_cuoi_ben"] == conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong='ben:THAK'").fetchone()[0]
+    assert h["giao_hang"]["phi_ship"] == 600
+    assert DT.ho_so_ben(conn, "HSC")["giao_hang"] is None                 # bên chưa có lô / sửa giao hàng → null
+
+
+def test_4b_ho_so_ben_quan_sat_mang_gia_kome_lech_cua_nhom(conn, batch):
+    from tests.test_mart_doi_thu import _bang_gia
+    _ba_ben(conn, batch)                                                  # trung vị ~560 ¥/kg
+    assert all(q["gia_kome_lech"] is False for q in DT.ho_so_ben(conn, "THAK")["quan_sat"])   # chưa có giá KOME
+    _bang_gia(conn, batch, "NT01", "std", 0, 60000)                       # 60000 / 1,08 / 10 kg ≈ 5 556 > 3 × trung vị
+    qs = DT.ho_so_ben(conn, "THAK")["quan_sat"]
+    assert qs and all(q["gia_kome_lech"] is True for q in qs)
+    n = next(x for x in DT.so_sanh(conn)["nhom"] if x["nhom_khoa"] == qs[0]["nhom_khoa"])
+    assert n["gia_kome_lech"] is True                                     # CÙNG cờ với So sánh (một định nghĩa)
+
+
+def test_B18_ho_so_ben_mang_co_bat_thuong_va_moc_cua_mart(conn, batch):
+    """Tab Đối thủ vẽ xám / không đếm dòng bất thường — /ben phải mang cờ + mốc của mart.gia_doi_thu_hien_hanh (dòng
+    lịch sử: false). Nhóm chỉ còn dòng bất thường thì so_sanh_nhom không có nhóm đó → gia_kome_so null."""
+    from tests.test_mart_doi_thu import _bang_gia
+    _hang(conn, batch)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)                         # chuẩn ≈ ¥453,7/kg
+    _qs(conn, batch, "HSC", 5, hang="h1", ngay=date(2026, 7, 1))           # lịch sử
+    _qs(conn, batch, "HSC", 1, hang="h1", ngay=date(2026, 7, 20))          # hiện hành, chỗ giữ ¥1
+    qs = sorted(DT.ho_so_ben(conn, "HSC")["quan_sat"], key=lambda q: q["ngay_nguon"])
+    assert [(q["hien_hanh"], q["bat_thuong"], q["moc_bat_thuong_la"]) for q in qs] == [(False, False, None), (True, True, "kome")]
+    assert qs[1]["moc_bat_thuong"] == 454 and qs[1]["gia_kome_so"] is None
+    assert DT.so_sanh(conn)["nhom"] == []
+
+
+def test_4b_mat_hang_doc_ca_dong_lich_su_va_lich_su_sua_moi_nhat_truoc(conn, batch, monkeypatch):
+    _hang(conn, batch)
+    cu = _qs(conn, batch, "THAK", 540, hang="h1", ngay=date(2026, 7, 1))
+    moi = _qs(conn, batch, "THAK", 560, hang="h1", ngay=date(2026, 8, 1))
+    nd = _nguoi(conn)
+    DT.sua(conn, cu, {"gia_goc": "545"}, nd)
+    DT.dat_ghep(conn, "THAK", "h1", "NT01", None, "cung_hang", None)
+    DT.sua(conn, moi, {"gia_goc": "565"}, None)                           # khoá của dòng KHÁC — không vào lịch sử của `cu`
+    conn.commit()
+    dem = _dem(conn, monkeypatch)
+    m = DT.mat_hang(conn, "nap", cu)
+    assert dem["n"] == 1
+    monkeypatch.undo()
+    q = m["quan_sat"]
+    assert q["id"] == cu and q["hien_hanh"] is False and q["bat_thuong"] is False and q["gia_goc"] == 545
+    assert _QS_4B <= set(q)
+    ls = m["lich_su"]
+    assert [x["doi_tuong"] for x in ls] == ["THAK/h1", f"gia:{cu}"]
+    assert set(ls[0]) >= {"id", "loai", "ai", "luc", "truoc", "sau"}
+    assert ls[0]["id"] > ls[1]["id"] and ls[1]["ai"] == "lan" and ls[0]["ai"] is None
+    assert q["sua_cuoi"] == ls[0]["id"]
+    assert DT.mat_hang(conn, "nap", moi)["quan_sat"]["hien_hanh"] is True
+    assert DT.mat_hang(conn, "nap", 999999) is None
+    with pytest.raises(DT.LoiNhap):
+        DT.mat_hang(conn, "xyz", cu)
+
+
+def test_4b_mat_hang_dong_tay_theo_khoa_tay(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.commit()
+    m = DT.mat_hang(conn, "tay", tid)
+    assert m["quan_sat"]["nguon"] == "tay" and m["quan_sat"]["hien_hanh"] is True
+    assert [x["doi_tuong"] for x in m["lich_su"]] == [f"tay:{tid}"]
+
+
+def test_4b_lich_su_nhieu_khoa_toi_da_5_va_50_dong(conn, batch):
+    for i in range(55):
+        conn.execute("INSERT INTO app.doi_thu_nhat_ky (loai, doi_tuong) VALUES ('giao_hang', %s)", (f"giao:{'AB'[i % 2]}",))
+    conn.commit()
+    ls = DT.lich_su(conn, ["giao:A", "giao:B"])
+    assert len(ls) == 50 and [x["id"] for x in ls] == sorted((x["id"] for x in ls), reverse=True)
+    assert DT.lich_su(conn, ["giao:C"]) == []
+    for sai in (["a"] * 6, [], ["x" * 301], "giao:A", [1]):
+        with pytest.raises(DT.LoiNhap):
+            DT.lich_su(conn, sai)
+
+
+# ---------------------------------------------------------------- đợt 4b task 2: ghi từ pop-up, chống sửa đè
+
+@pytest.fixture
+def ben_goc(conn):
+    """app.doi_thu sống qua TRUNCATE (GIU_LAI) — test nào sửa THAK thì trả lại dòng gốc khi xong."""
+    goc = conn.execute("SELECT ten, web, ghi_chu FROM app.doi_thu WHERE ma='THAK'").fetchone()
+    yield
+    conn.rollback()
+    conn.execute("UPDATE app.doi_thu SET ten=%s, web=%s, ghi_chu=%s WHERE ma='THAK'", goc)
+    conn.commit()
+
+
+def _nk(conn, khoa=None):
+    if khoa is None:
+        return conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky").fetchone()[0]
+    return conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky WHERE doi_tuong=%s", (khoa,)).fetchone()[0]
+
+
+def _max_nk(conn):
+    return conn.execute("SELECT coalesce(max(id), 0) FROM app.doi_thu_nhat_ky").fetchone()[0]
+
+
+def _qs_dong(conn, nguon, id):
+    return conn.execute("SELECT nhom_khoa, nhan, ma_kome, gia_goc, hien_hanh FROM mart.gia_doi_thu_quan_sat"
+                        " WHERE nguon=%s AND id=%s", (nguon, id)).fetchone()
+
+
+def test_4b2_nhan_khong_dua_dong_ra_khoi_nhom_va_doi_nhan_giu_ma_kome(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    assert _qs_dong(conn, "nap", fid)[:3] == ("ma:NT01", "thay_the", "NT01")
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "nhan": "khong"}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[0] is None
+    assert ra["sua_cuoi"] == _max_nk(conn) and (ra["nguon"], ra["id"]) == ("nap", fid)
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": ra["sua_cuoi"], "nhan": "cung_hang"}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[:3] == ("ma:NT01", "cung_hang", "NT01")   # bỏ nhóm rồi ghép lại: nhớ mã KOME
+
+
+def test_4b2_hai_truong_khong_gia_la_hai_dinh_chinh_MOT_nhat_ky(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0,
+                           "thay_doi": {"so_goi_thung": "20", "khuyen_mai": "mua 10 tặng 1"}}, None)
+    conn.commit()
+    assert conn.execute("SELECT count(*) FROM app.dinh_chinh_gia WHERE fact_id=%s", (fid,)).fetchone()[0] == 2
+    assert _nk(conn) == 1 and _nk(conn, f"gia:{fid}") == 1
+
+
+@pytest.mark.parametrize("vi_sao", [None, ""])
+def test_4b2_truong_gia_khong_co_vi_sao_la_LoiNhap(conn, batch, vi_sao):
+    fid = _ba_ben(conn, batch)[0]
+    with pytest.raises(DT.LoiNhap, match="vì sao"):
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "vi_sao_gia": vi_sao,
+                               "thay_doi": {"gia_goc": "520"}}, None)
+
+
+def test_4b2_da_doi_khong_loai_nguon_la_LoiNhap(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    with pytest.raises(DT.LoiNhap, match="loại nguồn"):
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "vi_sao_gia": "da_doi",
+                               "thay_doi": {"gia_goc": "520"}}, None)
+
+
+def test_4b2_doc_sai_la_dinh_chinh_da_doi_la_dong_tay_co_fact_goc(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "vi_sao_gia": "doc_sai",
+                           "thay_doi": {"gia_goc": "545"}}, None)
+    conn.commit()
+    assert conn.execute("SELECT count(*) FROM app.gia_doi_thu_tay").fetchone()[0] == 0
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": _max_nk(conn), "vi_sao_gia": "da_doi",
+                                "thay_doi": {"thue": "co"}, "loai_nguon": "to_roi",
+                                "lien_ket_bang_chung": "https://drive.google.com/x", "ghi_chu_nguon": "Zalo"}, None)
+    conn.commit()
+    r = conn.execute("SELECT id, fact_goc_id, gia_goc, thue, loai_nguon, lien_ket_bang_chung, ghi_chu_nguon"
+                     " FROM app.gia_doi_thu_tay").fetchall()
+    assert len(r) == 1 and r[0][1:] == (fid, 545, "co", "to_roi", "https://drive.google.com/x", "Zalo")
+    assert (ra["nguon"], ra["id"]) == ("tay", r[0][0])
+    assert ra["sua_cuoi"] == conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong IN (%s, 'THAK/hTHAK')",
+                                          (f"tay:{ra['id']}",)).fetchone()[0]   # sua_cuoi của DÒNG MỚI (khoá của nó)
+    assert _qs_dong(conn, "tay", r[0][0])[4] is True and _qs_dong(conn, "nap", fid)[4] is False
+    assert _nk(conn, f"gia:{fid}") == 2                    # dòng nạp cũ cũng mang dấu → pop-up cũ của nó bị 409
+
+
+def test_4b2_sua_dong_tay_la_dong_tay_MOI_va_hai_nhat_ky(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi", "khuyen_mai": "km",
+                            "lien_ket_bang_chung": "https://drive.google.com/b"}, None)
+    conn.commit()
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "vi_sao_gia": "doc_sai",
+                                "thay_doi": {"gia_goc": "525", "so_goi_thung": "20"}}, None)
+    conn.commit()
+    moi = ra["id"]
+    assert ra["nguon"] == "tay" and moi != tid
+    cot = "ma_doi_thu, ma_hang_dt, fact_goc_id, loai_nguon, lien_ket_bang_chung, khuyen_mai, gia_goc, so_goi_thung"
+    cu_r = conn.execute(f"SELECT {cot} FROM app.gia_doi_thu_tay WHERE id=%s", (tid,)).fetchone()
+    moi_r = conn.execute(f"SELECT {cot} FROM app.gia_doi_thu_tay WHERE id=%s", (moi,)).fetchone()
+    assert cu_r[6] == 520 and cu_r[7] is None                               # dòng cũ không đổi (sổ chỉ thêm)
+    assert moi_r[:6] == cu_r[:6] and moi_r[6:] == (525, 20)
+    assert _nk(conn, f"tay:{tid}") == 2 and _nk(conn, f"tay:{moi}") == 1  # gia_moi + sửa ; sửa
+    assert _qs_dong(conn, "tay", moi)[4] is True and _qs_dong(conn, "tay", tid)[4] is False
+    assert ra["sua_cuoi"] == _max_nk(conn)
+
+
+def test_4b2_sua_tay_da_doi_ghi_loai_nguon_moi(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.commit()
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "vi_sao_gia": "da_doi",
+                                "thay_doi": {"gia_goc": "510"}, "loai_nguon": "chung_tu"}, None)
+    conn.commit()
+    assert conn.execute("SELECT gia_goc, loai_nguon, fact_goc_id FROM app.gia_doi_thu_tay WHERE id=%s",
+                        (ra["id"],)).fetchone() == (510, "chung_tu", fid)
+
+
+def test_4b2_xung_dot_khong_ghi_gi_ghi_de_thi_ghi(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    lan = _nguoi(conn)
+    da_xem = _max_nk(conn)
+    DT.sua(conn, fid, {"muc_gia": "sỉ"}, lan)                               # người khác vừa sửa
+    conn.commit()
+    truoc = (_nk(conn), conn.execute("SELECT count(*) FROM app.dinh_chinh_gia").fetchone()[0])
+    b = {"nguon": "nap", "id": fid, "da_xem": da_xem, "nhan": "khong", "thay_doi": {"kenh_gia": "web"}}
+    with pytest.raises(DT.XungDot) as e:
+        DT.sua_mat_hang(conn, b, None)
+    conn.rollback()
+    assert e.value.ai == "lan" and isinstance(e.value.luc, str) and "T" in e.value.luc
+    assert e.value.sau == {"muc_gia": "sỉ"}
+    assert (_nk(conn), conn.execute("SELECT count(*) FROM app.dinh_chinh_gia").fetchone()[0]) == truoc
+    assert conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0
+    DT.sua_mat_hang(conn, b | {"ghi_de": True}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[0] is None and _nk(conn) == truoc[0] + 2
+
+
+def test_4b2_xung_dot_theo_khoa_ghep_cua_hang(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    DT.dat_ghep(conn, "THAK", "hTHAK", "NT01", None, "cung_hang", None)    # ghép = khoá '<bên>/<hàng>'
+    conn.commit()
+    with pytest.raises(DT.XungDot):
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "thay_doi": {"kenh_gia": "web"}}, None)
+    conn.rollback()
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": _max_nk(conn), "thay_doi": {"kenh_gia": "web"}}, None)
+
+
+def test_4b2_khong_co_gi_doi_va_dau_vao_sai_la_LoiNhap(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    for b in ({"nguon": "nap", "id": fid},                                   # rỗng
+              {"nguon": "nap", "id": fid, "nhan": "thay_the"},               # nhãn đang là thay_the
+              {"nguon": "nap", "id": 999999, "nhan": "khong"},
+              {"nguon": "xyz", "id": fid, "nhan": "khong"},
+              {"nguon": "nap", "id": "abc", "nhan": "khong"},
+              {"nguon": "nap", "id": fid, "nhan": "la"},
+              {"nguon": "nap", "id": fid, "thay_doi": ["gia_goc"]},
+              {"nguon": "nap", "id": fid, "thay_doi": {"kenh_gia": "x"}, "vi_sao_gia": "?"},
+              {"nguon": "nap", "id": fid, "thay_doi": {"kenh_gia": "x"}, "da_xem": "abc"},
+              {"nguon": "nap", "id": fid, "thay_doi": {"kenh_gia": "x"}, "da_xem": -1}):
+        with pytest.raises(DT.LoiNhap):
+            DT.sua_mat_hang(conn, {"da_xem": 0} | b, None)
+        conn.rollback()
+
+
+def test_4b2_mot_phan_hong_thi_khong_phan_nao_vao(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    with pytest.raises(DT.LoiNhap):
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "nhan": "khong", "thay_doi": {"so_goi_thung": "1.5"}}, None)
+    conn.commit()                                          # kể cả khi người gọi LỠ commit: kiểm trước khi ghi
+    assert conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0 and _nk(conn) == 0
+
+
+def test_4b2_sua_ben_web_ten_ghi_chu_va_nhat_ky(conn, ben_goc):
+    with pytest.raises(DT.LoiNhap):
+        DT.sua_ben(conn, "THAK", {"web": "http://thak.jp"}, None)
+    for sai in ({"ten": ""}, {"ten": "x" * 81}, {"ghi_chu": "x" * 301}, {"la": "1"}, {}, {"ten": 5}):
+        with pytest.raises(DT.LoiNhap):
+            DT.sua_ben(conn, "THAK", sai, None)
+    with pytest.raises(DT.LoiNhap):
+        DT.sua_ben(conn, "KHONG-CO", {"ten": "X"}, None)
+    conn.rollback()
+    DT.sua_ben(conn, "THAK", {"web": "https://thak.jp", "ghi_chu": "  gọi trước 10h ", "ten": "Thak Foods"}, None)
+    conn.commit()
+    assert conn.execute("SELECT ten, web, ghi_chu FROM app.doi_thu WHERE ma='THAK'").fetchone() == \
+        ("Thak Foods", "https://thak.jp", "gọi trước 10h")
+    DT.sua_ben(conn, "THAK", {"web": ""}, None, da_xem=_max_nk(conn))
+    conn.commit()
+    assert conn.execute("SELECT web FROM app.doi_thu WHERE ma='THAK'").fetchone()[0] is None
+    r = conn.execute("SELECT loai, truoc, sau FROM app.doi_thu_nhat_ky WHERE doi_tuong='ben:THAK' ORDER BY id").fetchall()
+    assert [x[0] for x in r] == ["doi_thu", "doi_thu"] and r[1][1:] == ({"web": "https://thak.jp"}, {"web": None})
+    with pytest.raises(DT.XungDot):
+        DT.sua_ben(conn, "THAK", {"ghi_chu": "x"}, None, da_xem=0)
+
+
+def test_4b2_sua_muc_gia_dong_tay_dong_cu_het_hien_hanh_ngay_nguon_giu_nguyen(conn, batch):
+    """Sửa kênh / mức giá đổi phân vùng hien_hanh: dòng cũ (bị thay) KHÔNG được còn hiện hành ở phân vùng cũ."""
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.execute("UPDATE app.gia_doi_thu_tay SET luc = '2026-08-01 10:00+09' WHERE id=%s", (tid,))
+    conn.commit()
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "thay_doi": {"muc_gia": "sỉ"}}, None)
+    conn.commit()
+    hh = dict(conn.execute("SELECT id, hien_hanh FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay'").fetchall())
+    assert hh == {tid: False, ra["id"]: True}
+    ngay = dict(conn.execute("SELECT id, ngay_nguon FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay'").fetchall())
+    assert ngay[ra["id"]] == ngay[tid] == date(2026, 8, 1)                 # "đọc sai" giữ ngày nguồn / tuổi
+    assert conn.execute("SELECT thay_cho_tay_id FROM app.gia_doi_thu_tay WHERE id=%s", (ra["id"],)).fetchone()[0] == tid
+    assert DT.mat_hang(conn, "tay", tid)["quan_sat"]["hien_hanh"] is False  # dòng bị thay vẫn đọc được (lịch sử)
+
+
+def test_4b2_gia_da_doi_dong_tay_la_ngay_moi_va_thay_dong_cu(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.execute("UPDATE app.gia_doi_thu_tay SET luc = '2026-08-01 10:00+09' WHERE id=%s", (tid,))
+    conn.commit()
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "vi_sao_gia": "da_doi",
+                                "loai_nguon": "chung_tu", "thay_doi": {"kenh_gia": "web", "gia_goc": "500"}}, None)
+    conn.commit()
+    r = conn.execute("SELECT thay_cho_tay_id, (luc AT TIME ZONE 'Asia/Tokyo')::date > '2026-08-01'"
+                     " FROM app.gia_doi_thu_tay WHERE id=%s", (ra["id"],)).fetchone()
+    assert r == (tid, True)
+    hh = dict(conn.execute("SELECT id, hien_hanh FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay'").fetchall())
+    assert hh == {tid: False, ra["id"]: True}
+
+
+def test_4b2_gia_da_doi_dong_nap_doi_kenh_dong_nap_het_hien_hanh(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "vi_sao_gia": "da_doi", "loai_nguon": "to_roi",
+                                "thay_doi": {"kenh_gia": "web"}}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[4] is False and _qs_dong(conn, "tay", ra["id"])[4] is True
+    hien = conn.execute("SELECT nguon, id FROM mart.gia_doi_thu_hien_hanh WHERE ma_doi_thu='THAK'").fetchall()
+    assert hien == [("tay", ra["id"])]                                      # MỘT quan sát hiện hành, không phải hai
+
+
+def test_4b2_dong_bi_thay_sau_moc_van_hien_hanh_khi_xem_lui(conn, batch):
+    """Dòng thay mới hơn mốc đang xem thì chưa 'thay' gì — dòng nạp vẫn hiện hành ở mốc cũ."""
+    from tests.test_mart_doi_thu import _mua
+    fid = _ba_ben(conn, batch)[0]
+    _mua(conn, batch, "202601010001", date(2026, 9, 20), hang="NT01")
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "vi_sao_gia": "da_doi", "loai_nguon": "to_roi",
+                           "thay_doi": {"kenh_gia": "web"}}, None)
+    conn.commit()
+    conn.execute("SELECT set_config('kome.moc', '2026-08-31', true)")
+    assert _qs_dong(conn, "nap", fid)[4] is True
+    conn.rollback()
+
+
+def test_4b2_nhan_ghep_khong_ma_kome_va_khach_ke_bo_ghep_la_LoiNhap(conn, batch):
+    from tests.test_mart_doi_thu import _ke
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 540, hang="hX", ma=None)
+    with pytest.raises(DT.LoiNhap, match="Chọn mã KOME trước"):
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "nhan": "cung_hang"}, None)
+    conn.rollback()
+    ke = _ke(conn, "202601010001", "ma:NT01", 700)
+    with pytest.raises(DT.LoiNhap, match="khách kể"):
+        DT.sua_mat_hang(conn, {"nguon": "tay", "id": ke, "da_xem": 0, "nhan": "khong"}, None)
+    conn.rollback()
+    assert _nk(conn) == 0 and conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0
+
+
+
+# ---------------------------------------------------------------- đợt 4b rà cuối: B13 ghép mã / nhóm, B14 dòng bị thay,
+# B15 "đã bỏ khỏi nhóm", giá đã đổi không mang link cũ
+
+def _nhom_ten(conn, ten="Nhóm cá"):
+    i = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES (%s) RETURNING id", (ten,)).fetchone()[0]
+    conn.commit()
+    return i
+
+
+def _nk_max(conn, fid, khoa_ghep):
+    return conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong IN (%s, %s)",
+                        (f"gia:{fid}", khoa_ghep)).fetchone()[0]
+
+
+def test_4b_ra_ghep_dong_CHUA_GHEP_voi_ma_roi_doi_ma_roi_dat_nhom(conn, batch):
+    """B13: dòng Duyệt › Chưa ghép (AI không đề xuất mã) ghép được ngay trong pop-up; ghép sai đổi sang mã khác; nhóm có
+    tên chọn tường minh rồi bỏ về 'theo mã KOME'. Mỗi lần một dòng nhật ký ghép trên '<bên>/<hàng>'."""
+    _hang(conn, batch)
+    _hang(conn, batch, "NT02", "Ca X (500g x 20 packs)")
+    fid = _qs(conn, batch, "THAK", 540, hang="hX", ma=None, nhan=None)
+    assert _qs_dong(conn, "nap", fid)[:3] == (None, None, None)
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "ma_kome": " NT01 ", "nhan": "cung_hang"}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[:3] == ("ma:NT01", "cung_hang", "NT01")
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": ra["sua_cuoi"], "ma_kome": "NT02"}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[:3] == ("ma:NT02", "cung_hang", "NT02")     # nhãn giữ, mã đổi
+    g = _nhom_ten(conn)
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": ra["sua_cuoi"], "nhom_id": g}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[:3] == (f"n:{g}", "cung_hang", "NT02")
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": ra["sua_cuoi"], "nhom_id": None}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[0] == "ma:NT02"
+    assert _nk(conn, "THAK/hX") == 4 and _nk(conn) == 4
+    assert ra["sua_cuoi"] == _max_nk(conn)
+    q = DT.mat_hang(conn, "nap", fid)["quan_sat"]
+    assert (q["ma_ghep"], q["nhom_ghep"], q["thay_boi"]) == ("NT02", None, None)
+
+
+def test_4b_ra_ghep_ma_nhom_sai_va_ma_moi_khong_nhan_la_LoiNhap_khong_ghi_gi(conn, batch):
+    from tests.test_mart_doi_thu import _ke
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 540, hang="hX", ma=None, nhan=None)
+    ke = _ke(conn, "202601010001", "ma:NT01", 700)
+    for b, loi in (({"ma_kome": "KHONG-CO", "nhan": "cung_hang"}, "Không có mã KOME"),
+                   ({"ma_kome": "NT01", "nhan": "cung_hang", "nhom_id": 987654}, "nhóm so sánh"),
+                   ({"ma_kome": "NT01"}, "cùng thương hiệu hoặc khác thương hiệu"),
+                   ({"ma_kome": 5, "nhan": "cung_hang"}, "Mã KOME"),
+                   ({"nhom_id": "abc"}, "Nhóm so sánh"),
+                   ({"ma_kome": "NT01", "nhan": "khong", "thay_doi": {"so_goi_thung": "20"}}, "cùng thương hiệu")):
+        with pytest.raises(DT.LoiNhap, match=loi):
+            DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0} | b, None)
+        conn.rollback()
+    with pytest.raises(DT.LoiNhap, match="khách kể"):
+        DT.sua_mat_hang(conn, {"nguon": "tay", "id": ke, "da_xem": 0, "ma_kome": "NT01"}, None)
+    conn.rollback()
+    assert _nk(conn) == 0 and conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0
+    assert conn.execute("SELECT count(*) FROM app.dinh_chinh_gia").fetchone()[0] == 0
+
+
+def test_4b_ra_doi_ma_van_qua_chong_sua_de_khoa_ghep(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 540, hang="hX", ma=None, nhan=None)
+    DT.dat_ghep(conn, "THAK", "hX", "NT01", None, "thay_the", _nguoi(conn))
+    conn.commit()
+    with pytest.raises(DT.XungDot) as e:
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "ma_kome": "", "nhan": "khong"}, None)
+    conn.rollback()
+    assert e.value.ai == "lan" and e.value.thay_boi is None
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "ma_kome": "", "nhan": "khong", "ghi_de": True}, None)
+    conn.commit()
+    assert conn.execute("SELECT product_code, nhan FROM app.ghep_hang").fetchone() == (None, "khong")
+
+
+def test_4b_ra_dong_tay_DA_BI_THAY_khong_sua_duoc_ke_ca_ghi_de_va_tro_ban_moi_nhat(conn, batch):
+    """B14: A mở tay:5 (cache cũ), B sửa → tay:6 thay tay:5; A lưu tay:5 thì bị từ chối, trỏ bản mới — cả khi da_xem
+    đã gồm lần sửa của B (đọc tươi) và cả khi ghi_de. Chuỗi thay lần tới CUỐI."""
+    fid, fid2, _ = _ba_ben(conn, batch)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.commit()
+    moi = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "vi_sao_gia": "doc_sai",
+                                 "thay_doi": {"gia_goc": "525"}}, _nguoi(conn))["id"]
+    conn.commit()
+    truoc = (_nk(conn), conn.execute("SELECT count(*) FROM app.gia_doi_thu_tay").fetchone()[0])
+    for ghi_de in (False, True):
+        with pytest.raises(DT.XungDot) as e:
+            DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "ghi_de": ghi_de,
+                                   "vi_sao_gia": "doc_sai", "thay_doi": {"gia_goc": "530"}}, None)
+        conn.rollback()
+        assert e.value.thay_boi == {"nguon": "tay", "id": moi} and e.value.ai == "lan"
+    assert (_nk(conn), conn.execute("SELECT count(*) FROM app.gia_doi_thu_tay").fetchone()[0]) == truoc
+    assert DT.mat_hang(conn, "tay", tid)["quan_sat"]["thay_boi"] == {"nguon": "tay", "id": moi}
+    assert DT.mat_hang(conn, "tay", moi)["quan_sat"]["thay_boi"] is None
+    moi2 = DT.sua_mat_hang(conn, {"nguon": "tay", "id": moi, "da_xem": _max_nk(conn), "thay_doi": {"so_goi_thung": "20"}},
+                           None)["id"]
+    conn.commit()
+    assert DT.mat_hang(conn, "tay", tid)["quan_sat"]["thay_boi"] == {"nguon": "tay", "id": moi2}
+    # dòng NẠP đã có "giá đã đổi" (fact_goc_id) cũng vậy — trỏ tới cuối chuỗi
+    assert DT.mat_hang(conn, "nap", fid)["quan_sat"]["thay_boi"] == {"nguon": "tay", "id": moi2}
+    with pytest.raises(DT.XungDot) as e:
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": _max_nk(conn), "thay_doi": {"so_goi_thung": "20"}}, None)
+    conn.rollback()
+    assert e.value.thay_boi == {"nguon": "tay", "id": moi2}
+    assert conn.execute("SELECT count(*) FROM app.dinh_chinh_gia").fetchone()[0] == 0
+    # dòng chưa bị thay vẫn sửa được
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid2, "da_xem": _max_nk(conn), "thay_doi": {"so_goi_thung": "20"}}, None)
+
+
+def test_4b_ra_gia_da_doi_dong_tay_KHONG_chep_link_bang_chung_cu(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi",
+                            "lien_ket_bang_chung": "https://drive.google.com/cu"}, None)
+    conn.commit()
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "vi_sao_gia": "da_doi",
+                                "loai_nguon": "chung_tu", "thay_doi": {"gia_goc": "510"}}, None)
+    conn.commit()
+    assert conn.execute("SELECT lien_ket_bang_chung FROM app.gia_doi_thu_tay WHERE id=%s", (ra["id"],)).fetchone()[0] is None
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": ra["id"], "da_xem": _max_nk(conn), "vi_sao_gia": "da_doi",
+                                "loai_nguon": "chung_tu", "lien_ket_bang_chung": "https://drive.google.com/moi",
+                                "thay_doi": {"gia_goc": "505"}}, None)
+    conn.commit()
+    assert conn.execute("SELECT lien_ket_bang_chung FROM app.gia_doi_thu_tay WHERE id=%s",
+                        (ra["id"],)).fetchone()[0] == "https://drive.google.com/moi"
+    # "Đọc sai" vẫn là CÙNG quan sát → giữ link của nó
+    ra2 = DT.sua_mat_hang(conn, {"nguon": "tay", "id": ra["id"], "da_xem": _max_nk(conn), "thay_doi": {"so_goi_thung": "20"}},
+                          None)
+    assert conn.execute("SELECT lien_ket_bang_chung FROM app.gia_doi_thu_tay WHERE id=%s",
+                        (ra2["id"],)).fetchone()[0] == "https://drive.google.com/moi"
+
+
+def test_4b_ra_so_sanh_va_ho_so_ben_mang_DA_BO_KHOI_NHOM_va_hoan_tac(conn, batch, monkeypatch):
+    """B15: bỏ khỏi nhóm → /so-sanh `da_bo` (nhóm rời + nhãn cũ + sua_cuoi) và /ben `bo_nhom`; hoàn tác = ghi lại nhãn
+    cũ qua CÙNG đường lưu → dòng về nhóm, da_bo rỗng. Vẫn MỘT lượt hỏi."""
+    fid, fid2, _ = _ba_ben(conn, batch)
+    assert DT.so_sanh(conn)["da_bo"] == []
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "nhan": "cung_hang"}, None)
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": ra["sua_cuoi"], "nhan": "khong"}, None)
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid2, "da_xem": _max_nk(conn), "nhan": "khong"}, None)   # nhãn AI
+    conn.commit()
+    dem = _dem(conn, monkeypatch)
+    db = {x["id"]: x for x in DT.so_sanh(conn)["da_bo"]}
+    assert dem["n"] == 1
+    assert set(db) == {fid, fid2}
+    x = db[fid]
+    assert (x["nguon"], x["ma_doi_thu"], x["nhom_khoa"], x["nhan_cu"], x["don_vi_so"]) == \
+        ("nap", "THAK", "ma:NT01", "cung_hang", "kg")
+    assert x["ten_nhom"] and x["ten_goc"] == "Basa" and x["sua_cuoi"] == _nk_max(conn, fid, "THAK/hTHAK")
+    assert db[fid2]["nhan_cu"] == "thay_the"                              # không có nhãn cũ trong nhật ký → nhãn AI
+    hs = {q["id"]: q for q in DT.ho_so_ben(conn, "THAK")["quan_sat"]}
+    assert hs[fid]["bo_nhom"]["nhan_cu"] == "cung_hang" and hs[fid]["bo_nhom"]["nhom_khoa"] == "ma:NT01"
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": x["sua_cuoi"], "nhan": x["nhan_cu"]}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[:2] == ("ma:NT01", "cung_hang")
+    assert [x["id"] for x in DT.so_sanh(conn)["da_bo"]] == [fid2]
+    assert DT.ho_so_ben(conn, "THAK")["quan_sat"][0]["bo_nhom"] is None

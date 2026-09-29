@@ -772,6 +772,49 @@ def tao_api(open_app_conn) -> APIRouter:
         return _dt_doc(request, "doi-thu/duyet", lambda c: DT.duyet(c, ben, loc), thang, ky, tu, den,
                        "Không đọc được danh sách duyệt.", ben=ben, loc=loc)
 
+    @r.get("/doi-thu/giao-hang")
+    def dt_giao_hang(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Phí & giao hàng — ảnh chụp theo phiên bản (mọi lần sửa giao hàng ghi app.doi_thu_nhat_ky, có trong
+        _PHIEN_BAN). 1 lượt hỏi."""
+        from kome import doi_thu_giao as DTG
+        return _dt_doc(request, "doi-thu/giao-hang", DTG.giao_hang, thang, ky, tu, den,
+                       "Không đọc được điều kiện giao hàng.")
+
+    def _dt_tuoi(request, tinh, thang, ky, tu, den, loi, khong_co="Không có."):
+        """Đọc TƯƠI (không ảnh chụp) cho pop-up sửa — số `sua_cuoi` / lịch sử phải là của lúc mở, không phải của ảnh
+        chụp, để chống sửa đè. Cùng mốc với _dt_doc (khoảng xem đang chọn). None -> 404 JSON."""
+        from kome import doi_thu as DT
+        try:
+            ts = _ts(request, thang, ky, tu, den).chinh()
+            with open_app_conn() as conn:
+                du_lieu = _voi_moc(ts, tinh)(conn)
+        except (DT.LoiNhap, KX.LoiKhoang) as e:
+            return _loi(str(e), 400)
+        except Exception:
+            traceback.print_exc()
+            return _loi(loi)
+        if du_lieu is None:
+            return _loi(khong_co, 404)
+        return JSONResponse(du_lieu, headers={"Cache-Control": "no-store"})
+
+    @r.get("/doi-thu/mat-hang/{nguon}/{id}")
+    def dt_mat_hang(request: Request, nguon: str, id: int, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Một quan sát (kể cả dòng lịch sử) + lịch sử sửa của nó — pop-up sửa. 1 lượt hỏi, không ảnh chụp."""
+        from kome import doi_thu as DT
+        return _dt_tuoi(request, lambda c: DT.mat_hang(c, nguon, id), thang, ky, tu, den,
+                        "Không đọc được mặt hàng.", "Không có mặt hàng này.")
+
+    @r.get("/doi-thu/lich-su")
+    def dt_lich_su(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """`?doi_tuong=a,b` (≤ 5 khoá nhật ký). Khoá có dấu phẩy: lặp tham số (`?doi_tuong=a&doi_tuong=b` — khi đó
+        không tách phẩy). 1 lượt hỏi, không ảnh chụp."""
+        from kome import doi_thu as DT
+        v = request.query_params.getlist("doi_tuong")
+        khoa = [k.strip() for k in v[0].split(",")] if len(v) == 1 else [k.strip() for k in v]
+        khoa = [k for k in khoa if k]
+        return _dt_tuoi(request, lambda c: {"lich_su": DT.lich_su(c, khoa)}, thang, ky, tu, den,
+                        "Không đọc được lịch sử sửa.")
+
     @r.get("/san-pham/{ma}/doi-thu")
     def sp_doi_thu(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         from kome import doi_thu as DT
@@ -793,6 +836,15 @@ def tao_api(open_app_conn) -> APIRouter:
             with open_app_conn() as conn:
                 ra = lam(conn, b, nguoi.id if nguoi else None)
                 conn.commit()
+        except DT.XungDot as e:
+            # Đợt 4b: có người ghi vào mục này sau lúc pop-up mở — không ghi gì (giao dịch không commit); pop-up hỏi
+            # "Ghi đè / Giữ bản kia" rồi gửi lại với ghi_de = true. `sua_cuoi` = mốc mới nếu người dùng chọn đọc lại.
+            # Dòng đã bị thay (B14): cùng dạng 409, thêm `thay_boi` {nguon, id} — pop-up mở bản mới, không cho Ghi đè.
+            x = {"ai": e.ai, "luc": e.luc, "sau": e.sau, "sua_cuoi": e.id}
+            if e.thay_boi:
+                x["thay_boi"] = e.thay_boi
+            return JSONResponse({"loi": str(e), "xung_dot": x, **({"thay_boi": e.thay_boi} if e.thay_boi else {})},
+                                status_code=409)
         except (DT.LoiNhap, KeyError, TypeError, ValueError) as e:
             return _loi(str(e) if isinstance(e, DT.LoiNhap) else "Thiếu hoặc sai trường dữ liệu.", 400)
         except Exception:
@@ -857,6 +909,67 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import doi_thu as DT
         return await _dt_ghi(request, lambda c, b, n: DT.sua_quy_cach(
             c, str(b["product_code"]), b.get("kg_moi_goi"), b.get("goi_moi_thung"), b.get("kg_moi_thung"), n))
+
+    # ---- Đợt 4b: ghi từ pop-up — MỘT giao dịch mỗi lần Lưu, chống sửa đè bằng `da_xem` (sua_cuoi lúc mở) -> 409.
+    # Thiếu `da_xem` = 0 (kiểm chặt); `ghi_de` chỉ nhận đúng true. Trả `sua_cuoi` mới để pop-up sửa tiếp không bị 409.
+
+    def _xem(b):
+        from kome import doi_thu as DT
+        return {"da_xem": DT.doc_da_xem(b.get("da_xem")), "ghi_de": b.get("ghi_de") is True}
+
+    def _chu(b, k, bat_buoc=True):
+        from kome import doi_thu as DT
+        v = b.get(k)
+        if v is None and not bat_buoc:
+            return None
+        if not isinstance(v, str):
+            raise DT.LoiNhap(f"Thiếu hoặc sai trường '{k}'.")
+        return v
+
+    @r.post("/doi-thu/sua-mat-hang")
+    async def dt_sua_mat_hang(request: Request):
+        """{nguon, id, da_xem, ghi_de, nhan, ma_kome?, nhom_id?, thay_doi, vi_sao_gia, loai_nguon, lien_ket_bang_chung,
+        ghi_chu_nguon} -> {ok, nguon, id, sua_cuoi} (DT.sua_mat_hang). Dòng đã bị thay -> 409 kèm thay_boi."""
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.sua_mat_hang(c, b, n))
+
+    @r.post("/doi-thu/giao-hang")
+    async def dt_sua_giao_hang(request: Request):
+        """{ma_doi_thu, thay_doi, da_xem, ghi_de} -> {ok, sua_cuoi}."""
+        from kome import doi_thu as DT, doi_thu_giao as DTG
+
+        def lam(c, b, n):
+            ma, td = _chu(b, "ma_doi_thu"), b.get("thay_doi")
+            if not isinstance(td, dict):
+                raise DT.LoiNhap("Trường sửa phải là một đối tượng.")
+            DTG.sua_giao_hang(c, ma, td, n, **_xem(b))
+            return {"sua_cuoi": DT.sua_cuoi_cua(c, [f"giao:{ma}"])}
+        return await _dt_ghi(request, lam)
+
+    @r.post("/doi-thu/dieu-kien")
+    async def dt_sua_dieu_kien(request: Request):
+        """{fact_id|null, ma_doi_thu, loai, noi_dung, bo, da_xem, ghi_de} -> {ok, id, sua_cuoi}."""
+        from kome import doi_thu as DT, doi_thu_giao as DTG
+
+        def lam(c, b, n):
+            fid = b.get("fact_id")
+            fid = None if fid is None else DT.doc_id(fid, "Mã điều kiện")
+            ma = _chu(b, "ma_doi_thu")
+            i = DTG.sua_dieu_kien(c, fact_id=fid, ma_doi_thu=ma, loai=_chu(b, "loai"),
+                                  noi_dung=_chu(b, "noi_dung"), bo=b.get("bo") is True, nguoi=n, **_xem(b))
+            return {"id": i, "sua_cuoi": DT.sua_cuoi_cua(c, [DTG.khoa_dieu_kien(fid, ma)])}
+        return await _dt_ghi(request, lam)
+
+    @r.post("/doi-thu/ben")
+    async def dt_sua_ben(request: Request):
+        """{ma, ten?, web?, ghi_chu?, da_xem, ghi_de} -> {ok, sua_cuoi}."""
+        from kome import doi_thu as DT
+
+        def lam(c, b, n):
+            ma = _chu(b, "ma")
+            DT.sua_ben(c, ma, {k: b[k] for k in DT.TRUONG_BEN if k in b}, n, **_xem(b))
+            return {"sua_cuoi": DT.sua_cuoi_cua(c, [f"ben:{ma}"])}
+        return await _dt_ghi(request, lam)
 
     @r.get("/san-pham/{ma}/nen-chao")
     def sp_nen_chao(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):

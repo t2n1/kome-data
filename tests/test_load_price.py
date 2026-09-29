@@ -22,7 +22,8 @@ def _row(product_code="P1", pack_code="00", unit_cost=0, **prices) -> dict:
 
     `prices` nhận các cặp price_ex_NN=<số>, price_in_NN=<số> muốn ghi đè.
     """
-    row = {"product_code": product_code, "pack_code": pack_code, "unit_cost": unit_cost}
+    row = {"product_code": product_code, "pack_code": pack_code, "unit_cost": unit_cost,
+           "price_ex_std": 0, "price_in_std": 0}      # 標準価格: cột bắt buộc của mẫu (cổng 2), trống = 0
     for level in _LEVELS:
         row[f"price_ex_{level}"] = 0
         row[f"price_in_{level}"] = 0
@@ -119,3 +120,28 @@ def test_muc_10_chu_so_nua_rong_khong_lam_lech(conn, batch):
         ("P1", "00", "09", 900, 972, 0),
         ("P1", "00", "10", 1000, 1080, 0),
     ]
+
+
+def _df_std(**kw):
+    d = {"product_code": "NT01", "pack_code": "02", "unit_cost": 4000, "price_ex_std": 0, "price_in_std": 4900}
+    for i in range(1, 11):
+        d[f"price_ex_{i:02d}"] = 0
+        d[f"price_in_{i:02d}"] = 0
+    d["price_in_01"] = 5540
+    d.update(kw)
+    return pd.DataFrame([d])
+
+
+def test_tieu_chuan_thanh_bac_std_va_bac_trong_bi_bo(conn, batch):
+    b = batch(1)
+    conn.execute("INSERT INTO core.dim_product (product_code, product_name, batch_id) VALUES ('NT01', 'x', %s)", (b,))
+    assert load(conn, _df_std(), date(2026, 9, 8), b) == 2           # 売価No.1 + std, 9 bậc trống bị bỏ
+    r = dict(conn.execute("SELECT price_level, price_in_tax FROM core.fact_price_list").fetchall())
+    assert r == {"01": 5540, "std": 4900}
+
+
+def test_khong_co_tieu_chuan_thi_khong_co_dong_std(conn, batch):
+    b = batch(1)
+    conn.execute("INSERT INTO core.dim_product (product_code, product_name, batch_id) VALUES ('NT01', 'x', %s)", (b,))
+    load(conn, _df_std(price_in_std=0), date(2026, 9, 8), b)
+    assert conn.execute("SELECT count(*) FROM core.fact_price_list WHERE price_level='std'").fetchone()[0] == 0

@@ -467,8 +467,8 @@ def ghi_kem_nhac(conn, ma: str, nguoi_id: int | None, kieu: str, ket_qua: str, n
     rồi vẫn commit (phần ghi nằm trong một SAVEPOINT).
 
     `canh_bao`: giá vừa ghi mà `mart.gia_doi_thu_hien_hanh` đánh cờ `bat_thuong` (> 2× hoặc < ½ trung vị
-    của nhóm ≥ 3 bên) -> một câu nhắc kiểm lại đơn vị, in trung vị của `mart.so_sanh_nhom` (số tab So sánh giá
-    hiện); KHÔNG chặn ghi. MỘT lượt hỏi cho mọi giá."""
+    của nhóm ≥ 3 bên, không thì của giá chuẩn KOME — B18) -> một câu nhắc kiểm lại đơn vị, in trung vị của
+    `mart.so_sanh_nhom` (số tab So sánh giá hiện) hoặc giá chuẩn KOME; KHÔNG chặn ghi. MỘT lượt hỏi cho mọi giá."""
     from kome.dinh_dang import yen
 
     # Kiểu / độ dài của chính câu ghi chú TRƯỚC (rẻ) — rồi mới mã hoá và dò từng thẻ.
@@ -502,13 +502,15 @@ def ghi_kem_nhac(conn, ma: str, nguoi_id: int | None, kieu: str, ket_qua: str, n
             # Số in ra là trung vị của `mart.so_sanh_nhom` — đúng số tab So sánh giá hiện (bỏ giá bất thường),
             # KHÔNG phải `trung_vi_nhom` (trung vị dùng để BẮT bất thường, tính cả giá lệch): hai con số cùng
             # tên "trung vị" trên hai màn là người đọc đi đối chiếu rồi không khớp.
-            for gia_goc, dv, dv_so, tv in conn.execute(
-                    """SELECT h.gia_goc, h.don_vi_gia, h.don_vi_so, s.trung_vi
+            for gia_goc, dv, dv_so, tv, moc, moc_la in conn.execute(
+                    """SELECT h.gia_goc, h.don_vi_gia, h.don_vi_so, s.trung_vi, h.moc_bat_thuong, h.moc_bat_thuong_la
                        FROM mart.gia_doi_thu_hien_hanh h
                        LEFT JOIN mart.so_sanh_nhom s ON s.nhom_khoa = h.nhom_khoa AND s.don_vi_so = h.don_vi_so
                        WHERE h.nguon = 'tay' AND h.id = ANY(%s) AND h.bat_thuong ORDER BY h.id""",
                     (ids,)).fetchall():
-                moc = (f"trung vị {yen(tv)}/{'kg' if dv_so == 'kg' else dv} của nhóm" if tv is not None
+                # Mốc là giá KOME chuẩn (nhóm < 3 bên — B18) thì nói đúng mốc đó, không nói "trung vị".
+                moc = (f"giá chuẩn KOME {yen(moc)}/kg" if moc_la == "kome"
+                       else f"trung vị {yen(tv)}/{'kg' if dv_so == 'kg' else dv} của nhóm" if tv is not None
                        else "giá các bên khác của nhóm")
                 canh_bao.append(f"Giá {yen(gia_goc)}/{dv} lệch xa {moc} — kiểm lại đơn vị?")
         conn.execute("RELEASE SAVEPOINT ghi_kem_nhac")

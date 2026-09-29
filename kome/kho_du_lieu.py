@@ -30,7 +30,7 @@ O_NAP = [
     {"ma": "giao", "nhan": "Giao thẳng", "specs": ["chokusousaki"], "nhip": "nen"},
     {"ma": "gia", "nhan": "Bảng giá", "specs": ["tanka"], "nhip": "nen"},
     {"ma": "no", "nhan": "Công nợ", "specs": ["seikyu_motocho"], "nhip": "ky"},
-    {"ma": "doi_thu", "nhan": "Bảng giá đối thủ", "specs": ["doi_thu_gia", "doi_thu_dieu_kien"], "nhip": "ky"},
+    {"ma": "doi_thu", "nhan": "Bảng giá đối thủ", "specs": ["doi_thu_gia", "doi_thu_dieu_kien", "doi_thu_giao_hang"], "nhip": "ky"},
 ]
 O_CUA = {o["ma"]: o for o in O_NAP}
 O_CUA_SPEC = {s: o for o in O_NAP for s in o["specs"]}

@@ -44,3 +44,377 @@
 .dt-hien-truong h3{margin:0 0 4px;font-size:.85rem}
 .dt-tinh{max-height:320px;overflow:auto}
 .dt-ke{display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;font-size:.72rem;background:var(--canh-nen);color:var(--canh-chu)}
+
+/* ---- Thanh tab + menu "Dữ liệu ▾" (đợt 4b) ---- */
+/* Menu nằm NGOÀI .kh-tab (nó cuộn ngang → cắt mất menu thả xuống). */
+.dt-thanh{display:flex;align-items:flex-end;gap:.4rem;border-bottom:1px solid var(--vien);margin:.2rem 0 .9rem}
+.dt-thanh .kh-tab{border-bottom:0;margin:0;flex:1 1 auto;min-width:0}
+.dt-menu-goc{position:relative;flex:none}
+.dt-menu-nut{font:inherit;font-size:.84rem;background:none;border:0;border-bottom:2px solid transparent;padding:.5rem .8rem;
+  color:var(--chu-nhat);cursor:pointer;white-space:nowrap;margin-bottom:-1px}
+.dt-menu-nut:hover{color:var(--chu)}
+.dt-menu-nut[aria-current="true"]{color:var(--do-chu);border-bottom-color:var(--do);font-weight:600}
+.dt-menu{position:absolute;right:0;top:100%;z-index:20;min-width:240px;max-width:calc(100vw - 2rem);background:var(--nen-the);
+  border:1px solid var(--vien);border-radius:10px;padding:6px;box-shadow:0 6px 20px color-mix(in srgb, var(--chu) 14%, transparent)}
+.dt-menu button{display:block;width:100%;text-align:left;font:inherit;font-size:.84rem;background:none;border:0;border-radius:6px;
+  padding:.45rem .6rem;color:var(--chu);cursor:pointer}
+.dt-menu button:hover,.dt-menu button:focus-visible{background:var(--nen-phu)}
+.dt-menu small{display:block;color:var(--chu-nhat);font-size:.72rem}
+
+/* ---- Hộp thoại chung (HopThoai.tsx) ---- */
+.lop-phu.giua{align-items:center;padding:1rem}
+.dt-hop{width:100%;max-height:88vh;overflow-y:auto;background:var(--nen-the);border:1px solid var(--vien);border-radius:14px;
+  padding:1rem 1.1rem;outline:none}
+.dt-hop-dau{display:flex;align-items:baseline;gap:.5rem;margin-bottom:.6rem}
+.dt-hop-dau .nut-dong{margin-left:auto}
+.dt-hop-than{min-width:0}
+
+/* ---- Pop-up sửa (SuaMatHang.tsx, SuaNho.tsx — đặc tả §4.7, bản phác popup-sua.html) ---- */
+/* Hộp portal vào <body> (ngoài .man-doi-thu) nên ô nhập tự khai lại kiểu. */
+.dt-hop input[type="text"],.dt-hop input[type="url"],.dt-hop select,.dt-hop textarea{font:inherit;font-size:.82rem;
+  padding:.3rem .5rem;border:1px solid var(--vien-dam);border-radius:7px;background:var(--nen);color:var(--chu);min-width:0}
+.dt-hop textarea{width:100%;resize:vertical}
+.dt-hop fieldset{border:1px solid var(--vien);border-radius:10px;margin:10px 0 0;padding:.5rem .7rem;min-width:0;
+  display:flex;flex-direction:column;gap:6px}
+.dt-hop legend{color:var(--chu-nhat);font-size:.74rem;padding:0 4px}
+.dt-hang{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.8rem}
+.dt-hang label{display:inline-flex;gap:6px;align-items:center}
+.dt-dau-phu{margin:0 0 .2rem;font-size:.76rem;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.dt-goi-y{color:var(--chu-nhat);font-size:.72rem;margin:2px 0 0}
+.dt-so-nho{width:4rem;text-align:right}
+.dt-rong-o{flex:1 1 220px}
+/* Radio dạng viên: viên đang chọn mang màu nhấn. */
+.dt-vien{display:inline-flex;gap:5px;align-items:center;border:1px solid var(--vien-dam);border-radius:999px;padding:.18rem .65rem;
+  cursor:pointer;font-size:.8rem}
+.dt-vien input{accent-color:var(--do);margin:0}
+.dt-vien:has(input:checked){border-color:var(--do);color:var(--do-chu);background:var(--do-nen)}
+.dt-vien:has(input:focus-visible){outline:2px solid var(--do);outline-offset:1px}
+.dt-vien.tat{opacity:.5;cursor:not-allowed}
+/* Ô được mở tới từ dấu "?" (tru_o): viền cam. */
+.dt-hop .dt-tro{outline:2px solid var(--canh-chu);outline-offset:1px;border-color:var(--canh-chu)}
+.dt-hoi{color:var(--canh-chu);font-weight:700}
+.dt-bac{border-collapse:collapse;font-size:.8rem}
+.dt-bac td{padding:3px 8px 3px 0;white-space:nowrap}
+.dt-them-bac{align-self:flex-start;font-size:.78rem}
+.dt-doi-gia{background:var(--nen-phu);border:1px solid var(--vien);border-radius:8px;padding:.45rem .6rem;display:flex;
+  flex-direction:column;gap:6px}
+.dt-lich-su{margin-top:10px;font-size:.78rem}
+.dt-lich-su summary{cursor:pointer;color:var(--chu-nhat)}
+.dt-lich-su ul{margin:6px 0 0;padding-left:1.1rem;display:flex;flex-direction:column;gap:3px}
+.dt-xung{margin-top:10px;background:var(--canh-nen);border:1px solid var(--canh-vien);color:var(--canh-chu);border-radius:8px;
+  padding:.5rem .7rem;font-size:.8rem}
+.dt-xung p{margin:0}
+.dt-nut-cuoi{align-items:center;margin-top:12px}
+.dt-nut-cuoi small{font-size:.72rem}
+.dt-giu-cho{display:flex;flex-direction:column;gap:10px;padding:.4rem 0}
+.dt-giu-cho span{display:block;height:54px;border-radius:10px;background:var(--nen-phu);animation:dt-nhap 1.2s ease-in-out infinite alternate}
+@keyframes dt-nhap{from{opacity:.55}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.dt-giu-cho span{animation:none}}
+/* Pop-up nhỏ: nhãn trên, ô dưới. */
+.dt-nho{display:flex;flex-direction:column;gap:8px}
+.dt-nho>label,.dt-luoi-2>label{display:flex;flex-direction:column;gap:3px;font-size:.78rem;color:var(--chu-nhat)}
+.dt-nho>label>input,.dt-nho>label>select,.dt-nho>label>textarea,.dt-luoi-2>label>input,.dt-luoi-2>label>select{color:var(--chu)}
+.dt-nho>label.dt-o-chon{flex-direction:row;align-items:center;gap:6px;color:var(--chu)}
+.dt-luoi-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.dt-goc{margin:0;font-size:.74rem}
+.dt-vung{margin:0}
+@media (max-width:560px){.dt-luoi-2{grid-template-columns:minmax(0,1fr)}.dt-bac td{white-space:normal}}
+
+/* ---- Tab So sánh giá (đợt 4b task 6; bản phác ca-trang-8.html, goi-thung-3.html, tooltip-thung-4.html, ky-hieu-thay-the.html C) ----
+   Màu: luật §3.1 (mau.ts::mauLech) → đỏ --do / xanh --ok / xám --chu-mo; cùng thương hiệu --lam-chu; "?" thuế / viền hết
+   --canh-chu (vàng). Token riêng --dt-* (thanh khác thương hiệu, "?" thiếu cam, KM, vạch thực bán) khai ở kome.css
+   (ba khối: sáng + hai khối tối giống hệt) — mã màu chỉ có một nhà (test_giao_dien::test_khong_ma_mau_nao_ngoai_kome_css). */
+
+.dt-ss{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
+@media (min-width:900px){.dt-ss{grid-template-columns:260px minmax(0,1fr)}}
+.dt-ss-trai{background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:10px;display:flex;flex-direction:column;
+  gap:8px;min-width:0}
+@media (min-width:900px){.dt-ss-trai{position:sticky;top:12px;max-height:calc(100vh - 24px)}}
+.dt-ss-trai input[type="search"]{width:100%;box-sizing:border-box}
+.dt-chips{display:flex;flex-wrap:wrap;gap:4px}
+.dt-chips .chip,.dt-dk-nhom .chip{font-size:.72rem;padding:.2rem .6rem;border:1px solid var(--vien-dam);background:var(--nen-phu);
+  color:var(--chu-thuong)}
+.dt-chips .chip{border-radius:999px}
+.dt-chips .chip[aria-pressed="true"],.dt-dk-nhom .chip[aria-pressed="true"]{border-color:var(--do);background:var(--do-nen);color:var(--do-chu)}
+.dt-mhs{list-style:none;margin:0;padding:0;overflow:auto;flex:1 1 auto;max-height:520px}
+@media (min-width:900px){.dt-mhs{max-height:none}}
+.dt-mh{display:grid;grid-template-columns:16px 34px minmax(0,1fr);gap:8px;align-items:center;padding:5px 4px;border-radius:8px;cursor:pointer}
+.dt-mh:hover{background:var(--nen-phu)}
+.dt-mh.chon{background:var(--do-nen)}
+.dt-mh input{margin:0;accent-color:var(--do)}
+.dt-mh b{display:block;font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-mh small{display:block;color:var(--chu-nhat);font-size:.68rem}
+.dt-mh:has(input:focus-visible){outline:2px solid var(--do);outline-offset:1px}
+.dt-mh .hinh-ma{border-radius:6px}
+.dt-cham{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px;flex:none}
+.dt-cham.do{background:var(--do)} .dt-cham.xanh{background:var(--ok-vien)} .dt-cham.xam{background:var(--chu-mo)}
+.dt-toi-da{color:var(--dt-cam);font-size:.72rem;margin:0;min-height:1em}
+.dt-ss-phai{background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:12px 14px;min-width:0}
+.dt-dk{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--vien)}
+.dt-dk-nhom{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+.dt-dk-nhom .chip{border-radius:6px}
+.dt-dk-nhan{color:var(--chu-nhat);font-size:.74rem;margin-right:2px}
+.dt-dk label{font-size:.78rem;display:inline-flex;gap:6px;align-items:center}
+.dt-thieu{margin:-4px 0 6px;font-size:.76rem;color:var(--chu-nhat)}
+.dt-thieu button{font:inherit;background:none;border:0;padding:0;color:var(--dt-cam);cursor:pointer;text-align:left}
+.dt-thieu button:hover{text-decoration:underline}
+.dt-nhom-dau{margin:14px 0 2px;font-size:.9rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap;scroll-margin-top:12px}
+.dt-nhom-dau .hinh-ma{border-radius:6px}
+.dt-nhom-dau small{color:var(--chu-nhat);font-size:.72rem;font-weight:400}
+.dt-nhom-dau small b{color:var(--chu);font-weight:600}
+.dt-svg{display:block;font-family:var(--font-ui);font-variant-numeric:tabular-nums}
+.dt-svg text{fill:var(--chu)}
+.dt-svg .t-nhat{fill:var(--chu-nhat)} .dt-svg .t-mo{fill:var(--chu-mo)}
+/* Tên hàng khác thương hiệu: mờ hơn tên cùng thương hiệu (chữ thường, không đậm) nhưng vẫn đọc được — --chu-nhat, không --chu-mo. */
+.dt-svg .t-khac{fill:var(--chu-nhat)} .dt-svg .t-kome{fill:var(--do-chu);font-weight:700}
+.dt-svg .t-do{fill:var(--do-chu)} .dt-svg .t-xanh{fill:var(--ok-chu)} .dt-svg .t-xam{fill:var(--chu-mo)}
+.dt-svg .t-cam{fill:var(--dt-cam);text-decoration:underline;cursor:pointer;outline:none}
+.dt-svg .t-cam:focus-visible{stroke:var(--dt-cam);stroke-width:.6}
+.dt-svg .t-vang{fill:var(--canh-chu)} .dt-svg .t-km{fill:var(--dt-km)} .dt-svg .t-dam{font-weight:700}
+.dt-svg .ke{stroke:var(--vien)}
+.dt-svg a.o-noi-goc{outline:none}
+.dt-svg a.o-noi-goc:focus-visible .dt-dich{stroke:var(--dt-cam);stroke-width:2.5}
+.dt-svg [role="button"]{cursor:pointer}
+.dt-svg .dt-hoi-thue{outline:none}
+.dt-svg .dt-hoi-thue circle{fill:var(--nen-the);stroke:var(--canh-chu)}
+.dt-svg .dt-hoi-thue text{fill:var(--canh-chu);font-weight:700}
+.dt-svg .dt-hoi-thue:focus-visible circle{stroke:var(--dt-cam);stroke-width:2}
+.dt-svg-cot{width:100%;max-width:960px;min-width:660px}
+.dt-svg-cham{width:100%;max-width:760px;min-width:600px}
+.dt-xem-them{font:inherit;font-size:.76rem;background:none;border:0;color:var(--dt-cam);cursor:pointer;padding:2px 0 6px 4px}
+.dt-chu-giai{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.72rem;color:var(--chu-nhat);margin:10px 0 0}
+.dt-chu-giai span{display:inline-flex;align-items:center;gap:4px}
+.dt-chu-giai i{display:inline-block;width:14px;height:10px;border-radius:2px;box-sizing:border-box}
+.dt-chu-giai .cg-kome{background:var(--do)} .dt-chu-giai .cg-cung{background:var(--lam-chu)} .dt-chu-giai .cg-khac{background:var(--dt-khac)}
+.dt-chu-giai .cg-dai{background:color-mix(in srgb, var(--do) 22%, transparent)} .dt-chu-giai .cg-le{border:1px dashed var(--chu-mo)}
+.dt-chu-giai .cg-het{border:2px solid var(--canh-chu)} .dt-chu-giai .cg-vang{color:var(--canh-chu);font-weight:700}
+.dt-chu-giai .cg-cam{color:var(--dt-cam);font-weight:700} .dt-chu-giai .cg-mo{opacity:.5}
+.dt-chu-giai .cg-cham{width:10px;height:10px;border-radius:50%;background:var(--chu-mo)}
+.dt-chu-giai .cg-vong{width:10px;height:10px;border-radius:50%;border:2px solid var(--chu-mo)}
+.dt-chu-giai .cg-nhat{border:1px dashed var(--chu-mo);background:color-mix(in srgb, var(--chu-mo) 20%, transparent)}
+.dt-chu-giai .cg-o-do{background:color-mix(in srgb, var(--do) 70%, transparent)} .dt-chu-giai .cg-o-xanh{background:color-mix(in srgb, var(--ok-vien) 70%, transparent)}
+.dt-nhiet-khung{overflow-x:auto;max-width:100%}
+
+/* Ô nổi giá (ONoiGia.tsx) — nằm trong .bd-noi.o-noi (chung.css đặt div flex / b margin-left:auto), nên dựng lại ở đây. */
+.o-noi:has(.dt-ng){max-width:min(440px,calc(100vw - 16px));min-width:min(320px,calc(100vw - 16px))}
+.o-noi div.dt-ng,.o-noi .dt-ng div,.o-noi .dt-ng p{display:block;white-space:normal;margin:0}
+.o-noi .dt-ng b{margin:0;padding:0}
+.dt-ng{font-size:.74rem;line-height:1.45}
+.o-noi .dt-ng + .dt-ng{border-top:1px solid var(--vien);margin-top:8px;padding-top:8px}
+.o-noi .dt-ng .dt-ng-ben{font-weight:700;font-size:.8rem}
+.o-noi .dt-ng .dt-ng-ten{color:var(--chu-nhat);font-size:.7rem;margin-bottom:4px}
+.dt-nh{display:inline-block;padding:0 7px;border-radius:999px;font-size:.66rem;margin:0 4px 0 0}
+.dt-nh.cung{background:var(--lam-chu);color:var(--nen-the)} .dt-nh.khac{background:var(--dt-khac);color:var(--dt-khac-chu)}
+.dt-nh.het{background:var(--canh-nen);color:var(--canh-chu)}
+.dt-nh.km{background:color-mix(in srgb, var(--dt-km) 18%, transparent);color:var(--dt-km)}
+.o-noi .dt-ng .dt-ng-o3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+.o-noi .dt-ng .dt-ng-o3>div{background:var(--nen-phu);border-radius:6px;padding:4px 8px}
+.dt-ng-o3 small{display:block;color:var(--chu-nhat);font-size:.62rem}
+.o-noi .dt-ng .dt-ng-o3 b{font-size:.92rem}
+.dt-ng-o3 em{font-style:normal;color:var(--chu-mo);font-size:.64rem;margin-left:4px}
+.o-noi .dt-ng .dt-thieu-o{color:var(--dt-cam)}
+.dt-ng table{border-collapse:collapse;width:100%;margin-top:6px;font-variant-numeric:tabular-nums}
+.dt-ng th{color:var(--chu-nhat);font-weight:400;text-align:left;font-size:.64rem;padding:2px 6px 2px 0;border-bottom:1px solid var(--vien)}
+.dt-ng td{padding:3px 6px 3px 0;border-bottom:1px solid var(--vien-phu);white-space:nowrap}
+.dt-ng td.r,.dt-ng th.r{text-align:right}
+.dt-ng tr.dang td{background:var(--nen-phu);font-weight:700}
+.dt-ng tr.kome td{color:var(--chu-nhat)}
+.dt-ng .c-do{color:var(--do-chu)} .dt-ng .c-xanh{color:var(--ok-chu)} .dt-ng .c-xam{color:var(--chu-mo)}
+.o-noi .dt-ng .dt-ng-chu{margin-top:6px;color:var(--chu-nhat);font-size:.66rem}
+.o-noi .dt-ng .dt-ng-chu.vang{color:var(--canh-chu)}
+
+/* ---- Tab Tóm tắt (đợt 4b task 7; bản phác ca-trang-8.html tab Tóm tắt) ----
+   Màu: KOME so trung vị theo mau.ts::mauKomeSoTT (đỏ --do / xanh --ok-vien / xám --chu-mo); "đang hết" --canh-chu (vàng);
+   khuyến mãi --dt-km (tím); bóng --dt-cam. Token --dt-* khai ở khối So sánh giá bên trên (cả hai chế độ). */
+.dt-tt{display:flex;flex-direction:column;gap:14px;min-width:0;container-type:inline-size}
+.dt-tt .c-do{color:var(--do-chu)} .dt-tt .c-vang{color:var(--canh-chu)} .dt-tt .c-km{color:var(--dt-km)}
+.dt-tt-tim{position:relative}
+.dt-tt-tim input{width:100%;box-sizing:border-box;font:inherit;font-size:.9rem;padding:.6rem .9rem;border:1px solid var(--vien-dam);
+  border-radius:10px;background:var(--nen-the);color:var(--chu)}
+.dt-tt-goi-y{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;list-style:none;margin:0;padding:6px;background:var(--nen-the);
+  border:1px solid var(--vien);border-radius:10px;box-shadow:0 6px 20px color-mix(in srgb, var(--chu) 14%, transparent)}
+.dt-tt-goi-y li{display:flex;gap:8px;align-items:baseline;padding:.4rem .6rem;border-radius:6px;cursor:pointer;min-width:0}
+.dt-tt-goi-y li[aria-selected="true"]{background:var(--nen-phu)}
+.dt-tt-goi-y b{font-weight:600;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dt-tt-goi-y small{color:var(--chu-nhat);font-size:.72rem;white-space:nowrap}
+.dt-tt-loai{flex:none;font-size:.66rem;color:var(--chu-nhat);border:1px solid var(--vien-dam);border-radius:999px;padding:0 6px}
+.dt-tt-o4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@container (max-width:640px){.dt-tt-o4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dt-tt-o{background:var(--nen-the);border:1px solid var(--vien);border-radius:10px;padding:10px 12px;min-width:0}
+.dt-tt-o small{display:block;color:var(--chu-nhat);font-size:.72rem}
+.dt-tt-o b{font-size:1.6rem;font-weight:650;font-variant-numeric:tabular-nums}
+.dt-tt-o em{font-style:normal;color:var(--chu-mo);font-size:.72rem;margin-left:4px}
+.dt-tt-xem{font:inherit;font-size:.74rem;background:none;border:0;padding:0;color:var(--dt-cam);cursor:pointer}
+.dt-tt-xem:hover{text-decoration:underline}
+.dt-tt-hai{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+@container (min-width:1040px){.dt-tt-hai{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dt-svg-tt{width:100%;max-width:1100px;min-width:640px}
+.dt-svg-tt .dt-dich{stroke:var(--nen-the);stroke-width:.5}
+.dt-tt-thanh{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:8px 0 6px}
+.dt-tt-thanh i{display:block;min-width:0}
+.dt-tt-cg{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.74rem;color:var(--chu-nhat)}
+.dt-tt-cg span{display:inline-flex;gap:4px;align-items:center} .dt-tt-cg b{color:var(--chu)}
+.dt-tt-cg i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.dt-tt-cg .cg-xanh{background:var(--ok-vien)} .dt-tt-cg .cg-xam{background:var(--chu-mo)} .dt-tt-cg .cg-do{background:var(--do)}
+.dt-tt-cg .cg-trong{background:var(--vien)}
+.dt-tt-canh{display:block;width:100%;text-align:left;font:inherit;font-size:.76rem;margin-top:8px;padding:.4rem .7rem;border-radius:8px;
+  border:1px solid var(--do-nen);background:var(--do-nen);color:var(--do-chu);cursor:pointer}
+.dt-tt-canh:hover{border-color:var(--do)}
+.dt-tt-dais{list-style:none;margin:0;padding:0;container-type:inline-size}
+.dt-tt-dai{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(0,170px) 50px 90px;gap:8px;align-items:center;width:100%;
+  font:inherit;color:inherit;text-align:left;background:none;border:0;border-bottom:1px solid var(--vien-phu);padding:5px 4px;cursor:pointer}
+.dt-tt-dai:hover{background:var(--nen-phu)}
+.dt-tt-dai:focus-visible{outline:2px solid var(--do);outline-offset:-2px;border-radius:6px}
+@container (max-width:440px){.dt-tt-dai{grid-template-columns:34px minmax(0,1fr) 50px 84px}.dt-tt-dai-svg{display:none}}
+.dt-tt-dai .hinh-ma{border-radius:6px}
+.dt-tt-dt{min-width:0}
+.dt-tt-dt b{display:block;font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tt-dt small,.dt-tt-gia small{display:block;color:var(--chu-nhat);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tt-dai-svg{width:100%;height:auto;display:block}
+.dt-tt-dai-nen{stroke:var(--vien-dam)} .dt-tt-dai-tv{stroke:var(--chu)} .dt-tt-dai-kome{stroke:var(--nen-the)}
+.dt-tt-pc{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.dt-tt-gia{text-align:right;font-variant-numeric:tabular-nums;font-size:.8rem;white-space:nowrap}
+.dt-tt-chs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@container (max-width:760px){.dt-tt-chs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dt-tt-ch{background:var(--nen-phu);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.dt-tt-ch .hinh-ma{border-radius:8px}
+.dt-tt-ten{font:inherit;font-size:.78rem;font-weight:600;text-align:left;background:none;border:0;padding:0;color:var(--chu)}
+button.dt-tt-ten{cursor:pointer} button.dt-tt-ten:hover{text-decoration:underline}
+.dt-tt-ch small{color:var(--chu-nhat);font-size:.68rem}
+.dt-tt-chip{font:inherit;display:inline-block;margin:2px 3px 0 0;padding:1px 7px;border-radius:999px;border:1px solid transparent;
+  background:var(--canh-nen);color:var(--canh-chu);font-size:.66rem;cursor:pointer}
+.dt-tt-chip:hover,.dt-tt-chip:focus-visible{border-color:var(--canh-chu);outline:none}
+.dt-svg-bong{width:100%;max-width:820px}
+.dt-svg .dt-bong{fill:var(--dt-cam)}
+.dt-svg .t-ben{cursor:pointer;outline:none} .dt-svg .t-ben:hover,.dt-svg .t-ben:focus-visible{text-decoration:underline}
+.dt-tt-kmb{list-style:none;margin:0;padding:0}
+.dt-tt-kmb button{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 34px;gap:8px;align-items:center;width:100%;font:inherit;
+  font-size:.74rem;color:inherit;text-align:left;background:none;border:0;padding:2px 4px;border-radius:6px;cursor:pointer}
+.dt-tt-kmb button:hover{background:var(--nen-phu)}
+.dt-tt-kmb span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tt-kmb-o{display:block}
+.dt-tt-kmb i{display:block;height:10px;border-radius:5px;background:var(--dt-km);min-width:3px}
+.dt-tt-kmb b{text-align:right;font-variant-numeric:tabular-nums}
+.dt-tt-kms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.dt-tt-km{font:inherit;text-align:left;background:var(--nen-phu);border:1px solid transparent;border-radius:8px;padding:8px;cursor:pointer;
+  color:inherit;min-width:0}
+.dt-tt-km:hover,.dt-tt-km:focus-visible{border-color:var(--dt-km);outline:none}
+.dt-tt-km small{display:block;color:var(--chu-nhat);font-size:.66rem}
+.dt-tt-km b{display:block;font-size:.74rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tt-km span{color:var(--do-chu);font-weight:700;font-size:.8rem} .dt-tt-km s{color:var(--chu-mo);font-weight:400}
+
+/* ---- Tab Đối thủ (đợt 4b task 8; bản phác ca-trang-8.html tab Đối thủ) ----
+   Thanh: cùng thương hiệu --lam-chu, khác --dt-khac, viền hết --canh-chu, % theo mau.ts::mauLech; "?" thiếu --dt-cam.
+   Ô số / bốn ô dùng lại .dt-tt-o4 / .dt-tt-o (container query theo khung .dt-hs). */
+.dt-hs{display:flex;flex-direction:column;gap:12px;min-width:0;container-type:inline-size}
+.dt-hs .c-do{color:var(--do-chu)} .dt-hs .c-vang{color:var(--canh-chu)} .dt-hs .c-km{color:var(--dt-km)}
+.dt-hs-chip{display:flex;flex-wrap:wrap;gap:5px}
+.dt-hs-chip button{font:inherit;font-size:.76rem;background:var(--nen-phu);border:1px solid var(--vien-dam);color:var(--chu-thuong);
+  border-radius:999px;padding:.2rem .75rem;cursor:pointer}
+.dt-hs-chip button span{color:var(--chu-mo);margin-left:2px;font-variant-numeric:tabular-nums}
+.dt-hs-chip button[aria-pressed="true"]{background:var(--do-nen);border-color:var(--do);color:var(--do-chu)}
+.dt-hs-chip button[aria-pressed="true"] span{color:inherit}
+.dt-hs-dau{display:flex;gap:6px 16px;align-items:baseline;flex-wrap:wrap}
+.dt-hs-dau h3{margin:0;font-size:1.25rem}
+.dt-hs-dau small{color:var(--chu-nhat);font-size:.76rem;display:inline-flex;flex-wrap:wrap;gap:0 4px;align-items:baseline}
+.dt-hs-dau .chip{font-size:.72rem}
+.dt-hs-lk{font:inherit;background:none;border:0;padding:0;color:var(--dt-cam);cursor:pointer}
+.dt-hs-lk:hover{text-decoration:underline}
+.dt-hs-ghi{margin:-6px 0 0;font-size:.78rem}
+.dt-hs-hai{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+@container (min-width:980px){.dt-hs-hai{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}}
+.dt-hs-phai{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dt-svg-hs{width:100%;max-width:720px;min-width:560px}
+.dt-svg-hs .dt-dich{stroke-linejoin:round}
+.dt-chu-giai .t-km-cg{color:var(--dt-km)}
+.dt-hs-dks{display:flex;flex-wrap:wrap;gap:6px}
+.dt-hs-dk{font:inherit;font-size:.76rem;text-align:left;background:var(--nen-phu);border:1px solid transparent;border-radius:8px;
+  padding:.25rem .6rem;color:var(--chu);cursor:pointer;max-width:100%}
+.dt-hs-dk:hover,.dt-hs-dk:focus-visible{border-color:var(--vien-dam);outline:none}
+.dt-hs-dk i,.dt-hs-giao i{font-style:normal;color:var(--chu-nhat);font-size:.68rem;margin-right:6px}
+.dt-hs-dk-moi{color:var(--dt-cam)}
+.dt-hs-giao{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin-top:10px;padding-top:8px;border-top:1px solid var(--vien-phu);
+  font-size:.78rem}
+.dt-hoi-cam{font:inherit;font-weight:700;background:none;border:0;padding:0 2px;color:var(--dt-cam);cursor:pointer}
+.dt-hoi-cam:hover{text-decoration:underline}
+.o-noi .dt-hs-spark{display:block;width:200px;margin:4px 0}
+.o-noi .dt-hs-spark small{display:block;color:var(--chu-nhat);font-size:.64rem;white-space:normal}
+/* Thanh đếm (TabTin.tsx::ThanhDem) — ngành của một bên, tin hiện trường. */
+.dt-dem{list-style:none;margin:0;padding:0}
+.dt-dem li>div,.dt-dem li>button{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,120px) minmax(0,1fr) 34px;gap:8px;align-items:center;width:100%;
+  font:inherit;font-size:.76rem;color:inherit;text-align:left;background:none;border:0;padding:3px 4px;border-radius:6px}
+.dt-dem li>button{cursor:pointer} .dt-dem li>button:hover,.dt-dem li>button:focus-visible{background:var(--nen-phu);outline:none}
+.dt-dem span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-dem-o{display:block}
+.dt-dem i{display:block;height:10px;border-radius:5px;background:var(--dt-cam);min-width:3px}
+.dt-dem b{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---- Tab Tin thị trường (đợt 4b task 8) — thẻ "đang hết" dùng lại .dt-tt-ch* (khung .dt-tt) ---- */
+.dt-tin-kms{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
+@container (max-width:900px){.dt-tin-kms{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container (max-width:560px){.dt-tin-kms{grid-template-columns:minmax(0,1fr)}}
+.dt-tin-km{background:var(--nen-phu);border-radius:10px;padding:10px 12px;min-width:0}
+.dt-tin-km-dau{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:4px}
+.dt-tin-km-dau span{color:var(--dt-km);font-size:.72rem;white-space:nowrap}
+.dt-tin-km-d{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;width:100%;font:inherit;font-size:.76rem;color:inherit;
+  text-align:left;background:none;border:0;border-top:1px solid var(--vien);padding:5px 4px;cursor:pointer;border-radius:0}
+.dt-tin-km-d:hover,.dt-tin-km-d:focus-visible{background:var(--nen-the);outline:none;border-radius:6px}
+.dt-tin-km-d>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tin-km-d b{color:var(--do-chu);white-space:nowrap;font-variant-numeric:tabular-nums}
+.dt-tin-km-d s{color:var(--chu-mo);font-weight:400}
+.dt-tin-km-d small{grid-column:1 / -1;color:var(--chu-nhat);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tin-km .dt-hoi-cam{padding:0}
+.dt-tin-ht{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@container (max-width:760px){.dt-tin-ht{grid-template-columns:minmax(0,1fr)}}
+.dt-tin-ht h3{margin:0 0 6px;font-size:.84rem}
+.dt-hs-chua{display:block;margin-top:6px;font-size:.76rem}
+
+/* ---- Tab Phí & giao hàng (đợt 4b task 9) — thanh ghép ship --dt-cam · vùng --dt-vung · daibiki --dt-dai (kome.css) ---- */
+.dt-phi{display:grid;gap:12px;min-width:0}
+.dt-phi-dk{background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:10px 14px;margin:0}
+.dt-svg-phi{width:100%;max-width:860px;min-width:640px}
+.dt-svg .dt-phi-hoi{outline:none}
+.dt-svg .dt-phi-hoi:focus-visible rect{stroke:var(--dt-cam);stroke-width:2}
+.dt-chu-giai .cg-ship{background:var(--dt-cam)} .dt-chu-giai .cg-vung{background:var(--dt-vung)}
+.dt-chu-giai .cg-dai-phi{background:var(--dt-dai)} .dt-chu-giai .cg-kome-vien{border:1.5px solid var(--do)}
+.dt-bang-giao{font-size:.8rem;border-collapse:collapse}
+.dt-bang-giao th,.dt-bang-giao td{white-space:nowrap;padding:4px 6px}
+.dt-bang-giao tr.kome td{background:var(--do-nen)}
+.dt-bang-giao tr.kome .dt-giao-ben{color:var(--do-chu);font-weight:700}
+.dt-bang-giao .dt-giao-ben{cursor:pointer}
+.dt-giao-o{font:inherit;color:inherit;background:none;border:0;padding:2px 4px;border-radius:4px;cursor:pointer;text-align:left}
+.dt-giao-o:hover,.dt-giao-o:focus-visible{background:var(--nen-phu)}
+.dt-giao-o:focus-visible{outline:2px solid var(--dt-cam);outline-offset:1px}
+.dt-giao-o.cam{color:var(--dt-cam);font-weight:700;text-decoration:underline}
+.dt-giao-o.vang{color:var(--canh-chu);font-weight:700}
+.dt-giao-o.c-do{color:var(--do-chu)} .dt-giao-o.c-xanh{color:var(--ok-chu)}
+
+/* ---- Dữ liệu › Giá KOME lệch (đợt 4b task 9) ---- */
+.dt-bang-lech{font-size:.8rem}
+.dt-bang-lech th,.dt-bang-lech td{white-space:nowrap;padding:4px 8px;vertical-align:middle}
+.dt-bang-lech .r{text-align:right}
+.dt-bang-lech .dt-lech-o{font-weight:600}
+.dt-bang-lech .c-do{color:var(--do-chu)} .dt-bang-lech .t-dam{font-weight:700}
+.dt-lech-ten{display:inline-flex;gap:8px;align-items:center}
+.dt-lech-ten .hinh-ma{border-radius:6px}
+
+/* ---- Duyệt / sửa một cột (đợt 4b task 9): bấm dòng mở SuaMatHang, "Đúng rồi" trên dòng ---- */
+.dt-duyet.dt-duyet-mot{grid-template-columns:minmax(0,1fr)}
+.dt-duyet-ds li{display:flex;gap:8px;align-items:center}
+.dt-duyet-ds li>button:first-child{flex:1;min-width:0}
+.dt-duyet-ds li>button:first-child:hover,.dt-duyet-ds li>button:first-child:focus-visible{background:var(--nen-phu)}
+.dt-duyet-ds li>button:focus-visible{outline:2px solid var(--dt-cam);outline-offset:1px}
+.dt-duyet-ds .dt-dung{flex:none;width:auto;font-size:.72rem;padding:.15rem .55rem;border:1px solid var(--vien-dam);border-radius:999px}
+/* "?" phí giao chưa cộng (Tính cả phí giao — tab So sánh). */
+.dt-svg .dt-hoi-phi{outline:none}
+.dt-svg .dt-hoi-phi circle{fill:var(--nen-the);stroke:var(--dt-cam)}
+.dt-svg .dt-hoi-phi text{fill:var(--dt-cam);font-weight:700}
+.dt-svg .dt-hoi-phi:focus-visible circle{stroke-width:2.5}
+
+/* ---- Rà cuối 4b: dấu ✎ (đã sửa) · dải "Đã bỏ khỏi nhóm … hoàn tác" (DaBoNhom.tsx) ---- */
+.dt-nh.sua{border:1px solid var(--vien);color:var(--chu)}
+.dt-da-bo{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;font-size:.78rem;margin:.5rem 0 0;
+  padding:.4rem .6rem;border:1px dashed var(--vien);border-radius:8px}
+.dt-da-bo-mh{white-space:normal}
+.dt-da-bo .lien-ket{font-size:inherit}
+.dt-da-bo .dt-loi{flex-basis:100%;margin:0}

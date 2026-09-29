@@ -258,6 +258,35 @@ thêm cột quyền nào** — chỉ thêm view mới trong `mart`, đã có s�
 cho cả ba vai trò ngay trong chính file migration. Không cần bước 2: chạy
 `python db/migrate.py` bằng vai trò `postgres` là đủ.
 
+### Triển khai đợt 4a + 4b của Thị trường & đối thủ (migration `065`–`069`)
+
+Năm migration này (`069` = chỉ mục sổ nhật ký theo đối tượng cho pop-up sửa / 409 của giao diện 4b — không đổi dữ liệu) thêm quy cách gói / bậc giá / giao hàng cho đối thủ, kg KOME theo 荷姿 của OBC (`066`), bảng giá
+KOME (`mart.gia_kome_bang`) và điều kiện giao hàng hiện hành (`068`). Làm ĐÚNG THỨ TỰ:
+
+1. `python db/migrate.py` **bằng vai trò `postgres`** — TRƯỚC khi push/Redeploy (code mới đọc các cột / view mới; giao diện 4b đọc `app.doi_thu_nhat_ky` theo `doi_tuong` nên cần cả `069`).
+2. Kiểm mẫu xuất OBC TRƯỚC khi nạp — thiếu cột đã khai trong `config/files.yml` là **cổng 2 chặn cả file**
+   (`ColumnMismatch`):
+   - `商品データ` phải có `荷姿１－荷姿区分コード` và `荷姿１－基準単位当り荷姿区分数`;
+   - `取引単価データ` phải có `標準価格（税抜）` và `標準価格（税込）`.
+3. Nạp lại `商品データ` và `取引単価データ` MỚI NHẤT (màn `/kho-du-lieu/nap`). Chưa nạp lại thì `pack1_code` NULL
+   (kg giữ luật cũ của `060`) và không có 標準価格.
+4. Sau khi nạp, soát các mã **không có 荷姿** (`pack1_code = ''`) mà bán bằng quy cách `'00'`: luật mới của `066`
+   coi một `'00'` là CẢ sản phẩm như tên ghi (xốt Barona 80g × 20 × 4 = 6,4 kg) và áp cho MỌI mã như thế, nên ¥/kg
+   của chúng có thể nhảy. Câu dưới liệt kê mã lệch trung vị nhóm hơn 3× (lên hoặc xuống) — chạy bằng vai trò chỉ đọc,
+   xem từng dòng: tên ghi sai quy cách thì sửa quy cách KOME ở `/doi-thu` (tab Nhóm & quy cách), không sửa OBC:
+
+    SELECT s.nhom_khoa, s.ten_nhom, m AS product_code, p.product_name,
+           round(coalesce(s.gia_kome_chuan, s.gia_kome)) AS kome_yen_kg, round(s.trung_vi::numeric) AS trung_vi,
+           round(coalesce(s.gia_kome_chuan, s.gia_kome) / s.trung_vi::numeric, 2) AS gap_lan
+    FROM mart.so_sanh_nhom s
+    CROSS JOIN LATERAL unnest(s.ma_kome) m
+    JOIN core.dim_product p ON p.product_code = m
+    WHERE s.don_vi_so = 'kg' AND s.trung_vi > 0 AND p.pack1_code = ''
+      AND EXISTS (SELECT 1 FROM mart.ban_den_moc f WHERE f.product_code = m AND f.pack_code = '00')
+      AND (coalesce(s.gia_kome_chuan, s.gia_kome) > 3 * s.trung_vi
+           OR coalesce(s.gia_kome_chuan, s.gia_kome) < s.trung_vi / 3)
+    ORDER BY gap_lan DESC;
+
 ### Kiểm tay sau khi chạy migration `029` (đợt 5b — báo cáo phân tích + dashboard)
 
 Chủ doanh nghiệp làm năm việc này sau khi migration `029` chạy xong trên CSDL

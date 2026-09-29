@@ -171,7 +171,10 @@ shohin:
     入数: case_qty
     棚番コード: shelf_code
     導入日（西暦　年　月）: introduced_on
-  code_columns: [product_code, kind_code, food_category_code, rank_code, compete_code, barcode, shelf_code]
+    荷姿１－荷姿区分コード: pack1_code
+    荷姿１－基準単位当り荷姿区分数: pack1_base_qty
+  # pack1_code trống → '' (= mã không có 荷姿); pack1_base_qty KHÔNG vào qty_columns: trống phải là NULL.
+  code_columns: [product_code, kind_code, food_category_code, rank_code, compete_code, barcode, shelf_code, pack1_code]
   money_columns: []
   qty_columns: [case_qty]
   rate_columns: []
@@ -257,6 +260,8 @@ tanka:
     売価No.９（税込）: price_in_09
     売価No.10（税抜）: price_ex_10
     売価No.10（税込）: price_in_10
+    標準価格（税抜）: price_ex_std
+    標準価格（税込）: price_in_std
   code_columns: [product_code, pack_code]
   # KHÔNG khai total_column: bảng giá không có "tổng tiền" nào có nghĩa
   # (cộng 20 cột giá lại là con số vô nghĩa). Tổng = 0 và cổng 4 bỏ qua
@@ -266,7 +271,8 @@ tanka:
                    price_ex_03, price_in_03, price_ex_04, price_in_04,
                    price_ex_05, price_in_05, price_ex_06, price_in_06,
                    price_ex_07, price_in_07, price_ex_08, price_in_08,
-                   price_ex_09, price_in_09, price_ex_10, price_in_10]
+                   price_ex_09, price_in_09, price_ex_10, price_in_10,
+                   price_ex_std, price_in_std]
   qty_columns: []
   rate_columns: []
 
@@ -401,7 +407,8 @@ doi_thu_gia:
             kg_moi_don_vi_gia: kg_moi_don_vi_gia, thue: thue, gom_ship: gom_ship, kenh_gia: kenh_gia,
             muc_gia: muc_gia, gia_bac: gia_bac, gia_truoc_km: gia_truoc_km, trang_thai: trang_thai,
             han_su_dung: han_su_dung, khuyen_mai: khuyen_mai, ma_kome_de_xuat: ma_kome_de_xuat,
-            nhan_de_xuat: nhan_de_xuat, ly_do_ghep: ly_do_ghep, do_chac: do_chac, ghi_chu: ghi_chu}
+            nhan_de_xuat: nhan_de_xuat, ly_do_ghep: ly_do_ghep, do_chac: do_chac, ghi_chu: ghi_chu,
+            so_goi_thung: so_goi_thung, kl_goi_g: kl_goi_g, bac: bac}
   code_columns: [ma_dong, ma_doi_thu, ma_hang_dt]
   money_columns: []
   qty_columns: []
@@ -419,6 +426,26 @@ doi_thu_dieu_kien:
   keys: [ma_dong]
   columns: {ma_dong: ma_dong, ma_doi_thu: ma_doi_thu, ngay_nguon: ngay_nguon, nguon_file: nguon_file,
             vi_tri: vi_tri, loai: loai, noi_dung: noi_dung}
+  code_columns: [ma_dong, ma_doi_thu]
+  money_columns: []
+  qty_columns: []
+  date_columns: [ngay_nguon]
+  required_date_columns: [ngay_nguon]
+  warn_row_drop_ratio: 0
+
+doi_thu_giao_hang:
+  display_name: Điều kiện giao hàng của đối thủ
+  core_table: core.fact_giao_hang_doi_thu
+  filename_pattern: '^doi_thu_giao_hang_(?P<date>\d{8})\.xlsx$'
+  sheet: giao_hang
+  header_row: 1
+  min_rows: 1
+  keys: [ma_dong]
+  columns: {ma_dong: ma_dong, ma_doi_thu: ma_doi_thu, ngay_nguon: ngay_nguon, bao_ship: bao_ship, phi_ship: phi_ship,
+            phi_ship_theo: phi_ship_theo, mien_ship_tu: mien_ship_tu, mien_ship_kien: mien_ship_kien,
+            thung_moi_kien: thung_moi_kien, phu_phi: phu_phi, phi_daibiki: phi_daibiki, daibiki_tu: daibiki_tu,
+            daibiki_sau: daibiki_sau, ck_mien_daibiki: ck_mien_daibiki, kien_toi_da_kg: kien_toi_da_kg,
+            ghep_kien: ghep_kien, thue: thue, cach_gui: cach_gui, nguon_chu: nguon_chu, nguon_file: nguon_file}
   code_columns: [ma_dong, ma_doi_thu]
   money_columns: []
   qty_columns: []

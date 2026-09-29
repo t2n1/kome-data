@@ -31,7 +31,8 @@ FILE_MAC_DINH = "uriage"
 # `meisai` là nguồn bán hàng DỰ PHÒNG (migration 017), không có cột riêng ở
 # bảng phủ (`coverage.COT`) vì nó đổ vào cùng bảng với `uriage`.
 _MO_TA_NGOAI_COT = {"meisai": "bán hàng (nguồn dự phòng của 売上伝票データ)",
-                    "doi_thu_dieu_kien": "điều kiện bán của đối thủ (đi cùng gói bảng giá đối thủ)"}
+                    "doi_thu_dieu_kien": "điều kiện bán của đối thủ (đi cùng gói bảng giá đối thủ)",
+                    "doi_thu_giao_hang": "điều kiện giao hàng của đối thủ (đi cùng gói bảng giá đối thủ)"}
 
 # Bốn tầng — ĐÚNG bốn tầng của gói thiết kế (Kho dữ liệu.dc.html: TANG):
 # OBC → raw → core → mart. (Schema `app` không phải một tầng của luồng OBC —

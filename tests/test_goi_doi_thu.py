@@ -51,37 +51,37 @@ def test_sap_ve_va_muc_gia():
 def test_gop_cap_chua_thue_co_thue_va_bo_trung():
     a = _d(ben="IMAI", thue="chua", gia_goc="90")
     b = _d(ben="IMAI", thue="co", gia_goc="97")
-    gia, _, _ = G.dung_goi([a, b, dict(a)], [], date(2026, 8, 31))
+    gia, _, _, _ = G.dung_goi([a, b, dict(a)], [], date(2026, 8, 31))
     assert len(gia) == 1 and gia[0]["gia_goc"] == "90" and "税込 ¥97" in gia[0]["ghi_chu"]
 
 
 def test_gia_bat_thuong_thanh_can_xem_khong_chan():
-    gia, _, canh = G.dung_goi([_d(gia_goc="5"), _d(ten_goc="X", gia_goc="0")], [], date(2026, 8, 31))
+    gia, _, _, canh = G.dung_goi([_d(gia_goc="5"), _d(ten_goc="X", gia_goc="0")], [], date(2026, 8, 31))
     assert [g["do_chac"] for g in gia] == ["can_xem", "can_xem"]
     assert canh
 
 
 def test_jan_trung_hai_ma_cung_ben_khong_dung_lam_khoa():
-    gia, _, _ = G.dung_goi([_d(jan="8934563321406", ten_goc="Nước dừa"),
+    gia, _, _, _ = G.dung_goi([_d(jan="8934563321406", ten_goc="Nước dừa"),
                             _d(jan="8934563321406", ten_goc="Nha đam")], [], date(2026, 8, 31))
     assert not any(g["ma_hang_dt"].startswith("jan:") for g in gia)
 
 
 def test_ma_dong_duy_nhat_va_du_cot():
     from kome.loaders.doi_thu import COT_GIA
-    gia, _, _ = G.dung_goi([_d(), _d(ten_goc="Khác")], [], date(2026, 8, 31))
+    gia, _, _, _ = G.dung_goi([_d(), _d(ten_goc="Khác")], [], date(2026, 8, 31))
     assert len({g["ma_dong"] for g in gia}) == 2
     assert all(list(g) == COT_GIA for g in gia)
 
 
 def test_web_api_co_word_boundary():
     """API and Google Sheet must be word-bounded, not match inside longer words."""
-    gia, _, _ = G.dung_goi([_d(file="Tapioca-price.pdf", ten_goc="Item1"),
+    gia, _, _, _ = G.dung_goi([_d(file="Tapioca-price.pdf", ten_goc="Item1"),
                             _d(file="RAPID-list.pdf", ten_goc="Item2")], [], date(2026, 8, 31))
     assert gia[0]["hinh_thuc_nguon"] == "file"
     assert gia[1]["hinh_thuc_nguon"] == "file"
     # But actual web sources should still match
-    gia2, _, _ = G.dung_goi([_d(file="tdmvn.shop (API, tải 2026-09-29)")], [], date(2026, 8, 31))
+    gia2, _, _, _ = G.dung_goi([_d(file="tdmvn.shop (API, tải 2026-09-29)")], [], date(2026, 8, 31))
     assert gia2[0]["hinh_thuc_nguon"] == "web"
 
 
@@ -112,3 +112,107 @@ def test_chay_tren_console_khong_utf8_khong_vo(tmp_path):
     assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
     assert (ra / "doi_thu_gia_20260831.xlsx").exists()
     assert (ra / "doi_thu_dieu_kien_20260831.xlsx").exists()
+
+
+def _dn(**kw):
+    d = {"ben": "NEXT", "file": "NEXT.pdf", "vi_tri": "tr1", "ten_goc": "CÁ BASA", "quy_cach_goc": "500g×20袋",
+         "gia_goc": "5500", "don_vi_gia": "thung", "kg_moi_don_vi_gia": "10", "thue": "chua", "trang_thai": "con"}
+    d.update(kw)
+    return d
+
+
+def test_kiem_bac_chuan_hoa_va_bat_loi():
+    ok, loi = G.kiem_bac('[{"tu": 5, "don_vi_sl": "thung", "gia": "5,300", "don_vi_gia": "thung"}]')
+    assert loi is None and ok == [{"tu": 5, "don_vi_sl": "thung", "gia": 5300, "don_vi_gia": "thung"}]
+    assert G.kiem_bac("") == (None, None)
+    for xau in ('{"tu": 5}', '[{"tu": 0, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}]',
+                '[{"tu": 5, "don_vi_sl": "hop", "gia": 1, "don_vi_gia": "kg"}]', "khong phai json",
+                '[{"tu": NaN, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}]',
+                '[{"tu": 1, "don_vi_sl": "thung", "gia": Infinity, "don_vi_gia": "kg"}]',
+                "[" + ",".join(['{"tu": 1, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}'] * 11) + "]"):
+        b, loi = G.kiem_bac(xau)
+        assert b is None and loi, xau
+
+
+def test_goi_mang_quy_cach_va_bac_va_so_nguyen():
+    g, _, _, canh = G.dung_goi([_dn(so_goi_thung="20", kl_goi_g="500",
+                                    bac='[{"tu": 5, "don_vi_sl": "thung", "gia": 5300, "don_vi_gia": "thung"}]')],
+                               [], date(2026, 8, 31))
+    assert g[0]["so_goi_thung"] == 20 and g[0]["kl_goi_g"] == 500.0
+    assert g[0]["bac"] == '[{"tu": 5, "don_vi_sl": "thung", "gia": 5300, "don_vi_gia": "thung"}]'
+    assert g[0]["do_chac"] == "chac" and not canh
+
+
+def test_gia_goc_phai_la_gia_le_khong_duoc_re_hon_bac():
+    # AI ghi bậc rẻ nhất (5.300) vào gia_goc còn bậc lẻ (5.500) nằm trong bac → cần xem
+    g, _, _, canh = G.dung_goi([_dn(gia_goc="5300",
+                                    bac='[{"tu": 1, "don_vi_sl": "thung", "gia": 5500, "don_vi_gia": "thung"}]')],
+                               [], date(2026, 8, 31))
+    assert g[0]["do_chac"] == "can_xem" and "giá lẻ" in g[0]["ghi_chu"]
+
+
+def test_bac_hong_thi_can_xem_khong_chan_ca_goi():
+    g, _, _, canh = G.dung_goi([_dn(bac="5cs: 5,300"), _dn(vi_tri="tr2", ten_goc="Khác")], [], date(2026, 8, 31))
+    assert g[0]["bac"] is None and g[0]["do_chac"] == "can_xem" and len(g) == 2
+
+
+def test_ghi_chu_cua_nguoi_doc_thanh_loai_ghi_chu_doc():
+    assert G.la_ghi_chu_doc("mỗi mặt hàng in 'Kiện 1th' … — chép vào ghi_chu từng dòng; không in phí ship")
+    assert G.la_ghi_chu_doc("Dữ liệu này KHÔNG có phí ship chung, vùng giao hay đơn tối thiểu")
+    assert G.la_ghi_chu_doc("Không tìm thấy phí ship / ngưỡng miễn ship trên các trang đã đọc")
+    assert not G.la_ghi_chu_doc("Kiện 28kg ghép 3 sản phẩm - bao thuế bao ship!")
+    _, dk, _, _ = G.dung_goi([], [{"ben": "VIETCOOK", "file": "v.pdf", "loai": "ship",
+                                   "noi_dung": "chép vào ghi_chu từng dòng; không in phí ship"}], date(2026, 8, 31))
+    assert dk[0]["loai"] == "ghi_chu_doc"
+
+
+def test_goi_giao_hang_ep_kieu_va_kiem_phu_phi():
+    _, _, gh, canh = G.dung_goi([], [], date(2026, 8, 31), giao=[
+        {"ben": "IMAI", "file": "imai.pdf", "bao_ship": "false", "phi_ship": "605", "phi_ship_theo": "thung",
+         "mien_ship_tu": "20,000", "phu_phi": '{"tohoku": 400, "hokkaido": 800}', "phi_daibiki": "440",
+         "nguon_chu": "Free delivery for over ¥20,000"},
+        {"ben": "VIETNAM-HOUSE", "file": "vh.pdf", "phu_phi": '{"okinawa": "x"}'}])
+    assert gh[0]["ma_dong"] == "IMAI-00001" and gh[0]["mien_ship_tu"] == 20000.0 and gh[0]["phi_ship_theo"] == "thung"
+    assert gh[0]["phu_phi"] == '{"tohoku": 400, "hokkaido": 800}'
+    assert gh[1]["phu_phi"] is None and any("phu_phi" in c for c in canh)   # chỉ nhận số ¥ hoặc "khong_nhan"
+
+
+def test_main_ghi_file_giao_hang_khi_co_csv_giao_hang(tmp_path):
+    import csv, subprocess, sys
+    vao = tmp_path / "vao"; vao.mkdir()
+    with open(vao / "spike_IMAI_giao_hang.csv", "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["ben", "file", "phi_ship", "phi_ship_theo"]); w.writeheader()
+        w.writerow({"ben": "IMAI", "file": "imai.pdf", "phi_ship": "605", "phi_ship_theo": "thung"})
+    ra = tmp_path / "ra"
+    r = subprocess.run([sys.executable, "scripts/goi_doi_thu.py", str(vao), "--ngay", "2026-08-31", "--ra", str(ra)],
+                       capture_output=True)
+    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
+    assert (ra / "doi_thu_giao_hang_20260831.xlsx").exists()
+
+
+def test_kl_goi_g_tren_30000_thanh_none_va_can_xem():
+    g, _, _, canh = G.dung_goi([_dn(kl_goi_g="30001"), _dn(vi_tri="tr2", ten_goc="B", kl_goi_g="30000")],
+                               [], date(2026, 8, 31))
+    assert g[0]["kl_goi_g"] is None and g[0]["do_chac"] == "can_xem" and canh
+    assert g[1]["kl_goi_g"] == 30000.0 and g[1]["do_chac"] == "chac"
+
+
+def test_giao_hang_bao_ship_va_ck_daibiki_chuan_hoa_dung_sai():
+    _, _, gh, canh = G.dung_goi([], [], date(2026, 8, 31), giao=[
+        {"ben": "A", "file": "a.pdf", "bao_ship": "Yes", "ck_mien_daibiki": "không"},
+        {"ben": "B", "file": "b.pdf", "bao_ship": "có", "ck_mien_daibiki": "0"},
+        {"ben": "C", "file": "c.pdf", "bao_ship": "tuy", "ck_mien_daibiki": ""}])
+    assert (gh[0]["bao_ship"], gh[0]["ck_mien_daibiki"]) == ("true", "false")
+    assert (gh[1]["bao_ship"], gh[1]["ck_mien_daibiki"]) == ("true", "false")
+    assert gh[2]["bao_ship"] is None and gh[2]["ck_mien_daibiki"] is None
+    assert any("bao_ship" in c for c in canh) and len(canh) == 1
+
+
+def test_giao_hang_so_ngoai_khoang_thanh_none_kem_canh_bao():
+    _, _, gh, canh = G.dung_goi([], [], date(2026, 8, 31), giao=[
+        {"ben": "A", "file": "a.pdf", "phi_ship": "-5", "mien_ship_tu": "-1", "phi_daibiki": "-440",
+         "daibiki_tu": "-1", "daibiki_sau": "-1", "kien_toi_da_kg": "0"},
+        {"ben": "B", "file": "b.pdf", "phi_ship": "0", "daibiki_tu": "0", "kien_toi_da_kg": "28"}])
+    for c in ("phi_ship", "mien_ship_tu", "phi_daibiki", "daibiki_tu", "daibiki_sau", "kien_toi_da_kg"):
+        assert gh[0][c] is None and any(c in x for x in canh), c
+    assert gh[1]["phi_ship"] == 0.0 and gh[1]["daibiki_tu"] == 0.0 and gh[1]["kien_toi_da_kg"] == 28.0

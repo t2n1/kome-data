@@ -70,6 +70,7 @@ MAN = {
     "kome/ngan_sach.py": ["ngan_sach"], "kome/nhat_ky.py": ["nhat_ky"],
     "kome/mua_vu.py": ["mua_vu"],
     "kome/doi_thu.py": ["doi_thu"],
+    "kome/doi_thu_giao.py": ["doi_thu"],
     "kome/nhat_ky_nap.py": ["kho_du_lieu"], "kome/san_pham.py": ["san_pham", "kho_hang", "tong_quan"],
     "kome/san_pham_360.py": ["san_pham"],
     "kome/tong_quan.py": ["tong_quan"], "kome/tuoi_du_lieu.py": ["tong_quan", "kho_du_lieu"],
@@ -84,7 +85,9 @@ MAN = {
 LUU_RIENG: dict[str, dict[str, str | None]] = {
     "zaiko": {"warehouse_name": "core.dim_warehouse.warehouse_name", "pack_name": None},
     "tanka": {**{f"price_ex_{i:02d}": "core.fact_price_list.price_ex_tax" for i in range(1, 11)},
-              **{f"price_in_{i:02d}": "core.fact_price_list.price_in_tax" for i in range(1, 11)}},
+              **{f"price_in_{i:02d}": "core.fact_price_list.price_in_tax" for i in range(1, 11)},
+              # 標準価格 → price_level = 'std' (kome/loaders/price.py)
+              "price_ex_std": "core.fact_price_list.price_ex_tax", "price_in_std": "core.fact_price_list.price_in_tax"},
     # row_title: dòng 【合計】/【繰越】 — kome/so_cai.py đọc để tách dòng tổng, không lưu.
     "seikyu_motocho": {"row_title": None},
 }
