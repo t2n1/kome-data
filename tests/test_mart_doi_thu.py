@@ -253,3 +253,35 @@ def test_cot_ra_cua_quan_sat_giu_nguyen_thu_tu_060(conn):
            WHERE table_schema = 'mart' AND table_name = 'gia_doi_thu_quan_sat' ORDER BY ordinal_position""")]
     assert cols[:5] == ["nguon", "id", "batch_id", "ma_doi_thu", "ten_doi_thu"]
     assert cols[-3:] == ["nen_gia", "hien_hanh", "tuoi_ngay"]
+
+
+def test_nguon_quan_sat_thang_lo_theo_DATA_DATE_cua_lo_khong_theo_ngay_nguon(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 540, ngay=date(2026, 7, 20))          # lô data_date 2026-07-20
+    conn.execute("UPDATE core.fact_gia_doi_thu SET ngay_nguon = '2026-06-30' WHERE id = %s", (fid,))
+    conn.execute("INSERT INTO app.thu_muc_nguon (thang, lien_ket) VALUES ('2026-07-01', 'https://drive.google.com/t7')")
+    conn.commit()
+    r = conn.execute("""SELECT thang_lo, lien_ket_thu_muc, web_ben FROM mart.nguon_quan_sat
+                        WHERE nguon = 'nap' AND id = %s""", (fid,)).fetchone()
+    assert r == (date(2026, 7, 1), "https://drive.google.com/t7", "https://thak.jp/")
+
+
+def test_nguon_quan_sat_gia_tay_mang_link_bang_chung(conn, batch):
+    tid = conn.execute("""INSERT INTO app.gia_doi_thu_tay (ma_doi_thu, ma_hang_dt, ten_goc, gia_goc, don_vi_gia,
+                            trang_thai, loai_nguon, lien_ket_bang_chung)
+                          VALUES ('THAK', 'ten:x|', 'x', 500, 'kg', 'con', 'to_roi', 'https://drive.google.com/anh')
+                          RETURNING id""").fetchone()[0]
+    conn.commit()
+    r = conn.execute("""SELECT thang_lo, lien_ket_thu_muc, lien_ket_bang_chung FROM mart.nguon_quan_sat
+                        WHERE nguon = 'tay' AND id = %s""", (tid,)).fetchone()
+    assert r == (None, None, "https://drive.google.com/anh")
+
+
+def test_nguon_quan_sat_moi_quan_sat_dung_MOT_dong(conn, batch):
+    _hang(conn, batch)
+    for b, g in [("THAK", 540), ("HSC", 560)]:
+        _qs(conn, batch, b, g)
+    n_qs, n_ng = conn.execute("""SELECT (SELECT count(*) FROM mart.gia_doi_thu_quan_sat),
+                                        (SELECT count(*) FROM mart.gia_doi_thu_quan_sat q
+                                         JOIN mart.nguon_quan_sat n USING (nguon, id))""").fetchone()
+    assert n_qs == n_ng == 2
