@@ -314,19 +314,41 @@ def bo_ma_nhom(conn, product_code: str, nguoi) -> None:
     _ghi_nhat_ky(conn, "nhom", f"nhom:{r[0]}", {product_code: r[0]}, {"bo_ma": product_code}, nguoi)
 
 
+_COT_QC = ("kg_moi_goi", "goi_moi_thung", "kg_moi_thung")
+_SCALE_QC = (Decimal("0.0001"), Decimal("0.01"), Decimal("0.0001"))    # độ chính xác cột app.quy_cach_kome
+
+
 def sua_quy_cach(conn, product_code: str, kg_moi_goi, goi_moi_thung, kg_moi_thung, nguoi) -> None:
-    v = (_so(kg_moi_goi, "Kg mỗi gói", True, True), _so(goi_moi_thung, "Gói mỗi thùng", True),
-         _so(kg_moi_thung, "Kg mỗi thùng", True, True))
+    """Lưu số quy cách người sửa. Biểu mẫu gửi lại CẢ BA ô, điền sẵn từ mart.quy_cach_kome (gồm giá trị SUY RA từ tên /
+    荷姿). Ô nào bằng giá trị hiệu lực hiện tại (so bằng số, theo độ chính xác của cột) = "không sửa": giữ nguyên số người
+    sửa ĐÃ CÓ của ô đó (NULL nếu chưa có) — không ghim số suy ra thành số "người sửa" (066 không cho nó thắng 荷姿).
+    Ô khác giá trị hiệu lực = người sửa; ô để trống = xoá số người sửa."""
+    gui = (_so(kg_moi_goi, "Kg mỗi gói", True, True), _so(goi_moi_thung, "Gói mỗi thùng", True),
+           _so(kg_moi_thung, "Kg mỗi thùng", True, True))
     cu = conn.execute("SELECT kg_moi_goi, goi_moi_thung, kg_moi_thung FROM mart.quy_cach_kome WHERE product_code=%s",
                       (product_code,)).fetchone()
     if cu is None:
         raise LoiNhap("Không có mã KOME này.")
-    conn.execute("""INSERT INTO app.quy_cach_kome VALUES (%s,%s,%s,%s)
-                    ON CONFLICT (product_code) DO UPDATE SET kg_moi_goi=EXCLUDED.kg_moi_goi,
-                      goi_moi_thung=EXCLUDED.goi_moi_thung, kg_moi_thung=EXCLUDED.kg_moi_thung""",
-                 (product_code, *v))
-    _ghi_nhat_ky(conn, "quy_cach", product_code, dict(zip(("kg_moi_goi", "goi_moi_thung", "kg_moi_thung"), cu)),
-                 dict(zip(("kg_moi_goi", "goi_moi_thung", "kg_moi_thung"), v)), nguoi)
+    co = conn.execute("SELECT kg_moi_goi, goi_moi_thung, kg_moi_thung FROM app.quy_cach_kome WHERE product_code=%s",
+                      (product_code,)).fetchone() or (None, None, None)
+
+    def _q(x, i):
+        return None if x is None else Decimal(x).quantize(_SCALE_QC[i])
+
+    moi = tuple(co[i] if (gui[i] is not None and cu[i] is not None and _q(gui[i], i) == _q(cu[i], i)) else gui[i]
+                for i in range(3))
+    doi = [i for i in range(3) if _q(moi[i], i) != _q(co[i], i)]
+    if not doi:
+        return
+    if all(x is None for x in moi):
+        conn.execute("DELETE FROM app.quy_cach_kome WHERE product_code=%s", (product_code,))
+    else:
+        conn.execute("""INSERT INTO app.quy_cach_kome (product_code, kg_moi_goi, goi_moi_thung, kg_moi_thung)
+                        VALUES (%s,%s,%s,%s)
+                        ON CONFLICT (product_code) DO UPDATE SET kg_moi_goi=EXCLUDED.kg_moi_goi,
+                          goi_moi_thung=EXCLUDED.goi_moi_thung, kg_moi_thung=EXCLUDED.kg_moi_thung""",
+                     (product_code, *moi))
+    _ghi_nhat_ky(conn, "quy_cach", product_code, {_COT_QC[i]: cu[i] for i in doi}, {_COT_QC[i]: moi[i] for i in doi}, nguoi)
 
 
 # ---------------------------------------------------------------- đọc (mỗi hàm ĐÚNG MỘT lượt hỏi)

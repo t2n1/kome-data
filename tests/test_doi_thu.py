@@ -718,3 +718,51 @@ def test_cac_cau_doc_mang_4_khoa_nguon(conn, batch):
     thak = [q for q in DT.duyet(conn)["dong"] if q["ma_doi_thu"] == "THAK"][0]
     assert (thak["thang_lo"], thak["lien_ket_thu_muc"], thak["web_ben"]) == ("2026-07-01", "https://drive.google.com/t7",
                                                                              "https://thak.jp/")
+
+
+# ---------------------------------------------------------------- sua_quy_cach: ô bằng số hiệu lực = không sửa (066)
+
+def _ovr(conn, ma):
+    return conn.execute("SELECT kg_moi_goi, goi_moi_thung, kg_moi_thung FROM app.quy_cach_kome WHERE product_code=%s",
+                        (ma,)).fetchone()
+
+
+def _kg00(conn, ma):
+    return float(conn.execute("SELECT kg_00 FROM mart.quy_cach_kome WHERE product_code=%s", (ma,)).fetchone()[0])
+
+
+def test_sua_quy_cach_o_bang_so_hieu_luc_khong_ghim_so_suy_ra(conn, batch):
+    from tests.test_mart_doi_thu import _hang_pack
+    _hang_pack(conn, batch, "BA02", "Xot Barona thit nuong sa (80g x 20 packs×4box)", "")
+    # đúng những gì biểu mẫu gửi lại: kg_moi_goi đã sửa, hai ô còn lại là giá trị hiệu lực (suy ra từ tên) 20 / 6.4
+    DT.sua_quy_cach(conn, "BA02", "0.082", "20", "6.4", None)
+    conn.commit()
+    assert _ovr(conn, "BA02") == (Decimal("0.082"), None, None)
+    assert _kg00(conn, "BA02") == pytest.approx(0.082 * 20 * 4)
+    n = conn.execute("SELECT truoc, sau FROM app.doi_thu_nhat_ky WHERE loai='quy_cach'").fetchall()
+    assert len(n) == 1 and set(n[0][1]) == {"kg_moi_goi"}                 # chỉ ghi ô thật sự đổi
+
+
+def test_sua_quy_cach_khong_doi_gi_thi_khong_tao_dong_khong_ghi_nhat_ky(conn, batch):
+    from tests.test_mart_doi_thu import _hang_pack
+    _hang_pack(conn, batch, "BA02", "Xot Barona thit nuong sa (80g x 20 packs×4box)", "")
+    DT.sua_quy_cach(conn, "BA02", "0.08", "20", "6.4", None)
+    conn.commit()
+    assert _ovr(conn, "BA02") is None
+    assert conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky WHERE loai='quy_cach'").fetchone()[0] == 0
+
+
+def test_sua_quy_cach_gui_so_khac_thi_luu_va_de_trong_thi_xoa(conn, batch):
+    from tests.test_mart_doi_thu import _hang_pack
+    _hang_pack(conn, batch, "BA02", "Xot Barona thit nuong sa (80g x 20 packs×4box)", "")
+    DT.sua_quy_cach(conn, "BA02", "0.08", "20", "7", None)
+    conn.commit()
+    assert _ovr(conn, "BA02") == (None, None, Decimal("7"))
+    assert _kg00(conn, "BA02") == pytest.approx(7)
+    DT.sua_quy_cach(conn, "BA02", "0.08", "20", "7", None)                 # gửi lại đúng số hiệu lực (7): giữ nguyên
+    conn.commit()
+    assert _ovr(conn, "BA02") == (None, None, Decimal("7"))
+    DT.sua_quy_cach(conn, "BA02", "0.08", "20", "", None)                  # để trống = xoá số người sửa
+    conn.commit()
+    assert _ovr(conn, "BA02") is None                                       # hết số người sửa nào thì bỏ hẳn dòng
+    assert _kg00(conn, "BA02") == pytest.approx(6.4)
