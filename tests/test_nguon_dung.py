@@ -16,10 +16,11 @@ def test_chua_dung_la_spec_co_that():
 
 
 def test_kho_du_lieu_bo_nguon_chua_dung_ca_o_nap_lan_bang_phu():
-    assert [o["ma"] for o in KDL.O_DUNG] == ["ban", "ton", "khach", "sp", "giao"]
-    assert [c.khoa for c in COV.COT_DUNG] == ["ban", "ton", "tokuisaki", "shohin", "chokusousaki"]
-    # COT đủ 8 vẫn là mô tả cho tài liệu sống (/kho-du-lieu/luong) — cố ý giữ.
-    assert len(COV.COT) == 8
+    assert [o["ma"] for o in KDL.O_DUNG] == ["ban", "ton", "khach", "sp", "giao", "doi_thu"]
+    assert [c.khoa for c in COV.COT_DUNG] == ["ban", "ton", "tokuisaki", "shohin", "chokusousaki",
+                                              "doi_thu_gia"]
+    # COT đủ 9 (8 nguồn OBC + gói đối thủ) vẫn là mô tả cho tài liệu sống (/kho-du-lieu/luong) — cố ý giữ.
+    assert len(COV.COT) == 9
 
 
 def test_bang_an_gom_core_va_mart_cua_cong_no():

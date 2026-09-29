@@ -6,7 +6,7 @@ import re
 from kome import archive, gates
 from kome.config import SPECS, FileSpec
 from kome.reader import read, ColumnMismatch
-from kome.loaders import inventory, customer, sales, master, price, so_cai
+from kome.loaders import inventory, customer, sales, master, price, so_cai, doi_thu
 
 # SPECS chuyển sang kome/config.py — xem ghi chú ở đó. Vẫn nhập lại tên ở
 # đây vì nhiều nơi đã gọi `from kome.pipeline import SPECS`.
@@ -34,6 +34,8 @@ LOADERS = {
          "city", "address", "phone", "lead_time_code"]),
     "tanka": price.load,
     "seikyu_motocho": so_cai.load,
+    "doi_thu_gia": doi_thu.load_gia,
+    "doi_thu_dieu_kien": doi_thu.load_dieu_kien,
 }
 
 # Bảng nào cần dọn khi hoàn tác một lô, theo từng loại file.
@@ -48,6 +50,8 @@ UNDO_TABLES = {
     "chokusousaki": ["core.dim_shipto"],
     "tanka": ["core.fact_price_list"],
     "seikyu_motocho": ["core.fact_ar_ledger"],
+    "doi_thu_gia": ["core.fact_gia_doi_thu"],
+    "doi_thu_dieu_kien": ["core.fact_dieu_kien_doi_thu"],
 }
 
 # Bảng SCD2: hoàn tác phải mở lại phiên bản trước đó, không chỉ xoá phiên bản

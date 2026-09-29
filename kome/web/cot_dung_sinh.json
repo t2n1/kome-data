@@ -11162,6 +11162,372 @@
    "ja": "請求先元帳",
    "mau": null,
    "ten": "seikyu_motocho"
+  },
+  {
+   "core_table": "core.fact_gia_doi_thu",
+   "cot": [
+    {
+     "core": "core.fact_gia_doi_thu.ma_dong",
+     "he": "ma_dong",
+     "ja": "ma_dong",
+     "loai": "nap",
+     "ly_do": "khoá của file",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.ma_doi_thu",
+     "he": "ma_doi_thu",
+     "ja": "ma_doi_thu",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.ma_hang_dt",
+     "he": "ma_hang_dt",
+     "ja": "ma_hang_dt",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.ngay_nguon",
+     "he": "ngay_nguon",
+     "ja": "ngay_nguon",
+     "loai": "nap",
+     "ly_do": "ngày bắt buộc đọc được (cổng 3)",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.hinh_thuc_nguon",
+     "he": "hinh_thuc_nguon",
+     "ja": "hinh_thuc_nguon",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.nguon_file",
+     "he": "nguon_file",
+     "ja": "nguon_file",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.vi_tri",
+     "he": "vi_tri",
+     "ja": "vi_tri",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.ten_goc",
+     "he": "ten_goc",
+     "ja": "ten_goc",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.ten_nhat",
+     "he": "ten_nhat",
+     "ja": "ten_nhat",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.jan",
+     "he": "jan",
+     "ja": "jan",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.quy_cach_goc",
+     "he": "quy_cach_goc",
+     "ja": "quy_cach_goc",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.gia_goc",
+     "he": "gia_goc",
+     "ja": "gia_goc",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.don_vi_gia",
+     "he": "don_vi_gia",
+     "ja": "don_vi_gia",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.kg_moi_don_vi_gia",
+     "he": "kg_moi_don_vi_gia",
+     "ja": "kg_moi_don_vi_gia",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.thue",
+     "he": "thue",
+     "ja": "thue",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.gom_ship",
+     "he": "gom_ship",
+     "ja": "gom_ship",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.kenh_gia",
+     "he": "kenh_gia",
+     "ja": "kenh_gia",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.muc_gia",
+     "he": "muc_gia",
+     "ja": "muc_gia",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.gia_bac",
+     "he": "gia_bac",
+     "ja": "gia_bac",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.gia_truoc_km",
+     "he": "gia_truoc_km",
+     "ja": "gia_truoc_km",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.trang_thai",
+     "he": "trang_thai",
+     "ja": "trang_thai",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.han_su_dung",
+     "he": "han_su_dung",
+     "ja": "han_su_dung",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.khuyen_mai",
+     "he": "khuyen_mai",
+     "ja": "khuyen_mai",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.ma_kome_de_xuat",
+     "he": "ma_kome_de_xuat",
+     "ja": "ma_kome_de_xuat",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.nhan_de_xuat",
+     "he": "nhan_de_xuat",
+     "ja": "nhan_de_xuat",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.ly_do_ghep",
+     "he": "ly_do_ghep",
+     "ja": "ly_do_ghep",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.do_chac",
+     "he": "do_chac",
+     "ja": "do_chac",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_gia_doi_thu.ghi_chu",
+     "he": "ghi_chu",
+     "ja": "ghi_chu",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    }
+   ],
+   "ja": "Bảng giá đối thủ",
+   "mau": null,
+   "ten": "doi_thu_gia"
+  },
+  {
+   "core_table": "core.fact_dieu_kien_doi_thu",
+   "cot": [
+    {
+     "core": "core.fact_dieu_kien_doi_thu.ma_dong",
+     "he": "ma_dong",
+     "ja": "ma_dong",
+     "loai": "nap",
+     "ly_do": "khoá của file",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_dieu_kien_doi_thu.ma_doi_thu",
+     "he": "ma_doi_thu",
+     "ja": "ma_doi_thu",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_dieu_kien_doi_thu.ngay_nguon",
+     "he": "ngay_nguon",
+     "ja": "ngay_nguon",
+     "loai": "nap",
+     "ly_do": "ngày bắt buộc đọc được (cổng 3)",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_dieu_kien_doi_thu.nguon_file",
+     "he": "nguon_file",
+     "ja": "nguon_file",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_dieu_kien_doi_thu.vi_tri",
+     "he": "vi_tri",
+     "ja": "vi_tri",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_dieu_kien_doi_thu.loai",
+     "he": "loai",
+     "ja": "loai",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    },
+    {
+     "core": "core.fact_dieu_kien_doi_thu.noi_dung",
+     "he": "noi_dung",
+     "ja": "noi_dung",
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
+     "view": []
+    }
+   ],
+   "ja": "Điều kiện bán của đối thủ",
+   "mau": null,
+   "ten": "doi_thu_dieu_kien"
   }
  ],
  "khoa": {
@@ -11313,6 +11679,61 @@
      "row_seq"
     ],
     "ten": "core.fact_ar_ledger"
+   },
+   {
+    "cot": [
+     "id",
+     "batch_id",
+     "ma_dong",
+     "ma_doi_thu",
+     "ngay_nguon",
+     "nguon_file",
+     "vi_tri",
+     "loai",
+     "noi_dung"
+    ],
+    "khoa": [
+     "ma_dong"
+    ],
+    "ten": "core.fact_dieu_kien_doi_thu"
+   },
+   {
+    "cot": [
+     "id",
+     "batch_id",
+     "ma_dong",
+     "ma_doi_thu",
+     "ma_hang_dt",
+     "ngay_nguon",
+     "hinh_thuc_nguon",
+     "nguon_file",
+     "vi_tri",
+     "ten_goc",
+     "ten_nhat",
+     "jan",
+     "quy_cach_goc",
+     "gia_goc",
+     "don_vi_gia",
+     "kg_moi_don_vi_gia",
+     "thue",
+     "gom_ship",
+     "kenh_gia",
+     "muc_gia",
+     "gia_bac",
+     "gia_truoc_km",
+     "trang_thai",
+     "han_su_dung",
+     "khuyen_mai",
+     "ma_kome_de_xuat",
+     "nhan_de_xuat",
+     "ly_do_ghep",
+     "do_chac",
+     "ghi_chu"
+    ],
+    "khoa": [
+     "ma_dong"
+    ],
+    "ten": "core.fact_gia_doi_thu"
    },
    {
     "cot": [
