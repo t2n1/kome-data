@@ -44,3 +44,27 @@
 .dt-hien-truong h3{margin:0 0 4px;font-size:.85rem}
 .dt-tinh{max-height:320px;overflow:auto}
 .dt-ke{display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;font-size:.72rem;background:var(--canh-nen);color:var(--canh-chu)}
+
+/* ---- Thanh tab + menu "Dữ liệu ▾" (đợt 4b) ---- */
+/* Menu nằm NGOÀI .kh-tab (nó cuộn ngang → cắt mất menu thả xuống). */
+.dt-thanh{display:flex;align-items:flex-end;gap:.4rem;border-bottom:1px solid var(--vien);margin:.2rem 0 .9rem}
+.dt-thanh .kh-tab{border-bottom:0;margin:0;flex:1 1 auto;min-width:0}
+.dt-menu-goc{position:relative;flex:none}
+.dt-menu-nut{font:inherit;font-size:.84rem;background:none;border:0;border-bottom:2px solid transparent;padding:.5rem .8rem;
+  color:var(--chu-nhat);cursor:pointer;white-space:nowrap;margin-bottom:-1px}
+.dt-menu-nut:hover{color:var(--chu)}
+.dt-menu-nut[aria-current="true"]{color:var(--do-chu);border-bottom-color:var(--do);font-weight:600}
+.dt-menu{position:absolute;right:0;top:100%;z-index:20;min-width:240px;max-width:calc(100vw - 2rem);background:var(--nen-the);
+  border:1px solid var(--vien);border-radius:10px;padding:6px;box-shadow:0 6px 20px color-mix(in srgb, var(--chu) 14%, transparent)}
+.dt-menu button{display:block;width:100%;text-align:left;font:inherit;font-size:.84rem;background:none;border:0;border-radius:6px;
+  padding:.45rem .6rem;color:var(--chu);cursor:pointer}
+.dt-menu button:hover,.dt-menu button:focus-visible{background:var(--nen-phu)}
+.dt-menu small{display:block;color:var(--chu-nhat);font-size:.72rem}
+
+/* ---- Hộp thoại chung (HopThoai.tsx) ---- */
+.lop-phu.giua{align-items:center;padding:1rem}
+.dt-hop{width:100%;max-height:88vh;overflow-y:auto;background:var(--nen-the);border:1px solid var(--vien);border-radius:14px;
+  padding:1rem 1.1rem;outline:none}
+.dt-hop-dau{display:flex;align-items:baseline;gap:.5rem;margin-bottom:.6rem}
+.dt-hop-dau .nut-dong{margin-left:auto}
+.dt-hop-than{min-width:0}

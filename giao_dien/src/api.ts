@@ -2,8 +2,20 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { baoKhoangMayChu, chuoiKhoang, docKhoang, useKhoang, type KhoangMayChu } from "./khung/khoang";
 import { batDau, docJson } from "./khung/tien_do";
 
+/** `du_lieu` = thân JSON của phản hồi lỗi (nếu có) — vd 409 của màn Đối thủ mang `xung_dot`. */
 export class LoiApi extends Error {
-  constructor(public ma: number, thong_diep: string) { super(thong_diep); }
+  constructor(public ma: number, thong_diep: string, public du_lieu?: unknown) { super(thong_diep); }
+}
+
+/** Đọc thân lỗi MỘT lần (body chỉ đọc được một lần): lấy `loi` làm thông điệp, gắn cả object vào `du_lieu`. */
+async function loiTuPhanHoi(r: Response): Promise<LoiApi> {
+  let thong_diep = `Lỗi ${r.status}`, du_lieu: unknown;
+  try {
+    du_lieu = await r.json();
+    const l = (du_lieu as { loi?: unknown } | null)?.loi;
+    if (typeof l === "string" && l) thong_diep = l;
+  } catch { /* không phải JSON */ }
+  return new LoiApi(r.status, thong_diep, du_lieu);
 }
 
 // fetch() thường: trình duyệt tự gửi If-None-Match và nhận 304 khi dữ liệu
@@ -19,11 +31,7 @@ async function layThat<T>(url: string, td: ReturnType<typeof batDau>): Promise<T
     location.href = "/dang-nhap";
     throw new LoiApi(401, "Chưa đăng nhập");
   }
-  if (!r.ok) {
-    let thong_diep = `Lỗi ${r.status}`;
-    try { thong_diep = (await r.json()).loi ?? thong_diep; } catch { /* không phải JSON */ }
-    throw new LoiApi(r.status, thong_diep);
-  }
+  if (!r.ok) throw await loiTuPhanHoi(r);
   const d = await docJson(r, td);
   // Dữ liệu doanh số mang `khoang` (kome/khoang_xem.py) — báo cho bộ chọn chung
   // để nó in đúng câu mô tả của máy chủ.
@@ -39,11 +47,7 @@ export async function gui<T>(url: string, du_lieu: unknown): Promise<T> {
     body: JSON.stringify(du_lieu),
   });
   if (r.status === 401) { location.href = "/dang-nhap"; throw new LoiApi(401, "Chưa đăng nhập"); }
-  if (!r.ok) {
-    let thong_diep = `Lỗi ${r.status}`;
-    try { thong_diep = (await r.json()).loi ?? thong_diep; } catch { /* không phải JSON */ }
-    throw new LoiApi(r.status, thong_diep);
-  }
+  if (!r.ok) throw await loiTuPhanHoi(r);
   return r.json() as Promise<T>;
 }
 
