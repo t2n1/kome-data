@@ -6,7 +6,7 @@ import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { TongQuan } from "./kieu";
 import { NHAN_TRANG_THAI } from "./kieu";
 
-export function TabTongQuan({ moBen }: { moBen: (ma: string) => void }) {
+export function TabTongQuan({ moBen, moSoSanh }: { moBen: (ma: string) => void; moSoSanh: (nganh: string, ben: string) => void }) {
   const kx = chuoiKhoang(useKhoang());
   const q = useQuery({ queryKey: ["doi-thu", "tong-quan", kx],
     queryFn: () => lay<TongQuan>(`/api/doi-thu/tong-quan${kx ? "?" + kx : ""}`) });
@@ -25,7 +25,10 @@ export function TabTongQuan({ moBen }: { moBen: (ma: string) => void }) {
               <tbody>{d?.ben.map(b => (
                 <tr key={b.ma}>
                   <th><button type="button" className="lien-ket" onClick={() => moBen(b.ma)}>{b.ten}</button></th>
-                  {nganh.map(n => { const v = o(b.ma, n); return <td key={n} className={v ? "dt-o co" : "dt-o"}>{v ? so(v) : ""}</td>; })}
+                  {nganh.map(n => { const v = o(b.ma, n); return (
+                    <td key={n} className={v ? "dt-o co" : "dt-o"}>{v ? (
+                      <button type="button" className="lien-ket" aria-label={`So sánh giá: ${b.ten}, ngành ${n} (${so(v)} mặt hàng)`}
+                        onClick={() => moSoSanh(n, b.ma)}>{so(v)}</button>) : ""}</td>); })}
                   <td>{b.ngay_moi ? `${ngay(b.ngay_moi)} · ${b.hinh_thuc === "web" ? "web" : "file"}` : "chưa có"}</td>
                   <td>{b.cho_duyet ? so(b.cho_duyet) : ""}</td>
                 </tr>))}</tbody>

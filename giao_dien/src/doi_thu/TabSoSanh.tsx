@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { lay } from "../api";
 import { Khoi } from "../chung/Khoi";
 import { ONoi } from "../chung/ONoi";
@@ -7,15 +7,43 @@ import { ngay, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { Nhom } from "./kieu";
 import { NHAN_DUYET } from "./kieu";
-import { dangLocDong, locNhom, locQuanSat, viTriKome, type BoLoc } from "./loc";
+import { BO_LOC_TRONG, dangLocDong, locNhom, locQuanSat, luaChonLoc, viTriKome, type BoLoc } from "./loc";
 
-export function TabSoSanh() {
+const TUOI = [[null, "Mọi tuổi"], [30, "≤ 30 ngày"], [90, "≤ 90 ngày"], [180, "≤ 180 ngày"]] as const;
+type Props = {
+  nganh: string; ben: string; nhom: string;   // đọc từ URL (?nganh= ?ben= ?nhom=) ở ManDoiThu
+  datNganh: (n: string) => void; datBen: (b: string) => void; datNhom: (khoa: string) => void;
+};
+
+export function TabSoSanh({ nganh, ben, nhom, datNganh, datBen, datNhom }: Props) {
   const kx = chuoiKhoang(useKhoang());
   const q = useQuery({ queryKey: ["doi-thu", "so-sanh", kx],
     queryFn: () => lay<{ nhom: Nhom[] }>(`/api/doi-thu/so-sanh${kx ? "?" + kx : ""}`) });
-  const [l, datL] = useState<BoLoc>({ tim: "", chi_cung_hang: false, chi_xac_nhan: false });
+  const [rieng, datRieng] = useState({ tim: "", chi_cung_hang: false, chi_xac_nhan: false, kenh: "", tuoi: null as number | null });
+  const l: BoLoc = { ...BO_LOC_TRONG, ...rieng, nganh, ben };
+  const datL = (moi: Partial<BoLoc>) => {
+    const { nganh: n, ben: b, ...con } = moi;
+    if (n !== undefined) datNganh(n);
+    if (b !== undefined) datBen(b);
+    if (Object.keys(con).length) datRieng({ ...rieng, ...con });
+  };
   const [mo, datMo] = useState<string | null>(null);
-  const ds = locNhom(q.data?.nhom ?? [], l);
+  const tatCa = q.data?.nhom;
+  const chon = useMemo(() => luaChonLoc(tatCa ?? []), [tatCa]);
+  const dsBen = chon.ben.some(b => b.ma === ben) || !ben ? chon.ben : [...chon.ben, { ma: ben, ten: ben }];
+  const ds = locNhom(tatCa ?? [], l);
+  // ?nhom=<nhom_khoa>: mở sẵn nhóm đó rồi cuộn tới nó (một lần cho mỗi giá trị của tham số).
+  const dong = useRef<Record<string, HTMLElement | null>>({});
+  const daMo = useRef("");
+  useEffect(() => {
+    if (!nhom || daMo.current === nhom || !tatCa) return;
+    const k = ds.find(n => n.nhom_khoa === nhom);
+    if (!k) return;
+    daMo.current = nhom;
+    const khoa = k.nhom_khoa + "|" + k.don_vi_so;
+    datMo(khoa);
+    requestAnimationFrame(() => dong.current[khoa]?.scrollIntoView?.({ block: "start" }));
+  });
   const donVi = (n: Nhom) => (n.don_vi_so === "kg" ? "/kg" : `/${n.don_vi_so.replace("don_vi:", "")}`);
   return (
     <section className="dt-khoi">
@@ -23,18 +51,26 @@ export function TabSoSanh() {
         cach_tinh="Giá quy về chưa thuế (giá có thuế ÷ 1,08) và về ¥/kg khi biết khối lượng. Giá KOME = đơn giá thực 90 ngày (Σ doanh thu thuần ÷ Σ kg đã bán). Không tính hàng hết, giá khách kể và giá bất thường (> 2× hoặc < ½ trung vị khi nhóm có ≥ 3 bên). Số của nhóm gồm cả hàng cùng hàng và hàng thay thế."
         canh_bao={dangLocDong(l) ? "Bộ lọc chỉ ẩn dòng chi tiết — số của nhóm (thấp nhất, trung vị, cao nhất, vị trí KOME) vẫn tính trên mọi hàng, cả cùng hàng lẫn thay thế." : null}>
         <div className="dt-loc">
-          <input type="search" placeholder="Tìm nhóm / mã KOME" aria-label="Tìm nhóm hoặc mã KOME" value={l.tim} onChange={e => datL({ ...l, tim: e.target.value })} />
-          <label><input type="checkbox" checked={l.chi_cung_hang} onChange={e => datL({ ...l, chi_cung_hang: e.target.checked })} /> Chỉ cùng hàng</label>
-          <label><input type="checkbox" checked={l.chi_xac_nhan} onChange={e => datL({ ...l, chi_xac_nhan: e.target.checked })} /> Chỉ số đã xác nhận</label>
+          <select aria-label="Ngành" value={nganh} onChange={e => datL({ nganh: e.target.value })}>
+            <option value="">Mọi ngành</option>{chon.nganh.map(n => <option key={n} value={n}>{n}</option>)}</select>
+          <select aria-label="Bên" value={ben} onChange={e => datL({ ben: e.target.value })}>
+            <option value="">Mọi bên</option>{dsBen.map(b => <option key={b.ma} value={b.ma}>{b.ten}</option>)}</select>
+          <select aria-label="Kênh hoặc mức giá" value={rieng.kenh} onChange={e => datL({ kenh: e.target.value })}>
+            <option value="">Mọi kênh / mức</option>{chon.kenh.map(k => <option key={k} value={k}>{k}</option>)}</select>
+          <select aria-label="Tuổi quan sát" value={rieng.tuoi ?? ""} onChange={e => datL({ tuoi: e.target.value === "" ? null : Number(e.target.value) })}>
+            {TUOI.map(([v, t]) => <option key={t} value={v ?? ""}>{t}</option>)}</select>
+          <input type="search" placeholder="Tìm nhóm / mã KOME" aria-label="Tìm nhóm hoặc mã KOME" value={l.tim} onChange={e => datL({ tim: e.target.value })} />
+          <label><input type="checkbox" checked={l.chi_cung_hang} onChange={e => datL({ chi_cung_hang: e.target.checked })} /> Chỉ cùng hàng</label>
+          <label><input type="checkbox" checked={l.chi_xac_nhan} onChange={e => datL({ chi_xac_nhan: e.target.checked })} /> Chỉ số đã xác nhận</label>
         </div>
         <div className="dt-cuon">
           <table className="bang dt-bang">
             <thead><tr><th>Nhóm</th><th>KOME</th><th>Thấp nhất</th><th>Trung vị</th><th>Cao nhất</th><th>Số bên</th><th>Vị trí KOME</th></tr></thead>
             <tbody>{ds.map(n => { const k = n.nhom_khoa + "|" + n.don_vi_so; return (
               <Fragment key={k}>
-                <tr className="dt-dong">
+                <tr className="dt-dong" ref={el => { dong.current[k] = el; }}>
                   <th><button type="button" className="lien-ket" aria-expanded={mo === k}
-                    onClick={() => datMo(mo === k ? null : k)}>{n.ten_nhom ?? n.nhom_khoa}</button></th>
+                    onClick={() => { daMo.current = mo === k ? "" : n.nhom_khoa; datMo(mo === k ? null : k); datNhom(daMo.current); }}>{n.ten_nhom ?? n.nhom_khoa}</button></th>
                   <td>{n.gia_kome != null ? yen(n.gia_kome) + donVi(n) : "—"}</td>
                   <td>{yen(n.thap_nhat)}{donVi(n)} <span className="dt-nhat">{n.ben_thap_nhat}</span></td>
                   <td>{yen(n.trung_vi)}{donVi(n)}</td>

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { gui, lay } from "../api";
-import type { TongQuan } from "./kieu";
+import type { NhomQuyCach, TongQuan } from "./kieu";
 import { Khoi } from "../chung/Khoi";
 import { ngay, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
@@ -20,6 +20,11 @@ const TRUONG: [keyof QuanSat, string][] = [["ten_goc", "Tên"], ["quy_cach_goc",
   ["kg_moi_don_vi_gia", "Kg / đơn vị"], ["thue", "Thuế"], ["gom_ship", "Ship"],
   ["kenh_gia", "Kênh"], ["muc_gia", "Mức"], ["trang_thai", "Trạng thái"]];
 
+const HANG_MOI_TRONG = { ma_doi_thu: "", ten_goc: "", quy_cach_goc: "", gia_goc: "", don_vi_gia: "", kg_moi_don_vi_gia: "",
+  thue: "khong_ro", gom_ship: "khong_ro", trang_thai: "con", loai_nguon: "", ghi_chu_nguon: "" };
+const NHAN_HANG_MOI: [keyof typeof HANG_MOI_TRONG, string][] = [["ten_goc", "Tên hàng"], ["quy_cach_goc", "Quy cách"], ["gia_goc", "Giá"],
+  ["don_vi_gia", "Đơn vị giá"], ["kg_moi_don_vi_gia", "Kg / đơn vị giá"], ["ghi_chu_nguon", "Ghi chú nguồn"]];
+
 export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const kx = chuoiKhoang(useKhoang());
   const qc = useQueryClient();
@@ -32,15 +37,21 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const [maKome, datMaKome] = useState("");
   const [loi, datLoi] = useState<string | null>(null);
   const [dang_gui, datDangGui] = useState(false);
-  const tq = useQuery({ queryKey: ["doi-thu", "tong-quan", kx], enabled: !!ben,
+  const [nhomId, datNhomId] = useState("");
+  const [moThem, datMoThem] = useState(false);
+  const [moi, datMoi] = useState(HANG_MOI_TRONG);
+  const tq = useQuery({ queryKey: ["doi-thu", "tong-quan", kx],
     queryFn: () => lay<TongQuan>(`/api/doi-thu/tong-quan${kx ? "?" + kx : ""}`) });
+  const nq = useQuery({ queryKey: ["doi-thu", "nhom-quy-cach", kx], enabled: !!chon && chon.nguon === "nap",
+    queryFn: () => lay<NhomQuyCach>(`/api/doi-thu/nhom-quy-cach${kx ? "?" + kx : ""}`) });
+  const nhomCoTen = nq.data?.nhom ?? [];
   const tenBen = tq.data?.ben.find(b => b.ma === ben)?.ten ?? ben;
-  const xong = () => { datChon(null); datSua({}); datLoi(null); datMaKome(""); qc.invalidateQueries({ queryKey: ["doi-thu"] }); };
+  const xong = () => { datChon(null); datSua({}); datLoi(null); datMaKome(""); datNhomId(""); qc.invalidateQueries({ queryKey: ["doi-thu"] }); };
   // Chống bấm đúp: mọi nút ghi khoá tới khi yêu cầu xong (thành công hay lỗi).
-  const lam = (gui_di: () => Promise<unknown>) => {
+  const lam = (gui_di: () => Promise<unknown>, sau: () => void = xong) => {
     if (dang_gui) return;
     datDangGui(true);
-    gui_di().then(xong).catch((e: Error) => datLoi(e.message)).finally(() => datDangGui(false));
+    gui_di().then(sau).catch((e: Error) => datLoi(e.message)).finally(() => datDangGui(false));
   };
   return (
     <div className="dt-duyet">
@@ -51,9 +62,37 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
           <div className="dt-loc" role="group" aria-label="Lọc">
             {LOC.map(([m, n]) => <button key={m} type="button" className="chip" aria-pressed={loc === m} onClick={() => datLoc(m)}>{n}</button>)}
           </div>
+          <p><button type="button" className="chip" aria-expanded={moThem} onClick={() => { datMoThem(!moThem); datLoi(null); }}>
+            Thêm hàng AI bỏ sót</button></p>
+          {moThem && (
+            <fieldset className="dt-them" aria-label="Thêm hàng AI bỏ sót">
+              <legend>Thêm hàng AI bỏ sót</legend>
+              <label>Đối thủ<select value={moi.ma_doi_thu} onChange={e => datMoi({ ...moi, ma_doi_thu: e.target.value })}>
+                <option value="">— chọn bên —</option>
+                {tq.data?.ben.map(b => <option key={b.ma} value={b.ma}>{b.ten}</option>)}</select></label>
+              {NHAN_HANG_MOI.map(([k, n]) => (
+                <label key={k}>{n}<input value={moi[k]} onChange={e => datMoi({ ...moi, [k]: e.target.value })} /></label>))}
+              {(["thue", "gom_ship", "trang_thai"] as const).map(k => (
+                <label key={k}>{{ thue: "Thuế", gom_ship: "Ship", trang_thai: "Trạng thái" }[k]}
+                  <select value={moi[k]} onChange={e => datMoi({ ...moi, [k]: e.target.value })}>
+                    {CHON[k]!.map(([m, t]) => <option key={m} value={m}>{t}</option>)}</select></label>))}
+              <label>Loại nguồn<select value={moi.loai_nguon} onChange={e => datMoi({ ...moi, loai_nguon: e.target.value })}>
+                <option value="">— loại nguồn (bắt buộc) —</option>
+                {LOAI_NGUON.map(([m, n]) => <option key={m} value={m}>{n}</option>)}</select></label>
+              {loi && <p role="alert" className="dt-loi">{loi}</p>}
+              <div className="dt-nut">
+                <button type="button" className="chip"
+                  disabled={dang_gui || !moi.ma_doi_thu || !moi.ten_goc.trim() || !moi.loai_nguon || (moi.trang_thai !== "het" && !moi.gia_goc.trim())}
+                  title="Cần: đối thủ, tên hàng, loại nguồn và giá (trừ khi hàng đã hết)"
+                  onClick={() => lam(() => gui("/api/doi-thu/gia-moi", moi), () => { datMoThem(false); datMoi(HANG_MOI_TRONG); datLoi(null); qc.invalidateQueries({ queryKey: ["doi-thu"] }); })}>
+                  Thêm hàng</button>
+                <button type="button" className="chip" onClick={() => { datMoThem(false); datLoi(null); }}>Đóng</button>
+              </div>
+            </fieldset>)}
           <ul className="dt-ds dt-chon">{q.data?.dong.map(x => (
             <li key={x.nguon + x.id}><button type="button" aria-pressed={chon?.id === x.id && chon.nguon === x.nguon}
-              onClick={() => { datChon(x); datSua({}); datLoi(null); datMaKome(x.ma_kome ?? ""); }}>
+              onClick={() => { datChon(x); datSua({}); datLoi(null); datMaKome(x.ma_kome ?? "");
+                datNhomId(x.nhom_khoa?.startsWith("n:") ? x.nhom_khoa.slice(2) : ""); }}>
               <b>{x.ma_doi_thu}</b> · {x.ten_goc} · {x.gia_goc != null ? yen(x.gia_goc) : "—"}/{x.don_vi_gia ?? "?"} ·{" "}
               {NHAN_DUYET[x.trang_thai_duyet]}{x.bat_thuong ? " · bất thường" : ""}</button></li>))}</ul>
         </Khoi>
@@ -88,13 +127,17 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
             </fieldset>
             <fieldset><legend>Ghép với KOME</legend>
               <input placeholder="Mã KOME (trống = không ghép)" aria-label="Mã KOME" value={maKome} onChange={e => datMaKome(e.target.value)} />
+              <select aria-label="Nhóm so sánh" value={nhomId} onChange={e => datNhomId(e.target.value)}>
+                <option value="">— theo mã KOME —</option>
+                {nhomCoTen.map(g => <option key={g.id} value={String(g.id)}>{g.ten}</option>)}</select>
               {(["cung_hang", "thay_the", "khong"] as const).map(n => (
                 <button key={n} type="button" className="chip"
                   disabled={dang_gui || (n !== "khong" && !maKome.trim())}
                   title={n !== "khong" && !maKome.trim() ? "Nhập mã KOME trước" : undefined} onClick={() => {
                   const ma = maKome.trim();
                   lam(() => gui("/api/doi-thu/ghep", { ma_doi_thu: chon.ma_doi_thu, ma_hang_dt: chon.ma_hang_dt,
-                    product_code: n === "khong" ? null : ma || null, nhom_id: null, nhan: n }));
+                    product_code: n === "khong" ? null : ma || null,
+                    nhom_id: n === "khong" || !nhomId ? null : Number(nhomId), nhan: n }));
                 }}>{n === "cung_hang" ? "Cùng hàng" : n === "thay_the" ? "Thay thế" : "Không ghép"}</button>))}
             </fieldset>
           </Khoi>

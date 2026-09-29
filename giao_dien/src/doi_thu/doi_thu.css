@@ -24,4 +24,18 @@
 .dt-sua fieldset{border:1px solid var(--vien);border-radius:8px;margin:10px 0;padding:.5rem .7rem;display:flex;flex-direction:column;gap:6px;min-width:0}
 .dt-nut{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
 .dt-nhat{color:var(--chu-nhat)}
-@media (max-width:760px){.dt-duyet{grid-template-columns:minmax(0,1fr)}.dt-sua label{grid-template-columns:minmax(0,1fr)}}
+.dt-them{border:1px solid var(--vien);border-radius:8px;margin:8px 0;padding:.5rem .7rem;display:grid;gap:6px;min-width:0}
+.dt-them label{display:grid;grid-template-columns:140px minmax(0,1fr);gap:8px;font-size:.8rem}
+.dt-them input,.dt-nhom-qc input,.dt-nhom-qc textarea{font:inherit;font-size:.82rem;padding:.3rem .5rem;border:1px solid var(--vien-dam);
+  border-radius:8px;background:var(--nen-the);color:var(--chu);min-width:0}
+.dt-loi{color:var(--do-chu);margin:0;font-size:.8rem}
+.dt-nhom-qc{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.dt-nhom-ds{max-height:none}
+.dt-nhom-ds>li{padding:.5rem 0}
+.dt-ma{list-style:none;margin:4px 0;padding:0}
+.dt-ma li{display:flex;gap:8px;align-items:center;justify-content:space-between;border:0;padding:.1rem 0}
+.dt-them-ma{display:flex;gap:8px;flex-wrap:wrap}
+.dt-them-ma input{flex:1 1 220px}
+.dt-tao-nhom{border:1px solid var(--vien);border-radius:8px;margin:10px 0 0;padding:.5rem .7rem;display:grid;gap:6px;min-width:0}
+.dt-so{width:5.5rem;text-align:right}
+@media (max-width:760px){.dt-duyet{grid-template-columns:minmax(0,1fr)}.dt-sua label,.dt-them label{grid-template-columns:minmax(0,1fr)}}
