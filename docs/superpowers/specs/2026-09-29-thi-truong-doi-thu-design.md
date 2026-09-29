@@ -27,7 +27,7 @@ kiện ship, hết hàng — của 19 bên đang theo dõi. Ba nguồn:
 |---|---|
 | Nơi đặt | **Trong web KOME** (Hướng 1) — nối được với giá / doanh số / khách thật |
 | AI đọc file ở đâu | **Chỉ trong phiên làm việc với Claude** (B). Web không gọi API AI nào |
-| "Hàng tương đương" | **Hai nhãn**: `cung_hang` (cùng hãng + quy cách) · `thay_the` (cùng loại, khác hãng/quy cách). Mặc định so `cung_hang`; bật thêm `thay_the` |
+| "Hàng tương đương" | **Hai nhãn**: `cung_hang` (cùng hãng + quy cách) · `thay_the` (cùng loại, khác hãng/quy cách). Số của nhóm tính trên CẢ HAI nhãn (80% hàng cạnh tranh là `thay_the` — chỉ `cung_hang` thì phần lớn nhóm rỗng); bộ lọc "Chỉ cùng hàng" chỉ ẩn dòng chi tiết và màn nói rõ điều đó (sửa 2026-09-29 khi làm Đợt 1) |
 | Trục so sánh | **Nhóm so sánh** (ví dụ "Riềng xay đông lạnh") — mã KOME và hàng đối thủ cùng gắn vào. 80% hàng cạnh tranh là `thay_the`, nên mã KOME không đủ làm trục |
 | Giá KOME để so | **Đơn giá thực 90 ngày** quy về ¥/kg (Σ doanh thu thuần ÷ Σ kg đã bán) |
 | Ai sửa được | **Mọi người đã đăng nhập** (A). Nhật ký ghi ai sửa; bản gốc không bao giờ mất |
@@ -246,6 +246,7 @@ Hướng dẫn đọc (`HUONG_DAN.md` của phép thử) chuyển vào `docs/doi
 | Đợt | Gồm | Ghi chú |
 |---|---|---|
 | **1** | §4 toàn bộ bảng trừ `tiep_xuc_nhac` · bộ nạp + gói · `/doi-thu` bốn tab · khối Sản phẩm 360 · nạp tháng 8 thật | Lõi. Làm được ngay |
+| **1b** | Phần giao diện của Đợt 1 chưa làm (soát cuối 2026-09-29): form "Thêm hàng AI bỏ sót" và chọn nhóm khi ghép (§5.4) · màn tạo nhóm có tên và sửa quy cách KOME (§4.2 — API `/api/doi-thu/nhom`, `/quy-cach` ĐÃ có; 60/168 mã chưa tách được kg từ tên, phần lớn là đồ uống theo ml) · bấm ô lưới → So sánh lọc ngành + bên (§5.1) · lọc ngành / kênh-mức / tuổi quan sát (§5.2) · liên kết `&nhom=` từ Sản phẩm 360 (§5.5) | Làm trước Đợt 2 |
 | **2** | §6 tin hiện trường `@` · nối hồ sơ khách / `/lien-he` / hồ sơ đối thủ · hiện trường 30 ngày | Sau khi Đợt 1 có dữ liệu thật |
 | **3** | Ảnh: trang gốc cạnh dòng duyệt + ảnh bằng chứng sale đính kèm (nguồn loại 2, 3) | **Cần chọn chỗ lưu ảnh** — web hiện không có (chỉ `meta.nap_cho` bytea, 24 giờ). Mỗi tháng ~400 trang; Vercel 4,5 MB/yêu cầu. Đề xuất Supabase Storage; quyết định riêng |
 
