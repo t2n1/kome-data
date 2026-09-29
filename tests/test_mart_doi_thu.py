@@ -1,0 +1,126 @@
+"""Migration 060 — chỉ số mart của Thị trường & đối thủ (đặc tả §4.4)."""
+from datetime import date
+import pytest
+
+from tests.test_khach_hang import _mua, HOM_NAY
+
+
+def _hang(conn, batch, ma="NT01", ten="Ca Ba sa cat khuc (500g x 20 packs)"):
+    b = batch(9001)
+    conn.execute("""INSERT INTO core.dim_product (product_code, product_name, food_category_name, batch_id)
+                    VALUES (%s, %s, '冷凍食品_VNM', %s) ON CONFLICT DO NOTHING""", (ma, ten, b))
+    conn.commit()
+
+
+def _qs(conn, batch, ben, gia, kg=1, thue="chua", ma="NT01", ngay=date(2026, 7, 20), trang="con",
+        hang=None, nhan="thay_the", do_chac="chac"):
+    b = batch(abs(hash((ben, gia, hang, ngay))) % 50_000 + 20_000, ngay)
+    r = conn.execute(
+        """INSERT INTO core.fact_gia_doi_thu (batch_id, ma_dong, ma_doi_thu, ma_hang_dt, ngay_nguon, hinh_thuc_nguon,
+             ten_goc, gia_goc, don_vi_gia, kg_moi_don_vi_gia, thue, gom_ship, trang_thai, ma_kome_de_xuat, nhan_de_xuat, do_chac)
+           VALUES (%s, 'x-1', %s, %s, %s, 'file', 'Basa', %s, 'kg', %s, %s, 'khong_ro', %s, %s, %s, %s) RETURNING id""",
+        (b, ben, hang or f"ten:basa|{ben}", ngay, gia, kg, thue, trang, ma, nhan, do_chac)).fetchone()[0]
+    conn.commit()
+    return r
+
+
+def test_quy_cach_tach_tu_ten_va_nguoi_sua_thang(conn, batch):
+    _hang(conn, batch)
+    _hang(conn, batch, "NT04", "Ca ro phi nguyen con (10kg/case)")
+    q = dict(((r[0], (r[1], r[2], r[3])) for r in conn.execute(
+        "SELECT product_code, kg_moi_goi, goi_moi_thung, kg_moi_thung FROM mart.quy_cach_kome")))
+    assert q["NT01"] == (pytest.approx(0.5), 20, None)
+    assert q["NT04"][2] == 10
+    conn.execute("INSERT INTO app.quy_cach_kome (product_code, kg_moi_goi) VALUES ('NT01', 0.45)")
+    conn.commit()
+    assert float(conn.execute("SELECT kg_moi_goi FROM mart.quy_cach_kome WHERE product_code='NT01'").fetchone()[0]) == 0.45
+
+
+def test_gia_kome_kg_la_TY_SO_CAC_TONG_doc_ban_den_moc(conn, batch):
+    _hang(conn, batch)
+    # _mua: pack_code '02', qty 6, amount 110.000, tax 10.000 → 100.000 ÷ (6 thùng × 20 × 0,5 kg) = ¥1.666,7/kg
+    _mua(conn, batch, "202601010001", HOM_NAY, hang="NT01")
+    _mua(conn, batch, "009000000002", HOM_NAY, hang="NT01")     # mã nội bộ (044) — không được lọt
+    y = conn.execute("SELECT yen_kg FROM mart.gia_kome_kg WHERE product_code='NT01'").fetchone()[0]
+    assert float(y) == pytest.approx(100_000 / 60, rel=1e-6)
+
+
+def test_quy_doi_chia_thue_dung_mot_lan_va_khong_kg_thi_don_vi(conn, batch):
+    _hang(conn, batch)
+    _qs(conn, batch, "A", 540, thue="co")
+    _qs(conn, batch, "B", 100, kg=None)
+    r = dict(conn.execute("SELECT ma_doi_thu, (yen_chuan, don_vi_so) FROM mart.gia_doi_thu_quan_sat").fetchall())
+    assert float(r["A"][0]) == pytest.approx(500)
+    assert r["B"][1] == "don_vi:kg"
+
+
+def test_dinh_chinh_ap_tren_ban_nap_khong_dung_core(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "A", 850)
+    conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong, gia_tri_moi) VALUES (%s, 'gia_goc', '580')", (fid,))
+    conn.commit()
+    g, tt = conn.execute("SELECT gia_goc, trang_thai_duyet FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()
+    assert g == 580 and tt == "da_sua"
+    assert conn.execute("SELECT gia_goc FROM core.fact_gia_doi_thu WHERE id=%s", (fid,)).fetchone()[0] == 850
+
+
+def test_dinh_chinh_mo_coi_sau_hoan_tac_khong_no(conn, batch):
+    conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong, gia_tri_moi) VALUES (999999, 'gia_goc', '1')")
+    conn.commit()
+    assert conn.execute("SELECT count(*) FROM mart.gia_doi_thu_quan_sat").fetchone()[0] == 0
+
+
+def test_bat_thuong_hon_2_lan_trung_vi_khi_du_3_ben_va_khong_vao_trung_vi(conn, batch):
+    _hang(conn, batch)
+    for ben, g in [("A", 540), ("B", 560), ("C", 580), ("D", 1400)]:
+        _qs(conn, batch, ben, g)
+    bt = dict(conn.execute("SELECT ma_doi_thu, bat_thuong FROM mart.gia_doi_thu_hien_hanh").fetchall())
+    assert bt == {"A": False, "B": False, "C": False, "D": True}
+    tv = conn.execute("SELECT trung_vi, cao_nhat, so_ben FROM mart.so_sanh_nhom WHERE nhom_khoa='ma:NT01'").fetchone()
+    assert float(tv[0]) == 560 and float(tv[1]) == 580 and tv[2] == 3
+
+
+def test_nhom_duoi_3_ben_khong_xet_bat_thuong(conn, batch):
+    _hang(conn, batch)
+    _qs(conn, batch, "A", 100); _qs(conn, batch, "B", 900)
+    assert not any(r[0] for r in conn.execute("SELECT bat_thuong FROM mart.gia_doi_thu_hien_hanh"))
+
+
+def test_xac_nhan_go_co_bat_thuong(conn, batch):
+    _hang(conn, batch)
+    for ben, g in [("A", 540), ("B", 560), ("C", 580)]:
+        _qs(conn, batch, ben, g)
+    fid = _qs(conn, batch, "D", 1400)
+    conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong) VALUES (%s, 'xac_nhan')", (fid,))
+    conn.commit()
+    assert conn.execute("SELECT bat_thuong FROM mart.gia_doi_thu_hien_hanh WHERE id=%s", (fid,)).fetchone()[0] is False
+
+
+def test_het_hang_khong_vao_trung_vi(conn, batch):
+    _hang(conn, batch)
+    _qs(conn, batch, "A", 500); _qs(conn, batch, "B", 600); _qs(conn, batch, "C", 100, trang="het")
+    assert float(conn.execute("SELECT thap_nhat FROM mart.so_sanh_nhom WHERE nhom_khoa='ma:NT01'").fetchone()[0]) == 500
+
+
+def test_quan_sat_moi_hon_thang_cu_va_quay_ve_moc(conn, batch):
+    _hang(conn, batch)
+    _mua(conn, batch, "202601010001", date(2026, 9, 20), hang="NT01")   # mốc dữ liệu = 20/9
+    _qs(conn, batch, "A", 500, hang="h1", ngay=date(2026, 8, 5))
+    _qs(conn, batch, "A", 520, hang="h1", ngay=date(2026, 9, 5))
+    assert conn.execute("SELECT gia_goc FROM mart.gia_doi_thu_hien_hanh").fetchone()[0] == 520
+    conn.execute("SELECT set_config('kome.moc', '2026-08-31', true)")
+    assert conn.execute("SELECT gia_goc FROM mart.gia_doi_thu_hien_hanh").fetchone()[0] == 500
+    conn.rollback()
+
+
+def test_ghep_cua_nguoi_thang_de_xuat_va_nhom_co_ten_gop_ma(conn, batch):
+    _hang(conn, batch); _hang(conn, batch, "NT99", "Ca Ba sa cat khuc (1kg x 10 packs)")
+    _qs(conn, batch, "A", 500, hang="h1")
+    _qs(conn, batch, "B", 520, hang="h2", ma="NT99")
+    conn.execute("INSERT INTO app.ghep_hang (ma_doi_thu, ma_hang_dt, product_code, nhan) VALUES ('A', 'h1', NULL, 'khong')")
+    n = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Basa cắt khúc') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO app.nhom_so_sanh_ma VALUES ('NT01', %s), ('NT99', %s)", (n, n))
+    conn.commit()
+    r = dict(conn.execute("SELECT ma_doi_thu, (ma_kome, nhom_khoa, ten_nhom) FROM mart.gia_doi_thu_quan_sat").fetchall())
+    assert r["A"][0] is None and r["A"][1] is None               # người nói "không ghép" → ra khỏi mọi nhóm
+    assert r["B"][1] == f"n:{n}" and r["B"][2] == "Basa cắt khúc"
