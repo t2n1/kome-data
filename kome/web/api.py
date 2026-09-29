@@ -772,6 +772,49 @@ def tao_api(open_app_conn) -> APIRouter:
         return _dt_doc(request, "doi-thu/duyet", lambda c: DT.duyet(c, ben, loc), thang, ky, tu, den,
                        "Không đọc được danh sách duyệt.", ben=ben, loc=loc)
 
+    @r.get("/doi-thu/giao-hang")
+    def dt_giao_hang(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Tab Phí & giao hàng — ảnh chụp theo phiên bản (mọi lần sửa giao hàng ghi app.doi_thu_nhat_ky, có trong
+        _PHIEN_BAN). 1 lượt hỏi."""
+        from kome import doi_thu_giao as DTG
+        return _dt_doc(request, "doi-thu/giao-hang", DTG.giao_hang, thang, ky, tu, den,
+                       "Không đọc được điều kiện giao hàng.")
+
+    def _dt_tuoi(request, tinh, thang, ky, tu, den, loi, khong_co="Không có."):
+        """Đọc TƯƠI (không ảnh chụp) cho pop-up sửa — số `sua_cuoi` / lịch sử phải là của lúc mở, không phải của ảnh
+        chụp, để chống sửa đè. Cùng mốc với _dt_doc (khoảng xem đang chọn). None -> 404 JSON."""
+        from kome import doi_thu as DT
+        try:
+            ts = _ts(request, thang, ky, tu, den).chinh()
+            with open_app_conn() as conn:
+                du_lieu = _voi_moc(ts, tinh)(conn)
+        except (DT.LoiNhap, KX.LoiKhoang) as e:
+            return _loi(str(e), 400)
+        except Exception:
+            traceback.print_exc()
+            return _loi(loi)
+        if du_lieu is None:
+            return _loi(khong_co, 404)
+        return JSONResponse(du_lieu, headers={"Cache-Control": "no-store"})
+
+    @r.get("/doi-thu/mat-hang/{nguon}/{id}")
+    def dt_mat_hang(request: Request, nguon: str, id: int, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Một quan sát (kể cả dòng lịch sử) + lịch sử sửa của nó — pop-up sửa. 1 lượt hỏi, không ảnh chụp."""
+        from kome import doi_thu as DT
+        return _dt_tuoi(request, lambda c: DT.mat_hang(c, nguon, id), thang, ky, tu, den,
+                        "Không đọc được mặt hàng.", "Không có mặt hàng này.")
+
+    @r.get("/doi-thu/lich-su")
+    def dt_lich_su(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """`?doi_tuong=a,b` (≤ 5 khoá nhật ký). Khoá có dấu phẩy: lặp tham số (`?doi_tuong=a&doi_tuong=b` — khi đó
+        không tách phẩy). 1 lượt hỏi, không ảnh chụp."""
+        from kome import doi_thu as DT
+        v = request.query_params.getlist("doi_tuong")
+        khoa = [k.strip() for k in v[0].split(",")] if len(v) == 1 else [k.strip() for k in v]
+        khoa = [k for k in khoa if k]
+        return _dt_tuoi(request, lambda c: {"lich_su": DT.lich_su(c, khoa)}, thang, ky, tu, den,
+                        "Không đọc được lịch sử sửa.")
+
     @r.get("/san-pham/{ma}/doi-thu")
     def sp_doi_thu(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         from kome import doi_thu as DT

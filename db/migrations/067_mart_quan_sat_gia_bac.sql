@@ -5,6 +5,10 @@
 -- thường, thấp / cao nhất) vẫn trên GIÁ LẺ (yen_chuan) — "Khách mua" chỉ đổi cái được vẽ.
 -- quan_sat: CREATE OR REPLACE (cột cũ giữ thứ tự, cột mới ở CUỐI) — hien_hanh dùng q.* nên phải DROP + tạo lại cùng
 -- so_sanh_nhom (không view nào khác phụ thuộc hai view đó — kiểm bằng pg_depend trước khi chạy).
+-- so_sanh_nhom thêm ở CUỐI (đợt 4b): gia_kome_so (= coalesce(chuẩn, thực bán) — giá KOME để so), lech_trung_vi
+-- (so ÷ trung vị − 1, số thực), gia_kome_lech (so > 3× hoặc < ⅓ trung vị — ĐỊNH NGHĨA MỘT LẦN của "giá KOME lệch": Tóm
+-- tắt không vẽ nhóm đó, Dữ liệu › Giá KOME lệch liệt kê; giao diện không tự tính lại), kome_kg_goi / kome_goi_thung /
+-- kome_kg_thung (mart.quy_cach_kome của mã CHÍNH — cùng mã `chinh` của bảng giá).
 
 CREATE FUNCTION mart.gia_bac_kg(p_bac jsonb, p_sl numeric, p_pallet boolean, p_kg_thung numeric, p_so_goi integer,
                                 p_kl_goi numeric, p_thue text) RETURNS numeric LANGUAGE sql IMMUTABLE AS $$
@@ -217,7 +221,7 @@ tv_gia AS MATERIALIZED (      -- đọc hai lần (chinh, kome) → MATERIALIZED
     FROM thanh_vien tv LEFT JOIN mart.gia_kome_kg g USING (product_code)
                        LEFT JOIN kb s ON s.product_code = tv.product_code AND s.price_level = 'std'
 ),
-chinh AS (      -- mã "chính" của nhóm: bán nhiều kg nhất (không ai bán → mã nhỏ nhất)
+chinh AS MATERIALIZED (      -- mã "chính" của nhóm: bán nhiều kg nhất (không ai bán → mã nhỏ nhất); đọc hai lần (bang, g)
     SELECT DISTINCT ON (nhom_khoa) nhom_khoa, product_code FROM tv_gia
     ORDER BY nhom_khoa, kg_ban DESC NULLS LAST, product_code
 ),
@@ -238,7 +242,8 @@ bang AS (
            min(b.yen_kg) FILTER (WHERE mart.la_gia_km_kome(b.price_level))                                   AS km
     FROM chinh c JOIN kb b USING (product_code)
     GROUP BY c.nhom_khoa
-)
+),
+g AS (
 SELECT h.nhom_khoa, max(h.ten_nhom) AS ten_nhom, h.don_vi_so, k.ma_kome,
        CASE WHEN h.don_vi_so = 'kg' THEN k.gia_kome END                                 AS gia_kome,
        count(DISTINCT h.ma_doi_thu)                                                     AS so_ben,
@@ -252,9 +257,21 @@ SELECT h.nhom_khoa, max(h.ten_nhom) AS ten_nhom, h.don_vi_so, k.ma_kome,
        k.nganh,
        CASE WHEN h.don_vi_so = 'kg' THEN k.gia_kome_chuan END                           AS gia_kome_chuan,
        CASE WHEN h.don_vi_so = 'kg' THEN b.gia_kome_bang END                            AS gia_kome_bang,
-       CASE WHEN h.don_vi_so = 'kg' AND b.km < coalesce(k.gia_kome_chuan, 'infinity') THEN b.km END AS gia_kome_km
+       CASE WHEN h.don_vi_so = 'kg' AND b.km < coalesce(k.gia_kome_chuan, 'infinity') THEN b.km END AS gia_kome_km,
+       q.kg_moi_goi AS kome_kg_goi, q.goi_moi_thung AS kome_goi_thung, q.kg_02 AS kome_kg_thung
 FROM h LEFT JOIN kome k USING (nhom_khoa) LEFT JOIN bang b USING (nhom_khoa)
-GROUP BY h.nhom_khoa, h.don_vi_so, k.ma_kome, k.gia_kome, k.nganh, k.gia_kome_chuan, b.gia_kome_bang, b.km;
+       LEFT JOIN chinh c USING (nhom_khoa) LEFT JOIN mart.quy_cach_kome q ON q.product_code = c.product_code
+GROUP BY h.nhom_khoa, h.don_vi_so, k.ma_kome, k.gia_kome, k.nganh, k.gia_kome_chuan, b.gia_kome_bang, b.km,
+         q.kg_moi_goi, q.goi_moi_thung, q.kg_02
+)
+-- g.gia_kome / g.gia_kome_chuan đã NULL khi don_vi_so <> 'kg' → so cũng NULL, lech NULL, gia_kome_lech false.
+SELECT g.nhom_khoa, g.ten_nhom, g.don_vi_so, g.ma_kome, g.gia_kome, g.so_ben, g.so_quan_sat, g.thap_nhat, g.ben_thap_nhat,
+       g.trung_vi, g.cao_nhat, g.ty_le_re_hon_kome, g.nganh, g.gia_kome_chuan, g.gia_kome_bang, g.gia_kome_km,
+       x.so                                                                                     AS gia_kome_so,
+       CASE WHEN x.so > 0 AND g.trung_vi > 0 THEN x.so / g.trung_vi - 1 END                    AS lech_trung_vi,
+       coalesce(x.so > 0 AND g.trung_vi > 0 AND (x.so > 3 * g.trung_vi OR x.so < g.trung_vi / 3), false) AS gia_kome_lech,
+       g.kome_kg_goi, g.kome_goi_thung, g.kome_kg_thung
+FROM g CROSS JOIN LATERAL (SELECT coalesce(g.gia_kome_chuan, g.gia_kome) AS so) x;
 
 GRANT SELECT ON mart.gia_doi_thu_quan_sat, mart.gia_doi_thu_hien_hanh, mart.so_sanh_nhom TO kome_app, kome_report, kome_ingest;
 GRANT EXECUTE ON FUNCTION mart.gia_bac_kg(jsonb, numeric, boolean, numeric, integer, numeric, text) TO kome_app, kome_report, kome_ingest;

@@ -110,8 +110,13 @@ def test_duyet_chua_ghep_van_hien_dong_chua_ai_dung_toi(conn, batch):
 
 
 def _dk(conn, batch, bid, ngay, ben, loai, nd, ma_dong):
+    # Cùng (bid, ngày) = CÙNG một lô (một file nạp) — mart.dieu_kien_hien_hanh (068) lấy LÔ mới nhất của bên, nên hai
+    # dòng của một gói phải chung batch_id như lúc nạp thật (fixture `batch` tạo lô mới mỗi lần gọi).
+    lo = batch.__dict__.setdefault("_lo_dk", {})
+    if (bid, ngay) not in lo:
+        lo[(bid, ngay)] = batch(bid, ngay)
     conn.execute("INSERT INTO core.fact_dieu_kien_doi_thu (batch_id, ma_dong, ma_doi_thu, ngay_nguon, loai, noi_dung)"
-                 " VALUES (%s,%s,%s,%s,%s,%s)", (batch(bid, ngay), ma_dong, ben, ngay, loai, nd))
+                 " VALUES (%s,%s,%s,%s,%s,%s)", (lo[(bid, ngay)], ma_dong, ben, ngay, loai, nd))
     conn.commit()
 
 
@@ -882,3 +887,161 @@ def test_kl_goi_g_lam_tron_ve_0_la_LoiNhap_ca_hai_duong(conn, batch, nhap):
         DT.sua(conn, fid, {"kl_goi_g": nhap}, None)
     with pytest.raises(DT.LoiNhap):
         DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "500", "loai_nguon": "to_roi", "kl_goi_g": nhap}, None)
+
+
+
+# ---------------------------------------------------------------- đợt 4b — dữ liệu đọc cho màn mới
+
+_QS_4B = {"so_goi_thung", "kl_goi_g", "bac", "kg_thung_dt", "gia_goi", "gia_thung", "gia_1", "gia_5", "gia_10",
+          "gia_pallet", "sua_cuoi"}
+_NHOM_4B = {"gia_kome_chuan", "gia_kome_bang", "gia_kome_km", "gia_kome_so", "lech_trung_vi", "gia_kome_lech",
+            "kome_kg_goi", "kome_goi_thung", "kome_kg_thung"}
+
+
+def _ba_ben(conn, batch):
+    _hang(conn, batch)
+    return [_qs(conn, batch, b, g, hang=f"h{b}") for b, g in [("THAK", 540), ("HSC", 560), ("JVB", 580)]]
+
+
+def _nguoi(conn, ten="lan"):
+    i = conn.execute("INSERT INTO app.nguoi_dung (ten_dang_nhap, mat_khau_hash, mat_khau_salt) VALUES (%s, %s, %s)"
+                     " RETURNING id", (ten, b"\x00", b"\x00")).fetchone()[0]
+    conn.commit()
+    return i
+
+
+def test_4b_so_sanh_mang_khoa_nhom_moi_va_quan_sat_moi(conn, batch):
+    _ba_ben(conn, batch)
+    n = DT.so_sanh(conn)["nhom"][0]
+    assert _NHOM_4B <= set(n)
+    assert n["gia_kome_lech"] is False and n["gia_kome_so"] is None
+    assert all(_QS_4B <= set(q) for q in n["quan_sat"])
+    q = n["quan_sat"][0]
+    assert q["gia_1"] == 540 and q["sua_cuoi"] == 0                      # làm tròn yên, chưa ai sửa = 0
+
+
+def test_4b_sua_cuoi_theo_khoa_gia_va_khoa_ghep(conn, batch):
+    fid, fid2, _ = _ba_ben(conn, batch)
+    sc = lambda: next(q for q in DT.so_sanh(conn)["nhom"][0]["quan_sat"] if q["id"] == fid)["sua_cuoi"]
+    assert sc() == 0
+    DT.sua(conn, fid, {"gia_goc": "545"}, None)
+    conn.commit()
+    k1 = conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong=%s", (f"gia:{fid}",)).fetchone()[0]
+    assert sc() == k1
+    DT.sua(conn, fid2, {"gia_goc": "561"}, None)                           # sửa dòng KHÁC không đổi sua_cuoi
+    conn.commit()
+    assert sc() == k1
+    DT.dat_ghep(conn, "THAK", "hTHAK", "NT01", None, "cung_hang", None)
+    conn.commit()
+    k2 = conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong='THAK/hTHAK'").fetchone()[0]
+    assert k2 > k1 and sc() == k2
+
+
+def test_4b_duyet_va_ho_so_ben_mang_cot_quan_sat_moi(conn, batch):
+    _ba_ben(conn, batch)
+    assert all(_QS_4B <= set(q) for q in DT.duyet(conn)["dong"])
+    assert all(_QS_4B <= set(q) for q in DT.ho_so_ben(conn, "THAK")["quan_sat"])
+
+
+def test_4b_tong_quan_khuyen_mai_het_hang_mang_khoa_mat_hang(conn, batch):
+    _hang(conn, batch)
+    km = _qs(conn, batch, "THAK", 540, hang="hkm")
+    het = _qs(conn, batch, "HSC", 560, hang="hhet", trang="het")
+    DT.sua(conn, km, {"khuyen_mai": "mua 10 tặng 1"}, None)
+    conn.commit()
+    t = DT.tong_quan(conn)
+    k = t["khuyen_mai"][0]
+    assert (k["nguon"], k["id"], k["ma_hang_dt"], k["ma_doi_thu"], k["ben"]) == ("nap", km, "hkm", "THAK", "THAK")
+    h = t["het_hang"][0]
+    assert (h["nguon"], h["id"], h["ma_hang_dt"], h["ma_doi_thu"], h["ten_doi_thu"]) == \
+        ("nap", het, "hhet", "HSC", "HSC Station")
+
+
+def test_4b_tong_quan_dieu_kien_doc_hien_hanh_bo_ghi_chu_doc_ap_dinh_chinh(conn, batch):
+    from kome import doi_thu_giao as G
+    _dk(conn, batch, 9301, date(2026, 9, 5), "THAK", "ship", "freeship >= 30,000", "d-1")
+    _dk(conn, batch, 9301, date(2026, 9, 5), "THAK", "ghi_chu_doc", "chép vào ghi_chu", "d-2")
+    _dk(conn, batch, 9301, date(2026, 9, 5), "THAK", "khac", "nghỉ Obon", "d-3")
+    fid = conn.execute("SELECT id FROM core.fact_dieu_kien_doi_thu WHERE ma_dong='d-1'").fetchone()[0]
+    G.sua_dieu_kien(conn, fact_id=fid, ma_doi_thu="THAK", loai="ship", noi_dung="freeship >= 25,000", bo=False, nguoi=None)
+    G.sua_dieu_kien(conn, fact_id=None, ma_doi_thu="THAK", loai="thanh_toan", noi_dung="Chuyển khoản", bo=False, nguoi=None)
+    conn.commit()
+    dk = {d["noi_dung"]: d for d in DT.tong_quan(conn)["dieu_kien"]}
+    assert set(dk) == {"freeship >= 25,000", "Chuyển khoản"}               # bỏ ghi_chu_doc (068) và 'khac' (Tổng quan)
+    s = dk["freeship >= 25,000"]
+    assert (s["id"], s["fact_id"], s["them_tay"], s["ben"], s["loai"]) == (fid, fid, False, "THAK", "ship")
+    nk = dict(conn.execute("SELECT doi_tuong, max(id) FROM app.doi_thu_nhat_ky GROUP BY 1").fetchall())
+    assert s["sua_cuoi"] == nk[f"dk:{fid}"]
+    tay = dk["Chuyển khoản"]
+    assert tay["them_tay"] is True and tay["fact_id"] is None and tay["id"] < 0 and tay["sua_cuoi"] == nk["dk:tay:THAK"]
+
+
+def test_4b_ho_so_ben_giao_hang_sua_cuoi_ben_dieu_kien_va_gia_kome_so(conn, batch):
+    from tests.test_mart_doi_thu import _bang_gia
+    from tests.test_doi_thu_giao import _nap
+    from kome import doi_thu_giao as G
+    _ba_ben(conn, batch)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)                        # NT01 chưa 荷姿: kg_02 = 20 × 0,5 = 10 kg
+    _nap(conn, batch, "THAK", phi_ship=605)
+    _dk(conn, batch, 9302, date(2026, 9, 5), "THAK", "khac", "nghỉ Obon", "d-1")
+    h = DT.ho_so_ben(conn, "THAK")
+    assert h["giao_hang"]["ma_doi_thu"] == "THAK" and h["giao_hang"]["phi_ship"] == 605
+    assert h["sua_cuoi_ben"] == 0
+    assert [(d["loai"], d["noi_dung"], d["them_tay"]) for d in h["dieu_kien"]] == [("khac", "nghỉ Obon", False)]
+    assert isinstance(h["dieu_kien"][0]["id"], int) and h["dieu_kien"][0]["sua_cuoi"] == 0
+    assert h["quan_sat"] and all(q["gia_kome_so"] == round(4900 / 1.08 / 10) for q in h["quan_sat"])
+    G.sua_giao_hang(conn, "THAK", {"phi_ship": "600"}, None)
+    conn.execute("INSERT INTO app.doi_thu_nhat_ky (loai, doi_tuong) VALUES ('doi_thu', 'ben:THAK')")
+    conn.commit()
+    h = DT.ho_so_ben(conn, "THAK")
+    assert h["sua_cuoi_ben"] == conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong='ben:THAK'").fetchone()[0]
+    assert h["giao_hang"]["phi_ship"] == 600
+    assert DT.ho_so_ben(conn, "HSC")["giao_hang"] is None                 # bên chưa có lô / sửa giao hàng → null
+
+
+def test_4b_mat_hang_doc_ca_dong_lich_su_va_lich_su_sua_moi_nhat_truoc(conn, batch, monkeypatch):
+    _hang(conn, batch)
+    cu = _qs(conn, batch, "THAK", 540, hang="h1", ngay=date(2026, 7, 1))
+    moi = _qs(conn, batch, "THAK", 560, hang="h1", ngay=date(2026, 8, 1))
+    nd = _nguoi(conn)
+    DT.sua(conn, cu, {"gia_goc": "545"}, nd)
+    DT.dat_ghep(conn, "THAK", "h1", "NT01", None, "cung_hang", None)
+    DT.sua(conn, moi, {"gia_goc": "565"}, None)                           # khoá của dòng KHÁC — không vào lịch sử của `cu`
+    conn.commit()
+    dem = _dem(conn, monkeypatch)
+    m = DT.mat_hang(conn, "nap", cu)
+    assert dem["n"] == 1
+    monkeypatch.undo()
+    q = m["quan_sat"]
+    assert q["id"] == cu and q["hien_hanh"] is False and q["bat_thuong"] is False and q["gia_goc"] == 545
+    assert _QS_4B <= set(q)
+    ls = m["lich_su"]
+    assert [x["doi_tuong"] for x in ls] == ["THAK/h1", f"gia:{cu}"]
+    assert set(ls[0]) >= {"id", "loai", "ai", "luc", "truoc", "sau"}
+    assert ls[0]["id"] > ls[1]["id"] and ls[1]["ai"] == "lan" and ls[0]["ai"] is None
+    assert q["sua_cuoi"] == ls[0]["id"]
+    assert DT.mat_hang(conn, "nap", moi)["quan_sat"]["hien_hanh"] is True
+    assert DT.mat_hang(conn, "nap", 999999) is None
+    with pytest.raises(DT.LoiNhap):
+        DT.mat_hang(conn, "xyz", cu)
+
+
+def test_4b_mat_hang_dong_tay_theo_khoa_tay(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.commit()
+    m = DT.mat_hang(conn, "tay", tid)
+    assert m["quan_sat"]["nguon"] == "tay" and m["quan_sat"]["hien_hanh"] is True
+    assert [x["doi_tuong"] for x in m["lich_su"]] == [f"tay:{tid}"]
+
+
+def test_4b_lich_su_nhieu_khoa_toi_da_5_va_50_dong(conn, batch):
+    for i in range(55):
+        conn.execute("INSERT INTO app.doi_thu_nhat_ky (loai, doi_tuong) VALUES ('giao_hang', %s)", (f"giao:{'AB'[i % 2]}",))
+    conn.commit()
+    ls = DT.lich_su(conn, ["giao:A", "giao:B"])
+    assert len(ls) == 50 and [x["id"] for x in ls] == sorted((x["id"] for x in ls), reverse=True)
+    assert DT.lich_su(conn, ["giao:C"]) == []
+    for sai in (["a"] * 6, [], ["x" * 301], "giao:A", [1]):
+        with pytest.raises(DT.LoiNhap):
+            DT.lich_su(conn, sai)

@@ -266,3 +266,27 @@ def test_dieu_kien_quay_ve_moc(conn, batch):
     conn.execute("SELECT set_config('kome.moc', '2026-08-31', true)")
     assert [r[0] for r in conn.execute("SELECT noi_dung FROM mart.dieu_kien_hien_hanh WHERE ma_doi_thu='YUMI'")] == ["cũ"]
     conn.rollback()
+
+
+# ---------------------------------------------------------------- đợt 4b — đọc cho tab Phí & giao hàng
+
+def test_4b_giao_hang_mot_luot_kome_dau_kem_sua_cuoi_va_bang_chung(conn, batch, monkeypatch):
+    _nap(conn, batch, "IMAI", phi_ship=605)
+    G.sua_giao_hang(conn, "IMAI", {"phi_ship": "600"}, None)
+    conn.commit()
+    dem = {"n": 0}
+    that = conn.execute
+
+    def demo(*a, **k):
+        dem["n"] += 1
+        return that(*a, **k)
+    monkeypatch.setattr(conn, "execute", demo)
+    d = G.giao_hang(conn)
+    assert dem["n"] == 1
+    monkeypatch.undo()
+    assert set(d) == {"dong", "bang_chung"}
+    assert d["dong"][0]["ma_doi_thu"] == "KOME" and d["dong"][0]["sua_cuoi"] == 0
+    imai = next(x for x in d["dong"] if x["ma_doi_thu"] == "IMAI")
+    assert imai["phi_ship"] == 600
+    assert imai["sua_cuoi"] == conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong='giao:IMAI'").fetchone()[0]
+    assert set(d["bang_chung"]) == {"so_don_ship", "don_ship_lon_nhat", "so_don_dai_330", "so_don_dai_300"}

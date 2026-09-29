@@ -437,7 +437,32 @@ _COT_QS = """ma_doi_thu, ten_doi_thu, nguon, id, ma_hang_dt, ngay_nguon, hinh_th
              ten_goc, quy_cach_goc, gia_goc, don_vi_gia, kg_moi_don_vi_gia, thue, gom_ship, kenh_gia, muc_gia,
              gia_bac, gia_truoc_km, trang_thai, khuyen_mai, loai_nguon, ghi_chu, ma_kome, nhan, nhom_khoa,
              ten_nhom, trang_thai_duyet, round(yen_chuan) AS yen_chuan, don_vi_so, nen_gia, tuoi_ngay, bat_thuong,
-             thang_lo, lien_ket_thu_muc, web_ben, lien_ket_bang_chung"""
+             thang_lo, lien_ket_thu_muc, web_ben, lien_ket_bang_chung,
+             so_goi_thung, kl_goi_g, bac, kg_thung_dt, round(gia_goi) AS gia_goi, round(gia_thung) AS gia_thung,
+             round(gia_1) AS gia_1, round(gia_5) AS gia_5, round(gia_10) AS gia_10, round(gia_pallet) AS gia_pallet,
+             coalesce((SELECT max(nk_.nk_id) FROM (SELECT id AS nk_id, doi_tuong AS nk_dt FROM app.doi_thu_nhat_ky) nk_
+                       WHERE nk_.nk_dt IN (CASE nguon WHEN 'nap' THEN 'gia:' ELSE 'tay:' END || id,
+                                           ma_doi_thu || '/' || ma_hang_dt)), 0) AS sua_cuoi"""
+# sua_cuoi (đợt 4b): lần ghi nhật ký MỚI NHẤT trên khoá của chính quan sát — 'gia:<id>' (dòng nạp: xác nhận / sửa) hoặc
+# 'tay:<id>' (dòng tay), và '<bên>/<hàng>' (ghép); 0 = chưa ai sửa. Pop-up gửi lại số này để chống sửa đè. Cột nhật ký
+# đổi tên trong bảng dẫn xuất (nk_id / nk_dt): `_COT_QS` dùng tên cột TRẦN của quan sát (nguon, id, …) ở mọi câu gọi, mà
+# `id` trần bên trong một FROM app.doi_thu_nhat_ky sẽ trỏ vào id của NHẬT KÝ. Chỉ mục (doi_tuong, id DESC): 069.
+_COT_QS_KHONG_BT = _COT_QS.replace(", bat_thuong", "")      # quan sát lịch sử (không hiện hành) không có bat_thuong
+assert "bat_thuong" not in _COT_QS_KHONG_BT
+
+
+def _sua_cuoi(khoa_sql: str) -> str:
+    """Biểu thức SQL: max(id) nhật ký của MỘT khoá (0 khi chưa có) — khoá viết đủ bí danh, không dùng tên trần."""
+    return f"coalesce((SELECT max(nkx_.id) FROM app.doi_thu_nhat_ky nkx_ WHERE nkx_.doi_tuong = {khoa_sql}), 0)"
+
+
+def _dieu_kien_json(a: str) -> str:
+    """Một điều kiện của mart.dieu_kien_hien_hanh (bí danh `a`) -> JSON. sua_cuoi theo khoá ghi của
+    doi_thu_giao.sua_dieu_kien: 'dk:<fact_id>' (điều kiện đã nạp), 'dk:tay:<bên>' (dòng thêm tay — MỘT khoá chung cho
+    mọi dòng tay của bên đó)."""
+    khoa = f"CASE WHEN {a}.them_tay THEN 'dk:tay:' || {a}.ma_doi_thu ELSE 'dk:' || {a}.fact_id END"
+    return (f"json_build_object('id', {a}.id, 'fact_id', {a}.fact_id, 'ben', {a}.ma_doi_thu, 'loai', {a}.loai, "
+            f"'noi_dung', {a}.noi_dung, 'ngay', {a}.ngay_nguon, 'them_tay', {a}.them_tay, 'sua_cuoi', {_sua_cuoi(khoa)})")
 
 NGAY_HIEN_TRUONG = 30       # cửa sổ "hiện trường" của Tổng quan
 NGAY_TIN_KHACH = 90         # cửa sổ tin của khách / của đối thủ (mặc định của đặc tả §6: "chỉ tính 90 ngày")
@@ -456,10 +481,7 @@ _KE_DA_NHOM = "(loai_nguon = 'khach_ke' AND nhom_khoa IS NOT NULL)"
 
 
 _TONG_QUAN = f"""
-WITH h AS MATERIALIZED (SELECT * FROM mart.gia_doi_thu_hien_hanh),
-dk0 AS (SELECT * FROM core.fact_dieu_kien_doi_thu WHERE mart.moc_lui() IS NULL OR ngay_nguon <= mart.moc_lui()),
-dk AS (SELECT DISTINCT f.ma_doi_thu, f.loai, f.noi_dung, f.ngay_nguon      -- chỉ gói MỚI NHẤT của từng bên
-       FROM dk0 f WHERE f.ngay_nguon = (SELECT max(g.ngay_nguon) FROM dk0 g WHERE g.ma_doi_thu = f.ma_doi_thu))
+WITH h AS MATERIALIZED (SELECT * FROM mart.gia_doi_thu_hien_hanh)
 SELECT json_build_object(
   'ben', (SELECT coalesce(json_agg(json_build_object('ma', d.ma, 'ten', d.ten, 'web', d.web,
             'ngay_moi', x.ngay_moi, 'hinh_thuc', x.hinh_thuc, 'so_dong', coalesce(x.so_dong, 0),
@@ -473,12 +495,16 @@ SELECT json_build_object(
             SELECT h.ma_doi_thu, mart.ten_nganh(p.food_category_name) nganh, count(DISTINCT h.ma_hang_dt) n
             FROM h JOIN core.dim_product p ON p.product_code = h.ma_kome GROUP BY 1, 2) z),
   'khuyen_mai', (SELECT coalesce(json_agg(json_build_object('ben', ma_doi_thu, 'ten_goc', ten_goc, 'gia_goc', gia_goc,
-            'gia_truoc_km', gia_truoc_km, 'khuyen_mai', khuyen_mai, 'ngay', ngay_nguon) ORDER BY ma_doi_thu, ten_goc), '[]')
+            'gia_truoc_km', gia_truoc_km, 'khuyen_mai', khuyen_mai, 'ngay', ngay_nguon,
+            'nguon', nguon, 'id', id, 'ma_hang_dt', ma_hang_dt, 'ma_doi_thu', ma_doi_thu) ORDER BY ma_doi_thu, ten_goc), '[]')
           FROM h WHERE gia_truoc_km IS NOT NULL OR nullif(khuyen_mai, '') IS NOT NULL),
-  'dieu_kien', (SELECT coalesce(json_agg(json_build_object('ben', ma_doi_thu, 'loai', loai, 'noi_dung', noi_dung,
-            'ngay', ngay_nguon) ORDER BY ma_doi_thu, loai), '[]') FROM dk WHERE loai <> 'khac'),
+  -- Điều kiện HIỆN HÀNH (068: lô mới nhất của bên ≤ mốc, bỏ 'ghi_chu_doc', áp sửa / bỏ, cộng dòng thêm tay); Tổng quan bỏ 'khac'.
+  'dieu_kien', (SELECT coalesce(json_agg({_dieu_kien_json('d')} ORDER BY d.ma_doi_thu, d.loai, d.id), '[]')
+          FROM (SELECT id, fact_id, ma_doi_thu, loai, noi_dung, ngay_nguon, them_tay FROM mart.dieu_kien_hien_hanh
+                WHERE loai <> 'khac') d),
   'het_hang', (SELECT coalesce(json_agg(json_build_object('ben', ma_doi_thu, 'ten_goc', ten_goc, 'ma_kome', ma_kome,
-            'ten_nhom', ten_nhom, 'trang_thai', trang_thai) ORDER BY ten_nhom, ma_doi_thu), '[]')
+            'ten_nhom', ten_nhom, 'trang_thai', trang_thai, 'nguon', nguon, 'id', id, 'ma_hang_dt', ma_hang_dt,
+            'ma_doi_thu', ma_doi_thu, 'ten_doi_thu', ten_doi_thu) ORDER BY ten_nhom, ma_doi_thu), '[]')
           FROM h WHERE trang_thai IN ('het', 'sap_ve') AND ma_kome IS NOT NULL),
   'hien_truong', (
     WITH tx AS MATERIALIZED (
@@ -520,6 +546,9 @@ SELECT coalesce(json_agg(json_build_object(
          'gia_kome', round(s.gia_kome), 'so_ben', s.so_ben, 'thap_nhat', round(s.thap_nhat), 'ben_thap_nhat', s.ben_thap_nhat,
          'trung_vi', round(s.trung_vi::numeric), 'cao_nhat', round(s.cao_nhat), 'ty_le_re_hon_kome', s.ty_le_re_hon_kome,
          'nganh', s.nganh,
+         'gia_kome_chuan', round(s.gia_kome_chuan), 'gia_kome_bang', s.gia_kome_bang, 'gia_kome_km', round(s.gia_kome_km),
+         'gia_kome_so', round(s.gia_kome_so), 'lech_trung_vi', s.lech_trung_vi, 'gia_kome_lech', s.gia_kome_lech,
+         'kome_kg_goi', s.kome_kg_goi, 'kome_goi_thung', s.kome_goi_thung, 'kome_kg_thung', s.kome_kg_thung,
          'quan_sat', (SELECT coalesce(json_agg(to_json(h) ORDER BY h.yen_chuan NULLS LAST), '[]') FROM h
                       WHERE h.nhom_khoa = s.nhom_khoa AND h.don_vi_so = s.don_vi_so))
        ORDER BY s.so_ben DESC, s.ten_nhom), '[]')
@@ -552,13 +581,16 @@ def nhom_va_quy_cach(conn) -> dict:
     return conn.execute(_NHOM_QUY_CACH).fetchone()[0]
 
 
+# gia_kome_so của nhóm từng quan sát: mart.so_sanh_nhom (view nặng) đọc MỘT lần qua CTE MATERIALIZED, không mỗi dòng.
 _HO_SO = f"""
+WITH ss AS MATERIALIZED (SELECT nhom_khoa, don_vi_so, gia_kome_so FROM mart.so_sanh_nhom)
 SELECT (SELECT to_json(d) FROM app.doi_thu d WHERE d.ma = %(ma)s),
-       (SELECT coalesce(json_agg(json_build_object('loai', loai, 'noi_dung', noi_dung, 'ngay', ngay_nguon)
-                ORDER BY ngay_nguon DESC), '[]') FROM core.fact_dieu_kien_doi_thu WHERE ma_doi_thu = %(ma)s
-                AND (mart.moc_lui() IS NULL OR ngay_nguon <= mart.moc_lui())),
+       (SELECT coalesce(json_agg({_dieu_kien_json('d')} ORDER BY d.ngay_nguon DESC, d.loai, d.id), '[]')
+          FROM mart.dieu_kien_hien_hanh d WHERE d.ma_doi_thu = %(ma)s),
        (SELECT coalesce(json_agg(to_json(q) ORDER BY q.ten_goc, q.ngay_nguon DESC), '[]')
-          FROM (SELECT {_COT_QS.replace(', bat_thuong', '')}, hien_hanh FROM mart.gia_doi_thu_quan_sat LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
+          FROM (SELECT {_COT_QS_KHONG_BT}, hien_hanh, round(ss.gia_kome_so) AS gia_kome_so
+                FROM mart.gia_doi_thu_quan_sat LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
+                LEFT JOIN ss USING (nhom_khoa, don_vi_so)
                 WHERE ma_doi_thu = %(ma)s) q),
        (SELECT coalesce(json_agg(json_build_object(
                   'tiep_xuc_id', t.id, 'ma_khach', t.customer_code, 'ten_khach', t.ten_khach, 'ngay', t.ngay,
@@ -578,16 +610,75 @@ SELECT (SELECT to_json(d) FROM app.doi_thu d WHERE d.ma = %(ma)s),
                 WHERE (n.thoi_diem AT TIME ZONE 'Asia/Tokyo')::date > %(hom_nay)s::date - {NGAY_TIN_KHACH}
                   AND EXISTS (SELECT 1 FROM app.tiep_xuc_nhac z
                               WHERE z.tiep_xuc_id = n.id AND z.loai = 'doi_thu' AND z.khoa = %(ma)s)
-                ORDER BY n.thoi_diem DESC, n.id DESC LIMIT 100) t)
+                ORDER BY n.thoi_diem DESC, n.id DESC LIMIT 100) t),
+       (SELECT to_json(g) FROM (SELECT gh.*, {_sua_cuoi("'giao:' || gh.ma_doi_thu")} AS sua_cuoi
+                                FROM mart.giao_hang_hien_hanh gh WHERE gh.ma_doi_thu = %(ma)s) g),
+       {_sua_cuoi("'ben:' || %(ma)s")}
 """
 
 
 def ho_so_ben(conn, ma: str, hom_nay=None) -> dict | None:
     """Hồ sơ một đối thủ. `khach_dang_mua` (đợt 2): tin `@` NGAY_TIN_KHACH ngày qua nhắc bên này — mỗi phần tử là
     MỘT lần tiếp xúc (khách + tên hiện hành, các nhóm được nhắc, giá khách kể cho CHÍNH bên này). Theo đồng hồ thật
-    giờ Tokyo (`hom_nay_o_nhat`), không theo mốc dữ liệu — xem `tong_quan`. Vẫn MỘT lượt hỏi."""
-    ben, dk, qs, kh = conn.execute(_HO_SO, {"ma": ma, "hom_nay": hom_nay or hom_nay_o_nhat()}).fetchone()
-    return None if ben is None else {"ben": ben, "dieu_kien": dk, "quan_sat": qs, "khach_dang_mua": kh}
+    giờ Tokyo (`hom_nay_o_nhat`), không theo mốc dữ liệu — xem `tong_quan`. Vẫn MỘT lượt hỏi.
+    Đợt 4b: `dieu_kien` = mart.dieu_kien_hien_hanh của bên (kèm id / fact_id / them_tay / sua_cuoi); mỗi quan sát mang
+    `gia_kome_so` của nhóm nó (null nếu không có); `giao_hang` = dòng mart.giao_hang_hien_hanh của bên (kèm sua_cuoi
+    theo khoá 'giao:<bên>') hoặc null; `sua_cuoi_ben` = max nhật ký 'ben:<mã>' (0 = chưa sửa)."""
+    ben, dk, qs, kh, gh, scb = conn.execute(_HO_SO, {"ma": ma, "hom_nay": hom_nay or hom_nay_o_nhat()}).fetchone()
+    return None if ben is None else {"ben": ben, "dieu_kien": dk, "quan_sat": qs, "khach_dang_mua": kh,
+                                     "giao_hang": gh, "sua_cuoi_ben": scb}
+
+
+KHOA_LICH_SU_TOI_DA = 5
+LICH_SU_TOI_DA = 50
+
+
+def _lich_su_sql(khoa_sql: str) -> str:
+    """Lịch sử sửa (mới nhất trước, ≤ LICH_SU_TOI_DA dòng) của các khoá nhật ký `khoa_sql` (biểu thức text[]).
+    `ai` = tên người phụ trách của tài khoản, không có thì tên đăng nhập (cùng nếp khach_doi_thu; app.nguoi_dung không
+    có cột tên hiển thị); null = ghi từ script / máy không có cổng đăng nhập."""
+    return f"""(SELECT coalesce(json_agg(json_build_object('id', nk.id, 'loai', nk.loai, 'doi_tuong', nk.doi_tuong,
+                    'ai', coalesce(sp.ten, nd.ten_dang_nhap), 'luc', nk.luc, 'truoc', nk.truoc, 'sau', nk.sau)
+                    ORDER BY nk.id DESC), '[]')
+                FROM (SELECT * FROM app.doi_thu_nhat_ky WHERE doi_tuong = ANY({khoa_sql})
+                      ORDER BY id DESC LIMIT {LICH_SU_TOI_DA}) nk
+                LEFT JOIN app.nguoi_dung nd ON nd.id = nk.nguoi_dung_id
+                LEFT JOIN core.dim_salesperson sp ON sp.salesperson_code = nd.salesperson_code)"""
+
+
+def lich_su(conn, khoa: list[str]) -> list:
+    """Lịch sử sửa của 1–KHOA_LICH_SU_TOI_DA khoá nhật ký ('gia:<id>', 'giao:<bên>', …). Đọc tươi, MỘT lượt hỏi."""
+    if (not isinstance(khoa, list) or not 1 <= len(khoa) <= KHOA_LICH_SU_TOI_DA
+            or any(not isinstance(k, str) or not 1 <= len(k) <= DAI_TOI_DA for k in khoa)):
+        raise LoiNhap(f"Cần 1–{KHOA_LICH_SU_TOI_DA} khoá, mỗi khoá 1–{DAI_TOI_DA} ký tự.")
+    return conn.execute(f"SELECT {_lich_su_sql('%(khoa)s')}", {"khoa": khoa}).fetchone()[0]
+
+
+# Một mặt hàng cho pop-up sửa: đọc mart.gia_doi_thu_quan_sat (KHÔNG chỉ hiện hành — sửa được cả dòng lịch sử);
+# bat_thuong chỉ có nghĩa với dòng hiện hành (lấy từ mart.gia_doi_thu_hien_hanh), dòng lịch sử = false.
+_MAT_HANG = f"""
+WITH q AS MATERIALIZED (
+    SELECT {_COT_QS_KHONG_BT}, hien_hanh FROM mart.gia_doi_thu_quan_sat LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
+    WHERE nguon = %(nguon)s AND id = %(id)s)
+SELECT (SELECT to_json(x) FROM (
+          SELECT q.*, CASE WHEN q.hien_hanh THEN coalesce((SELECT h.bat_thuong FROM mart.gia_doi_thu_hien_hanh h
+                                                           WHERE h.nguon = q.nguon AND h.id = q.id), false)
+                           ELSE false END AS bat_thuong FROM q) x),
+       {_lich_su_sql("ARRAY(SELECT v.k FROM q CROSS JOIN LATERAL (VALUES "
+                     "(CASE q.nguon WHEN 'nap' THEN 'gia:' ELSE 'tay:' END || q.id), "
+                     "(q.ma_doi_thu || '/' || q.ma_hang_dt)) v(k))")}
+"""
+
+
+def mat_hang(conn, nguon: str, id: int) -> dict | None:
+    """{"quan_sat", "lich_su"} của MỘT quan sát (nguồn 'nap' | 'tay'); None = không có (hoặc sau mốc). MỘT lượt hỏi.
+    Lịch sử theo khoá của chính dòng: 'gia:<id>' / 'tay:<id>' và '<bên>/<hàng>' (ghép)."""
+    if nguon not in ("nap", "tay"):
+        raise LoiNhap("Nguồn chỉ nhận nap / tay.")
+    if not 0 < int(id) < 2 ** 63:                            # ngoài bigint: không có dòng nào (không để CSDL nổ 500)
+        return None
+    qs, ls = conn.execute(_MAT_HANG, {"nguon": nguon, "id": int(id)}).fetchone()
+    return None if qs is None else {"quan_sat": qs, "lich_su": ls}
 
 
 _DUYET = f"""

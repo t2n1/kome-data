@@ -113,6 +113,23 @@ def sua_giao_hang(conn, ma_doi_thu: str, thay_doi: dict, nguoi) -> None:
     _ghi_nhat_ky(conn, "giao_hang", f"giao:{ma_doi_thu}", None, {t: _chu(v) for t, v in sach.items()}, nguoi)
 
 
+_GIAO_HANG = """
+SELECT json_build_object(
+  'dong', (SELECT coalesce(json_agg(x ORDER BY x.thu_tu, x.ma_doi_thu), '[]')
+           FROM (SELECT g.*, coalesce((SELECT max(nk.id) FROM app.doi_thu_nhat_ky nk
+                                       WHERE nk.doi_tuong = 'giao:' || g.ma_doi_thu), 0) AS sua_cuoi
+                 FROM mart.giao_hang_hien_hanh g) x),
+  'bang_chung', (SELECT to_json(b) FROM mart.giao_hang_kome_bang_chung b))
+"""
+
+
+def giao_hang(conn) -> dict:
+    """Tab Phí & giao hàng: `dong` = mart.giao_hang_hien_hanh (KOME đứng đầu — thu_tu 0) kèm `sua_cuoi` (max nhật ký
+    'giao:<bên>', 0 = chưa sửa; pop-up gửi lại để chống sửa đè), `bang_chung` = dòng duy nhất của
+    mart.giao_hang_kome_bang_chung. MỘT lượt hỏi."""
+    return conn.execute(_GIAO_HANG).fetchone()[0]
+
+
 def sua_dieu_kien(conn, *, fact_id, ma_doi_thu: str, loai: str, noi_dung: str, bo: bool, nguoi) -> int:
     """Sửa / bỏ một điều kiện đã nạp (fact_id), hoặc thêm tay (fact_id None). Bỏ dòng thêm tay = gọi lại với bo=True
     và CÙNG (ma_doi_thu, loai, noi_dung) — xem mart.dieu_kien_hien_hanh (068)."""

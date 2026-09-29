@@ -3796,6 +3796,7 @@
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -3830,6 +3831,7 @@
       "mart.cong_no_phieu",
       "mart.doanh_thu_12t",
       "mart.dong_ban",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_360",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
@@ -3886,6 +3888,7 @@
       "kome/cong_no.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -3929,6 +3932,7 @@
       "mart.ben_tra_cua_khach",
       "mart.cong_no_ben_tra",
       "mart.cong_no_phieu",
+      "mart.dieu_kien_hien_hanh",
       "mart.doanh_thu_12t",
       "mart.dong_ban",
       "mart.dong_ban_khoang",
@@ -3936,6 +3940,8 @@
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_bang",
       "mart.gia_kome_kg",
+      "mart.giao_hang_hien_hanh",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_360",
       "mart.khach_khoang",
       "mart.khach_mat_hang",
@@ -4022,13 +4028,14 @@
      "he": "customer_code",
      "ja": "得意先コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 71 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 72 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -4077,6 +4084,7 @@
       "mart.gia_doi_thu_hien_hanh",
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_kg",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_360",
       "mart.khach_khoang",
       "mart.khach_mat_hang",
@@ -4217,11 +4225,12 @@
      "he": "product_code",
      "ja": "商品コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 34 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 35 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
@@ -4251,6 +4260,7 @@
       "mart.dong_ban",
       "mart.dong_ban_khoang",
       "mart.gia_kome_kg",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
       "mart.khach_mat_hang_khoang",
@@ -4413,6 +4423,7 @@
       "kome/bao_cao.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -4455,6 +4466,7 @@
       "mart.dong_ban",
       "mart.dong_ban_khoang",
       "mart.gia_kome_kg",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_360",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
@@ -4497,13 +4509,14 @@
      "he": "tax_amount",
      "ja": "消費税額",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 45 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 46 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -4546,6 +4559,7 @@
       "mart.dong_ban",
       "mart.dong_ban_khoang",
       "mart.gia_kome_kg",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_360",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
@@ -7197,6 +7211,7 @@
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
@@ -7226,6 +7241,7 @@
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_bang",
       "mart.gia_kome_kg",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
       "mart.khach_mat_hang_khoang",
@@ -7247,11 +7263,12 @@
      "he": "product_name",
      "ja": "商品名",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.gia_doi_thu_hien_hanh, mart.gia_doi_thu_quan_sat và 12 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.gia_doi_thu_hien_hanh, mart.gia_doi_thu_quan_sat và 13 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
@@ -7279,6 +7296,7 @@
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_bang",
       "mart.gia_kome_kg",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
       "mart.khach_mat_hang_khoang",
@@ -7317,11 +7335,12 @@
      "he": "kind_code",
      "ja": "種別コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 10 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 11 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
@@ -7345,6 +7364,7 @@
       "mart.ban_theo_nganh_thang",
       "mart.ban_theo_nganh_thang_so_sanh",
       "mart.ban_theo_san_pham",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
       "mart.khach_mat_hang_khoang",
@@ -10579,6 +10599,7 @@
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -10613,6 +10634,7 @@
       "mart.cong_no_phieu",
       "mart.doanh_thu_12t",
       "mart.dong_ban",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_360",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
@@ -10648,6 +10670,7 @@
       "kome/cong_no.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -10691,6 +10714,7 @@
       "mart.ben_tra_cua_khach",
       "mart.cong_no_ben_tra",
       "mart.cong_no_phieu",
+      "mart.dieu_kien_hien_hanh",
       "mart.doanh_thu_12t",
       "mart.dong_ban",
       "mart.dong_ban_khoang",
@@ -10698,6 +10722,8 @@
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_bang",
       "mart.gia_kome_kg",
+      "mart.giao_hang_hien_hanh",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_360",
       "mart.khach_khoang",
       "mart.khach_mat_hang",
@@ -10764,13 +10790,14 @@
      "he": "customer_code",
      "ja": "得意先コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 71 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 72 chỉ số khác",
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -10819,6 +10846,7 @@
       "mart.gia_doi_thu_hien_hanh",
       "mart.gia_doi_thu_quan_sat",
       "mart.gia_kome_kg",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_360",
       "mart.khach_khoang",
       "mart.khach_mat_hang",
@@ -10918,11 +10946,12 @@
      "he": "product_code",
      "ja": "商品コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 34 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 35 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/khach_hang.py",
       "kome/khoi_tong_quan.py",
       "kome/lien_he.py",
@@ -10952,6 +10981,7 @@
       "mart.dong_ban",
       "mart.dong_ban_khoang",
       "mart.gia_kome_kg",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
       "mart.khach_mat_hang_khoang",
@@ -11094,6 +11124,7 @@
       "kome/bao_cao.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
+      "kome/doi_thu_giao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
       "kome/khach_thang.py",
@@ -11136,6 +11167,7 @@
       "mart.dong_ban",
       "mart.dong_ban_khoang",
       "mart.gia_kome_kg",
+      "mart.giao_hang_kome_bang_chung",
       "mart.khach_360",
       "mart.khach_mat_hang",
       "mart.khach_mat_hang_cua",
@@ -12170,12 +12202,8 @@
      "ja": "ma_dong",
      "loai": "nap",
      "ly_do": "khoá của file",
-     "ma": [
-      "kome/doi_thu.py"
-     ],
-     "man": [
-      "doi_thu"
-     ],
+     "ma": [],
+     "man": [],
      "view": []
     },
     {
@@ -12183,7 +12211,7 @@
      "he": "ma_doi_thu",
      "ja": "ma_doi_thu",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/doi_thu_giao.py",
+     "ly_do": "màn hình đọc qua mart.dieu_kien_hien_hanh",
      "ma": [
       "kome/doi_thu.py",
       "kome/doi_thu_giao.py"
@@ -12191,7 +12219,9 @@
      "man": [
       "doi_thu"
      ],
-     "view": []
+     "view": [
+      "mart.dieu_kien_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_dieu_kien_doi_thu.ngay_nguon",
@@ -12205,34 +12235,28 @@
      "man": [
       "doi_thu"
      ],
-     "view": []
+     "view": [
+      "mart.dieu_kien_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_dieu_kien_doi_thu.nguon_file",
      "he": "nguon_file",
      "ja": "nguon_file",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py",
-     "ma": [
-      "kome/doi_thu.py"
-     ],
-     "man": [
-      "doi_thu"
-     ],
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
      "view": []
     },
     {
      "core": "core.fact_dieu_kien_doi_thu.vi_tri",
      "he": "vi_tri",
      "ja": "vi_tri",
-     "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py",
-     "ma": [
-      "kome/doi_thu.py"
-     ],
-     "man": [
-      "doi_thu"
-     ],
+     "loai": "luu",
+     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
+     "ma": [],
+     "man": [],
      "view": []
     },
     {
@@ -12240,7 +12264,7 @@
      "he": "loai",
      "ja": "loai",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/doi_thu_giao.py",
+     "ly_do": "màn hình đọc qua mart.dieu_kien_hien_hanh",
      "ma": [
       "kome/doi_thu.py",
       "kome/doi_thu_giao.py"
@@ -12248,14 +12272,16 @@
      "man": [
       "doi_thu"
      ],
-     "view": []
+     "view": [
+      "mart.dieu_kien_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_dieu_kien_doi_thu.noi_dung",
      "he": "noi_dung",
      "ja": "noi_dung",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/doi_thu_giao.py",
+     "ly_do": "màn hình đọc qua mart.dieu_kien_hien_hanh",
      "ma": [
       "kome/doi_thu.py",
       "kome/doi_thu_giao.py"
@@ -12263,7 +12289,9 @@
      "man": [
       "doi_thu"
      ],
-     "view": []
+     "view": [
+      "mart.dieu_kien_hien_hanh"
+     ]
     }
    ],
    "ja": "Điều kiện bán của đối thủ",
@@ -12279,19 +12307,33 @@
      "ja": "ma_dong",
      "loai": "nap",
      "ly_do": "khoá của file",
-     "ma": [],
-     "man": [],
-     "view": []
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.ma_doi_thu",
      "he": "ma_doi_thu",
      "ja": "ma_doi_thu",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.ngay_nguon",
@@ -12299,179 +12341,305 @@
      "ja": "ngay_nguon",
      "loai": "nap",
      "ly_do": "ngày bắt buộc đọc được (cổng 3)",
-     "ma": [],
-     "man": [],
-     "view": []
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.bao_ship",
      "he": "bao_ship",
      "ja": "bao_ship",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.phi_ship",
      "he": "phi_ship",
      "ja": "phi_ship",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.phi_ship_theo",
      "he": "phi_ship_theo",
      "ja": "phi_ship_theo",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.mien_ship_tu",
      "he": "mien_ship_tu",
      "ja": "mien_ship_tu",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.mien_ship_kien",
      "he": "mien_ship_kien",
      "ja": "mien_ship_kien",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.thung_moi_kien",
      "he": "thung_moi_kien",
      "ja": "thung_moi_kien",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.phu_phi",
      "he": "phu_phi",
      "ja": "phu_phi",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.phi_daibiki",
      "he": "phi_daibiki",
      "ja": "phi_daibiki",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.daibiki_tu",
      "he": "daibiki_tu",
      "ja": "daibiki_tu",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.daibiki_sau",
      "he": "daibiki_sau",
      "ja": "daibiki_sau",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.ck_mien_daibiki",
      "he": "ck_mien_daibiki",
      "ja": "ck_mien_daibiki",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.kien_toi_da_kg",
      "he": "kien_toi_da_kg",
      "ja": "kien_toi_da_kg",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.ghep_kien",
      "he": "ghep_kien",
      "ja": "ghep_kien",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.thue",
      "he": "thue",
      "ja": "thue",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.cach_gui",
      "he": "cach_gui",
      "ja": "cach_gui",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.nguon_chu",
      "he": "nguon_chu",
      "ja": "nguon_chu",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     },
     {
      "core": "core.fact_giao_hang_doi_thu.nguon_file",
      "he": "nguon_file",
      "ja": "nguon_file",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.giao_hang_hien_hanh",
+     "ma": [
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
+     ],
+     "man": [
+      "doi_thu"
+     ],
+     "view": [
+      "mart.giao_hang_hien_hanh"
+     ]
     }
    ],
    "ja": "Điều kiện giao hàng của đối thủ",
@@ -13000,6 +13168,9 @@
    "san_pham",
    "tong_quan"
   ],
+  "mart.dieu_kien_hien_hanh": [
+   "doi_thu"
+  ],
   "mart.doanh_thu_12t": [
    "ban_do"
   ],
@@ -13038,6 +13209,12 @@
   "mart.gia_kome_kg": [
    "doi_thu",
    "lien_he"
+  ],
+  "mart.giao_hang_hien_hanh": [
+   "doi_thu"
+  ],
+  "mart.giao_hang_kome_bang_chung": [
+   "doi_thu"
   ],
   "mart.khach_360": [
    "ban_do",

@@ -578,3 +578,52 @@ def test_066_nap_lai_CUNG_ngay_bac_bi_bo_thi_bien_mat(conn, batch):
     conn.commit()
     assert {r[0] for r in conn.execute("SELECT price_level FROM mart.gia_kome_bang WHERE product_code='NT01'")} == {"std"}
     assert [(g["bac"], g["gia"]) for g in SP360._bac_gia(conn, "NT01")] == [("標準価格", 5000)]
+
+
+# ---------------------------------------------------------------- đợt 4b — so_sanh_nhom: giá KOME để so + quy cách mã chính
+
+_COT_4B = "gia_kome_so, lech_trung_vi, gia_kome_lech, kome_kg_goi, kome_goi_thung, kome_kg_thung"
+
+
+def test_4b_so_sanh_nhom_gia_kome_so_la_chuan_va_lech_khi_qua_3_lan_trung_vi(conn, batch):
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    for ben, g in (("A", 100), ("B", 120), ("C", 140)):
+        _qs(conn, batch, ben, g)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)                         # chuẩn ¥453,7/kg > 3 × trung vị ¥120
+    so, lech, bat, kg_goi, goi_thung, kg_thung = conn.execute(
+        f"SELECT {_COT_4B} FROM mart.so_sanh_nhom WHERE nhom_khoa='ma:NT01'").fetchone()
+    chuan = 4900 / 1.08 / 10
+    assert float(so) == pytest.approx(chuan)
+    assert isinstance(lech, float) and lech == pytest.approx(chuan / 120 - 1)
+    assert bat is True
+    assert (float(kg_goi), float(goi_thung), float(kg_thung)) == (pytest.approx(0.5), 20, pytest.approx(10))
+
+
+def test_4b_gia_kome_lech_false_khi_gan_trung_vi_va_khong_co_gia_kome(conn, batch):
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _qs(conn, batch, "A", 540)
+    assert conn.execute(f"SELECT gia_kome_so, gia_kome_lech FROM mart.so_sanh_nhom WHERE nhom_khoa='ma:NT01'").fetchone() \
+        == (None, False)                                                   # chưa có giá KOME → không "lệch"
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)
+    so, lech, bat = conn.execute("SELECT gia_kome_so, lech_trung_vi, gia_kome_lech FROM mart.so_sanh_nhom "
+                                 "WHERE nhom_khoa='ma:NT01'").fetchone()
+    assert bat is False and lech == pytest.approx(4900 / 1.08 / 10 / 540 - 1)
+
+
+def test_4b_quy_cach_la_cua_ma_CHINH_ban_nhieu_kg_nhat(conn, batch):
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _hang_pack(conn, batch, "NT02", "Ca Ba sa phi le (1kg x 10 packs)", "02", 10)
+    n = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Basa') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO app.nhom_so_sanh_ma (product_code, nhom_id) VALUES ('NT01', %s), ('NT02', %s)", (n, n))
+    conn.commit()
+    _qs(conn, batch, "A", 540)
+    _mua(conn, batch, "202601010001", HOM_NAY, hang="NT02")               # NT02 bán nhiều kg nhất → mã chính
+    kg_goi, goi_thung, kg_thung = conn.execute(
+        "SELECT kome_kg_goi, kome_goi_thung, kome_kg_thung FROM mart.so_sanh_nhom WHERE nhom_khoa=%s", (f"n:{n}",)).fetchone()
+    assert (float(kg_goi), float(goi_thung), float(kg_thung)) == (pytest.approx(1), 10, pytest.approx(10))
+
+
+def test_4b_chinh_la_CTE_MATERIALIZED_tuong_minh(conn):
+    """chinh nay được đọc hai lần (bang, quy cách mã chính) → bất biến CTE-trùng."""
+    d = conn.execute("SELECT pg_get_viewdef('mart.so_sanh_nhom'::regclass)").fetchone()[0]
+    assert "chinh AS MATERIALIZED" in d

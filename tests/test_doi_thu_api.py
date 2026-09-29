@@ -17,9 +17,12 @@ def _nen(conn, batch):
 @pytest.mark.parametrize("url, tran", [("/api/doi-thu/tong-quan", 2), ("/api/doi-thu/so-sanh", 2),
                                         ("/api/doi-thu/ben/A", 2), ("/api/doi-thu/duyet?loc=bat_thuong", 2),
                                         ("/api/san-pham/NT01/doi-thu", 2), ("/api/doi-thu/goi-y-nhac", 2),
-                                        ("/api/khach-hang/K0001/doi-thu", 2)])
+                                        ("/api/khach-hang/K0001/doi-thu", 2),
+                                        ("/api/doi-thu/mat-hang/nap/{fid}", 2),
+                                        ("/api/doi-thu/lich-su?doi_tuong=gia:{fid},giao:KOME", 2),
+                                        ("/api/doi-thu/giao-hang", 2)])
 def test_ngan_sach_luot_hoi(conn, batch, test_db_url, monkeypatch, url, tran):
-    _nen(conn, batch)
+    url = url.format(fid=_nen(conn, batch)[0])
     c = _web(test_db_url)
     dem = {"n": 0}
     that = psycopg.Connection.execute
@@ -273,3 +276,35 @@ def test_nhat_ky_thao_tac_co_dong_dan_link_thu_muc(conn, batch):
     DT.dat_thu_muc(conn, "2026-07", "https://drive.google.com/t7", None)
     conn.commit()
     assert any(d.loai == "doi_thu" and "thư mục" in d.noi_dung.lower() for d in NK.dong_thoi_gian(conn))
+
+
+# ---- Đợt 4b: đọc tươi cho pop-up sửa + tab Phí & giao hàng ---------------------------------------------
+
+def test_mat_hang_200_kem_lich_su_va_404_json(conn, batch, test_db_url):
+    from kome import doi_thu as DT
+    fid = _nen(conn, batch)[0]
+    DT.sua(conn, fid, {"gia_goc": "545"}, None)
+    conn.commit()
+    c = _web(test_db_url)
+    r = c.get(f"/api/doi-thu/mat-hang/nap/{fid}")
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["quan_sat"]["id"] == fid and [x["doi_tuong"] for x in j["lich_su"]] == [f"gia:{fid}"]
+    r = c.get("/api/doi-thu/mat-hang/nap/999999")
+    assert r.status_code == 404 and r.json() == {"loi": "Không có mặt hàng này."}
+    assert c.get(f"/api/doi-thu/mat-hang/xyz/{fid}").status_code == 400
+
+
+def test_lich_su_qua_5_khoa_400_va_hinh_dang(conn, batch, test_db_url):
+    c = _web(test_db_url)
+    assert c.get("/api/doi-thu/lich-su?doi_tuong=a,b,c,d,e,f").status_code == 400
+    assert c.get("/api/doi-thu/lich-su").status_code == 400
+    r = c.get("/api/doi-thu/lich-su?doi_tuong=giao:KOME")
+    assert r.status_code == 200 and r.json() == {"lich_su": []}
+
+
+def test_giao_hang_kome_dung_dau(conn, batch, test_db_url):
+    r = _web(test_db_url).get("/api/doi-thu/giao-hang")
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["dong"][0]["ma_doi_thu"] == "KOME" and "sua_cuoi" in j["dong"][0] and "so_don_ship" in j["bang_chung"]
