@@ -1006,7 +1006,10 @@ riêng từng bên: `docs/doi-thu/so-tay-theo-ben.md`. Có test canh: `tests/tes
 (`giao_dien/src/khach/GhiTiepXuc.tsx`, logic thuần `nhac.ts`). `noi_dung` VẪN là chữ thường như gõ — câu gốc không bao giờ
 sửa, CHECK / chỉ-thêm của `app.nhat_ky_tiep_xuc` (030) không đổi. Thẻ vào `app.tiep_xuc_nhac` (CHỈ THÊM — `REVOKE UPDATE,
 DELETE` khỏi `kome_app`; vị trí lưu theo KÝ TỰ Unicode trên câu đã `strip()`, POST gửi đơn vị UTF-16 và máy chủ tự đổi).
-`@hàng` LUÔN trỏ một NHÓM (`ma:<mã>` | `n:<id>`, khoá kiểm bằng `doi_thu.KHOA_NHOM.fullmatch`). Máy KHÔNG đọc số trong câu:
+`@hàng` LUÔN trỏ một NHÓM (`ma:<mã>` | `n:<id>`, khoá kiểm bằng `doi_thu.KHOA_NHOM.fullmatch`). Khoá đã lưu
+quy về nhóm HIỆN HÀNH lúc ĐỌC bằng ĐÚNG MỘT hàm `mart.nhom_cua_khoa(khoá)` (`ma:X` mà X thuộc nhóm có tên → `n:<nhóm>`) —
+mọi chỗ gom / đếm / so thẻ hoặc giá khách kể (view quan sát, hiện trường, lý do ngừng, khách đang mua) gọi hàm đó; không tự
+viết lại CASE (thẻ `ma:X` đứng ngoài nhóm của X là giá khách kể lọt khỏi trung vị, bất thường và So sánh mà không lỗi nào nổ). Máy KHÔNG đọc số trong câu:
 giá khách kể chỉ đến từ ô giá tuỳ chọn → `app.gia_doi_thu_tay` (`loai_nguon = 'khach_ke'`, `nhom_khoa`, `ma_hang_dt =
 'ke:<khách>:<nhóm>'`), qua cùng quy đổi + bất thường của 060, KHÔNG vào trung vị; dòng tiếp xúc + thẻ + giá ghi trong MỘT
 giao dịch (`lien_he.ghi_kem_nhac`), cảnh báo lệch trung vị trả về chứ không chặn. Cửa sổ tin 90 / 30 ngày theo ĐỒNG HỒ THẬT
