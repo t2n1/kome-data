@@ -35,7 +35,7 @@ export function TabSoSanh() {
                   <th><button type="button" className="lien-ket" aria-expanded={mo === k}
                     onClick={() => datMo(mo === k ? null : k)}>{n.ten_nhom ?? n.nhom_khoa}</button></th>
                   <td>{n.gia_kome != null ? yen(n.gia_kome) + donVi(n) : "—"}</td>
-                  <td>{yen(n.thap_nhat)}{donVi(n)} <span className="nhat">{n.ben_thap_nhat}</span></td>
+                  <td>{yen(n.thap_nhat)}{donVi(n)} <span className="dt-nhat">{n.ben_thap_nhat}</span></td>
                   <td>{yen(n.trung_vi)}{donVi(n)}</td>
                   <td>{yen(n.cao_nhat)}{donVi(n)}</td>
                   <td>{n.so_ben}</td>
@@ -44,7 +44,7 @@ export function TabSoSanh() {
                 {mo === k && locQuanSat(n.quan_sat, l).map(x => (
                   <tr key={x.nguon + x.id} className={"dt-con" + (x.bat_thuong ? " bat-thuong" : "")}>
                     <td>{x.ten_doi_thu ?? x.ma_doi_thu}</td>
-                    <td colSpan={2}>{x.ten_goc} <span className="nhat">{x.quy_cach_goc}</span></td>
+                    <td colSpan={2}>{x.ten_goc} <span className="dt-nhat">{x.quy_cach_goc}</span></td>
                     <td><ONoi noi_dung={<div className="o-noi-chu">{x.nen_gia}<br />Nguồn: {x.nguon_file ?? x.loai_nguon} · {ngay(x.ngay_nguon)}{x.vi_tri ? ` · ${x.vi_tri}` : ""}</div>}>
                       {x.yen_chuan != null ? yen(x.yen_chuan) : "—"}</ONoi></td>
                     <td>{x.gia_goc != null ? `${yen(x.gia_goc)}/${x.don_vi_gia ?? "?"}` : "—"}</td>

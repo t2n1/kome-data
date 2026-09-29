@@ -23,5 +23,5 @@
 .dt-sua label{display:grid;grid-template-columns:160px minmax(0,1fr);gap:8px;margin:4px 0;font-size:.8rem}
 .dt-sua fieldset{border:1px solid var(--vien);border-radius:8px;margin:10px 0;padding:.5rem .7rem;display:flex;flex-direction:column;gap:6px;min-width:0}
 .dt-nut{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
-.nhat{color:var(--chu-nhat)}
+.dt-nhat{color:var(--chu-nhat)}
 @media (max-width:760px){.dt-duyet{grid-template-columns:minmax(0,1fr)}.dt-sua label{grid-template-columns:minmax(0,1fr)}}

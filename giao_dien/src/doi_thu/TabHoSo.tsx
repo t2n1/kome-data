@@ -36,7 +36,7 @@ export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) =
             <div className="dt-cuon">
               <table className="bang dt-bang"><thead><tr><th>Ngành</th><th>Số mã</th></tr></thead>
                 <tbody>{manh.map(x => <tr key={x.nganh}><td>{x.nganh}</td><td>{so(x.so_ma)}</td></tr>)}</tbody></table>
-            </div>) : tq.isSuccess ? <p className="nhat">Chưa ghép được mặt hàng nào với ngành của KOME.</p> : null}
+            </div>) : tq.isSuccess ? <p className="dt-nhat">Chưa ghép được mặt hàng nào với ngành của KOME.</p> : null}
           <h3>Điều kiện</h3>
           <ul className="dt-ds">{hs.dieu_kien.map((k, i) => <li key={i}>{k.loai} · {k.noi_dung} · {ngay(k.ngay)}</li>)}</ul>
           <h3>Mặt hàng ({hien.length})</h3>
@@ -44,7 +44,7 @@ export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) =
             <table className="bang dt-bang"><thead><tr><th>Hàng</th><th>Giá</th><th>¥ quy đổi</th><th>Trạng thái</th><th>Ghép KOME</th><th>Lịch sử</th></tr></thead>
               <tbody>{hien.map(x => (
                 <tr key={x.nguon + x.id}>
-                  <td>{x.ten_goc} <span className="nhat">{x.quy_cach_goc}</span></td>
+                  <td>{x.ten_goc} <span className="dt-nhat">{x.quy_cach_goc}</span></td>
                   <td>{x.gia_goc != null ? `${yen(x.gia_goc)}/${x.don_vi_gia ?? "?"}` : "—"}</td>
                   <td>{x.yen_chuan != null ? yen(x.yen_chuan) : "—"}</td>
                   <td>{NHAN_TRANG_THAI[x.trang_thai]}</td>

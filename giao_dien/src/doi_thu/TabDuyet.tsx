@@ -61,7 +61,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
       {chon && chon.nguon === "nap" && (
         <section className="dt-khoi dt-sua">
           <Khoi tieu_de={chon.ten_goc} canh_bao={loi}>
-            <p className="nhat">Nguồn: {chon.nguon_file} · {chon.vi_tri} · {ngay(chon.ngay_nguon)}{chon.ghi_chu ? ` · ${chon.ghi_chu}` : ""}</p>
+            <p className="dt-nhat">Nguồn: {chon.nguon_file} · {chon.vi_tri} · {ngay(chon.ngay_nguon)}{chon.ghi_chu ? ` · ${chon.ghi_chu}` : ""}</p>
             {TRUONG.map(([k, n]) => {
               const goc = String(chon[k] ?? ""), gt = sua[k] ?? goc, ds = CHON[k];
               const doi = (v: string) => { const { [k]: _bo, ...con } = sua; datSua(v === goc ? con : { ...con, [k]: v }); };
