@@ -161,10 +161,9 @@ KOME). Nên chưa ai tạo nhóm nào thì So sánh vẫn chạy ngay; tạo nh�
   Σ(qty × kg theo `pack_code` từ `app.quy_cach_kome`), đọc `mart.ban_den_moc` (bỏ mã nội bộ, quay về
   mốc). Tỷ số của các TỔNG (bất biến tỷ suất). Không có quy cách → NULL, không đoán.
 - **`mart.so_sanh_nhom`** — mỗi nhóm: giá KOME, số bên, thấp nhất / trung vị / cao nhất của đối thủ
-  (chỉ quan sát `hien_hanh`, `con`, cùng `don_vi_so`), vị trí của KOME (phân vị), số quan sát
-  "khách kể" tách riêng (KHÔNG trộn vào trung vị bảng giá).
+  (chỉ quan sát `hien_hanh`, không gồm hàng `het`, cùng `don_vi_so` — `sap_ve`/`khong_ro` vẫn tính vì phần lớn nguồn không ghi tồn), vị trí của KOME (phân vị), quan sát "khách kể" KHÔNG trộn vào trung vị bảng giá (cột đếm riêng: Đợt 2).
 - **Bắt giá bất thường** (MỘT định nghĩa, `mart.la_gia_bat_thuong`): quan sát lệch > 2× hoặc < 0,5×
-  trung vị của nhóm, khi nhóm có ≥ 3 bên. Quan sát bất thường → `can_xem`, không vào trung vị.
+  trung vị của nhóm, khi nhóm có ≥ 3 bên. Quan sát bất thường mang cờ `bat_thuong` (tab Duyệt lọc được), không vào thống kê của nhóm.
   Không phải lỗi thì người duyệt bấm "đúng rồi" → ra khỏi diện bất thường.
 - **Ưu tiên nguồn** khi cùng (bên, hàng) có nhiều quan sát cùng ngày: `app.loai_nguon.thu_tu` nhỏ hơn thắng.
 
