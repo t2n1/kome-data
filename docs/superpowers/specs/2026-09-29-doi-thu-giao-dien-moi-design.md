@@ -166,7 +166,7 @@ bằng MỘT nút "Lưu":
 
 | Phần | Trường | Ghi vào |
 |---|---|---|
-| So với [hàng KOME] | Cùng thương hiệu · Khác thương hiệu · **Không liên quan — bỏ khỏi nhóm** | `app.ghep_hang` (`nhan` = `cung_hang`/`thay_the`/`khong`) — đã có, `dat_ghep` |
+| So với [hàng KOME] | **Mã KOME** (ô nhập + gợi ý) · **Nhóm** (ô chọn) · Cùng thương hiệu · Khác thương hiệu · **Không liên quan — bỏ khỏi nhóm** (thay khung "Ghép với KOME" cũ của Duyệt — phán quyết B13 khi làm 4b) | `app.ghep_hang` (`nhan` = `cung_hang`/`thay_the`/`khong`, `ma_kome`, nhóm) — đã có, `dat_ghep` |
 | Tình trạng & khuyến mãi | Còn · Hết · Sắp về · ô khuyến mãi · giá trước khuyến mãi | `app.dinh_chinh_gia` (`trang_thai`, **`khuyen_mai`, `gia_truoc_km`** — thêm vào `TRUONG_SUA`) |
 | Quy cách | gói / thùng · tịnh 1 gói (g) → tự tính "1 thùng = … kg" | `app.dinh_chinh_gia` (**`so_goi_thung`, `kl_goi_g`** — §5.1) |
 | Giá | giá ĐÚNG như bảng in + đơn vị (gói / thùng / kg) + thuế + các bậc "từ [n] [thùng / kg / gói] → [giá]" (thêm / xoá bậc) | đụng vào giá thì hỏi **"Vì sao đổi giá?"**: *Máy đọc sai* → `app.dinh_chinh_gia` (`gia_goc`, `don_vi_gia`, `thue`, **`bac`**) · *Giá đã đổi* → `app.gia_doi_thu_tay` (loại nguồn bắt buộc + link bằng chứng tuỳ chọn, §11) |
