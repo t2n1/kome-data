@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from kome import doi_thu_giao as G
-from kome.doi_thu import LoiNhap
+from kome.doi_thu import LoiNhap, XungDot
 
 
 @pytest.fixture
@@ -290,3 +290,36 @@ def test_4b_giao_hang_mot_luot_kome_dau_kem_sua_cuoi_va_bang_chung(conn, batch, 
     assert imai["phi_ship"] == 600
     assert imai["sua_cuoi"] == conn.execute("SELECT max(id) FROM app.doi_thu_nhat_ky WHERE doi_tuong='giao:IMAI'").fetchone()[0]
     assert set(d["bang_chung"]) == {"so_don_ship", "don_ship_lon_nhat", "so_don_dai_330", "so_don_dai_300"}
+
+
+# ---- đợt 4b task 2: chống sửa đè (409)
+
+def _max_nk(conn):
+    return conn.execute("SELECT coalesce(max(id), 0) FROM app.doi_thu_nhat_ky").fetchone()[0]
+
+
+def test_4b2_giao_hang_va_dieu_kien_xung_dot_mac_dinh_khong_kiem(conn, batch):
+    G.sua_giao_hang(conn, "IMAI", {"phi_ship": "600"}, None)
+    G.sua_giao_hang(conn, "IMAI", {"phi_ship": "610"}, None)               # lệnh gọi cũ (không da_xem): không kiểm
+    conn.commit()
+    with pytest.raises(XungDot):
+        G.sua_giao_hang(conn, "IMAI", {"phi_ship": "620"}, None, da_xem=0)
+    conn.rollback()
+    G.sua_giao_hang(conn, "IMAI", {"phi_ship": "620"}, None, da_xem=0, ghi_de=True)
+    G.sua_giao_hang(conn, "JVB", {"phi_ship": "620"}, None, da_xem=0)       # khoá bên KHÁC: không xung đột
+    conn.commit()
+    conn.execute("""INSERT INTO core.fact_dieu_kien_doi_thu (batch_id, ma_dong, ma_doi_thu, ngay_nguon, loai, noi_dung)
+                    VALUES (%s, 'd-1', 'THAK', '2026-09-05', 'ship', 'freeship >= 30,000')""", (batch(9401),))
+    conn.commit()
+    fid = conn.execute("SELECT id FROM core.fact_dieu_kien_doi_thu").fetchone()[0]
+    kw = dict(ma_doi_thu="THAK", loai="ship", bo=False, nguoi=None)
+    G.sua_dieu_kien(conn, fact_id=fid, noi_dung="freeship >= 25,000", da_xem=0, **kw)
+    G.sua_dieu_kien(conn, fact_id=None, noi_dung="tay 1", da_xem=0, **kw)
+    conn.commit()
+    with pytest.raises(XungDot):
+        G.sua_dieu_kien(conn, fact_id=fid, noi_dung="freeship >= 20,000", da_xem=0, **kw)
+    conn.rollback()
+    with pytest.raises(XungDot):
+        G.sua_dieu_kien(conn, fact_id=None, noi_dung="tay 2", da_xem=0, **kw)
+    conn.rollback()
+    G.sua_dieu_kien(conn, fact_id=None, noi_dung="tay 2", da_xem=_max_nk(conn), **kw)

@@ -8,7 +8,7 @@ import json
 import math
 from decimal import Decimal
 
-from kome.doi_thu import LoiNhap, _ghi_nhat_ky, _so, _hai_so_le, DAI_TOI_DA
+from kome.doi_thu import LoiNhap, _ghi_nhat_ky, _so, _hai_so_le, DAI_TOI_DA, kiem_xung_dot
 
 TRUONG_GIAO_HANG = ("bao_ship", "phi_ship", "phi_ship_theo", "mien_ship_tu", "mien_ship_kien", "thung_moi_kien",
                     "phu_phi", "phi_daibiki", "daibiki_tu", "daibiki_sau", "ck_mien_daibiki", "kien_toi_da_kg",
@@ -89,9 +89,12 @@ def _chu(v) -> str:
     return str(v)
 
 
-def sua_giao_hang(conn, ma_doi_thu: str, thay_doi: dict, nguoi) -> None:
+def sua_giao_hang(conn, ma_doi_thu: str, thay_doi: dict, nguoi, da_xem=None, ghi_de: bool = False) -> None:
     """Một lần bấm Lưu ở pop-up giao hàng. ma_doi_thu 'KOME' → app.giao_hang_kome (mọi lần sửa đều đặt da_xac_nhan —
-    một người đã đặt số; khoá 'xac_nhan': True = chỉ xác nhận số suy từ phiếu bán, không đổi trường nào). Đối thủ → một dòng app.dinh_chinh_giao_hang mỗi trường đổi."""
+    một người đã đặt số; khoá 'xac_nhan': True = chỉ xác nhận số suy từ phiếu bán, không đổi trường nào). Đối thủ → một dòng app.dinh_chinh_giao_hang mỗi trường đổi.
+    Chống sửa đè (đợt 4b): `da_xem` = sua_cuoi lúc mở pop-up, khoá 'giao:<bên>' (doi_thu.kiem_xung_dot); None = không
+    kiểm (lệnh gọi cũ / script)."""
+    kiem_xung_dot(conn, [f"giao:{ma_doi_thu}"], da_xem, ghi_de)
     thay_doi = dict(thay_doi or {})
     xac_nhan = bool(thay_doi.pop("xac_nhan", False))
     if not thay_doi and not xac_nhan:
@@ -130,9 +133,17 @@ def giao_hang(conn) -> dict:
     return conn.execute(_GIAO_HANG).fetchone()[0]
 
 
-def sua_dieu_kien(conn, *, fact_id, ma_doi_thu: str, loai: str, noi_dung: str, bo: bool, nguoi) -> int:
+def khoa_dieu_kien(fact_id, ma_doi_thu: str) -> str:
+    """Khoá nhật ký của một điều kiện: 'dk:<fact_id>' (đã nạp) / 'dk:tay:<bên>' (MỌI dòng thêm tay của bên đó)."""
+    return f"dk:{fact_id}" if fact_id is not None else f"dk:tay:{ma_doi_thu}"
+
+
+def sua_dieu_kien(conn, *, fact_id, ma_doi_thu: str, loai: str, noi_dung: str, bo: bool, nguoi,
+                  da_xem=None, ghi_de: bool = False) -> int:
     """Sửa / bỏ một điều kiện đã nạp (fact_id), hoặc thêm tay (fact_id None). Bỏ dòng thêm tay = gọi lại với bo=True
-    và CÙNG (ma_doi_thu, loai, noi_dung) — xem mart.dieu_kien_hien_hanh (068)."""
+    và CÙNG (ma_doi_thu, loai, noi_dung) — xem mart.dieu_kien_hien_hanh (068). Chống sửa đè (đợt 4b): khoá
+    `khoa_dieu_kien`; `da_xem` None = không kiểm."""
+    kiem_xung_dot(conn, [khoa_dieu_kien(fact_id, ma_doi_thu)], da_xem, ghi_de)
     if loai not in LOAI_DK:
         raise LoiNhap(f"Loại điều kiện chỉ nhận {', '.join(LOAI_DK)}.")
     nd = (noi_dung or "").strip()
@@ -146,6 +157,6 @@ def sua_dieu_kien(conn, *, fact_id, ma_doi_thu: str, loai: str, noi_dung: str, b
     i = conn.execute("""INSERT INTO app.dinh_chinh_dieu_kien (fact_id, ma_doi_thu, loai, noi_dung, bo, nguoi_dung_id)
                         VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
                      (fact_id, ma_doi_thu, loai, nd, bool(bo), nguoi)).fetchone()[0]
-    _ghi_nhat_ky(conn, "dieu_kien", f"dk:{fact_id}" if fact_id is not None else f"dk:tay:{ma_doi_thu}",
+    _ghi_nhat_ky(conn, "dieu_kien", khoa_dieu_kien(fact_id, ma_doi_thu),
                  None, {"loai": loai, "noi_dung": nd, "bo": bool(bo)}, nguoi)
     return i

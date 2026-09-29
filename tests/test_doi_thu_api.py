@@ -308,3 +308,104 @@ def test_giao_hang_kome_dung_dau(conn, batch, test_db_url):
     assert r.status_code == 200, r.text
     j = r.json()
     assert j["dong"][0]["ma_doi_thu"] == "KOME" and "sua_cuoi" in j["dong"][0] and "so_don_ship" in j["bang_chung"]
+
+
+# ---- Đợt 4b task 2: ghi từ pop-up (một giao dịch, 409 chống sửa đè) -------------------------------------
+
+_POST_4B = ["/api/doi-thu/sua-mat-hang", "/api/doi-thu/giao-hang", "/api/doi-thu/dieu-kien", "/api/doi-thu/ben"]
+
+
+def _max_nk(conn):
+    return conn.execute("SELECT coalesce(max(id), 0) FROM app.doi_thu_nhat_ky").fetchone()[0]
+
+
+@pytest.mark.parametrize("url", _POST_4B)
+def test_4b2_post_chi_nhan_json_va_than_phai_la_doi_tuong(test_db_url, url):
+    c = _web(test_db_url)
+    assert c.post(url, data={"ma": "THAK"}).status_code == 415
+    for than in ([], "x", 5):
+        r = c.post(url, json=than)
+        assert r.status_code == 400 and "loi" in r.json()
+
+
+def test_4b2_sua_mat_hang_ok_tra_sua_cuoi(conn, batch, test_db_url):
+    fid = _nen(conn, batch)[0]
+    r = _web(test_db_url).post("/api/doi-thu/sua-mat-hang", json={
+        "nguon": "nap", "id": fid, "da_xem": 0, "ghi_de": False, "nhan": "khong",
+        "thay_doi": {"so_goi_thung": "20"}, "vi_sao_gia": None})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["ok"] and (j["nguon"], j["id"]) == ("nap", fid) and j["sua_cuoi"] == _max_nk(conn)
+
+
+def test_4b2_sua_mat_hang_truong_gia_khong_vi_sao_400(conn, batch, test_db_url):
+    fid = _nen(conn, batch)[0]
+    r = _web(test_db_url).post("/api/doi-thu/sua-mat-hang",
+                               json={"nguon": "nap", "id": fid, "da_xem": 0, "thay_doi": {"gia_goc": "500"}})
+    assert r.status_code == 400 and "vì sao" in r.json()["loi"]
+
+
+def test_4b2_mot_phan_hong_thi_khong_phan_nao_vao_qua_api(conn, batch, test_db_url):
+    fid = _nen(conn, batch)[0]
+    r = _web(test_db_url).post("/api/doi-thu/sua-mat-hang", json={
+        "nguon": "nap", "id": fid, "da_xem": 0, "nhan": "khong", "thay_doi": {"so_goi_thung": "1.5"}})
+    assert r.status_code == 400
+    assert conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0 and _max_nk(conn) == 0
+
+
+def test_4b2_xung_dot_409_kem_ai_luc_sau_va_khong_ghi(conn, batch, test_db_url):
+    from kome import doi_thu as DT
+    from tests.test_doi_thu import _nguoi
+    fid = _nen(conn, batch)[0]
+    DT.sua(conn, fid, {"muc_gia": "sỉ"}, _nguoi(conn))
+    conn.commit()
+    c = _web(test_db_url)
+    b = {"nguon": "nap", "id": fid, "da_xem": 0, "nhan": "khong"}
+    r = c.post("/api/doi-thu/sua-mat-hang", json=b)
+    assert r.status_code == 409, r.text
+    j = r.json()
+    assert j["loi"] == "Có người vừa sửa mục này."
+    assert j["xung_dot"]["ai"] == "lan" and j["xung_dot"]["sau"] == {"muc_gia": "sỉ"}
+    assert j["xung_dot"]["luc"][:2] == "20" and "T" in j["xung_dot"]["luc"]
+    assert conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0
+    r = c.post("/api/doi-thu/sua-mat-hang", json=b | {"ghi_de": True})
+    assert r.status_code == 200 and conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 1
+
+
+def test_4b2_giao_hang_va_dieu_kien_qua_api_409(conn, batch, test_db_url):
+    c = _web(test_db_url)
+    r = c.post("/api/doi-thu/giao-hang", json={"ma_doi_thu": "IMAI", "thay_doi": {"phi_ship": "600"}, "da_xem": 0})
+    assert r.status_code == 200 and r.json()["sua_cuoi"] == _max_nk(conn)
+    r = c.post("/api/doi-thu/giao-hang", json={"ma_doi_thu": "IMAI", "thay_doi": {"phi_ship": "610"}, "da_xem": 0})
+    assert r.status_code == 409 and r.json()["xung_dot"]["sau"] == {"phi_ship": "600.00"}
+    r = c.post("/api/doi-thu/giao-hang", json={"ma_doi_thu": "IMAI", "thay_doi": ["phi_ship"], "da_xem": 0})
+    assert r.status_code == 400
+    b = {"fact_id": None, "ma_doi_thu": "IMAI", "loai": "khac", "noi_dung": "Nghỉ Obon", "bo": False, "da_xem": 0}
+    r = c.post("/api/doi-thu/dieu-kien", json=b)
+    assert r.status_code == 200 and isinstance(r.json()["id"], int) and r.json()["sua_cuoi"] == _max_nk(conn)
+    assert c.post("/api/doi-thu/dieu-kien", json=b | {"noi_dung": "khác"}).status_code == 409
+    assert c.post("/api/doi-thu/dieu-kien", json=b | {"noi_dung": "khác", "ghi_de": True}).status_code == 200
+    assert c.post("/api/doi-thu/dieu-kien", json=b | {"loai": "la", "ghi_de": True}).status_code == 400
+
+
+@pytest.fixture
+def imai_goc(conn):
+    goc = conn.execute("SELECT ten, web, ghi_chu FROM app.doi_thu WHERE ma='IMAI'").fetchone()
+    yield
+    conn.rollback()
+    conn.execute("UPDATE app.doi_thu SET ten=%s, web=%s, ghi_chu=%s WHERE ma='IMAI'", goc)
+    conn.commit()
+
+
+def test_4b2_ben_qua_api(conn, test_db_url, imai_goc):
+    c = _web(test_db_url)
+    r = c.post("/api/doi-thu/ben", json={"ma": "IMAI", "web": "http://imai.jp", "da_xem": 0})
+    assert r.status_code == 400 and "https" in r.json()["loi"]
+    r = c.post("/api/doi-thu/ben", json={"ma": "IMAI", "web": "https://imai.jp", "ghi_chu": "x", "da_xem": 0})
+    assert r.status_code == 200 and r.json()["sua_cuoi"] == _max_nk(conn)
+    assert c.post("/api/doi-thu/ben", json={"ma": "IMAI", "web": "", "da_xem": 0}).status_code == 409
+    r = c.post("/api/doi-thu/ben", json={"ma": "IMAI", "web": "", "da_xem": _max_nk(conn)})
+    assert r.status_code == 200
+    assert conn.execute("SELECT web, ghi_chu FROM app.doi_thu WHERE ma='IMAI'").fetchone() == (None, "x")
+    assert c.get("/api/doi-thu/ben/IMAI").json()["sua_cuoi_ben"] == _max_nk(conn)
+
