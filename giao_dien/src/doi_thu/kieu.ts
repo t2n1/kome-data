@@ -76,7 +76,7 @@ export type HienTruong = { ngay: number; tong: number; doi_thu: { ma: string; te
 
 // ---- Đợt 4b — lịch sử sửa, điều kiện, phí & giao hàng (đặc tả 2026-09-29-doi-thu-dot-4b) ----
 export type LichSu = { id: number; loai: string; doi_tuong: string; ai: string | null; luc: string; truoc: unknown; sau: unknown };
-export type DieuKien = { id: number; fact_id: number | null; ben: string; loai: string; noi_dung: string; ngay: string; them_tay: boolean };
+export type DieuKien = { id: number; fact_id: number | null; ben: string; loai: string; noi_dung: string; ngay: string; them_tay: boolean; sua_cuoi: number };
 export type GiaoHang = { ma_doi_thu: string; ten: string | null; bao_ship: boolean | null; phi_ship: number | null;
   phi_ship_theo: "don" | "thung" | "kien" | null; mien_ship_tu: number | null; mien_ship_kien: number | null;
   thung_moi_kien: number | null; phu_phi: Record<string, number | "khong_nhan"> | null; phi_daibiki: number | null;

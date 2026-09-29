@@ -52,6 +52,7 @@ export default function ManDoiThu() {
   }, []);
 
   const [mo, datMo] = useState(false);
+  const dauMo = useRef<"dau" | "cuoi">("dau");   // mục nào nhận focus khi menu mở
   const nut = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const dongMenu = useCallback((tra = false) => { datMo(false); if (tra) nut.current?.focus(); }, []);
@@ -74,9 +75,9 @@ export default function ManDoiThu() {
     else if (e.key === "Home") { e.preventDefault(); d[0]?.focus(); }
     else if (e.key === "End") { e.preventDefault(); d[d.length - 1]?.focus(); }
   };
-  useEffect(() => { if (mo) muc()[0]?.focus(); }, [mo]);
+  useEffect(() => { if (mo) { const d = muc(); (dauMo.current === "cuoi" ? d[d.length - 1] : d[0])?.focus(); } }, [mo]);
 
-  const chon = (m: MucDuLieu) => { dongMenu(); doi({ tab: m.tab }); if (m.cuon) cuonToiThuMuc(); };
+  const chon = (m: MucDuLieu) => { dongMenu(true); doi({ tab: m.tab }); if (m.cuon) cuonToiThuMuc(); };
   const trongMenu = TAB_MENU.has(t.tab);
 
   return (
@@ -88,8 +89,13 @@ export default function ManDoiThu() {
         </div>
         <div className="dt-menu-goc">
           <button ref={nut} type="button" className="dt-menu-nut" aria-haspopup="menu" aria-expanded={mo}
-            aria-current={trongMenu ? "true" : undefined} onClick={() => datMo(m => !m)}
-            onKeyDown={e => { if (e.key === "ArrowDown") { e.preventDefault(); datMo(true); } }}>Dữ liệu ▾</button>
+            aria-current={trongMenu ? "true" : undefined} onClick={() => { dauMo.current = "dau"; datMo(m => !m); }}
+            onKeyDown={e => {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault(); dauMo.current = e.key === "ArrowUp" ? "cuoi" : "dau";
+                if (mo) { const d = muc(); (dauMo.current === "cuoi" ? d[d.length - 1] : d[0])?.focus(); } else datMo(true);
+              }
+            }}>Dữ liệu ▾</button>
           {mo && (
             <div ref={menu} role="menu" aria-label="Dữ liệu" className="dt-menu" onKeyDown={phimMenu}>
               {MENU.map(m => (
