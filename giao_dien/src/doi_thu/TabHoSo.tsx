@@ -36,7 +36,7 @@ export function TabHoSo({ ben, chonBen }: { ben: string; chonBen: (ma: string) =
             <div className="dt-cuon">
               <table className="bang dt-bang"><thead><tr><th>Ngành</th><th>Số mã</th></tr></thead>
                 <tbody>{manh.map(x => <tr key={x.nganh}><td>{x.nganh}</td><td>{so(x.so_ma)}</td></tr>)}</tbody></table>
-            </div>) : <p className="nhat">Chưa ghép được mặt hàng nào với ngành của KOME.</p>}
+            </div>) : tq.isSuccess ? <p className="nhat">Chưa ghép được mặt hàng nào với ngành của KOME.</p> : null}
           <h3>Điều kiện</h3>
           <ul className="dt-ds">{hs.dieu_kien.map((k, i) => <li key={i}>{k.loai} · {k.noi_dung} · {ngay(k.ngay)}</li>)}</ul>
           <h3>Mặt hàng ({hien.length})</h3>

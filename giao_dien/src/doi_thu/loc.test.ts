@@ -13,6 +13,9 @@ describe("lọc so sánh", () => {
   it("nhóm không còn quan sát nào thì ẩn", () => {
     expect(locNhom([nhom({})], { ...L, chi_xac_nhan: true })).toHaveLength(0);
   });
+  it("tìm được chữ đ", () => {
+    expect(locNhom([nhom({ ten_nhom: "Đậu hũ" })], { ...L, tim: "dau hu" })).toHaveLength(1);
+  });
   it("tìm không dấu, theo cả mã KOME", () => {
     expect(locNhom([nhom({})], { ...L, tim: "basa" })).toHaveLength(0);
     expect(locNhom([nhom({})], { ...L, tim: "ba sa" })).toHaveLength(1);
@@ -21,6 +24,9 @@ describe("lọc so sánh", () => {
   it("vị trí KOME", () => {
     expect(viTriKome(nhom({ gia_kome: 600, ty_le_re_hon_kome: 0 }))).toBe("KOME rẻ nhất");
     expect(viTriKome(nhom({ gia_kome: 600, ty_le_re_hon_kome: 0.25 }))).toBe("25% giá đối thủ rẻ hơn KOME");
+    expect(viTriKome(nhom({ gia_kome: 600, ty_le_re_hon_kome: 1 }))).toBe("KOME đắt nhất");
+    expect(viTriKome(nhom({ gia_kome: 600, ty_le_re_hon_kome: 0.004 }))).not.toContain("rẻ nhất");
+    expect(viTriKome(nhom({ gia_kome: 600, ty_le_re_hon_kome: 0.996 }))).not.toContain("đắt nhất");
     expect(viTriKome(nhom({ gia_kome: null, ty_le_re_hon_kome: null }))).toBeNull();
   });
 });

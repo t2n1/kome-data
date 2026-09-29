@@ -29,10 +29,11 @@ export function TabSoSanh() {
         <div className="dt-cuon">
           <table className="bang dt-bang">
             <thead><tr><th>Nhóm</th><th>KOME</th><th>Thấp nhất</th><th>Trung vị</th><th>Cao nhất</th><th>Số bên</th><th>Vị trí KOME</th></tr></thead>
-            <tbody>{ds.map(n => (
-              <Fragment key={n.nhom_khoa + n.don_vi_so}>
-                <tr className="dt-dong" onClick={() => datMo(mo === n.nhom_khoa ? null : n.nhom_khoa)}>
-                  <th>{n.ten_nhom ?? n.nhom_khoa}</th>
+            <tbody>{ds.map(n => { const k = n.nhom_khoa + "|" + n.don_vi_so; return (
+              <Fragment key={k}>
+                <tr className="dt-dong">
+                  <th><button type="button" className="lien-ket" aria-expanded={mo === k}
+                    onClick={() => datMo(mo === k ? null : k)}>{n.ten_nhom ?? n.nhom_khoa}</button></th>
                   <td>{n.gia_kome != null ? yen(n.gia_kome) + donVi(n) : "—"}</td>
                   <td>{yen(n.thap_nhat)}{donVi(n)} <span className="nhat">{n.ben_thap_nhat}</span></td>
                   <td>{yen(n.trung_vi)}{donVi(n)}</td>
@@ -40,7 +41,7 @@ export function TabSoSanh() {
                   <td>{n.so_ben}</td>
                   <td>{viTriKome(n) ?? "—"}</td>
                 </tr>
-                {mo === n.nhom_khoa && locQuanSat(n.quan_sat, l).map(x => (
+                {mo === k && locQuanSat(n.quan_sat, l).map(x => (
                   <tr key={x.nguon + x.id} className={"dt-con" + (x.bat_thuong ? " bat-thuong" : "")}>
                     <td>{x.ten_doi_thu ?? x.ma_doi_thu}</td>
                     <td colSpan={2}>{x.ten_goc} <span className="nhat">{x.quy_cach_goc}</span></td>
@@ -50,7 +51,7 @@ export function TabSoSanh() {
                     <td>{x.nhan === "cung_hang" ? "cùng hàng" : "thay thế"}</td>
                     <td>{NHAN_DUYET[x.trang_thai_duyet]}{x.bat_thuong ? " · bất thường" : ""}</td>
                   </tr>))}
-              </Fragment>))}</tbody>
+              </Fragment>); })}</tbody>
           </table>
         </div>
       </Khoi>

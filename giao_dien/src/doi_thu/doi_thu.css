@@ -8,7 +8,8 @@
 .dt-bang{font-variant-numeric:tabular-nums}
 .dt-bang th,.dt-bang td{text-align:left}
 .dt-o.co{background:var(--lam-nen);color:var(--lam-chu);text-align:center}
-.dt-dong{cursor:pointer}
+.dt-dong th button{text-align:left}
+.dt-ben{margin:0 0 8px}
 .dt-con td{font-size:.9em}
 .dt-con.bat-thuong td{color:var(--do-chu)}
 .dt-loc{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
