@@ -1733,7 +1733,7 @@ GRANT SELECT ON mart.giao_hang_hien_hanh, mart.giao_hang_kome_bang_chung, mart.d
 
 Kiểm tên cột của `meta.ingest_batch` (`loaded_at`, `undone_at`, `data_date`) và chữ ký `mart.la_phi_dieu_chinh` trước khi chạy: `grep -n "loaded_at\|undone_at" db/migrations/0*.sql | head`, `grep -n "FUNCTION mart.la_phi_dieu_chinh" db/migrations/*.sql`. Tên khác thì dùng tên thật.
 
-"Bỏ đi" một dòng thêm tay thì ghi dòng mới với `fact_id` NULL và `bo = true` cho cùng nội dung — view trên chưa gỡ dòng thêm tay cũ. Tránh bằng cách: `sua_dieu_kien` với dòng thêm tay nhận `fact_id = -<id thêm tay>` (id âm của view), và ghi `app.dinh_chinh_dieu_kien` một dòng `bo = true` kèm `fact_id` = NULL cùng cột mới `thay_cho` … — **không thêm cột**: dùng quy ước đơn giản, dòng thêm tay CHỈ bỏ được bằng cách ghi một dòng `fact_id = NULL, bo = true` có CÙNG `ma_doi_thu, loai, noi_dung`, và view loại mọi dòng thêm tay có một dòng `bo` cùng bộ ba đó ghi sau nó:
+Bỏ một dòng THÊM TAY: ghi một dòng `fact_id = NULL, bo = true` có CÙNG `ma_doi_thu, loai, noi_dung`; view loại mọi dòng thêm tay có dòng `bo` cùng bộ ba ghi SAU nó (không thêm cột). Nhánh `UNION ALL` thứ hai của view ở trên phải là bản dưới đây (dùng bản này, không dùng bản ngắn ở trên):
 
 ```sql
 -- thay nhánh UNION ALL thứ hai ở trên bằng:
@@ -1936,7 +1936,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
  {"ten": "KOME đơn lớn: miễn ship, daibiki 300", "dk": "<như trên>", "don": {"tien": 25000, "thung": 2, "vung": "kanto", "tra": "daibiki"}, "ra": {"ship": 0, "vung": 0, "daibiki": 300, "chua_ro": [], "khong_nhan": false}},
  {"ten": "KOME Hokkaido: phu_phi NULL → chưa rõ vùng", "dk": "<như trên>", "don": {"tien": 15000, "thung": 1, "vung": "hokkaido", "tra": "ck"}, "ra": {"ship": 500, "vung": 0, "daibiki": 0, "chua_ro": ["vùng"], "khong_nhan": false}},
  {"ten": "IMAI theo thùng dưới ngưỡng", "dk": {"bao_ship": false, "phi_ship": 605, "phi_ship_theo": "thung", "mien_ship_tu": 20000, "mien_ship_kien": null, "thung_moi_kien": null, "phu_phi": {"tohoku": 400, "hokkaido": 800}, "phi_daibiki": 440, "daibiki_tu": null, "daibiki_sau": null, "ck_mien_daibiki": true, "kien_toi_da_kg": null, "ghep_kien": null, "thue": null, "cach_gui": null},
-  "don": {"tien": 15000, "thung": 2, "vung": "tohoku", "tra": "daibiki"}, "ra": {"ship": 1210, "vung": 800, "daibiki": 440, "chua_ro": [], "khong_nhan": false}},
+  "don": {"tien": 15000, "thung": 2, "vung": "tohoku", "tra": "daibiki"}, "ra": {"ship": 1210, "vung": 400, "daibiki": 440, "chua_ro": [], "khong_nhan": false}},
  {"ten": "IMAI Kyushu không có trong phu_phi → 0", "dk": "<như IMAI>", "don": {"tien": 25000, "thung": 1, "vung": "kyushu", "tra": "ck"}, "ra": {"ship": 0, "vung": 0, "daibiki": 0, "chua_ro": [], "khong_nhan": false}},
  {"ten": "Vietnam House Okinawa không nhận", "dk": {"bao_ship": true, "phi_ship": null, "phi_ship_theo": null, "mien_ship_tu": null, "mien_ship_kien": null, "thung_moi_kien": null, "phu_phi": {"hokkaido": 1200, "okinawa": "khong_nhan"}, "phi_daibiki": 330, "daibiki_tu": null, "daibiki_sau": null, "ck_mien_daibiki": true, "kien_toi_da_kg": 25, "ghep_kien": "3–4 loại", "thue": null, "cach_gui": null},
   "don": {"tien": 15000, "thung": 1, "vung": "okinawa", "tra": "daibiki"}, "ra": {"ship": 0, "vung": 0, "daibiki": 330, "chua_ro": [], "khong_nhan": true}},
