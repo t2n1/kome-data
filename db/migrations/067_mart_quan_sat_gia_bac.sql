@@ -109,6 +109,18 @@ tay AS (
     FROM app.gia_doi_thu_tay t
 ),
 tat AS (SELECT * FROM nap UNION ALL SELECT * FROM tay),
+-- BỊ THAY (đợt 4b): khoá (nguon, id) của các dòng đã có dòng tay thay — dòng tay qua thay_cho_tay_id (sửa dòng tay =
+-- thêm dòng mới), dòng nạp qua fact_goc_id ("giá đã đổi"). Dòng thay phải ≤ mốc (cùng ngày nguồn của CTE `tay`). Tính
+-- MỘT lần, không tương quan (một lượt quét app.gia_doi_thu_tay) rồi LEFT JOIN — không phải EXISTS từng dòng.
+thay AS MATERIALIZED (
+    SELECT 'tay'::text AS nguon, t.thay_cho_tay_id AS id FROM app.gia_doi_thu_tay t
+    WHERE t.thay_cho_tay_id IS NOT NULL
+      AND (t.luc AT TIME ZONE 'Asia/Tokyo')::date <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))
+    UNION
+    SELECT 'nap'::text, t.fact_goc_id FROM app.gia_doi_thu_tay t
+    WHERE t.fact_goc_id IS NOT NULL
+      AND (t.luc AT TIME ZONE 'Asia/Tokyo')::date <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))
+),
 ghep AS (
     SELECT a.*, g.ma_doi_thu IS NOT NULL AS co_ghep,
            CASE WHEN g.ma_doi_thu IS NULL THEN a.ma_kome_de_xuat
@@ -116,15 +128,11 @@ ghep AS (
            CASE WHEN g.ma_doi_thu IS NULL THEN a.nhan_de_xuat
                 WHEN g.nhan = 'khong' THEN NULL ELSE g.nhan END         AS nhan,
            CASE WHEN g.nhan = 'khong' THEN NULL ELSE g.nhom_id END AS nhom_ghep,
-           -- BỊ THAY (đợt 4b): dòng tay có thay_cho_tay_id = dòng này (sửa dòng tay = thêm dòng mới), hoặc dòng nạp có
-           -- dòng tay fact_goc_id = nó ("giá đã đổi"). Dòng thay phải ≤ mốc (cùng ngày nguồn của CTE `tay`). Dòng bị
-           -- thay VẪN ở view (lịch sử) nhưng không bao giờ hien_hanh — kể cả khi dòng thay rơi sang phân vùng khác
-           -- (sửa kênh / mức giá): không thì hai phân vùng cùng có một "hiện hành" cho MỘT quan sát.
-           EXISTS (SELECT 1 FROM app.gia_doi_thu_tay t
-                   WHERE CASE a.nguon WHEN 'tay' THEN t.thay_cho_tay_id ELSE t.fact_goc_id END = a.id
-                     AND (t.luc AT TIME ZONE 'Asia/Tokyo')::date
-                         <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date)))  AS bi_thay
+           -- Dòng bị thay VẪN ở view (lịch sử) nhưng không bao giờ hien_hanh — kể cả khi dòng thay rơi sang phân vùng
+           -- khác (sửa kênh / mức giá): không thì hai phân vùng cùng có một "hiện hành" cho MỘT quan sát.
+           th.id IS NOT NULL AS bi_thay
     FROM tat a LEFT JOIN app.ghep_hang g USING (ma_doi_thu, ma_hang_dt)
+    LEFT JOIN thay th ON th.nguon = a.nguon AND th.id = a.id
     WHERE a.ngay_nguon <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))
 ),
 r AS (
