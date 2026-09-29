@@ -5,6 +5,7 @@ UPDATE). Mỗi lần ghi thêm một dòng app.doi_thu_nhat_ky CÙNG giao dịch
 ảnh chụp đổi nhờ dòng nhật ký (nếp 064). '' = xoá về "không ghi" (NULL ở mart.giao_hang_hien_hanh), không phải 0.
 """
 import json
+import math
 from decimal import Decimal
 
 from kome.doi_thu import LoiNhap, _ghi_nhat_ky, _so, DAI_TOI_DA
@@ -15,6 +16,14 @@ TRUONG_GIAO_HANG = ("bao_ship", "phi_ship", "phi_ship_theo", "mien_ship_tu", "mi
 VUNG = ("hokkaido", "tohoku", "kanto", "chubu", "kansai", "chugoku", "shikoku", "kyushu", "okinawa")
 _SO = {"phi_ship", "mien_ship_tu", "phi_daibiki", "daibiki_tu", "daibiki_sau", "kien_toi_da_kg"}
 _NGUYEN = {"mien_ship_kien", "thung_moi_kien"}
+# Sổ đính chính CHỈ THÊM: một dòng hỏng là hỏng vĩnh viễn — nên chặn ở cửa theo ĐÚNG cột đích (numeric(10,2) / (12,2) /
+# (8,2), integer) và view 068 còn tự bỏ qua dòng không đọc được.
+_TRAN_SO = {"phi_ship": Decimal("99999999.99"), "phi_daibiki": Decimal("99999999.99"), "daibiki_sau": Decimal("99999999.99"),
+            "mien_ship_tu": Decimal("9999999999.99"), "daibiki_tu": Decimal("9999999999.99"),
+            "kien_toi_da_kg": Decimal("999999.99")}
+_DUONG = {"kien_toi_da_kg"}     # CHECK > 0 (các số ¥ cho phép 0)
+_TRAN_NGUYEN = 10000
+_TRAN_VUNG = 9_999_999
 _BOOL = {"bao_ship", "ck_mien_daibiki"}
 _TAP = {"phi_ship_theo": ("don", "thung", "kien"), "thue": ("bao", "chua", "khong_ro")}
 LOAI_DK = ("ship", "khuyen_mai", "thanh_toan", "thue", "khac")
@@ -34,11 +43,16 @@ def _kiem_truong(t: str, v):
             raise LoiNhap(f"{t} chỉ nhận có / không.")
         return s == "true"
     if t in _SO:
-        return _so(v, t)
+        x = _so(v, t, t in _DUONG)
+        if not x.is_finite() or x > _TRAN_SO[t]:
+            raise LoiNhap(f"{t} quá lớn.")
+        return x
     if t in _NGUYEN:
         x = _so(v, t, True)
         if x != x.to_integral_value():
             raise LoiNhap(f"{t} phải là số nguyên.")
+        if x > _TRAN_NGUYEN:
+            raise LoiNhap(f"{t} tối đa {_TRAN_NGUYEN}.")
         return int(x)
     if t in _TAP:
         if v not in _TAP[t]:
@@ -46,12 +60,15 @@ def _kiem_truong(t: str, v):
         return v
     if t == "phu_phi":
         if isinstance(v, str):
+            def _cam(_c):       # NaN / Infinity / -Infinity: JSON của Python nhận, jsonb của Postgres không
+                raise ValueError(_c)
             try:
-                v = json.loads(v)
+                v = json.loads(v, parse_constant=_cam)
             except ValueError:
                 raise LoiNhap("Phụ phí vùng không đọc được.")
         if not isinstance(v, dict) or any(k not in VUNG for k in v) or any(
-                not (x == "khong_nhan" or (isinstance(x, (int, float)) and not isinstance(x, bool) and x >= 0))
+                not (x == "khong_nhan" or (isinstance(x, (int, float)) and not isinstance(x, bool)
+                                           and 0 <= x <= _TRAN_VUNG and math.isfinite(x)))
                 for x in v.values()):
             raise LoiNhap("Phụ phí vùng: mỗi vùng một số ¥ (≥ 0) hoặc 'khong_nhan'.")
         return v
@@ -71,8 +88,8 @@ def _chu(v) -> str:
 
 
 def sua_giao_hang(conn, ma_doi_thu: str, thay_doi: dict, nguoi) -> None:
-    """Một lần bấm Lưu ở pop-up giao hàng. ma_doi_thu 'KOME' → app.giao_hang_kome (khoá 'xac_nhan': True = chủ DN
-    xác nhận số suy từ phiếu bán). Đối thủ → một dòng app.dinh_chinh_giao_hang mỗi trường đổi."""
+    """Một lần bấm Lưu ở pop-up giao hàng. ma_doi_thu 'KOME' → app.giao_hang_kome (mọi lần sửa đều đặt da_xac_nhan —
+    một người đã đặt số; khoá 'xac_nhan': True = chỉ xác nhận số suy từ phiếu bán, không đổi trường nào). Đối thủ → một dòng app.dinh_chinh_giao_hang mỗi trường đổi."""
     thay_doi = dict(thay_doi or {})
     xac_nhan = bool(thay_doi.pop("xac_nhan", False))
     if not thay_doi and not xac_nhan:
@@ -80,7 +97,7 @@ def sua_giao_hang(conn, ma_doi_thu: str, thay_doi: dict, nguoi) -> None:
     sach = {t: _kiem_truong(t, v) for t, v in thay_doi.items()}
     if ma_doi_thu == "KOME":
         cu = conn.execute(f"SELECT {', '.join(sach) or 'da_xac_nhan'} FROM app.giao_hang_kome").fetchone()
-        dat = [f"{t} = %s" for t in sach] + ["sua_luc = now()", "sua_boi = %s"] + (["da_xac_nhan = true"] if xac_nhan else [])
+        dat = [f"{t} = %s" for t in sach] + ["sua_luc = now()", "sua_boi = %s", "da_xac_nhan = true"]
         conn.execute(f"UPDATE app.giao_hang_kome SET {', '.join(dat)}",
                      [json.dumps(v) if isinstance(v, dict) else v for v in sach.values()] + [nguoi])
         _ghi_nhat_ky(conn, "giao_hang", "giao:KOME", dict(zip(sach, cu)) if sach else None,
