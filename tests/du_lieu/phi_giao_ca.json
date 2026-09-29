@@ -1,0 +1,353 @@
+[
+ {
+  "ten": "KOME đơn nhỏ daibiki",
+  "dk": {
+   "bao_ship": false,
+   "phi_ship": 500,
+   "phi_ship_theo": "don",
+   "mien_ship_tu": 20000,
+   "mien_ship_kien": null,
+   "thung_moi_kien": null,
+   "phu_phi": null,
+   "phi_daibiki": 330,
+   "daibiki_tu": 20000,
+   "daibiki_sau": 300,
+   "ck_mien_daibiki": null,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": "chua",
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 15000,
+   "thung": 1,
+   "vung": "kanto",
+   "tra": "daibiki"
+  },
+  "ra": {
+   "ship": 500,
+   "vung": 0,
+   "daibiki": 330,
+   "chua_ro": [],
+   "khong_nhan": false
+  }
+ },
+ {
+  "ten": "KOME đơn lớn: miễn ship, daibiki 300",
+  "dk": {
+   "bao_ship": false,
+   "phi_ship": 500,
+   "phi_ship_theo": "don",
+   "mien_ship_tu": 20000,
+   "mien_ship_kien": null,
+   "thung_moi_kien": null,
+   "phu_phi": null,
+   "phi_daibiki": 330,
+   "daibiki_tu": 20000,
+   "daibiki_sau": 300,
+   "ck_mien_daibiki": null,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": "chua",
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 25000,
+   "thung": 2,
+   "vung": "kanto",
+   "tra": "daibiki"
+  },
+  "ra": {
+   "ship": 0,
+   "vung": 0,
+   "daibiki": 300,
+   "chua_ro": [],
+   "khong_nhan": false
+  }
+ },
+ {
+  "ten": "KOME Hokkaido: phu_phi NULL → chưa rõ vùng",
+  "dk": {
+   "bao_ship": false,
+   "phi_ship": 500,
+   "phi_ship_theo": "don",
+   "mien_ship_tu": 20000,
+   "mien_ship_kien": null,
+   "thung_moi_kien": null,
+   "phu_phi": null,
+   "phi_daibiki": 330,
+   "daibiki_tu": 20000,
+   "daibiki_sau": 300,
+   "ck_mien_daibiki": null,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": "chua",
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 15000,
+   "thung": 1,
+   "vung": "hokkaido",
+   "tra": "ck"
+  },
+  "ra": {
+   "ship": 500,
+   "vung": 0,
+   "daibiki": 0,
+   "chua_ro": [
+    "vùng"
+   ],
+   "khong_nhan": false
+  }
+ },
+ {
+  "ten": "IMAI theo thùng dưới ngưỡng",
+  "dk": {
+   "bao_ship": false,
+   "phi_ship": 605,
+   "phi_ship_theo": "thung",
+   "mien_ship_tu": 20000,
+   "mien_ship_kien": null,
+   "thung_moi_kien": null,
+   "phu_phi": {
+    "tohoku": 400,
+    "hokkaido": 800
+   },
+   "phi_daibiki": 440,
+   "daibiki_tu": null,
+   "daibiki_sau": null,
+   "ck_mien_daibiki": true,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": null,
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 15000,
+   "thung": 2,
+   "vung": "tohoku",
+   "tra": "daibiki"
+  },
+  "ra": {
+   "ship": 1210,
+   "vung": 400,
+   "daibiki": 440,
+   "chua_ro": [],
+   "khong_nhan": false
+  }
+ },
+ {
+  "ten": "IMAI Kyushu không có trong phu_phi → 0",
+  "dk": {
+   "bao_ship": false,
+   "phi_ship": 605,
+   "phi_ship_theo": "thung",
+   "mien_ship_tu": 20000,
+   "mien_ship_kien": null,
+   "thung_moi_kien": null,
+   "phu_phi": {
+    "tohoku": 400,
+    "hokkaido": 800
+   },
+   "phi_daibiki": 440,
+   "daibiki_tu": null,
+   "daibiki_sau": null,
+   "ck_mien_daibiki": true,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": null,
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 25000,
+   "thung": 1,
+   "vung": "kyushu",
+   "tra": "ck"
+  },
+  "ra": {
+   "ship": 0,
+   "vung": 0,
+   "daibiki": 0,
+   "chua_ro": [],
+   "khong_nhan": false
+  }
+ },
+ {
+  "ten": "Vietnam House Okinawa không nhận",
+  "dk": {
+   "bao_ship": true,
+   "phi_ship": null,
+   "phi_ship_theo": null,
+   "mien_ship_tu": null,
+   "mien_ship_kien": null,
+   "thung_moi_kien": null,
+   "phu_phi": {
+    "hokkaido": 1200,
+    "okinawa": "khong_nhan"
+   },
+   "phi_daibiki": 330,
+   "daibiki_tu": null,
+   "daibiki_sau": null,
+   "ck_mien_daibiki": true,
+   "kien_toi_da_kg": 25,
+   "ghep_kien": "3–4 loại",
+   "thue": null,
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 15000,
+   "thung": 1,
+   "vung": "okinawa",
+   "tra": "daibiki"
+  },
+  "ra": {
+   "ship": 0,
+   "vung": 0,
+   "daibiki": 330,
+   "chua_ro": [],
+   "khong_nhan": true
+  }
+ },
+ {
+  "ten": "Ichiba miễn khi đủ 1 kiện 2 thùng",
+  "dk": {
+   "bao_ship": false,
+   "phi_ship": null,
+   "phi_ship_theo": "kien",
+   "mien_ship_tu": null,
+   "mien_ship_kien": 1,
+   "thung_moi_kien": 2,
+   "phu_phi": null,
+   "phi_daibiki": null,
+   "daibiki_tu": null,
+   "daibiki_sau": null,
+   "ck_mien_daibiki": null,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": "bao",
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 8000,
+   "thung": 2,
+   "vung": "kanto",
+   "tra": "ck"
+  },
+  "ra": {
+   "ship": 0,
+   "vung": 0,
+   "daibiki": 0,
+   "chua_ro": [],
+   "khong_nhan": false
+  }
+ },
+ {
+  "ten": "Ichiba 1 thùng: chưa đủ kiện, phí không ghi → chưa rõ",
+  "dk": {
+   "bao_ship": false,
+   "phi_ship": null,
+   "phi_ship_theo": "kien",
+   "mien_ship_tu": null,
+   "mien_ship_kien": 1,
+   "thung_moi_kien": 2,
+   "phu_phi": null,
+   "phi_daibiki": null,
+   "daibiki_tu": null,
+   "daibiki_sau": null,
+   "ck_mien_daibiki": null,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": "bao",
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 8000,
+   "thung": 1,
+   "vung": "kanto",
+   "tra": "daibiki"
+  },
+  "ra": {
+   "ship": 0,
+   "vung": 0,
+   "daibiki": 0,
+   "chua_ro": [
+    "ship",
+    "daibiki"
+   ],
+   "khong_nhan": false
+  }
+ },
+ {
+  "ten": "Bùi Trâm phụ phí theo kiện × số kiện",
+  "dk": {
+   "bao_ship": true,
+   "phi_ship": null,
+   "phi_ship_theo": null,
+   "mien_ship_tu": null,
+   "mien_ship_kien": null,
+   "thung_moi_kien": 2,
+   "phu_phi": {
+    "kyushu": 850,
+    "hokkaido": 850
+   },
+   "phi_daibiki": null,
+   "daibiki_tu": null,
+   "daibiki_sau": null,
+   "ck_mien_daibiki": null,
+   "kien_toi_da_kg": 28,
+   "ghep_kien": null,
+   "thue": "bao",
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 15000,
+   "thung": 4,
+   "vung": "kyushu",
+   "tra": "ck"
+  },
+  "ra": {
+   "ship": 0,
+   "vung": 1700,
+   "daibiki": 0,
+   "chua_ro": [],
+   "khong_nhan": false
+  }
+ },
+ {
+  "ten": "JVB không ghi gì",
+  "dk": {
+   "bao_ship": null,
+   "phi_ship": null,
+   "phi_ship_theo": null,
+   "mien_ship_tu": null,
+   "mien_ship_kien": null,
+   "thung_moi_kien": null,
+   "phu_phi": null,
+   "phi_daibiki": null,
+   "daibiki_tu": null,
+   "daibiki_sau": null,
+   "ck_mien_daibiki": null,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": null,
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 15000,
+   "thung": 1,
+   "vung": "hokkaido",
+   "tra": "daibiki"
+  },
+  "ra": {
+   "ship": 0,
+   "vung": 0,
+   "daibiki": 0,
+   "chua_ro": [
+    "ship",
+    "vùng",
+    "daibiki"
+   ],
+   "khong_nhan": false
+  }
+ }
+]
