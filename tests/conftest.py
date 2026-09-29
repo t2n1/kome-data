@@ -36,8 +36,10 @@ SCHEMAS = ("core", "mart", "app", "meta")
 #    sau đó thấy bảng RỖNG dù migration đã chạy đúng, một lỗi trông giống hệt
 #    "migration quên INSERT" nhưng thật ra là fixture xoá mất dữ liệu tham
 #    chiếu (đã bắt được lỗi này thật khi viết test_ban_do.py).
+#  - app.loai_nguon, app.doi_thu: gieo TĨNH bởi 059 (5 loại nguồn, 21 đối thủ), bảng khác
+#    trỏ khoá ngoại vào — cùng lý do với core.dim_prefecture.
 GIU_LAI = {"meta.schema_migration", "core.dim_date", "core.dim_salesperson",
-           "core.dim_prefecture"}
+           "core.dim_prefecture", "app.loai_nguon", "app.doi_thu"}
 
 # Nhớ danh sách bảng sau lần tra đầu tiên (xem fixture `conn`).
 _TABLES: list[str] | None = None
