@@ -433,10 +433,26 @@ def test_canh_bao_khi_gia_lech_xa_trung_vi_nhom(conn, batch):
     nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
     r = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac,
                         [{"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 1400, "don_vi_gia": "kg"}])
-    assert r["canh_bao"] == ["Giá ¥1,400/kg lệch xa trung vị ¥560 của nhóm — kiểm lại đơn vị?"]
-    ok = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac,
+    assert r["canh_bao"] == ["Giá ¥1,400/kg lệch xa trung vị ¥560/kg của nhóm — kiểm lại đơn vị?"]
+    ok =LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac,
                          [{"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 600, "don_vi_gia": "kg"}])
     assert ok["canh_bao"] == []
+
+
+def test_canh_bao_in_DUNG_trung_vi_cua_bang_so_sanh(conn, batch):
+    """Câu cảnh báo in trung vị của `mart.so_sanh_nhom` (bỏ giá bất thường) — đúng số người ta thấy ở tab
+    So sánh giá. Trung vị dùng để BẮT bất thường (`trung_vi_nhom`, tính cả giá lệch) là ¥570 ở đây: in số
+    đó là hai con số cùng tên "trung vị" trên hai màn."""
+    from tests.test_mart_doi_thu import _qs
+    _nen_nhac(conn, batch)
+    for ben, g in [("A", 540), ("B", 560), ("C", 580), ("D", 1400)]:
+        _qs(conn, batch, ben, g)
+    tv = conn.execute("SELECT trung_vi FROM mart.so_sanh_nhom WHERE nhom_khoa = 'ma:NT01'").fetchone()[0]
+    assert round(tv) == 560
+    nhac = [_the(CAU, "doi_thu", "THAK", "@THAK"), _the(CAU, "nhom", "ma:NT01", "@Basa")]
+    r = LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", CAU, "", nhac,
+                        [{"ma_doi_thu": "THAK", "nhom_khoa": "ma:NT01", "gia_goc": 1400, "don_vi_gia": "kg"}])
+    assert r["canh_bao"] == ["Giá ¥1,400/kg lệch xa trung vị ¥560/kg của nhóm — kiểm lại đơn vị?"]
 
 
 def test_ghi_kem_nhac_dung_luot_hoi_canh_bao_MOT_cho_moi_gia(conn, batch, monkeypatch):

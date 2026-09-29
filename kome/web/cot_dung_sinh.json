@@ -4290,12 +4290,14 @@
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.gia_kome_kg và 4 chỉ số khác",
      "ma": [
       "kome/doi_thu.py",
+      "kome/lien_he.py",
       "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
       "chung",
       "doi_thu",
+      "lien_he",
       "san_pham"
      ],
      "view": [
@@ -10723,12 +10725,14 @@
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.gia_kome_kg và 4 chỉ số khác",
      "ma": [
       "kome/doi_thu.py",
+      "kome/lien_he.py",
       "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
       "chung",
       "doi_thu",
+      "lien_he",
       "san_pham"
      ],
      "view": [
@@ -12454,7 +12458,8 @@
    "lien_he"
   ],
   "mart.gia_kome_kg": [
-   "doi_thu"
+   "doi_thu",
+   "lien_he"
   ],
   "mart.khach_360": [
    "ban_do",
@@ -12694,7 +12699,8 @@
    "tong_quan"
   ],
   "mart.quy_cach_kome": [
-   "doi_thu"
+   "doi_thu",
+   "lien_he"
   ],
   "mart.sale_khoang": [
    "bao_cao",
@@ -12719,7 +12725,8 @@
    "tong_quan"
   ],
   "mart.so_sanh_nhom": [
-   "doi_thu"
+   "doi_thu",
+   "lien_he"
   ],
   "mart.sp_co_don": [
    "san_pham"
