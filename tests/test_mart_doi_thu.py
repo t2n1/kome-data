@@ -1,5 +1,7 @@
 """Migration 060 — chỉ số mart của Thị trường & đối thủ (đặc tả §4.4)."""
 from datetime import date
+import json
+
 import pytest
 
 from tests.test_khach_hang import _mua, HOM_NAY
@@ -252,7 +254,10 @@ def test_cot_ra_cua_quan_sat_giu_nguyen_thu_tu_060(conn):
         """SELECT column_name FROM information_schema.columns
            WHERE table_schema = 'mart' AND table_name = 'gia_doi_thu_quan_sat' ORDER BY ordinal_position""")]
     assert cols[:5] == ["nguon", "id", "batch_id", "ma_doi_thu", "ten_doi_thu"]
-    assert cols[-3:] == ["nen_gia", "hien_hanh", "tuoi_ngay"]
+    i = cols.index("tuoi_ngay")                        # cột 060 giữ thứ tự; 067 chỉ THÊM ở cuối
+    assert cols[i - 2:i + 1] == ["nen_gia", "hien_hanh", "tuoi_ngay"]
+    assert cols[i + 1:] == ["so_goi_thung", "kl_goi_g", "bac", "kg_thung_dt", "gia_goi", "gia_thung",
+                            "gia_1", "gia_5", "gia_10", "gia_pallet"]
 
 
 def test_nguon_quan_sat_thang_lo_theo_DATA_DATE_cua_lo_khong_theo_ngay_nguon(conn, batch):
@@ -414,3 +419,97 @@ def test_066_quy_cach_02_thang_00_khi_co_ca_hai_bac_gia(conn, batch):
     _gia_ngay(conn, batch, "NT01", "std", 0, 5400, date(2026, 7, 1), pack="02")
     r = conn.execute("SELECT pack_code, yen_kg FROM mart.gia_kome_bang WHERE product_code='NT01' AND price_level='std'").fetchall()
     assert len(r) == 1 and r[0][0] == "02" and float(r[0][1]) == pytest.approx(5400 / 1.08 / 10)
+
+
+# ---------------------------------------------------------------- 067 — quy cách gói + giá bậc + KOME chuẩn ở So sánh
+
+def _qs_bac(conn, batch, ben, gia_goc, don_vi, kg, bac, thue="chua", so_goi=None, kl_goi=None, muc=None):
+    b = batch(abs(hash((ben, gia_goc, str(bac)))) % 50_000 + 60_000)
+    r = conn.execute(
+        """INSERT INTO core.fact_gia_doi_thu (batch_id, ma_dong, ma_doi_thu, ma_hang_dt, ngay_nguon, hinh_thuc_nguon,
+             ten_goc, gia_goc, don_vi_gia, kg_moi_don_vi_gia, thue, gom_ship, trang_thai, ma_kome_de_xuat, nhan_de_xuat,
+             do_chac, bac, so_goi_thung, kl_goi_g, muc_gia)
+           VALUES (%s, 'x-1', %s, %s, '2026-08-20', 'file', 'Basa', %s, %s, %s, %s, 'khong_ro', 'con', 'NT01', 'cung_hang',
+                   'chac', %s, %s, %s, %s) RETURNING id""",
+        (b, ben, f"ten:basa|{ben}", gia_goc, don_vi, kg, thue, json.dumps(bac) if bac is not None else None,
+         so_goi, kl_goi, muc)).fetchone()[0]
+    conn.commit()
+    return r
+
+
+def _gia(conn, fid):
+    r = conn.execute("""SELECT gia_1, gia_5, gia_10, gia_pallet, kg_thung_dt, gia_goi, gia_thung
+                        FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s""", (fid,)).fetchone()
+    return tuple(None if x is None else float(x) for x in r)
+
+
+def test_067_gia_tai_so_luong_theo_bac_thung(conn, batch):
+    _hang(conn, batch)
+    fid = _qs_bac(conn, batch, "NEXT", 5500, "thung", 10,
+                  [{"tu": 5, "don_vi_sl": "thung", "gia": 5300, "don_vi_gia": "thung"}], so_goi=20, kl_goi=500)
+    g1, g5, g10, gp, kgt, ggoi, gth = _gia(conn, fid)
+    assert (g1, g5, g10) == (pytest.approx(550), pytest.approx(530), pytest.approx(530))
+    assert gp is None                                  # không ghi pallet → KHÔNG đoán
+    assert kgt == pytest.approx(10) and ggoi == pytest.approx(275) and gth == pytest.approx(5500)
+
+
+def test_067_bac_theo_kg_quy_ra_thung_bang_quy_cach(conn, batch):
+    _hang(conn, batch)
+    # Vietnam House: 25kg → 600/kg · 50kg → 580/kg; thùng 20 × 500g = 10 kg ⇒ 25 kg = 2,5 thùng, 50 kg = 5 thùng
+    fid = _qs_bac(conn, batch, "VH", 610, "kg", 1,
+                  [{"tu": 25, "don_vi_sl": "kg", "gia": 600, "don_vi_gia": "kg"},
+                   {"tu": 50, "don_vi_sl": "kg", "gia": 580, "don_vi_gia": "kg"}], so_goi=20, kl_goi=500)
+    g1, g5, g10, *_ = _gia(conn, fid)
+    assert (g1, g5, g10) == (pytest.approx(610), pytest.approx(580), pytest.approx(580))
+
+
+def test_067_bac_kg_khong_biet_quy_cach_thi_khong_ap_khong_doan(conn, batch):
+    _hang(conn, batch)
+    fid = _qs_bac(conn, batch, "OBA", 530, "kg", 1, [{"tu": 48, "don_vi_sl": "kg", "gia": 510, "don_vi_gia": "kg"}])
+    assert _gia(conn, fid)[:3] == (pytest.approx(530), pytest.approx(530), pytest.approx(530))
+
+
+def test_067_bac_pallet_chi_ap_cho_pallet_va_thue_chia_mot_lan(conn, batch):
+    _hang(conn, batch)
+    fid = _qs_bac(conn, batch, "A", 5400, "thung", 10,
+                  [{"tu": 1, "don_vi_sl": "pallet", "gia": 4860, "don_vi_gia": "thung"}], thue="co")
+    g1, g5, g10, gp, *_ = _gia(conn, fid)
+    assert g1 == pytest.approx(500) and g10 == pytest.approx(500) and gp == pytest.approx(450)
+
+
+def test_067_dinh_chinh_bac_va_quy_cach_thang_ban_nap(conn, batch):
+    _hang(conn, batch)
+    fid = _qs_bac(conn, batch, "NEXT", 5500, "thung", 10, None)
+    for t, v in (("bac", '[{"tu": 10, "don_vi_sl": "thung", "gia": 5000, "don_vi_gia": "thung"}]'),
+                 ("so_goi_thung", "20"), ("kl_goi_g", "500"), ("khuyen_mai", "mua 10 tặng 1")):
+        conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong, gia_tri_moi) VALUES (%s, %s, %s)", (fid, t, v))
+    conn.commit()
+    g1, g5, g10, *_ = _gia(conn, fid)
+    assert (g1, g5, g10) == (pytest.approx(550), pytest.approx(550), pytest.approx(500))
+    km, sg = conn.execute("SELECT khuyen_mai, so_goi_thung FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()
+    assert km == "mua 10 tặng 1" and sg == 20
+    conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong, gia_tri_moi) VALUES (%s, 'khuyen_mai', '')", (fid,))
+    conn.commit()
+    assert conn.execute("SELECT khuyen_mai FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()[0] is None
+
+
+def test_067_thong_ke_nhom_van_tren_gia_le(conn, batch):
+    _hang(conn, batch)
+    for ben, g in (("A", 5400), ("B", 5600), ("C", 5800)):
+        _qs_bac(conn, batch, ben, g, "thung", 10, [{"tu": 5, "don_vi_sl": "thung", "gia": 3000, "don_vi_gia": "thung"}])
+    tv = conn.execute("SELECT trung_vi FROM mart.so_sanh_nhom WHERE nhom_khoa='ma:NT01'").fetchone()[0]
+    assert float(tv) == pytest.approx(560)             # bậc 5 thùng (300/kg) KHÔNG kéo trung vị
+
+
+def test_067_so_sanh_nhom_mang_gia_kome_chuan_va_bang_va_km(conn, batch):
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _qs(conn, batch, "A", 540)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)
+    _bang_gia(conn, batch, "NT01", "01", 5130, 5540)
+    _bang_gia(conn, batch, "NT01", "10", 4500, 4860)
+    r = conn.execute("""SELECT gia_kome_chuan, gia_kome_bang, gia_kome_km, ty_le_re_hon_kome
+                        FROM mart.so_sanh_nhom WHERE nhom_khoa='ma:NT01'""").fetchone()
+    assert float(r[0]) == pytest.approx(4900 / 1.08 / 10)
+    assert set(r[1]) == {"01"}                          # std và 10 (khuyến mãi) KHÔNG vào dải giá thường
+    assert float(r[2]) == pytest.approx(450)
+    assert float(r[3]) == 0                             # A ¥540 không rẻ hơn chuẩn ¥453,7
