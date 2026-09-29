@@ -9,6 +9,8 @@
 -- (so ÷ trung vị − 1, số thực), gia_kome_lech (so > 3× hoặc < ⅓ trung vị — ĐỊNH NGHĨA MỘT LẦN của "giá KOME lệch": Tóm
 -- tắt không vẽ nhóm đó, Dữ liệu › Giá KOME lệch liệt kê; giao diện không tự tính lại), kome_kg_goi / kome_goi_thung /
 -- kome_kg_thung (mart.quy_cach_kome của mã CHÍNH — cùng mã `chinh` của bảng giá).
+-- hien_hanh (B18): mốc "bất thường" khi < 3 bên = giá KOME chuẩn của nhóm (mart.gia_lech_moc, cùng 2× / ½); khối
+-- "KOME của nhóm" dời từ so_sanh_nhom vào hien_hanh (cột nhom_*), so_sanh_nhom đọc lại.
 -- hien_hanh (đợt 4b): dòng BỊ THAY (app.gia_doi_thu_tay.thay_cho_tay_id / fact_goc_id trỏ tới nó) không bao giờ hiện
 -- hành; các dòng còn lại xếp như cũ. Dòng bị thay vẫn ở view làm lịch sử.
 
@@ -202,7 +204,24 @@ FROM k;
 DROP VIEW mart.so_sanh_nhom;
 DROP VIEW mart.gia_doi_thu_hien_hanh;
 
--- Thân = 060.
+-- "Giá bất thường" (B18, kiểm trên dữ liệu thật 2026-09-30): ngưỡng > 2× / < ½ MỐC viết ĐÚNG MỘT LẦN ở đây; hàm
+-- la_gia_bat_thuong của 060 (≥ 3 bên, mốc = trung vị) nay gọi hàm này. MỐC của một quan sát do gia_doi_thu_hien_hanh chọn.
+CREATE FUNCTION mart.gia_lech_moc(gia numeric, moc numeric) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+    SELECT coalesce(moc > 0 AND gia IS NOT NULL AND (gia > 2 * moc OR gia < 0.5 * moc), false)
+$$;
+CREATE OR REPLACE FUNCTION mart.la_gia_bat_thuong(gia numeric, trung_vi numeric, so_ben bigint) RETURNS boolean
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT coalesce(so_ben >= 3 AND mart.gia_lech_moc(gia, trung_vi), false)
+$$;
+
+-- Thân = 060, thêm (B18):
+--  * MỐC của "bất thường": nhóm ≥ 3 bên có trung vị → trung vị (như 060); không thì (< 3 bên / không trung vị) và so theo
+--    kg → giá KOME CHUẨN của nhóm (nhom_gia_kome_chuan). Đo thật: HSC ghi ¥1–15/thùng làm chỗ giữ (~20 dòng) ở nhóm 1–2
+--    bên — 060 không bắt được, thanh "−100%" đứng đầu tab Đối thủ và vào ô "Rẻ hơn KOME". Cùng ngưỡng 2× / ½
+--    (mart.gia_lech_moc). `moc_bat_thuong` / `moc_bat_thuong_la` ('trung_vi' | 'kome') = mốc đã dùng — màn in lý do.
+--    Không mốc (nhóm < 3 bên không so theo kg / KOME không có giá chuẩn) → không bao giờ bất thường.
+--  * Khối "KOME của nhóm" (dời từ so_sanh_nhom 062/066 — cần cho mốc, và so_sanh_nhom đọc lại từ đây để mart.gia_kome_kg
+--    / mart.gia_kome_bang chỉ được đánh giá MỘT lần mỗi câu): cột nhom_* giống nhau trên mọi dòng của một nhom_khoa.
 CREATE VIEW mart.gia_doi_thu_hien_hanh AS
 WITH q AS MATERIALIZED (SELECT * FROM mart.gia_doi_thu_quan_sat WHERE hien_hanh),
 tv AS (
@@ -212,23 +231,9 @@ tv AS (
     FROM q
     WHERE nhom_khoa IS NOT NULL AND yen_chuan IS NOT NULL AND trang_thai <> 'het' AND loai_nguon <> 'khach_ke'
     GROUP BY 1, 2
-)
-SELECT q.*, tv.trung_vi AS trung_vi_nhom, tv.so_ben AS so_ben_nhom,
-       q.trang_thai_duyet NOT IN ('da_xac_nhan', 'da_sua')
-         AND mart.la_gia_bat_thuong(q.yen_chuan, tv.trung_vi::numeric, tv.so_ben) AS bat_thuong
-FROM q LEFT JOIN tv USING (nhom_khoa, don_vi_so);
-
--- Thân = 062, thêm giá KOME chuẩn / bảng / khuyến mãi (066). "Vị trí" (ty_le_re_hon_kome) so với 標準価格, không có thì
--- thực bán 90 ngày. Nhóm nhiều mã: chuẩn = trung bình có trọng số kg đã bán 90 ngày (tỷ số các tổng), không mã nào
--- bán thì trung bình thường; bảng / khuyến mãi lấy của mã bán nhiều kg nhất trong nhóm.
-CREATE VIEW mart.so_sanh_nhom AS
-WITH h AS MATERIALIZED (
-    SELECT * FROM mart.gia_doi_thu_hien_hanh
-    WHERE nhom_khoa IS NOT NULL AND yen_chuan IS NOT NULL AND trang_thai <> 'het'
-      AND loai_nguon <> 'khach_ke' AND NOT bat_thuong
 ),
 thanh_vien AS (      -- mã KOME của từng nhóm: nhóm ngầm định = đúng mã đó; nhóm có tên = nhom_so_sanh_ma
-    SELECT DISTINCT nhom_khoa, substr(nhom_khoa, 4) AS product_code FROM h WHERE nhom_khoa LIKE 'ma:%'
+    SELECT DISTINCT nhom_khoa, substr(nhom_khoa, 4) AS product_code FROM q WHERE nhom_khoa LIKE 'ma:%'
     UNION
     SELECT 'n:' || nhom_id, product_code FROM app.nhom_so_sanh_ma
 ),
@@ -241,10 +246,12 @@ tv_gia AS MATERIALIZED (      -- đọc hai lần (chinh, kome) → MATERIALIZED
     FROM thanh_vien tv LEFT JOIN mart.gia_kome_kg g USING (product_code)
                        LEFT JOIN kb s ON s.product_code = tv.product_code AND s.price_level = 'std'
 ),
-chinh AS MATERIALIZED (      -- mã "chính" của nhóm: bán nhiều kg nhất (không ai bán → mã nhỏ nhất); đọc hai lần (bang, g)
+chinh AS MATERIALIZED (      -- mã "chính" của nhóm: bán nhiều kg nhất (không ai bán → mã nhỏ nhất); đọc hai lần (bang, kn)
     SELECT DISTINCT ON (nhom_khoa) nhom_khoa, product_code FROM tv_gia
     ORDER BY nhom_khoa, kg_ban DESC NULLS LAST, product_code
 ),
+-- "Vị trí" so với 標準価格, không có thì thực bán 90 ngày. Nhóm nhiều mã: chuẩn = trung bình có trọng số kg đã bán 90 ngày
+-- (tỷ số các tổng), không mã nào bán thì trung bình thường; bảng / khuyến mãi lấy của mã bán nhiều kg nhất trong nhóm.
 kome AS (
     SELECT t.nhom_khoa, array_agg(t.product_code ORDER BY t.product_code) AS ma_kome,
            sum(t.doanh_thu) / nullif(sum(t.kg_ban), 0) AS gia_kome,
@@ -263,26 +270,54 @@ bang AS (
     FROM chinh c JOIN kb b USING (product_code)
     GROUP BY c.nhom_khoa
 ),
+kn AS (
+    SELECT k.nhom_khoa, k.ma_kome, k.gia_kome, k.gia_kome_chuan, k.nganh, b.gia_kome_bang, b.km,
+           qc.kg_moi_goi, qc.goi_moi_thung, qc.kg_02
+    FROM kome k LEFT JOIN bang b USING (nhom_khoa) LEFT JOIN chinh c USING (nhom_khoa)
+                LEFT JOIN mart.quy_cach_kome qc ON qc.product_code = c.product_code
+)
+SELECT q.*, tv.trung_vi AS trung_vi_nhom, tv.so_ben AS so_ben_nhom,
+       q.trang_thai_duyet NOT IN ('da_xac_nhan', 'da_sua') AND mart.gia_lech_moc(q.yen_chuan, m.moc) AS bat_thuong,
+       m.moc AS moc_bat_thuong, m.la AS moc_bat_thuong_la,
+       kn.ma_kome AS nhom_ma_kome, kn.gia_kome AS nhom_gia_kome, kn.gia_kome_chuan AS nhom_gia_kome_chuan,
+       kn.nganh AS nhom_nganh, kn.gia_kome_bang AS nhom_gia_kome_bang, kn.km AS nhom_gia_kome_km,
+       kn.kg_moi_goi AS nhom_kome_kg_goi, kn.goi_moi_thung AS nhom_kome_goi_thung, kn.kg_02 AS nhom_kome_kg_thung
+FROM q LEFT JOIN tv USING (nhom_khoa, don_vi_so) LEFT JOIN kn USING (nhom_khoa)
+CROSS JOIN LATERAL (
+    SELECT CASE WHEN tv.so_ben >= 3 AND tv.trung_vi > 0 THEN tv.trung_vi::numeric
+                WHEN q.don_vi_so = 'kg' AND kn.gia_kome_chuan > 0 THEN kn.gia_kome_chuan END AS moc,
+           CASE WHEN tv.so_ben >= 3 AND tv.trung_vi > 0 THEN 'trung_vi'
+                WHEN q.don_vi_so = 'kg' AND kn.gia_kome_chuan > 0 THEN 'kome' END AS la
+) m;
+
+-- Thân = 062, thêm giá KOME chuẩn / bảng / khuyến mãi (066) — khối "KOME của nhóm" nay ĐỌC các cột nhom_* của
+-- gia_doi_thu_hien_hanh (B18, xem trên), không tự tính lại. Trung vị / thấp / cao nhất bỏ giá bất thường.
+CREATE VIEW mart.so_sanh_nhom AS
+WITH h AS MATERIALIZED (
+    SELECT * FROM mart.gia_doi_thu_hien_hanh
+    WHERE nhom_khoa IS NOT NULL AND yen_chuan IS NOT NULL AND trang_thai <> 'het'
+      AND loai_nguon <> 'khach_ke' AND NOT bat_thuong
+),
 g AS (
-SELECT h.nhom_khoa, max(h.ten_nhom) AS ten_nhom, h.don_vi_so, k.ma_kome,
-       CASE WHEN h.don_vi_so = 'kg' THEN k.gia_kome END                                 AS gia_kome,
+SELECT h.nhom_khoa, max(h.ten_nhom) AS ten_nhom, h.don_vi_so, h.nhom_ma_kome AS ma_kome,
+       CASE WHEN h.don_vi_so = 'kg' THEN h.nhom_gia_kome END                            AS gia_kome,
        count(DISTINCT h.ma_doi_thu)                                                     AS so_ben,
        count(*)                                                                         AS so_quan_sat,
        min(h.yen_chuan)                                                                 AS thap_nhat,
        (array_agg(h.ma_doi_thu ORDER BY h.yen_chuan))[1]                                AS ben_thap_nhat,
        percentile_cont(0.5) WITHIN GROUP (ORDER BY h.yen_chuan)                         AS trung_vi,
        max(h.yen_chuan)                                                                 AS cao_nhat,
-       CASE WHEN h.don_vi_so = 'kg' AND coalesce(k.gia_kome_chuan, k.gia_kome) IS NOT NULL
-            THEN avg((h.yen_chuan < coalesce(k.gia_kome_chuan, k.gia_kome))::int) END   AS ty_le_re_hon_kome,
-       k.nganh,
-       CASE WHEN h.don_vi_so = 'kg' THEN k.gia_kome_chuan END                           AS gia_kome_chuan,
-       CASE WHEN h.don_vi_so = 'kg' THEN b.gia_kome_bang END                            AS gia_kome_bang,
-       CASE WHEN h.don_vi_so = 'kg' AND b.km < coalesce(k.gia_kome_chuan, 'infinity') THEN b.km END AS gia_kome_km,
-       q.kg_moi_goi AS kome_kg_goi, q.goi_moi_thung AS kome_goi_thung, q.kg_02 AS kome_kg_thung
-FROM h LEFT JOIN kome k USING (nhom_khoa) LEFT JOIN bang b USING (nhom_khoa)
-       LEFT JOIN chinh c USING (nhom_khoa) LEFT JOIN mart.quy_cach_kome q ON q.product_code = c.product_code
-GROUP BY h.nhom_khoa, h.don_vi_so, k.ma_kome, k.gia_kome, k.nganh, k.gia_kome_chuan, b.gia_kome_bang, b.km,
-         q.kg_moi_goi, q.goi_moi_thung, q.kg_02
+       CASE WHEN h.don_vi_so = 'kg' AND coalesce(h.nhom_gia_kome_chuan, h.nhom_gia_kome) IS NOT NULL
+            THEN avg((h.yen_chuan < coalesce(h.nhom_gia_kome_chuan, h.nhom_gia_kome))::int) END AS ty_le_re_hon_kome,
+       h.nhom_nganh AS nganh,
+       CASE WHEN h.don_vi_so = 'kg' THEN h.nhom_gia_kome_chuan END                      AS gia_kome_chuan,
+       CASE WHEN h.don_vi_so = 'kg' THEN h.nhom_gia_kome_bang END                       AS gia_kome_bang,
+       CASE WHEN h.don_vi_so = 'kg' AND h.nhom_gia_kome_km < coalesce(h.nhom_gia_kome_chuan, 'infinity')
+            THEN h.nhom_gia_kome_km END                                                 AS gia_kome_km,
+       h.nhom_kome_kg_goi AS kome_kg_goi, h.nhom_kome_goi_thung AS kome_goi_thung, h.nhom_kome_kg_thung AS kome_kg_thung
+FROM h
+GROUP BY h.nhom_khoa, h.don_vi_so, h.nhom_ma_kome, h.nhom_gia_kome, h.nhom_nganh, h.nhom_gia_kome_chuan,
+         h.nhom_gia_kome_bang, h.nhom_gia_kome_km, h.nhom_kome_kg_goi, h.nhom_kome_goi_thung, h.nhom_kome_kg_thung
 )
 -- g.gia_kome / g.gia_kome_chuan đã NULL khi don_vi_so <> 'kg' → so cũng NULL, lech NULL, gia_kome_lech false.
 SELECT g.nhom_khoa, g.ten_nhom, g.don_vi_so, g.ma_kome, g.gia_kome, g.so_ben, g.so_quan_sat, g.thap_nhat, g.ben_thap_nhat,
@@ -295,3 +330,4 @@ FROM g CROSS JOIN LATERAL (SELECT coalesce(g.gia_kome_chuan, g.gia_kome) AS so) 
 
 GRANT SELECT ON mart.gia_doi_thu_quan_sat, mart.gia_doi_thu_hien_hanh, mart.so_sanh_nhom TO kome_app, kome_report, kome_ingest;
 GRANT EXECUTE ON FUNCTION mart.gia_bac_kg(jsonb, numeric, boolean, numeric, integer, numeric, text) TO kome_app, kome_report, kome_ingest;
+GRANT EXECUTE ON FUNCTION mart.gia_lech_moc(numeric, numeric) TO kome_app, kome_report, kome_ingest;

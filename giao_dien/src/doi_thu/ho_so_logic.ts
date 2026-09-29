@@ -3,7 +3,7 @@
 // + /api/doi-thu/tong-quan (danh sách bên, lưới ngành). Không định nghĩa chỉ số mới: % = mau.ts::phanTram.
 import { yen, so } from "../dinh_dang";
 import type { DaBo, GiaoHang, QuanSat, TongQuan } from "./kieu";
-import { LECH_NGANG, NGAY_CU, phanTram } from "./mau";
+import { LECH_NGANG, NGAY_CU, laBatThuong, phanTram } from "./mau";
 import { tenNganh } from "./nganh";
 import { lienKetAnToan, timTrongDrive } from "./nguon";
 
@@ -34,22 +34,29 @@ const cuaBang = (q: QsHs) => q.hien_hanh && q.loai_nguon !== "khach_ke";
 
 /** Một dòng của biểu đồ "Giá bên này so với KOME": quan sát HIỆN HÀNH có `gia_kome_so` (không tính khách kể — không
  *  phải bảng giá của bên), nhóm KHÔNG có giá KOME lệch (`gia_kome_lech`: > 3× / < ⅓ trung vị — cùng cờ Tóm tắt bỏ khỏi
- *  trục; vẽ nó là thanh −99% đỏ giả). p = % yen_chuan so gia_kome_so (cùng đơn vị so); p null = thiếu giá → "?". */
+ *  trục; vẽ nó là thanh −99% đỏ giả). p = % yen_chuan so gia_kome_so (cùng đơn vị so); p null = thiếu giá → "?".
+ *  `bt` = giá bất thường (mau.ts::laBatThuong, B18): có dòng kể cả khi nhóm không còn trong So sánh (gia_kome_so null — mọi
+ *  giá của nhóm đều bất thường), p = null, tro = undefined, xếp CUỐI; vẽ xám, không vào ô số. */
 export type DongHs = { q: QsHs; p: number | null; cung: boolean; het: boolean; km: boolean; cu: boolean; thueKhongRo: boolean;
-  gomShip: boolean; tro: "gia_goc" | "kl_goi_g" | undefined };
+  gomShip: boolean; tro: "gia_goc" | "kl_goi_g" | undefined; bt: boolean };
 
 export const coKm = (q: Pick<QuanSat, "khuyen_mai" | "gia_truoc_km">) => !!(q.khuyen_mai ?? "").trim() || q.gia_truoc_km != null;
 
-/** Xếp p tăng dần (bên này rẻ nhất so KOME trước); p null cuối, trong nhóm cùng p theo tên nhóm rồi tên gốc. */
+/** Dòng bất thường lên biểu đồ (xám) khi đã ghép nhóm — kể cả khi nhóm không có gia_kome_so. */
+const btVe = (q: QsHs) => laBatThuong(q) && q.nhom_khoa != null;
+
+/** Xếp p tăng dần (bên này rẻ nhất so KOME trước); p null sau, bất thường cuối cùng; trong nhóm cùng p theo tên nhóm rồi
+ *  tên gốc. */
 export function dongSoKome(qs: QsHs[]): DongHs[] {
   const thay = new Set<string>();   // một quan sát một dòng (khoá nguon + id), phòng dữ liệu lặp
-  return qs.filter(q => cuaBang(q) && q.gia_kome_so != null && !q.gia_kome_lech
+  const hang = (d: DongHs) => (d.bt ? 2 : d.p == null ? 1 : 0);
+  return qs.filter(q => cuaBang(q) && (q.gia_kome_so != null || btVe(q)) && !q.gia_kome_lech
     && !thay.has(q.nguon + q.id) && !!thay.add(q.nguon + q.id)).map(q => {
-    const p = phanTram(q.yen_chuan, q.gia_kome_so);
-    return { q, p, cung: q.nhan === "cung_hang", het: q.trang_thai === "het", km: coKm(q), cu: (q.tuoi_ngay ?? 0) > NGAY_CU,
+    const bt = laBatThuong(q), p = bt ? null : phanTram(q.yen_chuan, q.gia_kome_so);
+    return { q, p, bt, cung: q.nhan === "cung_hang", het: q.trang_thai === "het", km: coKm(q), cu: (q.tuoi_ngay ?? 0) > NGAY_CU,
       thueKhongRo: q.thue === "khong_ro", gomShip: q.gom_ship === "co",
-      tro: p != null ? undefined : q.gia_goc == null ? "gia_goc" as const : "kl_goi_g" as const };
-  }).sort((a, b) => (a.p == null ? (b.p == null ? 0 : 1) : b.p == null ? -1 : a.p - b.p)
+      tro: p != null || bt ? undefined : q.gia_goc == null ? "gia_goc" as const : "kl_goi_g" as const };
+  }).sort((a, b) => hang(a) - hang(b) || (a.p != null && b.p != null ? a.p - b.p : 0)
     || (a.q.ten_nhom ?? "").localeCompare(b.q.ten_nhom ?? "", "vi") || a.q.ten_goc.localeCompare(b.q.ten_goc, "vi"));
 }
 
@@ -67,23 +74,24 @@ export function daBoCuaBen(qs: QsHs[]): DaBo[] {
 
 export const ngoaiBieuDo = (qs: QsHs[]) => ({
   lech: demKhac(qs, q => q.gia_kome_so != null && !!q.gia_kome_lech),
-  chuaSo: demKhac(qs, q => q.gia_kome_so == null),
+  chuaSo: demKhac(qs, q => q.gia_kome_so == null && !btVe(q)),
 });
 
 export const THU_GON = 25;
-/** Thu gọn biểu đồ: nhiều hơn `n` dòng thì giữ `n` dòng |p| lớn nhất (p null — thiếu giá — xếp sau mọi p), GIỮ thứ tự p
- *  của `dong`; `an` = số dòng ẩn. */
-export function thuGon<T extends { p: number | null }>(dong: T[], n = THU_GON): { hien: T[]; an: number } {
+/** Thu gọn biểu đồ: nhiều hơn `n` dòng thì giữ `n` dòng |p| lớn nhất (p null — thiếu giá — xếp sau mọi p, giá bất thường
+ *  sau cùng), GIỮ thứ tự p của `dong`; `an` = số dòng ẩn. */
+export function thuGon<T extends { p: number | null; bt?: boolean }>(dong: T[], n = THU_GON): { hien: T[]; an: number } {
   if (dong.length <= n) return { hien: dong, an: 0 };
-  const giu = new Set(dong.map((d, i) => ({ i, k: d.p == null ? -1 : Math.abs(d.p) }))
+  const giu = new Set(dong.map((d, i) => ({ i, k: d.bt ? -2 : d.p == null ? -1 : Math.abs(d.p) }))
     .sort((a, b) => b.k - a.k || a.i - b.i).slice(0, n).map(x => x.i));
   return { hien: dong.filter((_, i) => giu.has(i)), an: dong.length - n };
 }
 
-/** Bốn ô số (nhóm giá KOME lệch KHÔNG tính — cùng tập với biểu đồ): trùng KOME = số dòng của biểu đồ; rẻ hơn KOME > 5% (p < −5); đang hết (trong các dòng trùng, như bản phác);
+/** Bốn ô số (nhóm giá KOME lệch và giá bất thường KHÔNG tính): trùng KOME = số dòng KHÔNG bất thường của biểu đồ; rẻ hơn
+ *  KOME > 5% (p < −5); đang hết (trong các dòng trùng, như bản phác);
  *  khuyến mãi = mọi dòng hiện hành có KM (cùng vị từ với tq.khuyen_mai: ghi chú KM hoặc giá trước KM), không tính khách kể. */
 export function o4(qs: QsHs[]): { trung: number; reHon: number; het: number; km: number } {
-  const d = dongSoKome(qs);
+  const d = dongSoKome(qs).filter(x => !x.bt);
   return { trung: d.length, reHon: d.filter(x => x.p != null && x.p < -LECH_NGANG).length, het: d.filter(x => x.het).length,
     km: qs.filter(q => cuaBang(q) && coKm(q)).length };
 }

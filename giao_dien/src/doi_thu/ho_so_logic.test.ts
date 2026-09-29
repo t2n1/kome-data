@@ -145,3 +145,27 @@ describe("daBoCuaBen (B15)", () => {
     expect(ds.map(x => [x.ten_goc, x.nhom_khoa, x.nhan_cu, x.sua_cuoi])).toEqual([["a", "n:1", "thay_the", 2], ["b", "ma:X", "cung_hang", 5]]);
   });
 });
+
+describe("giá bất thường trên tab Đối thủ (B18)", () => {
+  const qs = [
+    q({ yen_chuan: 1, bat_thuong: true, moc_bat_thuong: 454, moc_bat_thuong_la: "kome", ten_goc: "chỗ giữ ¥1" }),
+    q({ yen_chuan: 3, bat_thuong: true, gia_kome_so: null, nhom_khoa: "ma:X", ten_goc: "nhóm chỉ còn bất thường" }),
+    q({ yen_chuan: 3, bat_thuong: true, gia_kome_so: null, nhom_khoa: null, ten_goc: "chưa ghép" }),
+    q({ yen_chuan: 80, ten_goc: "rẻ thật" }), q({ yen_chuan: 120, ten_goc: "đắt" }),
+  ];
+  it("vẽ (xám, p null, không '?' trỏ ô) và xếp CUỐI — kể cả khi nhóm không còn giá KOME; chưa ghép thì không vẽ", () => {
+    const d = dongSoKome(qs);
+    expect(d.map(x => [x.q.ten_goc, x.p, x.bt, x.tro])).toEqual([
+      ["rẻ thật", -20, false, undefined], ["đắt", 20, false, undefined],
+      ["chỗ giữ ¥1", null, true, undefined], ["nhóm chỉ còn bất thường", null, true, undefined]]);
+  });
+  it("không vào ô số: trùng / rẻ hơn KOME chỉ đếm dòng thường", () =>
+    expect(o4(qs)).toEqual({ trung: 2, reHon: 1, het: 0, km: 0 }));
+  it("không bị đếm là 'chưa so được' khi đã vẽ; dòng chưa ghép vẫn đếm", () =>
+    expect(ngoaiBieuDo(qs)).toEqual({ lech: 0, chuaSo: 1 }));
+  it("thu gọn giữ bất thường sau cùng (dù |p| giả của nó lớn nhất)", () => {
+    const d = [{ p: -99, bt: true }, { p: 5 }, { p: null }, { p: -30 }];
+    expect(thuGon(d, 2).hien).toEqual([{ p: 5 }, { p: -30 }]);
+    expect(thuGon(d, 3).hien).toEqual([{ p: 5 }, { p: null }, { p: -30 }]);
+  });
+});

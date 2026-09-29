@@ -9,6 +9,8 @@ export type QuanSat = {
   nhan: "cung_hang" | "thay_the" | null; nhom_khoa: string | null; ten_nhom: string | null;
   trang_thai_duyet: "ai_doc" | "can_xem" | "da_xac_nhan" | "da_sua" | "nhap_tay";
   yen_chuan: number | null; don_vi_so: string; nen_gia: string; tuoi_ngay: number | null; bat_thuong?: boolean;
+  // Mốc đã dùng để bắt "bất thường" (B18, mart.gia_doi_thu_hien_hanh): trung vị nhóm ≥ 3 bên, không thì giá chuẩn KOME (¥/kg).
+  moc_bat_thuong?: number | null; moc_bat_thuong_la?: "trung_vi" | "kome" | null;
   // Liên kết nguồn (đợt 3, đặc tả §11): dòng `tay` có `thang_lo`/`lien_ket_thu_muc` = null.
   thang_lo: string | null; lien_ket_thu_muc: string | null; web_ben: string | null; lien_ket_bang_chung: string | null;
   // Đợt 4b (quy cách / bậc giá / giá theo đơn vị bán): null = chưa biết, KHÔNG phải 0.

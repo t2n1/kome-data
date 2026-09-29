@@ -1010,6 +1010,20 @@ def test_4b_ho_so_ben_quan_sat_mang_gia_kome_lech_cua_nhom(conn, batch):
     assert n["gia_kome_lech"] is True                                     # CÙNG cờ với So sánh (một định nghĩa)
 
 
+def test_B18_ho_so_ben_mang_co_bat_thuong_va_moc_cua_mart(conn, batch):
+    """Tab Đối thủ vẽ xám / không đếm dòng bất thường — /ben phải mang cờ + mốc của mart.gia_doi_thu_hien_hanh (dòng
+    lịch sử: false). Nhóm chỉ còn dòng bất thường thì so_sanh_nhom không có nhóm đó → gia_kome_so null."""
+    from tests.test_mart_doi_thu import _bang_gia
+    _hang(conn, batch)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)                         # chuẩn ≈ ¥453,7/kg
+    _qs(conn, batch, "HSC", 5, hang="h1", ngay=date(2026, 7, 1))           # lịch sử
+    _qs(conn, batch, "HSC", 1, hang="h1", ngay=date(2026, 7, 20))          # hiện hành, chỗ giữ ¥1
+    qs = sorted(DT.ho_so_ben(conn, "HSC")["quan_sat"], key=lambda q: q["ngay_nguon"])
+    assert [(q["hien_hanh"], q["bat_thuong"], q["moc_bat_thuong_la"]) for q in qs] == [(False, False, None), (True, True, "kome")]
+    assert qs[1]["moc_bat_thuong"] == 454 and qs[1]["gia_kome_so"] is None
+    assert DT.so_sanh(conn)["nhom"] == []
+
+
 def test_4b_mat_hang_doc_ca_dong_lich_su_va_lich_su_sua_moi_nhat_truoc(conn, batch, monkeypatch):
     _hang(conn, batch)
     cu = _qs(conn, batch, "THAK", 540, hang="h1", ngay=date(2026, 7, 1))

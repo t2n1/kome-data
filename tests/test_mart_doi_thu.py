@@ -554,10 +554,14 @@ def test_067_dinh_chinh_bac_hong_khong_lam_sap_view_dung_bac_nap(conn, batch):
 
 
 def test_so_sanh_nhom_tv_gia_la_CTE_MATERIALIZED_tuong_minh(conn):
-    """tv_gia được đọc hai lần (chinh, kome) → bất biến CTE-trùng: ghi `AS MATERIALIZED` tường minh."""
-    d = conn.execute("SELECT pg_get_viewdef('mart.so_sanh_nhom'::regclass)").fetchone()[0]
-    for cte in ("h", "kb", "tv_gia"):
+    """tv_gia được đọc hai lần (chinh, kome) → bất biến CTE-trùng: ghi `AS MATERIALIZED` tường minh. Từ B18 khối "KOME
+    của nhóm" ở mart.gia_doi_thu_hien_hanh; so_sanh_nhom đọc lại cột nhom_* chứ không tự đọc giá KOME lần thứ hai."""
+    d = conn.execute("SELECT pg_get_viewdef('mart.gia_doi_thu_hien_hanh'::regclass)").fetchone()[0]
+    for cte in ("q", "kb", "tv_gia"):
         assert f"{cte} AS MATERIALIZED" in d, cte
+    s = conn.execute("SELECT pg_get_viewdef('mart.so_sanh_nhom'::regclass)").fetchone()[0]
+    assert "h AS MATERIALIZED" in s
+    assert "mart.gia_kome_kg" not in s and "mart.gia_kome_bang" not in s
 
 
 def test_066_nap_lai_CUNG_ngay_bac_bi_bo_thi_bien_mat(conn, batch):
@@ -625,5 +629,79 @@ def test_4b_quy_cach_la_cua_ma_CHINH_ban_nhieu_kg_nhat(conn, batch):
 
 def test_4b_chinh_la_CTE_MATERIALIZED_tuong_minh(conn):
     """chinh nay được đọc hai lần (bang, quy cách mã chính) → bất biến CTE-trùng."""
-    d = conn.execute("SELECT pg_get_viewdef('mart.so_sanh_nhom'::regclass)").fetchone()[0]
+    d = conn.execute("SELECT pg_get_viewdef('mart.gia_doi_thu_hien_hanh'::regclass)").fetchone()[0]
     assert "chinh AS MATERIALIZED" in d
+
+
+# ---------------------------------------------------------------- B18 — mốc "bất thường" khi nhóm < 3 bên = giá KOME chuẩn
+
+def _bt(conn):
+    return {r[0]: (r[1], r[2], None if r[3] is None else float(r[3])) for r in conn.execute(
+        "SELECT ma_doi_thu, bat_thuong, moc_bat_thuong_la, moc_bat_thuong FROM mart.gia_doi_thu_hien_hanh")}
+
+
+def test_B18_nhom_duoi_3_ben_so_voi_GIA_KOME_CHUAN_cung_nguong_2_lan(conn, batch):
+    """HSC ghi ¥1–15/thùng làm chỗ giữ ở nhóm 1–2 bên: 060 không bắt (cần ≥ 3 bên). Mốc nay là giá KOME chuẩn của nhóm,
+    ngưỡng > 2× / < ½ (mart.gia_lech_moc) — ĐÚNG 2× hay ½ không bất thường; dòng bất thường ra khỏi thống kê nhóm."""
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)                         # chuẩn 4900 / 1,08 / 10 kg ≈ ¥453,7/kg
+    chuan = 4900 / 1.08 / 10
+    _qs(conn, batch, "HSC", 1)                                             # ¥1/kg — chỗ giữ
+    _qs(conn, batch, "B", 400)
+    bt = _bt(conn)
+    assert bt["HSC"][:2] == (True, "kome") and bt["HSC"][2] == pytest.approx(chuan)
+    assert bt["B"][:2] == (False, "kome")
+    so_ben, thap, tv, re = conn.execute("SELECT so_ben, thap_nhat, trung_vi, ty_le_re_hon_kome FROM mart.so_sanh_nhom "
+                                        "WHERE nhom_khoa='ma:NT01'").fetchone()
+    assert (so_ben, float(thap), float(tv), float(re)) == (1, 400, 400, 1)  # HSC không vào thấp nhất / trung vị / "rẻ hơn"
+    # Biên: đúng ½ và đúng 2× không bất thường (so_sanh bằng, cùng ngưỡng của la_gia_bat_thuong 060).
+    assert conn.execute("SELECT mart.gia_lech_moc(50, 100), mart.gia_lech_moc(200, 100), mart.gia_lech_moc(49.9, 100), "
+                        "mart.gia_lech_moc(200.1, 100), mart.gia_lech_moc(1, NULL), mart.gia_lech_moc(NULL, 100)").fetchone()         == (False, False, True, True, False, False)
+    assert conn.execute("SELECT mart.la_gia_bat_thuong(1, 100, 3), mart.la_gia_bat_thuong(1, 100, 2)").fetchone() == (True, False)
+
+
+def test_B18_du_3_ben_van_so_voi_TRUNG_VI_khong_phai_gia_KOME(conn, batch):
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)                         # ¥453,7 — 3 bên ~¥120: KOME lệch, không phải họ
+    for ben, g in (("A", 100), ("B", 120), ("C", 140)):
+        _qs(conn, batch, ben, g)
+    bt = _bt(conn)
+    assert all(v[:2] == (False, "trung_vi") for v in bt.values())
+    assert bt["A"][2] == pytest.approx(120)
+
+
+def test_B18_khong_moc_thi_khong_bat_thuong_va_xac_nhan_go_co(conn, batch):
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _qs(conn, batch, "A", 1)                                               # chưa có giá chuẩn KOME → không mốc
+    assert _bt(conn)["A"] == (False, None, None)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)
+    fid = _qs(conn, batch, "B", 2)
+    assert _bt(conn)["B"][:2] == (True, "kome")
+    conn.execute("INSERT INTO app.dinh_chinh_gia (fact_id, truong) VALUES (%s, 'xac_nhan')", (fid,))
+    conn.commit()
+    assert _bt(conn)["B"][0] is False                                       # người đã xác nhận → giá thật, không cờ
+
+
+def test_B18_nhom_khong_theo_kg_khong_so_voi_gia_KOME(conn, batch):
+    """Giá KOME chuẩn là ¥/kg: nhóm so theo đơn vị khác (thùng / gói chưa quy ra kg) không có mốc KOME."""
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)
+    _qs(conn, batch, "A", 2, kg=None)                                      # don_vi:kg — không quy được ra ¥/kg
+    assert _bt(conn)["A"] == (False, None, None)
+
+
+def test_B18_nhom_co_ten_dung_gia_chuan_CO_TRONG_SO_cua_nhom(conn, batch):
+    """Mốc của nhóm có tên = gia_kome_chuan của so_sanh_nhom (MỘT định nghĩa — cột nhom_gia_kome_chuan)."""
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _hang_pack(conn, batch, "NT02", "Ca Ba sa phi le (1kg x 10 packs)", "02", 10)
+    n = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Basa') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO app.nhom_so_sanh_ma (product_code, nhom_id) VALUES ('NT01', %s), ('NT02', %s)", (n, n))
+    conn.commit()
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)
+    _bang_gia(conn, batch, "NT02", "std", 0, 5400)
+    _qs(conn, batch, "A", 470)
+    _qs(conn, batch, "HSC", 3)
+    bt = _bt(conn)
+    chuan = conn.execute("SELECT gia_kome_chuan FROM mart.so_sanh_nhom WHERE nhom_khoa=%s", (f"n:{n}",)).fetchone()[0]
+    assert bt["HSC"][:2] == (True, "kome") and bt["HSC"][2] == pytest.approx(float(chuan))
+    assert bt["A"][0] is False

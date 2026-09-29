@@ -4,7 +4,7 @@
 // Bọc bằng chung/ONoi.tsx (`svg`) ở chỗ gọi; ở đây chỉ là NỘI DUNG.
 import { ngay, so_luong, yen } from "../dinh_dang";
 import { NHAN_GHEP, type Nhom, type QuanSat } from "./kieu";
-import { mauLech, NGAY_CU } from "./mau";
+import { laBatThuong, lyDoBatThuong, mauLech, NGAY_CU } from "./mau";
 import { daSua } from "./sua_logic";
 import { bangBac, giaKome, giaTai, LUA_CHON_GK, nhanKlGoi, pcDau, phiKome, phiMatHang, type PhiNoi, type PhiSoSanh,
   type SoLuong } from "./so_sanh_logic";
@@ -40,6 +40,7 @@ export function NoiGia({ n, q, sl, gk, phi }: { n: Nhom; q: QuanSat; sl: SoLuong
   const nhanGk = LUA_CHON_GK.find(x => x.ma === gk)?.nhan ?? gk;
   // Bật "Tính cả phí giao": bảng bậc vẫn là giá TRẦN hai phía (so trần với trần); giá kèm phí ở dòng DongPhi bên dưới.
   const pPhi = phiMatHang(n, q, sl, phi);
+  const bt = laBatThuong(q);       // B18: % in ra nhưng KHÔNG tô màu lệch
   return (
     <div className="dt-ng">
       <p className="dt-ng-ben">{q.ten_doi_thu ?? q.ma_doi_thu}</p>
@@ -64,7 +65,7 @@ export function NoiGia({ n, q, sl, gk, phi }: { n: Nhom; q: QuanSat; sl: SoLuong
             <tr key={i} className={d.dang ? "dang" : undefined}>
               <td>{d.nhan}{d.re ? " ↓" : ""}</td>
               <td className="r">{yen(d.goi)}</td><td className="r">{yen(d.thung)}</td><td className="r">{yen(d.kg)}</td>
-              <td className={"r c-" + mauLech(d.p)}>{pcDau(d.p)}</td>
+              <td className={"r c-" + (bt ? "xam" : mauLech(d.p))}>{pcDau(d.p)}</td>
             </tr>))}
           <tr className="kome">
             <td>KOME <small>({nhanGk})</small></td>
@@ -74,6 +75,7 @@ export function NoiGia({ n, q, sl, gk, phi }: { n: Nhom; q: QuanSat; sl: SoLuong
           </tr>
         </tbody>
       </table>
+      {bt && <p className="dt-ng-chu vang">⚠ {lyDoBatThuong(q)}</p>}
       {!b.coBac && <p className="dt-ng-chu">Bên này không ghi giá bậc</p>}
       {b.toiThieu && <p className="dt-ng-chu">Đặt tối thiểu: {b.toiThieu}</p>}
       {khacCo && <p className="dt-ng-chu vang">Thùng bên này {kgChu(q.kg_thung_dt)}, thùng KOME {kgChu(n.kome_kg_thung)} — so theo ¥/kg</p>}

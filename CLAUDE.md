@@ -1090,6 +1090,10 @@ Có test canh: `tests/test_doi_thu_bang.py`, `tests/test_mart_doi_thu.py`, `test
   `mauKomeSoTT` là chiều ngược cho "KOME so trung vị"). Cột, chấm, bản đồ nhiệt, ô nổi, hồ sơ đối thủ đều gọi nó — không chỗ nào viết lại ngưỡng.
   Ngoại lệ có phán quyết (B11): nhãn lệch PHÍ (¥) ở tab Phí & giao hàng tô theo DẤU (rẻ hơn = đỏ, đắt hơn = xanh, bằng = xám, không ngưỡng ±5%).
   Tính cả phí mà MỘT bên thiếu phí → `p = null`, xám, nhãn "phí ?" — không so nửa vời (B12).
+- **Giá bất thường (B18, kiểm trên dữ liệu thật)**: MỘT cột `mart.gia_doi_thu_hien_hanh.bat_thuong` — > 2× / < ½ MỐC (`mart.gia_lech_moc`);
+  mốc = trung vị nhóm ≥ 3 bên, không thì giá chuẩn KOME của nhóm (¥/kg; `moc_bat_thuong` / `_la` để màn in lý do; không mốc → không bao giờ bất thường).
+  Khối "KOME của nhóm" nay ở view đó (cột `nhom_*`), `so_sanh_nhom` đọc lại. Giao diện chỉ đọc cờ (`mau.ts::laBatThuong`): không `mauLech`,
+  không vào ô số, vẽ xám "⚠" + lý do (`lyDoBatThuong`) ở tab Đối thủ / cột / chấm / bản đồ nhiệt / ô nổi, vẫn bấm được mở pop-up.
 - **Nhãn thương hiệu** `kieu.ts::NHAN_GHEP` (`cung_hang` "cùng thương hiệu" / `thay_the`); `nganh.ts::tenNganh` CHỈ để hiển thị
   (tên ngành trống → "(chưa phân loại)"), không khoá nối, không lọc.
 - **Trình duyệt chỉ CHỌN cột giá, không tự quy đổi** — `gia_1/5/10/pallet`, `kg_thung_dt`… đến từ `mart.gia_doi_thu_quan_sat` (067, `mart.gia_bac_kg`). Hai ngoại lệ:

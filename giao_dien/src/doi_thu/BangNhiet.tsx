@@ -32,7 +32,8 @@ export function BangNhiet({ ds, sl, gk, chiCung, mo, phi, moPhi }: { ds: Nhom[];
                 const c = o.get(khoaONhiet(n, b));
                 if (!c) return null;
                 const t = c.p == null ? 0 : Math.min(1, Math.abs(c.p) / DAM_TOI_DA);
-                const dam = (0.2 + 0.7 * t) * (c.cung ? 1 : 0.45);
+                // Ô chỉ có giá bất thường (B18): nhạt, xám, "⚠" — không phải "?" cam (không thiếu gì để điền).
+                const dam = c.bt ? 0.12 : (0.2 + 0.7 * t) * (c.cung ? 1 : 0.45);
                 const het = c.q.trang_thai === "het";
                 const cx = LW + i * CW;
                 const tatCa = matHangCuaBen(n, b, { sl, chiCung, phi });
@@ -45,7 +46,7 @@ export function BangNhiet({ ds, sl, gk, chiCung, mo, phi, moPhi }: { ds: Nhom[];
                   else mo(c.q);
                 };
                 return (
-                  <ONoi key={b} svg nhan={`${n.ten_nhom ?? n.nhom_khoa} · ${b}: ${pcDau(c.p)} so KOME${c.so > 1 ? `, ${c.so} mặt hàng` : ""}${phiChuONhiet(c)}`}
+                  <ONoi key={b} svg nhan={`${n.ten_nhom ?? n.nhom_khoa} · ${b}: ${c.bt ? "giá bất thường — không so" : `${pcDau(c.p)} so KOME`}${c.so > 1 ? `, ${c.so} mặt hàng` : ""}${phiChuONhiet(c)}`}
                     onBam={bam}
                     noi_dung={<>{tatCa.map(q => <NoiGia key={`${q.nguon}${q.id}`} n={n} q={q} sl={sl} gk={gk} phi={phi} />)}</>}>
                     <rect className="dt-dich" x={cx + 2} y={y + 2} width={CW - 4} height={RH - 4} rx={4}
@@ -53,8 +54,8 @@ export function BangNhiet({ ds, sl, gk, chiCung, mo, phi, moPhi }: { ds: Nhom[];
                       stroke={het ? "var(--canh-chu)" : c.cung ? "none" : "var(--chu-mo)"} strokeWidth={het ? 2 : 1}
                       strokeDasharray={!het && !c.cung ? "3 2" : undefined} />
                     <text x={cx + CW / 2} y={y + 20} fontSize={10.5} textAnchor="middle" pointerEvents="none"
-                      style={{ fill: c.p == null ? "var(--dt-cam)" : dam >= 0.6 ? "var(--dt-vach)" : "var(--chu)" }}>
-                      {c.cung ? "" : "≈"}{c.p == null ? <tspan fontWeight={700}>?</tspan> : pcDau(c.p)}{c.so > 1 ? ` ·${c.so}` : ""}</text>
+                      style={{ fill: c.bt ? "var(--chu-nhat)" : c.p == null ? "var(--dt-cam)" : dam >= 0.6 ? "var(--dt-vach)" : "var(--chu)" }}>
+                      {c.cung ? "" : "≈"}{c.bt ? "⚠" : c.p == null ? <tspan fontWeight={700}>?</tspan> : pcDau(c.p)}{c.so > 1 ? ` ·${c.so}` : ""}</text>
                   </ONoi>);
               })}
             </g>);
@@ -69,7 +70,7 @@ export function ChuGiaiNhiet() {
     <div className="dt-chu-giai">
       <span><i className="cg-o-do" />đối thủ rẻ hơn KOME</span><span><i className="cg-o-xanh" />KOME rẻ hơn</span>
       <span><i className="cg-nhat" />≈ chỉ có khác thương hiệu</span><span>·n = số mặt hàng của bên</span>
-      <span><i className="cg-het" />đang hết</span>
+      <span><i className="cg-het" />đang hết</span><span>⚠ giá bất thường — không so</span>
     </div>
   );
 }

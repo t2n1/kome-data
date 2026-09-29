@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LECH_NGANG, NGAY_CU, mauKomeSoTT, mauLech, phanTram } from "./mau";
+import { LECH_NGANG, NGAY_CU, laBatThuong, lyDoBatThuong, mauKomeSoTT, mauLech, phanTram } from "./mau";
 
 describe("luật màu: đỏ = bất lợi cho KOME", () => {
   it("hằng số", () => { expect(LECH_NGANG).toBe(5); expect(NGAY_CU).toBe(60); });
@@ -18,5 +18,20 @@ describe("phanTram", () => {
   it("thiếu giá hoặc gốc 0/null -> null, không NaN", () => {
     expect(phanTram(null, 100)).toBeNull(); expect(phanTram(100, null)).toBeNull();
     expect(phanTram(100, 0)).toBeNull(); expect(phanTram(undefined, undefined)).toBeNull();
+  });
+});
+
+describe("giá bất thường (B18)", () => {
+  it("chỉ đọc cờ của máy chủ", () => {
+    expect(laBatThuong({ bat_thuong: true })).toBe(true);
+    expect(laBatThuong({ bat_thuong: false })).toBe(false); expect(laBatThuong({})).toBe(false); expect(laBatThuong(null)).toBe(false);
+  });
+  it("lý do nói đúng mốc: giá chuẩn KOME khi nhóm < 3 bên, trung vị khi đủ bên; chiều theo giá so mốc", () => {
+    expect(lyDoBatThuong({ yen_chuan: 1, don_vi_so: "kg", moc_bat_thuong: 454, moc_bat_thuong_la: "kome" }))
+      .toBe("Giá bất thường: ¥1/kg dưới ½ giá chuẩn KOME ¥454/kg — không so, không đếm.");
+    expect(lyDoBatThuong({ yen_chuan: 1400, don_vi_so: "kg", moc_bat_thuong: 570, moc_bat_thuong_la: "trung_vi" }))
+      .toBe("Giá bất thường: ¥1,400/kg trên 2× trung vị nhóm ¥570/kg — không so, không đếm.");
+    expect(lyDoBatThuong({ yen_chuan: 2, don_vi_so: "don_vi:thung", moc_bat_thuong: 1600, moc_bat_thuong_la: "trung_vi" }))
+      .toBe("Giá bất thường: ¥2/thùng dưới ½ trung vị nhóm ¥1,600/thùng — không so, không đếm.");
   });
 });

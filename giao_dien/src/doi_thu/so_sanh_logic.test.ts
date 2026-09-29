@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Nhom, QuanSat } from "./kieu";
 import { LUA_CHON_GK, khoaNhom, khoaONhiet, NHAN_SL, bangBac, batTat, demThieu, dongCot, giaBacKg, giaKome, giaTai, locDanhSach, macDinhSp, matHangCuaBen,
   nhanBac, nhanKlGoi, nhomChon, oNhiet, pcDau, soMatHang, thieuQuyCach, giaCoPhi, apPhi, bamONhiet, phiChuONhiet,
-  type PhiSoSanh } from "./so_sanh_logic";
+  donViChuaQuy, type PhiSoSanh } from "./so_sanh_logic";
 import type { DieuKienGiao } from "./phi_giao";
 
 let seq = 0;
@@ -110,10 +110,11 @@ describe("dongCot", () => {
     expect([y.cu, y.thueKhongRo, y.gomShip, y.km]).toEqual([true, true, true, true]);
     expect(dong[2].gia).toBeNull(); expect(dong[2].p).toBeNull();
   });
-  it("bất thường vẫn vẽ, mang cờ trên q", () => {
+  it("bất thường vẫn vẽ, mang cờ trên q — sau KOME dù rẻ hơn (B18)", () => {
     const n = nh({ quan_sat: [qs({ ten_goc: "Z", gia_1: 5, bat_thuong: true })] });
     const { dong } = dongCot(n, { sl: "1", gk: "thuc", chiCung: false, moRong: true });
-    expect(dong[0].q?.bat_thuong).toBe(true);
+    expect(dong.map(d => d.kome)).toEqual([true, false]);
+    expect(dong[1].q?.bat_thuong).toBe(true); expect(dong[1].bt).toBe(true); expect(dong[1].p).toBeNull();
   });
 });
 
@@ -382,5 +383,46 @@ describe("dongCot / oNhiet có phí giao", () => {
     const chuaGia = nh({ quan_sat: [qs({ ten_doi_thu: "X", ma_doi_thu: "x", gia_1: null })] });
     expect(bamONhiet(oNhiet([chuaGia], { sl: "1", gk: "chuan", chiCung: false }).o.get(khoaONhiet(chuaGia, "X"))!, "1"))
       .toEqual({ loai: "gia" });
+  });
+});
+
+describe("giá bất thường ở So sánh (B18)", () => {
+  const n = () => nh({ quan_sat: [
+    qs({ ten_goc: "chỗ giữ", gia_1: 1, yen_chuan: 1, bat_thuong: true, ma_doi_thu: "h", ten_doi_thu: "HSC" }),
+    qs({ ten_goc: "HSC thật", gia_1: 480, yen_chuan: 480, ma_doi_thu: "h", ten_doi_thu: "HSC" }),
+    qs({ ten_goc: "chỉ bất thường", gia_1: 2, yen_chuan: 2, bat_thuong: true, ma_doi_thu: "z", ten_doi_thu: "Z", nhan: "cung_hang" }),
+    ...[400, 450, 460, 470, 490, 495].map((g, i) => qs({ ten_goc: `T${i}`, gia_1: g, yen_chuan: g, ma_doi_thu: `t${i}`, ten_doi_thu: `T${i}` })),
+  ] });
+  it("cột: bất thường p null (không màu), xếp sau mọi dòng thường; thu gọn giữ 5 rẻ nhất THƯỜNG", () => {
+    const { dong, an } = dongCot(n(), { sl: "1", gk: "chuan", chiCung: false, moRong: false });
+    const ten = dong.map(d => d.kome ? "KOME" : d.ten);
+    expect(ten.slice(0, 5)).toEqual(["T0", "T1", "T2", "T3", "HSC thật"]);
+    expect(ten.slice(-1)).toEqual(["chỉ bất thường"]);          // cùng thương hiệu → luôn giữ, nhưng cuối
+    expect(dong.filter(d => d.bt).every(d => d.p == null)).toBe(true);
+    expect(dong.find(d => !d.kome && !d.bt)!.p).toBe(-23);        // 400 so chuẩn 520
+    expect(an).toBe(3);                                           // T4, T5, "chỗ giữ"
+  });
+  it("bảng nhiệt: bên còn hàng thường thì ô là hàng thường; bên chỉ có bất thường thì ô xám, bấm mở pop-up", () => {
+    const { o } = oNhiet([n()], { sl: "1", gk: "chuan", chiCung: false });
+    const h = o.get(khoaONhiet(n(), "HSC"))!, z = o.get(khoaONhiet(n(), "Z"))!;
+    expect([h.q.ten_goc, h.bt, h.p, h.so]).toEqual(["HSC thật", false, -8, 2]);
+    expect([z.q.ten_goc, z.bt, z.p]).toEqual(["chỉ bất thường", true, null]);
+    expect(bamONhiet(z, "1")).toEqual({ loai: "sua" });
+    expect(phiChuONhiet(z)).toBe("");
+  });
+});
+
+describe("thẻ nhóm chưa quy ra ¥/kg (F2)", () => {
+  it("donViChuaQuy: nhãn đơn vị cho dòng nhóm don_vi:*, null khi so theo kg", () => {
+    expect(donViChuaQuy({ don_vi_so: "don_vi:goi" })).toBe("gói");
+    expect(donViChuaQuy({ don_vi_so: "don_vi:thung" })).toBe("thùng");
+    expect(donViChuaQuy({ don_vi_so: "kg" })).toBeNull();
+  });
+  it("dòng KOME của thẻ đó không có giá để so (giá KOME là ¥/kg) → không % nào", () => {
+    const g = nh({ don_vi_so: "don_vi:goi", gia_kome: null, gia_kome_chuan: null, gia_kome_so: null, gia_kome_bang: null,
+      quan_sat: [qs({ gia_1: 300, yen_chuan: 300, don_vi_so: "don_vi:goi" })] });
+    const { dong } = dongCot(g, { sl: "1", gk: "chuan", chiCung: false, moRong: true });
+    expect(dong.find(d => d.kome)!.gia).toBeNull();
+    expect(dong.every(d => d.p == null)).toBe(true);
   });
 });

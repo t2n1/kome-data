@@ -8,7 +8,8 @@ import type { Nhom } from "./kieu";
 import { mauLech, phanTram } from "./mau";
 import { NoiGia } from "./ONoiGia";
 import { daSua } from "./sua_logic";
-import { dongCot, khoaNhom, pcDau, type PhiSoSanh, type SoLuong } from "./so_sanh_logic";
+import { donViChuaQuy, dongCot, khoaNhom, pcDau, type PhiSoSanh, type SoLuong } from "./so_sanh_logic";
+import { lyDoBatThuong } from "./mau";
 import type { MoPhi, MoSua } from "./BieuDoCot";
 
 const W = 760, LW = 200, RH = 50, TREN = 30, LO = -60, HI = 60;
@@ -39,14 +40,17 @@ export function BieuDoCham({ ds, sl, gk, chiCung, mo, phi, moPhi }: { ds: Nhom[]
           const thieu = hang.filter(d => d.gia == null);   // thiếu giá của MẶT HÀNG (thiếu giá KOME đã nói ở nhãn hàng)
           // Có giá mà không vẽ được vì phí giao chưa cộng (mặt hàng hoặc KOME) — không so giá trần với giá kèm phí.
           const komeHoi = tat.find(d => d.kome)?.phiHoi ?? null;
-          const hoiPhi = gK == null ? [] : hang.filter(d => d.gia != null && d.p == null && (d.phiHoi || komeHoi));
+          const hoiPhi = gK == null ? [] : hang.filter(d => !d.bt && d.gia != null && d.p == null && (d.phiHoi || komeHoi));
+          // Giá bất thường (B18): không chấm (không có % để đặt), một dấu xám bấm mở pop-up dòng đầu.
+          const bt = hang.filter(d => d.bt);
           const dauPhi = komeHoi ? tat.find(d => d.kome)! : hoiPhi[0];
           return (
             <g key={khoaNhom(n)}>
               <line x1={LW} x2={W - 20} y1={y} y2={y} stroke="var(--vien-phu)" />
               <text x={LW - 8} y={y - 2} fontSize={11.5} textAnchor="end">{ngan(n.ten_nhom ?? n.nhom_khoa, 26)}</text>
               <text x={LW - 8} y={y + 12} fontSize={10} textAnchor="end" className="t-nhat">
-                {gK == null ? "chưa có giá KOME" : `KOME ${yen(gK)}${n.don_vi_so === "kg" ? "/kg" : ""}`}</text>
+                {donViChuaQuy(n) ? `giá theo ${donViChuaQuy(n)}, chưa quy ra ¥/kg`
+                  : gK == null ? "chưa có giá KOME" : `KOME ${yen(gK)}${n.don_vi_so === "kg" ? "/kg" : ""}`}</text>
               {hang.map((d, j) => {
                 if (d.p == null) return null;
                 const yy = y + (j % 3 - 1) * 8, m = MAU[mauLech(d.p)];
@@ -71,6 +75,12 @@ export function BieuDoCham({ ds, sl, gk, chiCung, mo, phi, moPhi }: { ds: Nhom[]
                   aria-label={`${thieu.length} mặt hàng chưa có giá — điền`} onClick={() => mo(thieu[0].q!, "gia_goc")}
                   onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); mo(thieu[0].q!, "gia_goc"); } }}>
                   ? {thieu.length}</text>)}
+              {bt.length > 0 && (
+                <ONoi svg nhan={`${bt.length} giá bất thường — không so; bấm để sửa`} onBam={() => mo(bt[0].q!)}
+                  noi_dung={<>{bt.map(d => <div key={`${d.q!.nguon}${d.q!.id}`} className="o-noi-chu">
+                    {d.ben} · {d.ten}: {lyDoBatThuong(d.q!)}</div>)}</>}>
+                  <text x={LW + 4} y={y - 12} fontSize={10.5} className="t-nhat">⚠ {bt.length} bất thường</text>
+                </ONoi>)}
               {hoiPhi.length > 0 && dauPhi && (
                 <text x={W - 20} y={y + 14} fontSize={11} textAnchor="end" className="t-cam t-dam" role="button" tabIndex={0}
                   aria-label={`${hoiPhi.length} mặt hàng chưa so được vì phí giao chưa cộng — điền`} onClick={() => moPhi?.(n, dauPhi)}

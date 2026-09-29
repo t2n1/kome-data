@@ -12,7 +12,7 @@ import { ngay, so, thang_nhan, yen } from "../dinh_dang";
 import { chuoiKhoang, giuKhoang, useKhoang } from "../khung/khoang";
 import type { DieuKien, GiaoHang, KhachDangMua, TongQuan } from "./kieu";
 import { LOAI_DK, LOAI_NGUON, NHAN_GHEP, NHAN_TRANG_THAI, nhanDonVi } from "./kieu";
-import { mauLech } from "./mau";
+import { lyDoBatThuong, mauLech } from "./mau";
 import { Ra } from "./NguonDong";
 import { lienKetAnToan } from "./nguon";
 import { pcDau } from "./so_sanh_logic";
@@ -111,7 +111,7 @@ function HoSoBen({ hs, tq, moSua, moDuyet, moLech }: {
       <div className="dt-hs-hai">
         <section className="dt-khoi">
           <Khoi tieu_de="Giá bên này so với KOME, từng sản phẩm"
-            cach_tinh="Mỗi thanh = một mặt hàng hiện hành của bên này ghép được với nhóm có giá KOME; dài = giá ¥/kg chưa thuế của bên so với giá KOME của nhóm (標準価格, thiếu thì thực bán 90 ngày). Trái = bên này rẻ hơn KOME. Tên là tên nhóm KOME; tên gốc trong ô nổi. Ngoài ±60% vẽ ở mép. Bấm thanh để sửa.">
+            cach_tinh="Mỗi thanh = một mặt hàng hiện hành của bên này ghép được với nhóm có giá KOME; dài = giá ¥/kg chưa thuế của bên so với giá KOME của nhóm (標準価格, thiếu thì thực bán 90 ngày). Trái = bên này rẻ hơn KOME. Tên là tên nhóm KOME; tên gốc trong ô nổi. Ngoài ±60% vẽ ở mép. Giá bất thường (> 2× / < ½ trung vị nhóm; nhóm dưới 3 bên thì so giá chuẩn KOME) vẽ xám, không đếm. Bấm thanh để sửa.">
             {dong.length ? <><BieuDoLech dong={dong} qs={hs.quan_sat} mo={(x, t) => moSua({ loai: "mh", q: x, tru_o: t })} /><ChuGiai /></>
               : <p className="dt-nhat">Chưa mặt hàng nào của bên này ghép được với nhóm có giá KOME.</p>}
             <DaBoNhom ds={daBo} ben={false} />
@@ -201,15 +201,20 @@ function BieuDoLech({ dong: tatCa, qs, mo }: { dong: DongHs[]; qs: QsHs[]; mo: (
         <text x={xP(58)} y={11} fontSize={10.5} textAnchor="end" className="t-xanh">KOME rẻ hơn ▶</text>
         {dong.map((d, i) => {
           const y = TREN + i * RH, q = d.q, ten = q.ten_nhom ?? q.ten_goc;
-          const nhan = `${ten} (${q.ten_goc})${daSua(q) ? " (đã sửa)" : ""}: ${d.p == null ? "chưa có giá để so" : `${pcDau(d.p)} so KOME`} — sửa`;
+          const nhan = `${ten} (${q.ten_goc})${daSua(q) ? " (đã sửa)" : ""}: ${d.bt ? "giá bất thường, không so"
+            : d.p == null ? "chưa có giá để so" : `${pcDau(d.p)} so KOME`} — sửa`;
           const dx = d.p == null ? x0 : xP(d.p), trai = d.p != null && d.p < 0;
           // Nhãn % cạnh đầu thanh; thanh trái sát mép (không đủ chỗ trước cột tên) thì nhãn sang nửa phải (trống) của dòng.
           const chatTrai = trai && dx - LW < 58, xn = trai ? (chatTrai ? x0 + 6 : dx - 4) : dx + 4;
           return (
             <g key={`${q.nguon}${q.id}`} opacity={d.cu ? 0.5 : 1}>
-              <text x={LW - 8} y={y + 12} fontSize={11} textAnchor="end" className={d.cung ? "" : "t-khac"}>
+              <text x={LW - 8} y={y + 12} fontSize={11} textAnchor="end" className={d.bt ? "t-nhat" : d.cung ? "" : "t-khac"}>
                 {daSua(q) && <tspan className="t-nhat">✎ </tspan>}{ngan(ten, 32)}</text>
-              {d.p == null
+              {d.bt
+                ? <ONoi svg nhan={nhan} onBam={() => mo(q)} noi_dung={<NoiHs d={d} qs={qs} />}>
+                    <text x={x0 + 4} y={y + 13} fontSize={10.5} className="t-nhat">⚠ giá bất thường</text>
+                  </ONoi>
+                : d.p == null
                 ? <ONoi svg nhan={nhan} onBam={() => mo(q, d.tro)} noi_dung={<NoiHs d={d} qs={qs} />}>
                     <text x={x0 + 4} y={y + 13} fontSize={12} className="t-cam t-dam">?</text>
                   </ONoi>
@@ -256,8 +261,9 @@ function NoiHs({ d, qs }: { d: DongHs; qs: QsHs[] }) {
       <div className="o-noi-chu">{q.ten_nhom ?? q.nhom_khoa}</div>
       <DongNoi nhan="Giá như bảng in" gia={q.gia_goc == null ? "?" : `${yen(q.gia_goc)}/${q.don_vi_gia ? nhanDonVi(q.don_vi_gia) : "?"}`} />
       <DongNoi nhan={`Quy đổi ¥/${dv}`} gia={q.yen_chuan == null ? "?" : yen(q.yen_chuan)} />
-      <DongNoi nhan={`KOME ¥/${dv}`} gia={yen(q.gia_kome_so)} />
-      <DongNoi nhan="So KOME" gia={d.p == null ? "?" : pcDau(d.p)} mau={MAU[mauLech(d.p)]} />
+      {q.gia_kome_so != null && <DongNoi nhan={`KOME ¥/${dv}`} gia={yen(q.gia_kome_so)} />}
+      {d.bt ? <div className="o-noi-chu">{lyDoBatThuong(q)}</div>
+        : <DongNoi nhan="So KOME" gia={d.p == null ? "?" : pcDau(d.p)} mau={MAU[mauLech(d.p)]} />}
       {co.length > 0 && <div className="o-noi-chu">{co.join(" · ")}</div>}
       {ls.length > 0 && (
         <div className="dt-hs-spark">
@@ -284,7 +290,7 @@ function ChuGiai() {
       <span><i className="cg-cung" />{NHAN_GHEP.cung_hang}</span><span><i className="cg-khac" />{NHAN_GHEP.thay_the}</span>
       <span><i className="cg-het" />đang hết</span><span><b className="t-km-cg">KM</b>khuyến mãi</span>
       <span><b className="cg-vang">?</b>thuế</span><span><b className="cg-cam">?</b>thiếu — bấm để điền</span>
-      <span className="cg-mo">mờ = cũ</span><span>🚚 gồm ship</span>
+      <span className="cg-mo">mờ = cũ</span><span>🚚 gồm ship</span><span>⚠ giá bất thường — không so</span>
     </div>
   );
 }
