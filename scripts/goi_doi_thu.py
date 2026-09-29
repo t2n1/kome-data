@@ -2,27 +2,36 @@
 
     python scripts/goi_doi_thu.py <thư mục CSV> --ngay 2026-08-31 --ra <thư mục ra>
 
-Đọc mọi `spike_*.csv` (giá) và `spike_*_dieu_kien.csv` (điều kiện), ghi hai file nạp được:
-doi_thu_gia_YYYYMMDD.xlsx, doi_thu_dieu_kien_YYYYMMDD.xlsx. Không chặn cả gói vì một dòng xấu:
+Đọc mọi `spike_*.csv` (giá), `spike_*_dieu_kien.csv` (điều kiện) và `spike_*_giao_hang.csv` (giao hàng),
+ghi các file nạp được: doi_thu_gia_YYYYMMDD.xlsx, doi_thu_dieu_kien_YYYYMMDD.xlsx và (khi có dòng)
+doi_thu_giao_hang_YYYYMMDD.xlsx. Không chặn cả gói vì một dòng xấu:
 dòng xấu mang do_chac=can_xem + lý do ở ghi_chu (cổng 5 của nguồn này, đặc tả §4.1).
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import json
 import re
 import sys
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from kome.loaders.doi_thu import COT_GIA, COT_DIEU_KIEN  # noqa: E402
+from kome.loaders.doi_thu import COT_GIA, COT_DIEU_KIEN, COT_GIAO_HANG  # noqa: E402
 from kome.ten_hang import chuan_ten  # noqa: E402
 
 GIA_THAP = 20          # giá < 20 yên (một gói / một kg) gần như chắc là lỗi của nguồn
 _WEB = re.compile(r"\.(jp|com|shop|asia|top)\b|\bGoogle Sheet\b|\bAPI\b")
 _NGAY = [re.compile(r"(20\d\d)[.\-/](\d{1,2})[.\-/](\d{1,2})"), re.compile(r"(20\d\d)(\d\d)(\d\d)")]
 _ID_BEN = re.compile(r"(?<![A-Za-z])(?:_id|id|mã SP|商品コード)\s*[:=]?\s*([A-Za-z0-9\-]{4,})")
+DON_VI_SL = ("thung", "kg", "goi", "pallet")
+DON_VI_GIA_BAC = ("thung", "kg", "goi")
+BAC_TOI_DA = 10
+# Câu người ĐỌC tự ghi (không phải điều kiện của bên) — tháng 8 lọt vào dieu_kien (VIETCOOK, HSC, JVB, EIHATSU, THAK).
+_GHI_CHU_DOC = re.compile(r"chép vào|ghi_chu|không in (phí|thông tin)|không tìm thấy|dữ liệu này|trên các trang đã đọc"
+                          r"|in ở từng ô|mỗi (ô|mặt hàng) (ghi|in)|— không chép", re.I)
+_VUNG = ("hokkaido", "tohoku", "kanto", "chubu", "kansai", "chugoku", "shikoku", "kyushu", "okinawa")
 
 
 def jan_hop_le(s: str) -> bool:
@@ -87,7 +96,55 @@ def _so(v):
         return None
 
 
-def dung_goi(gia: list[dict], dk: list[dict], ngay: date) -> tuple[list[dict], list[dict], list[str]]:
+def la_ghi_chu_doc(noi_dung: str) -> bool:
+    return bool(_GHI_CHU_DOC.search(noi_dung or ""))
+
+
+def kiem_bac(s) -> tuple[list[dict] | None, str | None]:
+    """Chữ JSON của cột `bac` → danh sách bậc chuẩn hoá (lược đồ 065) hoặc (None, lý do). Trống → (None, None)."""
+    if s is None or str(s).strip() == "":
+        return None, None
+    try:
+        v = json.loads(s)
+    except (TypeError, ValueError):
+        return None, f"bac không phải JSON: {str(s)[:40]}"
+    if not isinstance(v, list) or not 1 <= len(v) <= BAC_TOI_DA:
+        return None, f"bac phải là mảng 1–{BAC_TOI_DA} bậc"
+    ra = []
+    for b in v:
+        if not isinstance(b, dict):
+            return None, "mỗi bậc phải là object"
+        tu, gia = _so(b.get("tu")), _so(b.get("gia"))
+        if not tu or tu <= 0 or not gia or gia <= 0:
+            return None, "bậc cần tu > 0 và gia > 0"
+        if b.get("don_vi_sl") not in DON_VI_SL or b.get("don_vi_gia") not in DON_VI_GIA_BAC:
+            return None, f"đơn vị bậc phải thuộc {DON_VI_SL} / {DON_VI_GIA_BAC}"
+        ra.append({"tu": int(tu) if tu == int(tu) else tu, "don_vi_sl": b["don_vi_sl"],
+                   "gia": int(gia) if gia == int(gia) else gia, "don_vi_gia": b["don_vi_gia"]})
+    return ra, None
+
+
+def _nguyen(v):
+    x = _so(v)
+    return int(x) if x is not None and x == int(x) and x > 0 else None
+
+
+def _phu_phi(s) -> tuple[str | None, str | None]:
+    if s is None or str(s).strip() == "":
+        return None, None
+    try:
+        v = json.loads(s)
+    except (TypeError, ValueError):
+        return None, "phu_phi không phải JSON"
+    if not isinstance(v, dict) or any(k not in _VUNG for k in v) or \
+            any(not (x == "khong_nhan" or (isinstance(x, (int, float)) and not isinstance(x, bool) and x >= 0))
+                for x in v.values()):
+        return None, 'phu_phi: {"<vùng>": ¥ hoặc "khong_nhan"}, vùng thuộc ' + "/".join(_VUNG)
+    return json.dumps(v, ensure_ascii=False), None
+
+
+def dung_goi(gia: list[dict], dk: list[dict], ngay: date, giao: list[dict] | None = None
+             ) -> tuple[list[dict], list[dict], list[dict], list[str]]:
     canh: list[str] = []
     # 1. Gộp cặp chưa thuế / có thuế của CÙNG một ô (IMAI in cả hai cột): giữ dòng chưa thuế.
     nhom: dict[tuple, list[dict]] = {}
@@ -128,6 +185,13 @@ def dung_goi(gia: list[dict], dk: list[dict], ngay: date) -> tuple[list[dict], l
         g = _so(d.get("gia_goc"))
         if g is not None and g < GIA_THAP:
             ly_do.append(f"giá {d.get('gia_goc')} bất thường (< {GIA_THAP})")
+        bac, loi_bac = kiem_bac(d.get("bac"))
+        if loi_bac:
+            ly_do.append(loi_bac)
+        if bac and g is not None:
+            cung_dv = [b["gia"] for b in bac if b["don_vi_gia"] == (d.get("don_vi_gia") or "")]
+            if cung_dv and max(cung_dv) > g:
+                ly_do.append("gia_goc phải là giá lẻ (bậc mua ít nhất), không phải bậc rẻ nhất")
         do_chac = "can_xem" if ly_do or d.get("do_chac") == "can_xem" else "chac"
         ghi = " · ".join(x for x in [d.get("ghi_chu") or "", *ly_do] if x)
         if ly_do:
@@ -146,18 +210,43 @@ def dung_goi(gia: list[dict], dk: list[dict], ngay: date) -> tuple[list[dict], l
             "ma_kome_de_xuat": d.get("ma_kome") or None,
             "nhan_de_xuat": d.get("nhan_ghep") if d.get("nhan_ghep") in ("cung_hang", "thay_the") else None,
             "ly_do_ghep": d.get("ly_do_ghep"), "do_chac": do_chac, "ghi_chu": ghi or None,
+            "so_goi_thung": _nguyen(d.get("so_goi_thung")),
+            "kl_goi_g": _so(d.get("kl_goi_g")) if (_so(d.get("kl_goi_g")) or 0) > 0 else None,
+            "bac": json.dumps(bac, ensure_ascii=False) if bac else None,
         }
-        ra.append({c: o.get(c) for c in COT_GIA})   # 3 cột mới (so_goi_thung, kl_goi_g, bac): Task 3 điền
+        ra.append({c: o[c] for c in COT_GIA})
     dk_ra, dem_dk = [], {}
     for d in dk:
         ben = d["ben"]
         dem_dk[ben] = dem_dk.get(ben, 0) + 1
         loai = d.get("loai") if d.get("loai") in ("ship", "khuyen_mai", "thanh_toan", "thue", "khac") else "khac"
+        if la_ghi_chu_doc(d.get("noi_dung")):
+            loai = "ghi_chu_doc"
         dk_ra.append({"ma_dong": f"{ben}-{dem_dk[ben]:05d}", "ma_doi_thu": ben,
                       "ngay_nguon": suy_ngay(d.get("file") or "", ngay).isoformat(),
                       "nguon_file": d.get("file"), "vi_tri": d.get("vi_tri"), "loai": loai,
                       "noi_dung": d.get("noi_dung")})
-    return ra, [x for x in dk_ra if (x["noi_dung"] or "").strip()], canh
+    gh_ra, dem_gh = [], {}
+    for d in giao or []:
+        ben = d["ben"]
+        dem_gh[ben] = dem_gh.get(ben, 0) + 1
+        pp, loi = _phu_phi(d.get("phu_phi"))
+        if loi:
+            canh.append(f"{ben} giao hàng: {loi}")
+        theo = d.get("phi_ship_theo") if d.get("phi_ship_theo") in ("don", "thung", "kien") else None
+        thue = d.get("thue") if d.get("thue") in ("bao", "chua", "khong_ro") else None
+        gh_ra.append({
+            "ma_dong": f"{ben}-{dem_gh[ben]:05d}", "ma_doi_thu": ben,
+            "ngay_nguon": suy_ngay(d.get("file") or "", ngay).isoformat(),
+            "bao_ship": d.get("bao_ship") or None, "phi_ship": _so(d.get("phi_ship")), "phi_ship_theo": theo,
+            "mien_ship_tu": _so(d.get("mien_ship_tu")), "mien_ship_kien": _nguyen(d.get("mien_ship_kien")),
+            "thung_moi_kien": _nguyen(d.get("thung_moi_kien")), "phu_phi": pp, "phi_daibiki": _so(d.get("phi_daibiki")),
+            "daibiki_tu": _so(d.get("daibiki_tu")), "daibiki_sau": _so(d.get("daibiki_sau")),
+            "ck_mien_daibiki": d.get("ck_mien_daibiki") or None, "kien_toi_da_kg": _so(d.get("kien_toi_da_kg")),
+            "ghep_kien": d.get("ghep_kien") or None, "thue": thue, "cach_gui": d.get("cach_gui") or None,
+            "nguon_chu": d.get("nguon_chu") or None, "nguon_file": d.get("file") or None,
+        })
+    return ra, [x for x in dk_ra if (x["noi_dung"] or "").strip()], gh_ra, canh
 
 
 def _doc(p: Path) -> list[dict]:
@@ -174,15 +263,17 @@ def main() -> None:
     ap.add_argument("--ngay", type=date.fromisoformat, required=True)
     ap.add_argument("--ra", type=Path, required=True)
     a = ap.parse_args()
-    gia, dk = [], []
+    gia, dk, giao = [], [], []
     for p in sorted(a.thu_muc.glob("spike_*.csv")):
-        (dk if p.stem.endswith("_dieu_kien") else gia).extend(_doc(p))
-    g, d, canh = dung_goi(gia, dk, a.ngay)
+        (dk if p.stem.endswith("_dieu_kien") else giao if p.stem.endswith("_giao_hang") else gia).extend(_doc(p))
+    g, d, gh, canh = dung_goi(gia, dk, a.ngay, giao)
     a.ra.mkdir(parents=True, exist_ok=True)
     s = a.ngay.strftime("%Y%m%d")
     pd.DataFrame(g, columns=COT_GIA).to_excel(a.ra / f"doi_thu_gia_{s}.xlsx", sheet_name="gia", index=False)
     pd.DataFrame(d, columns=COT_DIEU_KIEN).to_excel(a.ra / f"doi_thu_dieu_kien_{s}.xlsx", sheet_name="dieu_kien", index=False)
-    print(f"{len(g)} dòng giá · {len(d)} điều kiện · {len(canh)} cảnh báo")
+    if gh:
+        pd.DataFrame(gh, columns=COT_GIAO_HANG).to_excel(a.ra / f"doi_thu_giao_hang_{s}.xlsx", sheet_name="giao_hang", index=False)
+    print(f"{len(g)} dòng giá · {len(d)} điều kiện · {len(gh)} giao hàng · {len(canh)} cảnh báo")
     for c in canh[:50]:
         print("  ", c)
 
