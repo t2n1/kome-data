@@ -12017,7 +12017,9 @@
      "case_qty",
      "shelf_code",
      "introduced_on",
-     "batch_id"
+     "batch_id",
+     "pack1_code",
+     "pack1_base_qty"
     ],
     "khoa": [
      "product_code"
@@ -12139,7 +12141,10 @@
      "nhan_de_xuat",
      "ly_do_ghep",
      "do_chac",
-     "ghi_chu"
+     "ghi_chu",
+     "so_goi_thung",
+     "kl_goi_g",
+     "bac"
     ],
     "khoa": [
      "ma_dong"

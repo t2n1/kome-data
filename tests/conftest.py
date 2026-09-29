@@ -38,11 +38,16 @@ SCHEMAS = ("core", "mart", "app", "meta")
 #    chiếu (đã bắt được lỗi này thật khi viết test_ban_do.py).
 #  - app.loai_nguon, app.doi_thu: gieo TĨNH bởi 059 (5 loại nguồn, 21 đối thủ), bảng khác
 #    trỏ khoá ngoại vào — cùng lý do với core.dim_prefecture.
+#  - app.giao_hang_kome: MỘT dòng mặc định gieo bởi 065 (điều kiện giao hàng của KOME suy từ phiếu bán).
+#    Khác các bảng trên, nó có khoá ngoại `sua_boi` → app.nguoi_dung nên `TRUNCATE ... CASCADE` vẫn cuốn
+#    nó đi dù không nằm trong danh sách dọn — fixture `conn` gieo lại đúng dòng đã chụp từ migration.
 GIU_LAI = {"meta.schema_migration", "core.dim_date", "core.dim_salesperson",
-           "core.dim_prefecture", "app.loai_nguon", "app.doi_thu"}
+           "core.dim_prefecture", "app.loai_nguon", "app.doi_thu", "app.giao_hang_kome"}
 
 # Nhớ danh sách bảng sau lần tra đầu tiên (xem fixture `conn`).
 _TABLES: list[str] | None = None
+# Dòng mặc định của app.giao_hang_kome (cột → giá trị), chụp một lần sau migration.
+_GIAO_HANG_KOME: dict | None = None
 
 
 @pytest.fixture(scope="session")
@@ -128,8 +133,18 @@ def conn(_session_conn):
     global _TABLES
     if _TABLES is None:
         _TABLES = _bang_can_don(c)
+    global _GIAO_HANG_KOME
+    if _GIAO_HANG_KOME is None:
+        cur = c.execute("SELECT * FROM app.giao_hang_kome")
+        cot = [d.name for d in cur.description]
+        _GIAO_HANG_KOME = dict(zip(cot, cur.fetchone()))
+        _GIAO_HANG_KOME.pop("sua_boi")
     if _TABLES:
         c.execute(f"TRUNCATE {', '.join(_TABLES)} RESTART IDENTITY CASCADE")
+    if not c.execute("SELECT 1 FROM app.giao_hang_kome").fetchone():
+        cot = list(_GIAO_HANG_KOME)
+        c.execute(f"INSERT INTO app.giao_hang_kome ({', '.join(cot)}) VALUES ({', '.join(['%s'] * len(cot))})",
+                  [_GIAO_HANG_KOME[k] for k in cot])
     c.commit()
     yield c
 
