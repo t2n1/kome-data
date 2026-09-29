@@ -58,3 +58,30 @@
   .mv-tim input{min-width:0;width:100%}
   .mv-truot{height:44px}
 }
+/* Tab "Theo mùa": bản đồ nhiệt mã × tháng. Sáu bậc rời rạc (0 = trống), màu pha từ token
+   `--do` vào `--nen-the` — cùng công thức cho nền sáng lẫn tối, không bảng màu thứ hai. */
+.mv-nh-chon{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:8px}
+.mv-nh-nhan-chon{font-size:.75rem;color:var(--chu-mo);margin-right:2px}
+.mv-nh-chu-giai{display:inline-flex;align-items:center;gap:3px;font-size:.72rem;color:var(--chu-mo);margin-left:auto}
+.mv-nh-chu-giai i{display:inline-block;width:14px;height:10px;border-radius:2px}
+.mv-nh-chu-giai i.mv-nh-b0{margin-left:8px;border:1px solid var(--vien)}
+.mv-nh-cuon{width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.mv-nh-bang{display:flex}
+.mv-nh-bang svg{display:block;flex:none}
+.mv-nh-trai{position:sticky;left:0;z-index:1}
+.mv-nh-nen-nhan{fill:var(--nen-the)}
+.mv-nh-nhan text{font-size:11px;fill:var(--chu)}
+.mv-nh-nhan:hover .mv-nh-nen-nhan{fill:var(--nen-phu)}
+.mv-nh-nam{font-size:10px;font-weight:600;fill:var(--chu-mo)}
+.mv-nh-thang{font-size:10px;fill:var(--chu-mo)}
+.mv-nh-thang.do-dang{font-style:italic;fill:var(--chu-mo);opacity:.8}
+.mv-nh-o{stroke:none}
+.mv-nh-o:hover{stroke:var(--chu);stroke-width:1}
+.mv-nh-b0{fill:transparent;background:transparent}
+.mv-nh-b1{fill:color-mix(in srgb,var(--do) 12%,var(--nen-the));background:color-mix(in srgb,var(--do) 12%,var(--nen-the))}
+.mv-nh-b2{fill:color-mix(in srgb,var(--do) 28%,var(--nen-the));background:color-mix(in srgb,var(--do) 28%,var(--nen-the))}
+.mv-nh-b3{fill:color-mix(in srgb,var(--do) 46%,var(--nen-the));background:color-mix(in srgb,var(--do) 46%,var(--nen-the))}
+.mv-nh-b4{fill:color-mix(in srgb,var(--do) 66%,var(--nen-the));background:color-mix(in srgb,var(--do) 66%,var(--nen-the))}
+.mv-nh-b5{fill:color-mix(in srgb,var(--do) 88%,var(--nen-the));background:color-mix(in srgb,var(--do) 88%,var(--nen-the))}
+.mv-nh-danh-dau{fill:none;stroke:var(--chu);stroke-width:1.5}
+a:focus-visible > .mv-nh-o,a:focus-visible .mv-nh-nen-nhan{stroke:var(--lien-ket);stroke-width:2}

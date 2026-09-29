@@ -171,3 +171,11 @@ a.tng-dong:hover,.tng-dong:focus-visible{background:var(--nen-phu)}
 .hang-so{display:flex;flex-wrap:wrap;gap:.25rem 1rem;margin-bottom:.5rem;font-size:.76rem}
 .hs-nhan{color:var(--chu-nhat)}
 .hs-muc b{font-variant-numeric:tabular-nums}
+
+/* Tab gạch chân (Khách hàng, hồ sơ, Mùa vụ) — chuyển từ khach/khach.css để màn tải lười
+   khác dùng được mà không phụ thuộc chunk CSS của màn Khách hàng. */
+.kh-tab,.hs-tab{display:flex;gap:.2rem;border-bottom:1px solid var(--vien);margin:.2rem 0 .9rem;overflow-x:auto}
+.kh-tab button,.hs-tab button{font:inherit;font-size:.84rem;background:none;border:0;border-bottom:2px solid transparent;
+  padding:.5rem .8rem;color:var(--chu-nhat);cursor:pointer;white-space:nowrap;position:relative;margin-bottom:-1px}
+.kh-tab button[aria-selected="true"],.hs-tab button[aria-selected="true"]{color:var(--do-chu);border-bottom-color:var(--do);font-weight:600}
+.kh-tab button:hover,.hs-tab button:hover{color:var(--chu)}

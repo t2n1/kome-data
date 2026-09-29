@@ -12,12 +12,7 @@
 .kh-muc .phu{font-size:.74rem}
 .kh-loc-nguoi{font-size:.82rem;margin:.1rem 0 .7rem;color:var(--chu-thuong)}
 
-/* Tab Danh sách / Bản đồ */
-.kh-tab,.hs-tab{display:flex;gap:.2rem;border-bottom:1px solid var(--vien);margin:.2rem 0 .9rem;overflow-x:auto}
-.kh-tab button,.hs-tab button{font:inherit;font-size:.84rem;background:none;border:0;border-bottom:2px solid transparent;
-  padding:.5rem .8rem;color:var(--chu-nhat);cursor:pointer;white-space:nowrap;position:relative;margin-bottom:-1px}
-.kh-tab button[aria-selected="true"],.hs-tab button[aria-selected="true"]{color:var(--do-chu);border-bottom-color:var(--do);font-weight:600}
-.kh-tab button:hover,.hs-tab button:hover{color:var(--chu)}
+/* Tab Danh sách / Bản đồ: lớp .kh-tab/.hs-tab nay ở chung/chung.css (màn Mùa vụ dùng chung). */
 
 /* Phân khúc "Danh sách làm việc" */
 .kh-phan-khuc{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(196px,100%),1fr));gap:.5rem;margin-bottom:.8rem}

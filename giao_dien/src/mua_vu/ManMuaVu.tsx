@@ -1,17 +1,22 @@
-// Màn "Mùa vụ sản phẩm" (/mua-vu, đặc tả 2026-09-29-mua-vu-san-pham-design.md): kéo thanh
-// thời gian theo NGÀY, treemap ngành → mã đổi theo cửa sổ N ngày kết thúc ở ngày đó.
-// Không theo khoảng xem chung (thanh kéo là trục thời gian riêng). Chỉ số (?cs=) và cửa
-// sổ (?n=) nằm trên URL; vị trí thanh kéo thì không.
+// Màn "Mùa vụ sản phẩm" (/mua-vu, đặc tả 2026-09-29-mua-vu-san-pham-design.md). Hai tab:
+//   * "Theo mùa" (mặc định): bản đồ nhiệt mã × tháng (./BanDoNhiet.tsx) — cả dải tháng trên
+//     một hàng; bấm ô là mở tab Ảnh chụp ở cuối tháng đó;
+//   * "Ảnh chụp" (?tab=anh): kéo thanh thời gian theo NGÀY, treemap ngành → mã đổi theo
+//     cửa sổ N ngày kết thúc ở ngày đó.
+// Không theo khoảng xem chung (thanh kéo là trục thời gian riêng). Tab (?tab=), chỉ số (?cs=)
+// và cửa sổ (?n=) nằm trên URL; vị trí thanh kéo thì không.
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { lay } from "../api";
 import { useRong } from "../chung/hooks";
 import { Khoi } from "../chung/Khoi";
 import { DongNoi, ONoi } from "../chung/ONoi";
-import { gon, ngay, pc, so_luong, yen } from "../dinh_dang";
+import { ngay, pc } from "../dinh_dang";
 import { giuKhoang } from "../khung/khoang";
 import { CAO_NHAN, xep } from "./cay_o";
-import { LuyKe, cuaSo, namTruoc, ngayCua, type ChiSo, type DuLieuMV } from "./du_lieu";
+import { BanDoNhiet, type KieuTo } from "./BanDoNhiet";
+import { CAU_SO_LUONG, LuyKe, cuaSo, inGon, inSo, namTruoc, ngayCua, type ChiSo, type DuLieuMV } from "./du_lieu";
+import type { KieuXep } from "./nhiet";
 import { ThanhThoiGian } from "./ThanhThoiGian";
 import "./mua_vu.css";
 
@@ -20,19 +25,21 @@ const CHI_SO: { ma: ChiSo; nhan: string }[] = [
 const CUA_SO = [7, 30, 90];
 const CAO_CAY = 460;
 
+type Tab = "mua" | "anh";
+
 const docUrl = () => {
   const q = new URLSearchParams(location.search);
   const cs = (["dt", "lg", "sl"] as ChiSo[]).find(x => x === q.get("cs")) ?? "dt";
   const n = CUA_SO.find(x => String(x) === q.get("n")) ?? 30;
-  return { cs, n };
+  const tab: Tab = q.get("tab") === "anh" ? "anh" : "mua";
+  return { cs, n, tab };
 };
-
-const inSo = (cs: ChiSo, v: number) => (cs === "sl" ? so_luong(v) : yen(v));
-const inGon = (cs: ChiSo, v: number) => (cs === "sl" ? so_luong(v, 0) : gon(v));
 
 export default function ManMuaVu() {
   const q = useQuery({ queryKey: ["mua-vu"], queryFn: () => lay<DuLieuMV>("/api/mua-vu"), staleTime: 5 * 60e3 });
-  const [{ cs, n }, datUrl] = useState(docUrl);
+  const [{ cs, n, tab }, datUrl] = useState(docUrl);
+  const [to, datTo] = useState<KieuTo>("ma");
+  const [kieu, datKieu] = useState<KieuXep>("cao_diem");
   const [b, datBTho] = useState<number | null>(null);
   const [tat, datTat] = useState<Set<number>>(new Set());
   const [danhDau, datDanhDau] = useState<number | null>(null);
@@ -46,13 +53,22 @@ export default function ManMuaVu() {
     raf.current = requestAnimationFrame(() => datBTho(x));
   }, []);
 
-  const doiUrl = (moi: { cs?: ChiSo; n?: number }) => {
-    const gt = { cs, n, ...moi };
+  const doiUrl = (moi: { cs?: ChiSo; n?: number; tab?: Tab }) => {
+    const gt = { cs, n, tab, ...moi };
     datUrl(gt);
     const p = new URLSearchParams(location.search);
     p.set("cs", gt.cs); p.set("n", String(gt.n));
+    if (gt.tab === "anh") p.set("tab", "anh"); else p.delete("tab");
     history.replaceState(null, "", giuKhoang(`${location.pathname}?${p}`));
   };
+  // Bấm một ô của bản đồ nhiệt: sang Ảnh chụp, cửa sổ 30 ngày, thanh kéo ở ngày cuối tháng đó.
+  const doiUrlRef = useRef(doiUrl); doiUrlRef.current = doiUrl;
+  const chonThang = useCallback((ngayCuoi: number) => {
+    cancelAnimationFrame(raf.current);
+    datBTho(ngayCuoi);
+    doiUrlRef.current({ tab: "anh", n: 30 });
+    window.scrollTo({ top: 0 });
+  }, []);
 
   const dl = q.data;
   const L = useMemo(() => (dl ? new LuyKe(dl) : null), [dl]);
@@ -103,19 +119,23 @@ export default function ManMuaVu() {
   ].filter(Boolean).join(" ");
 
   const cachTinh = `Mỗi ô = tổng ${n} ngày kết thúc ở ngày đang chọn. Doanh thu thuần (chưa thuế), đã gồm phiếu đỏ (trả hàng, số âm). Không tính mua hàng của nhân viên. Phí & điều chỉnh và hàng tặng không phải sản phẩm nên không vẽ, nhưng tiền vẫn có trong tổng.`
-    + (cs === "sl" ? " Số lượng cộng lẫn thùng (ケース) và lẻ (バラ): so MỘT mã qua các mùa là đúng, so kích thước ô giữa hai mã khác nhau thì không." : "");
+    + (cs === "sl" ? CAU_SO_LUONG : "");
 
   return (
     <div className="mv">
+      <div className="kh-tab" role="tablist" aria-label="Cách xem">
+        <button type="button" role="tab" aria-selected={tab === "mua"} onClick={() => doiUrl({ tab: "mua" })}>Theo mùa</button>
+        <button type="button" role="tab" aria-selected={tab === "anh"} onClick={() => doiUrl({ tab: "anh" })}>Ảnh chụp</button>
+      </div>
       <div className="mv-chon">
         <div className="mv-nhom" role="group" aria-label="Chỉ số">
           {CHI_SO.map(c => <button key={c.ma} type="button" className="chip"
             aria-pressed={c.ma === cs} onClick={() => doiUrl({ cs: c.ma })}>{c.nhan}</button>)}
         </div>
-        <div className="mv-nhom" role="group" aria-label="Cửa sổ">
+        {tab === "anh" && <div className="mv-nhom" role="group" aria-label="Cửa sổ">
           {CUA_SO.map(x => <button key={x} type="button" className="chip"
             aria-pressed={x === n} onClick={() => doiUrl({ n: x })}>{x} ngày</button>)}
-        </div>
+        </div>}
         <div className="mv-tim">
           <input type="search" placeholder="Đánh dấu một mã…" value={tim} onChange={e => datTim(e.target.value)}
                  onKeyDown={e => { if (e.key === "Escape") { datTim(""); datDanhDau(null); } }} />
@@ -135,6 +155,10 @@ export default function ManMuaVu() {
           </button>))}
       </div>
 
+      {tab === "mua" ? (
+        <BanDoNhiet dl={dl} L={L} cs={cs} nganhCua={nganhCua} tat={tat} danhDau={danhDau}
+          to={to} datTo={datTo} kieu={kieu} datKieu={datKieu} onChon={chonThang} />
+      ) : <>
       <Khoi tieu_de={`${n} ngày · ${ngay(ngayCua(dl.ngay_dau!, cua.a))} → ${ngay(ngayCua(dl.ngay_dau!, cua.b))}`}
             phu={cay ? `Tổng ${inSo(cs, cay.tong)}` : undefined} cach_tinh={cachTinh} canh_bao={canhBao || undefined}>
         <a href="#mv-ngay-cuoi" className="mv-bo-qua">Bỏ qua ô, tới thanh thời gian</a>
@@ -175,6 +199,7 @@ export default function ManMuaVu() {
       </Khoi>
 
       <ThanhThoiGian so_ngay={L.so_ngay} ngay_dau={dl.ngay_dau!} tong_ngay={L.tongNgay} b={bb} n={n} datB={datB} />
+      </>}
     </div>
   );
 }

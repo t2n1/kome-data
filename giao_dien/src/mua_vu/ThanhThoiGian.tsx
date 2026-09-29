@@ -5,13 +5,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRong } from "../chung/hooks";
 import { ngay } from "../dinh_dang";
-import { ngayCua } from "./du_lieu";
+import { MUA, ngayCua } from "./du_lieu";
 
 const CAO = 56;
-const MUA: Record<number, string> = {
-  3: "xuan", 4: "xuan", 5: "xuan", 6: "he", 7: "he", 8: "he",
-  9: "thu", 10: "thu", 11: "thu", 12: "dong", 1: "dong", 2: "dong",
-};
 
 export function ThanhThoiGian({ so_ngay, ngay_dau, tong_ngay, b, n, datB }: {
   so_ngay: number; ngay_dau: string; tong_ngay: Float64Array; b: number; n: number; datB: (b: number) => void;

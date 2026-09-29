@@ -1,4 +1,5 @@
 """Mùa vụ sản phẩm (/mua-vu, migration 058) — đặc tả 2026-09-29-mua-vu-san-pham-design.md."""
+import re
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -23,6 +24,24 @@ def test_man_khong_tu_viet_lai_chi_so_va_dung_giu_khoang():
     assert "giuKhoang(" in src                       # replaceState qua giuKhoang
     assert "toFixed(" not in src and "de-DE" not in src   # định dạng qua dinh_dang.ts
     assert "/api/mua-vu" in src
+
+
+def test_tab_theo_mua_mac_dinh_va_tab_di_qua_giu_khoang():
+    """Hai tab: "Theo mùa" (bản đồ nhiệt, mặc định) và "Ảnh chụp" (?tab=anh). Tab nằm trên URL
+    và đi qua CÙNG `doiUrl` → `history.replaceState(null, "", giuKhoang(...))`."""
+    src = (_SRC / "mua_vu" / "ManMuaVu.tsx").read_text(encoding="utf-8")
+    assert "Theo mùa" in src and "Ảnh chụp" in src and 'role="tablist"' in src
+    assert 'q.get("tab") === "anh" ? "anh" : "mua"' in src          # không tham số = Theo mùa
+    assert 'p.set("tab", "anh")' in src
+    assert 'history.replaceState(null, "", giuKhoang(' in src
+    nhiet = (_SRC / "mua_vu" / "BanDoNhiet.tsx").read_text(encoding="utf-8")
+    assert "toFixed(" not in nhiet and "de-DE" not in nhiet
+    assert 'aria-hidden="true"' in nhiet and 'role="group"' in nhiet
+    # Ánh xạ tháng → mùa viết MỘT lần (du_lieu.ts), thanh thời gian và bản đồ nhiệt cùng đọc.
+    mot_lan = re.compile(r"const MUA\s*[:=]")
+    assert mot_lan.search((_SRC / "mua_vu" / "du_lieu.ts").read_text(encoding="utf-8"))
+    assert not mot_lan.search((_SRC / "mua_vu" / "ThanhThoiGian.tsx").read_text(encoding="utf-8"))
+    assert not mot_lan.search(nhiet)
 
 
 def _hang(conn, batch):
