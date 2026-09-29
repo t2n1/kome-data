@@ -16,7 +16,8 @@ const THU_TU_VUNG = Object.keys(TEN_VUNG);
 
 const SO: (keyof GiaoHang)[] = ["phi_ship", "mien_ship_tu", "mien_ship_kien", "thung_moi_kien", "phi_daibiki", "daibiki_tu",
   "daibiki_sau", "kien_toi_da_kg", "sua_cuoi"];
-const soHoac = (v: unknown): number | null => {
+/** Chuỗi / số từ JSON → số; rỗng, null hoặc không phải số → null (không bao giờ NaN / 0). */
+export const soHoac = (v: unknown): number | null => {
   if (v == null || v === "") return null;
   const n = typeof v === "number" ? v : Number(String(v).trim());
   return Number.isFinite(n) ? n : null;
@@ -50,20 +51,20 @@ export function phiSoSanh(ds: GiaoHang[]): PhiSoSanh {
 }
 
 /** Một thanh của biểu đồ: `tong` = ship + vùng + daibiki (phần đã biết); `lech` = tong − tổng KOME (¥, null khi bên này
- *  hoặc KOME có "?" / không nhận — so nửa vời là nói sai); `p` = % TỔNG KHÁCH TRẢ (tiền hàng + phí) của bên so với ở KOME —
- *  màu theo mau.ts::mauLech (đối thủ rẻ hơn > 5% = đỏ). */
-export type ThanhPhi = { g: GiaoHang; r: KetQuaPhi; tong: number; kome: boolean; lech: number | null; p: number | null };
+ *  hoặc KOME có "?" / không nhận — so nửa vời là nói sai); `mau` theo DẤU của `lech` (phán quyết chủ DN, bản phác
+ *  ca-trang-8): khách tốn ít hơn ở bên đó = đỏ (bất lợi KOME), nhiều hơn = xanh, bằng = xám — KHÔNG ngưỡng ±5%. */
+export type ThanhPhi = { g: GiaoHang; r: KetQuaPhi; tong: number; kome: boolean; lech: number | null; mau: MauLech | null };
 
 export function thanhPhi(ds: GiaoHang[], don: DonMau): ThanhPhi[] {
   const ra = ds.map((g, i) => {
     const r = tinh(dieuKien(g), don);
-    return { g, r, tong: r.ship + r.vung + r.daibiki, kome: g.ma_doi_thu === "KOME", lech: null as number | null, p: null as number | null, i };
+    return { g, r, tong: r.ship + r.vung + r.daibiki, kome: g.ma_doi_thu === "KOME", lech: null as number | null, mau: null as MauLech | null, i };
   });
   const K = ra.find(x => x.kome);
   const soDuoc = (x: typeof ra[number]) => !x.r.chua_ro.length && !x.r.khong_nhan;
   if (K && soDuoc(K)) for (const x of ra) if (!x.kome && soDuoc(x)) {
     x.lech = x.tong - K.tong;
-    x.p = phanTram(don.tien + x.tong, don.tien + K.tong);
+    x.mau = x.lech < 0 ? "do" : x.lech > 0 ? "xanh" : "xam";
   }
   ra.sort((a, b) => (+a.r.khong_nhan - +b.r.khong_nhan) || (a.r.chua_ro.length - b.r.chua_ro.length) || (a.tong - b.tong) || a.i - b.i);
   return ra.map(({ i: _i, ...x }) => x);

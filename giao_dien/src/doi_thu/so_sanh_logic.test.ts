@@ -328,9 +328,10 @@ describe("dongCot / oNhiet có phí giao", () => {
     expect(kome).toMatchObject({ gia: 603, phiHoi: null });           // 520 + 830/10
     const a = dong.find(d => d.ten === "A")!;
     expect(a).toMatchObject({ gia: 544, phiHoi: null, p: -10 });      // bao ship: chỉ daibiki 440
-    expect(dong.find(d => d.ten === "B")).toMatchObject({ gia: 450, phiHoi: "dk", p: -25 });
-    expect(dong.find(d => d.ten === "C")).toMatchObject({ gia: 400, phiHoi: "kg" });
-    expect(dong.find(d => d.ten === "D")).toMatchObject({ gia: 480, phiHoi: "dk" });
+    // Không so giá trần với giá đã cộng phí: mặt hàng mang "?" phí → p = null (xám; "?" đã nói lý do).
+    expect(dong.find(d => d.ten === "B")).toMatchObject({ gia: 450, phiHoi: "dk", p: null });
+    expect(dong.find(d => d.ten === "C")).toMatchObject({ gia: 400, phiHoi: "kg", p: null });
+    expect(dong.find(d => d.ten === "D")).toMatchObject({ gia: 480, phiHoi: "dk", p: null });
     // giá mua 1 thùng (đuôi đứt) cũng kèm phí của đơn 1 thùng
     expect(a.giaLe).toBe(544);
   });
@@ -350,6 +351,15 @@ describe("dongCot / oNhiet có phí giao", () => {
   it("oNhiet dùng cùng giá kèm phí và mang cờ", () => {
     const r = oNhiet([n()], { sl: "1", gk: "chuan", chiCung: false, phi });
     expect(r.o.get(khoaONhiet(n(), "Bên A"))).toMatchObject({ p: -10, hoi: null });
-    expect(r.o.get(khoaONhiet(n(), "Bên B"))).toMatchObject({ p: -25, hoi: "dk" });
+    expect(r.o.get(khoaONhiet(n(), "Bên B"))).toMatchObject({ p: null, hoi: "dk" });
+  });
+  it("KOME thiếu phí (kg / điều kiện) → mọi p = null, kể cả mặt hàng đã cộng được phí", () => {
+    const khongKg = { ...n(), kome_kg_thung: null };
+    const { dong } = dongCot(khongKg, { sl: "1", gk: "chuan", chiCung: false, moRong: true, phi });
+    expect(dong.find(d => d.kome)).toMatchObject({ gia: 520, phiHoi: "kg" });
+    expect(dong.find(d => d.ten === "A")).toMatchObject({ gia: 544, phiHoi: null, p: null });
+    expect(oNhiet([khongKg], { sl: "1", gk: "chuan", chiCung: false, phi }).o.get(khoaONhiet(khongKg, "Bên A"))).toMatchObject({ p: null });
+    const khongDk = dongCot(n(), { sl: "1", gk: "chuan", chiCung: false, moRong: true, phi: { ...phi, kome: null } }).dong;
+    expect(khongDk.filter(d => !d.kome).every(d => d.p == null)).toBe(true);
   });
 });

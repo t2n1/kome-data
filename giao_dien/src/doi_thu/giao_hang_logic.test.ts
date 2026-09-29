@@ -36,12 +36,14 @@ describe("thanhPhi — biểu đồ 'Khách phải trả thêm'", () => {
     expect(o[o.length - 1].g.ma_doi_thu).toBe("B");
     expect(o[o.length - 1].r.khong_nhan).toBe(true);
   });
-  it("lệch so KOME (¥) và p theo tổng khách trả (tiền hàng + phí); không so khi bên đó hoặc KOME có '?'", () => {
+  it("lệch so KOME (¥), màu theo DẤU (rẻ hơn = đỏ, đắt hơn = xanh, bằng = xám — không ngưỡng ±5%); không so khi có '?'", () => {
     const r = thanhPhi([KOME, A, B, C], don());
     const b = r.find(x => x.g.ma_doi_thu === "B")!;
-    expect(b.lech).toBe(-500);                          // 330 − 830: rẻ hơn KOME ¥500
-    expect(b.p).toBe(Math.round(100 * (15330 / 15830 - 1)));
-    expect(r.find(x => x.g.ma_doi_thu === "C")!.lech).toBeNull();
+    expect(b).toMatchObject({ lech: -500, mau: "do" });           // 330 − 830: rẻ hơn KOME ¥500 (chỉ 3% đơn) — vẫn đỏ
+    expect(r.find(x => x.g.ma_doi_thu === "A")).toMatchObject({ lech: 215, mau: "xanh" });
+    const D = g("D", { bao_ship: false, phi_ship: 500, phi_ship_theo: "don", mien_ship_tu: 20000, phi_daibiki: 330 });
+    expect(thanhPhi([KOME, D], don()).find(x => x.g.ma_doi_thu === "D")).toMatchObject({ lech: 0, mau: "xam" });
+    expect(r.find(x => x.g.ma_doi_thu === "C")).toMatchObject({ lech: null, mau: null });
     expect(r.find(x => x.kome)!.lech).toBeNull();
     const k2 = { ...KOME, phi_daibiki: null };
     expect(thanhPhi([k2, B], don()).find(x => x.g.ma_doi_thu === "B")!.lech).toBeNull();

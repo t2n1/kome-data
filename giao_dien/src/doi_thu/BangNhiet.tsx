@@ -48,8 +48,7 @@ export function BangNhiet({ ds, sl, gk, chiCung, mo, phi }: { ds: Nhom[]; sl: So
                       strokeDasharray={!het && !c.cung ? "3 2" : undefined} />
                     <text x={cx + CW / 2} y={y + 20} fontSize={10.5} textAnchor="middle" pointerEvents="none"
                       style={{ fill: c.p == null ? "var(--dt-cam)" : dam >= 0.6 ? "var(--dt-vach)" : "var(--chu)" }}>
-                      {c.cung ? "" : "≈"}{c.p == null ? <tspan fontWeight={700}>?</tspan> : pcDau(c.p)}{c.so > 1 ? ` ·${c.so}` : ""}
-                      {c.hoi && c.p != null && <tspan className="t-cam-nhat" fontWeight={700}> ?</tspan>}</text>
+                      {c.cung ? "" : "≈"}{c.p == null ? <tspan fontWeight={700}>?</tspan> : pcDau(c.p)}{c.so > 1 ? ` ·${c.so}` : ""}</text>
                   </ONoi>);
               })}
             </g>);

@@ -96,9 +96,13 @@ const tenBen = (q: QuanSat) => q.ten_doi_thu ?? q.ma_doi_thu;
 /** So giá tăng dần, null xếp cuối (ổn định). */
 const theoGia = (a: number | null, b: number | null) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : a - b);
 
-function dongTu(q: QuanSat, sl: SoLuong, gK: number | null, phi: PhiSoSanh | null): Dong {
+/** % so KOME — nhưng KHÔNG BAO GIỜ so giá đã cộng phí với giá trần: một bên (mặt hàng hoặc KOME) còn "?" phí → null. */
+const pSo = (gia: number | null, gK: number | null, hoi: LyDoHoiPhi | null, komeHoi: LyDoHoiPhi | null) =>
+  (hoi || komeHoi ? null : phanTram(gia, gK));
+
+function dongTu(q: QuanSat, sl: SoLuong, gK: number | null, phi: PhiSoSanh | null, komeHoi: LyDoHoiPhi | null): Dong {
   const { gia, khongGhiPallet, giaLe, hoi, phi: r } = giaMH(q, sl, phi);
-  return { kome: false, q, ben: tenBen(q), ten: q.ten_goc, gia, giaLe, p: phanTram(gia, gK), phiHoi: hoi, phi: r,
+  return { kome: false, q, ben: tenBen(q), ten: q.ten_goc, gia, giaLe, p: pSo(gia, gK, hoi, komeHoi), phiHoi: hoi, phi: r,
     cung: q.nhan === "cung_hang", soGoi: q.so_goi_thung, klGoi: q.kl_goi_g, thieu: thieuQuyCach(q),
     cu: (q.tuoi_ngay ?? 0) > NGAY_CU, thueKhongRo: q.thue === "khong_ro", gomShip: q.gom_ship === "co",
     het: q.trang_thai === "het", km: !!q.khuyen_mai || q.gia_truoc_km != null, khongGhiPallet };
@@ -114,7 +118,7 @@ export function dongCot(n: Nhom, o: { sl: SoLuong; gk: string; chiCung: boolean;
     soGoi: n.kome_goi_thung, klGoi: n.kome_kg_goi == null ? null : n.kome_kg_goi * 1000, thieu: false, cu: false,
     thueKhongRo: false, gomShip: false, het: false, km: false, khongGhiPallet: false, phiHoi: k.hoi, phi: k.phi };
   const hang = n.quan_sat.filter(q => veDuoc(q) && (!o.chiCung || q.nhan === "cung_hang"))
-    .map(q => dongTu(q, o.sl, gK, p)).sort((a, b) => theoGia(a.gia, b.gia));
+    .map(q => dongTu(q, o.sl, gK, p, k.hoi)).sort((a, b) => theoGia(a.gia, b.gia));
   const giu = o.moRong ? null : new Set([...hang.slice(0, 5), ...hang.filter(d => d.cung)]);
   const hien = giu ? hang.filter(d => giu.has(d)) : hang;
   return { dong: [kome, ...hien].sort((a, b) => theoGia(a.gia, b.gia)), an: hang.length - hien.length };
@@ -134,7 +138,7 @@ export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolea
   const soNhom = new Map<string, number>();
   for (const n of ds) {
     const p = phiCua(n, o.sl, o.phi);
-    const gK = giaKomePhi(n, o.gk, o.sl, p).gia;
+    const k = giaKomePhi(n, o.gk, o.sl, p), gK = k.gia;
     const theoBen = new Map<string, QuanSat[]>();
     for (const q of n.quan_sat) {
       if (!veDuoc(q) || (o.chiCung && q.nhan !== "cung_hang")) continue;
@@ -144,7 +148,7 @@ export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolea
     for (const [b, ds2] of theoBen) {
       const cung = ds2.filter(q => q.nhan === "cung_hang");
       const chon = (cung.length ? cung : ds2).map(q => ({ q, g: giaMH(q, o.sl, p) })).sort((x, y) => theoGia(x.g.gia, y.g.gia))[0];
-      ket.set(khoaONhiet(n, b), { q: chon.q, p: phanTram(chon.g.gia, gK), so: ds2.length, cung: cung.length > 0, hoi: chon.g.hoi });
+      ket.set(khoaONhiet(n, b), { q: chon.q, p: pSo(chon.g.gia, gK, chon.g.hoi, k.hoi), so: ds2.length, cung: cung.length > 0, hoi: chon.g.hoi });
       soNhom.set(b, (soNhom.get(b) ?? 0) + 1);
     }
   }

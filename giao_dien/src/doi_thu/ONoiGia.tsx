@@ -37,6 +37,8 @@ export function NoiGia({ n, q, sl, gk, phi }: { n: Nhom; q: QuanSat; sl: SoLuong
   const klKome = n.kome_kg_goi == null ? null : n.kome_kg_goi * 1000;
   const khacCo = q.kg_thung_dt != null && n.kome_kg_thung != null && Math.abs(q.kg_thung_dt - n.kome_kg_thung) > 0.01;
   const nhanGk = LUA_CHON_GK.find(x => x.ma === gk)?.nhan ?? gk;
+  // Bật "Tính cả phí giao": bảng bậc vẫn là giá TRẦN hai phía (so trần với trần); giá kèm phí ở dòng DongPhi bên dưới.
+  const pPhi = phiMatHang(n, q, sl, phi);
   return (
     <div className="dt-ng">
       <p className="dt-ng-ben">{q.ten_doi_thu ?? q.ma_doi_thu}</p>
@@ -53,7 +55,8 @@ export function NoiGia({ n, q, sl, gk, phi }: { n: Nhom; q: QuanSat; sl: SoLuong
         <O nhan="1 thùng" gia={kgChu(q.kg_thung_dt)} kome={kgChu(n.kome_kg_thung)} />
       </div>
       <table>
-        <thead><tr><th>Mua</th><th className="r">¥ / gói</th><th className="r">¥ / thùng</th><th className="r">¥ / kg</th><th className="r">so KOME</th></tr></thead>
+        <thead><tr><th>Mua</th><th className="r">¥ / gói</th><th className="r">¥ / thùng</th><th className="r">¥ / kg</th>
+          <th className="r">{pPhi ? "so KOME (giá trần)" : "so KOME"}</th></tr></thead>
         <tbody>
           {b.dong.map((d, i) => (
             <tr key={i} className={d.dang ? "dang" : undefined}>
@@ -76,7 +79,7 @@ export function NoiGia({ n, q, sl, gk, phi }: { n: Nhom; q: QuanSat; sl: SoLuong
       {cu && <p className="dt-ng-chu vang">Bảng giá đã {q.tuoi_ngay} ngày</p>}
       {sl === "pallet" && khongGhiPallet && <p className="dt-ng-chu">Bên này không ghi giá pallet — đang dùng giá lẻ</p>}
       {q.gom_ship === "co" && <p className="dt-ng-chu">🚚 Giá đã gồm ship</p>}
-      <DongPhi p={phiMatHang(n, q, sl, phi)} />
+      <DongPhi p={pPhi} />
       <p className="dt-ng-chu">
         Giá gốc {q.gia_goc == null ? "?" : `${yen(q.gia_goc)}/${q.don_vi_gia ?? "?"}`}
         {q.gia_bac ? ` · bậc ghi: “${q.gia_bac}”` : ""}{q.kenh_gia ? ` · ${q.kenh_gia}` : ""} · {ngay(q.ngay_nguon)}

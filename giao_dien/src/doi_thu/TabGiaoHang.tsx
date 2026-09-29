@@ -8,10 +8,9 @@ import { Khoi } from "../chung/Khoi";
 import { ONoi } from "../chung/ONoi";
 import { ngay, so, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
-import { chuanGiao, DON_THUNG, DON_TIEN, DON_VUNG, oBang, TEN_VUNG, thanhPhi, truOPhan, type ThanhPhi } from "./giao_hang_logic";
+import { chuanGiao, soHoac, DON_THUNG, DON_TIEN, DON_VUNG, oBang, TEN_VUNG, thanhPhi, truOPhan, type ThanhPhi } from "./giao_hang_logic";
 import { giaoTrong } from "./ho_so_logic";
 import type { GiaoHang, TongQuan } from "./kieu";
-import { mauLech } from "./mau";
 import type { DonMau } from "./phi_giao";
 import { SuaGiaoHang } from "./SuaNho";
 
@@ -19,7 +18,6 @@ export type BangChung = { so_don_ship: number | null; don_ship_lon_nhat: number 
   so_don_dai_300: number | null };
 export type GiaoHangApi = { dong: GiaoHang[]; bang_chung: BangChung | null };
 
-const soHoac = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
 
 /** GET /api/doi-thu/giao-hang — MỘT khoá truy vấn cho tab này và "Tính cả phí giao" của So sánh. Số đổi Number() ở đây. */
 export function useGiaoHang(bat = true) {
@@ -46,8 +44,8 @@ const CACH_TINH = <>
   Ngoài tiền hàng, khách trả thêm: phí ship (khi đơn chưa tới ngưỡng miễn; theo đơn, thùng hoặc kiện) + phụ phí vùng (mỗi
   kiện; kiện = số thùng ÷ thùng/kiện, không biết thì 1 kiện) + phí daibiki (chỉ khi trả daibiki; từ ngưỡng thì dùng phí sau
   ngưỡng). "Bao ship" = phí đã nằm trong giá hàng — tab So sánh đã so giá đó. Phần bên đó không ghi là ô "?" và không cộng.
-  Đỏ = khách trả ở bên đó ít hơn ở KOME quá 5% (tính trên tiền hàng + phí), xanh = nhiều hơn, xám = ngang. Dòng KOME suy từ
-  phiếu bán cho tới khi có người xác nhận.</>;
+  Đỏ = khách trả phí ở bên đó ít hơn ở KOME, xanh = nhiều hơn, xám = bằng. Chỉ so khi cả hai bên đều không còn phần "?".
+  Dòng KOME suy từ phiếu bán cho tới khi có người xác nhận.</>;
 
 export function TabGiaoHang() {
   const kx = chuoiKhoang(useKhoang());
@@ -162,7 +160,7 @@ function BieuDoPhi({ ds, don, bc, mo }: { ds: GiaoHang[]; don: DonMau; bc: BangC
                   {t.tong > 0 || !t.r.chua_ro.length ? yen(t.tong) : ""}
                   {t.g.bao_ship && <tspan className="t-nhat"> bao ship</tspan>}
                   {t.r.chua_ro.length > 0 && <tspan className="t-nhat"> chưa rõ {t.r.chua_ro.join(", ")}</tspan>}
-                  {t.lech != null && <tspan className={"t-dam t-" + mauLech(t.p)}>
+                  {t.lech != null && <tspan className={"t-dam t-" + t.mau}>
                     {"  "}{t.lech < 0 ? `rẻ hơn KOME ${yen(-t.lech)}` : t.lech > 0 ? `đắt hơn KOME ${yen(t.lech)}` : "bằng KOME"}</tspan>}
                 </>}
               </text>
