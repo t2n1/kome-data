@@ -11,17 +11,17 @@ import {
 } from "./sua_logic";
 
 /** Trạng thái một lần Lưu: đang gửi · câu lỗi (400) · xung đột (409). Thành công → làm mới mọi truy vấn "doi-thu"
- *  rồi `xong()`. `ghiDe` gửi lại ĐÚNG hàm vừa gửi với `ghi_de = true`; `giu` = giữ bản kia (làm mới rồi đóng). */
+ *  rồi `xong()`. `giu` = giữ bản kia (làm mới rồi đóng). "Ghi đè" KHÔNG ở đây: mỗi pop-up gọi lại CHÍNH hàm lưu hiện
+ *  tại của nó với `ghi_de = true` (`luu(true)`) — sửa thêm sau 409 vẫn được gửi, và vẫn qua kiểm tra của form. */
 export function useGhi(xong: () => void, dong: () => void) {
   const qc = useQueryClient();
   const [dang, datDang] = useState(false);
   const [loi, datLoi] = useState<string | null>(null);
   const [xung, datXung] = useState<XungDot | null>(null);
-  const cuoi = useRef<((ghi_de: boolean) => Promise<unknown>) | null>(null);
-  const chay = (fn: (ghi_de: boolean) => Promise<unknown>, ghi_de = false) => {
+  const chay = (fn: () => Promise<unknown>) => {
     if (dang) return;
-    cuoi.current = fn; datDang(true); datLoi(null); datXung(null);
-    fn(ghi_de)
+    datDang(true); datLoi(null); datXung(null);
+    fn()
       .then(() => { qc.invalidateQueries({ queryKey: ["doi-thu"] }); xong(); })
       .catch((e: unknown) => {
         const x = docXungDot(e);
@@ -31,7 +31,6 @@ export function useGhi(xong: () => void, dong: () => void) {
   };
   return {
     dang, loi, xung, datLoi, chay,
-    ghiDe: () => { if (cuoi.current) chay(cuoi.current, true); },
     giu: () => { qc.invalidateQueries({ queryKey: ["doi-thu"] }); dong(); },
   };
 }
@@ -73,15 +72,25 @@ export function SuaDieuKien({ ben, dk, dong, xong }: {
   const [loai, datLoai] = useState(dk?.loai ?? "ship");
   const [nd, datNd] = useState(dk?.noi_dung ?? "");
   const [bo, datBo] = useState(false);
+  // Dòng thêm tay: bước 1 (bỏ dòng cũ) đã vào CSDL chưa. Lần Lưu sau chỉ chạy bước 2 — chạy lại bước 1 thì 409 với
+  // chính mình. Ref cho phần async, state để vẽ lại (nút Lưu bật, ô "bỏ đi" tắt).
+  const daBoRef = useRef(false);
+  const [daBo, datDaBo] = useState(false);
   const g = useGhi(xong, dong);
-  const doi = !dk || bo || loai !== dk.loai || nd.trim() !== dk.noi_dung;
-  const hopLe = bo || (nd.trim().length >= 1 && nd.trim().length <= 300);
-  const luu = () => g.chay(async ghi_de => {
+  const doi = !dk || daBo || bo || loai !== dk.loai || nd.trim() !== dk.noi_dung;
+  const hopLe = (bo && !daBo) || (nd.trim().length >= 1 && nd.trim().length <= 300);
+  const luu = (ghi_de = false) => g.chay(async () => {
     const goc = { ma_doi_thu: ben.ma, da_xem: dk?.sua_cuoi ?? 0, ghi_de };
-    if (!dk) return gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: null, loai, noi_dung: nd.trim(), bo: false });
+    const them = () => gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: null, loai, noi_dung: nd.trim(), bo: false });
+    if (!dk) return them();
     if (!dk.them_tay) return gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: dk.fact_id, loai, noi_dung: nd.trim(), bo });
-    await gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: null, loai: dk.loai, noi_dung: dk.noi_dung, bo: true });
-    if (!bo) return gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: null, loai, noi_dung: nd.trim(), bo: false });
+    if (!daBoRef.current) {
+      await gui("/api/doi-thu/dieu-kien", { ...goc, fact_id: null, loai: dk.loai, noi_dung: dk.noi_dung, bo: true });
+      daBoRef.current = true; datDaBo(true);
+    }
+    if (bo && !daBo) return;
+    try { return await them(); }
+    catch { throw new Error("Đã bỏ điều kiện cũ nhưng chưa thêm được điều kiện mới — bấm Lưu lại."); }
   });
   return (
     <HopThoai tieu_de={`${dk ? "Sửa" : "Thêm"} điều kiện bán · ${ben.ten ?? ben.ma}`} dong={dong} rong={480}>
@@ -93,11 +102,11 @@ export function SuaDieuKien({ ben, dk, dong, xong }: {
           </select></label>
         <label>Nội dung
           <textarea rows={3} maxLength={300} value={nd} disabled={bo} onChange={e => datNd(e.target.value)} /></label>
-        {dk && <label className="dt-o-chon">
+        {dk && !daBo && <label className="dt-o-chon">
           <input type="checkbox" checked={bo} onChange={e => datBo(e.target.checked)} /> Điều kiện này không còn đúng — bỏ đi</label>}
         {dk && <small className="dt-nhat">{dk.them_tay ? "Thêm tay" : "Từ bảng giá"} · {ngay(dk.ngay)}</small>}
-        {g.xung && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={g.ghiDe} giu={g.giu} />}
-        <NutLuu luu={luu} dong={dong} tat={!doi || !hopLe} dang={g.dang} loi={g.loi} />
+        {g.xung && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={() => luu(true)} giu={g.giu} />}
+        <NutLuu luu={() => luu()} dong={dong} tat={!doi || !hopLe} dang={g.dang} loi={g.loi} />
       </div>
     </HopThoai>
   );
@@ -116,10 +125,10 @@ export function SuaBen({ ben, sua_cuoi, dong, xong }: {
   if (ten.trim() !== ben.ten) d.ten = ten.trim();
   if (web.trim() !== (ben.web ?? "")) d.web = web.trim();
   if (ghiChu.trim() !== (ben.ghi_chu ?? "")) d.ghi_chu = ghiChu.trim();
-  const luu = () => {
+  const luu = (ghi_de = false) => {
     if (!ten.trim()) return g.datLoi("Tên hiển thị không được trống.");
     if (web.trim() && !/^https:\/\/\S+$/i.test(web.trim())) return g.datLoi("Website phải bắt đầu bằng https://");
-    g.chay(ghi_de => gui("/api/doi-thu/ben", { ma: ben.ma, ...d, da_xem: sua_cuoi, ghi_de }));
+    g.chay(() => gui("/api/doi-thu/ben", { ma: ben.ma, ...d, da_xem: sua_cuoi, ghi_de }));
   };
   return (
     <HopThoai tieu_de={`Sửa thông tin: ${ben.ten}`} dong={dong} rong={480}>
@@ -129,8 +138,8 @@ export function SuaBen({ ben, sua_cuoi, dong, xong }: {
         <label>Ghi chú về bên này
           <textarea rows={3} maxLength={300} placeholder="vd: chỉ bán sỉ, giao Kanto thứ 3 & 6" value={ghiChu}
             onChange={e => datGhiChu(e.target.value)} /></label>
-        {g.xung && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={g.ghiDe} giu={g.giu} />}
-        <NutLuu luu={luu} dong={dong} tat={!Object.keys(d).length} dang={g.dang} loi={g.loi} />
+        {g.xung && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={() => luu(true)} giu={g.giu} />}
+        <NutLuu luu={() => luu()} dong={dong} tat={!Object.keys(d).length} dang={g.dang} loi={g.loi} />
       </div>
     </HopThoai>
   );
@@ -162,8 +171,9 @@ export function SuaGiaoHang({ dong, tru_o, dong_lai, xong }: {
   const g = useGhi(xong, dong_lai);
   const kome = dong.ma_doi_thu === "KOME";
   const p = payloadGiao(dong, f, false, xacNhan);
-  const tro = tru_o === "phu_phi" ? "phu_phi.hokkaido" : tru_o;
-  const dau = (k: string) => (tro === k ? { "data-focus": "", className: "dt-tro" } : {});
+  // Ô `tru_o` mang `data-focus` + viền cam tới khi rời ô (cùng nếp SuaMatHang).
+  const [tro, datTro] = useState(tru_o === "phu_phi" ? "phu_phi.hokkaido" : tru_o ?? null);
+  const dau = (k: string) => (tro === k ? { "data-focus": "", className: "dt-tro", onBlur: () => datTro(null) } : {});
   const datT = (t: TruongGiaoDon, v: string) => datF({ ...f, truong: { ...f.truong, [t]: v } });
   const o = (t: TruongGiaoDon) => {
     const v = f.truong[t];
@@ -177,7 +187,7 @@ export function SuaGiaoHang({ dong, tru_o, dong_lai, xong }: {
     return <input type="text" inputMode={GIAO_SO.includes(t) ? "decimal" : undefined} placeholder={GOI_Y[t] ?? "?"}
       value={v} onChange={e => datT(t, e.target.value)} {...dau(t)} />;
   };
-  const luu = () => g.chay(ghi_de => gui("/api/doi-thu/giao-hang", payloadGiao(dong, f, ghi_de, xacNhan).body));
+  const luu = (ghi_de = false) => g.chay(() => gui("/api/doi-thu/giao-hang", payloadGiao(dong, f, ghi_de, xacNhan).body));
   return (
     <HopThoai tieu_de={`Điều kiện giao hàng · ${dong.ten ?? dong.ma_doi_thu}`} dong={dong_lai} rong={620}>
       <div className="dt-nho">
@@ -203,8 +213,8 @@ export function SuaGiaoHang({ dong, tru_o, dong_lai, xong }: {
         </fieldset>
         {kome && <label className="dt-o-chon">
           <input type="checkbox" checked={xacNhan} onChange={e => datXacNhan(e.target.checked)} /> Tôi xác nhận các số này</label>}
-        {g.xung && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={g.ghiDe} giu={g.giu} />}
-        <NutLuu luu={luu} dong={dong_lai} tat={p.rong} dang={g.dang} loi={g.loi} chu="Để trống = chưa rõ (không phải 0)." />
+        {g.xung && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={() => luu(true)} giu={g.giu} />}
+        <NutLuu luu={() => luu()} dong={dong_lai} tat={p.rong} dang={g.dang} loi={g.loi} chu="Để trống = chưa rõ (không phải 0)." />
       </div>
     </HopThoai>
   );

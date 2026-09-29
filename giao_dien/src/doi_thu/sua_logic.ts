@@ -6,7 +6,7 @@ import type { Bac, GiaoHang, QuanSat, XungDot } from "./kieu";
 
 export type BacNhap = { tu: string; don_vi_sl: Bac["don_vi_sl"]; gia: string; don_vi_gia: Bac["don_vi_gia"] };
 export type FormMatHang = { nhan: "cung_hang" | "thay_the" | "khong"; trang_thai: string; khuyen_mai: string;
-  so_goi_thung: string; kl_goi_g: string; gia_goc: string; don_vi_gia: string; thue: string; bac: BacNhap[];
+  gia_truoc_km: string; so_goi_thung: string; kl_goi_g: string; gia_goc: string; don_vi_gia: string; thue: string; bac: BacNhap[];
   vi_sao_gia: "" | "doc_sai" | "da_doi"; loai_nguon: string; lien_ket_bang_chung: string };
 
 /** Trường giá: đụng vào là phải nói "vì sao đổi giá" (= kome.doi_thu.TRUONG_GIA). */
@@ -34,6 +34,7 @@ const chu = (n: number | null | undefined) => (n == null ? "" : String(n));
 export function formTu(q: QuanSat): FormMatHang {
   return {
     nhan: q.nhan ?? "khong", trang_thai: q.trang_thai, khuyen_mai: q.khuyen_mai ?? "",
+    gia_truoc_km: chu(q.gia_truoc_km),
     so_goi_thung: chu(q.so_goi_thung), kl_goi_g: chu(q.kl_goi_g), gia_goc: chu(q.gia_goc),
     don_vi_gia: q.don_vi_gia ?? "", thue: q.thue ?? "",
     bac: (q.bac ?? []).map(b => ({ tu: String(b.tu), don_vi_sl: b.don_vi_sl, gia: String(b.gia), don_vi_gia: b.don_vi_gia })),
@@ -66,6 +67,7 @@ function thayDoi(q: QuanSat, f: FormMatHang): Record<string, unknown> {
   const g = formTu(q), d: Record<string, unknown> = {};
   if (f.trang_thai !== g.trang_thai) d.trang_thai = f.trang_thai;
   if (f.khuyen_mai.trim() !== g.khuyen_mai.trim()) d.khuyen_mai = f.khuyen_mai.trim();
+  if (!cungSo(f.gia_truoc_km, g.gia_truoc_km)) d.gia_truoc_km = f.gia_truoc_km.trim();     // "" = xoá (TRUONG_XOA_DUOC)
   if (!cungSo(f.so_goi_thung, g.so_goi_thung)) d.so_goi_thung = f.so_goi_thung.trim();
   if (!cungSo(f.kl_goi_g, g.kl_goi_g, true)) d.kl_goi_g = f.kl_goi_g.trim();
   if (!cungSo(f.gia_goc, g.gia_goc)) d.gia_goc = f.gia_goc.trim();
@@ -86,6 +88,12 @@ export function payload(q: QuanSat, f: FormMatHang, ghi_de: boolean): { body: ob
   if (doi_gia && f.vi_sao_gia) {
     body.vi_sao_gia = f.vi_sao_gia;
     if (f.vi_sao_gia === "da_doi") {
+      // "Giá đã đổi" thêm một dòng giá MỚI; máy chủ không chép bậc / khuyến mãi của dòng nạp cũ (điều kiện của giá cũ)
+      // → gửi kèm những gì người dùng ĐANG THẤY trong form (ô trống thì thôi), để thấy gì lưu nấy.
+      const bac = bacGui(f.bac);
+      if (!("bac" in thay_doi) && bac.length) thay_doi.bac = bac;
+      if (!("khuyen_mai" in thay_doi) && f.khuyen_mai.trim()) thay_doi.khuyen_mai = f.khuyen_mai.trim();
+      if (!("gia_truoc_km" in thay_doi) && f.gia_truoc_km.trim()) thay_doi.gia_truoc_km = f.gia_truoc_km.trim();
       body.loai_nguon = f.loai_nguon;
       if (f.lien_ket_bang_chung.trim()) body.lien_ket_bang_chung = f.lien_ket_bang_chung.trim();
     }
@@ -103,6 +111,9 @@ export const kgThung = (so_goi: string, kl_goi_g: string): number | null => {
 /** Lỗi hiển nhiên trước khi gửi (máy chủ vẫn kiểm lại hết); null = gửi được. Chỉ xét trường ĐÃ ĐỔI. */
 export function kiemForm(q: QuanSat, f: FormMatHang): string | null {
   const d = thayDoi(q, f);
+  const daDoi = f.vi_sao_gia === "da_doi" && TRUONG_GIA.some(k => k in d);
+  if (q.nguon === "nap" && !daDoi && (["so_goi_thung", "kl_goi_g", "gia_goc"] as const).some(k => k in d && !f[k].trim()))
+    return "Để trống không xoá được số máy đã đọc — nhập số đúng, hoặc chọn “Giá đã đổi” nếu bảng giá mới khác.";
   if ("so_goi_thung" in d && f.so_goi_thung.trim()) {
     const n = docSoNhap(f.so_goi_thung);
     if (n === null || !Number.isInteger(n) || n < 1 || n > GOI_TOI_DA)
@@ -115,6 +126,10 @@ export function kiemForm(q: QuanSat, f: FormMatHang): string | null {
   if ("gia_goc" in d && f.gia_goc.trim()) {
     const x = docSoNhap(f.gia_goc);
     if (x === null || Number.isNaN(x)) return "Giá phải là số.";
+  }
+  if ("gia_truoc_km" in d && f.gia_truoc_km.trim()) {
+    const x = docSoNhap(f.gia_truoc_km);
+    if (x === null || Number.isNaN(x)) return "Giá trước khuyến mãi phải là số.";
   }
   if ("bac" in d) {
     for (const b of f.bac) {

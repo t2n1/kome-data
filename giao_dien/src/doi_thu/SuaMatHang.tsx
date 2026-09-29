@@ -28,14 +28,21 @@ export function SuaMatHang({ nguon, id, tru_o, dong, xong }: {
   nguon: "nap" | "tay"; id: number; tru_o?: string; dong: () => void; xong: () => void;
 }) {
   const kx = chuoiKhoang(useKhoang());
+  // Form chỉ dựng từ dữ liệu tải SAU lúc mở (`isFetchedAfterMount`), và bộ nhớ đệm bỏ ngay khi đóng (gcTime 0):
+  // mở lại một dòng vừa lưu mà dùng bản đệm cũ thì form hiện số cũ và lần Lưu sau 409 với chính mình.
   const q = useQuery({
-    queryKey: ["doi-thu", "mat-hang", nguon, id, kx], staleTime: 0, refetchOnWindowFocus: false,
+    queryKey: ["doi-thu", "mat-hang", nguon, id, kx], staleTime: 0, gcTime: 0, refetchOnWindowFocus: false,
     queryFn: () => lay<MatHang>(`/api/doi-thu/mat-hang/${nguon}/${id}${kx ? "?" + kx : ""}`),
   });
-  const qs = q.data?.quan_sat;
+  // Chốt một lần: đã có bản tải sau lúc mở thì giữ form — lần tải lại về sau (pop-up khác làm mới "doi-thu") không
+  // được gỡ form đang gõ dở (FormSua cũng đã chụp quan sát lúc dựng).
+  const chot = useRef(false);
+  if (q.isFetchedAfterMount && !q.isFetching) chot.current = true;
+  const moi = chot.current;
+  const qs = moi ? q.data?.quan_sat : undefined;
   return (
     <HopThoai tieu_de={qs ? `Sửa: ${qs.ten_doi_thu ?? qs.ma_doi_thu} · ${qs.ten_goc}` : "Sửa mặt hàng"} dong={dong} rong={680}>
-      {q.isPending ? <div className="dt-giu-cho" aria-busy="true"><span /><span /><span /></div>
+      {!moi || q.isPending ? <div className="dt-giu-cho" aria-busy="true"><span /><span /><span /></div>
         : q.isError ? <p role="alert" className="dt-loi">{q.error.message}</p>
         : <FormSua key={`${q.data.quan_sat.nguon}:${q.data.quan_sat.id}`} d={q.data} tru_o={tru_o} dong={dong} xong={xong} />}
     </HopThoai>
@@ -77,10 +84,11 @@ function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: (
   const lop = (goc_lop: string, k: string) => (goc_lop + (tro === k ? " dt-tro" : "")).trim() || undefined;
   const datBac = (i: number, b: Partial<BacNhap>) => dat("bac", f.bac.map((x, j) => (j === i ? { ...x, ...b } : x)));
 
-  const luu = () => {
+  // "Ghi đè" gọi luu(true): gửi form HIỆN TẠI (kể cả sửa thêm sau 409) và vẫn qua kiemForm.
+  const luu = (ghi_de = false) => {
     const loi = kiemForm(q, f);
     if (loi) return g.datLoi(loi);
-    g.chay(ghi_de => gui("/api/doi-thu/sua-mat-hang", payload(q, f, ghi_de).body));
+    g.chay(() => gui("/api/doi-thu/sua-mat-hang", payload(q, f, ghi_de).body));
   };
   const nhom = q.ten_nhom ?? q.ma_kome ?? "hàng KOME";
   const donVi = Object.entries(DON_VI).filter(([m]) => m === "goi" || m === "thung" || m === "kg" || m === f.don_vi_gia);
@@ -99,11 +107,12 @@ function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: (
             nhan={n} focus={tro === "nhan" && (f.nhan === m || (i === 0 && !NHAN.some(([x]) => x === f.nhan)))}
             roi={() => datTro(null)} tat={m === "khong" && keKhongBo} tieu={m === "khong" && keKhongBo ? "Giá khách kể không bỏ ghép được ở đây." : undefined} />)}
         </div>
+        {keKhongBo && <p className="dt-goi-y">Giá khách kể không bỏ ghép được ở đây.</p>}
         {q.ma_kome == null && q.nhan == null && <p className="dt-goi-y">Mặt hàng này chưa ghép mã KOME nào — ghép ở màn Dữ liệu › Duyệt.</p>}
       </fieldset>
 
       <fieldset><legend>Tình trạng & khuyến mãi</legend>
-        <div className="dt-hang">
+        <div className="dt-hang" role="radiogroup" aria-label="Tình trạng">
           {["con", "het", "sap_ve", ...(q.trang_thai === "khong_ro" ? ["khong_ro"] : [])].map(m =>
             <Vien key={m} name={`${ma}-tt`} value={m} chon={f.trang_thai} dat={v => dat("trang_thai", v)}
               nhan={NHAN_TRANG_THAI[m] ?? m} focus={tro === "trang_thai" && f.trang_thai === m} roi={() => datTro(null)} />)}
@@ -111,6 +120,9 @@ function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: (
         <label className="dt-hang">Khuyến mãi
           <input type="text" className={lop("dt-rong-o", "khuyen_mai")} placeholder="để trống = không có"
             value={f.khuyen_mai} onChange={e => dat("khuyen_mai", e.target.value)} {...o("khuyen_mai")} /></label>
+        <label className="dt-hang">Giá trước khuyến mãi
+          <input type="text" inputMode="decimal" className={lop("dt-so", "gia_truoc_km")} placeholder="—" value={f.gia_truoc_km}
+            onChange={e => dat("gia_truoc_km", e.target.value)} {...o("gia_truoc_km")} /> ¥</label>
       </fieldset>
 
       <fieldset><legend>Quy cách</legend>
@@ -133,7 +145,8 @@ function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: (
             {f.don_vi_gia && !(f.don_vi_gia in DON_VI) && <option value={f.don_vi_gia}>{f.don_vi_gia}</option>}
           </select>
         </div>
-        <div className="dt-hang">
+        <div className="dt-hang" role="radiogroup" aria-labelledby={`${ma}-thue-nhan`}>
+          <span id={`${ma}-thue-nhan`}>Thuế</span>
           {THUE.map(([m, n]) => <Vien key={m} name={`${ma}-thue`} value={m} chon={f.thue} dat={v => dat("thue", v)} nhan={n}
             focus={tro === "thue" && (f.thue === m || (!f.thue && m === "co"))} roi={() => datTro(null)} />)}
         </div>
@@ -160,7 +173,8 @@ function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: (
           onClick={() => dat("bac", [...f.bac, f.bac.length ? { ...f.bac[f.bac.length - 1], tu: "", gia: "" } : BAC_TRONG])}>
           + thêm bậc mua nhiều rẻ hơn</button>}
         {p.doi_gia && <div className="dt-doi-gia">
-          <div className="dt-hang">Vì sao đổi giá?
+          <div className="dt-hang" role="radiogroup" aria-labelledby={`${ma}-vs-nhan`}>
+            <span id={`${ma}-vs-nhan`}>Vì sao đổi giá?</span>
             <Vien name={`${ma}-vs`} value="doc_sai" chon={f.vi_sao_gia} dat={v => dat("vi_sao_gia", v as FormMatHang["vi_sao_gia"])}
               nhan="Máy đọc sai bảng giá" />
             <Vien name={`${ma}-vs`} value="da_doi" chon={f.vi_sao_gia} dat={v => dat("vi_sao_gia", v as FormMatHang["vi_sao_gia"])}
@@ -185,8 +199,8 @@ function FormSua({ d, tru_o, dong, xong }: { d: MatHang; tru_o?: string; dong: (
         </ul>
       </details>
 
-      {g.xung && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={g.ghiDe} giu={g.giu} />}
-      <NutLuu luu={luu} dong={dong} tat={p.rong} dang={g.dang} loi={g.loi} chu="Bản gốc máy đọc vẫn giữ; lần sửa ghi vào Nhật ký" />
+      {g.xung && <KhungXungDot x={g.xung} dang={g.dang} ghiDe={() => luu(true)} giu={g.giu} />}
+      <NutLuu luu={() => luu()} dong={dong} tat={p.rong} dang={g.dang} loi={g.loi} chu="Bản gốc máy đọc vẫn giữ; lần sửa ghi vào Nhật ký" />
     </div>
   );
 }

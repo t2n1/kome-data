@@ -176,3 +176,41 @@ describe("giao hàng", () => {
     expect(p.rong).toBe(false); expect((p.body as { thay_doi: object }).thay_doi).toEqual({ xac_nhan: true });
   });
 });
+
+describe("vòng sửa 1", () => {
+  it("gia_truoc_km: số → chuỗi, đổi → gửi, xoá → ''", () => {
+    const q = qs({ gia_truoc_km: 6000 }); const f = formTu(q);
+    expect(f.gia_truoc_km).toBe("6000");
+    expect(payload(q, { ...f, gia_truoc_km: "6,000" }, false).rong).toBe(true);
+    expect((payload(q, { ...f, gia_truoc_km: "6500" }, false).body as { thay_doi: object }).thay_doi).toEqual({ gia_truoc_km: "6500" });
+    const p = payload(q, { ...f, gia_truoc_km: " " }, false);
+    expect((p.body as { thay_doi: object }).thay_doi).toEqual({ gia_truoc_km: "" }); expect(p.doi_gia).toBe(false);
+  });
+  it("gia_truoc_km sai → kiemForm báo", () => {
+    const q = qs(); expect(kiemForm(q, { ...formTu(q), gia_truoc_km: "abc" })).toMatch(/trước khuyến mãi/);
+  });
+  it("giá đã đổi: gửi kèm bậc / khuyến mãi / giá trước KM ĐANG THẤY dù không đổi", () => {
+    const q = qs({ khuyen_mai: "Giảm 5%", gia_truoc_km: 5600 }); const f = formTu(q);
+    const p = payload(q, { ...f, gia_goc: "5500", vi_sao_gia: "da_doi", loai_nguon: "bang_gia" }, false);
+    expect((p.body as { thay_doi: object }).thay_doi).toEqual({ gia_goc: "5500", khuyen_mai: "Giảm 5%", gia_truoc_km: "5600",
+      bac: [{ tu: 5, don_vi_sl: "thung", gia: 5100, don_vi_gia: "thung" }] });
+  });
+  it("giá đã đổi: ô trống không kèm", () => {
+    const q = qs({ bac: null }); const f = formTu(q);
+    const p = payload(q, { ...f, gia_goc: "5500", vi_sao_gia: "da_doi", loai_nguon: "bang_gia" }, false);
+    expect((p.body as { thay_doi: object }).thay_doi).toEqual({ gia_goc: "5500" });
+  });
+  it("đọc sai: không kèm trường không đổi", () => {
+    const q = qs({ khuyen_mai: "Giảm 5%" }); const f = formTu(q);
+    expect((payload(q, { ...f, gia_goc: "5500", vi_sao_gia: "doc_sai" }, false).body as { thay_doi: object }).thay_doi)
+      .toEqual({ gia_goc: "5500" });
+  });
+  it("dòng nạp: xoá gói / tịnh / giá (không phải giá đã đổi) → báo trước khi gửi", () => {
+    const q = qs(); const f = formTu(q);
+    expect(kiemForm(q, { ...f, so_goi_thung: "" })).toMatch(/Để trống/);
+    expect(kiemForm(q, { ...f, kl_goi_g: "" })).toMatch(/Để trống/);
+    expect(kiemForm(q, { ...f, gia_goc: "", vi_sao_gia: "doc_sai" })).toMatch(/Để trống/);
+    expect(kiemForm(q, { ...f, gia_goc: "", vi_sao_gia: "da_doi", loai_nguon: "khac" }) ?? "").not.toMatch(/Để trống/);
+    const t = qs({ nguon: "tay" }); expect(kiemForm(t, { ...formTu(t), so_goi_thung: "" })).toBeNull();
+  });
+});
