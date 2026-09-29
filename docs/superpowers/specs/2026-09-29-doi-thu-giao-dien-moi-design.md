@@ -284,9 +284,10 @@ Hôm nay `core.fact_dieu_kien_doi_thu` là chữ tự do. Tab §4.5 cần số.
 
   Trước khi xác nhận, dòng KOME mang nhãn "suy từ phiếu bán". View `mart.giao_hang_kome_bang_chung` giữ
   phép đếm đó để ⓘ in ra.
-- **Sửa của sale**: `app.dinh_chinh_giao_hang` (`ma_doi_thu`, `lo_id`, `truong`, `gia_tri_moi`, người,
-  lúc) — CHỈ THÊM (`REVOKE UPDATE, DELETE` khỏi `kome_app`). `mart.giao_hang_hien_hanh` = lô mới nhất của
-  bên + đính chính mới nhất, xét THEO TỪNG TRƯỜNG: đính chính áp dụng nếu ghi SAU lúc nạp lô mới nhất (`loaded_at`)
+- **Sửa của sale**: `app.dinh_chinh_giao_hang` (`ma_doi_thu`, `truong`, `gia_tri_moi`, người, lúc — KHÔNG có
+  `lo_id`: đính chính không gắn vào một lô, nó so `lúc` với `loaded_at` của lô mới nhất, luật từng trường R12
+  bên dưới) — CHỈ THÊM (`REVOKE UPDATE, DELETE` khỏi `kome_app`). `mart.giao_hang_hien_hanh` = lô mới nhất của
+  bên (`ngay_nguon ≤ mốc` — quay về mốc như mọi quan sát, cùng `mart.dieu_kien_hien_hanh`) + đính chính mới nhất, xét THEO TỪNG TRƯỜNG: đính chính áp dụng nếu ghi SAU lúc nạp lô mới nhất (`loaded_at`)
   HOẶC lô đó để trống trường ấy — điều được nói ra thắng im lặng (sale điền lại một trường lô mới bỏ trống thì
   vẫn thấy). Đính chính không đọc được (hỏng) → dùng giá trị của lô; `''` = xoá → NULL. KOME đọc
   `app.giao_hang_kome`; MỌI lần sửa dòng KOME đặt `da_xac_nhan = true` (một người đã đặt số), không riêng nút xác nhận.
@@ -297,13 +298,14 @@ Hôm nay `core.fact_dieu_kien_doi_thu` là chữ tự do. Tab §4.5 cần số.
   - miễn ship khi `tien ≥ mien_ship_tu` hoặc `thung ≥ mien_ship_kien`;
   - phí theo thùng × số thùng;
   - phụ phí vùng × số kiện (kiện = ⌈thùng ÷ thùng/kiện⌉, không biết thì 1 kiện);
-  - daibiki chỉ khi trả daibiki;
+  - daibiki chỉ khi trả daibiki; tới ngưỡng `daibiki_tu` thì dùng `daibiki_sau` — NULL → `chua_ro` (`0` mới là miễn);
   - trường NULL mà cần tới → vào `chua_ro`, không cộng 0.
   Trình duyệt tính vì phải đổi ngay khi bấm (ngoại lệ có chủ ý, như `/mua-vu`).
 - **Tách ghi chú nội bộ**: câu Claude tự ghi lúc đọc ("chép vào ghi_chu từng dòng", "không in thông tin
   thuế", "Dữ liệu này KHÔNG có phí ship…") KHÔNG được vào `fact_dieu_kien_doi_thu`. Chúng vào cột
-  `ghi_chu_doc` (mới, không hiện ở tab Đối thủ / Tin), hoặc sổ tay theo bên. `goi_doi_thu.py` từ chối dòng
-  `dieu_kien` có dấu hiệu ghi chú của người đọc (danh sách mẫu, có test).
+  `ghi_chu_doc` (mới, không hiện ở tab Đối thủ / Tin), hoặc sổ tay theo bên. `goi_doi_thu.py` KHÔNG từ chối
+  mà PHÂN LOẠI LẠI dòng `dieu_kien` có dấu hiệu ghi chú của người đọc thành `loai = 'ghi_chu_doc'`
+  (`la_ghi_chu_doc`, danh sách mẫu, có test) — dòng vẫn vào gói để đối chiếu; `mart.dieu_kien_hien_hanh` bỏ loại đó.
 - **Sửa điều kiện bán** (chip ở tab Đối thủ): `app.dinh_chinh_dieu_kien` (`fact_id` | NULL cho dòng thêm
   tay, `loai`, `noi_dung`, `bo` bool, người, lúc) — CHỈ THÊM.
 
@@ -385,7 +387,7 @@ Test mới (tên rõ, mỗi bất biến một test):
 - Pop-up một giao dịch: ghép + ba đính chính + giá đã đổi, hỏng một phần → không phần nào vào.
 - Mọi bảng `app` mới chỉ thêm (`kome_app` không UPDATE / DELETE); nằm trong `_PHIEN_BAN` hoặc ghi nhật ký
   cùng giao dịch.
-- Gói: từ chối điều kiện là ghi chú của người đọc; `gia_goc` không được nhỏ hơn mọi bậc.
+- Gói: điều kiện là ghi chú của người đọc được phân loại lại `ghi_chu_doc` (không vào điều kiện hiện hành); `gia_goc` không được nhỏ hơn mọi bậc.
 - §6.3: mã bán bằng `00` = thùng ra đúng ¥/kg.
 - `?tab=tong_quan` cũ mở Tóm tắt; lựa chọn So sánh còn nguyên sau khi đổi khoảng xem.
 - Build SPA (`test_ban_build_khop_ma_nguon`), CLAUDE.md thêm bất biến 065+.
