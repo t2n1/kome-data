@@ -57,7 +57,6 @@ def test_trang_mo_duoc(test_db_url):
     assert _web(test_db_url).get("/doi-thu").status_code == 200
 
 
-@pytest.mark.xfail(reason="Task 7 thêm mục thanh bên", strict=True)
 def test_muc_thanh_ben_va_route():
     assert 'url: "/doi-thu"' in (_SRC / "khung" / "muc.ts").read_text(encoding="utf-8")
     assert '"/doi-thu"' in (_SRC / "main.tsx").read_text(encoding="utf-8")

@@ -1,11 +1,13 @@
 // Mục điều hướng — ĐÚNG sáu nhóm, thứ tự, nhãn và icon của `NHOM` trong
 // kome-nav.js (gói thiết kế). `url: null` = màn chưa có (nhóm C / thiếu nguồn
 // dữ liệu, lộ trình §4.1): hiện mờ, không bấm được — không giả vờ có. Bốn màn
-// bị cắt khỏi phạm vi (lộ trình §4.2: web đặt hàng khách, mẫu chứng từ, thị
-// trường & đối thủ, sale mobile) KHÔNG hiện. Từ 2026-09-28 mục `url: null` cũng
+// bị cắt khỏi phạm vi (lộ trình §4.2: web đặt hàng khách, mẫu chứng từ,
+// sale mobile) KHÔNG hiện. Từ 2026-09-28 mục `url: null` cũng
 // KHÔNG hiện khi công tắc kome/man_chua_co.py::HIEN tắt (mặc định).
 // "muavu" (Mùa vụ sản phẩm, 2026-09-29) dùng icon "chart" — TA CHỌN trong bộ 24 icon;
 // gói thiết kế không có màn này.
+// "doithu" (Thị trường & đối thủ, 2026-09-29) — lộ trình §4.2 từng cắt, đặc tả
+// 2026-09-29-thi-truong-doi-thu-design.md §0 đảo lại; dùng icon "target", TA CHỌN (gói thiết kế không có màn này).
 import { KD, TN } from "../khoi_dau";
 
 export type Muc = { ma: string; nhan: string; url: string | null; icon: string; ly_do?: string };
@@ -27,6 +29,7 @@ export function nhomDieuHuong(): Nhom[] {
     { ma: "khachhang", ten: "KHÁCH HÀNG", muc: [
       { ma: "kh360", nhan: "Khách hàng & bản đồ", url: "/khach-hang", icon: "user" },
       { ma: "bando", nhan: "Bản đồ khách hàng", url: "/ban-do", icon: "pin" },
+      { ma: "doithu", nhan: "Thị trường & đối thủ", url: "/doi-thu", icon: "target" },
       { ma: "crm", nhan: "Cần liên hệ", url: "/lien-he", icon: "crm" },
     ] },
     { ma: "banhang", ten: "BÁN HÀNG", muc: [

@@ -1,0 +1,26 @@
+/* Màn Thị trường & đối thủ (/doi-thu). Dùng token của kome.css và lớp chung (.kh-tab, .chip, table.bang, button.lien-ket). */
+.man-doi-thu{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dt-luoi-khoi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:16px}
+.dt-rong{grid-column:1 / -1}
+.dt-khoi{background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:.9rem 1rem;min-width:0}
+.dt-khoi .khoi-dau{cursor:auto}
+.dt-cuon{overflow-x:auto;max-width:100%}
+.dt-bang{font-variant-numeric:tabular-nums}
+.dt-bang th,.dt-bang td{text-align:left}
+.dt-o.co{background:var(--lam-nen);color:var(--lam-chu);text-align:center}
+.dt-dong{cursor:pointer}
+.dt-con td{font-size:.9em}
+.dt-con.bat-thuong td{color:var(--do-chu)}
+.dt-loc{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.dt-loc input[type="search"],.dt-sua input,.dt-sua select,.man-doi-thu select{font:inherit;font-size:.82rem;padding:.3rem .5rem;
+  border:1px solid var(--vien-dam);border-radius:8px;background:var(--nen-the);color:var(--chu);min-width:0}
+.dt-ds{list-style:none;padding:0;margin:0;max-height:420px;overflow:auto;font-size:.82rem}
+.dt-ds li{padding:.25rem 0;border-bottom:1px solid var(--vien-phu)}
+.dt-chon button{width:100%;text-align:left;font:inherit;font-size:.8rem;background:none;border:0;padding:.3rem .2rem;color:var(--chu);cursor:pointer}
+.dt-chon button[aria-pressed="true"]{background:var(--nen-phu);font-weight:600}
+.dt-duyet{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.dt-sua label{display:grid;grid-template-columns:160px minmax(0,1fr);gap:8px;margin:4px 0;font-size:.8rem}
+.dt-sua fieldset{border:1px solid var(--vien);border-radius:8px;margin:10px 0;padding:.5rem .7rem;display:flex;flex-direction:column;gap:6px;min-width:0}
+.dt-nut{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
+.nhat{color:var(--chu-nhat)}
+@media (max-width:760px){.dt-duyet{grid-template-columns:minmax(0,1fr)}.dt-sua label{grid-template-columns:minmax(0,1fr)}}
