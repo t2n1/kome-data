@@ -127,6 +127,8 @@ def test_kiem_bac_chuan_hoa_va_bat_loi():
     assert G.kiem_bac("") == (None, None)
     for xau in ('{"tu": 5}', '[{"tu": 0, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}]',
                 '[{"tu": 5, "don_vi_sl": "hop", "gia": 1, "don_vi_gia": "kg"}]', "khong phai json",
+                '[{"tu": NaN, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}]',
+                '[{"tu": 1, "don_vi_sl": "thung", "gia": Infinity, "don_vi_gia": "kg"}]',
                 "[" + ",".join(['{"tu": 1, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}'] * 11) + "]"):
         b, loi = G.kiem_bac(xau)
         assert b is None and loi, xau
@@ -186,3 +188,31 @@ def test_main_ghi_file_giao_hang_khi_co_csv_giao_hang(tmp_path):
                        capture_output=True)
     assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
     assert (ra / "doi_thu_giao_hang_20260831.xlsx").exists()
+
+
+def test_kl_goi_g_tren_30000_thanh_none_va_can_xem():
+    g, _, _, canh = G.dung_goi([_dn(kl_goi_g="30001"), _dn(vi_tri="tr2", ten_goc="B", kl_goi_g="30000")],
+                               [], date(2026, 8, 31))
+    assert g[0]["kl_goi_g"] is None and g[0]["do_chac"] == "can_xem" and canh
+    assert g[1]["kl_goi_g"] == 30000.0 and g[1]["do_chac"] == "chac"
+
+
+def test_giao_hang_bao_ship_va_ck_daibiki_chuan_hoa_dung_sai():
+    _, _, gh, canh = G.dung_goi([], [], date(2026, 8, 31), giao=[
+        {"ben": "A", "file": "a.pdf", "bao_ship": "Yes", "ck_mien_daibiki": "không"},
+        {"ben": "B", "file": "b.pdf", "bao_ship": "có", "ck_mien_daibiki": "0"},
+        {"ben": "C", "file": "c.pdf", "bao_ship": "tuy", "ck_mien_daibiki": ""}])
+    assert (gh[0]["bao_ship"], gh[0]["ck_mien_daibiki"]) == ("true", "false")
+    assert (gh[1]["bao_ship"], gh[1]["ck_mien_daibiki"]) == ("true", "false")
+    assert gh[2]["bao_ship"] is None and gh[2]["ck_mien_daibiki"] is None
+    assert any("bao_ship" in c for c in canh) and len(canh) == 1
+
+
+def test_giao_hang_so_ngoai_khoang_thanh_none_kem_canh_bao():
+    _, _, gh, canh = G.dung_goi([], [], date(2026, 8, 31), giao=[
+        {"ben": "A", "file": "a.pdf", "phi_ship": "-5", "mien_ship_tu": "-1", "phi_daibiki": "-440",
+         "daibiki_tu": "-1", "daibiki_sau": "-1", "kien_toi_da_kg": "0"},
+        {"ben": "B", "file": "b.pdf", "phi_ship": "0", "daibiki_tu": "0", "kien_toi_da_kg": "28"}])
+    for c in ("phi_ship", "mien_ship_tu", "phi_daibiki", "daibiki_tu", "daibiki_sau", "kien_toi_da_kg"):
+        assert gh[0][c] is None and any(c in x for x in canh), c
+    assert gh[1]["phi_ship"] == 0.0 and gh[1]["daibiki_tu"] == 0.0 and gh[1]["kien_toi_da_kg"] == 28.0

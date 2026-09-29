@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 import sys
 from datetime import date
@@ -28,6 +29,9 @@ _ID_BEN = re.compile(r"(?<![A-Za-z])(?:_id|id|mã SP|商品コード)\s*[:=]?\s*
 DON_VI_SL = ("thung", "kg", "goi", "pallet")
 DON_VI_GIA_BAC = ("thung", "kg", "goi")
 BAC_TOI_DA = 10
+KL_GOI_G_TOI_DA = 30000          # CHECK 065: kl_goi_g in (0, 30000]
+_CO = {"yes", "true", "1", "co", "có"}
+_KHONG = {"no", "false", "0", "khong", "không"}
 # Câu người ĐỌC tự ghi (không phải điều kiện của bên) — tháng 8 lọt vào dieu_kien (VIETCOOK, HSC, JVB, EIHATSU, THAK).
 _GHI_CHU_DOC = re.compile(r"chép vào|ghi_chu|không in (phí|thông tin)|không tìm thấy|dữ liệu này|trên các trang đã đọc"
                           r"|in ở từng ô|mỗi (ô|mặt hàng) (ghi|in)|— không chép", re.I)
@@ -91,9 +95,10 @@ def suy_muc_gia(d: dict) -> str | None:
 
 def _so(v):
     try:
-        return float(str(v).replace(",", "").strip())
+        x = float(str(v).replace(",", "").strip())
     except (TypeError, ValueError):
         return None
+    return x if math.isfinite(x) else None      # NaN / inf không bao giờ là số hợp lệ
 
 
 def la_ghi_chu_doc(noi_dung: str) -> bool:
@@ -127,6 +132,30 @@ def kiem_bac(s) -> tuple[list[dict] | None, str | None]:
 def _nguyen(v):
     x = _so(v)
     return int(x) if x is not None and x == int(x) and x > 0 else None
+
+
+def _bool(v, ten: str, ben: str, canh: list[str]) -> str | None:
+    """Cột đúng/sai → "true"/"false" cho bộ nạp (chỉ nhận true/1/co · false/0/khong); lạ → None + cảnh báo."""
+    t = str(v or "").strip().lower()
+    if not t:
+        return None
+    if t in _CO:
+        return "true"
+    if t in _KHONG:
+        return "false"
+    canh.append(f"{ben} giao hàng: {ten} = {str(v)[:20]!r} không phải đúng/sai")
+    return None
+
+
+def _khong_am(v, ten: str, ben: str, canh: list[str], *, duong: bool = False) -> float | None:
+    """Số >= 0 (hoặc > 0 khi duong) theo CHECK 065; ngoài khoảng → None + cảnh báo."""
+    x = _so(v)
+    if x is None:
+        return None
+    if x < 0 or (duong and x == 0):
+        canh.append(f"{ben} giao hàng: {ten} = {v} ngoài khoảng ({'> 0' if duong else '>= 0'})")
+        return None
+    return x
 
 
 def _phu_phi(s) -> tuple[str | None, str | None]:
@@ -188,6 +217,10 @@ def dung_goi(gia: list[dict], dk: list[dict], ngay: date, giao: list[dict] | Non
         bac, loi_bac = kiem_bac(d.get("bac"))
         if loi_bac:
             ly_do.append(loi_bac)
+        kl = _so(d.get("kl_goi_g"))
+        if kl is not None and kl > KL_GOI_G_TOI_DA:
+            ly_do.append(f"kl_goi_g {d.get('kl_goi_g')} > {KL_GOI_G_TOI_DA} g (nhầm đơn vị?)")
+            kl = None
         if bac and g is not None:
             cung_dv = [b["gia"] for b in bac if b["don_vi_gia"] == (d.get("don_vi_gia") or "")]
             if cung_dv and max(cung_dv) > g:
@@ -211,7 +244,7 @@ def dung_goi(gia: list[dict], dk: list[dict], ngay: date, giao: list[dict] | Non
             "nhan_de_xuat": d.get("nhan_ghep") if d.get("nhan_ghep") in ("cung_hang", "thay_the") else None,
             "ly_do_ghep": d.get("ly_do_ghep"), "do_chac": do_chac, "ghi_chu": ghi or None,
             "so_goi_thung": _nguyen(d.get("so_goi_thung")),
-            "kl_goi_g": _so(d.get("kl_goi_g")) if (_so(d.get("kl_goi_g")) or 0) > 0 else None,
+            "kl_goi_g": kl if (kl or 0) > 0 else None,
             "bac": json.dumps(bac, ensure_ascii=False) if bac else None,
         }
         ra.append({c: o[c] for c in COT_GIA})
@@ -238,11 +271,14 @@ def dung_goi(gia: list[dict], dk: list[dict], ngay: date, giao: list[dict] | Non
         gh_ra.append({
             "ma_dong": f"{ben}-{dem_gh[ben]:05d}", "ma_doi_thu": ben,
             "ngay_nguon": suy_ngay(d.get("file") or "", ngay).isoformat(),
-            "bao_ship": d.get("bao_ship") or None, "phi_ship": _so(d.get("phi_ship")), "phi_ship_theo": theo,
-            "mien_ship_tu": _so(d.get("mien_ship_tu")), "mien_ship_kien": _nguyen(d.get("mien_ship_kien")),
-            "thung_moi_kien": _nguyen(d.get("thung_moi_kien")), "phu_phi": pp, "phi_daibiki": _so(d.get("phi_daibiki")),
-            "daibiki_tu": _so(d.get("daibiki_tu")), "daibiki_sau": _so(d.get("daibiki_sau")),
-            "ck_mien_daibiki": d.get("ck_mien_daibiki") or None, "kien_toi_da_kg": _so(d.get("kien_toi_da_kg")),
+            "bao_ship": _bool(d.get("bao_ship"), "bao_ship", ben, canh),
+            "phi_ship": _khong_am(d.get("phi_ship"), "phi_ship", ben, canh), "phi_ship_theo": theo,
+            "mien_ship_tu": _khong_am(d.get("mien_ship_tu"), "mien_ship_tu", ben, canh), "mien_ship_kien": _nguyen(d.get("mien_ship_kien")),
+            "thung_moi_kien": _nguyen(d.get("thung_moi_kien")), "phu_phi": pp, "phi_daibiki": _khong_am(d.get("phi_daibiki"), "phi_daibiki", ben, canh),
+            "daibiki_tu": _khong_am(d.get("daibiki_tu"), "daibiki_tu", ben, canh),
+            "daibiki_sau": _khong_am(d.get("daibiki_sau"), "daibiki_sau", ben, canh),
+            "ck_mien_daibiki": _bool(d.get("ck_mien_daibiki"), "ck_mien_daibiki", ben, canh),
+            "kien_toi_da_kg": _khong_am(d.get("kien_toi_da_kg"), "kien_toi_da_kg", ben, canh, duong=True),
             "ghep_kien": d.get("ghep_kien") or None, "thue": thue, "cach_gui": d.get("cach_gui") or None,
             "nguon_chu": d.get("nguon_chu") or None, "nguon_file": d.get("file") or None,
         })
