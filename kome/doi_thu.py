@@ -14,7 +14,16 @@ from kome.ten_hang import chuan_ten
 from kome.tuoi_du_lieu import hom_nay_o_nhat
 
 TRUONG_SUA = ("ten_goc", "quy_cach_goc", "gia_goc", "don_vi_gia", "kg_moi_don_vi_gia",
-              "thue", "gom_ship", "kenh_gia", "muc_gia", "trang_thai")
+              "thue", "gom_ship", "kenh_gia", "muc_gia", "trang_thai",
+              "so_goi_thung", "kl_goi_g", "bac", "khuyen_mai", "gia_truoc_km")
+TRUONG_XOA_DUOC = ("khuyen_mai", "gia_truoc_km", "bac")   # "" / [] = xoá (khuyến mãi hết, bậc sai); trường khác không xoá được
+DON_VI_SL = ("thung", "kg", "goi", "pallet")               # cùng lược đồ `bac` của 065 / scripts/goi_doi_thu.py::kiem_bac
+DON_VI_GIA_BAC = ("thung", "kg", "goi")
+BAC_TOI_DA = 10
+SO_BAC_TOI_DA = Decimal("1000000000")                      # tu / gia của một bậc: chặn số khổng lồ (float -> inf làm hỏng JSON)
+GOI_TOI_DA = 100000
+KL_GOI_TOI_DA = Decimal("30000")                           # = CHECK kl_goi_g của 065
+GIA_TRUOC_KM_TOI_DA = Decimal("9999999999")                # numeric(12,2) của 065 chứa tới 10^10 - 0,01
 THUE = ("chua", "co", "khong_ro")
 SHIP = ("co", "khong", "khong_ro")
 TRANG_THAI = ("con", "het", "sap_ve", "khong_ro")
@@ -58,9 +67,54 @@ def _chuoi_so(v, ten, duong=False, phay_la_thap_phan=False):
     return None if x is None else format(x, "f")
 
 
+def kiem_bac_nhap(v) -> str:
+    """Bậc người nhập (list hoặc chữ JSON) -> chữ JSON chuẩn hoá cho app.dinh_chinh_gia / gia_doi_thu_tay.
+    Rỗng / None / [] = xoá bậc ('[]'). Chặt hơn view 067 (view chỉ bỏ qua bậc hỏng — lớp phòng thủ thứ hai)."""
+    if v is None:
+        v = []
+    if isinstance(v, str):
+        try:
+            v = json.loads(v) if v.strip() else []
+        except ValueError:
+            raise LoiNhap("Bậc giá không đọc được.")
+    if not isinstance(v, list) or len(v) > BAC_TOI_DA:
+        raise LoiNhap(f"Bậc giá là danh sách tối đa {BAC_TOI_DA} bậc.")
+    ra = []
+    for b in v:
+        if not isinstance(b, dict) or b.get("don_vi_sl") not in DON_VI_SL or b.get("don_vi_gia") not in DON_VI_GIA_BAC:
+            raise LoiNhap("Mỗi bậc cần: từ bao nhiêu (thùng / kg / gói / pallet) và giá (/ thùng / kg / gói).")
+        tu, gia = _so(b.get("tu"), "Số lượng của bậc", True), _so(b.get("gia"), "Giá của bậc", True)
+        if tu is None or gia is None:
+            raise LoiNhap("Bậc giá thiếu số lượng hoặc giá.")
+        if tu > SO_BAC_TOI_DA or gia > SO_BAC_TOI_DA:
+            raise LoiNhap("Số lượng hoặc giá của bậc quá lớn.")
+        ra.append({"tu": int(tu) if tu == tu.to_integral_value() else float(tu), "don_vi_sl": b["don_vi_sl"],
+                   "gia": int(gia) if gia == gia.to_integral_value() else float(gia), "don_vi_gia": b["don_vi_gia"]})
+    return json.dumps(ra, ensure_ascii=False)
+
+
 def _kiem(truong: str, v):
     if truong not in TRUONG_SUA:
         raise LoiNhap(f"Không sửa được trường '{truong}'.")
+    if truong == "bac":
+        return kiem_bac_nhap(v)
+    if truong == "so_goi_thung":
+        x = _so(v, "Số gói / thùng", True)
+        if x is None:
+            return None
+        if x != x.to_integral_value() or x > GOI_TOI_DA:
+            raise LoiNhap(f"Số gói / thùng phải là số nguyên từ 1 đến {GOI_TOI_DA}.")
+        return str(int(x))
+    if truong == "kl_goi_g":
+        x = _so(v, "Khối lượng 1 gói", True, True)
+        if x is not None and x > KL_GOI_TOI_DA:
+            raise LoiNhap("Khối lượng 1 gói (g) quá lớn.")
+        return None if x is None else format(x, "f")
+    if truong == "gia_truoc_km":
+        x = _so(v, "Giá trước khuyến mãi")
+        if x is not None and x > GIA_TRUOC_KM_TOI_DA:
+            raise LoiNhap("Giá trước khuyến mãi quá lớn.")
+        return "" if x is None else format(x, "f")
     if truong == "gia_goc":
         return _chuoi_so(v, "Giá")
     if truong == "kg_moi_don_vi_gia":
@@ -95,9 +149,12 @@ def sua(conn, fact_id: int, thay_doi: dict, nguoi) -> None:
     if not thay_doi:
         raise LoiNhap("Không có gì để sửa.")
     for k, v in thay_doi.items():
+        if k in TRUONG_XOA_DUOC:
+            continue
         if v is None or not str(v).strip():
             raise LoiNhap("Để trống không xoá được giá trị AI đã đọc — nhập giá trị đúng, hoặc dùng 'Giá đã đổi'.")
     sach = {k: _kiem(k, v) for k, v in thay_doi.items()}
+    sach = {k: ("" if (k in TRUONG_XOA_DUOC and v is None) else v) for k, v in sach.items()}   # '' = xoá (view 067)
     cu = conn.execute(f"SELECT {', '.join(sach)} FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s",
                       (fact_id,)).fetchone()
     if cu is None:
@@ -121,17 +178,21 @@ def gia_moi(conn, du_lieu: dict, nguoi) -> int:
         except (TypeError, ValueError):
             raise LoiNhap("Mã dòng giá gốc không hợp lệ.")
         goc = conn.execute("""SELECT ma_doi_thu, ma_hang_dt, ten_goc, quy_cach_goc, don_vi_gia, kg_moi_don_vi_gia,
-                                     thue, gom_ship, kenh_gia, muc_gia
+                                     thue, gom_ship, kenh_gia, muc_gia, so_goi_thung, kl_goi_g
                               FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s""",
                            (fact_goc,)).fetchone()
         if goc is None:
             raise LoiNhap("Không tìm thấy dòng giá gốc.")
     k = ("ma_doi_thu", "ma_hang_dt", "ten_goc", "quy_cach_goc", "don_vi_gia", "kg_moi_don_vi_gia",
-         "thue", "gom_ship", "kenh_gia", "muc_gia")
+         "thue", "gom_ship", "kenh_gia", "muc_gia", "so_goi_thung", "kl_goi_g")
     v = dict(zip(k, goc)) if goc else {}
     for truong in TRUONG_SUA:
         if truong in du_lieu and truong != "trang_thai":
             v[truong] = _kiem(truong, du_lieu[truong])
+    if v.get("bac") == "[]":
+        v["bac"] = None                                       # bậc rỗng = không có bậc (cột jsonb NULL)
+    for truong in ("khuyen_mai", "gia_truoc_km"):
+        v[truong] = v.get(truong) or None
     v["ma_doi_thu"] = v.get("ma_doi_thu") or du_lieu.get("ma_doi_thu")
     if not v.get("ma_doi_thu") or not v.get("ten_goc"):
         raise LoiNhap("Thiếu đối thủ hoặc tên hàng.")
@@ -143,11 +204,13 @@ def gia_moi(conn, du_lieu: dict, nguoi) -> int:
     tid = conn.execute(
         """INSERT INTO app.gia_doi_thu_tay (ma_doi_thu, ma_hang_dt, fact_goc_id, ten_goc, quy_cach_goc, gia_goc,
              don_vi_gia, kg_moi_don_vi_gia, thue, gom_ship, kenh_gia, muc_gia, trang_thai, loai_nguon,
-             ghi_chu_nguon, lien_ket_bang_chung, nguoi_dung_id)
+             ghi_chu_nguon, lien_ket_bang_chung, so_goi_thung, kl_goi_g, bac, khuyen_mai, gia_truoc_km, nguoi_dung_id)
            VALUES (%(ma_doi_thu)s, %(ma_hang_dt)s, %(fact_goc_id)s, %(ten_goc)s, %(quy_cach_goc)s, %(gia_goc)s,
              %(don_vi_gia)s, %(kg_moi_don_vi_gia)s, %(thue)s, %(gom_ship)s, %(kenh_gia)s, %(muc_gia)s,
-             %(trang_thai)s, %(loai_nguon)s, %(ghi_chu_nguon)s, %(lien_ket_bang_chung)s, %(nguoi)s) RETURNING id""",
-        {**{x: v.get(x) for x in k}, "gia_goc": v.get("gia_goc"), "fact_goc_id": fact_goc if goc else None,
+             %(trang_thai)s, %(loai_nguon)s, %(ghi_chu_nguon)s, %(lien_ket_bang_chung)s, %(so_goi_thung)s, %(kl_goi_g)s,
+             %(bac)s::jsonb, %(khuyen_mai)s, %(gia_truoc_km)s, %(nguoi)s) RETURNING id""",
+        {**{x: v.get(x) for x in k}, "bac": v.get("bac"), "khuyen_mai": v.get("khuyen_mai"), "gia_truoc_km": v.get("gia_truoc_km"),
+         "gia_goc": v.get("gia_goc"), "fact_goc_id": fact_goc if goc else None,
          "trang_thai": tt, "loai_nguon": ln, "ghi_chu_nguon": (du_lieu.get("ghi_chu_nguon") or "")[:DAI_TOI_DA] or None,
          "lien_ket_bang_chung": lk, "nguoi": nguoi}).fetchone()[0]
     _ghi_nhat_ky(conn, "gia_moi" if goc else "them", f"tay:{tid}", None, v | {"loai_nguon": ln, "lien_ket_bang_chung": lk}, nguoi)

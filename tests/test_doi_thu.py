@@ -1,6 +1,7 @@
 """kome/doi_thu.py — đọc/ghi của màn /doi-thu (đặc tả §4, §5)."""
 from datetime import date
 from decimal import Decimal
+import json
 import pytest
 
 from kome import doi_thu as DT
@@ -766,3 +767,93 @@ def test_sua_quy_cach_gui_so_khac_thi_luu_va_de_trong_thi_xoa(conn, batch):
     conn.commit()
     assert _ovr(conn, "BA02") is None                                       # hết số người sửa nào thì bỏ hẳn dòng
     assert _kg00(conn, "BA02") == pytest.approx(6.4)
+
+
+# ---------------------------------------------------------------- 4a: sửa gói/thùng, gram/gói, bậc, khuyến mãi
+
+def test_sua_quy_cach_goi_va_bac_va_khuyen_mai(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {"so_goi_thung": "20", "kl_goi_g": "500",
+                       "bac": [{"tu": 5, "don_vi_sl": "thung", "gia": "5,300", "don_vi_gia": "thung"}],
+                       "khuyen_mai": "mua 10 tặng 1"}, None)
+    conn.commit()
+    r = conn.execute("SELECT so_goi_thung, kl_goi_g, bac, khuyen_mai FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()
+    assert r[0] == 20 and float(r[1]) == 500 and r[2] == [{"tu": 5, "don_vi_sl": "thung", "gia": 5300, "don_vi_gia": "thung"}]
+    assert r[3] == "mua 10 tặng 1"
+
+
+def test_xoa_khuyen_mai_va_bac_duoc_nhung_khong_xoa_gia(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {"khuyen_mai": "", "bac": []}, None)
+    conn.commit()
+    km, bac = conn.execute("SELECT khuyen_mai, bac FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()
+    assert km is None and bac == []
+    with pytest.raises(DT.LoiNhap):
+        DT.sua(conn, fid, {"gia_goc": ""}, None)
+    for t in ("so_goi_thung", "kl_goi_g"):                                   # hai trường này KHÔNG xoá được
+        with pytest.raises(DT.LoiNhap):
+            DT.sua(conn, fid, {t: ""}, None)
+
+
+def test_xoa_gia_truoc_km_duoc(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {"gia_truoc_km": "600"}, None)
+    conn.commit()
+    assert conn.execute("SELECT gia_truoc_km FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()[0] == 600
+    DT.sua(conn, fid, {"gia_truoc_km": ""}, None)
+    conn.commit()
+    assert conn.execute("SELECT gia_truoc_km FROM mart.gia_doi_thu_quan_sat WHERE id=%s", (fid,)).fetchone()[0] is None
+
+
+@pytest.mark.parametrize("truong,v", [
+    ("so_goi_thung", "0"), ("so_goi_thung", "2.5"), ("so_goi_thung", "100001"),
+    ("kl_goi_g", "0"), ("kl_goi_g", "30001"),
+    ("bac", [{"tu": 0, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}]),
+    ("bac", [{"tu": 1, "don_vi_sl": "hop", "gia": 1, "don_vi_gia": "kg"}]),
+    ("bac", [{"tu": 1, "don_vi_sl": "thung", "gia": 0, "don_vi_gia": "kg"}]),
+    ("bac", [{"tu": 1, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "pallet"}]),
+    ("bac", [{"tu": 1, "don_vi_sl": "thung", "gia": 1}]),
+    ("bac", ["x"]), ("bac", {"tu": 1}), ("bac", 5),
+    ("bac", "khong phai json"), ("bac", [{"tu": 1, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}] * 11),
+    ("bac", [{"tu": "1" + "0" * 400, "don_vi_sl": "thung", "gia": 1, "don_vi_gia": "kg"}]),
+    ("gia_truoc_km", "-1"), ("gia_truoc_km", "abc"), ("gia_truoc_km", "99999999999"),
+])
+def test_truong_moi_kiem_dau_vao(conn, batch, truong, v):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    with pytest.raises(DT.LoiNhap):
+        DT.sua(conn, fid, {truong: v}, None)
+
+
+def test_bac_nhap_chu_json_chuan_hoa_va_bo_trong_la_xoa():
+    assert json.loads(DT.kiem_bac_nhap('[{"tu": "5", "don_vi_sl": "kg", "gia": "1,200", "don_vi_gia": "kg"}]')) == \
+        [{"tu": 5, "don_vi_sl": "kg", "gia": 1200, "don_vi_gia": "kg"}]
+    assert DT.kiem_bac_nhap("") == "[]" and DT.kiem_bac_nhap([]) == "[]" and DT.kiem_bac_nhap(None) == "[]"
+
+
+def test_gia_moi_mang_quy_cach_va_bac(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {"so_goi_thung": "20", "kl_goi_g": "500"}, None)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "5200", "loai_nguon": "to_roi",
+                            "bac": [{"tu": 5, "don_vi_sl": "thung", "gia": 5000, "don_vi_gia": "thung"}]}, None)
+    conn.commit()
+    r = conn.execute("SELECT so_goi_thung, kl_goi_g, bac FROM app.gia_doi_thu_tay WHERE id=%s", (tid,)).fetchone()
+    assert r[0] == 20 and float(r[1]) == 500 and r[2][0]["gia"] == 5000
+
+
+def test_gia_moi_khuyen_mai_gia_truoc_km_va_bo_trong_la_null(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "500", "loai_nguon": "to_roi",
+                            "khuyen_mai": "giảm 50", "gia_truoc_km": "550", "bac": []}, None)
+    tid2 = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "500", "loai_nguon": "to_roi",
+                             "khuyen_mai": "", "gia_truoc_km": "", "bac": ""}, None)
+    conn.commit()
+    r = conn.execute("SELECT khuyen_mai, gia_truoc_km, bac FROM app.gia_doi_thu_tay WHERE id=%s", (tid,)).fetchone()
+    assert r[0] == "giảm 50" and r[1] == 550 and r[2] is None
+    assert conn.execute("SELECT khuyen_mai, gia_truoc_km, bac FROM app.gia_doi_thu_tay WHERE id=%s", (tid2,)).fetchone() \
+        == (None, None, None)
