@@ -112,7 +112,8 @@ export default function ManDoiThu() {
         moSoSanh={o => doi({ tab: "so_sanh", sp: o.sp ?? [], nganh: o.nganh ?? "", ben: o.ben ?? "", nhom: "" })} />}
       {t.tab === "so_sanh" && <TabSoSanh sp={t.sp} sl={t.sl} xem={t.xem} gk={t.gk} cung={t.cung} nganh={t.nganh} ben={t.ben}
         nhom={t.nhom} dat={doi} />}
-      {t.tab === "ben" && <TabHoSo ben={t.ben} chonBen={b => doi({ ben: b })} moDuyet={b => doi({ tab: "duyet", ben: b })} />}
+      {t.tab === "ben" && <TabHoSo ben={t.ben} chonBen={b => doi({ ben: b })} moDuyet={b => doi({ tab: "duyet", ben: b })}
+        moLech={() => doi({ tab: "lech" })} />}
       {t.tab === "tin" && <TabTin moBen={b => doi({ tab: "ben", ben: b })}
         moSoSanh={sp => doi({ tab: "so_sanh", sp, nganh: "", ben: "", nhom: "" })} />}
       {t.tab === "nhom" && <TabNhomQuyCach />}

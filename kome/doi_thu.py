@@ -848,12 +848,13 @@ def nhom_va_quy_cach(conn) -> dict:
 
 # gia_kome_so của nhóm từng quan sát: mart.so_sanh_nhom (view nặng) đọc MỘT lần qua CTE MATERIALIZED, không mỗi dòng.
 _HO_SO = f"""
-WITH ss AS MATERIALIZED (SELECT nhom_khoa, don_vi_so, gia_kome_so FROM mart.so_sanh_nhom)
+WITH ss AS MATERIALIZED (SELECT nhom_khoa, don_vi_so, gia_kome_so, gia_kome_lech FROM mart.so_sanh_nhom)
 SELECT (SELECT to_json(d) FROM app.doi_thu d WHERE d.ma = %(ma)s),
        (SELECT coalesce(json_agg({_dieu_kien_json('d')} ORDER BY d.ngay_nguon DESC, d.loai, d.id), '[]')
           FROM mart.dieu_kien_hien_hanh d WHERE d.ma_doi_thu = %(ma)s),
        (SELECT coalesce(json_agg(to_json(q) ORDER BY q.ten_goc, q.ngay_nguon DESC), '[]')
-          FROM (SELECT {_COT_QS_KHONG_BT}, hien_hanh, round(ss.gia_kome_so) AS gia_kome_so
+          FROM (SELECT {_COT_QS_KHONG_BT}, hien_hanh, round(ss.gia_kome_so) AS gia_kome_so,
+                       coalesce(ss.gia_kome_lech, false) AS gia_kome_lech
                 FROM mart.gia_doi_thu_quan_sat LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
                 LEFT JOIN ss USING (nhom_khoa, don_vi_so)
                 WHERE ma_doi_thu = %(ma)s) q),
@@ -888,7 +889,9 @@ def ho_so_ben(conn, ma: str, hom_nay=None) -> dict | None:
     giờ Tokyo (`hom_nay_o_nhat`), không theo mốc dữ liệu — xem `tong_quan`. Vẫn MỘT lượt hỏi.
     Đợt 4b: `dieu_kien` = mart.dieu_kien_hien_hanh của bên (kèm id / fact_id / them_tay / sua_cuoi); mỗi quan sát mang
     `gia_kome_so` của nhóm nó (null nếu không có); `giao_hang` = dòng mart.giao_hang_hien_hanh của bên (kèm sua_cuoi
-    theo khoá 'giao:<bên>') hoặc null; `sua_cuoi_ben` = max nhật ký 'ben:<mã>' (0 = chưa sửa)."""
+    theo khoá 'giao:<bên>') hoặc null; `sua_cuoi_ben` = max nhật ký 'ben:<mã>' (0 = chưa sửa). Mỗi quan sát còn mang
+    `gia_kome_lech` của nhóm nó (mart.so_sanh_nhom: giá KOME > 3× / < ⅓ trung vị; không có nhóm → false) — màn không vẽ
+    những dòng đó như giá thật."""
     ben, dk, qs, kh, gh, scb = conn.execute(_HO_SO, {"ma": ma, "hom_nay": hom_nay or hom_nay_o_nhat()}).fetchone()
     return None if ben is None else {"ben": ben, "dieu_kien": dk, "quan_sat": qs, "khach_dang_mua": kh,
                                      "giao_hang": gh, "sua_cuoi_ben": scb}

@@ -999,6 +999,17 @@ def test_4b_ho_so_ben_giao_hang_sua_cuoi_ben_dieu_kien_va_gia_kome_so(conn, batc
     assert DT.ho_so_ben(conn, "HSC")["giao_hang"] is None                 # bên chưa có lô / sửa giao hàng → null
 
 
+def test_4b_ho_so_ben_quan_sat_mang_gia_kome_lech_cua_nhom(conn, batch):
+    from tests.test_mart_doi_thu import _bang_gia
+    _ba_ben(conn, batch)                                                  # trung vị ~560 ¥/kg
+    assert all(q["gia_kome_lech"] is False for q in DT.ho_so_ben(conn, "THAK")["quan_sat"])   # chưa có giá KOME
+    _bang_gia(conn, batch, "NT01", "std", 0, 60000)                       # 60000 / 1,08 / 10 kg ≈ 5 556 > 3 × trung vị
+    qs = DT.ho_so_ben(conn, "THAK")["quan_sat"]
+    assert qs and all(q["gia_kome_lech"] is True for q in qs)
+    n = next(x for x in DT.so_sanh(conn)["nhom"] if x["nhom_khoa"] == qs[0]["nhom_khoa"])
+    assert n["gia_kome_lech"] is True                                     # CÙNG cờ với So sánh (một định nghĩa)
+
+
 def test_4b_mat_hang_doc_ca_dong_lich_su_va_lich_su_sua_moi_nhat_truoc(conn, batch, monkeypatch):
     _hang(conn, batch)
     cu = _qs(conn, batch, "THAK", 540, hang="h1", ngay=date(2026, 7, 1))

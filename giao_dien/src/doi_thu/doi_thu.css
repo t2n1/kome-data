@@ -122,11 +122,8 @@
 
 /* ---- Tab So sánh giá (đợt 4b task 6; bản phác ca-trang-8.html, goi-thung-3.html, tooltip-thung-4.html, ky-hieu-thay-the.html C) ----
    Màu: luật §3.1 (mau.ts::mauLech) → đỏ --do / xanh --ok / xám --chu-mo; cùng thương hiệu --lam-chu; "?" thuế / viền hết
-   --canh-chu (vàng). Bốn token riêng của màn này khai ở :root cho cả hai chế độ (cùng nếp hai khối tối của kome.css —
-   ô nổi portal ra <body> nên không khai trên .man-doi-thu được): thanh khác thương hiệu, "?" thiếu (cam), KM, vạch thực bán. */
-:root{--dt-khac:#6E6A63;--dt-khac-chu:#FFFFFF;--dt-cam:#C2620E;--dt-km:#6B4FB8;--dt-vach:#FFFFFF}
-@media (prefers-color-scheme: dark){:root:not([data-theme="sang"]){--dt-khac:#4A433B;--dt-khac-chu:#D6CFC2;--dt-cam:#F0A05A;--dt-km:#B39AE8;--dt-vach:#FFFFFF}}
-:root[data-theme="toi"]{--dt-khac:#4A433B;--dt-khac-chu:#D6CFC2;--dt-cam:#F0A05A;--dt-km:#B39AE8;--dt-vach:#FFFFFF}
+   --canh-chu (vàng). Token riêng --dt-* (thanh khác thương hiệu, "?" thiếu cam, KM, vạch thực bán) khai ở kome.css
+   (ba khối: sáng + hai khối tối giống hệt) — mã màu chỉ có một nhà (test_giao_dien::test_khong_ma_mau_nao_ngoai_kome_css). */
 
 .dt-ss{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
 @media (min-width:900px){.dt-ss{grid-template-columns:260px minmax(0,1fr)}}
@@ -370,3 +367,4 @@ button.dt-tt-ten{cursor:pointer} button.dt-tt-ten:hover{text-decoration:underlin
 .dt-tin-ht{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 @container (max-width:760px){.dt-tin-ht{grid-template-columns:minmax(0,1fr)}}
 .dt-tin-ht h3{margin:0 0 6px;font-size:.84rem}
+.dt-hs-chua{display:block;margin-top:6px;font-size:.76rem}

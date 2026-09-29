@@ -29,8 +29,12 @@ export function chipBen(tq: TongQuan): { ma: string; ten: string; so: number }[]
  *  (`so_dong`) → tên. Không có bên nào → "". Đúng là phần tử đầu của chipBen. */
 export const benMacDinh = (tq: TongQuan): string => chipBen(tq)[0]?.ma ?? "";
 
+/** Dòng hiện hành thuộc bảng giá của bên (khách kể không phải bảng giá của bên). */
+const cuaBang = (q: QsHs) => q.hien_hanh && q.loai_nguon !== "khach_ke";
+
 /** Một dòng của biểu đồ "Giá bên này so với KOME": quan sát HIỆN HÀNH có `gia_kome_so` (không tính khách kể — không
- *  phải bảng giá của bên). p = % yen_chuan so gia_kome_so (cùng đơn vị so); p null = thiếu giá ¥/đơn vị so → "?". */
+ *  phải bảng giá của bên), nhóm KHÔNG có giá KOME lệch (`gia_kome_lech`: > 3× / < ⅓ trung vị — cùng cờ Tóm tắt bỏ khỏi
+ *  trục; vẽ nó là thanh −99% đỏ giả). p = % yen_chuan so gia_kome_so (cùng đơn vị so); p null = thiếu giá → "?". */
 export type DongHs = { q: QsHs; p: number | null; cung: boolean; het: boolean; km: boolean; cu: boolean; thueKhongRo: boolean;
   gomShip: boolean; tro: "gia_goc" | "kl_goi_g" | undefined };
 
@@ -39,7 +43,7 @@ export const coKm = (q: Pick<QuanSat, "khuyen_mai" | "gia_truoc_km">) => !!(q.kh
 /** Xếp p tăng dần (bên này rẻ nhất so KOME trước); p null cuối, trong nhóm cùng p theo tên nhóm rồi tên gốc. */
 export function dongSoKome(qs: QsHs[]): DongHs[] {
   const thay = new Set<string>();   // một quan sát một dòng (khoá nguon + id), phòng dữ liệu lặp
-  return qs.filter(q => q.hien_hanh && q.gia_kome_so != null && q.loai_nguon !== "khach_ke"
+  return qs.filter(q => cuaBang(q) && q.gia_kome_so != null && !q.gia_kome_lech
     && !thay.has(q.nguon + q.id) && !!thay.add(q.nguon + q.id)).map(q => {
     const p = phanTram(q.yen_chuan, q.gia_kome_so);
     return { q, p, cung: q.nhan === "cung_hang", het: q.trang_thai === "het", km: coKm(q), cu: (q.tuoi_ngay ?? 0) > NGAY_CU,
@@ -49,12 +53,30 @@ export function dongSoKome(qs: QsHs[]): DongHs[] {
     || (a.q.ten_nhom ?? "").localeCompare(b.q.ten_nhom ?? "", "vi") || a.q.ten_goc.localeCompare(b.q.ten_goc, "vi"));
 }
 
-/** Bốn ô số: trùng KOME = số dòng của biểu đồ; rẻ hơn KOME > 5% (p < −5); đang hết (trong các dòng trùng, như bản phác);
+const demKhac = (qs: QsHs[], f: (q: QsHs) => boolean) => new Set(qs.filter(q => cuaBang(q) && f(q)).map(q => q.nguon + q.id)).size;
+/** Số mặt hàng (dòng hiện hành, không khách kể) KHÔNG lên biểu đồ: `lech` = nhóm có giá KOME lệch (→ Dữ liệu › Giá KOME
+ *  lệch); `chuaSo` = không thuộc nhóm nào có giá KOME (chưa ghép, hoặc KOME không bán — → Duyệt / sửa của bên). */
+export const ngoaiBieuDo = (qs: QsHs[]) => ({
+  lech: demKhac(qs, q => q.gia_kome_so != null && !!q.gia_kome_lech),
+  chuaSo: demKhac(qs, q => q.gia_kome_so == null),
+});
+
+export const THU_GON = 25;
+/** Thu gọn biểu đồ: nhiều hơn `n` dòng thì giữ `n` dòng |p| lớn nhất (p null — thiếu giá — xếp sau mọi p), GIỮ thứ tự p
+ *  của `dong`; `an` = số dòng ẩn. */
+export function thuGon<T extends { p: number | null }>(dong: T[], n = THU_GON): { hien: T[]; an: number } {
+  if (dong.length <= n) return { hien: dong, an: 0 };
+  const giu = new Set(dong.map((d, i) => ({ i, k: d.p == null ? -1 : Math.abs(d.p) }))
+    .sort((a, b) => b.k - a.k || a.i - b.i).slice(0, n).map(x => x.i));
+  return { hien: dong.filter((_, i) => giu.has(i)), an: dong.length - n };
+}
+
+/** Bốn ô số (nhóm giá KOME lệch KHÔNG tính — cùng tập với biểu đồ): trùng KOME = số dòng của biểu đồ; rẻ hơn KOME > 5% (p < −5); đang hết (trong các dòng trùng, như bản phác);
  *  khuyến mãi = mọi dòng hiện hành có KM (cùng vị từ với tq.khuyen_mai: ghi chú KM hoặc giá trước KM), không tính khách kể. */
 export function o4(qs: QsHs[]): { trung: number; reHon: number; het: number; km: number } {
   const d = dongSoKome(qs);
   return { trung: d.length, reHon: d.filter(x => x.p != null && x.p < -LECH_NGANG).length, het: d.filter(x => x.het).length,
-    km: qs.filter(q => q.hien_hanh && q.loai_nguon !== "khach_ke" && coKm(q)).length };
+    km: qs.filter(q => cuaBang(q) && coKm(q)).length };
 }
 
 /** Lịch sử giá theo tháng của MỘT mặt hàng (cùng ma_hang_dt · kênh · mức giá · đơn vị so — cùng khoá hiện hành của

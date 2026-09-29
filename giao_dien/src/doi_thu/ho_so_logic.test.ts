@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Ben, GiaoHang, TongQuan } from "./kieu";
-import { benMacDinh, chipBen, dauBen, dongSoKome, giaoTrong, lichSuThang, nganhBen, o4, soMaTrung, tomTatGiao, type QsHs }
+import { benMacDinh, chipBen, dauBen, dongSoKome, giaoTrong, lichSuThang, nganhBen, ngoaiBieuDo, o4, soMaTrung, thuGon, tomTatGiao,
+  type QsHs }
   from "./ho_so_logic";
 
 let seq = 0;
@@ -112,5 +113,22 @@ describe("giaoTrong / tomTatGiao", () => {
   });
   it("bao ship thì bỏ phần miễn ship", () => {
     expect(tomTatGiao({ ...giaoTrong("a", null), bao_ship: true }).map(x => x.nhan)).toEqual(["ship", "daibiki"]);
+  });
+});
+
+describe("giá KOME lệch / chưa so được / thu gọn", () => {
+  it("nhóm gia_kome_lech không lên biểu đồ, không vào 4 ô; đếm riêng; chưa so = không có gia_kome_so", () => {
+    const qs = [q({ yen_chuan: 5, gia_kome_so: 5000, gia_kome_lech: true }), q({ yen_chuan: 5, gia_kome_so: 5000, gia_kome_lech: true }),
+      q({ yen_chuan: 80 }), q({ gia_kome_so: null }), q({ gia_kome_so: null, hien_hanh: false }),
+      q({ gia_kome_so: null, loai_nguon: "khach_ke" }), q({ gia_kome_lech: true, hien_hanh: false })];
+    expect(dongSoKome(qs).map(d => d.p)).toEqual([-20]);
+    expect(o4(qs)).toMatchObject({ trung: 1, reHon: 1 });
+    expect(ngoaiBieuDo(qs)).toEqual({ lech: 2, chuaSo: 1 });
+  });
+  it("thu gọn: giữ n dòng |p| lớn nhất theo thứ tự cũ, p null sau cùng; ít hơn n thì giữ hết", () => {
+    const d = [-50, -3, null, 2, 40, 10].map(p => ({ p }));
+    expect(thuGon(d, 3)).toEqual({ hien: [{ p: -50 }, { p: 40 }, { p: 10 }], an: 3 });
+    expect(thuGon(d, 6)).toEqual({ hien: d, an: 0 });
+    expect(thuGon([{ p: null }, { p: 1 }], 1).hien).toEqual([{ p: 1 }]);
   });
 });

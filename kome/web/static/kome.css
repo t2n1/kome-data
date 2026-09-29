@@ -65,6 +65,8 @@
    --canh-nen:#FFF9E8;--canh-vien:#E6D08A;--canh-chu:#8A5E06;
    /* Xanh lam của gói thiết kế (tầng core, kiểu nạp "snapshot" — Kho dữ liệu.dc.html). */
    --lam-nen:#E8F0F7; --lam-chu:#1B5E8C;
+   /* Màn /doi-thu (doi_thu.css): thanh khác thương hiệu, "?" thiếu (cam), khuyến mãi (tím), vạch thực bán. */
+   --dt-khac:#6E6A63; --dt-khac-chu:#FFFFFF; --dt-cam:#C2620E; --dt-km:#6B4FB8; --dt-vach:#FFFFFF;
    /* Màu theo lý do của /lien-he — mỗi cột đặt lại ba biến này (lien_he.css,
       .lh-m-<lý do>); đây là giá trị khi phần tử không thuộc cột nào. Chỉ
       tham chiếu token; khối tối chép lại y hệt cho test canh bảng tối. */
@@ -180,6 +182,7 @@
    --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
    --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
    --lam-nen:#172633; --lam-chu:#7FB3D9;
+   --dt-khac:#4A433B; --dt-khac-chu:#D6CFC2; --dt-cam:#F0A05A; --dt-km:#B39AE8; --dt-vach:#FFFFFF;
    --lh-mau:var(--vien); --lh-mau-chu:var(--chu-nhat); --lh-mau-nen:var(--nen-phu);
    --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
    /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt
@@ -224,6 +227,7 @@
    --loi-nen:#3A1E1C; --loi-vien:#D62C27; --loi-chu:#F0776F;
    --canh-nen:#2E2713;--canh-vien:#4A3D14;--canh-chu:#E2A72E;
    --lam-nen:#172633; --lam-chu:#7FB3D9;
+   --dt-khac:#4A433B; --dt-khac-chu:#D6CFC2; --dt-cam:#F0A05A; --dt-km:#B39AE8; --dt-vach:#FFFFFF;
    --lh-mau:var(--vien); --lh-mau-chu:var(--chu-nhat); --lh-mau-nen:var(--nen-phu);
    --ngoai-nen:#2B251D;--ngoai-chu:#978F83;
    /* Nền tối: bậc cao hơn phải NỔI hơn trên nền sẫm, nên hướng đậm/nhạt

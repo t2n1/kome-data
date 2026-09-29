@@ -74,7 +74,8 @@ export function TabTin({ moBen, moSoSanh }: { moBen: (ma: string) => void; moSoS
                     <span>{so(b.ds.length)} khuyến mãi</span></div>
                   {ds.map(k => (
                     <button key={`${k.nguon}${k.id}`} type="button" className="dt-tin-km-d" onClick={() => moSua(k, k.gia_goc == null ? "gia_goc" : undefined)}
-                      aria-label={`Sửa: ${b.ten} — ${k.ten_goc}`}>
+                      aria-label={`Sửa: ${b.ten} — ${k.ten_goc}, ${k.gia_goc == null ? "chưa có giá" : yen(k.gia_goc)}`
+                        + `${k.gia_truoc_km != null ? `, trước khuyến mãi ${yen(k.gia_truoc_km)}` : ""}${k.khuyen_mai ? `, ${k.khuyen_mai}` : ""}`}>
                       <span>{k.ten_goc}</span>
                       <b>{k.gia_goc == null ? <span className="dt-hoi-cam" aria-label="chưa có giá">?</span> : yen(k.gia_goc)}
                         {k.gia_truoc_km != null && <> <s>{yen(k.gia_truoc_km)}</s></>}</b>

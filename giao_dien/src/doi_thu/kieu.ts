@@ -15,6 +15,8 @@ export type QuanSat = {
   so_goi_thung: number | null; kl_goi_g: number | null; bac: Bac[] | null; kg_thung_dt: number | null;
   gia_goi: number | null; gia_thung: number | null; gia_1: number | null; gia_5: number | null; gia_10: number | null;
   gia_pallet: number | null; sua_cuoi: number; gia_kome_so?: number | null;
+  // Chỉ /ben/{ma}: cờ "giá KOME của nhóm lệch > 3× / < ⅓ trung vị" (mart.so_sanh_nhom) — dòng đó không vẽ như giá thật.
+  gia_kome_lech?: boolean;
 };
 export type Bac = { tu: number; don_vi_sl: "thung" | "kg" | "goi" | "pallet"; gia: number; don_vi_gia: "thung" | "kg" | "goi" };
 export type Nhom = {

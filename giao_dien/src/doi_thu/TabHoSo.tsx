@@ -4,14 +4,14 @@
 // Luật ở ho_so_logic.ts; màu % theo mau.ts::mauLech; thương hiệu theo kieu.ts::NHAN_GHEP. Mọi chỗ hiện hàng / điều kiện /
 // bên bấm được, mở pop-up sửa (SuaMatHang / SuaNho — không tự đóng, đóng ở `xong`).
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { lay } from "../api";
 import { Khoi, Spark } from "../chung/Khoi";
 import { DongNoi, ONoi } from "../chung/ONoi";
 import { ngay, so, thang_nhan, yen } from "../dinh_dang";
 import { chuoiKhoang, giuKhoang, useKhoang } from "../khung/khoang";
 import type { DieuKien, GiaoHang, KhachDangMua, TongQuan } from "./kieu";
-import { LOAI_DK, NHAN_GHEP, NHAN_TRANG_THAI, nhanDonVi } from "./kieu";
+import { LOAI_DK, LOAI_NGUON, NHAN_GHEP, NHAN_TRANG_THAI, nhanDonVi } from "./kieu";
 import { mauLech } from "./mau";
 import { Ra } from "./NguonDong";
 import { lienKetAnToan } from "./nguon";
@@ -19,7 +19,8 @@ import { pcDau } from "./so_sanh_logic";
 import { SuaMatHang } from "./SuaMatHang";
 import { SuaBen, SuaDieuKien, SuaGiaoHang } from "./SuaNho";
 import { ThanhDem } from "./TabTin";
-import { benMacDinh, chipBen, dauBen, dongSoKome, giaoTrong, lichSuThang, nganhBen, o4, tomTatGiao, type DongHs, type QsHs }
+import { benMacDinh, chipBen, dauBen, dongSoKome, giaoTrong, lichSuThang, nganhBen, ngoaiBieuDo, o4, thuGon, tomTatGiao, type DongHs,
+  type QsHs }
   from "./ho_so_logic";
 
 type HoSo = { ben: { ma: string; ten: string; web: string | null; ghi_chu: string | null };
@@ -32,12 +33,17 @@ const MAU: Record<string, string> = { do: "var(--do)", xanh: "var(--ok-vien)", x
 const nhanLoai = (m: string) => (LOAI_DK.find(([k]) => k === m)?.[1] ?? m).toLowerCase();
 const ngan = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
 
-export function TabHoSo({ ben, chonBen, moDuyet }: { ben: string; chonBen: (ma: string) => void; moDuyet: (ma: string) => void }) {
+export function TabHoSo({ ben, chonBen, moDuyet, moLech }: {
+  ben: string; chonBen: (ma: string) => void; moDuyet: (ma: string) => void; moLech: () => void;
+}) {
   const kx = chuoiKhoang(useKhoang());
   const tq = useQuery({ queryKey: ["doi-thu", "tong-quan", kx], queryFn: () => lay<TongQuan>(`/api/doi-thu/tong-quan${kx ? "?" + kx : ""}`) });
-  // Không có ?ben= trên URL → bên nhiều mặt hàng ghép được KOME nhất (ho_so_logic.ts::benMacDinh). KHÔNG ghi lên URL:
-  // link chia sẻ không mang bên thì người mở vẫn thấy bên mặc định của dữ liệu lúc đó.
-  const ma = ben || (tq.data ? benMacDinh(tq.data) : "");
+  // Không có ?ben= trên URL → bên nhiều mặt hàng ghép được KOME nhất (ho_so_logic.ts::benMacDinh). KHÔNG ghi lên URL
+  // (link chia sẻ không mang bên thì người mở thấy bên mặc định của dữ liệu lúc đó), nhưng CHỐT lần đầu tính được cho khoảng
+  // xem này: lưu một pop-up làm mới tong-quan thì số mặt hàng đổi, bên mặc định không được nhảy sang bên khác dưới tay người sửa.
+  const chot = useRef<{ kx: string; ma: string } | null>(null);
+  if (!ben && tq.data && chot.current?.kx !== kx) chot.current = { kx, ma: benMacDinh(tq.data) };
+  const ma = ben || (chot.current?.kx === kx ? chot.current.ma : "");
   const q = useQuery({ queryKey: ["doi-thu", "ben", ma, kx], enabled: !!ma,
     queryFn: () => lay<KetQua>(`/api/doi-thu/ben/${encodeURIComponent(ma)}${kx ? "?" + kx : ""}`) });
   const chip = useMemo(() => (tq.data ? chipBen(tq.data) : []), [tq.data]);
@@ -56,7 +62,7 @@ export function TabHoSo({ ben, chonBen, moDuyet }: { ben: string; chonBen: (ma: 
         : tq.error || q.error ? <div className="khoi-loi">Không tải được: {((tq.error ?? q.error) as Error).message}</div>
         : !ma ? <p className="dt-nhat">Chưa theo dõi đối thủ nào.</p>
         : !hs ? <p className="dt-nhat">Không có đối thủ này.</p>
-        : <HoSoBen hs={hs} tq={tq.data!} moSua={datSua} moDuyet={moDuyet} />}
+        : <HoSoBen key={hs.ben.ma} hs={hs} tq={tq.data!} moSua={datSua} moDuyet={moDuyet} moLech={moLech} />}
 
       {sua?.loai === "mh" && <SuaMatHang nguon={sua.q.nguon} id={sua.q.id} tru_o={sua.tru_o} dong={dongSua} xong={dongSua} />}
       {hs && sua?.loai === "dk" && <SuaDieuKien ben={{ ma: hs.ben.ma, ten: hs.ben.ten }} dk={sua.dk} dong={dongSua} xong={dongSua} />}
@@ -67,11 +73,14 @@ export function TabHoSo({ ben, chonBen, moDuyet }: { ben: string; chonBen: (ma: 
   );
 }
 
-function HoSoBen({ hs, tq, moSua, moDuyet }: { hs: HoSo; tq: TongQuan; moSua: (s: Sua) => void; moDuyet: (ma: string) => void }) {
+function HoSoBen({ hs, tq, moSua, moDuyet, moLech }: {
+  hs: HoSo; tq: TongQuan; moSua: (s: Sua) => void; moDuyet: (ma: string) => void; moLech: () => void;
+}) {
   const dau = useMemo(() => dauBen(hs.quan_sat), [hs]);
   const so4 = useMemo(() => o4(hs.quan_sat), [hs]);
   const dong = useMemo(() => dongSoKome(hs.quan_sat), [hs]);
   const nganh = useMemo(() => nganhBen(tq, hs.ben.ma), [tq, hs]);
+  const ngoai = useMemo(() => ngoaiBieuDo(hs.quan_sat), [hs]);
   const web = lienKetAnToan(hs.ben.web);
   const giao = tomTatGiao(hs.giao_hang);
   return (
@@ -102,6 +111,12 @@ function HoSoBen({ hs, tq, moSua, moDuyet }: { hs: HoSo; tq: TongQuan; moSua: (s
             cach_tinh="Mỗi thanh = một mặt hàng hiện hành của bên này ghép được với nhóm có giá KOME; dài = giá ¥/kg chưa thuế của bên so với giá KOME của nhóm (標準価格, thiếu thì thực bán 90 ngày). Trái = bên này rẻ hơn KOME. Tên là tên nhóm KOME; tên gốc trong ô nổi. Ngoài ±60% vẽ ở mép. Bấm thanh để sửa.">
             {dong.length ? <><BieuDoLech dong={dong} qs={hs.quan_sat} mo={(x, t) => moSua({ loai: "mh", q: x, tru_o: t })} /><ChuGiai /></>
               : <p className="dt-nhat">Chưa mặt hàng nào của bên này ghép được với nhóm có giá KOME.</p>}
+            {ngoai.lech > 0 && (
+              <button type="button" className="dt-tt-canh" onClick={moLech}>
+                ⚠ {so(ngoai.lech)} mặt hàng có giá KOME lệch — xem Dữ liệu › Giá KOME lệch</button>)}
+            {ngoai.chuaSo > 0 && (
+              <button type="button" className="dt-hs-lk dt-hs-chua" onClick={() => moDuyet(hs.ben.ma)}>
+                {so(ngoai.chuaSo)} mặt hàng chưa so được với KOME → Duyệt</button>)}
           </Khoi>
         </section>
         <div className="dt-hs-phai">
@@ -162,9 +177,13 @@ function HoSoBen({ hs, tq, moSua, moDuyet }: { hs: HoSo; tq: TongQuan; moSua: (s
 const W = 720, LW = 230, PHAI = 96, RH = 22, TREN = 22, P_MIN = -60, P_MAX = 60;
 const xP = (p: number) => LW + (Math.max(P_MIN, Math.min(P_MAX, p)) - P_MIN) / (P_MAX - P_MIN) * (W - LW - PHAI);
 
-function BieuDoLech({ dong, qs, mo }: { dong: DongHs[]; qs: QsHs[]; mo: (q: QsHs, tru_o?: string) => void }) {
+function BieuDoLech({ dong: tatCa, qs, mo }: { dong: DongHs[]; qs: QsHs[]; mo: (q: QsHs, tru_o?: string) => void }) {
+  const [moRong, datMoRong] = useState(false);
+  const { hien, an } = useMemo(() => thuGon(tatCa), [tatCa]);
+  const dong = moRong ? tatCa : hien;
   const H = TREN + dong.length * RH + 18, x0 = xP(0);
   return (
+    <>
     <div className="dt-cuon">
       <svg viewBox={`0 0 ${W} ${H}`} className="dt-svg dt-svg-hs" role="group" aria-label="Giá từng mặt hàng của bên này so với giá KOME">
         {[-50, -25, 25, 50].map(p => (
@@ -212,6 +231,10 @@ function BieuDoLech({ dong, qs, mo }: { dong: DongHs[]; qs: QsHs[]; mo: (q: QsHs
         <line x1={x0} x2={x0} y1={TREN - 6} y2={H - 16} stroke="var(--do)" strokeWidth={2} pointerEvents="none" />
       </svg>
     </div>
+    {an > 0 && (moRong
+      ? <button type="button" className="dt-xem-them" onClick={() => datMoRong(false)}>thu gọn ▴</button>
+      : <button type="button" className="dt-xem-them" onClick={() => datMoRong(true)}>xem thêm {so(an)} mặt hàng ▾</button>)}
+    </>
   );
 }
 
@@ -235,9 +258,18 @@ function NoiHs({ d, qs }: { d: DongHs; qs: QsHs[] }) {
           <Spark gia_tri={ls.map(x => x.gia)} mau="var(--lam-chu)" cao={28} />
           <small>{ls.map(x => `${thang_nhan(x.thang)} ${yen(x.gia)}`).join(" → ")}</small>
         </div>)}
-      <div className="o-noi-chu">{ngay(q.ngay_nguon)} · bấm để sửa</div>
+      <div className="o-noi-chu">{ngay(q.ngay_nguon)} · {nguonChu(q)}</div>
+      <div className="o-noi-chu">bấm để sửa · liên kết nguồn trong pop-up</div>
     </>
   );
+}
+
+/** Nguồn của dòng, dạng CHỮ: ô nổi không nhận chuột (pointer-events: none của .bd-noi) nên liên kết thật (NguonDong)
+ *  nằm trong pop-up sửa mà thanh mở ra — ở đây chỉ nói nguồn là gì. */
+function nguonChu(q: QsHs): string {
+  if (q.nguon === "nap") return q.hinh_thuc_nguon === "web" ? "nguồn: trang của bên" : `nguồn: ${q.nguon_file ?? "bảng giá"}`;
+  return `nguồn: ${(LOAI_NGUON.find(([m]) => m === q.loai_nguon)?.[1] ?? q.loai_nguon).toLowerCase()}`
+    + (lienKetAnToan(q.lien_ket_bang_chung) ? " · có bằng chứng" : "");
 }
 
 function ChuGiai() {
