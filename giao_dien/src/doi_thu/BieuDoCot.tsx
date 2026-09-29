@@ -65,13 +65,13 @@ export function BieuDoCot({ n, sl, gk, chiCung, mo, neo }: Chung & { n: Nhom; ne
           {dong.map((d, i) => {
             const y = 6 + TOP + i * RH, q = d.q;
             const re = d.gia != null && d.giaLe != null && d.gia < d.giaLe;
-            const lopTen = d.kome ? "t-kome" : d.cung ? "t-dam" : "t-mo";
+            const lopTen = d.kome ? "t-kome" : d.cung ? "t-dam" : "t-khac";
             const soGoi = d.soGoi == null ? null : so_luong(d.soGoi), kl = nhanKlGoi(d.klGoi);
             const cuoi = d.gia == null ? LW : x(Math.max(d.gia, re ? d.giaLe! : 0));
             return (
               <g key={d.kome ? "kome" : `${q!.nguon}${q!.id}`}>
-                <text x={4} y={y + 16} fontSize={11.5} className={lopTen}>{d.kome ? "KOME" : ngan(d.ben, 18)}</text>
-                <text x={X_TEN} y={y + 16} fontSize={11.5} className={d.kome ? "t-kome" : d.cung ? "" : "t-mo"}>
+                <text x={4} y={y + 16} fontSize={11.5} className={lopTen} opacity={d.cu ? 0.5 : 1}>{d.kome ? "KOME" : ngan(d.ben, 18)}</text>
+                <text x={X_TEN} y={y + 16} fontSize={11.5} className={d.kome ? "t-kome" : d.cung ? "" : "t-khac"} opacity={d.cu ? 0.5 : 1}>
                   {ngan(d.kome ? n.ten_nhom ?? n.nhom_khoa : d.ten, 28)}</text>
                 {soGoi != null ? <text x={C1} y={y + 16} fontSize={12} textAnchor="end">{soGoi}</text>
                   : d.kome ? <text x={C1} y={y + 16} fontSize={12} textAnchor="end" className="t-mo">?</text>

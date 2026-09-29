@@ -7,7 +7,7 @@ import { yen } from "../dinh_dang";
 import type { Nhom } from "./kieu";
 import { mauLech, phanTram } from "./mau";
 import { NoiGia } from "./ONoiGia";
-import { dongCot, giaKome, pcDau, type SoLuong } from "./so_sanh_logic";
+import { dongCot, khoaNhom, giaKome, pcDau, type SoLuong } from "./so_sanh_logic";
 import type { MoSua } from "./BieuDoCot";
 
 const W = 760, LW = 200, RH = 50, TREN = 30, LO = -60, HI = 60;
@@ -34,7 +34,7 @@ export function BieuDoCham({ ds, sl, gk, chiCung, mo }: { ds: Nhom[]; sl: SoLuon
           const hang = dongCot(n, { sl, gk, chiCung, moRong: true }).dong.filter(d => !d.kome);
           const thieu = hang.filter(d => d.gia == null);   // thiếu giá của MẶT HÀNG (thiếu giá KOME đã nói ở nhãn hàng)
           return (
-            <g key={n.nhom_khoa + n.don_vi_so}>
+            <g key={khoaNhom(n)}>
               <line x1={LW} x2={W - 20} y1={y} y2={y} stroke="var(--vien-phu)" />
               <text x={LW - 8} y={y - 2} fontSize={11.5} textAnchor="end">{ngan(n.ten_nhom ?? n.nhom_khoa, 26)}</text>
               <text x={LW - 8} y={y + 12} fontSize={10} textAnchor="end" className="t-nhat">

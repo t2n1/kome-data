@@ -12,9 +12,10 @@ import { BangNhiet, ChuGiaiNhiet } from "./BangNhiet";
 import { BieuDoCham, ChuGiaiCham } from "./BieuDoCham";
 import { BieuDoCot, ChuGiaiCot, type MoSua } from "./BieuDoCot";
 import type { Nhom } from "./kieu";
+import { dongMoSan } from "./loc";
 import { mauKomeSoTT } from "./mau";
 import { tenNganh } from "./nganh";
-import { batTat, demThieu, LUA_CHON_GK, locDanhSach, macDinhSp, NHAN_SL, nhomChon, pcDau, soMatHang,
+import { batTat, demThieu, khoaNhom, LUA_CHON_GK, locDanhSach, macDinhSp, NHAN_SL, nhomChon, pcDau, soMatHang,
   type NutNhanh, type SoLuong } from "./so_sanh_logic";
 import { SuaMatHang } from "./SuaMatHang";
 import { TOI_DA_SP, type TrangThaiUrl } from "./url";
@@ -49,7 +50,7 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, nhom, dat }: Props) {
   const chon = useMemo(() => nhomChon(tatCa ?? [], chonSp), [tatCa, chonSp]);
   const ds = useMemo(() => locDanhSach(tatCa ?? [], { nganh, tim, nhanh }), [tatCa, nganh, tim, nhanh]);
   const dsNganh = useMemo(() => [...new Set((tatCa ?? []).map(n => n.nganh ?? ""))].sort((a, b) => a.localeCompare(b, "ja")), [tatCa]);
-  const thieu = useMemo(() => demThieu(chon), [chon]);
+  const thieu = useMemo(() => demThieu(chon, { chiCung: cung }), [chon, cung]);
   const mo: MoSua = (x, tru_o) => datSua({ nguon: x.nguon, id: x.id, tru_o });
 
   const batTatNhom = (khoa: string) => {
@@ -74,10 +75,10 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, nhom, dat }: Props) {
     dat({ sp: [nhom, ...chonSp.filter(k => k !== nhom)].slice(0, TOI_DA_SP), nhom: "" });
   }, [nhom, tatCa, khongDong]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const k = cuonToi.current;
-    if (!k) return;
+    const d = cuonToi.current && dongMoSan(chon, cuonToi.current);   // nhiều đơn vị so → dòng 'kg' trước
+    if (!d) return;
     cuonToi.current = "";
-    requestAnimationFrame(() => neo.current[k]?.scrollIntoView?.({ block: "start" }));
+    requestAnimationFrame(() => neo.current[khoaNhom(d)]?.scrollIntoView?.({ block: "start" }));
   }, [chon]);
 
   const ve = { sl, gk, chiCung: cung, mo };
@@ -105,7 +106,7 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, nhom, dat }: Props) {
                 const p = n.lech_trung_vi == null ? null : Math.round(n.lech_trung_vi * 100);
                 const ten = n.ten_nhom ?? n.nhom_khoa;
                 return (
-                  <li key={n.nhom_khoa + n.don_vi_so}>
+                  <li key={khoaNhom(n)}>
                     <label className={"dt-mh" + (on ? " chon" : "")}>
                       <input type="checkbox" checked={on} onChange={() => batTatNhom(n.nhom_khoa)} />
                       <HinhMa ma={n.ma_kome?.[0]} ten={ten} co={34} trang_tri />
@@ -143,8 +144,8 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, nhom, dat }: Props) {
                 onClick={() => mo(thieu.dau!, thieu.truong ?? undefined)}>bấm để điền cái đầu tiên</button></p>)}
             {chon.length === 0 ? <p className="dt-nhat">Chọn ít nhất một nhóm ở cột trái.</p>
               : xem === "cot" ? <>
-                  {chon.map(n => <BieuDoCot key={n.nhom_khoa + n.don_vi_so} n={n} {...ve}
-                    neo={e => { neo.current[n.nhom_khoa] = e; }} />)}
+                  {chon.map(n => <BieuDoCot key={khoaNhom(n)} n={n} {...ve}
+                    neo={e => { neo.current[khoaNhom(n)] = e; }} />)}
                   <ChuGiaiCot />
                 </>
               : xem === "cham" ? <><BieuDoCham ds={chon} {...ve} /><ChuGiaiCham /></>

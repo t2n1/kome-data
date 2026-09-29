@@ -63,8 +63,13 @@ export function dongCot(n: Nhom, o: { sl: SoLuong; gk: string; chiCung: boolean;
   return { dong: [kome, ...hien].sort((a, b) => theoGia(a.gia, b.gia)), an: hang.length - hien.length };
 }
 
+/** Khoá ô bảng nhiệt / neo cuộn của MỘT dòng nhóm (nhom_khoa + don_vi_so) và một bên. */
+export const khoaNhom = (n: Pick<Nhom, "nhom_khoa" | "don_vi_so">) => `${n.nhom_khoa}|${n.don_vi_so}`;
+export const khoaONhiet = (n: Pick<Nhom, "nhom_khoa" | "don_vi_so">, ben: string) => `${khoaNhom(n)}|${ben}`;
+
 /** Ô bảng nhiệt: mỗi (nhóm, bên) — mặt hàng cùng thương hiệu rẻ nhất, không có thì khác thương hiệu rẻ nhất.
- *  `ben` = tên hiển thị (ten_doi_thu ?? ma_doi_thu), xếp theo số nhóm có mặt giảm dần; khoá ô `${nhom_khoa}|${ben}`. */
+ *  `ben` = tên hiển thị (ten_doi_thu ?? ma_doi_thu), xếp theo số nhóm có mặt giảm dần; khoá ô = `khoaONhiet(n, ben)`
+ *  (`${nhom_khoa}|${don_vi_so}|${ben}` — một nhom_khoa có thể có nhiều dòng, mỗi don_vi_so một dòng). */
 export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolean }):
   { ben: string[]; o: Map<string, { q: QuanSat; p: number | null; so: number; cung: boolean }> } {
   const ket = new Map<string, { q: QuanSat; p: number | null; so: number; cung: boolean }>();
@@ -80,7 +85,7 @@ export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolea
     for (const [b, ds2] of theoBen) {
       const cung = ds2.filter(q => q.nhan === "cung_hang");
       const chon = (cung.length ? cung : ds2).map(q => ({ q, gia: giaTai(q, o.sl).gia })).sort((x, y) => theoGia(x.gia, y.gia))[0];
-      ket.set(`${n.nhom_khoa}|${b}`, { q: chon.q, p: phanTram(chon.gia, gK), so: ds2.length, cung: cung.length > 0 });
+      ket.set(khoaONhiet(n, b), { q: chon.q, p: phanTram(chon.gia, gK), so: ds2.length, cung: cung.length > 0 });
       soNhom.set(b, (soNhom.get(b) ?? 0) + 1);
     }
   }
@@ -88,10 +93,13 @@ export function oNhiet(ds: Nhom[], o: { sl: SoLuong; gk: string; chiCung: boolea
   return { ben, o: ket };
 }
 
-/** Đếm mặt hàng thiếu quy cách (không tính khách kể): số lượng, mặt hàng đầu tiên, và trường thiếu của nó (để mở pop-up đúng ô). */
-export function demThieu(ds: Nhom[]): { so: number; dau: QuanSat | null; truong: "so_goi_thung" | "kl_goi_g" | null } {
+/** Đếm mặt hàng thiếu quy cách (không tính khách kể; `chiCung` = chỉ đếm hàng cùng thương hiệu — đúng những dòng đang vẽ):
+ *  số lượng, mặt hàng đầu tiên, và trường thiếu của nó (để mở pop-up đúng ô). */
+export function demThieu(ds: Nhom[], o: { chiCung?: boolean } = {}):
+  { so: number; dau: QuanSat | null; truong: "so_goi_thung" | "kl_goi_g" | null } {
   let so = 0; let dau: QuanSat | null = null;
-  for (const n of ds) for (const q of n.quan_sat) if (veDuoc(q) && thieuQuyCach(q)) { so++; dau ??= q; }
+  for (const n of ds) for (const q of n.quan_sat)
+    if (veDuoc(q) && (!o.chiCung || q.nhan === "cung_hang") && thieuQuyCach(q)) { so++; dau ??= q; }
   return { so, dau, truong: dau ? (dau.so_goi_thung == null ? "so_goi_thung" : "kl_goi_g") : null };
 }
 

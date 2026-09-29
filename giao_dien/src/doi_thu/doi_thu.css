@@ -124,9 +124,9 @@
    Màu: luật §3.1 (mau.ts::mauLech) → đỏ --do / xanh --ok / xám --chu-mo; cùng thương hiệu --lam-chu; "?" thuế / viền hết
    --canh-chu (vàng). Bốn token riêng của màn này khai ở :root cho cả hai chế độ (cùng nếp hai khối tối của kome.css —
    ô nổi portal ra <body> nên không khai trên .man-doi-thu được): thanh khác thương hiệu, "?" thiếu (cam), KM, vạch thực bán. */
-:root{--dt-khac:#B9B2A7;--dt-cam:#C2620E;--dt-km:#6B4FB8;--dt-vach:#FFFFFF}
-@media (prefers-color-scheme: dark){:root:not([data-theme="sang"]){--dt-khac:#4A433B;--dt-cam:#F0A05A;--dt-km:#B39AE8;--dt-vach:#FFFFFF}}
-:root[data-theme="toi"]{--dt-khac:#4A433B;--dt-cam:#F0A05A;--dt-km:#B39AE8;--dt-vach:#FFFFFF}
+:root{--dt-khac:#6E6A63;--dt-khac-chu:#FFFFFF;--dt-cam:#C2620E;--dt-km:#6B4FB8;--dt-vach:#FFFFFF}
+@media (prefers-color-scheme: dark){:root:not([data-theme="sang"]){--dt-khac:#4A433B;--dt-khac-chu:#D6CFC2;--dt-cam:#F0A05A;--dt-km:#B39AE8;--dt-vach:#FFFFFF}}
+:root[data-theme="toi"]{--dt-khac:#4A433B;--dt-khac-chu:#D6CFC2;--dt-cam:#F0A05A;--dt-km:#B39AE8;--dt-vach:#FFFFFF}
 
 .dt-ss{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
 @media (min-width:900px){.dt-ss{grid-template-columns:260px minmax(0,1fr)}}
@@ -167,7 +167,9 @@
 .dt-nhom-dau small b{color:var(--chu);font-weight:600}
 .dt-svg{display:block;font-family:var(--font-ui);font-variant-numeric:tabular-nums}
 .dt-svg text{fill:var(--chu)}
-.dt-svg .t-nhat{fill:var(--chu-nhat)} .dt-svg .t-mo{fill:var(--chu-mo)} .dt-svg .t-kome{fill:var(--do-chu);font-weight:700}
+.dt-svg .t-nhat{fill:var(--chu-nhat)} .dt-svg .t-mo{fill:var(--chu-mo)}
+/* Tên hàng khác thương hiệu: mờ hơn tên cùng thương hiệu (chữ thường, không đậm) nhưng vẫn đọc được — --chu-nhat, không --chu-mo. */
+.dt-svg .t-khac{fill:var(--chu-nhat)} .dt-svg .t-kome{fill:var(--do-chu);font-weight:700}
 .dt-svg .t-do{fill:var(--do-chu)} .dt-svg .t-xanh{fill:var(--ok-chu)} .dt-svg .t-xam{fill:var(--chu-mo)}
 .dt-svg .t-cam{fill:var(--dt-cam);text-decoration:underline;cursor:pointer;outline:none}
 .dt-svg .t-cam:focus-visible{stroke:var(--dt-cam);stroke-width:.6}
@@ -205,7 +207,7 @@
 .o-noi .dt-ng .dt-ng-ben{font-weight:700;font-size:.8rem}
 .o-noi .dt-ng .dt-ng-ten{color:var(--chu-nhat);font-size:.7rem;margin-bottom:4px}
 .dt-nh{display:inline-block;padding:0 7px;border-radius:999px;font-size:.66rem;margin:0 4px 0 0}
-.dt-nh.cung{background:var(--lam-chu);color:var(--nen-the)} .dt-nh.khac{background:var(--dt-khac);color:var(--chu)}
+.dt-nh.cung{background:var(--lam-chu);color:var(--nen-the)} .dt-nh.khac{background:var(--dt-khac);color:var(--dt-khac-chu)}
 .dt-nh.het{background:var(--canh-nen);color:var(--canh-chu)}
 .dt-nh.km{background:color-mix(in srgb, var(--dt-km) 18%, transparent);color:var(--dt-km)}
 .o-noi .dt-ng .dt-ng-o3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}

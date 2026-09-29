@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Nhom, QuanSat } from "./kieu";
-import { LUA_CHON_GK, NHAN_SL, bangBac, batTat, demThieu, dongCot, giaBacKg, giaKome, giaTai, locDanhSach, macDinhSp, matHangCuaBen,
+import { LUA_CHON_GK, khoaNhom, khoaONhiet, NHAN_SL, bangBac, batTat, demThieu, dongCot, giaBacKg, giaKome, giaTai, locDanhSach, macDinhSp, matHangCuaBen,
   nhanBac, nhanKlGoi, nhomChon, oNhiet, pcDau, soMatHang, thieuQuyCach } from "./so_sanh_logic";
 
 let seq = 0;
@@ -127,18 +127,29 @@ describe("oNhiet", () => {
     const n2 = nh({ nhom_khoa: "n2", quan_sat: [qs({ ten_doi_thu: "B", ma_doi_thu: "b", gia_1: 100 }), qs({ loai_nguon: "khach_ke", ten_doi_thu: "K", ma_doi_thu: "k", gia_1: 1 })] });
     const r = oNhiet([n1, n2], { sl: "1", gk: "thuc", chiCung: false });
     expect(r.ben).toEqual(["B", "A"]);
-    const a = r.o.get("n1|A")!;
+    const a = r.o.get("n1|kg|A")!;
     expect(a.q.gia_1).toBe(900); expect(a.cung).toBe(true); expect(a.so).toBe(3); expect(a.p).toBe(80);
-    const b = r.o.get("n1|B")!;
+    const b = r.o.get("n1|kg|B")!;
     expect(b.q.gia_1).toBe(600); expect(b.cung).toBe(false); expect(b.so).toBe(2);
-    expect(r.o.has("n2|K")).toBe(false);
-    expect(r.o.get("n2|B")!.p).toBe(-80);
+    expect(r.o.has("n2|kg|K")).toBe(false);
+    expect(r.o.get("n2|kg|B")!.p).toBe(-80);
+  });
+  it("hai dòng cùng nhom_khoa khác don_vi_so không ghi đè ô của nhau", () => {
+    const kg = nh({ nhom_khoa: "ma:X", don_vi_so: "kg", gia_kome: 500, quan_sat: [qs({ ten_doi_thu: "A", ma_doi_thu: "a", gia_1: 400 })] });
+    const goi = nh({ nhom_khoa: "ma:X", don_vi_so: "don_vi:goi", gia_kome: 100, gia_kome_chuan: 100,
+      quan_sat: [qs({ ten_doi_thu: "A", ma_doi_thu: "a", gia_1: 150 })] });
+    const r = oNhiet([kg, goi], { sl: "1", gk: "thuc", chiCung: false });
+    expect(r.o.get(khoaONhiet(kg, "A"))!.p).toBe(-20);
+    expect(r.o.get(khoaONhiet(goi, "A"))!.p).toBe(50);
+    expect(khoaONhiet(goi, "A")).toBe("ma:X|don_vi:goi|A");
+    expect(khoaNhom(kg)).not.toBe(khoaNhom(goi));
+    expect(r.ben).toEqual(["A"]);
   });
   it("chiCung bỏ ô chỉ có khác thương hiệu", () => {
     const n1 = nh({ nhom_khoa: "n1", quan_sat: [qs({ ten_doi_thu: "A", ma_doi_thu: "a", gia_1: 300, nhan: "thay_the" }), qs({ ten_doi_thu: "B", ma_doi_thu: "b", gia_1: 300, nhan: "cung_hang" })] });
     const r = oNhiet([n1], { sl: "1", gk: "thuc", chiCung: true });
     expect(r.ben).toEqual(["B"]);
-    expect(r.o.has("n1|A")).toBe(false);
+    expect(r.o.has("n1|kg|A")).toBe(false);
   });
 });
 
@@ -153,6 +164,11 @@ describe("demThieu / locDanhSach", () => {
     expect(demThieu([nh({ quan_sat: [qs({ kl_goi_g: null })] })]).truong).toBe("kl_goi_g");
     expect(demThieu([nh({ quan_sat: [qs({})] })])).toEqual({ so: 0, dau: null, truong: null });
     expect(thieuQuyCach(qs({ kl_goi_g: null }))).toBe(true);
+    // chiCung: chỉ đếm hàng cùng thương hiệu (M4, T2 là khác thương hiệu).
+    expect(demThieu([n], { chiCung: true })).toEqual({ so: 0, dau: null, truong: null });
+    n.quan_sat.push(qs({ ten_goc: "C1", nhan: "cung_hang", kl_goi_g: null }));
+    expect(demThieu([n], { chiCung: true })).toMatchObject({ so: 1, truong: "kl_goi_g" });
+    expect(demThieu([n]).so).toBe(3);
   });
   const ds = () => [
     nh({ nhom_khoa: "1", ten_nhom: "Gạo Việt", ma_kome: ["G01"], nganh: "米", so_ben: 2, lech_trung_vi: 0.5, quan_sat: [qs({})] }),
