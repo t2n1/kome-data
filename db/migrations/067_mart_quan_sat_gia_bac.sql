@@ -212,7 +212,7 @@ thanh_vien AS (      -- mã KOME của từng nhóm: nhóm ngầm định = đú
 -- mart.gia_kome_chuan(mã) ở đây — hàm SQL STABLE có FROM không gộp vào câu gọi, nên mỗi dòng thanh_vien sẽ dựng lại cả
 -- view. chuan = yen_kg của bậc 'std' = ĐÚNG thân của mart.gia_kome_chuan (066); sửa hàm đó thì sửa cả chỗ này.
 kb AS MATERIALIZED (SELECT product_code, price_level, yen_kg FROM mart.gia_kome_bang),
-tv_gia AS (
+tv_gia AS MATERIALIZED (      -- đọc hai lần (chinh, kome) → MATERIALIZED tường minh (bất biến CTE-trùng)
     SELECT tv.nhom_khoa, tv.product_code, g.doanh_thu, g.kg_ban, s.yen_kg AS chuan
     FROM thanh_vien tv LEFT JOIN mart.gia_kome_kg g USING (product_code)
                        LEFT JOIN kb s ON s.product_code = tv.product_code AND s.price_level = 'std'

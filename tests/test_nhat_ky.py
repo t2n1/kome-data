@@ -201,3 +201,10 @@ def test_hoan_tac_ghi_ten_nguoi_bam(conn, co_cong):
     r = conn.execute("SELECT undone_at IS NOT NULL, huy_boi FROM meta.ingest_batch WHERE batch_id = %s",
                      (lo,)).fetchone()
     assert r == (True, a)
+
+
+@pytest.mark.parametrize("chi_tiet,nhan", [("giao_hang", "Sửa điều kiện giao hàng"), ("dieu_kien", "Sửa điều kiện bán")])
+def test_nhat_ky_doi_thu_co_nhan_cho_giao_hang_va_dieu_kien(chi_tiet, nhan):
+    from datetime import datetime, timezone
+    d = NK.Dong("doi_thu", datetime(2026, 9, 29, tzinfo=timezone.utc), None, "giao:IMAI", chi_tiet, None, None)
+    assert d.noi_dung == f"{nhan} · giao:IMAI"

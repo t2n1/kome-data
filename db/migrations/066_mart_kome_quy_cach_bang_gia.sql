@@ -53,14 +53,18 @@ GROUP BY f.product_code;
 -- 売価No.10 = giá KHUYẾN MÃI của KOME (chủ DN 2026-09-29). ĐỊNH NGHĨA MỘT LẦN; kome/san_pham_360.py::NHAN_BAC chép nhãn.
 CREATE FUNCTION mart.la_gia_km_kome(p_level text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT p_level = '10' $$;
 
--- Bảng giá KOME quy về ¥/kg chưa thuế. CHỈ dùng lần nạp MỚI NHẤT ≤ mốc (040) của từng (mã, quy cách): kome/loaders/price.py
+-- Bảng giá KOME quy về ¥/kg chưa thuế. CHỈ dùng lần nạp MỚI NHẤT ≤ mốc (040) của từng (mã, quy cách) — valid_from rồi
+-- batch_id: kome/loaders/price.py
 -- bỏ bậc 0/0 nên khi 売価No.10 hết hạn không có dòng mới nào ghi đè — không giới hạn thì khuyến mãi đã kết thúc ở lại mãi.
 -- Luật hai cột: chưa thuế nếu > 0 và KHÔNG mâu thuẫn (gồm thuế > 0 mà nhỏ hơn chưa thuế); không thì gồm thuế ÷ 1,08
 -- (kome/san_pham_360.py::_bac_gia chép luật này để hiện từng quy cách — sửa một bên là sửa cả hai). Mỗi (mã, bậc) một
 -- dòng: ưu tiên quy cách '02' khi biết kg, không thì '00'.
 CREATE VIEW mart.gia_kome_bang AS
 WITH m0 AS (
-    SELECT f.*, f.valid_from = max(f.valid_from) OVER (PARTITION BY f.product_code, f.pack_code) AS moi_nhat
+    -- lần nạp mới nhất = valid_from lớn nhất RỒI batch_id lớn nhất trong ngày đó: file sửa CÙNG ngày được price.py upsert
+    -- (đổi batch_id của bậc còn lại), bậc bị bỏ giữ batch_id cũ và phải biến mất.
+    SELECT f.*, rank() OVER (PARTITION BY f.product_code, f.pack_code ORDER BY f.valid_from DESC, f.batch_id DESC) = 1
+               AS moi_nhat
     FROM core.fact_price_list f
     WHERE f.valid_from <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))
 ),

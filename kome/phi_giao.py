@@ -35,7 +35,10 @@ def tinh(dk: dict, don: dict) -> dict:
             ra["vung"] = float(pp[vung]) * kien
     if tra == "daibiki":
         if dk.get("daibiki_tu") is not None and tien >= float(dk["daibiki_tu"]):
-            ra["daibiki"] = _so(dk.get("daibiki_sau")) or 0
+            if dk.get("daibiki_sau") is None:          # tới ngưỡng mà không ghi phí sau ngưỡng: chưa rõ, KHÔNG phải miễn
+                ra["chua_ro"].append("daibiki")
+            else:
+                ra["daibiki"] = _so(dk["daibiki_sau"])
         elif dk.get("phi_daibiki") is None:
             ra["chua_ro"].append("daibiki")
         else:

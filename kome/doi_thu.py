@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from kome.ten_hang import chuan_ten
 from kome.tuoi_du_lieu import hom_nay_o_nhat
@@ -62,6 +62,23 @@ def _so(v, ten, duong=False, phay_la_thap_phan=False):
     return x
 
 
+def _hai_so_le(x, ten, duong=False):
+    """Số đã đọc → đúng dạng một cột numeric(·,2) sẽ lưu: làm tròn 0,01 (nửa lên), '-0' → 0 (`+ 0`). Trường phải > 0
+    mà làm tròn thành 0 ('0.001') → LoiNhap — không để CSDL nổ CHECK (500), cũng không để sổ đính chính giữ một số
+    mà view (regex không dấu trừ, ≤ 6 chữ số lẻ) bỏ qua. None → None; vô hạn / NaN → LoiNhap."""
+    if x is None:
+        return None
+    if not x.is_finite():
+        raise LoiNhap(f"{ten} quá lớn.")
+    try:                                                       # quá độ chính xác 28 chữ số → InvalidOperation
+        x = x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) + 0
+    except InvalidOperation:
+        raise LoiNhap(f"{ten} quá lớn.")
+    if duong and x <= 0:
+        raise LoiNhap(f"{ten} làm tròn 0,01 thành 0 — nhập số lớn hơn.")
+    return x
+
+
 def _chuoi_so(v, ten, duong=False, phay_la_thap_phan=False):
     x = _so(v, ten, duong, phay_la_thap_phan)
     return None if x is None else format(x, "f")
@@ -105,13 +122,13 @@ def _kiem(truong: str, v):
         if x != x.to_integral_value() or x > GOI_TOI_DA:
             raise LoiNhap(f"Số gói / thùng phải là số nguyên từ 1 đến {GOI_TOI_DA}.")
         return str(int(x))
-    if truong == "kl_goi_g":
-        x = _so(v, "Khối lượng 1 gói", True, True)
+    if truong == "kl_goi_g":                                   # numeric(10,2) > 0 — sửa và giá tay lưu CÙNG một số
+        x = _hai_so_le(_so(v, "Khối lượng 1 gói", True, True), "Khối lượng 1 gói", True)
         if x is not None and x > KL_GOI_TOI_DA:
             raise LoiNhap("Khối lượng 1 gói (g) quá lớn.")
         return None if x is None else format(x, "f")
-    if truong == "gia_truoc_km":
-        x = _so(v, "Giá trước khuyến mãi")
+    if truong == "gia_truoc_km":                               # numeric(12,2) ≥ 0
+        x = _hai_so_le(_so(v, "Giá trước khuyến mãi"), "Giá trước khuyến mãi")
         if x is not None and x > GIA_TRUOC_KM_TOI_DA:
             raise LoiNhap("Giá trước khuyến mãi quá lớn.")
         return "" if x is None else format(x, "f")

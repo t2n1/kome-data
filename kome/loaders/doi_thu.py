@@ -36,9 +36,10 @@ def _so(v):
     if v is None or (isinstance(v, float) and pd.isna(v)) or str(v).strip() == "":
         return None
     try:
-        return Decimal(str(v).replace(",", "").strip())
+        x = Decimal(str(v).replace(",", "").strip())
     except InvalidOperation:
         return None
+    return x if x.is_finite() else None       # 'NaN' / 'Infinity' → không ghi (NaN của Postgres lớn hơn mọi số: lọt CHECK '>= 0')
 
 
 def _chu(v):

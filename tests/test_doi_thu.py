@@ -857,3 +857,28 @@ def test_gia_moi_khuyen_mai_gia_truoc_km_va_bo_trong_la_null(conn, batch):
     assert r[0] == "giảm 50" and r[1] == 550 and r[2] is None
     assert conn.execute("SELECT khuyen_mai, gia_truoc_km, bac FROM app.gia_doi_thu_tay WHERE id=%s", (tid2,)).fetchone() \
         == (None, None, None)
+
+
+# ---------------------------------------------------------------- chuẩn hoá kl_goi_g / gia_truoc_km (soát cuối đợt 4a)
+
+@pytest.mark.parametrize("truong,nhap,mong", [
+    ("kl_goi_g", "500.1234567", Decimal("500.12")), ("kl_goi_g", "0.005", Decimal("0.01")),
+    ("gia_truoc_km", "-0", Decimal("0")), ("gia_truoc_km", "550.1234567", Decimal("550.12"))])
+def test_sua_va_gia_moi_luu_CUNG_mot_so_da_lam_tron(conn, batch, truong, nhap, mong):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    DT.sua(conn, fid, {truong: nhap}, None)
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "500", "loai_nguon": "to_roi", truong: nhap}, None)
+    conn.commit()
+    assert conn.execute(f"SELECT {truong} FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s", (fid,)).fetchone()[0] == mong
+    assert conn.execute(f"SELECT {truong} FROM app.gia_doi_thu_tay WHERE id=%s", (tid,)).fetchone()[0] == mong
+
+
+@pytest.mark.parametrize("nhap", ["0.001", "0.004"])
+def test_kl_goi_g_lam_tron_ve_0_la_LoiNhap_ca_hai_duong(conn, batch, nhap):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "NEXT", 550)
+    with pytest.raises(DT.LoiNhap):
+        DT.sua(conn, fid, {"kl_goi_g": nhap}, None)
+    with pytest.raises(DT.LoiNhap):
+        DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "500", "loai_nguon": "to_roi", "kl_goi_g": nhap}, None)

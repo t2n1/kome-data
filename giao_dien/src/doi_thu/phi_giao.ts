@@ -30,7 +30,11 @@ export function tinh(dk: DieuKienGiao, don: DonMau): KetQuaPhi {
     else if (pp[don.vung] != null) ra.vung = (pp[don.vung] as number) * kien;
   }
   if (don.tra === "daibiki") {
-    if (dk.daibiki_tu != null && don.tien >= dk.daibiki_tu) ra.daibiki = dk.daibiki_sau ?? 0;
+    if (dk.daibiki_tu != null && don.tien >= dk.daibiki_tu) {
+      // tới ngưỡng mà không ghi phí sau ngưỡng: chưa rõ, KHÔNG phải miễn (0 mới là miễn)
+      if (dk.daibiki_sau == null) ra.chua_ro.push("daibiki");
+      else ra.daibiki = dk.daibiki_sau;
+    }
     else if (dk.phi_daibiki == null) ra.chua_ro.push("daibiki");
     else ra.daibiki = dk.phi_daibiki;
   }

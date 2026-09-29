@@ -1,5 +1,6 @@
 -- 068 — Điều kiện giao hàng / điều kiện bán HIỆN HÀNH (đặc tả giao diện mới §5.4).
--- Giao hàng của một bên = lô nạp mới nhất của bên đó (meta.ingest_batch chưa hoàn tác, data_date rồi batch_id), mỗi
+-- Giao hàng của một bên = lô nạp mới nhất của bên đó (meta.ingest_batch chưa hoàn tác, ngay_nguon ≤ mốc — quay về mốc
+-- như mọi quan sát đối thủ, bất biến 059–060; data_date rồi batch_id), mỗi
 -- trường: đính chính của sale áp dụng NẾU ghi SAU lúc nạp lô đó (loaded_at) HOẶC lô để trống trường đó (điều nói ra thắng
 -- im lặng); lần sửa hỏng → rơi về lô; bên chưa có lô nào mà sale đã điền → vẫn có dòng. '' = xoá về "không ghi" (NULL). KOME: app.giao_hang_kome
 -- (`suy` = chưa ai xác nhận số suy từ phiếu bán). Điều kiện bán: lô mới nhất của bên, bỏ loại 'ghi_chu_doc', áp sửa / bỏ
@@ -10,6 +11,7 @@ WITH lo AS (
     SELECT DISTINCT ON (f.ma_doi_thu) f.*, b.loaded_at
     FROM core.fact_giao_hang_doi_thu f JOIN meta.ingest_batch b USING (batch_id)
     WHERE b.undone_at IS NULL
+      AND f.ngay_nguon <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))    -- quay về mốc (bất biến 059–060)
     ORDER BY f.ma_doi_thu, b.data_date DESC, f.batch_id DESC, f.id DESC
 ),
 dc AS (
@@ -124,6 +126,7 @@ WITH lo AS (
     SELECT DISTINCT ON (f.ma_doi_thu) f.ma_doi_thu, f.batch_id
     FROM core.fact_dieu_kien_doi_thu f JOIN meta.ingest_batch b USING (batch_id)
     WHERE b.undone_at IS NULL
+      AND f.ngay_nguon <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))    -- quay về mốc (bất biến 059–060)
     ORDER BY f.ma_doi_thu, b.data_date DESC, f.batch_id DESC
 ),
 sua AS (

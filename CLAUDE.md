@@ -1056,7 +1056,8 @@ noreferrer"` + `referrerPolicy="no-referrer"`. Nút "Tìm file trong Drive" dự
   Đo thật: đây là nguyên nhân 15 nhóm giá KOME > 3× thị trường.
 - **Bảng giá KOME** = `mart.gia_kome_bang` (¥/kg chưa thuế; luật hai cột: chưa thuế nếu > 0 và không mâu thuẫn,
   không thì gồm thuế ÷ 1,08).
-  - CHỈ lần nạp MỚI NHẤT ≤ mốc của từng (mã, quy cách) — bộ nạp giá bỏ bậc 0/0 nên 売価No.10 hết hạn không có dòng nào
+  - CHỈ lần nạp MỚI NHẤT ≤ mốc của từng (mã, quy cách) — `valid_from` lớn nhất RỒI `batch_id` lớn nhất trong ngày đó
+    (file sửa cùng ngày được upsert; bậc bị bỏ giữ lô cũ và phải biến mất) — bộ nạp giá bỏ bậc 0/0 nên 売価No.10 hết hạn không có dòng nào
     ghi đè; không giới hạn thì khuyến mãi đã kết thúc ở lại mãi. `kome/san_pham_360.py::_bac_gia` cùng luật đó và giữ
     BẢN CHÉP Python của luật hai cột (hiện từng quy cách) — bản chép bắt buộc của 066, sửa một bên là sửa cả hai.
   - 標準価格 = `price_level 'std'` (bộ nạp `tanka`); `mart.gia_kome_chuan`.
@@ -1065,17 +1066,22 @@ noreferrer"` + `referrerPolicy="no-referrer"`. Nút "Tìm file trong Drive" dự
   - "Vị trí KOME" của `mart.so_sanh_nhom` so với 標準価格 (không có thì thực bán 90 ngày). `so_sanh_nhom` đọc
     `mart.gia_kome_bang` MỘT lần (CTE `AS MATERIALIZED`, bất biến CTE-trùng).
 - **Điều kiện giao hàng** = `mart.giao_hang_hien_hanh` (068).
-  - Đối thủ: lô mới nhất, mỗi TRƯỜNG một luật — đính chính của sale (sổ chỉ thêm `app.dinh_chinh_giao_hang`) áp nếu ghi
+  - Đối thủ: lô mới nhất có `ngay_nguon ≤ mốc` (quay về mốc như mọi quan sát — cả `mart.dieu_kien_hien_hanh`), mỗi
+    TRƯỜNG một luật — đính chính của sale (sổ chỉ thêm `app.dinh_chinh_giao_hang`) áp nếu ghi
     SAU lúc nạp lô đó HOẶC lô đó để trống trường đó ("điều được nói ra thắng im lặng"). Đính chính hỏng / không đọc được
     → rơi về giá trị của lô; `''` = xoá → NULL.
   - KOME: `app.giao_hang_kome`. Một dòng, sửa được; mặc định SUY từ phiếu bán, `suy = true` tới khi có người sửa hoặc
     xác nhận (mọi lần sửa đều đặt `da_xac_nhan = true`). Bằng chứng: `mart.giao_hang_kome_bang_chung` đếm trên doanh thu
     THUẦN `amount - tax_amount` (bẫy #8).
   - Điều kiện bán = `mart.dieu_kien_hien_hanh`: bỏ loại `ghi_chu_doc` (câu của người đọc, không phải của bên).
-  - Mọi đường ghi (`kome/doi_thu_giao.py`) kiểm hữu hạn + trong cột đích rồi thêm dòng `app.doi_thu_nhat_ky` cùng giao dịch.
+  - Mọi đường ghi (`kome/doi_thu_giao.py`) kiểm hữu hạn + trong cột đích — số làm tròn 0,01 về ĐÚNG dạng cột lưu
+    (`doi_thu._hai_so_le`: `'-0'` → 0; trường phải > 0 mà tròn thành 0 → LoiNhap; trần xét SAU khi tròn), nên mọi chữ
+    lưu vào sổ đính chính khớp regex của 068 (cùng hàm cho `kl_goi_g` / `gia_truoc_km` ở `doi_thu._kiem`) — rồi thêm dòng
+    `app.doi_thu_nhat_ky` cùng giao dịch.
     Hai sổ mới KHÔNG có trong `_PHIEN_BAN`.
 - **Phí của đơn mẫu**: MỘT thuật toán, hai bản — `kome/phi_giao.py` và `giao_dien/src/doi_thu/phi_giao.ts`. Chạy chung
-  `tests/du_lieu/phi_giao_ca.json`; sửa một bản là sửa cả hai. NULL cần tới → `chua_ro`, không cộng 0.
+  `tests/du_lieu/phi_giao_ca.json`; sửa một bản là sửa cả hai. NULL cần tới → `chua_ro`, không cộng 0 (kể cả
+  `daibiki_sau` NULL khi đơn đã tới `daibiki_tu` — `0` mới là miễn).
 
 Có test canh: `tests/test_doi_thu_bang.py`, `tests/test_mart_doi_thu.py`, `tests/test_doi_thu.py`,
 `tests/test_doi_thu_giao.py`, `tests/test_phi_giao.py`, `tests/test_goi_doi_thu.py`, `tests/test_nap_doi_thu.py`.

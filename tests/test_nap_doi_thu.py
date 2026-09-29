@@ -1,6 +1,7 @@
 """Nạp gói bảng giá đối thủ qua luồng nạp chung (5 cổng, hoàn tác theo lô)."""
 from datetime import date
 import pandas as pd
+import pytest
 
 from kome.loaders.doi_thu import COT_GIA, COT_DIEU_KIEN, COT_GIAO_HANG
 from kome.pipeline import ingest, undo_batch
@@ -91,3 +92,15 @@ def test_hoan_tac_giao_hang_xoa_sach_lo(conn, tmp_path):
 def test_mot_o_nap_nhan_ca_ba_loai_file():
     from kome.kho_du_lieu import O_CUA
     assert O_CUA["doi_thu"]["specs"] == ["doi_thu_gia", "doi_thu_dieu_kien", "doi_thu_giao_hang"]
+
+
+@pytest.mark.parametrize("v", ["NaN", "nan", "Infinity", "-inf", "sNaN", float("inf")])
+def test_bo_nap_khong_bao_gio_luu_so_NaN_hay_vo_han(v):
+    from kome.loaders.doi_thu import _so
+    assert _so(v) is None
+
+
+def test_bo_nap_van_doc_so_thuong():
+    from decimal import Decimal
+    from kome.loaders.doi_thu import _so
+    assert _so("1,234.5") == Decimal("1234.5") and _so(" 605 ") == Decimal("605") and _so("") is None

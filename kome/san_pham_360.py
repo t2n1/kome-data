@@ -179,7 +179,8 @@ def _bac_gia(conn, ma: str) -> list[dict]:
     Giá chưa thuế: cột chưa thuế nếu > 0 và không mâu thuẫn cột gồm thuế; không thì gồm thuế ÷ 1,08 — BẢN CHÉP BẮT BUỘC
     của luật hai cột trong mart.gia_kome_bang (066) (ở đây hiện giá theo TỪNG quy cách nên không đọc view được);
     sửa một bên là sửa cả hai."""
-    # Chỉ lần nạp MỚI NHẤT của từng (mã, quy cách) ≤ mốc (`valid_from = max`): kome/loaders/price.py BỎ bậc 0/0 nên khi
+    # Chỉ lần nạp MỚI NHẤT của từng (mã, quy cách) ≤ mốc (valid_from lớn nhất RỒI batch_id lớn nhất trong ngày đó — file
+    # sửa cùng ngày được upsert, bậc bị bỏ giữ batch_id cũ): kome/loaders/price.py BỎ bậc 0/0 nên khi
     # một bậc (vd 売価No.10) hết hạn, không có dòng mới nào ghi đè dòng cũ — không giới hạn thì bậc đã hết ở lại mãi.
     # Cùng luật với mart.gia_kome_bang (066) và cùng mốc lùi `mart.moc_lui()` (040).
     # core.fact_price_list giữ LỊCH SỬ giá — mỗi lần nạp master là một dòng MỚI; DISTINCT ON … valid_from DESC
@@ -189,7 +190,8 @@ def _bac_gia(conn, ma: str) -> list[dict]:
     rows = conn.execute(
         """SELECT DISTINCT ON (price_level, pack_code)
                   price_level, pack_code, price_ex_tax, price_in_tax, valid_from
-           FROM (SELECT f.*, f.valid_from = max(f.valid_from) OVER (PARTITION BY f.pack_code) AS moi_nhat
+           FROM (SELECT f.*, rank() OVER (PARTITION BY f.pack_code ORDER BY f.valid_from DESC, f.batch_id DESC) = 1
+                            AS moi_nhat
                  FROM core.fact_price_list f
                  WHERE f.product_code = %s
                    AND f.valid_from <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))) t

@@ -8,7 +8,7 @@ import json
 import math
 from decimal import Decimal
 
-from kome.doi_thu import LoiNhap, _ghi_nhat_ky, _so, DAI_TOI_DA
+from kome.doi_thu import LoiNhap, _ghi_nhat_ky, _so, _hai_so_le, DAI_TOI_DA
 
 TRUONG_GIAO_HANG = ("bao_ship", "phi_ship", "phi_ship_theo", "mien_ship_tu", "mien_ship_kien", "thung_moi_kien",
                     "phu_phi", "phi_daibiki", "daibiki_tu", "daibiki_sau", "ck_mien_daibiki", "kien_toi_da_kg",
@@ -43,8 +43,10 @@ def _kiem_truong(t: str, v):
             raise LoiNhap(f"{t} chỉ nhận có / không.")
         return s == "true"
     if t in _SO:
-        x = _so(v, t, t in _DUONG)
-        if not x.is_finite() or x > _TRAN_SO[t]:
+        # Làm tròn về ĐÚNG dạng cột đích (numeric(·,2)) TRƯỚC khi kiểm: '-0' → 0, 7 chữ số lẻ → 2, '0.001' của trường
+        # phải > 0 → LoiNhap. Chữ lưu vào sổ đối thủ phải khớp regex của 068 — không thì "đã lưu" mà view vẫn hiện số của lô.
+        x = _hai_so_le(_so(v, t, t in _DUONG), t, t in _DUONG)
+        if x > _TRAN_SO[t]:
             raise LoiNhap(f"{t} quá lớn.")
         return x
     if t in _NGUYEN:

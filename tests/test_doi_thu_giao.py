@@ -206,3 +206,63 @@ def test_lo_da_hoan_tac_bi_bo_qua(conn, batch):
     conn.commit()
     assert conn.execute("SELECT count(*) FROM mart.giao_hang_hien_hanh WHERE ma_doi_thu='IMAI'").fetchone()[0] == 0
     assert conn.execute("SELECT count(*) FROM mart.dieu_kien_hien_hanh WHERE ma_doi_thu='IMAI'").fetchone()[0] == 0
+
+
+# ---------------------------------------------------------------- chuẩn hoá về đúng dạng lưu (soát cuối đợt 4a)
+
+@pytest.mark.parametrize("truong,nhap,mong", [
+    ("phi_ship", "-0", Decimal("0")), ("phi_ship", "-0.00", Decimal("0")),
+    ("phi_ship", "1.1234567", Decimal("1.12")), ("daibiki_tu", "20000.005", Decimal("20000.01")),
+    ("kien_toi_da_kg", "28.1234567", Decimal("28.12")), ("kien_toi_da_kg", "0.005", Decimal("0.01"))])
+@pytest.mark.parametrize("ben", ["IMAI", "KOME"])
+def test_so_chuan_hoa_ve_2_chu_so_va_view_THAY_dung_so_da_luu(conn, batch, kome_mac_dinh, ben, truong, nhap, mong):
+    """Lưu 'thành công' mà view vẫn hiện số của lô là nói dối: mọi số lưu được phải khớp regex của 068."""
+    if ben == "IMAI":
+        _nap(conn, batch, "IMAI", phi_ship=605, daibiki_tu=30000, kien_toi_da_kg=20)
+    G.sua_giao_hang(conn, ben, {truong: nhap}, None)
+    conn.commit()
+    assert _cot(conn, ben, truong) == mong
+    if ben == "IMAI":
+        g = conn.execute("SELECT gia_tri_moi FROM app.dinh_chinh_giao_hang ORDER BY id DESC LIMIT 1").fetchone()[0]
+        assert g == format(mong.quantize(Decimal("0.01")), "f")
+
+
+@pytest.mark.parametrize("nhap", ["0.001", "0.004", "-0"])
+@pytest.mark.parametrize("ben", ["IMAI", "KOME"])
+def test_kien_toi_da_kg_lam_tron_ve_0_la_LoiNhap(conn, kome_mac_dinh, ben, nhap):
+    with pytest.raises(LoiNhap):
+        G.sua_giao_hang(conn, ben, {"kien_toi_da_kg": nhap}, None)
+
+
+def test_tran_xet_SAU_khi_lam_tron(conn, kome_mac_dinh):
+    with pytest.raises(LoiNhap):
+        G.sua_giao_hang(conn, "IMAI", {"phi_ship": "99999999.995"}, None)
+
+
+# ---------------------------------------------------------------- quay về mốc (bất biến 059–060 "Quan sát quay về mốc")
+
+def test_giao_hang_quay_ve_moc(conn, batch):
+    from tests.test_khach_hang import _mua
+    _mua(conn, batch, "202601010001", date(2026, 9, 20))                   # mốc dữ liệu = 20/9
+    _nap(conn, batch, "IMAI", date(2026, 7, 31), phi_ship=500)
+    _nap(conn, batch, "IMAI", date(2026, 9, 5), phi_ship=605)
+    _nap(conn, batch, "NEXT", date(2026, 9, 5), phi_ship=700)             # chỉ có lô SAU mốc
+    assert _cot(conn, "IMAI", "phi_ship") == 605
+    conn.execute("SELECT set_config('kome.moc', '2026-08-31', true)")
+    assert _cot(conn, "IMAI", "phi_ship") == 500
+    assert conn.execute("SELECT count(*) FROM mart.giao_hang_hien_hanh WHERE ma_doi_thu='NEXT'").fetchone()[0] == 0
+    conn.rollback()
+
+
+def test_dieu_kien_quay_ve_moc(conn, batch):
+    from tests.test_khach_hang import _mua
+    _mua(conn, batch, "202601010001", date(2026, 9, 20))
+    for ngay, nd in ((date(2026, 7, 31), "cũ"), (date(2026, 9, 5), "mới")):
+        b = batch(abs(hash(nd)) % 1000 + 3000, ngay)
+        conn.execute("""INSERT INTO core.fact_dieu_kien_doi_thu (batch_id, ma_dong, ma_doi_thu, ngay_nguon, loai, noi_dung)
+                        VALUES (%s, 'd', 'YUMI', %s, 'ship', %s)""", (b, ngay, nd))
+    conn.commit()
+    assert [r[0] for r in conn.execute("SELECT noi_dung FROM mart.dieu_kien_hien_hanh WHERE ma_doi_thu='YUMI'")] == ["mới"]
+    conn.execute("SELECT set_config('kome.moc', '2026-08-31', true)")
+    assert [r[0] for r in conn.execute("SELECT noi_dung FROM mart.dieu_kien_hien_hanh WHERE ma_doi_thu='YUMI'")] == ["cũ"]
+    conn.rollback()

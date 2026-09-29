@@ -349,5 +349,73 @@
    ],
    "khong_nhan": false
   }
+ },
+ {
+  "ten": "Đã tới ngưỡng daibiki_tu mà daibiki_sau không ghi → chưa rõ (NULL ≠ miễn phí)",
+  "dk": {
+   "bao_ship": false,
+   "phi_ship": 500,
+   "phi_ship_theo": "don",
+   "mien_ship_tu": 20000,
+   "mien_ship_kien": null,
+   "thung_moi_kien": null,
+   "phu_phi": null,
+   "phi_daibiki": 330,
+   "daibiki_tu": 20000,
+   "daibiki_sau": null,
+   "ck_mien_daibiki": null,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": "chua",
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 25000,
+   "thung": 2,
+   "vung": "kanto",
+   "tra": "daibiki"
+  },
+  "ra": {
+   "ship": 0,
+   "vung": 0,
+   "daibiki": 0,
+   "chua_ro": [
+    "daibiki"
+   ],
+   "khong_nhan": false
+  }
+ },
+ {
+  "ten": "Đã tới ngưỡng daibiki_tu, daibiki_sau = 0 → miễn phí daibiki",
+  "dk": {
+   "bao_ship": false,
+   "phi_ship": 500,
+   "phi_ship_theo": "don",
+   "mien_ship_tu": 20000,
+   "mien_ship_kien": null,
+   "thung_moi_kien": null,
+   "phu_phi": null,
+   "phi_daibiki": 330,
+   "daibiki_tu": 20000,
+   "daibiki_sau": 0,
+   "ck_mien_daibiki": null,
+   "kien_toi_da_kg": null,
+   "ghep_kien": null,
+   "thue": "chua",
+   "cach_gui": null
+  },
+  "don": {
+   "tien": 25000,
+   "thung": 2,
+   "vung": "kanto",
+   "tra": "daibiki"
+  },
+  "ra": {
+   "ship": 0,
+   "vung": 0,
+   "daibiki": 0,
+   "chua_ro": [],
+   "khong_nhan": false
+  }
  }
 ]

@@ -334,8 +334,16 @@ def test_066_gia_kome_kg_ma_ban_bang_00_la_ca_thung(conn, batch):
     assert float(y) == pytest.approx(6266 / 6.4, rel=1e-6)      # ¥979/kg — KHÔNG phải ¥78.325/kg (coi '00' = 80g)
 
 
+def _lo_gia(conn, batch, ma, ngay, n):
+    """MỘT lần nạp giá = MỘT lô cho mọi bậc của mã trong ngày đó (như price.py) — 066 lấy batch_id lớn nhất trong
+    valid_from mới nhất, nên gieo mỗi bậc một lô là tự bỏ bậc của chính mình."""
+    r = conn.execute("SELECT max(batch_id) FROM core.fact_price_list WHERE product_code = %s AND valid_from = %s",
+                     (ma, ngay)).fetchone()[0]
+    return r if r is not None else batch(n, ngay)
+
+
 def _bang_gia(conn, batch, ma, lv, ex, inc, pack="02"):
-    b = batch(9100 + len(lv) + ex % 97)
+    b = _lo_gia(conn, batch, ma, date(2026, 9, 8), 9100 + len(lv) + ex % 97)
     conn.execute("""INSERT INTO core.fact_price_list (product_code, pack_code, price_level, valid_from, price_ex_tax,
                       price_in_tax, unit_cost, batch_id) VALUES (%s, %s, %s, '2026-09-08', %s, %s, 0, %s)""",
                  (ma, pack, lv, ex, inc, b))
@@ -364,7 +372,7 @@ def test_066_bang_gia_ma_chi_co_00_dung_kg_00(conn, batch):
 
 
 def _gia_ngay(conn, batch, ma, lv, ex, inc, ngay, pack="02"):
-    b = batch(9200 + len(lv) + ex % 89 + inc % 83)
+    b = _lo_gia(conn, batch, ma, ngay, 9200 + len(lv) + ex % 89 + inc % 83)
     conn.execute("""INSERT INTO core.fact_price_list (product_code, pack_code, price_level, valid_from, price_ex_tax,
                       price_in_tax, unit_cost, batch_id) VALUES (%s, %s, %s, %s, %s, %s, 0, %s)""",
                  (ma, pack, lv, ngay, ex, inc, b))
@@ -543,3 +551,30 @@ def test_067_dinh_chinh_bac_hong_khong_lam_sap_view_dung_bac_nap(conn, batch):
         else:                       # không phải mảng JSON → dùng bậc đã nạp
             assert g[:3] == (pytest.approx(550), pytest.approx(530), pytest.approx(530))
         assert conn.execute("SELECT count(*) FROM mart.so_sanh_nhom").fetchone()[0] >= 0
+
+
+def test_so_sanh_nhom_tv_gia_la_CTE_MATERIALIZED_tuong_minh(conn):
+    """tv_gia được đọc hai lần (chinh, kome) → bất biến CTE-trùng: ghi `AS MATERIALIZED` tường minh."""
+    d = conn.execute("SELECT pg_get_viewdef('mart.so_sanh_nhom'::regclass)").fetchone()[0]
+    for cte in ("h", "kb", "tv_gia"):
+        assert f"{cte} AS MATERIALIZED" in d, cte
+
+
+def test_066_nap_lai_CUNG_ngay_bac_bi_bo_thi_bien_mat(conn, batch):
+    """File đính chính cùng valid_from: price.py upsert (khoá có valid_from) đổi batch_id của bậc còn lại, bậc bị bỏ giữ
+    batch_id cũ — "lần nạp mới nhất" phải là batch_id lớn nhất TRONG valid_from mới nhất, không chỉ valid_from."""
+    from kome import san_pham_360 as SP360
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    ngay = date(2026, 7, 25)
+    b1, b2 = batch(9301, ngay), batch(9302, ngay)
+    assert b2 > b1
+    for lv, inc in (("std", 4900), ("10", 4320)):                        # file đầu: tiêu chuẩn + khuyến mãi
+        conn.execute("""INSERT INTO core.fact_price_list (product_code, pack_code, price_level, valid_from, price_ex_tax,
+                          price_in_tax, unit_cost, batch_id) VALUES ('NT01', '02', %s, %s, 0, %s, 0, %s)""", (lv, ngay, inc, b1))
+    conn.execute("""INSERT INTO core.fact_price_list (product_code, pack_code, price_level, valid_from, price_ex_tax,
+                      price_in_tax, unit_cost, batch_id) VALUES ('NT01', '02', 'std', %s, 0, 5400, 0, %s)
+                    ON CONFLICT (product_code, pack_code, price_level, valid_from) DO UPDATE SET
+                      price_in_tax = EXCLUDED.price_in_tax, batch_id = EXCLUDED.batch_id""", (ngay, b2))   # file sửa: bỏ bậc 10
+    conn.commit()
+    assert {r[0] for r in conn.execute("SELECT price_level FROM mart.gia_kome_bang WHERE product_code='NT01'")} == {"std"}
+    assert [(g["bac"], g["gia"]) for g in SP360._bac_gia(conn, "NT01")] == [("標準価格", 5000)]
