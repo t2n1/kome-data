@@ -56,6 +56,7 @@ _PHIEN_BAN = """concat_ws('|',
     (SELECT max(undone_at) FROM meta.ingest_batch),
     (SELECT max(id) FROM app.ngan_sach_nhat_ky),
     (SELECT max(id) FROM app.nhat_ky_tiep_xuc),
+    (SELECT max(id) FROM app.doi_thu_nhat_ky),
     (SELECT max(filename) FROM meta.schema_migration))"""
 
 # Phiên bản CHỈ theo dữ liệu nạp (lô nạp, hoàn tác, migration) — cho ảnh chụp
