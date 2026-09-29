@@ -225,7 +225,14 @@ nguồn (web/file, ngày) · (Đợt 2) khách đang mua của bên này.
   `trang_thai_cap = 'ngung'` (bất biến 024) với mã cùng nhóm → hiện ngay lý do ngừng mua. Hồ sơ đối
   thủ — "khách đang mua của bên này". So sánh — cột giá khách kể. Tổng quan — hiện trường 30 ngày.
 - **Hằng tháng (Claude)**: đọc ghi chú chữ tự do, đề xuất gắn thẻ bị quên → danh sách chờ duyệt
-  (bấm đồng ý mới thêm `tiep_xuc_nhac`; câu gốc không bao giờ sửa).
+  (bấm đồng ý mới thêm `tiep_xuc_nhac`; câu gốc không bao giờ sửa). **Chưa làm** — để sau Đợt 2
+  (Đợt 2 chỉ có thẻ do sale tự gắn lúc ghi).
+- **Đã làm ở Đợt 2 (2026-09-29, migration 063)** — lệch/chốt so với đoạn trên: `@hàng` LUÔN trỏ một NHÓM
+  (`nhom_khoa` = `ma:<mã>` | `n:<id>`), không trỏ mã trần; giá khách kể nằm ở `app.gia_doi_thu_tay.nhom_khoa`
+  với `ma_hang_dt = 'ke:<khách>:<nhóm>'`; cửa sổ 90 / 30 ngày theo ĐỒNG HỒ THẬT giờ Tokyo (như `/lien-he`),
+  còn "ngừng mua bao lâu" theo mốc dữ liệu; ghép thẻ hàng ↔ đối thủ = đối thủ gần nhất đứng TRƯỚC (thẻ hàng
+  đứng trước mọi đối thủ mà câu chỉ có MỘT đối thủ → ghép với đối thủ đó), MỘT hàm `nhac.ts::ghepCap` dùng cả
+  lúc ghi lẫn lúc xem (máy chủ trả thẻ đã lưu theo vị trí).
 
 ## 7. Quy trình hằng tháng (trong phiên với Claude)
 

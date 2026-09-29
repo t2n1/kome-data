@@ -1002,6 +1002,21 @@ Khoá hàng đối thủ qua các tháng `ma_hang_dt` (JAN hợp lệ → mã c�
 riêng từng bên: `docs/doi-thu/so-tay-theo-ben.md`. Có test canh: `tests/test_doi_thu_bang.py`, `tests/test_mart_doi_thu.py`,
 `tests/test_doi_thu.py`, `tests/test_doi_thu_api.py`. **Migration 059–060 phải chạy TRƯỚC khi triển khai.**
 
+**Bất biến (063, tin hiện trường `@` — chủ DN chốt 2026-09-29):** sale gõ `@đối thủ` / `@hàng` trong ô ghi tiếp xúc
+(`giao_dien/src/khach/GhiTiepXuc.tsx`, logic thuần `nhac.ts`). `noi_dung` VẪN là chữ thường như gõ — câu gốc không bao giờ
+sửa, CHECK / chỉ-thêm của `app.nhat_ky_tiep_xuc` (030) không đổi. Thẻ vào `app.tiep_xuc_nhac` (CHỈ THÊM — `REVOKE UPDATE,
+DELETE` khỏi `kome_app`; vị trí lưu theo KÝ TỰ Unicode trên câu đã `strip()`, POST gửi đơn vị UTF-16 và máy chủ tự đổi).
+`@hàng` LUÔN trỏ một NHÓM (`ma:<mã>` | `n:<id>`, khoá kiểm bằng `doi_thu.KHOA_NHOM.fullmatch`). Máy KHÔNG đọc số trong câu:
+giá khách kể chỉ đến từ ô giá tuỳ chọn → `app.gia_doi_thu_tay` (`loai_nguon = 'khach_ke'`, `nhom_khoa`, `ma_hang_dt =
+'ke:<khách>:<nhóm>'`), qua cùng quy đổi + bất thường của 060, KHÔNG vào trung vị; dòng tiếp xúc + thẻ + giá ghi trong MỘT
+giao dịch (`lien_he.ghi_kem_nhac`), cảnh báo lệch trung vị trả về chứ không chặn. Cửa sổ tin 90 / 30 ngày theo ĐỒNG HỒ THẬT
+giờ Tokyo (`hom_nay_o_nhat`, cùng lý lẽ tạm ẩn của `/lien-he`), ảnh chụp theo ngày; "ngừng mua bao lâu" theo mốc dữ liệu.
+Ghép thẻ hàng ↔ đối thủ có MỘT định nghĩa, `nhac.ts::ghepCap` (đối thủ gần nhất đứng trước; câu chỉ một đối thủ thì thẻ hàng
+đứng trước nó vẫn ghép với nó), dùng cả lúc ghi lẫn lúc xem — máy chủ trả thẻ đã lưu theo vị trí, KHÔNG dò chữ trong câu.
+Khối mới đi endpoint riêng 1 lượt (`/api/khach-hang/{mã}/doi-thu`, `/api/doi-thu/goi-y-nhac`) — `ho_so()` vẫn ≤ 8. Có test
+canh: `tests/test_lien_he.py`, `tests/test_doi_thu.py`, `tests/test_mart_doi_thu.py`, `giao_dien/src/khach/nhac.test.ts`.
+**Migration 063 phải chạy TRƯỚC khi triển khai.**
+
 **Bất biến (Hình sản phẩm — chủ DN chốt 2026-09-29):** nguồn DUY NHẤT là `config/hinh_san_pham.csv`
 (`sku,imageUrl`, chủ DN gửi) → `kome/hinh_san_pham.py::doc` (mã là CHỮ, không ép số; CHỈ nhận `https://`;
 nhớ theo mtime; file thiếu → `{}`) → `window.__KOME__.hinh` (`app.py::_khoi_dau`, 0 truy vấn; trang đăng
