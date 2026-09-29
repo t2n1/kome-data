@@ -844,6 +844,12 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     def man_mua_vu(request: Request):
         return _man_khach(request)
 
+    # Thị trường & đối thủ — dữ liệu qua /api/doi-thu/* (kome/doi_thu.py -> mart, 059–060). NGOÀI
+    # DUONG_KHO_DU_LIEU: mọi người đăng nhập vào và sửa được (đặc tả §2 "Ai sửa được": A).
+    @app.get("/doi-thu", response_class=HTMLResponse)
+    def man_doi_thu(request: Request):
+        return _man_khach(request)
+
     # Công nợ & thu tiền (đợt 6) — dữ liệu qua /api/cong-no (kome/cong_no.py ->
     # mart.cong_no_*, migration 038).
     @app.get("/cong-no", response_class=HTMLResponse)

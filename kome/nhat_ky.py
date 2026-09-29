@@ -26,6 +26,7 @@ LOAI = {
     "nap": ("⟳", "Nạp dữ liệu", "ok"),
     "huy": ("✕", "Hoàn tác lô", "loi"),
     "ngan_sach": ("¥", "Sửa ngân sách", "canh"),
+    "doi_thu": ("🏷", "Giá đối thủ", "canh"),
     "quyen": ("⚿", "Phân quyền", "lam"),
     "tiep_xuc": ("☎", "Ghi tiếp xúc", "nhat"),
 }
@@ -49,6 +50,10 @@ _NGUON = """
              || CASE n.chi_so WHEN 'lai_gop' THEN ' · lãi gộp' ELSE ' · doanh thu' END, NULL,
            n.muc_tieu_cu::text, n.muc_tieu_moi::text
     FROM app.ngan_sach_nhat_ky n
+    UNION ALL
+    SELECT 'doi_thu', n.luc, n.nguoi_dung_id, n.doi_tuong, n.loai,
+           n.truoc::text, n.sau::text
+    FROM app.doi_thu_nhat_ky n
     UNION ALL
     SELECT 'quyen', q.sua_luc, q.sua_boi, q.ten_dang_nhap, q.co,
            q.gia_tri_cu::text, q.gia_tri_moi::text
@@ -95,6 +100,11 @@ class Dong:
             return f"Hoàn tác lô {self.doi_tuong} — xoá mọi dòng của lô khỏi kho"
         if self.loai == "ngan_sach":
             return f"Chỉ tiêu {self.doi_tuong}"
+        if self.loai == "doi_thu":
+            viec = {"sua": "Sửa giá", "xac_nhan": "Xác nhận giá", "gia_moi": "Cập nhật giá mới",
+                    "them": "Thêm hàng", "ghep": "Ghép hàng", "nhom": "Tạo nhóm so sánh",
+                    "quy_cach": "Sửa quy cách KOME", "doi_thu": "Sửa đối thủ"}
+            return f"{viec.get(self.chi_tiet, self.chi_tiet)} · {self.doi_tuong}"
         if self.loai == "quyen":
             return f"Quyền {TEN_CO.get(self.chi_tiet, self.chi_tiet)} của {self.doi_tuong}"
         return f"{self.ten_khach or self.doi_tuong}: {self.truoc}"
