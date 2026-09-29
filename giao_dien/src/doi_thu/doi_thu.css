@@ -305,3 +305,68 @@ button.dt-tt-ten{cursor:pointer} button.dt-tt-ten:hover{text-decoration:underlin
 .dt-tt-km small{display:block;color:var(--chu-nhat);font-size:.66rem}
 .dt-tt-km b{display:block;font-size:.74rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dt-tt-km span{color:var(--do-chu);font-weight:700;font-size:.8rem} .dt-tt-km s{color:var(--chu-mo);font-weight:400}
+
+/* ---- Tab Đối thủ (đợt 4b task 8; bản phác ca-trang-8.html tab Đối thủ) ----
+   Thanh: cùng thương hiệu --lam-chu, khác --dt-khac, viền hết --canh-chu, % theo mau.ts::mauLech; "?" thiếu --dt-cam.
+   Ô số / bốn ô dùng lại .dt-tt-o4 / .dt-tt-o (container query theo khung .dt-hs). */
+.dt-hs{display:flex;flex-direction:column;gap:12px;min-width:0;container-type:inline-size}
+.dt-hs .c-do{color:var(--do-chu)} .dt-hs .c-vang{color:var(--canh-chu)} .dt-hs .c-km{color:var(--dt-km)}
+.dt-hs-chip{display:flex;flex-wrap:wrap;gap:5px}
+.dt-hs-chip button{font:inherit;font-size:.76rem;background:var(--nen-phu);border:1px solid var(--vien-dam);color:var(--chu-thuong);
+  border-radius:999px;padding:.2rem .75rem;cursor:pointer}
+.dt-hs-chip button span{color:var(--chu-mo);margin-left:2px;font-variant-numeric:tabular-nums}
+.dt-hs-chip button[aria-pressed="true"]{background:var(--do-nen);border-color:var(--do);color:var(--do-chu)}
+.dt-hs-chip button[aria-pressed="true"] span{color:inherit}
+.dt-hs-dau{display:flex;gap:6px 16px;align-items:baseline;flex-wrap:wrap}
+.dt-hs-dau h3{margin:0;font-size:1.25rem}
+.dt-hs-dau small{color:var(--chu-nhat);font-size:.76rem;display:inline-flex;flex-wrap:wrap;gap:0 4px;align-items:baseline}
+.dt-hs-dau .chip{font-size:.72rem}
+.dt-hs-lk{font:inherit;background:none;border:0;padding:0;color:var(--dt-cam);cursor:pointer}
+.dt-hs-lk:hover{text-decoration:underline}
+.dt-hs-ghi{margin:-6px 0 0;font-size:.78rem}
+.dt-hs-hai{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+@container (min-width:980px){.dt-hs-hai{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}}
+.dt-hs-phai{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dt-svg-hs{width:100%;max-width:720px;min-width:560px}
+.dt-svg-hs .dt-dich{stroke-linejoin:round}
+.dt-chu-giai .t-km-cg{color:var(--dt-km)}
+.dt-hs-dks{display:flex;flex-wrap:wrap;gap:6px}
+.dt-hs-dk{font:inherit;font-size:.76rem;text-align:left;background:var(--nen-phu);border:1px solid transparent;border-radius:8px;
+  padding:.25rem .6rem;color:var(--chu);cursor:pointer;max-width:100%}
+.dt-hs-dk:hover,.dt-hs-dk:focus-visible{border-color:var(--vien-dam);outline:none}
+.dt-hs-dk i,.dt-hs-giao i{font-style:normal;color:var(--chu-nhat);font-size:.68rem;margin-right:6px}
+.dt-hs-dk-moi{color:var(--dt-cam)}
+.dt-hs-giao{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin-top:10px;padding-top:8px;border-top:1px solid var(--vien-phu);
+  font-size:.78rem}
+.dt-hoi-cam{font:inherit;font-weight:700;background:none;border:0;padding:0 2px;color:var(--dt-cam);cursor:pointer}
+.dt-hoi-cam:hover{text-decoration:underline}
+.o-noi .dt-hs-spark{display:block;width:200px;margin:4px 0}
+.o-noi .dt-hs-spark small{display:block;color:var(--chu-nhat);font-size:.64rem;white-space:normal}
+/* Thanh đếm (TabTin.tsx::ThanhDem) — ngành của một bên, tin hiện trường. */
+.dt-dem{list-style:none;margin:0;padding:0}
+.dt-dem li>div,.dt-dem li>button{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,120px) minmax(0,1fr) 34px;gap:8px;align-items:center;width:100%;
+  font:inherit;font-size:.76rem;color:inherit;text-align:left;background:none;border:0;padding:3px 4px;border-radius:6px}
+.dt-dem li>button{cursor:pointer} .dt-dem li>button:hover,.dt-dem li>button:focus-visible{background:var(--nen-phu);outline:none}
+.dt-dem span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-dem-o{display:block}
+.dt-dem i{display:block;height:10px;border-radius:5px;background:var(--dt-cam);min-width:3px}
+.dt-dem b{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---- Tab Tin thị trường (đợt 4b task 8) — thẻ "đang hết" dùng lại .dt-tt-ch* (khung .dt-tt) ---- */
+.dt-tin-kms{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
+@container (max-width:900px){.dt-tin-kms{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container (max-width:560px){.dt-tin-kms{grid-template-columns:minmax(0,1fr)}}
+.dt-tin-km{background:var(--nen-phu);border-radius:10px;padding:10px 12px;min-width:0}
+.dt-tin-km-dau{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:4px}
+.dt-tin-km-dau span{color:var(--dt-km);font-size:.72rem;white-space:nowrap}
+.dt-tin-km-d{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;width:100%;font:inherit;font-size:.76rem;color:inherit;
+  text-align:left;background:none;border:0;border-top:1px solid var(--vien);padding:5px 4px;cursor:pointer;border-radius:0}
+.dt-tin-km-d:hover,.dt-tin-km-d:focus-visible{background:var(--nen-the);outline:none;border-radius:6px}
+.dt-tin-km-d>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tin-km-d b{color:var(--do-chu);white-space:nowrap;font-variant-numeric:tabular-nums}
+.dt-tin-km-d s{color:var(--chu-mo);font-weight:400}
+.dt-tin-km-d small{grid-column:1 / -1;color:var(--chu-nhat);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-tin-km .dt-hoi-cam{padding:0}
+.dt-tin-ht{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@container (max-width:760px){.dt-tin-ht{grid-template-columns:minmax(0,1fr)}}
+.dt-tin-ht h3{margin:0 0 6px;font-size:.84rem}

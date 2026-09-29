@@ -146,3 +146,16 @@ export function goiY(ss: Nhom[], ben: Ben[], tim: string, n = 8): GoiY[] {
   }
   return [...b, ...g].slice(0, n);
 }
+
+/** Tab Tin thị trường — khuyến mãi gom theo bên: mọi bên có khuyến mãi (nhiều trước, rồi tên); trong mỗi bên, dòng có giảm giá
+ *  rõ (gia_truoc_km > gia_goc) trước theo % giảm lớn nhất, rồi theo tên gốc. Tên bên từ tq.ben (không có → mã). */
+export function kmGomBen(tq: TongQuan): { ma: string; ten: string; ds: TongQuan["khuyen_mai"] }[] {
+  const ten = new Map(tq.ben.map(b => [b.ma, b.ten]));
+  const theo = new Map<string, TongQuan["khuyen_mai"]>();
+  for (const k of tq.khuyen_mai) (theo.get(k.ben) ?? theo.set(k.ben, []).get(k.ben)!).push(k);
+  const giam = (k: TongQuan["khuyen_mai"][number]) =>
+    k.gia_goc != null && k.gia_truoc_km != null && k.gia_truoc_km > k.gia_goc ? 1 - k.gia_goc / k.gia_truoc_km : -1;
+  return [...theo.entries()].map(([ma, ds]) => ({ ma, ten: ten.get(ma) ?? ma,
+    ds: [...ds].sort((a, b) => giam(b) - giam(a) || a.ten_goc.localeCompare(b.ten_goc, "vi")) }))
+    .sort((a, b) => b.ds.length - a.ds.length || a.ten.localeCompare(b.ten, "vi"));
+}

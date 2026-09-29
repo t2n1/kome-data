@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Ben, Nhom, QuanSat, TongQuan } from "./kieu";
-import { bongNganh, coHoi, datNhat, diemVitri, goiY, kmNoiBat, kmTheoBen, mauTT, nganhObc, nhomCuaO, reNhat, SO_COT, tiLe,
+import { bongNganh, coHoi, datNhat, diemVitri, goiY, kmGomBen, kmNoiBat, kmTheoBen, mauTT, nganhObc, nhomCuaO, reNhat, SO_COT, tiLe,
   tongSo } from "./tom_tat_logic";
 
 let seq = 0;
@@ -178,4 +178,19 @@ describe("goiY", () => {
     expect(goiY(ss, bs, "hsc")[0]).toEqual({ loai: "ben", khoa: "hsc", ten: "HSC Station", phu: "hsc" });
     expect(goiY(ss, bs, "m", 2)).toHaveLength(2);
   });
+});
+
+describe("kmGomBen", () => {
+  it("gom theo bên, bên nhiều trước; trong bên: giảm % lớn trước, rồi tên; tên bên từ tq.ben", () => {
+    const t = tq({ ben: [ben("a", "An"), ben("b", "Bình")], khuyen_mai: [
+      km({ ben: "b", ten_goc: "z" }),
+      km({ ben: "a", ten_goc: "c" }), km({ ben: "a", ten_goc: "b", gia_goc: 90, gia_truoc_km: 100 }),
+      km({ ben: "a", ten_goc: "a" }), km({ ben: "a", ten_goc: "d", gia_goc: 50, gia_truoc_km: 100 }),
+      km({ ben: "x", ten_goc: "q" }), km({ ben: "x", ten_goc: "r" }),
+    ] });
+    const r = kmGomBen(t);
+    expect(r.map(x => [x.ma, x.ten, x.ds.length])).toEqual([["a", "An", 4], ["x", "x", 2], ["b", "Bình", 1]]);
+    expect(r[0].ds.map(k => k.ten_goc)).toEqual(["d", "b", "a", "c"]);
+  });
+  it("không khuyến mãi thì rỗng", () => expect(kmGomBen(tq())).toEqual([]));
 });
