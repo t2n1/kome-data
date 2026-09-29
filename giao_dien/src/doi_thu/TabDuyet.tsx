@@ -8,6 +8,8 @@ import { ngay, yen } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { QuanSat } from "./kieu";
 import { NHAN_DUYET } from "./kieu";
+import { NguonDong, Ra } from "./NguonDong";
+import { cacThangCho, lienKetAnToan, nhanThang, thangCua } from "./nguon";
 
 const LOC = [["", "Tất cả"], ["can_xem", "Cần xem"], ["bat_thuong", "Bất thường"], ["chua_xac_nhan", "Chưa ai xác nhận"], ["chua_ghep", "Chưa ghép"]];
 const LOAI_NGUON = [["bang_gia", "Bảng giá / web"], ["chung_tu", "Chứng từ khách đưa"], ["to_roi", "Tờ rơi / tin nhắn"], ["khach_ke", "Khách kể"], ["khac", "Nghe nói / khác"]];
@@ -22,9 +24,38 @@ const TRUONG: [keyof QuanSat, string][] = [["ten_goc", "Tên"], ["quy_cach_goc",
   ["kenh_gia", "Kênh"], ["muc_gia", "Mức"], ["trang_thai", "Trạng thái"]];
 
 const HANG_MOI_TRONG = { ma_doi_thu: "", ten_goc: "", quy_cach_goc: "", gia_goc: "", don_vi_gia: "", kg_moi_don_vi_gia: "",
-  thue: "khong_ro", gom_ship: "khong_ro", trang_thai: "con", loai_nguon: "", ghi_chu_nguon: "" };
+  thue: "khong_ro", gom_ship: "khong_ro", trang_thai: "con", loai_nguon: "", ghi_chu_nguon: "", lien_ket_bang_chung: "" };
 const NHAN_HANG_MOI: [keyof typeof HANG_MOI_TRONG, string][] = [["ten_goc", "Tên hàng"], ["quy_cach_goc", "Quy cách"], ["gia_goc", "Giá"],
   ["don_vi_gia", "Đơn vị giá"], ["kg_moi_don_vi_gia", "Kg / đơn vị giá"], ["ghi_chu_nguon", "Ghi chú nguồn"]];
+
+/** Một dòng "Thư mục Drive tháng …": link đã lưu (nút mở + đổi) hoặc ô dán link (đặc tả §11.1). */
+function ThuMucThang({ thang, hien, xong }: { thang: string; hien: string | null; xong: () => void }) {
+  const [sua, datSua] = useState(false);
+  const [gt, datGt] = useState("");
+  const [loi, datLoi] = useState<string | null>(null);
+  const [dang, datDang] = useState(false);
+  const nhan = nhanThang(thang);
+  const luu = () => {
+    if (dang) return;
+    datDang(true);
+    gui("/api/doi-thu/thu-muc", { thang, lien_ket: gt.trim() })
+      .then(() => { datSua(false); datGt(""); datLoi(null); xong(); })
+      .catch((e: Error) => datLoi(e.message)).finally(() => datDang(false));
+  };
+  return (
+    <p className="dt-thu-muc">Thư mục Drive {nhan}:{" "}
+      {hien && !sua ? <>
+        <Ra href={hien}>Mở thư mục ↗</Ra>{" "}
+        <button type="button" className="chip" aria-label={`Đổi link thư mục Drive ${nhan}`} onClick={() => { datGt(hien); datSua(true); }}>đổi</button>
+      </> : <>
+        <input type="url" aria-label={`Link thư mục Drive ${nhan}`} placeholder="https://drive.google.com/…" value={gt}
+          onChange={e => datGt(e.target.value)} />{" "}
+        <button type="button" className="chip" disabled={dang || !gt.trim()} onClick={luu}>Lưu</button>
+        {hien && <> <button type="button" className="chip" onClick={() => { datSua(false); datLoi(null); }}>Bỏ</button></>}
+      </>}
+      {loi && <span role="alert" className="dt-loi"> {loi}</span>}
+    </p>);
+}
 
 export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const kx = chuoiKhoang(useKhoang());
@@ -34,7 +65,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const q = useQuery({ queryKey: ["doi-thu", "duyet", ben, loc, kx], queryFn: () => lay<{ dong: QuanSat[] }>(url) });
   const [chon, datChon] = useState<QuanSat | null>(null);
   const [sua, datSua] = useState<Record<string, string>>({});
-  const [nguon, datNguon] = useState({ loai_nguon: "", ghi_chu_nguon: "" });
+  const [nguon, datNguon] = useState({ loai_nguon: "", ghi_chu_nguon: "", lien_ket_bang_chung: "" });
   const [maKome, datMaKome] = useState("");
   const [loi, datLoi] = useState<string | null>(null);          // lỗi của khung sửa / ghép dòng đang chọn
   const [loiThem, datLoiThem] = useState<string | null>(null);  // lỗi của form thêm hàng
@@ -62,6 +93,9 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
         <Khoi tieu_de="Dòng cần duyệt" dang_tai={q.isLoading} loi={q.error ? (q.error as Error).message : null}>
           {ben && <p className="dt-ben"><button type="button" className="chip" aria-label={`Bỏ lọc đối thủ ${tenBen}`} onClick={boBen}>
             Đối thủ: {tenBen} ✕</button></p>}
+          {cacThangCho(q.data?.dong ?? []).map(t => (
+            <ThuMucThang key={t} thang={t} xong={() => qc.invalidateQueries({ queryKey: ["doi-thu"] })}
+              hien={lienKetAnToan(q.data?.dong.find(d => thangCua(d.thang_lo) === t && d.lien_ket_thu_muc)?.lien_ket_thu_muc)} />))}
           <div className="dt-loc" role="group" aria-label="Lọc">
             {LOC.map(([m, n]) => <button key={m} type="button" className="chip" aria-pressed={loc === m} onClick={() => datLoc(m)}>{n}</button>)}
           </div>
@@ -79,6 +113,8 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
                 <label key={k}>{{ thue: "Thuế", gom_ship: "Ship", trang_thai: "Trạng thái" }[k]}
                   <select value={moi[k]} onChange={e => datMoi({ ...moi, [k]: e.target.value })}>
                     {CHON[k]!.map(([m, t]) => <option key={m} value={m}>{t}</option>)}</select></label>))}
+              <label>Link bằng chứng<input type="url" aria-label="Link bằng chứng" placeholder="Link bằng chứng (tuỳ chọn) — ảnh trên Drive"
+                value={moi.lien_ket_bang_chung} onChange={e => datMoi({ ...moi, lien_ket_bang_chung: e.target.value })} /></label>
               <label>Loại nguồn<select value={moi.loai_nguon} onChange={e => datMoi({ ...moi, loai_nguon: e.target.value })}>
                 <option value="">— loại nguồn (bắt buộc) —</option>
                 {LOAI_NGUON.map(([m, n]) => <option key={m} value={m}>{n}</option>)}</select></label>
@@ -103,7 +139,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
       {chon && chon.nguon === "nap" && (
         <section className="dt-khoi dt-sua">
           <Khoi tieu_de={chon.ten_goc} canh_bao={loi}>
-            <p className="dt-nhat">Nguồn: {chon.nguon_file} · {chon.vi_tri} · {ngay(chon.ngay_nguon)}{chon.ghi_chu ? ` · ${chon.ghi_chu}` : ""}</p>
+            <p className="dt-nhat">Nguồn: {chon.nguon_file} · {chon.vi_tri} · {ngay(chon.ngay_nguon)}{chon.ghi_chu ? ` · ${chon.ghi_chu}` : ""} <NguonDong q={chon} /></p>
             {TRUONG.map(([k, n]) => {
               const goc = String(chon[k] ?? ""), gt = sua[k] ?? goc, ds = CHON[k];
               const doi = (v: string) => { const { [k]: _bo, ...con } = sua; datSua(v === goc ? con : { ...con, [k]: v }); };
@@ -125,6 +161,8 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
                 {LOAI_NGUON.map(([m, n]) => <option key={m} value={m}>{n}</option>)}</select>
               <input placeholder="Ghi chú nguồn (Zalo 29/9, hoá đơn khách …)" aria-label="Ghi chú nguồn" value={nguon.ghi_chu_nguon}
                 onChange={e => datNguon({ ...nguon, ghi_chu_nguon: e.target.value })} />
+              <input type="url" aria-label="Link bằng chứng" placeholder="Link bằng chứng (tuỳ chọn) — ảnh trên Drive" value={nguon.lien_ket_bang_chung}
+                onChange={e => datNguon({ ...nguon, lien_ket_bang_chung: e.target.value })} />
               <button type="button" className="chip" disabled={dang_gui || !nguon.loai_nguon || !sua.gia_goc}
                 onClick={() => lam(() => gui("/api/doi-thu/gia-moi", { fact_goc_id: chon.id, ...sua, ...nguon }))}>Lưu giá mới</button>
             </fieldset>
