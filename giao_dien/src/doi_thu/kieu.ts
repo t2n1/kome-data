@@ -11,7 +11,7 @@ export type QuanSat = {
   yen_chuan: number | null; don_vi_so: string; nen_gia: string; tuoi_ngay: number | null; bat_thuong?: boolean;
 };
 export type Nhom = {
-  nhom_khoa: string; ten_nhom: string | null; don_vi_so: string; ma_kome: string[] | null; gia_kome: number | null;
+  nhom_khoa: string; ten_nhom: string | null; nganh: string | null; don_vi_so: string; ma_kome: string[] | null; gia_kome: number | null;
   so_ben: number; thap_nhat: number; ben_thap_nhat: string; trung_vi: number; cao_nhat: number;
   ty_le_re_hon_kome: number | null; quan_sat: QuanSat[];
 };
@@ -26,3 +26,7 @@ export type TongQuan = {
 export const NHAN_DUYET: Record<QuanSat["trang_thai_duyet"], string> = {
   ai_doc: "AI đọc", can_xem: "Cần xem", da_xac_nhan: "Đã xác nhận", da_sua: "Đã sửa", nhap_tay: "Nhập tay" };
 export const NHAN_TRANG_THAI: Record<string, string> = { con: "Còn", het: "Hết", sap_ve: "Sắp về", khong_ro: "?" };
+export type NhomCoTen = { id: number; ten: string; ma: { ma: string; ten: string | null }[] };
+export type QuyCach = { ma: string; ten: string | null; nganh: string; kg_moi_goi: number | null; goi_moi_thung: number | null;
+                        kg_moi_thung: number | null; da_sua: boolean };
+export type NhomQuyCach = { nhom: NhomCoTen[]; quy_cach: QuyCach[] };

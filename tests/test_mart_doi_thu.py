@@ -167,3 +167,18 @@ def test_gia_kome_kg_chi_nhan_pack_00_va_02(conn, batch):
     conn.execute("UPDATE core.fact_sales_line SET pack_code = '01' WHERE product_code = 'NT01'")
     conn.commit()
     assert conn.execute("SELECT count(*) FROM mart.gia_kome_kg WHERE product_code='NT01'").fetchone()[0] == 0
+
+
+def test_so_sanh_nhom_co_cot_nganh_cua_ma_va_nganh_pho_bien_nhat_cua_nhom_co_ten(conn, batch):
+    _hang(conn, batch)                                                   # NT01: 冷凍食品_VNM
+    _qs(conn, batch, "A", 500)
+    assert conn.execute("SELECT nganh FROM mart.so_sanh_nhom WHERE nhom_khoa='ma:NT01'").fetchone()[0] == "冷凍食品_VNM"
+    b = batch(9002)
+    for ma, nganh in (("NT02", "冷凍食品_VNM"), ("NT03", "乾物_VNM")):
+        conn.execute("INSERT INTO core.dim_product (product_code, product_name, food_category_name, batch_id) "
+                     "VALUES (%s, 'X (1kg x 10)', %s, %s)", (ma, nganh, b))
+    n = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Nhóm hai ngành') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO app.nhom_so_sanh_ma VALUES ('NT01', %s), ('NT02', %s), ('NT03', %s)", (n, n, n))
+    conn.commit()
+    _qs(conn, batch, "B", 520, hang="h2")
+    assert conn.execute("SELECT nganh FROM mart.so_sanh_nhom WHERE nhom_khoa=%s", (f"n:{n}",)).fetchone()[0] == "冷凍食品_VNM"

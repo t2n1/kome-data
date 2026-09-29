@@ -222,3 +222,82 @@ def test_gia_moi_hang_moi_co_khoa_GIONG_goi_doi_thu(conn, batch):
                              "loai_nguon": "to_roi"}, None)
     khoa2 = conn.execute("SELECT ma_hang_dt FROM app.gia_doi_thu_tay WHERE id=%s", (tid2,)).fetchone()[0]
     assert khoa2 == G.ma_hang_dt({"ten_goc": "Hang khong quy cach", "quy_cach_goc": ""})
+
+
+# ---------------------------------------------------------------- đợt 1b: nhóm & quy cách
+
+def _sp(conn, batch, ma, ten, nganh="冷凍食品_VNM", kind=None):
+    conn.execute("INSERT INTO core.dim_product (product_code, product_name, food_category_name, kind_code, batch_id) "
+                 "VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING", (ma, ten, nganh, kind, batch(9001)))
+    conn.commit()
+
+
+def test_nhom_va_quy_cach_MOT_luot_khong_phi_khong_posm_co_danh_sach_ma(conn, batch, monkeypatch):
+    _hang(conn, batch)
+    _sp(conn, batch, "NT02", "Ca (1kg x 10 packs)")
+    _sp(conn, batch, "MKT01", "Poster", "雑貨_VNM")
+    _sp(conn, batch, "FEE01", "Phi ship", "冷凍食品_VNM", kind="1")
+    n = DT.tao_nhom(conn, "Basa", ["NT01", "NT02"], None)
+    conn.commit()
+    dem = _dem(conn, monkeypatch)
+    d = DT.nhom_va_quy_cach(conn)
+    assert dem["n"] == 1
+    monkeypatch.undo()
+    ma = [q["ma"] for q in d["quy_cach"]]
+    assert "NT01" in ma and "NT02" in ma and "MKT01" not in ma and "FEE01" not in ma
+    q1 = next(q for q in d["quy_cach"] if q["ma"] == "NT01")
+    assert q1["nganh"] == "冷凍食品_VNM" and float(q1["kg_moi_goi"]) == 0.5 and q1["da_sua"] is False
+    assert set(q1) == {"ma", "ten", "nganh", "kg_moi_goi", "goi_moi_thung", "kg_moi_thung", "da_sua"}
+    g = next(x for x in d["nhom"] if x["id"] == n)
+    assert g["ten"] == "Basa" and [m["ma"] for m in g["ma"]] == ["NT01", "NT02"] and g["ma"][0]["ten"]
+
+
+def test_them_ma_nhom_chuyen_tu_nhom_khac_va_nhat_ky_co_truoc(conn, batch):
+    _hang(conn, batch)
+    _sp(conn, batch, "NT02", "Ca (1kg x 10 packs)")
+    a = DT.tao_nhom(conn, "A", ["NT01"], None)
+    b = DT.tao_nhom(conn, "B", [], None)
+    DT.them_ma_nhom(conn, b, ["NT01", "NT02"], None)
+    conn.commit()
+    assert dict(conn.execute("SELECT product_code, nhom_id FROM app.nhom_so_sanh_ma").fetchall()) == {"NT01": b, "NT02": b}
+    truoc, sau = conn.execute("SELECT truoc, sau FROM app.doi_thu_nhat_ky WHERE loai='nhom' ORDER BY id DESC LIMIT 1").fetchone()
+    assert truoc == {"NT01": a} and sau["ma_kome"] == ["NT01", "NT02"]
+    assert conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky WHERE loai='nhom'").fetchone()[0] == 3
+
+
+def test_them_ma_nhom_loi_nhap(conn, batch):
+    _hang(conn, batch)
+    a = DT.tao_nhom(conn, "A", [], None)
+    n0 = conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky").fetchone()[0]
+    with pytest.raises(DT.LoiNhap, match="NT0l"):
+        DT.them_ma_nhom(conn, a, ["NT01", "NT0l"], None)
+    with pytest.raises(DT.LoiNhap):
+        DT.them_ma_nhom(conn, 987654321, ["NT01"], None)
+    with pytest.raises(DT.LoiNhap):
+        DT.them_ma_nhom(conn, a, [], None)
+    assert conn.execute("SELECT count(*) FROM app.nhom_so_sanh_ma").fetchone()[0] == 0
+    assert conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky").fetchone()[0] == n0
+
+
+def test_bo_ma_nhom_xoa_va_ma_khong_thuoc_nhom_la_LoiNhap(conn, batch):
+    _hang(conn, batch)
+    a = DT.tao_nhom(conn, "A", ["NT01"], None)
+    DT.bo_ma_nhom(conn, "NT01", None)
+    conn.commit()
+    assert conn.execute("SELECT count(*) FROM app.nhom_so_sanh_ma").fetchone()[0] == 0
+    truoc = conn.execute("SELECT truoc FROM app.doi_thu_nhat_ky WHERE loai='nhom' ORDER BY id DESC LIMIT 1").fetchone()[0]
+    assert truoc == {"NT01": a}
+    with pytest.raises(DT.LoiNhap):
+        DT.bo_ma_nhom(conn, "NT01", None)
+
+
+def test_tao_nhom_ma_la_LoiNhap_va_nhat_ky_ghi_nhom_cu(conn, batch):
+    _hang(conn, batch)
+    a = DT.tao_nhom(conn, "A", ["NT01"], None)
+    with pytest.raises(DT.LoiNhap, match="NT0l"):
+        DT.tao_nhom(conn, "B", ["NT0l"], None)
+    assert conn.execute("SELECT count(*) FROM app.nhom_so_sanh WHERE ten='B'").fetchone()[0] == 0
+    b = DT.tao_nhom(conn, "B", ["NT01"], None)
+    conn.commit()
+    truoc = conn.execute("SELECT truoc FROM app.doi_thu_nhat_ky WHERE doi_tuong=%s", (f"nhom:{b}",)).fetchone()[0]
+    assert truoc == {"NT01": a}

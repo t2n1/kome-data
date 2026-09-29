@@ -21,6 +21,6 @@ export function KhoiDoiThu({ ma }: { ma: string }) {
       goc={<span className="phu">{n.so_ben} bên</span>}>
       <p className="phu">Thấp nhất {yen(n.thap_nhat)}/kg ({n.ben_thap_nhat}) · trung vị {yen(n.trung_vi)}/kg</p>
       <p>KOME {n.gia_kome != null ? `${yen(n.gia_kome)}/kg` : "—"}{vt ? ` · ${vt}` : ""}</p>
-      <a className="hs2-lien-ket" href={giuKhoang("/doi-thu?tab=so_sanh")}>Xem so sánh ›</a>
+      <a className="hs2-lien-ket" href={giuKhoang(`/doi-thu?tab=so_sanh&nhom=${encodeURIComponent(n.nhom_khoa)}`)}>Xem so sánh ›</a>
     </The>);
 }
