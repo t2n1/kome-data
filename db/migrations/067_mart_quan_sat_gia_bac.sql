@@ -9,6 +9,8 @@
 -- (so ÷ trung vị − 1, số thực), gia_kome_lech (so > 3× hoặc < ⅓ trung vị — ĐỊNH NGHĨA MỘT LẦN của "giá KOME lệch": Tóm
 -- tắt không vẽ nhóm đó, Dữ liệu › Giá KOME lệch liệt kê; giao diện không tự tính lại), kome_kg_goi / kome_goi_thung /
 -- kome_kg_thung (mart.quy_cach_kome của mã CHÍNH — cùng mã `chinh` của bảng giá).
+-- hien_hanh (đợt 4b): dòng BỊ THAY (app.gia_doi_thu_tay.thay_cho_tay_id / fact_goc_id trỏ tới nó) không bao giờ hiện
+-- hành; các dòng còn lại xếp như cũ. Dòng bị thay vẫn ở view làm lịch sử.
 
 CREATE FUNCTION mart.gia_bac_kg(p_bac jsonb, p_sl numeric, p_pallet boolean, p_kg_thung numeric, p_so_goi integer,
                                 p_kl_goi numeric, p_thue text) RETURNS numeric LANGUAGE sql IMMUTABLE AS $$
@@ -113,7 +115,15 @@ ghep AS (
                 WHEN g.nhan = 'khong' THEN NULL ELSE g.product_code END AS ma_kome,
            CASE WHEN g.ma_doi_thu IS NULL THEN a.nhan_de_xuat
                 WHEN g.nhan = 'khong' THEN NULL ELSE g.nhan END         AS nhan,
-           CASE WHEN g.nhan = 'khong' THEN NULL ELSE g.nhom_id END AS nhom_ghep
+           CASE WHEN g.nhan = 'khong' THEN NULL ELSE g.nhom_id END AS nhom_ghep,
+           -- BỊ THAY (đợt 4b): dòng tay có thay_cho_tay_id = dòng này (sửa dòng tay = thêm dòng mới), hoặc dòng nạp có
+           -- dòng tay fact_goc_id = nó ("giá đã đổi"). Dòng thay phải ≤ mốc (cùng ngày nguồn của CTE `tay`). Dòng bị
+           -- thay VẪN ở view (lịch sử) nhưng không bao giờ hien_hanh — kể cả khi dòng thay rơi sang phân vùng khác
+           -- (sửa kênh / mức giá): không thì hai phân vùng cùng có một "hiện hành" cho MỘT quan sát.
+           EXISTS (SELECT 1 FROM app.gia_doi_thu_tay t
+                   WHERE CASE a.nguon WHEN 'tay' THEN t.thay_cho_tay_id ELSE t.fact_goc_id END = a.id
+                     AND (t.luc AT TIME ZONE 'Asia/Tokyo')::date
+                         <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date)))  AS bi_thay
     FROM tat a LEFT JOIN app.ghep_hang g USING (ma_doi_thu, ma_hang_dt)
     WHERE a.ngay_nguon <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))
 ),
@@ -136,8 +146,10 @@ SELECT x.nguon, x.id, x.batch_id, x.ma_doi_thu, d.ten AS ten_doi_thu, x.ma_hang_
                                   ELSE 'thuế không rõ' END,
                         CASE x.gom_ship WHEN 'co' THEN 'gồm ship' WHEN 'khong' THEN 'chưa ship' ELSE 'ship không rõ' END,
                         x.kenh_gia, x.muc_gia)                                         AS nen_gia,
+       -- Dòng bị thay tách ra phân vùng riêng (x.bi_thay trong PARTITION BY) rồi loại: các dòng CÒN LẠI xếp như cũ.
+       NOT x.bi_thay AND
        row_number() OVER (PARTITION BY x.ma_doi_thu, x.ma_hang_dt, coalesce(x.kenh_gia, ''), coalesce(x.muc_gia, ''),
-                                       (x.loai_nguon = 'khach_ke')
+                                       (x.loai_nguon = 'khach_ke'), x.bi_thay
                           ORDER BY x.ngay_nguon DESC, ln.thu_tu, (x.nguon = 'tay') DESC, x.batch_id DESC NULLS FIRST, x.id DESC) = 1
                                                                                        AS hien_hanh,
        (SELECT hom_nay FROM mart.moc_thoi_gian) - x.ngay_nguon                         AS tuoi_ngay,

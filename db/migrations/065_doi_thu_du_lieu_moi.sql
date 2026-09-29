@@ -19,7 +19,10 @@ ALTER TABLE app.gia_doi_thu_tay
     ADD COLUMN kl_goi_g     numeric(10,2) CHECK (kl_goi_g IS NULL OR (kl_goi_g > 0 AND kl_goi_g <= 30000)),
     ADD COLUMN bac          jsonb         CHECK (bac IS NULL OR jsonb_typeof(bac) = 'array'),
     ADD COLUMN khuyen_mai   text,
-    ADD COLUMN gia_truoc_km numeric(12,2) CHECK (gia_truoc_km IS NULL OR gia_truoc_km >= 0);
+    ADD COLUMN gia_truoc_km numeric(12,2) CHECK (gia_truoc_km IS NULL OR gia_truoc_km >= 0),
+    -- Dòng tay mà dòng này THAY (sửa một dòng tay = thêm dòng mới — sổ chỉ thêm; NULL = không thay dòng nào).
+    -- mart.gia_doi_thu_quan_sat (067): dòng bị thay không bao giờ hiện hành.
+    ADD COLUMN thay_cho_tay_id bigint REFERENCES app.gia_doi_thu_tay(id);
 
 ALTER TABLE core.dim_product
     ADD COLUMN pack1_code     text,

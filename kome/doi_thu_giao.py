@@ -142,8 +142,10 @@ def sua_dieu_kien(conn, *, fact_id, ma_doi_thu: str, loai: str, noi_dung: str, b
                   da_xem=None, ghi_de: bool = False) -> int:
     """Sửa / bỏ một điều kiện đã nạp (fact_id), hoặc thêm tay (fact_id None). Bỏ dòng thêm tay = gọi lại với bo=True
     và CÙNG (ma_doi_thu, loai, noi_dung) — xem mart.dieu_kien_hien_hanh (068). Chống sửa đè (đợt 4b): khoá
-    `khoa_dieu_kien`; `da_xem` None = không kiểm."""
-    kiem_xung_dot(conn, [khoa_dieu_kien(fact_id, ma_doi_thu)], da_xem, ghi_de)
+    `khoa_dieu_kien`; `da_xem` None = không kiểm. THÊM một dòng tay mới (fact_id None, bo False) không kiểm — thêm
+    không đè lên ai (mọi dòng tay của bên chung một khoá, kiểm thì hai người thêm hai dòng khác nhau cũng bị 409)."""
+    if fact_id is not None or bo:
+        kiem_xung_dot(conn, [khoa_dieu_kien(fact_id, ma_doi_thu)], da_xem, ghi_de)
     if loai not in LOAI_DK:
         raise LoiNhap(f"Loại điều kiện chỉ nhận {', '.join(LOAI_DK)}.")
     nd = (noi_dung or "").strip()

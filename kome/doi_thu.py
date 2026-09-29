@@ -554,8 +554,10 @@ def _kiem_loai_nguon(conn, ln) -> str:
 
 def sua_tay(conn, tay_id: int, thay_doi: dict, nguoi, *, nguon: dict | None = None) -> int:
     """Sửa một dòng `app.gia_doi_thu_tay` (sổ CHỈ THÊM) = thêm dòng MỚI: chép dòng cũ (cùng bên / hàng / fact_goc_id /
-    loại nguồn / nhóm / khách / tiếp xúc / link bằng chứng), áp `thay_doi` (TRUONG_SUA, qua `_kiem`). Dòng mới thành
-    hiện hành vì mới hơn (luc = now, id lớn hơn). `nguon` (đường 'Giá đã đổi' của pop-up): loai_nguon bắt buộc,
+    loại nguồn / nhóm / khách / tiếp xúc / link bằng chứng), áp `thay_doi` (TRUONG_SUA, qua `_kiem`), đặt
+    `thay_cho_tay_id` = dòng cũ — mart.gia_doi_thu_quan_sat (067) không bao giờ cho dòng bị thay hiện hành, kể cả khi
+    dòng mới sang phân vùng khác (sửa kênh / mức giá). "Đọc sai" (mặc định) giữ `luc` của dòng cũ (ngày nguồn / tuổi
+    không đổi — vẫn là quan sát đó); `nguon` (đường 'Giá đã đổi' của pop-up) = now(), loai_nguon bắt buộc,
     lien_ket_bang_chung / ghi_chu_nguon ghi đè khi CÓ khoá. Nhật ký HAI dòng — khoá 'tay:<cũ>' và 'tay:<mới>' — để
     sua_cuoi của cả hai khớp (pop-up cũ của dòng cũ bị 409). Trả id mới."""
     thay_doi = thay_doi or {}
@@ -564,10 +566,11 @@ def sua_tay(conn, tay_id: int, thay_doi: dict, nguoi, *, nguon: dict | None = No
     if not thay_doi and not nguon:
         raise LoiNhap("Không có gì để sửa.")
     sach = {k: _kiem(k, v) for k, v in thay_doi.items()}
-    r = conn.execute(f"SELECT {', '.join(_COT_TAY)} FROM app.gia_doi_thu_tay WHERE id = %s", (tay_id,)).fetchone()
+    r = conn.execute(f"SELECT {', '.join(_COT_TAY)}, luc FROM app.gia_doi_thu_tay WHERE id = %s", (tay_id,)).fetchone()
     if r is None:
         raise LoiNhap("Không tìm thấy dòng giá này.")
     cu = dict(zip(_COT_TAY, r))
+    luc_cu = r[-1]
     v = dict(cu)
     for k, x in sach.items():
         if k == "bac":
@@ -589,9 +592,10 @@ def sua_tay(conn, tay_id: int, thay_doi: dict, nguoi, *, nguon: dict | None = No
     if v["gia_goc"] is None and v["trang_thai"] != "het":
         raise LoiNhap("Nhập giá (chỉ được bỏ trống khi ghi hàng đã hết).")
     moi = conn.execute(
-        f"""INSERT INTO app.gia_doi_thu_tay ({', '.join(_COT_TAY)}, nguoi_dung_id)
-            VALUES ({', '.join('%s::jsonb' if k == 'bac' else '%s' for k in _COT_TAY)}, %s) RETURNING id""",
-        [v[k] for k in _COT_TAY] + [nguoi]).fetchone()[0]
+        f"""INSERT INTO app.gia_doi_thu_tay ({', '.join(_COT_TAY)}, nguoi_dung_id, thay_cho_tay_id, luc)
+            VALUES ({', '.join('%s::jsonb' if k == 'bac' else '%s' for k in _COT_TAY)}, %s, %s, coalesce(%s, now()))
+            RETURNING id""",
+        [v[k] for k in _COT_TAY] + [nguoi, tay_id, None if nguon else luc_cu]).fetchone()[0]
     truoc = {k: cu[k] for k in doi}
     sau = {k: v[k] for k in doi} | {"tay_cu": tay_id, "tay_moi": moi}
     for khoa in (f"tay:{tay_id}", f"tay:{moi}"):
@@ -605,7 +609,9 @@ VI_SAO_GIA = ("doc_sai", "da_doi")
 
 def sua_mat_hang(conn, b: dict, nguoi) -> dict:
     """MỘT lần bấm Lưu ở pop-up mặt hàng: nhãn ghép + sửa trường, CÙNG giao dịch (route commit một lần; lỗi ở bước
-    nào thì không bước nào vào — mọi kiểm đầu vào chạy TRƯỚC lần ghi đầu tiên). `b`:
+    nào thì không bước nào vào). Mọi phép kiểm đầu vào đã biết — trường, vì sao, loại nguồn, link / ghi chú nguồn, "có
+    giá trừ khi hết", mã KOME và loại dòng của nhãn — chạy TRƯỚC lần ghi đầu tiên; sau đó chỉ còn lỗi CSDL ngoài dự
+    kiến (khi ấy vẫn không commit). `b`:
       nguon 'nap'|'tay', id, da_xem (sua_cuoi lúc mở), ghi_de, nhan ('cung_hang'|'thay_the'|'khong'|null),
       thay_doi {TRUONG_SUA: giá trị}, vi_sao_gia ('doc_sai'|'da_doi'|null — bắt buộc khi thay_doi có TRUONG_GIA),
       loai_nguon / lien_ket_bang_chung / ghi_chu_nguon (đường 'da_doi').
@@ -640,25 +646,37 @@ def sua_mat_hang(conn, b: dict, nguoi) -> dict:
     if vi_sao == "da_doi" and thay_doi:
         _kiem_loai_nguon(conn, b.get("loai_nguon"))
         kiem_lien_ket(b.get("lien_ket_bang_chung"), "Link bằng chứng")
+        if b.get("ghi_chu_nguon") is not None and not isinstance(b.get("ghi_chu_nguon"), str):
+            raise LoiNhap("Ghi chú nguồn phải là chữ.")
 
     r = conn.execute("""SELECT q.ma_doi_thu, q.ma_hang_dt, q.ma_kome, q.nhan, q.gia_goc, q.trang_thai,
-                               g.product_code, g.nhom_id
+                               g.product_code, g.nhom_id, q.loai_nguon, q.nhom_khoa
                         FROM mart.gia_doi_thu_quan_sat q LEFT JOIN app.ghep_hang g USING (ma_doi_thu, ma_hang_dt)
                         WHERE q.nguon = %s AND q.id = %s""", (nguon, id_)).fetchone()
     if r is None:
         raise LoiNhap("Không tìm thấy dòng giá này (có thể lô đã bị hoàn tác).")
-    ben, hang, ma_kome, nhan_cu, gia_cu, trang_thai_cu, ghep_ma, ghep_nhom = r
+    ben, hang, ma_kome, nhan_cu, gia_cu, trang_thai_cu, ghep_ma, ghep_nhom, loai_nguon_cu, nhom_khoa_cu = r
     khoa_dong = f"{'gia' if nguon == 'nap' else 'tay'}:{id_}"
     khoa_ghep = f"{ben}/{hang}"
     doi_nhan = nhan is not None and nhan != nhan_cu
     if not doi_nhan and not thay_doi:
         raise LoiNhap("Không có gì để sửa.")
+    ma_ghep = ma_kome if ma_kome is not None else ghep_ma
+    if doi_nhan and nhan == "khong" and loai_nguon_cu == "khach_ke" and nhom_khoa_cu is not None:
+        raise LoiNhap("Giá khách kể không bỏ ghép được ở đây.")     # nhóm của nó là thẻ @hàng (nhom_ke), không phải ghép
+    if doi_nhan and nhan != "khong" and ma_ghep is None:
+        raise LoiNhap("Chọn mã KOME trước.")
+    if thay_doi and (nguon == "tay" or vi_sao == "da_doi"):          # đường thêm dòng app.gia_doi_thu_tay
+        gia = _kiem("gia_goc", thay_doi["gia_goc"]) if "gia_goc" in thay_doi else gia_cu
+        tt = thay_doi.get("trang_thai", trang_thai_cu) or "con"
+        if gia is None and tt != "het":
+            raise LoiNhap("Nhập giá (chỉ được bỏ trống khi ghi hàng đã hết).")
     kiem_xung_dot(conn, [khoa_dong, khoa_ghep], da_xem, ghi_de)
 
     if doi_nhan:
         # Mã KOME hiện hành (hoặc mã đã lưu ở lần ghép 'khong' trước — bỏ nhóm rồi ghép lại vẫn nhớ mã); nhóm ghép
         # tường minh giữ nguyên, nhóm ngầm định (mã thuộc nhóm có tên) đi theo mã như cũ.
-        dat_ghep(conn, ben, hang, ma_kome if ma_kome is not None else ghep_ma, ghep_nhom, nhan, nguoi)
+        dat_ghep(conn, ben, hang, ma_ghep, ghep_nhom, nhan, nguoi)
     nguon_ra, id_ra = nguon, id_
     if thay_doi:
         if vi_sao == "da_doi":

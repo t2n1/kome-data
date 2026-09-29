@@ -319,7 +319,9 @@ def test_4b2_giao_hang_va_dieu_kien_xung_dot_mac_dinh_khong_kiem(conn, batch):
     with pytest.raises(XungDot):
         G.sua_dieu_kien(conn, fact_id=fid, noi_dung="freeship >= 20,000", da_xem=0, **kw)
     conn.rollback()
-    with pytest.raises(XungDot):
-        G.sua_dieu_kien(conn, fact_id=None, noi_dung="tay 2", da_xem=0, **kw)
+    G.sua_dieu_kien(conn, fact_id=None, noi_dung="tay 2", da_xem=0, **kw)   # THÊM dòng tay mới: không đè ai
+    conn.commit()
+    with pytest.raises(XungDot):                                             # BỎ dòng tay: có kiểm
+        G.sua_dieu_kien(conn, fact_id=None, noi_dung="tay 1", da_xem=0, **(kw | {"bo": True}))
     conn.rollback()
-    G.sua_dieu_kien(conn, fact_id=None, noi_dung="tay 2", da_xem=_max_nk(conn), **kw)
+    G.sua_dieu_kien(conn, fact_id=None, noi_dung="tay 1", da_xem=_max_nk(conn), **(kw | {"bo": True}))

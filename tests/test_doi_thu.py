@@ -1237,3 +1237,71 @@ def test_4b2_sua_ben_web_ten_ghi_chu_va_nhat_ky(conn, ben_goc):
     with pytest.raises(DT.XungDot):
         DT.sua_ben(conn, "THAK", {"ghi_chu": "x"}, None, da_xem=0)
 
+
+def test_4b2_sua_muc_gia_dong_tay_dong_cu_het_hien_hanh_ngay_nguon_giu_nguyen(conn, batch):
+    """Sửa kênh / mức giá đổi phân vùng hien_hanh: dòng cũ (bị thay) KHÔNG được còn hiện hành ở phân vùng cũ."""
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.execute("UPDATE app.gia_doi_thu_tay SET luc = '2026-08-01 10:00+09' WHERE id=%s", (tid,))
+    conn.commit()
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "thay_doi": {"muc_gia": "sỉ"}}, None)
+    conn.commit()
+    hh = dict(conn.execute("SELECT id, hien_hanh FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay'").fetchall())
+    assert hh == {tid: False, ra["id"]: True}
+    ngay = dict(conn.execute("SELECT id, ngay_nguon FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay'").fetchall())
+    assert ngay[ra["id"]] == ngay[tid] == date(2026, 8, 1)                 # "đọc sai" giữ ngày nguồn / tuổi
+    assert conn.execute("SELECT thay_cho_tay_id FROM app.gia_doi_thu_tay WHERE id=%s", (ra["id"],)).fetchone()[0] == tid
+    assert DT.mat_hang(conn, "tay", tid)["quan_sat"]["hien_hanh"] is False  # dòng bị thay vẫn đọc được (lịch sử)
+
+
+def test_4b2_gia_da_doi_dong_tay_la_ngay_moi_va_thay_dong_cu(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    conn.execute("UPDATE app.gia_doi_thu_tay SET luc = '2026-08-01 10:00+09' WHERE id=%s", (tid,))
+    conn.commit()
+    ra = DT.sua_mat_hang(conn, {"nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "vi_sao_gia": "da_doi",
+                                "loai_nguon": "chung_tu", "thay_doi": {"kenh_gia": "web", "gia_goc": "500"}}, None)
+    conn.commit()
+    r = conn.execute("SELECT thay_cho_tay_id, (luc AT TIME ZONE 'Asia/Tokyo')::date > '2026-08-01'"
+                     " FROM app.gia_doi_thu_tay WHERE id=%s", (ra["id"],)).fetchone()
+    assert r == (tid, True)
+    hh = dict(conn.execute("SELECT id, hien_hanh FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay'").fetchall())
+    assert hh == {tid: False, ra["id"]: True}
+
+
+def test_4b2_gia_da_doi_dong_nap_doi_kenh_dong_nap_het_hien_hanh(conn, batch):
+    fid = _ba_ben(conn, batch)[0]
+    ra = DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "vi_sao_gia": "da_doi", "loai_nguon": "to_roi",
+                                "thay_doi": {"kenh_gia": "web"}}, None)
+    conn.commit()
+    assert _qs_dong(conn, "nap", fid)[4] is False and _qs_dong(conn, "tay", ra["id"])[4] is True
+    hien = conn.execute("SELECT nguon, id FROM mart.gia_doi_thu_hien_hanh WHERE ma_doi_thu='THAK'").fetchall()
+    assert hien == [("tay", ra["id"])]                                      # MỘT quan sát hiện hành, không phải hai
+
+
+def test_4b2_dong_bi_thay_sau_moc_van_hien_hanh_khi_xem_lui(conn, batch):
+    """Dòng thay mới hơn mốc đang xem thì chưa 'thay' gì — dòng nạp vẫn hiện hành ở mốc cũ."""
+    from tests.test_mart_doi_thu import _mua
+    fid = _ba_ben(conn, batch)[0]
+    _mua(conn, batch, "202601010001", date(2026, 9, 20), hang="NT01")
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "vi_sao_gia": "da_doi", "loai_nguon": "to_roi",
+                           "thay_doi": {"kenh_gia": "web"}}, None)
+    conn.commit()
+    conn.execute("SELECT set_config('kome.moc', '2026-08-31', true)")
+    assert _qs_dong(conn, "nap", fid)[4] is True
+    conn.rollback()
+
+
+def test_4b2_nhan_ghep_khong_ma_kome_va_khach_ke_bo_ghep_la_LoiNhap(conn, batch):
+    from tests.test_mart_doi_thu import _ke
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 540, hang="hX", ma=None)
+    with pytest.raises(DT.LoiNhap, match="Chọn mã KOME trước"):
+        DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "nhan": "cung_hang"}, None)
+    conn.rollback()
+    ke = _ke(conn, "202601010001", "ma:NT01", 700)
+    with pytest.raises(DT.LoiNhap, match="khách kể"):
+        DT.sua_mat_hang(conn, {"nguon": "tay", "id": ke, "da_xem": 0, "nhan": "khong"}, None)
+    conn.rollback()
+    assert _nk(conn) == 0 and conn.execute("SELECT count(*) FROM app.ghep_hang").fetchone()[0] == 0
+

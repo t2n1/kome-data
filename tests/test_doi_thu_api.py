@@ -383,8 +383,9 @@ def test_4b2_giao_hang_va_dieu_kien_qua_api_409(conn, batch, test_db_url):
     b = {"fact_id": None, "ma_doi_thu": "IMAI", "loai": "khac", "noi_dung": "Nghỉ Obon", "bo": False, "da_xem": 0}
     r = c.post("/api/doi-thu/dieu-kien", json=b)
     assert r.status_code == 200 and isinstance(r.json()["id"], int) and r.json()["sua_cuoi"] == _max_nk(conn)
-    assert c.post("/api/doi-thu/dieu-kien", json=b | {"noi_dung": "khác"}).status_code == 409
-    assert c.post("/api/doi-thu/dieu-kien", json=b | {"noi_dung": "khác", "ghi_de": True}).status_code == 200
+    assert c.post("/api/doi-thu/dieu-kien", json=b | {"noi_dung": "khác"}).status_code == 200   # thêm mới: không kiểm
+    assert c.post("/api/doi-thu/dieu-kien", json=b | {"bo": True}).status_code == 409
+    assert c.post("/api/doi-thu/dieu-kien", json=b | {"bo": True, "ghi_de": True}).status_code == 200
     assert c.post("/api/doi-thu/dieu-kien", json=b | {"loai": "la", "ghi_de": True}).status_code == 400
 
 
@@ -408,4 +409,32 @@ def test_4b2_ben_qua_api(conn, test_db_url, imai_goc):
     assert r.status_code == 200
     assert conn.execute("SELECT web, ghi_chu FROM app.doi_thu WHERE ma='IMAI'").fetchone() == (None, "x")
     assert c.get("/api/doi-thu/ben/IMAI").json()["sua_cuoi_ben"] == _max_nk(conn)
+
+
+def test_4b2_hong_SAU_buoc_nhan_van_khong_ghi_gi(conn, batch, test_db_url):
+    """Dòng tay: đổi nhãn hợp lệ + gia_goc "" (không phải hết hàng) — lỗi "có giá" phải chặn TRƯỚC dat_ghep."""
+    from kome import doi_thu as DT
+    from tests.test_doi_thu import _ba_ben
+    fid = _ba_ben(conn, batch)[0]
+    tid = DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "520", "loai_nguon": "to_roi"}, None)
+    DT.dat_ghep(conn, "THAK", "hTHAK", "NT01", None, "cung_hang", None)
+    conn.commit()
+    truoc = (_max_nk(conn), conn.execute("SELECT count(*) FROM app.gia_doi_thu_tay").fetchone()[0])
+    r = _web(test_db_url).post("/api/doi-thu/sua-mat-hang", json={
+        "nguon": "tay", "id": tid, "da_xem": _max_nk(conn), "nhan": "thay_the", "vi_sao_gia": "doc_sai",
+        "thay_doi": {"gia_goc": ""}})
+    assert r.status_code == 400 and "Nhập giá" in r.json()["loi"]
+    assert conn.execute("SELECT nhan FROM app.ghep_hang").fetchone()[0] == "cung_hang"
+    assert (_max_nk(conn), conn.execute("SELECT count(*) FROM app.gia_doi_thu_tay").fetchone()[0]) == truoc
+
+
+def test_4b2_dong_bi_thay_van_doc_duoc_qua_mat_hang(conn, batch, test_db_url):
+    from kome import doi_thu as DT
+    from tests.test_doi_thu import _ba_ben
+    fid = _ba_ben(conn, batch)[0]
+    DT.sua_mat_hang(conn, {"nguon": "nap", "id": fid, "da_xem": 0, "vi_sao_gia": "da_doi", "loai_nguon": "to_roi",
+                           "thay_doi": {"kenh_gia": "web"}}, None)
+    conn.commit()
+    r = _web(test_db_url).get(f"/api/doi-thu/mat-hang/nap/{fid}")
+    assert r.status_code == 200 and r.json()["quan_sat"]["hien_hanh"] is False
 
