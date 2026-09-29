@@ -12183,9 +12183,10 @@
      "he": "ma_doi_thu",
      "ja": "ma_doi_thu",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py",
+     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/doi_thu_giao.py",
      "ma": [
-      "kome/doi_thu.py"
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
      ],
      "man": [
       "doi_thu"
@@ -12239,9 +12240,10 @@
      "he": "loai",
      "ja": "loai",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py",
+     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/doi_thu_giao.py",
      "ma": [
-      "kome/doi_thu.py"
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
      ],
      "man": [
       "doi_thu"
@@ -12253,9 +12255,10 @@
      "he": "noi_dung",
      "ja": "noi_dung",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py",
+     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/doi_thu_giao.py",
      "ma": [
-      "kome/doi_thu.py"
+      "kome/doi_thu.py",
+      "kome/doi_thu_giao.py"
      ],
      "man": [
       "doi_thu"
