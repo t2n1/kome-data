@@ -169,6 +169,9 @@ KOME). Nên chưa ai tạo nhóm nào thì So sánh vẫn chạy ngay; tạo nh�
 
 ## 5. Màn hình
 
+> **Đợt 4 (2026-09-29) thay toàn bộ mục này** — xem `2026-09-29-doi-thu-giao-dien-moi-design.md`.
+> Phần dưới giữ làm lịch sử Đợt 1–3.
+
 `/doi-thu` (React, `giao_dien/src/doi_thu/`), NGOÀI `DUONG_KHO_DU_LIEU` (mọi người đăng nhập vào
 được); thanh bên nhóm "Khách hàng & thị trường", icon chọn trong bộ 24 của gói thiết kế và GHI RÕ
 là ta chọn (bất biến 4d). Theo khoảng xem: mốc = cuối khoảng (xem lùi tháng 8 là thấy thị trường
