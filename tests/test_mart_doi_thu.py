@@ -285,3 +285,74 @@ def test_nguon_quan_sat_moi_quan_sat_dung_MOT_dong(conn, batch):
                                         (SELECT count(*) FROM mart.gia_doi_thu_quan_sat q
                                          JOIN mart.nguon_quan_sat n USING (nguon, id))""").fetchone()
     assert n_qs == n_ng == 2
+
+
+# ---------------------------------------------------------------- 066 — kg theo 荷姿 OBC + bảng giá KOME
+
+def _hang_pack(conn, batch, ma, ten, pack1_code, pack1_base_qty=None):
+    b = batch(9002)
+    conn.execute("""INSERT INTO core.dim_product (product_code, product_name, food_category_name, pack1_code, pack1_base_qty, batch_id)
+                    VALUES (%s, %s, '調味料_VNM', %s, %s, %s)""", (ma, ten, pack1_code, pack1_base_qty, b))
+    conn.commit()
+
+
+def _kg(conn, ma):
+    r = conn.execute("SELECT kg_00, kg_02 FROM mart.quy_cach_kome WHERE product_code=%s", (ma,)).fetchone()
+    return tuple(None if x is None else float(x) for x in r)
+
+
+def test_066_kg_theo_hanh_dong_goi_OBC(conn, batch):
+    _hang_pack(conn, batch, "BA02", "Xot Barona thit nuong sa (80g x 20 packs×4box)", "")      # không 荷姿: 00 = cả sản phẩm
+    _hang_pack(conn, batch, "DK20", "Ngu Vi Huong 3g (3g x 100 pack x 4 boxes)", "02", 400)   # 02 = 400 × 00
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _hang(conn, batch, "NT09", "Ca X (500g x 20 packs)")                                      # chưa nạp 荷姿 → luật cũ
+    assert _kg(conn, "BA02") == (pytest.approx(6.4), pytest.approx(6.4))
+    assert _kg(conn, "DK20") == (pytest.approx(0.003), pytest.approx(1.2))
+    assert _kg(conn, "NT01") == (pytest.approx(0.5), pytest.approx(10))
+    assert _kg(conn, "NT09") == (pytest.approx(0.5), pytest.approx(10))
+
+
+def test_066_gia_kome_kg_ma_ban_bang_00_la_ca_thung(conn, batch):
+    """15 nhóm lệch (đo 2026-09-29): xốt Barona bán bằng '00' mà một '00' là cả thùng 6,4 kg."""
+    import pandas as pd
+    from kome.loaders import sales
+    _hang_pack(conn, batch, "BA02", "Xot Barona thit nuong sa (80g x 20 packs×4box)", "")
+    b = batch(9003, HOM_NAY)
+    # Cùng hình dạng dòng như tests/test_khach_hang.py::_mua, nhưng pack '00', qty 1, doanh thu thuần ¥6.266.
+    sales.load(conn, pd.DataFrame([{
+        "slip_no": "SBA02", "line_seq": 1, "sales_date": HOM_NAY, "customer_code": "202601010001",
+        "product_code": "BA02", "pack_code": "00", "case_qty": 0, "qty": 1, "unit_price": 6266, "unit_cost": 5000,
+        "amount": 6266, "tax_amount": 0, "cost": 5000, "gross_profit": 1266, "paid_amount": 0, "batch_id": b,
+    }]), HOM_NAY, b)
+    conn.commit()
+    y = conn.execute("SELECT yen_kg FROM mart.gia_kome_kg WHERE product_code='BA02'").fetchone()[0]
+    assert float(y) == pytest.approx(6266 / 6.4, rel=1e-6)      # ¥979/kg — KHÔNG phải ¥78.325/kg (coi '00' = 80g)
+
+
+def _bang_gia(conn, batch, ma, lv, ex, inc, pack="02"):
+    b = batch(9100 + len(lv) + ex % 97)
+    conn.execute("""INSERT INTO core.fact_price_list (product_code, pack_code, price_level, valid_from, price_ex_tax,
+                      price_in_tax, unit_cost, batch_id) VALUES (%s, %s, %s, '2026-09-08', %s, %s, 0, %s)""",
+                 (ma, pack, lv, ex, inc, b))
+    conn.commit()
+
+
+def test_066_gia_kome_chuan_va_luat_hai_cot(conn, batch):
+    _hang_pack(conn, batch, "NT01", "Ca Ba sa cat khuc (500g x 20 packs)", "02", 20)
+    _bang_gia(conn, batch, "NT01", "std", 0, 4900)          # chỉ có gồm thuế → ÷ 1,08
+    _bang_gia(conn, batch, "NT01", "01", 5130, 5540)        # hai cột khớp → chưa thuế
+    _bang_gia(conn, batch, "NT01", "10", 5900, 4900)        # gồm thuế < chưa thuế → mâu thuẫn → gồm thuế ÷ 1,08
+    assert float(conn.execute("SELECT mart.gia_kome_chuan('NT01')").fetchone()[0]) == pytest.approx(4900 / 1.08 / 10)
+    r = {x[0]: (float(x[1]), x[2]) for x in conn.execute(
+        "SELECT price_level, yen_kg, hai_cot_lech FROM mart.gia_kome_bang WHERE product_code='NT01'")}
+    assert r["01"] == (pytest.approx(513), False)
+    assert r["10"] == (pytest.approx(4900 / 1.08 / 10), True)
+    assert conn.execute("SELECT mart.la_gia_km_kome('10'), mart.la_gia_km_kome('01'), mart.la_gia_km_kome('std')").fetchone() \
+        == (True, False, False)
+    assert conn.execute("SELECT mart.gia_kome_chuan('KHONG_CO')").fetchone()[0] is None
+
+
+def test_066_bang_gia_ma_chi_co_00_dung_kg_00(conn, batch):
+    _hang_pack(conn, batch, "BA02", "Xot Barona thit nuong sa (80g x 20 packs×4box)", "")
+    _bang_gia(conn, batch, "BA02", "std", 0, 6804, pack="00")
+    assert float(conn.execute("SELECT mart.gia_kome_chuan('BA02')").fetchone()[0]) == pytest.approx(6804 / 1.08 / 6.4)

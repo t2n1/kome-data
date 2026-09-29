@@ -7637,42 +7637,54 @@
      "he": "pack1_code",
      "ja": "荷姿１－荷姿区分コード",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/khoi_tong_quan.py, kome/mua_vu.py và 1 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.gia_kome_kg, mart.quy_cach_kome, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/khoi_tong_quan.py",
+      "kome/lien_he.py",
       "kome/mua_vu.py",
       "kome/san_pham.py"
      ],
      "man": [
       "doi_thu",
       "kho_hang",
+      "lien_he",
       "mua_vu",
       "san_pham",
       "tong_quan"
      ],
-     "view": []
+     "view": [
+      "mart.gia_kome_kg",
+      "mart.quy_cach_kome",
+      "mart.so_sanh_nhom"
+     ]
     },
     {
      "core": "core.dim_product.pack1_base_qty",
      "he": "pack1_base_qty",
      "ja": "荷姿１－基準単位当り荷姿区分数",
      "loai": "man",
-     "ly_do": "màn hình đọc qua kome/doi_thu.py, kome/khoi_tong_quan.py, kome/mua_vu.py và 1 chỉ số khác",
+     "ly_do": "màn hình đọc qua mart.gia_kome_kg, mart.quy_cach_kome, mart.so_sanh_nhom",
      "ma": [
       "kome/doi_thu.py",
       "kome/khoi_tong_quan.py",
+      "kome/lien_he.py",
       "kome/mua_vu.py",
       "kome/san_pham.py"
      ],
      "man": [
       "doi_thu",
       "kho_hang",
+      "lien_he",
       "mua_vu",
       "san_pham",
       "tong_quan"
      ],
-     "view": []
+     "view": [
+      "mart.gia_kome_kg",
+      "mart.quy_cach_kome",
+      "mart.so_sanh_nhom"
+     ]
     },
     {
      "core": null,
