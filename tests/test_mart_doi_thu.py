@@ -182,3 +182,74 @@ def test_so_sanh_nhom_co_cot_nganh_cua_ma_va_nganh_pho_bien_nhat_cua_nhom_co_ten
     conn.commit()
     _qs(conn, batch, "B", 520, hang="h2")
     assert conn.execute("SELECT nganh FROM mart.so_sanh_nhom WHERE nhom_khoa=%s", (f"n:{n}",)).fetchone()[0] == "冷凍食品_VNM"
+
+
+# ---- 063: giá khách kể (tin hiện trường `@`) ---------------------------------------------------------
+
+def _ke(conn, khach, nhom_khoa, gia, ben="THAK", ten="Basa", don_vi="kg", kg=1, luc=None):
+    """Một tin khách kể: giống hệt cách `doi_thu.gia_khach_ke` sẽ ghi (ma_hang_dt = 'ke:<khách>:<nhóm>')."""
+    r = conn.execute(
+        """INSERT INTO app.gia_doi_thu_tay (ma_doi_thu, ma_hang_dt, ten_goc, gia_goc, don_vi_gia, kg_moi_don_vi_gia,
+             thue, gom_ship, loai_nguon, customer_code, nhom_khoa, luc)
+           VALUES (%s, %s, %s, %s, %s, %s, 'khong_ro', 'khong_ro', 'khach_ke', %s, %s, coalesce(%s, now())) RETURNING id""",
+        (ben, f"ke:{khach}:{nhom_khoa}", ten, gia, don_vi, kg, khach, nhom_khoa, luc)).fetchone()[0]
+    conn.commit()
+    return r
+
+
+def test_gia_khach_ke_mang_nhom_khoa_cua_the_hang_khong_qua_ghep(conn, batch):
+    _hang(conn, batch, ten="Ca Ba sa cat khuc (500g x 20 packs)")
+    fid = _ke(conn, "202601010001", "ma:NT01", 700)
+    r = conn.execute("SELECT nhom_khoa, ten_nhom, loai_nguon, ma_kome FROM mart.gia_doi_thu_quan_sat "
+                     "WHERE nguon = 'tay' AND id = %s", (fid,)).fetchone()
+    assert r[0] == "ma:NT01" and r[1] == "Ca Ba sa cat khuc (500g x 20 packs)" and r[2] == "khach_ke" and r[3] is None
+    n = conn.execute("INSERT INTO app.nhom_so_sanh (ten) VALUES ('Nhóm cá') RETURNING id").fetchone()[0]
+    conn.commit()
+    f2 = _ke(conn, "202601010002", f"n:{n}", 710)
+    r = conn.execute("SELECT nhom_khoa, ten_nhom FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay' AND id=%s", (f2,)).fetchone()
+    assert r == (f"n:{n}", "Nhóm cá")
+
+
+def test_gia_tay_khong_co_nhom_khoa_van_di_theo_ghep_nhu_cu(conn, batch):
+    _hang(conn, batch)
+    conn.execute("""INSERT INTO app.gia_doi_thu_tay (ma_doi_thu, ma_hang_dt, ten_goc, gia_goc, don_vi_gia, loai_nguon)
+                    VALUES ('THAK', 'tay1', 'Basa', 500, 'kg', 'bang_gia')""")
+    conn.commit()
+    assert conn.execute("SELECT nhom_khoa FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay'").fetchone()[0] is None
+
+
+def test_gia_khach_ke_khong_vao_trung_vi_nhung_co_trong_hien_hanh_va_bi_bat_thuong(conn, batch):
+    _hang(conn, batch)
+    for ben, g in [("A", 540), ("B", 560), ("C", 580)]:
+        _qs(conn, batch, ben, g)
+    fid = _ke(conn, "202601010001", "ma:NT01", 1400)
+    h = conn.execute("SELECT bat_thuong, trung_vi_nhom, so_ben_nhom FROM mart.gia_doi_thu_hien_hanh "
+                     "WHERE nguon='tay' AND id=%s", (fid,)).fetchone()
+    assert h[0] is True and float(h[1]) == 560 and h[2] == 3
+    tv = conn.execute("SELECT trung_vi, cao_nhat, so_ben, so_quan_sat FROM mart.so_sanh_nhom "
+                      "WHERE nhom_khoa='ma:NT01'").fetchone()
+    assert float(tv[0]) == 560 and float(tv[1]) == 580 and tv[2] == 3 and tv[3] == 3
+
+
+def test_hai_tin_khach_ke_cung_khach_ben_nhom_chi_tin_moi_nhat_hien_hanh(conn, batch):
+    _hang(conn, batch)
+    cu = _ke(conn, "202601010001", "ma:NT01", 600, luc="2026-07-01 09:00+09")
+    moi = _ke(conn, "202601010001", "ma:NT01", 650, luc="2026-07-10 09:00+09")
+    hh = dict(conn.execute("SELECT id, hien_hanh FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay'").fetchall())
+    assert hh == {cu: False, moi: True}
+
+
+def test_tin_cua_hai_khach_khac_nhau_khong_de_nhau(conn, batch):
+    _hang(conn, batch)
+    a = _ke(conn, "202601010001", "ma:NT01", 600)
+    b = _ke(conn, "202601010002", "ma:NT01", 640)
+    hh = dict(conn.execute("SELECT id, hien_hanh FROM mart.gia_doi_thu_quan_sat WHERE nguon='tay'").fetchall())
+    assert hh == {a: True, b: True}
+
+
+def test_cot_ra_cua_quan_sat_giu_nguyen_thu_tu_060(conn):
+    cols = [r[0] for r in conn.execute(
+        """SELECT column_name FROM information_schema.columns
+           WHERE table_schema = 'mart' AND table_name = 'gia_doi_thu_quan_sat' ORDER BY ordinal_position""")]
+    assert cols[:5] == ["nguon", "id", "batch_id", "ma_doi_thu", "ten_doi_thu"]
+    assert cols[-3:] == ["nen_gia", "hien_hanh", "tuoi_ngay"]
