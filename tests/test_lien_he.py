@@ -535,3 +535,17 @@ def test_do_dai_cau_ghi_chu_duoc_kiem_TRUOC_khi_do_the(conn, batch, monkeypatch)
     with pytest.raises(LH.LoiNhap, match="dài quá"):
         LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", dai, "", [hong], [])
     assert goi == [] and _so_dong_tx(conn) == 0
+
+
+def test_noi_dung_co_nua_cap_UTF16_le_loi_bi_chan_bang_LoiNhap(conn, batch):
+    """JSON cho phép một nửa cặp UTF-16 lẻ (U+D800) -> str Python không mã hoá UTF-8 được -> psycopg nổ (500). Chặn ở
+    `doc_bieu_mau` — điểm kiểm DUY NHẤT (cả `ghi` lẫn `ghi_kem_nhac` đi qua nó), không ghi dòng nào."""
+    _nen_nhac(conn, batch)
+    le = "Khách nói " + chr(0xD800)
+    with pytest.raises(LH.LoiNhap, match="không hợp lệ"):
+        LH.doc_bieu_mau("goi", "tot", le, "")
+    with pytest.raises(LH.LoiNhap):
+        LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", le, "", [], [])
+    conn.commit()
+    assert _so_dong_tx(conn) == 0
+    LH.doc_bieu_mau("goi", "tot", "\U0001F41F cặp đủ vẫn nhận", "")     # emoji (cặp surrogate đủ) không bị chặn

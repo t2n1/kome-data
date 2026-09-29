@@ -316,6 +316,11 @@ def _ten_nhom(k: str) -> str:
             f"WHERE sp_.product_code = CASE WHEN left({k}, 3) = 'ma:' THEN substr({k}, 4) END), {k})")
 
 
+# Giá khách kể đã mang nhóm (thẻ @hàng) — không có gì để ghép hay xác nhận ở màn Duyệt: không vào hàng "chưa ghép"
+# và không vào số "chờ duyệt". Giá khách kể BẤT THƯỜNG vẫn hiện ở bộ lọc "bất thường" của Duyệt.
+_KE_DA_NHOM = "(loai_nguon = 'khach_ke' AND nhom_khoa IS NOT NULL)"
+
+
 _TONG_QUAN = f"""
 WITH h AS MATERIALIZED (SELECT * FROM mart.gia_doi_thu_hien_hanh),
 dk0 AS (SELECT * FROM core.fact_dieu_kien_doi_thu WHERE mart.moc_lui() IS NULL OR ngay_nguon <= mart.moc_lui()),
@@ -327,7 +332,8 @@ SELECT json_build_object(
             'cho_duyet', coalesce(x.cho_duyet, 0)) ORDER BY d.ma), '[]')
           FROM app.doi_thu d LEFT JOIN (
             SELECT ma_doi_thu, max(ngay_nguon) ngay_moi, max(hinh_thuc_nguon) hinh_thuc, count(*) so_dong,
-                   count(*) FILTER (WHERE trang_thai_duyet IN ('can_xem', 'ai_doc') OR bat_thuong) cho_duyet
+                   count(*) FILTER (WHERE (trang_thai_duyet IN ('can_xem', 'ai_doc') OR bat_thuong)
+                                      AND NOT {_KE_DA_NHOM}) cho_duyet
             FROM h GROUP BY 1) x ON x.ma_doi_thu = d.ma WHERE d.dang_theo_doi),
   'luoi', (SELECT coalesce(json_agg(json_build_object('ben', ma_doi_thu, 'nganh', nganh, 'so_ma', n)), '[]') FROM (
             SELECT h.ma_doi_thu, mart.ten_nganh(p.food_category_name) nganh, count(DISTINCT h.ma_hang_dt) n
@@ -345,7 +351,8 @@ SELECT json_build_object(
         SELECT n.id, n.customer_code FROM app.nhat_ky_tiep_xuc n
         WHERE (n.thoi_diem AT TIME ZONE 'Asia/Tokyo')::date > %(hom_nay)s::date - {NGAY_HIEN_TRUONG}
           AND EXISTS (SELECT 1 FROM app.tiep_xuc_nhac z WHERE z.tiep_xuc_id = n.id)),
-    m AS MATERIALIZED (SELECT DISTINCT z.tiep_xuc_id, z.loai, z.khoa
+    m AS MATERIALIZED (SELECT DISTINCT z.tiep_xuc_id, z.loai,
+                              CASE WHEN z.loai = 'nhom' THEN mart.nhom_cua_khoa(z.khoa) ELSE z.khoa END AS khoa
                        FROM app.tiep_xuc_nhac z JOIN tx ON tx.id = z.tiep_xuc_id)
     SELECT json_build_object('ngay', {NGAY_HIEN_TRUONG}, 'tong', (SELECT count(*) FROM tx),
       'doi_thu', (SELECT coalesce(json_agg(json_build_object('ma', q.ma, 'ten', q.ten, 'so_tin', q.n) ORDER BY q.n DESC, q.ma), '[]')
@@ -358,7 +365,7 @@ SELECT json_build_object(
       'tinh', (SELECT coalesce(json_agg(json_build_object('tinh', q.tinh, 'so_tin', q.n) ORDER BY q.n DESC, q.tinh), '[]')
                FROM (SELECT coalesce(nullif(c.prefecture, ''), '(chưa rõ)') AS tinh, count(*) AS n
                      FROM tx LEFT JOIN core.dim_customer c ON c.customer_code = tx.customer_code AND c.is_current
-                     GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 47) q)))
+                     GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 48) q)))      -- 47 tỉnh + "(chưa rõ)"
 )
 """
 
@@ -421,11 +428,12 @@ SELECT (SELECT to_json(d) FROM app.doi_thu d WHERE d.ma = %(ma)s),
        (SELECT coalesce(json_agg(json_build_object(
                   'tiep_xuc_id', t.id, 'ma_khach', t.customer_code, 'ten_khach', t.ten_khach, 'ngay', t.ngay,
                   'nhom', (SELECT coalesce(json_agg(json_build_object('khoa', x.khoa, 'ten', x.ten) ORDER BY x.khoa), '[]')
-                           FROM (SELECT DISTINCT z.khoa, {_ten_nhom('z.khoa')} AS ten FROM app.tiep_xuc_nhac z
+                           FROM (SELECT DISTINCT k.khoa, {_ten_nhom('k.khoa')} AS ten FROM app.tiep_xuc_nhac z
+                                 CROSS JOIN LATERAL (SELECT mart.nhom_cua_khoa(z.khoa) AS khoa) k
                                  WHERE z.tiep_xuc_id = t.id AND z.loai = 'nhom') x),
-                  'gia', (SELECT coalesce(json_agg(json_build_object('nhom_khoa', g.nhom_khoa, 'ten_nhom', {_ten_nhom('g.nhom_khoa')},
+                  'gia', (SELECT coalesce(json_agg(json_build_object('nhom_khoa', k.khoa, 'ten_nhom', {_ten_nhom('k.khoa')},
                                 'gia_goc', g.gia_goc, 'don_vi_gia', g.don_vi_gia) ORDER BY g.id), '[]')
-                          FROM app.gia_doi_thu_tay g
+                          FROM app.gia_doi_thu_tay g CROSS JOIN LATERAL (SELECT mart.nhom_cua_khoa(g.nhom_khoa) AS khoa) k
                           WHERE g.tiep_xuc_id = t.id AND g.ma_doi_thu = %(ma)s AND g.loai_nguon = 'khach_ke'))
                 ORDER BY t.thoi_diem DESC, t.id DESC), '[]')
           FROM (SELECT n.id, n.customer_code, n.thoi_diem, c.customer_name AS ten_khach,
@@ -453,7 +461,7 @@ FROM (SELECT {_COT_QS} FROM mart.gia_doi_thu_hien_hanh h
       WHERE (%(ben)s = '' OR ma_doi_thu = %(ben)s)
         AND CASE %(loc)s WHEN 'can_xem' THEN trang_thai_duyet = 'can_xem'
                          WHEN 'bat_thuong' THEN bat_thuong
-                         WHEN 'chua_ghep' THEN ma_kome IS NULL AND NOT EXISTS (
+                         WHEN 'chua_ghep' THEN ma_kome IS NULL AND NOT {_KE_DA_NHOM} AND NOT EXISTS (
                              SELECT 1 FROM app.ghep_hang g
                              WHERE g.ma_doi_thu = h.ma_doi_thu AND g.ma_hang_dt = h.ma_hang_dt)
                          WHEN 'chua_xac_nhan' THEN trang_thai_duyet IN ('ai_doc', 'can_xem')
@@ -479,16 +487,19 @@ def khoi_san_pham(conn, ma: str) -> dict | None:
     return r[0] if r else None
 
 
-_GOI_Y_NHAC = """
+_GOI_Y_NHAC = f"""
 SELECT json_build_object(
   'doi_thu', (SELECT coalesce(json_agg(json_build_object('ma', d.ma, 'ten', d.ten) ORDER BY d.ma), '[]')
               FROM app.doi_thu d WHERE d.dang_theo_doi),
-  'hang', (SELECT coalesce(json_agg(json_build_object('khoa', z.khoa, 'ten', z.ten, 'loai', z.loai)
-                                    ORDER BY z.thu_tu, z.ten, z.khoa), '[]')
-           FROM (SELECT 0 AS thu_tu, 'n:' || n.id AS khoa, n.ten, 'nhom' AS loai FROM app.nhom_so_sanh n
+  'hang', (SELECT coalesce(json_agg(json_strip_nulls(json_build_object('khoa', z.khoa, 'ten', z.ten, 'loai', z.loai,
+                                                                       'ma', z.ma, 'ten_nhom', z.ten_nhom))
+                                    ORDER BY z.thu_tu, z.ten, z.khoa, z.ma), '[]')
+           FROM (SELECT 0 AS thu_tu, 'n:' || n.id AS khoa, n.ten, 'nhom' AS loai, NULL::text AS ma, NULL::text AS ten_nhom
+                 FROM app.nhom_so_sanh n
                  UNION ALL
-                 SELECT 1, 'ma:' || p.product_code, coalesce(nullif(p.product_name, ''), p.product_code), 'ma'
-                 FROM core.dim_product p
+                 SELECT 1, k.khoa, coalesce(nullif(p.product_name, ''), p.product_code), 'ma', p.product_code,
+                        CASE WHEN left(k.khoa, 2) = 'n:' THEN {_ten_nhom('k.khoa')} END
+                 FROM core.dim_product p CROSS JOIN LATERAL (SELECT mart.nhom_cua_khoa('ma:' || p.product_code) AS khoa) k
                  WHERE NOT mart.khong_phai_hang(p.product_code, p.kind_code, p.food_category_name)) z))
 """
 
@@ -496,7 +507,10 @@ SELECT json_build_object(
 def goi_y_nhac(conn) -> dict:
     """Danh sách gợi ý cho ô `@` của ô ghi tiếp xúc. MỘT lượt hỏi.
     `doi_thu`: đối thủ đang theo dõi. `hang`: nhóm so sánh có tên (`loai = 'nhom'`, khoá `n:<id>`, đứng trước)
-    rồi mã KOME hàng thật (`loai = 'ma'`, khoá `ma:<mã>`; không phí / POSM — cùng vị từ `nhom_va_quy_cach`)."""
+    rồi mã KOME hàng thật (`loai = 'ma'`, `ma` = mã; không phí / POSM — cùng vị từ `nhom_va_quy_cach`). Mã thuộc một
+    nhóm có tên VẪN được gợi ý (sale gõ tên hàng chứ không nhớ tên nhóm) nhưng khoá của nó là NHÓM
+    (`mart.nhom_cua_khoa` -> `n:<id>`, kèm `ten_nhom`); mã lẻ giữ khoá `ma:<mã>`. Thẻ `@hàng` vì vậy luôn trỏ tới nhóm
+    so sánh thật của mã (R-A)."""
     return conn.execute(_GOI_Y_NHAC).fetchone()[0]
 
 
@@ -515,26 +529,28 @@ dt AS MATERIALIZED (
     SELECT DISTINCT z.tiep_xuc_id, z.khoa AS ma, d.ten
     FROM tx JOIN app.tiep_xuc_nhac z ON z.tiep_xuc_id = tx.id AND z.loai = 'doi_thu'
     JOIN app.doi_thu d ON d.ma = z.khoa),
-nh AS MATERIALIZED (
-    SELECT DISTINCT z.tiep_xuc_id, z.khoa, {_ten_nhom('z.khoa')} AS ten
-    FROM tx JOIN app.tiep_xuc_nhac z ON z.tiep_xuc_id = tx.id AND z.loai = 'nhom'),
+nh AS MATERIALIZED (     -- khoá nhóm HIỆN HÀNH (mart.nhom_cua_khoa, 063): 'ma:<mã>' của mã thuộc nhóm có tên -> 'n:<nhóm>'
+    SELECT DISTINCT z.tiep_xuc_id, k.khoa, {_ten_nhom('k.khoa')} AS ten
+    FROM tx JOIN app.tiep_xuc_nhac z ON z.tiep_xuc_id = tx.id AND z.loai = 'nhom'
+    CROSS JOIN LATERAL (SELECT mart.nhom_cua_khoa(z.khoa) AS khoa) k),
 ngung AS (      -- cặp (khách, mã) đã ngừng mua theo bất biến 024; view lọc theo khách nên vị từ đẩy xuống được
     SELECT h.product_code AS ma, coalesce(nullif(h.ten_hang, ''), h.product_code) AS ten, h.lan_cuoi,
-           (SELECT hom_nay FROM mart.moc_thoi_gian) - h.lan_cuoi AS so_ngay, nm.nhom_id
+           (SELECT hom_nay FROM mart.moc_thoi_gian) - h.lan_cuoi AS so_ngay,
+           mart.nhom_cua_khoa('ma:' || h.product_code) AS nhom_khoa
     FROM mart.khach_mat_hang h
-    LEFT JOIN app.nhom_so_sanh_ma nm ON nm.product_code = h.product_code
     WHERE h.customer_code = %(ma)s AND h.trang_thai_cap = 'ngung'),
-ly AS (         -- mỗi mã ngừng mua: tin MỚI NHẤT nhắc nhóm của nó (thẻ 'ma:<mã>' hoặc 'n:<nhóm của mã>')
+ly AS (         -- mỗi mã ngừng mua: tin MỚI NHẤT nhắc nhóm HIỆN HÀNH của nó (cả hai phía qua mart.nhom_cua_khoa)
     SELECT DISTINCT ON (g.ma) g.ma, g.ten, g.lan_cuoi, g.so_ngay, nh.khoa AS nhom_khoa, nh.ten AS ten_nhom,
            tx.id AS tiep_xuc_id, tx.ngay AS tin_ngay
     FROM ngung g
-    JOIN nh ON nh.khoa = 'ma:' || g.ma OR nh.khoa = 'n:' || g.nhom_id
+    JOIN nh ON nh.khoa = g.nhom_khoa
     JOIN tx ON tx.id = nh.tiep_xuc_id
     ORDER BY g.ma, tx.thoi_diem DESC, tx.id DESC)
 SELECT json_build_object(
   'tin', (SELECT coalesce(json_agg(json_build_object(
              'tiep_xuc_id', tx.id, 'ngay', tx.ngay, 'nguoi', tx.nguoi, 'noi_dung', tx.noi_dung,
-             'nhac', (SELECT coalesce(json_agg(json_build_object('loai', z.loai, 'khoa', z.khoa,
+             'nhac', (SELECT coalesce(json_agg(json_build_object('loai', z.loai,
+                             'khoa', CASE WHEN z.loai = 'nhom' THEN mart.nhom_cua_khoa(z.khoa) ELSE z.khoa END,
                              'vi_tri_dau', z.vi_tri_dau, 'do_dai', z.do_dai) ORDER BY z.vi_tri_dau), '[]')
                       FROM app.tiep_xuc_nhac z WHERE z.tiep_xuc_id = tx.id),
              'doi_thu', (SELECT coalesce(json_agg(json_build_object('ma', d.ma, 'ten', d.ten) ORDER BY d.ma), '[]')
@@ -542,11 +558,12 @@ SELECT json_build_object(
              'nhom', (SELECT coalesce(json_agg(json_build_object('khoa', h.khoa, 'ten', h.ten) ORDER BY h.khoa), '[]')
                       FROM nh h WHERE h.tiep_xuc_id = tx.id),
              'gia', (SELECT coalesce(json_agg(json_build_object('ma_doi_thu', t.ma_doi_thu, 'ten_doi_thu', d.ten,
-                             'nhom_khoa', t.nhom_khoa, 'ten_nhom', h.ten, 'gia_goc', t.gia_goc, 'don_vi_gia', t.don_vi_gia)
+                             'nhom_khoa', k.khoa, 'ten_nhom', h.ten, 'gia_goc', t.gia_goc, 'don_vi_gia', t.don_vi_gia)
                              ORDER BY t.id), '[]')
                      FROM app.gia_doi_thu_tay t
+                     CROSS JOIN LATERAL (SELECT mart.nhom_cua_khoa(t.nhom_khoa) AS khoa) k
                      JOIN app.doi_thu d ON d.ma = t.ma_doi_thu
-                     LEFT JOIN nh h ON h.tiep_xuc_id = t.tiep_xuc_id AND h.khoa = t.nhom_khoa
+                     LEFT JOIN nh h ON h.tiep_xuc_id = t.tiep_xuc_id AND h.khoa = k.khoa
                      WHERE t.tiep_xuc_id = tx.id AND t.loai_nguon = 'khach_ke'))
            ORDER BY tx.thoi_diem DESC, tx.id DESC), '[]') FROM tx),
   'ly_do_ngung', (SELECT coalesce(json_agg(json_build_object(
@@ -564,7 +581,8 @@ def khach_doi_thu(conn, ma_khach: str, hom_nay=None) -> dict:
 
     `tin`: mỗi lần tiếp xúc có thẻ `@` — đối thủ, nhóm (khoá + tên), giá khách kể kèm theo, ngày, người ghi, câu gốc,
     và `nhac` = MỌI thẻ theo thứ tự trong câu (`vi_tri_dau` tăng dần; vị trí/độ dài theo KÝ TỰ Unicode như đã lưu ở
-    `app.tiep_xuc_nhac` — giao diện đổi sang UTF-16 nếu cần tô chữ). Giao diện ghép "đối thủ gần nhất đứng trước"
+    `app.tiep_xuc_nhac` — giao diện đổi sang UTF-16 nếu cần tô chữ). Mọi khoá NHÓM trả ra (`nhac`, `nhom`, `gia`,
+    `ly_do_ngung`) là khoá HIỆN HÀNH qua `mart.nhom_cua_khoa` — thẻ đã lưu giữ nguyên như lúc ghi. Giao diện ghép "đối thủ gần nhất đứng trước"
     từ đúng danh sách này (cùng vòng lặp lúc ghi), không dò chữ trong câu.
     `ly_do_ngung`: các cặp (khách, mã) `mart.khach_mat_hang.trang_thai_cap = 'ngung'` (bất biến 024) mà nhóm của mã —
     thẻ `ma:<mã>` hoặc `n:<nhóm có tên chứa mã>` — được nhắc trong các tin trên; mỗi mã một dòng, tin MỚI NHẤT nhắc

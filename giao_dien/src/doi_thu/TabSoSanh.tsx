@@ -71,7 +71,7 @@ export function TabSoSanh({ nganh, ben, nhom, datNganh, datBen, datNhom }: Props
           <label><input type="checkbox" checked={l.chi_cung_hang} onChange={e => datL({ chi_cung_hang: e.target.checked })} /> Chỉ cùng hàng</label>
           <label><input type="checkbox" checked={l.chi_xac_nhan} onChange={e => datL({ chi_xac_nhan: e.target.checked })} /> Chỉ số đã xác nhận</label>
         </div>
-        {khongDong && <p className="dt-nhat" role="status">Chưa có giá bảng giá cho nhóm này — chỉ có tin khách kể (xem Tổng quan › Hiện trường)</p>}
+        {khongDong && <p className="dt-nhat" role="status">Chưa có giá từ bảng giá cho nhóm này — chỉ có tin khách kể (xem Tổng quan › Hiện trường)</p>}
         <div className="dt-cuon">
           <table className="bang dt-bang">
             <thead><tr><th>Nhóm</th><th>KOME</th><th>Thấp nhất</th><th>Trung vị</th><th>Cao nhất</th><th>Số bên</th><th>Vị trí KOME</th></tr></thead>

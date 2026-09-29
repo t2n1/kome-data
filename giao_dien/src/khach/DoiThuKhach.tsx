@@ -18,7 +18,7 @@ export function DoiThuKhach({ ma }: { ma: string }) {
   const mua = dongDangMua(data.tin);
   return (
     <The tieu_de="Đang mua của đối thủ" className="hs2-viec hs2-doi-thu"
-      cach_tinh="Từ thẻ @đối thủ / @hàng trong các lần ghi tiếp xúc 90 ngày qua, tin mới nhất trước. Hàng ghép với đối thủ gắn gần nhất đứng trước nó trong câu; giá là giá khách kể.">
+      cach_tinh="Từ thẻ @đối thủ / @hàng trong các lần ghi tiếp xúc 90 ngày qua, tin mới nhất trước. 90 ngày tính theo ĐỒNG HỒ THẬT (giờ Tokyo) — không theo khoảng xem đang chọn. Còn “ngừng mua bao lâu” tính tới ngày dữ liệu bán mới nhất. Hàng ghép với đối thủ gắn gần nhất đứng trước nó trong câu (câu chỉ có một đối thủ thì ghép với đối thủ đó); giá là giá khách kể.">
       <ul className="hs2-ds">
         {data.ly_do_ngung.map(l => (
           <li key={"n" + l.ma} className="ngung"><a href={`/san-pham/${encodeURIComponent(l.ma)}`}>{dongNgungMua(l)}</a></li>))}

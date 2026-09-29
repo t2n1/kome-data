@@ -116,7 +116,7 @@ export function GhiTiepXuc({ ma, kieu_tx, ket_qua_tx, lam_moi, id, gon = false, 
       {mo && (goiY.length ? (
         <ul className="hs-nhac-ds" role="listbox" id={idDs} aria-label="Gợi ý thẻ @">
           {goiY.map((m, i) => (
-            <li key={m.loai + m.khoa} id={`${idDs}-${i}`} role="option" aria-selected={i === iSang}
+            <li key={`${m.loai}|${m.khoa}|${m.nhan}`} id={`${idDs}-${i}`} role="option" aria-selected={i === iSang}
               className={i === iSang ? "sang" : undefined}
               onMouseDown={e => { e.preventDefault(); chon(m); }} onMouseEnter={() => datSang(i)}>
               <span className="hs-nhac-loai" aria-hidden="true">{m.loai === "doi_thu" ? "Đối thủ" : "Hàng"}</span>

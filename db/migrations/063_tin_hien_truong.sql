@@ -4,11 +4,17 @@
 -- (2) app.gia_doi_thu_tay.nhom_khoa: giá khách kể (loai_nguon = 'khach_ke') mang sẵn nhóm mà thẻ @hàng trỏ tới
 --     ('ma:<mã KOME>' | 'n:<id>', cùng định dạng 060) — không có bước ghép, vì sale chọn nhóm ngay trong thẻ.
 -- (3) mart.gia_doi_thu_quan_sat thay lại: thân GIỐNG HỆT 060 trừ (a) nap/tay mang thêm cột trong `nhom_ke`
---     (nap: NULL, tay: t.nhom_khoa) và (b) `nhom_khoa` = coalesce(nhom_ke, biểu thức cũ), `ten_nhom` của nhom_ke lấy
+--     (nap: NULL, tay: mart.nhom_cua_khoa(t.nhom_khoa) — xem (4)) và (b) `nhom_khoa` = coalesce(nhom_ke, biểu thức cũ), `ten_nhom` của nhom_ke lấy
 --     tên nhóm có tên hoặc tên hàng KOME. Danh sách/thứ tự cột RA không đổi (CREATE OR REPLACE VIEW), nên
 --     mart.gia_doi_thu_hien_hanh / so_sanh_nhom (060, 062) đọc lại được không cần tạo lại.
 --     Tin khách kể vẫn ngoài trung vị (`loai_nguon <> 'khach_ke'` ở 060/062) và ma_hang_dt = 'ke:<khách>:<nhóm>'
 --     nên phân vùng `hien_hanh` của 060 tách theo (khách, bên, nhóm): tin trùng → mới nhất; hai khách không đè nhau.
+-- (4) mart.nhom_cua_khoa(khoa): khoá nhóm HIỆN HÀNH của một khoá đã lưu — 'ma:<mã>' mà mã đó nằm trong một
+--     nhóm có tên (app.nhom_so_sanh_ma) -> 'n:<nhóm>'; còn lại giữ nguyên. Giải LÚC ĐỌC (thẻ và giá đã lưu giữ
+--     nguyên như lúc ghi — sổ chỉ thêm), nên đổi thành viên nhóm sau này thì mọi chỗ đi theo. ĐỊNH NGHĨA MỘT LẦN:
+--     view (3) và mọi truy vấn gộp / đếm thẻ `@` (kome/doi_thu.py) gọi hàm này, không tự chép CASE.
+--     Không có nó, giá khách kể gắn `@<mã>` của một mã thuộc nhóm có tên nằm ở nhóm ngầm định 'ma:<mã>' — không
+--     so với các bên cùng nhóm (không bao giờ bất thường), không lên So sánh giá, Hiện trường đếm thành hai món.
 -- 059–062 đã chạy trên CSDL thật — không sửa. Chạy bằng `postgres` qua `python db/migrate.py` (không SQL Editor — bẫy RLS, 061).
 
 CREATE TABLE app.tiep_xuc_nhac (
@@ -27,6 +33,12 @@ REVOKE UPDATE, DELETE ON app.tiep_xuc_nhac FROM kome_app;
 GRANT SELECT ON app.tiep_xuc_nhac TO kome_report, kome_ingest;
 
 ALTER TABLE app.gia_doi_thu_tay ADD COLUMN nhom_khoa text;   -- giá khách kể: nhóm mà thẻ @hàng trỏ tới
+
+CREATE FUNCTION mart.nhom_cua_khoa(p_khoa text) RETURNS text LANGUAGE sql STABLE AS $$
+    SELECT coalesce((SELECT 'n:' || nm.nhom_id FROM app.nhom_so_sanh_ma nm
+                     WHERE left(p_khoa, 3) = 'ma:' AND nm.product_code = substr(p_khoa, 4)), p_khoa)
+$$;
+GRANT EXECUTE ON FUNCTION mart.nhom_cua_khoa(text) TO kome_app, kome_report, kome_ingest;
 
 CREATE OR REPLACE VIEW mart.gia_doi_thu_quan_sat AS
 WITH dc AS (
@@ -70,7 +82,7 @@ tay AS (
            'tay'::text, NULL::text, NULL::text, t.ten_goc, t.quy_cach_goc, t.gia_goc, t.don_vi_gia,
            t.kg_moi_don_vi_gia, t.thue, t.gom_ship, t.kenh_gia, t.muc_gia, NULL::text, NULL::numeric,
            t.trang_thai, NULL::text, t.loai_nguon, t.ghi_chu_nguon,
-           NULL::text, NULL::text, 'nhap_tay'::text, t.nhom_khoa
+           NULL::text, NULL::text, 'nhap_tay'::text, mart.nhom_cua_khoa(t.nhom_khoa)
     FROM app.gia_doi_thu_tay t
 ),
 tat AS (SELECT * FROM nap UNION ALL SELECT * FROM tay),

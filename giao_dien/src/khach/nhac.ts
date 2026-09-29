@@ -22,7 +22,8 @@ export const DON_VI_CHON = ["kg", "goi", "thung"] as const;
 
 const DAI = (t: The) => t.nhan.length + 1;
 const gon = (s: string) => boDau(s).replace(/\s+/g, "");
-const CHU = /[\p{L}\p{N}_]/u;
+// `@` dính sau chữ/số LATIN (a@b — kiểu email) không mở gợi ý; sau kanji/kana (田中さん@THAK) hay dấu câu thì mở.
+const CHU = /[A-Za-z0-9_]/;
 const TU_TOI_DA = 40;
 
 /** Từ đang gõ sau `@` tại con trỏ: `{dau: vị trí của @, tu}` — hoặc null khi con trỏ không nằm trong một
@@ -44,9 +45,10 @@ export function dsGoiY(api: GoiYApi): MucGoiY[] {
   return [
     ...api.doi_thu.map(d => ({ loai: "doi_thu" as const, khoa: d.ma, nhan: d.ma, phu: d.ten, tim: gon(d.ma + " " + d.ten) })),
     ...api.hang.map(h => {
-      const ma = h.khoa.startsWith("ma:") ? h.khoa.slice(3) : "";
-      return { loai: "nhom" as const, khoa: h.khoa, nhan: h.ten || ma || h.khoa,
-               phu: h.loai === "nhom" ? "nhóm" : `mã ${ma}`, tim: gon(h.ten + " " + ma) };
+      // Mã thuộc nhóm có tên: khoá là NHÓM (máy chủ đã giải), nhãn vẫn là tên hàng — sale gõ tên hàng.
+      const ma = h.ma ?? (h.khoa.startsWith("ma:") ? h.khoa.slice(3) : "");
+      const phu = h.loai === "nhom" ? "nhóm" : `mã ${ma}` + (h.ten_nhom ? ` · thuộc nhóm ${h.ten_nhom}` : "");
+      return { loai: "nhom" as const, khoa: h.khoa, nhan: h.ten || ma || h.khoa, phu, tim: gon(h.ten + " " + ma) };
     })];
 }
 
@@ -189,8 +191,8 @@ export function dongDangMua(tin: TinDoiThu[], toi_da = 8): string[] {
   return ra.slice(0, toi_da);
 }
 
-/** "Đã ngừng mua <mã> — tin 12/09: đang lấy của THAK". */
+/** "Đã ngừng mua <mã> (40 ngày chưa mua) — tin 12/09: đang lấy của THAK". Số ngày = mốc dữ liệu − lần mua cuối. */
 export function dongNgungMua(l: LyDoNgung): string {
   const dt = l.doi_thu.map(d => d.ma).join(", ");
-  return `Đã ngừng mua ${l.ten || l.ma} — tin ${ngay_ngan(l.tin_ngay)}` + (dt ? `: đang lấy của ${dt}` : " có nhắc tới mã này");
+  return `Đã ngừng mua ${l.ten || l.ma} (${l.so_ngay} ngày chưa mua) — tin ${ngay_ngan(l.tin_ngay)}` + (dt ? `: đang lấy của ${dt}` : " có nhắc tới mã này");
 }

@@ -344,6 +344,10 @@ def doc_bieu_mau(kieu: str, ket_qua: str, noi_dung: str, hen_lai: str) -> tuple:
         raise LoiNhap("Ghi lại nội dung trao đổi — một dòng trống không nói được gì cho người sau.")
     if len(noi_dung) > DO_DAI_NOI_DUNG:
         raise LoiNhap(f"Nội dung dài quá {DO_DAI_NOI_DUNG} ký tự.")
+    try:        # JSON cho phép nửa cặp UTF-16 lẻ loi (U+D800…U+DFFF) -> str không mã hoá UTF-8 được -> 500 ở psycopg
+        noi_dung.encode("utf-8")
+    except UnicodeEncodeError:
+        raise LoiNhap("Nội dung có ký tự không hợp lệ (nửa ký tự UTF-16) — gõ hoặc dán lại câu.") from None
     hen = None
     if hen_lai:
         try:

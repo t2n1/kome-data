@@ -35,7 +35,8 @@ export type NhomQuyCach = { nhom: NhomCoTen[]; quy_cach: QuyCach[] };
 // ---- Đợt 2 — tin hiện trường `@` (kome/doi_thu.py: goi_y_nhac, khach_doi_thu, ho_so_ben, tong_quan) ----
 /** GET /api/doi-thu/goi-y-nhac — đối thủ đang theo dõi + nhóm có tên (`n:<id>`) rồi mã KOME (`ma:<mã>`). */
 export type GoiYApi = { doi_thu: { ma: string; ten: string }[];
-                        hang: { khoa: string; ten: string; loai: "nhom" | "ma" }[] };
+                        // Mã (`loai = 'ma'`) mang `ma`; mã thuộc nhóm có tên có khoá NHÓM `n:<id>` + `ten_nhom` (mart.nhom_cua_khoa).
+                        hang: { khoa: string; ten: string; loai: "nhom" | "ma"; ma?: string; ten_nhom?: string }[] };
 export type GiaKhachKe = { ma_doi_thu: string; ten_doi_thu: string | null; nhom_khoa: string; ten_nhom: string | null;
                            gia_goc: number; don_vi_gia: string };
 /** Đơn vị giá máy chủ nhận (kome/doi_thu.py, mã không dấu) → nhãn in ra. Dùng chung ô ghi tiếp xúc và các khối đọc. */

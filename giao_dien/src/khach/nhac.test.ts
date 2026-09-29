@@ -25,8 +25,14 @@ describe("tuDangGo — từ đang gõ sau @ tại con trỏ", () => {
   it("gặp khoảng trắng giữa @ và con trỏ: không còn gõ thẻ", () => {
     expect(tuDangGo("Khách nói @th ak", 16, [])).toBeNull();
   });
-  it("@ dính sau chữ (email) không mở gợi ý", () => {
+  it("@ dính sau chữ/số latin (email) không mở gợi ý", () => {
     expect(tuDangGo("mail a@b", 8, [])).toBeNull();
+    expect(tuDangGo("x9@b", 4, [])).toBeNull();
+  });
+  it("@ ngay sau kanji / kana / dấu câu vẫn mở gợi ý", () => {
+    expect(tuDangGo("田中さん@TH", 7, [])).toEqual({ dau: 4, tu: "TH" });
+    expect(tuDangGo("ラーメン@", 5, [])).toEqual({ dau: 4, tu: "" });
+    expect(tuDangGo("(@TH", 4, [])).toEqual({ dau: 1, tu: "TH" });
   });
   it("con trỏ ngay sau một thẻ đã chọn: không mở lại gợi ý", () => {
     expect(tuDangGo("@THAK", 5, [dt("THAK", 0)])).toBeNull();
@@ -55,6 +61,16 @@ describe("dsGoiY / locGoiY — lọc không dấu, đối thủ trước", () =>
   it("khớp theo mã: 'nt01' và tên đối thủ 'viet'", () => {
     expect(locGoiY(DS, "nt01").map(m => m.khoa)).toEqual(["ma:NT01"]);
     expect(locGoiY(DS, "viet").map(m => m.khoa)).toEqual(["VIFO"]);
+  });
+  it("mã thuộc nhóm có tên: khoá NHÓM, nhãn tên hàng, chữ phụ 'thuộc nhóm'", () => {
+    const ds = dsGoiY({ doi_thu: [], hang: [{ khoa: "n:5", ten: "Nhóm cá", loai: "nhom" },
+      { khoa: "n:5", ten: "Ca tra phi le", loai: "ma", ma: "NT05", ten_nhom: "Nhóm cá" },
+      { khoa: "ma:NT01", ten: "Basa", loai: "ma", ma: "NT01" }] });
+    const m = locGoiY(ds, "catra")[0];
+    expect(m).toMatchObject({ loai: "nhom", khoa: "n:5", nhan: "Ca tra phi le", phu: "mã NT05 · thuộc nhóm Nhóm cá" });
+    expect(locGoiY(ds, "nt05").map(x => x.khoa)).toEqual(["n:5"]);
+    expect(chenThe("@ca", 0, 3, m).the).toEqual({ loai: "nhom", khoa: "n:5", nhan: "Ca tra phi le", vi_tri_dau: 0 });
+    expect(ds[2].phu).toBe("mã NT01");
   });
   it("khớp đầu từ xếp trước khớp giữa, nhưng đối thủ vẫn trước hàng", () => {
     const ds = dsGoiY({ doi_thu: [{ ma: "ACA", ten: "A ca" }], hang: [{ khoa: "n:1", ten: "Xa ca", loai: "nhom" },
@@ -196,10 +212,10 @@ describe("ghepTin / dòng hiển thị của hồ sơ khách", () => {
   it("lý do ngừng mua", () => {
     expect(dongNgungMua({ ma: "NT01", ten: "Basa", nhom_khoa: "ma:NT01", ten_nhom: "Basa", lan_cuoi: "2026-06-21", so_ngay: 40,
       tiep_xuc_id: 1, tin_ngay: "2026-09-12", doi_thu: [{ ma: "THAK", ten: "THAK JSC" }] }))
-      .toBe("Đã ngừng mua Basa — tin 12/09: đang lấy của THAK");
+      .toBe("Đã ngừng mua Basa (40 ngày chưa mua) — tin 12/09: đang lấy của THAK");
     expect(dongNgungMua({ ma: "NT01", ten: "Basa", nhom_khoa: "ma:NT01", ten_nhom: "Basa", lan_cuoi: "2026-06-21", so_ngay: 40,
       tiep_xuc_id: 1, tin_ngay: "2026-09-12", doi_thu: [] }))
-      .toBe("Đã ngừng mua Basa — tin 12/09 có nhắc tới mã này");
+      .toBe("Đã ngừng mua Basa (40 ngày chưa mua) — tin 12/09 có nhắc tới mã này");
   });
 });
 
