@@ -717,6 +717,96 @@ def tao_api(open_app_conn) -> APIRouter:
         return _chup(request, KHOA_MUA_VU, MV.du_lieu,
                      "Không đọc được dữ liệu mùa vụ.", chi_nap=True)
 
+    # ---- Thị trường & đối thủ (059–060) --------------------------------
+    # Đọc app (đính chính, giá tay, ghép) -> phiên bản ĐẦY ĐỦ (không chi_nap). Theo mốc của khoảng xem.
+    def _dt_doc(request, goc, tinh, thang, ky, tu, den, loi, **them):
+        try:
+            ts = _ts(request, thang, ky, tu, den).chinh()
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        return _chup(request, _khoa(goc, **them, **ts.khoa()), _voi_moc(ts, tinh), loi)
+
+    @r.get("/doi-thu/tong-quan")
+    def dt_tong_quan(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        from kome import doi_thu as DT
+        return _dt_doc(request, "doi-thu/tong-quan", DT.tong_quan, thang, ky, tu, den, "Không đọc được tổng quan thị trường.")
+
+    @r.get("/doi-thu/so-sanh")
+    def dt_so_sanh(request: Request, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        from kome import doi_thu as DT
+        return _dt_doc(request, "doi-thu/so-sanh", DT.so_sanh, thang, ky, tu, den, "Không đọc được bảng so sánh.")
+
+    @r.get("/doi-thu/ben/{ma}")
+    def dt_ben(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        """Không có đối thủ này -> {"khong_co": true} (200), giao diện nói rõ; không để _chup biến nó thành 500."""
+        from kome import doi_thu as DT
+        return _dt_doc(request, "doi-thu/ben", lambda c: DT.ho_so_ben(c, ma) or {"khong_co": True},
+                       thang, ky, tu, den, "Không đọc được hồ sơ đối thủ.", ma=ma)
+
+    @r.get("/doi-thu/duyet")
+    def dt_duyet(request: Request, ben: str = "", loc: str = "", thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        from kome import doi_thu as DT
+        return _dt_doc(request, "doi-thu/duyet", lambda c: DT.duyet(c, ben, loc), thang, ky, tu, den,
+                       "Không đọc được danh sách duyệt.", ben=ben, loc=loc)
+
+    @r.get("/san-pham/{ma}/doi-thu")
+    def sp_doi_thu(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
+        from kome import doi_thu as DT
+        return _dt_doc(request, "san-pham/doi-thu", lambda c: {"nhom": DT.khoi_san_pham(c, ma)},
+                       thang, ky, tu, den, "Không đọc được giá đối thủ.", ma=ma)
+
+    async def _dt_ghi(request: Request, lam):
+        from kome import doi_thu as DT
+        if not request.headers.get("content-type", "").startswith("application/json"):
+            return _loi("Chỉ nhận JSON.", 415)
+        try:
+            b = await request.json()
+        except Exception:
+            return _loi("Thân yêu cầu không phải JSON.", 400)
+        nguoi = getattr(request.state, "nguoi", None)
+        try:
+            with open_app_conn() as conn:
+                ra = lam(conn, b, nguoi.id if nguoi else None)
+                conn.commit()
+        except (DT.LoiNhap, KeyError, TypeError, ValueError) as e:
+            return _loi(str(e) if isinstance(e, DT.LoiNhap) else "Thiếu hoặc sai trường dữ liệu.", 400)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không ghi được.")
+        return JSONResponse({"ok": True, **(ra or {})})
+
+    @r.post("/doi-thu/xac-nhan")
+    async def dt_xac_nhan(request: Request):
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.xac_nhan(c, int(b["fact_id"]), n))
+
+    @r.post("/doi-thu/sua")
+    async def dt_sua(request: Request):
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.sua(c, int(b["fact_id"]), dict(b["thay_doi"]), n))
+
+    @r.post("/doi-thu/gia-moi")
+    async def dt_gia_moi(request: Request):
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: {"id": DT.gia_moi(c, dict(b), n)})
+
+    @r.post("/doi-thu/ghep")
+    async def dt_ghep(request: Request):
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.dat_ghep(
+            c, str(b["ma_doi_thu"]), str(b["ma_hang_dt"]), b.get("product_code"), b.get("nhom_id"), str(b["nhan"]), n))
+
+    @r.post("/doi-thu/nhom")
+    async def dt_nhom(request: Request):
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: {"id": DT.tao_nhom(c, str(b["ten"]), list(b.get("ma_kome") or []), n)})
+
+    @r.post("/doi-thu/quy-cach")
+    async def dt_quy_cach(request: Request):
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.sua_quy_cach(
+            c, str(b["product_code"]), b.get("kg_moi_goi"), b.get("goi_moi_thung"), b.get("kg_moi_thung"), n))
+
     @r.get("/san-pham/{ma}/nen-chao")
     def sp_nen_chao(request: Request, ma: str, thang: str = "", ky: str = "", tu: str = "", den: str = ""):
         """Khách nên chào mã này (≤ 50 + tổng) — cột trái "Việc với mã này" và tab Tồn & bán

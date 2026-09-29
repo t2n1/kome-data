@@ -6,6 +6,7 @@ import { The } from "../../khach/HoSoTab";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../../khung/khoang";
 import { ngay, so, so_luong as soLuong, yen } from "../../dinh_dang";
 import type { HoSoMaApi, NenChaoApi } from "./kieu";
+import { KhoiDoiThu } from "./KhoiDoiThu";
 
 const lk = (ma: string) => giuKhoang(`/khach-hang/${encodeURIComponent(ma)}`);
 
@@ -65,5 +66,7 @@ export function ViecVoiMa({ h, moTab }: { h: HoSoMaApi["h"]; moTab: (t: string) 
         {!h.ngung_ban && nc.data && nc.data.t.tong > 5 && <button type="button" className="hs2-lien-ket" onClick={() => moTab("ban_them")}>
           Xem hết {nc.data.t.tong} khách ›</button>}
       </The>
+
+      <KhoiDoiThu ma={sp.ma} />
     </aside>);
 }

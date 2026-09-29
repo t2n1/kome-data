@@ -407,7 +407,7 @@ def test_man_nap_va_so_do_nguon_bo_nguon_chua_dung(conn, test_db_url):
     đều không có chúng."""
     client = TestClient(create_app(db_url=test_db_url))
     for url in ("/kho-du-lieu/nap", "/kho-du-lieu"):
-        assert [n["ma"] for n in man(client.get(url).text)["nguon"]] == ["ban", "ton", "khach", "sp", "giao"], url
+        assert [n["ma"] for n in man(client.get(url).text)["nguon"]] == ["ban", "ton", "khach", "sp", "giao", "doi_thu"], url
     cot = [d["khoa"] for d in man(client.get("/kho-du-lieu").text)["phu"]["dong"]]
     assert not {"shiiresaki", "tanka", "seikyu_motocho"} & set(cot)
     assert kd(client.get("/").text)["tinh_nang"]["cong_no"] is False

@@ -81,6 +81,7 @@ COT = [
     CotLoaiFile("Giao", "chokusousaki", "直送先", "điểm giao thẳng"),
     CotLoaiFile("Gia", "tanka", "取引単価データ", "bảng giá"),
     CotLoaiFile("No", "seikyu_motocho", "請求先元帳", "sổ công nợ, ô có khi tháng nằm trong kỳ của một lô"),
+    CotLoaiFile("DT", "doi_thu_gia", "Bảng giá đối thủ", "bảng giá đối thủ (không phải OBC), ô có khi tháng có gói"),
 ]
 
 # Cột của bảng phủ trên màn Kho dữ liệu: bỏ nguồn công ty chưa dùng

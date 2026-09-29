@@ -382,3 +382,46 @@ seikyu_motocho:
   qty_columns: []
   rate_columns: []
   date_columns: [entry_date]
+
+# Thị trường & đối thủ (đặc tả 2026-09-29-thi-truong-doi-thu-design.md §4.1). KHÔNG phải file OBC:
+# gói do scripts/goi_doi_thu.py dựng từ bảng giá / web đối thủ. Tên cột = tên hệ thống.
+# warn_row_drop_ratio 0: tháng này 19 bên, tháng sau 5 bên cập nhật — số dòng "sụt" là bình thường.
+# jan / ma_kome_de_xuat KHÔNG vào code_columns: cổng 3 chặn cột mã trống toàn bộ, mà nhiều gói không có JAN.
+doi_thu_gia:
+  display_name: Bảng giá đối thủ
+  core_table: core.fact_gia_doi_thu
+  filename_pattern: '^doi_thu_gia_(?P<date>\d{8})\.xlsx$'
+  sheet: gia
+  header_row: 1
+  min_rows: 1
+  keys: [ma_dong]
+  columns: {ma_dong: ma_dong, ma_doi_thu: ma_doi_thu, ma_hang_dt: ma_hang_dt, ngay_nguon: ngay_nguon,
+            hinh_thuc_nguon: hinh_thuc_nguon, nguon_file: nguon_file, vi_tri: vi_tri, ten_goc: ten_goc,
+            ten_nhat: ten_nhat, jan: jan, quy_cach_goc: quy_cach_goc, gia_goc: gia_goc, don_vi_gia: don_vi_gia,
+            kg_moi_don_vi_gia: kg_moi_don_vi_gia, thue: thue, gom_ship: gom_ship, kenh_gia: kenh_gia,
+            muc_gia: muc_gia, gia_bac: gia_bac, gia_truoc_km: gia_truoc_km, trang_thai: trang_thai,
+            han_su_dung: han_su_dung, khuyen_mai: khuyen_mai, ma_kome_de_xuat: ma_kome_de_xuat,
+            nhan_de_xuat: nhan_de_xuat, ly_do_ghep: ly_do_ghep, do_chac: do_chac, ghi_chu: ghi_chu}
+  code_columns: [ma_dong, ma_doi_thu, ma_hang_dt]
+  money_columns: []
+  qty_columns: []
+  date_columns: [ngay_nguon]
+  required_date_columns: [ngay_nguon]
+  warn_row_drop_ratio: 0
+
+doi_thu_dieu_kien:
+  display_name: Điều kiện bán của đối thủ
+  core_table: core.fact_dieu_kien_doi_thu
+  filename_pattern: '^doi_thu_dieu_kien_(?P<date>\d{8})\.xlsx$'
+  sheet: dieu_kien
+  header_row: 1
+  min_rows: 1
+  keys: [ma_dong]
+  columns: {ma_dong: ma_dong, ma_doi_thu: ma_doi_thu, ngay_nguon: ngay_nguon, nguon_file: nguon_file,
+            vi_tri: vi_tri, loai: loai, noi_dung: noi_dung}
+  code_columns: [ma_dong, ma_doi_thu]
+  money_columns: []
+  qty_columns: []
+  date_columns: [ngay_nguon]
+  required_date_columns: [ngay_nguon]
+  warn_row_drop_ratio: 0

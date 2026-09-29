@@ -73,6 +73,8 @@ BANG_THEO_LOAI = {
     "chokusousaki": ["core.dim_shipto"],
     "tanka": ["core.fact_price_list"],
     "seikyu_motocho": ["core.fact_ar_ledger"],
+    "doi_thu_gia": ["core.fact_gia_doi_thu"],
+    "doi_thu_dieu_kien": ["core.fact_dieu_kien_doi_thu"],
 }
 
 # Tên bảng bằng tiếng Việt cho người vận hành. Không in tên bảng SQL lên màn
@@ -90,6 +92,8 @@ TEN_BANG_VI = {
     "chokusousaki": "bảng điểm giao thẳng",
     "tanka": "bảng giá",
     "seikyu_motocho": "sổ công nợ",
+    "doi_thu_gia": "bảng giá đối thủ",
+    "doi_thu_dieu_kien": "điều kiện bán của đối thủ",
 }
 
 
