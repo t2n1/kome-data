@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { gui, lay } from "../api";
 import type { NhomQuyCach, TongQuan } from "./kieu";
 import { nhomIdHopLe } from "./loc";
@@ -29,29 +29,35 @@ const NHAN_HANG_MOI: [keyof typeof HANG_MOI_TRONG, string][] = [["ten_goc", "Tê
   ["don_vi_gia", "Đơn vị giá"], ["kg_moi_don_vi_gia", "Kg / đơn vị giá"], ["ghi_chu_nguon", "Ghi chú nguồn"]];
 
 /** Một dòng "Thư mục Drive tháng …": link đã lưu (nút mở + đổi) hoặc ô dán link (đặc tả §11.1). */
+const NGUON_TRONG = { loai_nguon: "", ghi_chu_nguon: "", lien_ket_bang_chung: "" };
+
 function ThuMucThang({ thang, hien, xong }: { thang: string; hien: string | null; xong: () => void }) {
   const [sua, datSua] = useState(false);
   const [gt, datGt] = useState("");
   const [loi, datLoi] = useState<string | null>(null);
   const [dang, datDang] = useState(false);
+  const [daLuu, datDaLuu] = useState<string | null>(null);   // link vừa lưu — giữ hiện tới khi truy vấn lại về
+  useEffect(() => { datDaLuu(null); }, [hien]);
+  const co = daLuu ?? hien;
   const nhan = nhanThang(thang);
   const luu = () => {
     if (dang) return;
     datDang(true);
-    gui("/api/doi-thu/thu-muc", { thang, lien_ket: gt.trim() })
-      .then(() => { datSua(false); datGt(""); datLoi(null); xong(); })
+    const lk = gt.trim();
+    gui("/api/doi-thu/thu-muc", { thang, lien_ket: lk })
+      .then(() => { datDaLuu(lienKetAnToan(lk)); datSua(false); datGt(""); datLoi(null); xong(); })
       .catch((e: Error) => datLoi(e.message)).finally(() => datDang(false));
   };
   return (
     <p className="dt-thu-muc">Thư mục Drive {nhan}:{" "}
-      {hien && !sua ? <>
-        <Ra href={hien}>Mở thư mục ↗</Ra>{" "}
-        <button type="button" className="chip" aria-label={`Đổi link thư mục Drive ${nhan}`} onClick={() => { datGt(hien); datSua(true); }}>đổi</button>
+      {co && !sua ? <>
+        <Ra href={co}>Mở thư mục ↗</Ra>{" "}
+        <button type="button" className="chip" aria-label={`Đổi link thư mục Drive ${nhan}`} onClick={() => { datGt(co); datSua(true); }}>đổi</button>
       </> : <>
         <input type="url" aria-label={`Link thư mục Drive ${nhan}`} placeholder="https://drive.google.com/…" value={gt}
           onChange={e => datGt(e.target.value)} />{" "}
-        <button type="button" className="chip" disabled={dang || !gt.trim()} onClick={luu}>Lưu</button>
-        {hien && <> <button type="button" className="chip" onClick={() => { datSua(false); datLoi(null); }}>Bỏ</button></>}
+        <button type="button" className="chip" aria-label={`Lưu link thư mục ${nhan}`} disabled={dang || !gt.trim()} onClick={luu}>Lưu</button>
+        {co && <> <button type="button" className="chip" aria-label={`Bỏ sửa link thư mục ${nhan}`} onClick={() => { datSua(false); datLoi(null); }}>Bỏ</button></>}
       </>}
       {loi && <span role="alert" className="dt-loi"> {loi}</span>}
     </p>);
@@ -65,7 +71,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const q = useQuery({ queryKey: ["doi-thu", "duyet", ben, loc, kx], queryFn: () => lay<{ dong: QuanSat[] }>(url) });
   const [chon, datChon] = useState<QuanSat | null>(null);
   const [sua, datSua] = useState<Record<string, string>>({});
-  const [nguon, datNguon] = useState({ loai_nguon: "", ghi_chu_nguon: "", lien_ket_bang_chung: "" });
+  const [nguon, datNguon] = useState(NGUON_TRONG);
   const [maKome, datMaKome] = useState("");
   const [loi, datLoi] = useState<string | null>(null);          // lỗi của khung sửa / ghép dòng đang chọn
   const [loiThem, datLoiThem] = useState<string | null>(null);  // lỗi của form thêm hàng
@@ -80,7 +86,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const nhomCoTen = nq.data?.nhom ?? [];
   const nhomChon = nhomIdHopLe(nhomCoTen, nhomId);  // chỉ nhóm CÓ trong ô chọn mới được gửi
   const tenBen = tq.data?.ben.find(b => b.ma === ben)?.ten ?? ben;
-  const xong = () => { datChon(null); datSua({}); datLoi(null); datMaKome(""); datNhomId(""); qc.invalidateQueries({ queryKey: ["doi-thu"] }); };
+  const xong = () => { datChon(null); datSua({}); datNguon(NGUON_TRONG); datLoi(null); datMaKome(""); datNhomId(""); qc.invalidateQueries({ queryKey: ["doi-thu"] }); };
   // Chống bấm đúp: mọi nút ghi khoá tới khi yêu cầu xong (thành công hay lỗi).
   const lam = (gui_di: () => Promise<unknown>, sau: () => void = xong, datL = datLoi) => {
     if (dang_gui) return;
@@ -113,7 +119,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
                 <label key={k}>{{ thue: "Thuế", gom_ship: "Ship", trang_thai: "Trạng thái" }[k]}
                   <select value={moi[k]} onChange={e => datMoi({ ...moi, [k]: e.target.value })}>
                     {CHON[k]!.map(([m, t]) => <option key={m} value={m}>{t}</option>)}</select></label>))}
-              <label>Link bằng chứng<input type="url" aria-label="Link bằng chứng" placeholder="Link bằng chứng (tuỳ chọn) — ảnh trên Drive"
+              <label>Link bằng chứng (hàng thêm)<input type="url" placeholder="Link bằng chứng (tuỳ chọn) — ảnh trên Drive"
                 value={moi.lien_ket_bang_chung} onChange={e => datMoi({ ...moi, lien_ket_bang_chung: e.target.value })} /></label>
               <label>Loại nguồn<select value={moi.loai_nguon} onChange={e => datMoi({ ...moi, loai_nguon: e.target.value })}>
                 <option value="">— loại nguồn (bắt buộc) —</option>
@@ -130,7 +136,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
             </fieldset>)}
           <ul className="dt-ds dt-chon">{q.data?.dong.map(x => (
             <li key={x.nguon + x.id}><button type="button" aria-pressed={chon?.id === x.id && chon.nguon === x.nguon}
-              onClick={() => { datChon(x); datSua({}); datLoi(null); datMaKome(x.ma_kome ?? "");
+              onClick={() => { datChon(x); datSua({}); datNguon(NGUON_TRONG); datLoi(null); datMaKome(x.ma_kome ?? "");
                 datNhomId(x.nhom_khoa?.startsWith("n:") ? x.nhom_khoa.slice(2) : ""); }}>
               <b>{x.ma_doi_thu}</b> · {x.ten_goc} · {x.gia_goc != null ? yen(x.gia_goc) : "—"}/{x.don_vi_gia ?? "?"} ·{" "}
               {NHAN_DUYET[x.trang_thai_duyet]}{x.bat_thuong ? " · bất thường" : ""}</button></li>))}</ul>
@@ -161,7 +167,7 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
                 {LOAI_NGUON.map(([m, n]) => <option key={m} value={m}>{n}</option>)}</select>
               <input placeholder="Ghi chú nguồn (Zalo 29/9, hoá đơn khách …)" aria-label="Ghi chú nguồn" value={nguon.ghi_chu_nguon}
                 onChange={e => datNguon({ ...nguon, ghi_chu_nguon: e.target.value })} />
-              <input type="url" aria-label="Link bằng chứng" placeholder="Link bằng chứng (tuỳ chọn) — ảnh trên Drive" value={nguon.lien_ket_bang_chung}
+              <input type="url" aria-label="Link bằng chứng (giá đã đổi)" placeholder="Link bằng chứng (tuỳ chọn) — ảnh trên Drive" value={nguon.lien_ket_bang_chung}
                 onChange={e => datNguon({ ...nguon, lien_ket_bang_chung: e.target.value })} />
               <button type="button" className="chip" disabled={dang_gui || !nguon.loai_nguon || !sua.gia_goc}
                 onClick={() => lam(() => gui("/api/doi-thu/gia-moi", { fact_goc_id: chon.id, ...sua, ...nguon }))}>Lưu giá mới</button>

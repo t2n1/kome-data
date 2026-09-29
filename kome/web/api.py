@@ -786,6 +786,8 @@ def tao_api(open_app_conn) -> APIRouter:
             b = await request.json()
         except Exception:
             return _loi("Thân yêu cầu không phải JSON.", 400)
+        if not isinstance(b, dict):
+            return _loi("Thân yêu cầu phải là một đối tượng JSON.", 400)
         nguoi = getattr(request.state, "nguoi", None)
         try:
             with open_app_conn() as conn:

@@ -163,7 +163,7 @@ KHOA_NHOM = re.compile(r"(ma:[^\s\x00-\x1f\x7f\ud800-\udfff]+|n:[0-9]{1,15})")
 
 LIEN_KET_TOI_DA = 2000
 _LIEN_KET = re.compile(r"https://[^\s\x00-\x1f\x7f\ud800-\udfff]+")
-_THANG = re.compile(r"(\d{4})-(0[1-9]|1[0-2])")
+_THANG = re.compile(r"(19|20)\d{2}-(0[1-9]|1[0-2])")  # Postgres không có năm 0; 1900–2099
 
 
 def kiem_lien_ket(v, ten: str):

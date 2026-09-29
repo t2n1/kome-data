@@ -683,7 +683,7 @@ def test_dat_thu_muc_upsert_va_ghi_nhat_ky(conn):
                   ({"lien_ket": "https://drive.google.com/a"}, {"lien_ket": "https://drive.google.com/b"})]
 
 
-@pytest.mark.parametrize("thang", ["2026-13", "2026-8", "08-2026", "", None, 202608])
+@pytest.mark.parametrize("thang", ["2026-13", "2026-8", "08-2026", "", None, 202608, "0000-01", "1899-12", "2100-01"])
 def test_dat_thu_muc_thang_sai_dang(conn, thang):
     from kome import doi_thu as DT
     with pytest.raises(DT.LoiNhap):

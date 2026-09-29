@@ -234,9 +234,16 @@ def test_ho_so_ben_va_tong_quan_co_khoi_moi_qua_api(conn, batch, test_db_url):
 def test_post_thu_muc_ghi_va_phien_ban_doi(conn, batch, test_db_url):
     _nen(conn, batch)
     c = _web(test_db_url)
+    from kome.web import anh_chup as AC
+    pb = lambda: conn.execute(f"SELECT {AC._PHIEN_BAN}").fetchone()[0]
+    conn.commit()
+    truoc = pb()
     r = c.post("/api/doi-thu/thu-muc", json={"thang": "2026-07", "lien_ket": "https://drive.google.com/t7"})
     assert r.status_code == 200 and r.json()["ok"] is True
+    conn.commit()
+    assert pb() != truoc, "lưu link thư mục phải làm đổi phiên bản ảnh chụp"
     dong = c.get("/api/doi-thu/duyet").json()["dong"]
+    assert dong
     assert all(d["lien_ket_thu_muc"] == "https://drive.google.com/t7" for d in dong if d["nguon"] == "nap")
 
 
@@ -245,6 +252,14 @@ def test_post_thu_muc_ghi_va_phien_ban_doi(conn, batch, test_db_url):
 def test_post_thu_muc_sai_tra_400(conn, batch, test_db_url, than):
     c = _web(test_db_url)
     r = c.post("/api/doi-thu/thu-muc", json=than)
+    assert r.status_code == 400 and "loi" in r.json()
+
+
+@pytest.mark.parametrize("url", ["/api/doi-thu/thu-muc", "/api/doi-thu/gia-moi"])
+@pytest.mark.parametrize("than", [[], "x", 5])
+def test_post_than_khong_phai_doi_tuong_tra_400(test_db_url, url, than):
+    c = _web(test_db_url)
+    r = c.post(url, json=than)
     assert r.status_code == 400 and "loi" in r.json()
 
 
