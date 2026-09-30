@@ -321,3 +321,17 @@ def test_api_co_cong_khong_co_co_kho_du_lieu_thi_403(conn, khach):
     _vao(c)
     assert c.get("/api/kho-du-lieu/bang-du-lieu?loai=sp").status_code == 403
     assert c.post("/api/kho-du-lieu/bang-du-lieu/luu", json={"loai": "sp", "o": []}).status_code == 403
+
+
+def test_giao_dien_man_bang_du_lieu_noi_dung_nguon():
+    """Màn React (Task 6): thanh trái có mục, main.tsx có route, màn gọi đúng API, giữ khoảng xem khi đổi ?loai=,
+    hỏi trước khi rời trang còn ô chưa lưu, số qua dinh_dang.ts (không toFixed / de-DE)."""
+    from tests.spa_kd import nguon
+    assert "/kho-du-lieu/bang-du-lieu" in nguon("he_thong", "TabKho.tsx")
+    main = nguon("main.tsx")
+    assert '"/kho-du-lieu/bang-du-lieu"' in main and "ManBangDuLieu" in main
+    man = nguon("bang_du_lieu", "ManBangDuLieu.tsx")
+    assert "/api/kho-du-lieu/bang-du-lieu" in man and "giuKhoang(" in man and "beforeunload" in man
+    for f in ("ManBangDuLieu.tsx", "BangTinh.tsx"):
+        m = nguon("bang_du_lieu", f)
+        assert "toFixed(" not in m and "de-DE" not in m, f

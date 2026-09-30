@@ -15,6 +15,7 @@ import { so } from "../dinh_dang";
 const TAB = [
   ["tong-quan", "/kho-du-lieu", "◆", "Tổng quan độ phủ"],
   ["nap", "/kho-du-lieu/nap", "＋", "Nạp dữ liệu mới"],
+  ["bang-du-lieu", "/kho-du-lieu/bang-du-lieu", "▦", "Bảng dữ liệu"],
   ["luong", "/kho-du-lieu/luong", "⇄", "Sơ đồ luồng dữ liệu"],
   ["cot-noi", "/kho-du-lieu/cot-noi", "⋈", "Cột nối giữa các file"],
   ["duong-di", "/kho-du-lieu/duong-di", "↳", "Dữ liệu đi đâu"],

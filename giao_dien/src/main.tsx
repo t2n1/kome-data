@@ -41,6 +41,8 @@ const TaiLieuLuong = lazy(() => import("./he_thong/TaiLieu").then(m => ({ defaul
 const TaiLieuCotNoi = lazy(() => import("./he_thong/TaiLieu").then(m => ({ default: m.TaiLieuCotNoi })));
 const DuongDi = lazy(() => import("./he_thong/DuongDi"));
 const BangKho = lazy(() => import("./he_thong/BangKho"));
+// Bảng dữ liệu sửa trực tiếp (072) — sổ app.sua_du_lieu chồng lên OBC.
+const ManBangDuLieu = lazy(() => import("./bang_du_lieu/ManBangDuLieu"));
 const NhatKy = lazy(() => import("./he_thong/NhatKy"));
 const CaiDat = lazy(() => import("./he_thong/CaiDat"));
 const NganSach = lazy(() => import("./he_thong/NganSach"));
@@ -70,6 +72,7 @@ function man(duong: string): (() => React.ReactElement) | null {
     if (duong === "/kho-du-lieu/luong") return () => <TaiLieuLuong />;
     if (duong === "/kho-du-lieu/cot-noi") return () => <TaiLieuCotNoi />;
     if (duong === "/kho-du-lieu/duong-di") return () => <DuongDi />;
+    if (duong === "/kho-du-lieu/bang-du-lieu") return () => <ManBangDuLieu />;
     if (/^\/kho-du-lieu\/bang\/[^/]+$/.test(duong)) return () => <BangKho />;
     if (duong === "/nhat-ky") return () => <NhatKy />;
     if (duong === "/cai-dat") return () => <CaiDat />;

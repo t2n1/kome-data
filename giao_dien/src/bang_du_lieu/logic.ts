@@ -49,25 +49,30 @@ function ngayHopLe(s: string): boolean {
   return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d;
 }
 
-/** Số ≤ 4 chữ số thập phân, không mũ, bỏ số 0 thừa: "20.0000" → "20", "83.750" → "83.75". Giá: số nguyên yên > 0. */
+/** Số ≤ 4 chữ số thập phân, không mũ, bỏ số 0 thừa: "20.0000" → "20", "83.750" → "83.75". Giá: số nguyên yên > 0.
+ *  Làm bằng CHUỖI (không qua số thực): quá 4 chữ số thập phân / giá có phần lẻ là LỖI, không làm tròn lặng lẽ. */
 function chuanSo(chu: string, gia: boolean): { gt: string } | { loi: string } {
   let s = chu.replace(/[¥￥]/g, "").replace(TRANG, "");
   if (SO_NGHIN.test(s)) s = s.replace(/,/g, "");             // chỉ khi ĐÚNG dạng nghìn — "1,5" là lỗi, như máy chủ
   if (s.startsWith("-") || s.startsWith("−")) return { loi: gia ? "Giá phải là số > 0" : "Số lượng phải ≥ 0" };
   if (s.startsWith("+")) s = s.slice(1);
   if (!SO_THUONG.test(s)) return { loi: "Phải là một số (vd 24 hoặc 83.75)" };
-  const n = Number(s);
-  if (!isFinite(n)) return { loi: "Phải là một số" };
+  const [nguyen0, le0 = ""] = s.split(".");
+  const nguyen = nguyen0.replace(/^0+(?=\d)/, "") || "0", le = le0.replace(/0+$/, "");
+  const gt = le ? `${nguyen}.${le}` : nguyen;
   if (gia) {
-    const r = Math.round(n);
-    if (r <= 0) return { loi: "Giá phải là số > 0" };
-    if (r >= 1e12) return { loi: "Giá quá lớn" };
-    return { gt: String(r) };
+    if (le) return { loi: "Giá là số yên nguyên" };
+    if (/^0+$/.test(nguyen)) return { loi: "Giá phải là số > 0" };
+    if (nguyen.length > 12 || Number(nguyen) >= 1e12) return { loi: "Giá quá lớn" };
+    return { gt };
   }
-  if (n >= 1e10) return { loi: "Số quá lớn" };
-  const t = n.toFixed(4).replace(/\.?0+$/, "");
-  return { gt: t === "" ? "0" : t };
+  if (le.length > 4) return { loi: "Tối đa 4 chữ số thập phân" };
+  if (nguyen.length > 10) return { loi: "Số quá lớn" };               // ≥ 1e10 (nguyen đã bỏ số 0 đầu)
+  return { gt };
 }
+
+/** Trần độ dài ô chữ — = kome/bang_du_lieu.py::DAI_TOI_DA (đếm theo ký tự Unicode như len() của Python). */
+export const DAI_TOI_DA = 200;
 
 export function kiemO(c: Cot, chu: string): { gt: string } | { loi: string } {
   if (!c.sua) return { loi: "Cột này chỉ xem, không sửa được" };
@@ -85,7 +90,9 @@ export function kiemO(c: Cot, chu: string): { gt: string } | { loi: string } {
     if (theoTen) return { gt: theoTen[0] };
     return { loi: "Giá trị không có trong danh sách" };
   }
-  return { gt: chu.trim() };
+  const t = chu.trim();
+  if ([...t].length > DAI_TOI_DA) return { loi: `Tối đa ${DAI_TOI_DA} ký tự` };
+  return { gt: t };
 }
 
 /** Hai chuỗi "cùng giá trị": rỗng ≡ null; cột số so theo SỐ ("20" ≡ "20.0000"). */
@@ -113,19 +120,33 @@ export function datO(cho: Cho, d: Dong, c: Cot, chu: string): Cho {
 
 const CAN_CO_O = /^(gia|ton|han):/;
 
+/** Ô (dòng, cột) sửa được theo DỮ LIỆU: cột không khoá, và với cột giá / tồn / hạn thì OBC phải có ô đó. (Cờ quyền
+ *  `sua_duoc` của người đang xem là việc của màn hình.) */
+export const suaDuocO = (d: Dong, c: Cot): boolean => c.sua && !(CAN_CO_O.test(c.ma) && d.o[c.ma] == null);
+
 export function dan(tsv: string, neo: { d: number; c: number }, cots: Cot[], dongs: Dong[]):
   { o: { k: string; cot: string; chu: string }[]; bo_qua: number } {
   const hang = tsv.split(/\r?\n/);
   while (hang.length && hang[hang.length - 1] === "") hang.pop();
+  if (!hang.length && /^(\r?\n)?$/.test(tsv)) hang.push("");        // đúng MỘT ô rỗng (Excel chép ô trống) = xoá ô neo
   const o: { k: string; cot: string; chu: string }[] = [];
   let bo_qua = 0;
   hang.forEach((h, i) => h.split("\t").forEach((chu, j) => {
     const d = dongs[neo.d + i], c = cots[neo.c + j];
-    if (!d || !c || !c.sua) { bo_qua++; return; }
-    if (CAN_CO_O.test(c.ma) && d.o[c.ma] == null) { bo_qua++; return; }   // OBC không có ô này
+    if (!d || !c || !suaDuocO(d, c)) { bo_qua++; return; }             // cột khoá / OBC không có ô này / ngoài bảng
     o.push({ k: d.k, cot: c.ma, chu });
   }));
   return { o, bo_qua };
+}
+
+/** Lỗi của MỘT ô đang chờ (null = hợp lệ / không chờ). Ngoại lệ: chữ chờ ĐÚNG bằng giá trị OBC của ô lệch ("↺ Về giá trị
+ *  OBC") luôn hợp lệ — máy chủ nhận "về OBC" kể cả khi mã OBC không có trong danh sách chọn. */
+export function loiCho(c: Cot, ko: string, cho: Cho, lech: Lech): string | null {
+  if (!Object.prototype.hasOwnProperty.call(cho, ko)) return null;
+  const v = cho[ko], l = lech[ko];
+  if (l && v === (l.obc ?? "")) return null;
+  const r = kiemO(c, v);
+  return "loi" in r ? r.loi : null;
 }
 
 export function thanLuu(loai: "sp" | "kh", cho: Cho, dongs: Dong[]):

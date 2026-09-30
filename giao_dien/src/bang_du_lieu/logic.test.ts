@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Cot, Dong, Lech } from "./kieu";
-import { cotMacDinh, dan, datO, docCotDaChon, ghiCotDaChon, giaTri, hienThi, khoaO, khungNhin, kiemO, locDong, tachO,
-  thanLuu } from "./logic";
+import { cotMacDinh, dan, datO, docCotDaChon, ghiCotDaChon, giaTri, hienThi, khoaO, khungNhin, kiemO, locDong, loiCho,
+  suaDuocO, tachO, thanLuu } from "./logic";
 
 const cot = (ma: string, kieu: Cot["kieu"], sua = true, chon?: [string, string][]): Cot =>
   ({ ma, nhan: ma, nhom: "x", kieu, sua, ...(chon ? { chon } : {}) });
@@ -47,10 +47,27 @@ describe("kiemO", () => {
     for (const x of ["", "abc", "-1", "1e3", "1,5", "NaN", "Infinity", "1.2.3", "10000000000"])
       expect(kiemO(SL, x), x).toHaveProperty("loi");
   });
-  it("giá: nguyên > 0, làm tròn", () => {
+  it("giá: số yên nguyên > 0 — phần lẻ bị TỪ CHỐI, không làm tròn", () => {
     expect(kiemO(GIA, "¥1,200")).toEqual({ gt: "1200" });
-    expect(kiemO(GIA, "99.6")).toEqual({ gt: "100" });
+    expect(kiemO(GIA, "1200.00")).toEqual({ gt: "1200" });
+    expect(kiemO(GIA, "1200.4")).toEqual({ loi: "Giá là số yên nguyên" });
+    expect(kiemO(GIA, "99.6")).toEqual({ loi: "Giá là số yên nguyên" });
     for (const x of ["0", "0.4", "-5", ""]) expect(kiemO(GIA, x), x).toHaveProperty("loi");
+  });
+  it("số lượng: quá 4 chữ số thập phân bị TỪ CHỐI (số 0 thừa cuối thì được)", () => {
+    expect(kiemO(SL, "1.00005")).toEqual({ loi: "Tối đa 4 chữ số thập phân" });
+    expect(kiemO(SL, "1.2345")).toEqual({ gt: "1.2345" });
+    expect(kiemO(SL, "1.234500")).toEqual({ gt: "1.2345" });
+    expect(kiemO(SL, "007.50")).toEqual({ gt: "7.5" });
+    expect(kiemO(SL, ".5")).toEqual({ gt: "0.5" });
+    expect(kiemO(SL, "3.")).toEqual({ gt: "3" });
+    expect(kiemO(SL, "9999999999.9999")).toEqual({ gt: "9999999999.9999" });
+  });
+  it("chữ: tối đa 200 ký tự (sau trim, đếm theo ký tự Unicode)", () => {
+    expect(kiemO(TEN, "a".repeat(200))).toEqual({ gt: "a".repeat(200) });
+    expect(kiemO(TEN, " " + "ạ".repeat(200) + " ")).toEqual({ gt: "ạ".repeat(200) });
+    expect(kiemO(TEN, "😀".repeat(200))).toEqual({ gt: "😀".repeat(200) });
+    expect(kiemO(TEN, "a".repeat(201))).toEqual({ loi: "Tối đa 200 ký tự" });
   });
   it("ngày: ISO hợp lệ / không hạn / rỗng", () => {
     expect(kiemO(HAN, "2026-02-28")).toEqual({ gt: "2026-02-28" });
@@ -109,8 +126,34 @@ describe("dan", () => {
     expect(dan("1\t2", { d: 2, c: 1 }, cots, dongs)).toEqual({ o: [], bo_qua: 2 });   // C không có ton; cột CHI khoá
     expect(dan("1\n2", { d: 2, c: 0 }, cots, dongs).bo_qua).toBe(1);                   // dòng thứ 2 ngoài bảng
   });
+  it("clipboard đúng MỘT ô rỗng → xoá ô neo (nếu sửa được)", () => {
+    for (const x of ["", "\n", "\r\n"])
+      expect(dan(x, { d: 1, c: 1 }, cots, dongs), JSON.stringify(x)).toEqual({ o: [{ k: "B", cot: "ton:0001", chu: "" }], bo_qua: 0 });
+    expect(dan("", { d: 0, c: 2 }, cots, dongs)).toEqual({ o: [], bo_qua: 1 });      // ô neo khoá
+    expect(dan("\n\n", { d: 0, c: 0 }, cots, dongs)).toEqual({ o: [], bo_qua: 0 });   // nhiều dòng rỗng: vẫn là "không có gì"
+  });
   it("chỉ bỏ dòng rỗng CUỐI", () => {
     expect(dan("a\n\nb\n\n", { d: 0, c: 0 }, cots, dongs).o.map(z => z.chu)).toEqual(["a", "", "b"]);
+  });
+});
+
+describe("loiCho / suaDuocO", () => {
+  it("ô không chờ / hợp lệ → null; sai → câu lỗi; về OBC (kể cả mã lạ) → null", () => {
+    const ko = khoaO("A", "rank_code");
+    expect(loiCho(HANG, ko, {}, {})).toBeNull();
+    expect(loiCho(HANG, ko, { [ko]: "0002" }, {})).toBeNull();
+    expect(loiCho(HANG, ko, { [ko]: "zz" }, {})).toBe("Giá trị không có trong danh sách");
+    const lech: Lech = { [ko]: { obc: "0777", ai: "an", luc: null } };
+    expect(loiCho(HANG, ko, { [ko]: "0777" }, lech)).toBeNull();
+    expect(loiCho(TEN, khoaO("A", "product_name"), { [khoaO("A", "product_name")]: "" },
+      { [khoaO("A", "product_name")]: { obc: null, ai: null, luc: null } })).toBeNull();
+  });
+  it("suaDuocO: cột khoá, ô giá / tồn / hạn OBC không có → false", () => {
+    expect(suaDuocO(d("A", { product_name: "x" }), TEN)).toBe(true);
+    expect(suaDuocO(d("A", {}), CHI)).toBe(false);
+    expect(suaDuocO(d("A", { "gia:02|01": null }), GIA)).toBe(false);
+    expect(suaDuocO(d("A", {}), SL)).toBe(false);
+    expect(suaDuocO(d("A", { "ton:0001": "0" }), SL)).toBe(true);
   });
 });
 
