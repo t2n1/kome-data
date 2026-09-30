@@ -22,7 +22,7 @@ dm AS (
                 ELSE mart.ten_nganh(p.food_category_name) END           AS nganh,
            (x.ma IN (SELECT product_code FROM mart.ma_ngung_ban_an))    AS an
     FROM (SELECT DISTINCT ma FROM v) x
-    LEFT JOIN core.dim_product p ON p.product_code = x.ma
+    LEFT JOIN mart.dim_product p ON p.product_code = x.ma
 )
 SELECT (SELECT min(ngay) FROM v), (SELECT max(ngay) FROM v),
        (SELECT coalesce(json_agg(json_build_array(ma, ten, nganh, an) ORDER BY ma), '[]')

@@ -222,6 +222,22 @@ def test_liet_ke_hien_dung_gia_tri_o_cot_ngan_sach(conn, capsys):
     ra = capsys.readouterr().out
     dong_an = next(d for d in ra.splitlines() if d.startswith("an "))
     dong_binh = next(d for d in ra.splitlines() if d.startswith("binh"))
-    # Từ 033 cột CUỐI là "Quản trị"; "Ngân sách" là cột kế cuối.
-    assert dong_an.split()[-2:] == ["CÓ", "—"], dong_an
-    assert dong_binh.split()[-2:] == ["—", "—"], dong_binh
+    # Từ 033 có cột "Quản trị", từ 072 cột CUỐI là "Sửa dữ liệu": "Ngân sách" là cột thứ ba từ cuối.
+    assert dong_an.split()[-3:] == ["CÓ", "—", "—"], dong_an
+    assert dong_binh.split()[-3:] == ["—", "—", "—"], dong_binh
+
+
+def test_cap_co_sua_du_lieu_KHONG_dung_toi_cac_co_khac_va_bo_trai_chieu(conn, capsys):
+    """072: --sua-du-lieu / --bo-sua-du-lieu đổi ĐÚNG cờ thứ tư; vừa cấp vừa bỏ → mã 2."""
+    ND.tao(conn, "an", MK, kho_du_lieu=True)
+    conn.commit()
+    assert chay(["quyen", "an", "--sua-du-lieu"], conn, _doc()) == 0
+    conn.commit()
+    n = ND.kiem_tra(conn, "an", MK)
+    assert n.duoc_sua_du_lieu is True and n.duoc_vao_kho_du_lieu is True and n.duoc_sua_ngan_sach is False
+    assert chay(["quyen", "an", "--sua-du-lieu", "--bo-sua-du-lieu"], conn, _doc()) == 2
+    assert chay(["quyen", "an", "--bo-sua-du-lieu"], conn, _doc()) == 0
+    conn.commit()
+    assert ND.kiem_tra(conn, "an", MK).duoc_sua_du_lieu is False
+    chay([], conn)
+    assert "Sửa dữ liệu" in capsys.readouterr().out

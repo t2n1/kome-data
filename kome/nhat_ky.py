@@ -1,6 +1,6 @@
 """Màn Nhật ký thao tác (thiết kế số 20) — ĐỌC GỘP các sổ đã có, không chép.
 
-Năm loại thao tác, năm nguồn, mỗi nguồn đã là sổ chỉ-thêm ở nơi của nó:
+Sáu loại thao tác, sáu nguồn, mỗi nguồn đã là sổ chỉ-thêm ở nơi của nó:
 
 | loại      | nguồn                                   | "ai"                  |
 |-----------|-----------------------------------------|-----------------------|
@@ -9,6 +9,8 @@ Năm loại thao tác, năm nguồn, mỗi nguồn đã là sổ chỉ-thêm ở
 | ngan_sach | app.ngan_sach_nhat_ky (026)             | sua_boi               |
 | quyen     | app.nhat_ky_quyen (033)                 | sua_boi               |
 | tiep_xuc  | app.nhat_ky_tiep_xuc (030)              | nguoi_dung_id         |
+| doi_thu   | app.doi_thu_nhat_ky (059)               | nguoi_dung_id         |
+| du_lieu   | app.sua_du_lieu (072)                   | nguoi_dung_id         |
 
 "Ai" NULL = máy trong công ty chưa bật đăng nhập (hoặc lô nạp trước 033, hoặc
 đổi quyền bằng script) — màn in rõ ra thay vì bỏ trống. Ngân sách truy vấn: 2
@@ -29,11 +31,13 @@ LOAI = {
     "doi_thu": ("🏷", "Giá đối thủ", "canh"),
     "quyen": ("⚿", "Phân quyền", "lam"),
     "tiep_xuc": ("☎", "Ghi tiếp xúc", "nhat"),
+    "du_lieu": ("✎", "Sửa dữ liệu", "canh"),
 }
 
 TEN_CO = {"duoc_vao_kho_du_lieu": "vào Kho dữ liệu (nạp + hoàn tác)",
           "duoc_sua_ngan_sach": "sửa Ngân sách",
-          "duoc_quan_tri": "quản trị (đổi quyền người khác)"}
+          "duoc_quan_tri": "quản trị (đổi quyền người khác)",
+          "duoc_sua_du_lieu": "sửa Bảng dữ liệu (bản sửa đè OBC)"}
 
 # Một khối UNION ALL, mỗi nhánh cùng bảy cột. Tên người nối MỘT LẦN ở ngoài.
 _NGUON = """
@@ -61,7 +65,11 @@ _NGUON = """
     UNION ALL
     SELECT 'tiep_xuc', t.thoi_diem, t.nguoi_dung_id, t.customer_code, t.kieu,
            t.noi_dung, t.ket_qua
-    FROM app.nhat_ky_tiep_xuc t"""
+    FROM app.nhat_ky_tiep_xuc t
+    UNION ALL
+    SELECT 'du_lieu', s.luc, s.nguoi_dung_id, s.bang || ': ' || s.khoa, s.cot,
+           s.gia_tri_truoc, CASE WHEN s.bo THEN '(về OBC)' ELSE s.gia_tri END
+    FROM app.sua_du_lieu s"""
 
 
 @dataclass
@@ -109,6 +117,8 @@ class Dong:
             return f"{viec.get(self.chi_tiet, self.chi_tiet)} · {self.doi_tuong}"
         if self.loai == "quyen":
             return f"Quyền {TEN_CO.get(self.chi_tiet, self.chi_tiet)} của {self.doi_tuong}"
+        if self.loai == "du_lieu":
+            return f"{self.doi_tuong} · {self.chi_tiet}"
         return f"{self.ten_khach or self.doi_tuong}: {self.truoc}"
 
     @property
@@ -153,7 +163,7 @@ def dong_thoi_gian(conn, loai: str | None = None, tim: str = "",
             FROM ({_NGUON}) u
             LEFT JOIN app.nguoi_dung nd ON nd.id = u.ai
             LEFT JOIN core.dim_salesperson s ON s.salesperson_code = nd.salesperson_code
-            LEFT JOIN core.dim_customer c
+            LEFT JOIN mart.dim_customer c
                    ON u.loai = 'tiep_xuc' AND c.customer_code = u.doi_tuong AND c.is_current
             WHERE {dk}
             ORDER BY u.luc DESC LIMIT %s""", ts + [gioi_han]).fetchall()

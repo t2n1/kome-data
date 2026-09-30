@@ -455,7 +455,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 "sale": nguoi.salesperson_code, "ten_sale": nguoi.ten_sale,
                 "duoc_vao_kho_du_lieu": nguoi.duoc_vao_kho_du_lieu,
                 "duoc_sua_ngan_sach": nguoi.duoc_sua_ngan_sach,
-                "duoc_quan_tri": nguoi.duoc_quan_tri},
+                "duoc_quan_tri": nguoi.duoc_quan_tri,
+                "duoc_sua_du_lieu": nguoi.duoc_sua_du_lieu},
             "co_dang_nhap": bool(bi_mat), "chi_doc": chi_doc,
             "gioi_han_tai_len": _gioi_han_tai_len(),
             "hien_kho": nguoi is None or nguoi.duoc_vao_kho_du_lieu,
@@ -709,7 +710,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
 
     # Nhãn cột quyền trên màn Cài đặt — thứ tự = ND.CO_QUYEN.
     _NHAN_CO = {"duoc_vao_kho_du_lieu": "Kho dữ liệu", "duoc_sua_ngan_sach": "Ngân sách",
-                "duoc_quan_tri": "Quản trị"}
+                "duoc_quan_tri": "Quản trị", "duoc_sua_du_lieu": "Sửa dữ liệu"}
     _MUC_CAI_DAT = [
         ("nguoi-dung", "Người dùng & phân quyền", "ユーザー管理", "Ai đăng nhập được và ai được nạp/hoàn tác, sửa ngân sách, đổi quyền."),
         ("ngan-sach", "Ngân sách & ngày nghỉ", "予算設定", "Chỉ tiêu theo người và lịch ngày lễ dùng cho mọi phép tính tiến độ."),
@@ -769,7 +770,8 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 ND.dat_quyen(conn, dich.ten_dang_nhap,
                              kho_du_lieu=moi["duoc_vao_kho_du_lieu"],
                              ngan_sach=moi["duoc_sua_ngan_sach"],
-                             quan_tri=moi["duoc_quan_tri"], sua_boi=nguoi.id)
+                             quan_tri=moi["duoc_quan_tri"],
+                             sua_du_lieu=moi["duoc_sua_du_lieu"], sua_boi=nguoi.id)
                 conn.commit()
             return RedirectResponse("/cai-dat?xong=" + quote(
                 f"Đã lưu quyền của {dich.ten_dang_nhap} — có hiệu lực ở lượt bấm kế tiếp của họ."),

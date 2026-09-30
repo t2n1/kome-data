@@ -370,7 +370,7 @@ def cua_ma(conn, kx: KhoangXem, ma: str, gioi_han: int = 30) -> dict:
                                   'lan_cuoi', x.lan_cuoi) ORDER BY x.dt DESC NULLS LAST, x.customer_code), '[]')
                  FROM (SELECT k.*, coalesce(nullif(c.customer_name, ''), k.customer_code) AS ten
                          FROM mart.khach_mat_hang_khoang(%s, %s) k
-                         LEFT JOIN core.dim_customer c ON c.customer_code = k.customer_code AND c.is_current
+                         LEFT JOIN mart.dim_customer c ON c.customer_code = k.customer_code AND c.is_current
                         WHERE k.product_code = %s
                         ORDER BY k.dt DESC NULLS LAST, k.customer_code LIMIT %s) x),
               -- Kỳ so (đặc tả 2026-09-28): doanh thu theo tháng của mã — cột ma của 24 tháng.

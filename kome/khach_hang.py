@@ -318,7 +318,7 @@ def danh_ba(conn) -> dict:
               FROM k
               LEFT JOIN v ON v.customer_code = k.customer_code
               LEFT JOIN mart.khach_thang_nay t ON t.customer_code = k.customer_code
-              LEFT JOIN core.dim_customer dc ON dc.customer_code = k.customer_code
+              LEFT JOIN mart.dim_customer dc ON dc.customer_code = k.customer_code
                                             AND dc.is_current)
         SELECT (SELECT coalesce(json_agg(d ORDER BY d.doanh_thu DESC, d.ma), '[]') FROM d),
                (SELECT coalesce(json_agg(n ORDER BY n.doanh_thu DESC, n.ma), '[]') FROM (
@@ -502,7 +502,7 @@ def ho_so(conn, ma: str) -> HoSo | None:
             LEFT JOIN LATERAL (
                 SELECT dc.building, dc.rank_name, dc.closing_day_name,
                        dc.transfer_account, dc.salesperson_name
-                  FROM core.dim_customer dc
+                  FROM mart.dim_customer dc
                  WHERE dc.customer_code = mart.khach_360.customer_code AND dc.is_current
             ) x ON true
             WHERE customer_code = %s""", (ma,)).fetchone()
@@ -564,7 +564,7 @@ def ho_so(conn, ma: str) -> HoSo | None:
                   h.so_lan, h.lan_cuoi, h.nhip_ngay, h.du_kien_lan_toi, h.tre_ngay,
                   h.trang_thai_cap, p.food_category_name, b.t2, b.t1, b.t0
              FROM mart.khach_mat_hang h
-             LEFT JOIN core.dim_product p ON p.product_code = h.product_code
+             LEFT JOIN mart.dim_product p ON p.product_code = h.product_code
              LEFT JOIN b ON b.product_code = h.product_code
             WHERE h.customer_code = %s
             ORDER BY h.doanh_thu_thuan DESC NULLS LAST, h.product_code""", (ma, ma)).fetchall()]
@@ -686,7 +686,7 @@ def ho_so(conn, ma: str) -> HoSo | None:
             (SELECT 'goi_y', p.product_code,
                     coalesce(nullif(p.product_name, ''), p.product_code),
                     ''::text, t.ty_suat, t.ty_suat
-               FROM core.dim_product p
+               FROM mart.dim_product p
                JOIN mart.ty_suat_mat_hang t ON t.product_code = p.product_code
               WHERE NOT EXISTS (SELECT 1 FROM h
                                  WHERE h.product_code = p.product_code)

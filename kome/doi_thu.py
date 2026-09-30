@@ -372,7 +372,7 @@ def gia_khach_ke(conn, ma_doi_thu: str, nhom_khoa: str, customer_code: str, tiep
     ten = conn.execute(
         """SELECT CASE WHEN left(%(k)s, 2) = 'n:'
                        THEN (SELECT ten FROM app.nhom_so_sanh WHERE id = substr(%(k)s, 3)::bigint)
-                       ELSE (SELECT coalesce(nullif(product_name, ''), product_code) FROM core.dim_product
+                       ELSE (SELECT coalesce(nullif(product_name, ''), product_code) FROM mart.dim_product
                              WHERE product_code = substr(%(k)s, 4)) END""", {"k": nhom_khoa}).fetchone()[0]
     if ten is None:
         raise LoiNhap(f"Không có nhóm hàng '{nhom_khoa}'.")
@@ -392,7 +392,7 @@ def dat_ghep(conn, ma_doi_thu: str, ma_hang_dt: str, product_code, nhom_id, nhan
     if nhan not in NHAN:
         raise LoiNhap("Nhãn ghép chỉ nhận cùng hàng / thay thế / không ghép.")
     if product_code is not None and product_code != "" and conn.execute(
-            "SELECT 1 FROM core.dim_product WHERE product_code=%s", (product_code,)).fetchone() is None:
+            "SELECT 1 FROM mart.dim_product WHERE product_code=%s", (product_code,)).fetchone() is None:
         raise LoiNhap(f"Không có mã KOME '{product_code}'.")
     cu = conn.execute("SELECT product_code, nhom_id, nhan FROM app.ghep_hang WHERE ma_doi_thu=%s AND ma_hang_dt=%s",
                       (ma_doi_thu, ma_hang_dt)).fetchone()
@@ -407,7 +407,7 @@ def dat_ghep(conn, ma_doi_thu: str, ma_hang_dt: str, product_code, nhom_id, nhan
 
 
 def _kiem_ma_kome(conn, ma_kome) -> list[str]:
-    """Mọi mã phải có trong core.dim_product — mã gõ nhầm không được vào nhóm (nhóm rỗng lặng lẽ)."""
+    """Mọi mã phải có trong mart.dim_product — mã gõ nhầm không được vào nhóm (nhóm rỗng lặng lẽ)."""
     if not isinstance(ma_kome, (list, tuple)):
         raise LoiNhap("Danh sách mã KOME phải là một danh sách.")
     ma = [str(m).strip() for m in ma_kome]
@@ -415,7 +415,7 @@ def _kiem_ma_kome(conn, ma_kome) -> list[str]:
         raise LoiNhap("Có mã KOME để trống.")
     ma = list(dict.fromkeys(ma))
     if ma:
-        co = {r[0] for r in conn.execute("SELECT product_code FROM core.dim_product WHERE product_code = ANY(%s)", (ma,))}
+        co = {r[0] for r in conn.execute("SELECT product_code FROM mart.dim_product WHERE product_code = ANY(%s)", (ma,))}
         for m in ma:
             if m not in co:
                 raise LoiNhap(f"Không có mã KOME '{m}'.")
@@ -638,7 +638,7 @@ def sua_mat_hang(conn, b: dict, nguoi) -> dict:
       theo mã KOME), thay_doi {TRUONG_SUA: giá trị}, vi_sao_gia ('doc_sai'|'da_doi'|null — bắt buộc khi thay_doi có
       TRUONG_GIA), loai_nguon / lien_ket_bang_chung / ghi_chu_nguon (đường 'da_doi').
     Ghép (B13, thay khung "Ghép với KOME" cũ của Duyệt — cùng luật `dat_ghep` của /ghep): mã phải có trong
-    core.dim_product, nhóm trong app.nhom_so_sanh; nhãn khác 'khong' cần mã; đổi sang mã MỚI thì phải chọn cùng / khác
+    mart.dim_product, nhóm trong app.nhom_so_sanh; nhãn khác 'khong' cần mã; đổi sang mã MỚI thì phải chọn cùng / khác
     thương hiệu (không lặng lẽ cất mã mới dưới nhãn 'khong'); giá khách kể đã mang nhóm (thẻ @hàng) không ghép lại ở
     đây. Khoá nhật ký / 409 = '<bên>/<hàng>' như cũ.
     Dòng ĐÃ BỊ THAY (B14 — dòng tay có bản sửa, dòng nạp có "giá đã đổi") -> XungDot(thay_boi=bản mới nhất), kể cả
@@ -725,7 +725,7 @@ def sua_mat_hang(conn, b: dict, nguoi) -> dict:
     if doi_ma and ma_moi is not None and nhan_moi == "khong":
         raise LoiNhap("Ghép với mã mới: chọn cùng thương hiệu hoặc khác thương hiệu.")
     if doi_ma and ma_moi is not None and conn.execute(
-            "SELECT 1 FROM core.dim_product WHERE product_code=%s", (ma_moi,)).fetchone() is None:
+            "SELECT 1 FROM mart.dim_product WHERE product_code=%s", (ma_moi,)).fetchone() is None:
         raise LoiNhap(f"Không có mã KOME '{ma_moi}'.")
     if doi_nhom and nhom_moi is not None and conn.execute(
             "SELECT 1 FROM app.nhom_so_sanh WHERE id=%s", (nhom_moi,)).fetchone() is None:
@@ -807,7 +807,7 @@ def _ghep_hieu_luc(conn, ben: str, dich: str):
     """(product_code, nhom_id, nhan) mà hàng `dich` của bên ĐANG mang, hoặc None. Ghép tường minh (app.ghep_hang, kể cả
     'khong') nếu có; không thì ghép AI của dòng hiện hành (không ẩn / không khách kể, ưu tiên mức cho khách thường rẻ nhất
     — gần với dòng đại diện mà KHÔNG phải dựng mart.gia_doi_thu_hien_hanh, view nặng): mã KOME + nhãn (nhãn null khi có
-    mã → 'thay_the', cùng mặc định của 067). Mã AI phải có trong core.dim_product (dat_ghep từ chối mã lạ — mã AI chưa
+    mã → 'thay_the', cùng mặc định của 067). Mã AI phải có trong mart.dim_product (dat_ghep từ chối mã lạ — mã AI chưa
     kiểm lúc nạp). Không có mã dùng được → None ('khong' chỉ chép khi nó là ghép tường minh). Đọc
     mart.gia_doi_thu_quan_sat lọc theo (bên, hàng) — hai cột nằm trong mọi PARTITION BY của view nên vị từ được đẩy xuống."""
     g = conn.execute("SELECT product_code, nhom_id, nhan FROM app.ghep_hang WHERE ma_doi_thu = %s AND ma_hang_dt = %s",
@@ -815,7 +815,7 @@ def _ghep_hieu_luc(conn, ben: str, dich: str):
     if g is not None:
         return tuple(g)
     r = conn.execute("""SELECT q.ma_kome, q.nhan
-                        FROM mart.gia_doi_thu_quan_sat q JOIN core.dim_product p ON p.product_code = q.ma_kome
+                        FROM mart.gia_doi_thu_quan_sat q JOIN mart.dim_product p ON p.product_code = q.ma_kome
                         WHERE q.ma_doi_thu = %s AND q.ma_hang_dt = %s AND q.hien_hanh AND q.loai_nguon <> 'khach_ke'
                         ORDER BY mart.la_muc_khach_thuong(q.muc_gia) DESC, (q.trang_thai = 'het'),
                                  q.yen_chuan NULLS LAST, q.nguon, q.id
@@ -987,7 +987,7 @@ NGAY_TIN_KHACH = 90         # cửa sổ tin của khách / của đối thủ (
 def _ten_nhom(k: str) -> str:
     """Biểu thức SQL: tên của nhóm có khoá `k` ('n:<id>' -> tên nhóm; 'ma:<mã>' -> tên hàng KOME; không có -> chính khoá)."""
     return (f"coalesce((SELECT ns_.ten FROM app.nhom_so_sanh ns_ WHERE ns_.id = CASE WHEN {k} ~ '^n:[0-9]+$' THEN substr({k}, 3)::bigint END), "
-            f"(SELECT coalesce(nullif(sp_.product_name, ''), sp_.product_code) FROM core.dim_product sp_ "
+            f"(SELECT coalesce(nullif(sp_.product_name, ''), sp_.product_code) FROM mart.dim_product sp_ "
             f"WHERE sp_.product_code = CASE WHEN left({k}, 3) = 'ma:' THEN substr({k}, 4) END), {k})")
 
 
@@ -1010,7 +1010,7 @@ SELECT json_build_object(
             FROM h GROUP BY 1) x ON x.ma_doi_thu = d.ma WHERE d.dang_theo_doi),
   'luoi', (SELECT coalesce(json_agg(json_build_object('ben', ma_doi_thu, 'nganh', nganh, 'so_ma', n)), '[]') FROM (
             SELECT h.ma_doi_thu, mart.ten_nganh(p.food_category_name) nganh, count(DISTINCT h.mat_hang_khoa) n
-            FROM h JOIN core.dim_product p ON p.product_code = h.ma_kome
+            FROM h JOIN mart.dim_product p ON p.product_code = h.ma_kome
             WHERE h.loai_nguon <> 'khach_ke' GROUP BY 1, 2) z),
   'khuyen_mai', (SELECT coalesce(json_agg(json_build_object('ben', ma_doi_thu, 'ten_goc', ten_goc, 'gia_goc', gia_goc,
             'gia_truoc_km', gia_truoc_km, 'khuyen_mai', khuyen_mai, 'ngay', ngay_nguon,
@@ -1044,7 +1044,7 @@ SELECT json_build_object(
                      GROUP BY 1, 2 ORDER BY 3 DESC, 1 LIMIT 10) q),
       'tinh', (SELECT coalesce(json_agg(json_build_object('tinh', q.tinh, 'so_tin', q.n) ORDER BY q.n DESC, q.tinh), '[]')
                FROM (SELECT coalesce(nullif(c.prefecture, ''), '(chưa rõ)') AS tinh, count(*) AS n
-                     FROM tx LEFT JOIN core.dim_customer c ON c.customer_code = tx.customer_code AND c.is_current
+                     FROM tx LEFT JOIN mart.dim_customer c ON c.customer_code = tx.customer_code AND c.is_current
                      GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 48) q)))      -- 47 tỉnh + "(chưa rõ)"
 )
 """
@@ -1054,7 +1054,7 @@ def tong_quan(conn, hom_nay=None) -> dict:
     """Tổng quan thị trường. `hien_truong` (đợt 2): tin `@` của NGAY_HIEN_TRUONG ngày qua theo ĐỒNG HỒ THẬT giờ
     Tokyo (`hom_nay_o_nhat`, không theo mốc dữ liệu — tin hiện trường là sự kiện ngoài đời, cùng lý lẽ ngoại lệ
     thứ hai của bất biến mốc, xem `/lien-he`). "Tin" = MỘT lần tiếp xúc có ít nhất một thẻ; mỗi đối thủ / nhóm /
-    tỉnh đếm số tin nhắc tới nó (không đếm số thẻ). Tỉnh = `core.dim_customer.prefecture` hiện hành."""
+    tỉnh đếm số tin nhắc tới nó (không đếm số thẻ). Tỉnh = `mart.dim_customer.prefecture` hiện hành."""
     return conn.execute(_TONG_QUAN, {"hom_nay": hom_nay or hom_nay_o_nhat()}).fetchone()[0]
 
 
@@ -1103,14 +1103,14 @@ _NHOM_QUY_CACH = """
 SELECT json_build_object(
   'nhom', (SELECT coalesce(json_agg(json_build_object('id', n.id, 'ten', n.ten, 'ma', coalesce(
              (SELECT json_agg(json_build_object('ma', m.product_code, 'ten', p.product_name) ORDER BY m.product_code)
-              FROM app.nhom_so_sanh_ma m LEFT JOIN core.dim_product p USING (product_code)
+              FROM app.nhom_so_sanh_ma m LEFT JOIN mart.dim_product p USING (product_code)
               WHERE m.nhom_id = n.id), '[]')) ORDER BY n.ten), '[]') FROM app.nhom_so_sanh n),
   'quy_cach', (SELECT coalesce(json_agg(json_build_object('ma', z.product_code, 'ten', z.product_name, 'nganh', z.nganh,
                  'kg_moi_goi', z.kg_moi_goi, 'goi_moi_thung', z.goi_moi_thung, 'kg_moi_thung', z.kg_moi_thung,
                  'da_sua', z.da_sua) ORDER BY z.nganh, z.product_code), '[]')
                FROM (SELECT p.product_code, p.product_name, mart.ten_nganh(p.food_category_name) AS nganh,
                             q.kg_moi_goi, q.goi_moi_thung, q.kg_moi_thung, q.da_sua
-                     FROM core.dim_product p JOIN mart.quy_cach_kome q USING (product_code)
+                     FROM mart.dim_product p JOIN mart.quy_cach_kome q USING (product_code)
                      WHERE NOT mart.khong_phai_hang(p.product_code, p.kind_code, p.food_category_name)) z))
 """
 
@@ -1154,7 +1154,7 @@ SELECT (SELECT to_json(d) FROM app.doi_thu d WHERE d.ma = %(ma)s),
           FROM (SELECT n.id, n.customer_code, n.thoi_diem, c.customer_name AS ten_khach,
                        (n.thoi_diem AT TIME ZONE 'Asia/Tokyo')::date AS ngay
                 FROM app.nhat_ky_tiep_xuc n
-                LEFT JOIN core.dim_customer c ON c.customer_code = n.customer_code AND c.is_current
+                LEFT JOIN mart.dim_customer c ON c.customer_code = n.customer_code AND c.is_current
                 WHERE (n.thoi_diem AT TIME ZONE 'Asia/Tokyo')::date > %(hom_nay)s::date - {NGAY_TIN_KHACH}
                   AND EXISTS (SELECT 1 FROM app.tiep_xuc_nhac z
                               WHERE z.tiep_xuc_id = n.id AND z.loai = 'doi_thu' AND z.khoa = %(ma)s)
@@ -1332,7 +1332,7 @@ SELECT json_build_object(
                  UNION ALL
                  SELECT 1, k.khoa, coalesce(nullif(p.product_name, ''), p.product_code), 'ma', p.product_code,
                         CASE WHEN left(k.khoa, 2) = 'n:' THEN {_ten_nhom('k.khoa')} END
-                 FROM core.dim_product p CROSS JOIN LATERAL (SELECT mart.nhom_cua_khoa('ma:' || p.product_code) AS khoa) k
+                 FROM mart.dim_product p CROSS JOIN LATERAL (SELECT mart.nhom_cua_khoa('ma:' || p.product_code) AS khoa) k
                  WHERE NOT mart.khong_phai_hang(p.product_code, p.kind_code, p.food_category_name)) z))
 """
 

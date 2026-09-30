@@ -57,6 +57,7 @@ _PHIEN_BAN = """concat_ws('|',
     (SELECT max(id) FROM app.ngan_sach_nhat_ky),
     (SELECT max(id) FROM app.nhat_ky_tiep_xuc),
     (SELECT max(id) FROM app.doi_thu_nhat_ky),
+    (SELECT max(id) FROM app.sua_du_lieu),
     (SELECT max(filename) FROM meta.schema_migration))"""
 
 # Phiên bản CHỈ theo dữ liệu nạp (lô nạp, hoàn tác, migration) — cho ảnh chụp
@@ -65,10 +66,13 @@ _PHIEN_BAN = """concat_ws('|',
 # trên cho những ảnh chụp đó thì mỗi lần ai đó ghi một cuộc gọi, danh bạ 1.710
 # khách (~6 s để dựng) lại phải tính lại — vì một thứ nó không hề đọc.
 # BẤT BIẾN: chọn `chi_nap=True` NGHĨA LÀ cam đoan dữ liệu không đọc bảng `app`
-# nào — sai là ảnh chụp đứng yên sau khi người ta sửa.
+# nào NGOÀI app.sua_du_lieu (072 — bản sửa đè OBC là dữ liệu mới như một lần nạp:
+# mọi màn đọc danh mục qua mart.dim_* nên đều thấy nó) — sai là ảnh chụp đứng yên
+# sau khi người ta sửa.
 _PHIEN_BAN_NAP = """concat_ws('|',
     (SELECT max(batch_id) FROM meta.ingest_batch),
     (SELECT max(undone_at) FROM meta.ingest_batch),
+    (SELECT max(id) FROM app.sua_du_lieu),
     (SELECT max(filename) FROM meta.schema_migration))"""
 
 

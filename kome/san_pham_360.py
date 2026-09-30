@@ -214,7 +214,7 @@ def ho_so(conn, ma: str) -> dict | None:
             SELECT s.*, mart.ten_nganh(p.food_category_name, s.product_code, p.kind_code),
                    m.hom_nay, d12.dt, d12.lg
               FROM s CROSS JOIN m
-              LEFT JOIN core.dim_product p ON p.product_code = s.product_code
+              LEFT JOIN mart.dim_product p ON p.product_code = s.product_code
               LEFT JOIN d12 ON true""", (ma, ma)).fetchone()
     if r is None:
         return None
@@ -249,7 +249,7 @@ def ho_so(conn, ma: str) -> dict | None:
         )
         SELECT 'lai'::text, h.customer_code, coalesce(nullif(d.customer_name, ''), h.customer_code),
                h.du_kien_lan_toi, h.nhip_ngay::numeric, h.lan_cuoi, h.doanh_thu_thuan::numeric
-          FROM h LEFT JOIN core.dim_customer d ON d.customer_code = h.customer_code AND d.is_current
+          FROM h LEFT JOIN mart.dim_customer d ON d.customer_code = h.customer_code AND d.is_current
          WHERE h.trang_thai_cap = 'mua' AND h.du_kien_lan_toi IS NOT NULL
         UNION ALL
         SELECT 'dem', NULL, NULL, NULL, count(*) FILTER (WHERE trang_thai_cap = 'mua'), NULL,

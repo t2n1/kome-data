@@ -428,7 +428,7 @@ def tao_api(open_app_conn) -> APIRouter:
                           d.pack_code, sum(d.qty), sum(d.doanh_thu_thuan),
                           sum(d.gross_profit), count(DISTINCT d.slip_no)
                      FROM mart.dong_ban d
-                     LEFT JOIN core.dim_product p ON p.product_code = d.product_code
+                     LEFT JOIN mart.dim_product p ON p.product_code = d.product_code
                     WHERE d.customer_code = %s AND d.sales_date BETWEEN %s AND %s
                     GROUP BY 1, 2, 3, 4
                     ORDER BY 1 DESC, 6 DESC""", (ma, a, b)).fetchall()

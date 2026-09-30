@@ -33,7 +33,7 @@ DAI_SALT = 16
 # và vẫn phải đăng nhập được.
 _COT = """SELECT n.id, n.ten_dang_nhap, n.salesperson_code,
                  n.duoc_vao_kho_du_lieu, n.duoc_sua_ngan_sach, s.ten,
-                 n.duoc_quan_tri{them}
+                 n.duoc_quan_tri, n.duoc_sua_du_lieu{them}
           FROM app.nguoi_dung n
           LEFT JOIN core.dim_salesperson s
                  ON s.salesperson_code = n.salesperson_code"""
@@ -61,6 +61,8 @@ class NguoiDung:
     # Quyền quản trị (033): đổi được cờ quyền của người khác trên /cai-dat.
     # Mặc định để đối tượng dựng tay trong test cũ vẫn chạy.
     duoc_quan_tri: bool = False
+    # Sửa Bảng dữ liệu (072): bản sửa đè OBC ở app.sua_du_lieu. Mặc định False như cờ trên.
+    duoc_sua_du_lieu: bool = False
     # Các bảng Tổng quan (056), JSON thô của json_agg — CHƯA tin được, luôn qua
     # kome.web.bang_tong_quan.tu_tho trước khi dùng. Đọc cùng lượt hỏi của cổng
     # đăng nhập nên trang chủ không tốn thêm truy vấn nào. compare/hash=False:
@@ -69,17 +71,18 @@ class NguoiDung:
     bang_gan_nhat: int | None = field(default=None, compare=False, hash=False)
 
 
-# Ba cờ quyền đổi được — thứ tự này là thứ tự cột trên màn Cài đặt, và là
-# CHECK của app.nhat_ky_quyen.co (033). Thêm cờ thứ tư là sửa CẢ HAI.
-CO_QUYEN = ("duoc_vao_kho_du_lieu", "duoc_sua_ngan_sach", "duoc_quan_tri")
+# Bốn cờ quyền đổi được — thứ tự này là thứ tự cột trên màn Cài đặt, và là
+# CHECK của app.nhat_ky_quyen.co (033, cờ thứ tư thêm ở 072). Thêm cờ nữa là sửa CẢ HAI.
+CO_QUYEN = ("duoc_vao_kho_du_lieu", "duoc_sua_ngan_sach", "duoc_quan_tri", "duoc_sua_du_lieu")
 
 
 def _nguoi(r) -> NguoiDung:
     return NguoiDung(id=r[0], ten_dang_nhap=r[1], salesperson_code=r[2],
                      duoc_vao_kho_du_lieu=r[3], duoc_sua_ngan_sach=r[4],
                      ten_sale=r[5], duoc_quan_tri=bool(r[6]),
-                     bang_gan_nhat=r[7] if len(r) > 8 else None,
-                     bang=r[8] if len(r) > 8 else None)
+                     duoc_sua_du_lieu=bool(r[7]),
+                     bang_gan_nhat=r[8] if len(r) > 9 else None,
+                     bang=r[9] if len(r) > 9 else None)
 
 
 def bam(mat_khau: str, salt: bytes) -> bytes:
@@ -88,21 +91,22 @@ def bam(mat_khau: str, salt: bytes) -> bytes:
 
 
 def tao(conn, ten: str, mat_khau: str, salesperson_code: str | None = None,
-        kho_du_lieu: bool = False, ngan_sach: bool = False) -> int:
+        kho_du_lieu: bool = False, ngan_sach: bool = False,
+        sua_du_lieu: bool = False) -> int:
     """Tạo tài khoản, trả về id. Ném UniqueViolation nếu tên đã có,
     ForeignKeyViolation nếu mã sale không có trong core.dim_salesperson.
 
-    Hai cờ quyền mặc định FALSE: quyền ghi phải được cấp TƯỜNG MINH, không
+    Các cờ quyền mặc định FALSE: quyền ghi phải được cấp TƯỜNG MINH, không
     phải thứ ai cũng có vì người tạo tài khoản quên đặt.
     """
     salt = os.urandom(DAI_SALT)
     return conn.execute(
         """INSERT INTO app.nguoi_dung
              (ten_dang_nhap, mat_khau_hash, mat_khau_salt, salesperson_code,
-              duoc_vao_kho_du_lieu, duoc_sua_ngan_sach)
-           VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
+              duoc_vao_kho_du_lieu, duoc_sua_ngan_sach, duoc_sua_du_lieu)
+           VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id""",
         (ten, bam(mat_khau, salt), salt, salesperson_code or None,
-         kho_du_lieu, ngan_sach),
+         kho_du_lieu, ngan_sach, sua_du_lieu),
     ).fetchone()[0]
 
 
@@ -143,6 +147,7 @@ def doi_mat_khau(conn, ten: str, mat_khau_moi: str) -> bool:
 
 def dat_quyen(conn, ten: str, kho_du_lieu: bool | None = None,
               ngan_sach: bool | None = None, quan_tri: bool | None = None,
+              sua_du_lieu: bool | None = None,
               sua_boi: int | None = None) -> bool:
     """False nếu không có tài khoản tên đó.
 
@@ -159,7 +164,7 @@ def dat_quyen(conn, ten: str, kho_du_lieu: bool | None = None,
         (ten,)).fetchone()
     if r is None:
         return False
-    moi = dict(zip(CO_QUYEN, (kho_du_lieu, ngan_sach, quan_tri)))
+    moi = dict(zip(CO_QUYEN, (kho_du_lieu, ngan_sach, quan_tri, sua_du_lieu)))
     cu = dict(zip(CO_QUYEN, r[1:]))
     for co, gt in moi.items():
         if gt is None or gt == cu[co]:

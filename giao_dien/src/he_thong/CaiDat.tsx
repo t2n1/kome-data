@@ -53,11 +53,12 @@ export default function CaiDat() {
                         <span className="sr">{nhan} cho {n.ten_dang_nhap}</span><span aria-hidden="true">{n[co] ? "có" : "—"}</span></label></td>))}
                     <td>{m.duoc_sua && <button type="submit" form={"q" + n.id} className="nut-nap">Lưu</button>}</td>
                   </tr>))}
-                {!m.nguoi_dung.length && <tr><td colSpan={6} className="khong-ap-dung">Chưa có tài khoản nào — tạo bằng <code>python scripts/tao_nguoi_dung.py them &lt;tên&gt;</code>.</td></tr>}
+                {!m.nguoi_dung.length && <tr><td colSpan={7} className="khong-ap-dung">Chưa có tài khoản nào — tạo bằng <code>python scripts/tao_nguoi_dung.py them &lt;tên&gt;</code>.</td></tr>}
               </tbody>
             </table></div>
             <p className="ghi-chu"><strong>Kho dữ liệu</strong> = nạp file và bấm Hoàn tác (xoá được cả một tháng doanh thu) ·{" "}
-              <strong>Ngân sách</strong> = đặt chỉ tiêu cả công ty · <strong>Quản trị</strong> = đổi ba cờ này của người khác.
+              <strong>Ngân sách</strong> = đặt chỉ tiêu cả công ty · <strong>Sửa dữ liệu</strong> = sửa đè giá trị OBC ở Bảng dữ liệu (OBC vẫn giữ nguyên) ·{" "}
+              <strong>Quản trị</strong> = đổi các cờ này của người khác.
               Tạo tài khoản, đổi mật khẩu: <code>python scripts/tao_nguoi_dung.py</code> (không làm trên web).
               Lọc "khách của tôi" là mặc định tiện dụng, không phải hàng rào — ai cũng xem được mọi khách.</p>
           </section>
