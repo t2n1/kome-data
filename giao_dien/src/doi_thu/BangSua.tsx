@@ -216,7 +216,8 @@ function HopGop({ q, ds, chay, dong, giu }: {
               </button>
             </li>))}
         </ul>)
-        : <p className="dt-nhat">Không có mặt hàng nào khác của bên này{tim.trim() ? " khớp ô tìm" : " trong bảng"}.</p>}
+        : <p className="dt-nhat">{tim.trim() ? "Không có mặt hàng nào khác của bên này khớp ô tìm (chỉ tìm trong các dòng đang lọc)."
+          : "Không có mặt hàng khác của bên này trong các dòng đang lọc — chọn lọc “Tất cả” để thấy hết."}</p>}
       {dich.length > TOI_DA && <p className="dt-nhat">Đang hiện {TOI_DA} / {dich.length} — gõ thêm để lọc.</p>}
       {dang && <p className="dt-nhat" role="status">Đang gộp…</p>}
     </HopThoai>);

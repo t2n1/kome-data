@@ -184,4 +184,21 @@ describe("070 — mỗi mặt hàng một thanh", () => {
       q({ ma_hang_dt: "x", dai_dien: false, yen_chuan: 6, ngay_nguon: "2026-08-01" } as Partial<QsHs>)],
       q({ ma_hang_dt: "x" }))).toHaveLength(2);
   });
+  it("o4.km đếm MẶT HÀNG: KM chỉ ở mức pallet (không đại diện) vẫn đếm; hai mức KM cùng mặt hàng = 1", () => {
+    const a = q({ mat_hang_khoa: "m1", dai_dien: true, yen_chuan: 90 } as Partial<QsHs>);
+    const b = q({ mat_hang_khoa: "m1", dai_dien: false, muc_gia: "pallet", khuyen_mai: "giảm 5%" } as Partial<QsHs>);
+    const c = q({ mat_hang_khoa: "m2", dai_dien: true, gia_truoc_km: 120 } as Partial<QsHs>);
+    const d = q({ mat_hang_khoa: "m2", dai_dien: false, khuyen_mai: "tặng" } as Partial<QsHs>);
+    const ke = q({ mat_hang_khoa: "m3", loai_nguon: "khach_ke", khuyen_mai: "rẻ" } as Partial<QsHs>);
+    const cu = q({ mat_hang_khoa: "m4", hien_hanh: false, khuyen_mai: "cũ" } as Partial<QsHs>);
+    expect(o4([a, b, c, d, ke, cu]).km).toBe(2);
+  });
+  it("lichSuThang bỏ dòng đã ẩn (an)", () => {
+    const x = q({ ma_hang_dt: "y" });
+    const qs = [q({ ma_hang_dt: "y", yen_chuan: 5, ngay_nguon: "2026-06-01" }),
+      q({ ma_hang_dt: "y", yen_chuan: 999, ngay_nguon: "2026-07-01", an: true }),
+      q({ ma_hang_dt: "y", yen_chuan: 6, ngay_nguon: "2026-08-01" })];
+    expect(lichSuThang(qs, x)).toEqual([{ thang: "2026-06", gia: 5 }, { thang: "2026-08", gia: 6 }]);
+    expect(lichSuThang(qs.slice(0, 2).concat(q({ ma_hang_dt: "z" })), x)).toEqual([]);
+  });
 });

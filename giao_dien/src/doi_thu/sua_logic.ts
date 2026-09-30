@@ -222,6 +222,7 @@ export const NHAN_TRUONG: Record<string, string> = {
   mien_ship_kien: "miễn ship theo kiện", thung_moi_kien: "thùng / kiện", phu_phi: "phụ phí vùng", phi_daibiki: "phí daibiki",
   daibiki_tu: "daibiki giảm từ", daibiki_sau: "daibiki sau ngưỡng", ck_mien_daibiki: "chuyển khoản miễn daibiki",
   kien_toi_da_kg: "kiện tối đa", ghep_kien: "ghép kiện", cach_gui: "cách gửi", xac_nhan: "xác nhận",
+  an: "ẩn / khôi phục", vao: "gộp mặt hàng",       // 070: nhật ký 'an' / 'hien' (sau = {an}) và 'gop' (sau = {vao})
 };
 const KHOA_KY_THUAT = new Set(["tay_cu", "tay_moi"]);
 
