@@ -314,6 +314,32 @@ tạo bảng, không nạp lại file nào.
    - `SELECT has_table_privilege('kome_app', 'mart.bang_gia_kome', 'SELECT');` phải `true`.
 3. Mở `/bang-gia`: có cột 売価No., chip "Đã đổi giá" đếm khớp số mã đổi giữa hai lần nạp gần nhất.
 
+### Triển khai bảng dữ liệu sửa (migration `072`)
+
+`072` (đặc tả `docs/superpowers/specs/2026-09-30-bang-du-lieu-sua-design.md`) thêm sổ chỉ-thêm `app.sua_du_lieu` (bản sửa đè giá trị OBC —
+`core` vẫn không bị ghi), luật `mart.ap_sua` / `mart.lech_obc`, bốn view hiệu lực `mart.dim_customer`, `mart.dim_product`,
+`mart.bang_gia_kome`, `mart.ton_hien_tai`, cờ quyền `app.nguoi_dung.duoc_sua_du_lieu`, và **viết lại mọi view / hàm của `mart`** đang đọc
+`core.dim_customer` / `core.dim_product` sang `mart.dim_*` (khối `DO` đọc định nghĩa sống). Không nạp lại file nào.
+
+1. `python db/migrate.py` **bằng vai trò `postgres`** — TRƯỚC khi push/Redeploy (mọi trang đọc `mart.dim_*`; thiếu thì lỗi ở khắp nơi).
+   Migration này đụng NHIỀU view — chạy một lần, ngoài giờ nạp 13:30.
+2. Kiểm sau khi chạy (vai trò chỉ đọc):
+   - `SELECT filename FROM meta.schema_migration WHERE filename LIKE '072%';` phải ra một dòng (chạy tay trong SQL editor thì phải tự INSERT tên file);
+   - test canh danh mục trên CSDL THẬT — phải trả về **KHÔNG dòng nào** (còn dòng = view đó vẫn đọc OBC thô, bản sửa không có tác dụng ở màn đó):
+
+     ```sql
+     SELECT c.relname FROM pg_class c WHERE c.relnamespace='mart'::regnamespace AND c.relkind='v'
+       AND c.relname NOT IN ('dim_customer','dim_product') AND pg_get_viewdef(c.oid) ~ '\mcore\.dim_(customer|product)\M';
+     SELECT p.proname FROM pg_proc p WHERE p.pronamespace='mart'::regnamespace AND p.prosrc ~ '\mcore\.dim_(customer|product)\M';
+     ```
+   - `SELECT has_table_privilege('kome_app', 'app.sua_du_lieu', 'UPDATE');` phải `false` (sổ chỉ thêm; cũng `'DELETE'` = `false`), còn `'INSERT'` phải `true`;
+   - `SELECT count(*) FROM mart.gia_kome_bang;` và `SELECT count(*) FROM mart.ton_hien_tai;` bằng số trước khi chạy (sổ rỗng ⇒ mọi số y như trước);
+   - bảng tạo qua Supabase SQL Editor bị tự bật RLS không policy — nếu `kome_app` báo `permission denied` thì `ALTER TABLE app.sua_du_lieu DISABLE ROW LEVEL SECURITY`.
+3. Cấp cờ cho người được sửa (mặc định KHÔNG ai có): `python scripts/tao_nguoi_dung.py quyen <tên> --sua-du-lieu` (thu lại: `--bo-sua-du-lieu`). Xem cờ hiện có bằng `python scripts/tao_nguoi_dung.py` (không tham số), hoặc ở `/cai-dat`.
+4. Mở Kho dữ liệu › Bảng dữ liệu: bảng hiện đủ dòng (232 mã, ~2.100 khách); sửa thử một ô trên CSDL thử rồi "Về giá trị OBC". Ô lệch OBC có vạch xanh.
+
+**Lưu ý vận hành:** bản sửa KHÔNG đổi `core` — nên sau khi sửa ở OBC và nạp lại, ô nào OBC đã ghi khác thì OBC thắng (bản sửa tự hết hiệu lực). Bản sửa số tồn thường chỉ sống tới ảnh chụp tồn kế tiếp. Muốn thấy mọi ô đang khác OBC: chip "Đã sửa trên web, OBC chưa có" trên màn.
+
 ### Kiểm tay sau khi chạy migration `029` (đợt 5b — báo cáo phân tích + dashboard)
 
 Chủ doanh nghiệp làm năm việc này sau khi migration `029` chạy xong trên CSDL

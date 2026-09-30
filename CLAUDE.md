@@ -8,6 +8,8 @@ Khách chủ yếu là tạp hoá Việt (577) và quán ăn Việt (269), trả
 ## Luật số một
 **OBC 奉行 là sổ cái kế toán chính thức. Dữ liệu của nó CHỈ ĐỌC.**
 Số sai thì sửa trong OBC rồi xuất lại — không bao giờ UPDATE trong CSDL này.
+Từ 072, web VẪN không bao giờ ghi `core`: bản sửa đè của người có cờ quyền nằm ở sổ chỉ-thêm `app.sua_du_lieu`, mọi màn đọc
+giá trị hiệu lực và chỉ ra ô nào đang khác OBC (xem bất biến 072).
 
 ## Quy trình hằng ngày
 13:30 nhân viên xuất 3 file từ OBC, kéo thả vào trang nội bộ.
@@ -118,6 +120,7 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/kho-hang` | **React** (giai đoạn 4, bám Kho hàng.dc.html; `/api/kho-hang?kho=&loc=`, 2 lượt): tab Tồn hiện tại (5 ô · bảng tồn theo dòng + tìm + chip ngành (`?nganh=`, lọc ở trình duyệt) + CSV · quá hạn / sắp chuyển lô / không kịp bán trước hạn / cận hạn / giá trị theo ngành / theo lô) · Hàng đang về (chưa có dữ liệu) · Cần đặt (hết + sắp thiếu, KHÔNG đề xuất số lượng). "Kho" hiện là LÔ (bẫy #6, 042) | `mart.ton_hien_tai`, `mart.ton_theo_lo`, `san_pham_360`, `core.dim_warehouse`, `core.dim_product` (ngành), `core.fact_inventory_daily` (chỉ để lấy ngày chụp) |
 | `/cong-no` | **Công nợ & thu tiền — React** (đợt 6, bám Công nợ.dc.html; `/api/cong-no`, MỘT ảnh chụp 2 lượt hỏi, lọc ở trình duyệt): 6 ô tổng · tuổi nợ (bấm để lọc) · phiếu còn nợ (tab quá hạn / sắp đến hạn / không suy được hạn / theo bên nhận hoá đơn) · lịch thu 7 ngày sau mốc · việc nên làm. Mốc = cuối kỳ sổ mới nhất. Tab Công nợ của hồ sơ khách: `/api/cong-no/khach/{mã}` | `mart.cong_no_ben_tra`, `mart.cong_no_phieu` (← `core.fact_ar_ledger`, sổ `請求先元帳`) |
 | `/kho-du-lieu` | **Tổng quan độ phủ — React** (thiết kế lại 2026-09-25, đặc tả `2026-09-25-tong-quan-do-phu-luoi-design.md`; thanh trái chung `TabKho.tsx::KhungKho`; máy chủ tính sẵn vào `window.__KOME__.man`, vai trò NẠP): ô tóm tắt (mỗi nguồn lịch sử "có từ → đến, thiếu n ngày làm việc" + hôm nay x/3 file 13:30) · LƯỚI tháng × loại dữ liệu đang dùng (`coverage.tinh_luoi_phu`: lịch sử = ngày làm việc có ÷ ngày làm việc, bán hàng từ 売上明細表 vẽ sọc; nền = tháng có bản mới theo `data_date`; cột tình trạng từ `kho_du_lieu.nut_nguon`) · từng ngày của tháng đang chọn (mọi ngày đi cùng một lần tải; `?ngay_thang=YYYY-MM` chọn sẵn, KHÔNG `?thang=` — đó là khoảng xem chung) · sức khoẻ / loại chưa vào kho / hạn chế thu gọn cuối trang | `mart.lich_kinh_doanh`, `meta.ingest_batch`, `core.*` |
+| `/kho-du-lieu/bang-du-lieu` | **Bảng dữ liệu — React** (072, 2026-09-30, đặc tả `2026-09-30-bang-du-lieu-sua-design.md`): bảng tính hai tab Sản phẩm / Khách hàng — cột OBC (danh mục, giá 売価No., tồn & hạn theo lô) sửa thẳng trong ô, dán khối Excel, chỉ vẽ dòng trong khung nhìn. Ô lệch OBC có vạch xanh (rê: giá trị OBC · ai · lúc) + "Về giá trị OBC"; chip "Đã sửa trên web, OBC chưa có". Lưu MỘT giao dịch (`POST /api/kho-du-lieu/bang-du-lieu/luu`): 400 kèm lỗi từng ô · 403 thiếu cờ · 409 ô đã đổi sau lúc mở (`thay`). XEM cần `duoc_vao_kho_du_lieu`, SỬA cần thêm `duoc_sua_du_lieu`. `GET /api/kho-du-lieu/bang-du-lieu?loai=sp\|kh` — 1 lượt, không qua ảnh chụp | `kome/bang_du_lieu.py` (đọc `core.*` THÔ để lấy giá trị OBC), `mart.dim_customer`, `mart.dim_product`, `mart.bang_gia_kome`, `mart.ton_hien_tai`, `app.sua_du_lieu` |
 | `/kho-du-lieu/nap` | **Nạp hai bước — React** (đợt B): mỗi loại file một ô (`kho_du_lieu.O_NAP`, cùng danh sách với sơ đồ nguồn; thả nhầm ô → chặn) · `POST /upload/kiem` (5 cổng qua `pipeline.kiem`, **không ghi gì**, file vào `<ARCHIVE_DIR>/_cho_xac_nhan/` — trên Vercel vào `meta.nap_cho`, 045) → `POST /upload/xac-nhan` (`ingest` đầy đủ, 5 cổng chạy lại) / `POST /upload/huy` · file chờ quá 24 giờ bị dọn · lô gần nhất + hoàn tác (`POST /undo/{lô}` → về `#lo-nap`). `POST /upload` một bước vẫn còn | `meta.ingest_batch`, `meta.nap_cho`, `core.*` |
 | `/kho-du-lieu/luong` | Tài liệu sống (đợt 2b): bốn tầng · các nguồn OBC · 5 cổng + ngưỡng từng file · cạm bẫy OBC · lộ trình. **0 truy vấn** | `config/files.yml`, `kome/web/tai_lieu_sinh.json` |
 | `/kho-du-lieu/cot-noi` | Tài liệu sống: ma trận khoá · file nối đi đâu · cột trong từng file (`?file=<spec>`). **0 truy vấn** | `config/files.yml` |
@@ -126,6 +129,39 @@ chỉ lộ ra nhiều tháng sau bằng một `permission denied` giữa lúc n�
 | `/nhat-ky` | **Nhật ký thao tác** (màn 20): ĐỌC GỘP năm sổ đã có — nạp + hoàn tác (`meta.ingest_batch`, `nap_boi`/`huy_boi` từ 033), sửa ngân sách (`app.ngan_sach_nhat_ky`), đổi quyền (`app.nhat_ky_quyen`), ghi tiếp xúc (`app.nhat_ky_tiep_xuc`). Lọc `?loai=`/`?tim=`, `/nhat-ky.csv`. **2 truy vấn** | năm sổ trên |
 | `/cai-dat` | **Cài đặt** (màn 21): người dùng & ba cờ quyền (đổi được CHỈ khi có `duoc_quan_tri` VÀ máy có cổng đăng nhập) · ngày lễ sắp tới · quy tắc khách · nguồn · hiển thị. Không bao giờ nhận mật khẩu | `app.nguoi_dung`, `mart.lich_kinh_doanh` |
 | `/giao-dien` | Đổi chế độ sáng/tối/theo hệ thống/theo giờ, ghi cookie, chuyển hướng về trang đã gọi | không đọc CSDL — chỉ đọc/ghi cookie |
+
+**Bất biến (072, bản sửa đè OBC — chủ DN chốt 2026-09-30):** người có cờ `duoc_sua_du_lieu` sửa thẳng giá trị
+OBC ở Kho dữ liệu › Bảng dữ liệu (đặc tả `2026-09-30-bang-du-lieu-sua-design.md`). Sáu luật:
+- **`core` KHÔNG BAO GIỜ bị web ghi.** Bản sửa là sổ CHỈ THÊM `app.sua_du_lieu` (`bang` ∈ khach / san_pham / gia / ton, `khoa`, `cot`,
+  `gia_tri`, `gia_tri_obc`, `bo`): `kome_app` bị `REVOKE UPDATE, DELETE`. CSDL CÓ `CHECK` trên giá trị (cột được phép theo bảng; số
+  ≥ 0 / giá > 0 / hạn là ngày CÓ THẬT qua `mart.la_ngay_obc`) — `kome_app` INSERT thẳng được, và một dòng sổ sai kiểu là mọi view
+  hiệu lực phía trên nổ VĨNH VIỄN (sổ không xoá được). Mã khách / mã hàng không sửa được (khoá nối); không thêm / xoá dòng.
+- **Luật hiệu lực viết ĐÚNG MỘT LẦN:** `mart.ap_sua(obc, j, cột)` / `mart.lech_obc(...)` — OBC vẫn ghi ĐÚNG giá trị lúc sửa
+  (`gia_tri_obc`) → bản sửa thắng; OBC đã ghi KHÁC (người ta đã sửa trong OBC) → OBC thắng, bản sửa tự hết hiệu lực không cần dọn;
+  dòng `bo = true` → OBC. Không view nào viết lại điều kiện đó. **`gia_tri_obc` phải là ĐÚNG chữ `::text` mà view so**
+  (`<cột core>::text`, `mart.bang_gia_kome.gia_obc`, `mart.ton_hien_tai.so_luong_obc` / `best_before_obc`) — lệch một ký tự là bản sửa
+  lặng lẽ không bao giờ áp, không lỗi nào nổ.
+- **Bốn view hiệu lực:** `mart.dim_customer`, `mart.dim_product` (cùng cột / kiểu / thứ tự với bản `core`, có test canh; thêm cột vào
+  `core.dim_customer` / `core.dim_product` nay PHẢI tạo lại `mart.dim_*`), `mart.bang_gia_kome` (+ `gia_obc`, `da_sua`),
+  `mart.ton_hien_tai` (+ `so_luong_obc`, `best_before_obc`, `sua_so_luong`, `sua_han`). Cột cặp mã–tên lấy TÊN theo mã hiệu lực (ngành
+  luôn là tên OBC có thật, không đẻ ngành mới). Bản sửa tồn sống tới ảnh chụp sau — màn nói ra. Không bị ảnh hưởng: tiền trên phiếu
+  và người phụ trách ghi trên phiếu (`core.fact_sales_line`), sổ công nợ.
+- **MỌI view / hàm của `mart` đọc `mart.dim_*`, không `core.dim_*`** (migration 072 khối `DO` đọc định nghĩa SỐNG trong danh mục
+  Postgres rồi viết lại). Test canh: `tests/test_bang_du_lieu_mart.py::test_KHONG_view_ham_mart_nao_con_doc_danh_muc_OBC_tho` — **một
+  migration SAU này chép thân view từ file migration CŨ sẽ đưa `core.dim_*` trở lại và lặng lẽ tắt bản sửa ở màn đó**: viết view
+  mới thì tham chiếu `mart.dim_*`, hoặc chạy lại phép viết lại. Phía Python: `tests/test_doc_hieu_luc.py` (danh sách trắng các file
+  được nhắc `core.dim_customer` / `core.dim_product`: loader, pipeline, `nhat_ky_nap`, `bang_kho`, `coverage`, `reader`,
+  `bang_du_lieu`) — thêm file hiển thị / phân tích mới đọc danh mục thì đọc `mart.dim_*`.
+- **Ảnh chụp:** `anh_chup._PHIEN_BAN` VÀ `_PHIEN_BAN_NAP` thêm `max(id)` của `app.sua_du_lieu` — bản sửa là "dữ liệu mới" như một
+  lần nạp; luật `chi_nap` thành "không đọc bảng `app` nào NGOÀI `app.sua_du_lieu`". `/nhat-ky` có nhánh `du_lieu` (trước → sau, hoặc
+  "về OBC").
+- **Hạng OBC (055) nay là "OBC trừ khi sửa trên web"** — `得意先ランク` vẫn là nguồn, nhưng `rank_code` đọc qua `mart.dim_customer`
+  nên ô bị sửa đè thắng cho tới khi OBC ghi khác; nhãn ngắn vẫn là `mart.hang_obc`. Cờ quyền thứ TƯ `duoc_sua_du_lieu`
+  (`ND.CO_QUYEN` ở cuối, `nhat_ky_quyen` CHECK có cờ đó, `python scripts/tao_nguoi_dung.py quyen <tên> --sua-du-lieu`): không có cổng
+  đăng nhập (máy công ty thiếu `KOME_SESSION_SECRET`) thì ai cũng sửa được — cùng nếp hai cờ cũ.
+Có test canh: `tests/test_bang_du_lieu_mart.py`, `tests/test_doc_hieu_luc.py`, `tests/test_bang_du_lieu.py`,
+`giao_dien/src/bang_du_lieu/logic.test.ts`. **Migration 072 phải chạy TRƯỚC khi triển khai** (mọi trang đọc `mart.dim_*` và cột
+`app.nguoi_dung.duoc_sua_du_lieu`).
 
 **Bất biến (055, hạng OBC — chủ DN chốt 2026-09-28):** hạng khách là **`得意先ランク` của
 OBC** (file `得意先全情報`, bản HIỆN HÀNH của `core.dim_customer` — không quay về theo mốc),

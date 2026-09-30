@@ -34,6 +34,12 @@ Mỗi dòng có các cột sau:
 
 Sổ CHỈ THÊM: `REVOKE UPDATE, DELETE` khỏi `kome_app`, cùng nếp 030 / 063 / 070. Chỉ mục `(bang, khoa, cot, id DESC)`.
 
+**CHECK giá trị ở mức CSDL** (`sua_du_lieu_cot_check` + `sua_du_lieu_gia_tri_check`, hàm `mart.la_ngay_obc`): `kome_app` INSERT
+thẳng được và sổ chỉ thêm, nên một dòng sai kiểu là MỌI view hiệu lực nổ vĩnh viễn (`::numeric`, `to_date`) mà không ai xoá được.
+Vì vậy CSDL chặn, không chỉ Python: `stock_qty` / `case_qty` / `pack1_base_qty` là số không âm ≤ 4 chữ số thập phân; `gia_chua_thue`
+> 0, không số mũ / NaN / Infinity; `best_before` rỗng, `賞味期限なし` hoặc ngày OBC CÓ THẬT (`mart.la_ngay_obc` — regex đơn thuần để
+`2027年02月30日` lọt qua rồi `to_date` nổ). Dòng `bo = true` không xét giá trị.
+
 Khoá theo bảng:
 
 | bang | khoa | cot được phép |
@@ -77,11 +83,12 @@ Mọi view hiệu lực gọi hai hàm đó — không view nào viết lại đ
   `is_current`, vì các view chỉ đọc bản hiện hành (đã kiểm: không view nào đọc bản cũ).
   - Nạp OBC đổi một cột khác của khách thì sinh phiên bản mới, nhưng cột đã sửa vẫn bằng `gia_tri_obc` → bản sửa vẫn thắng.
 - **`mart.dim_product`**: cùng cột với `core.dim_product`.
-- **`mart.bang_gia_kome`** (thân mới, thêm cột `da_sua boolean` ở CUỐI):
+- **`mart.bang_gia_kome`** (thân mới, thêm HAI cột ở CUỐI: `gia_obc` — giá OBC chưa thuế, đúng số mà `gia_tri_obc` so — và `da_sua boolean`):
   - `gia_chua_thue` của dòng hiện hành = `ap_sua(gia OBC::text, j, 'gia_chua_thue')::numeric`.
   - `doi` và `duoi_gia_von` tính trên giá hiệu lực. `hai_cot_lech` giữ theo OBC.
   - `mart.gia_kome_bang`, trang đối thủ, `/bang-gia`, tab Giá & lãi tự đi theo.
-- **`mart.ton_hien_tai`** (thân mới, thêm cột `da_sua` ở CUỐI):
+- **`mart.ton_hien_tai`** (thân mới, thêm BỐN cột ở CUỐI: `so_luong_obc`, `best_before_obc`, `sua_so_luong`, `sua_han` — thay cho một cột
+  `da_sua`, vì số lượng và hạn là hai ô sửa độc lập và `gia_tri_obc` phải lấy ĐÚNG chữ OBC mà view so):
   - `so_luong` = hiệu lực của `stock_qty`, `best_before` = hiệu lực.
   - `gia_tri` = `stock_value` của OBC, hoặc `round(so_luong × stock_unit_cost)` khi số lượng bị sửa.
   - `loai_han` / `han_con_lai` tính trên hạn hiệu lực.
@@ -100,6 +107,8 @@ Mọi view hiệu lực gọi hai hàm đó — không view nào viết lại đ
 - **Test canh (bắt buộc):** trên danh mục của CSDL test, KHÔNG view / hàm nào trong `mart` (trừ hai view hiệu lực) còn chứa
   `core.dim_customer` / `core.dim_product`. Lý do: migration sau chép thân view từ file migration cũ sẽ lặng lẽ đưa chỗ đọc
   OBC thô trở lại.
+- Đổi phía nguồn: thêm một cột vào `core.dim_customer` / `core.dim_product` nay phải tạo lại `mart.dim_*` (có test canh
+  cùng cột / cùng kiểu / cùng thứ tự: `tests/test_bang_du_lieu_mart.py::test_view_hieu_luc_cung_cot_cung_kieu_voi_core`).
 - Python: mọi chỗ HIỂN THỊ / phân tích / kiểm mã tồn tại đổi sang `mart.dim_*`. Giữ `core`: loader, pipeline, hoàn tác,
   `nhat_ky_nap`, `bang_kho`, và chính `kome/bang_du_lieu.py` (cần giá trị OBC). Test canh: danh sách trắng các file Python
   được nhắc `core.dim_customer` / `core.dim_product`.
@@ -130,8 +139,8 @@ Trả MỘT lượt hỏi, không qua ảnh chụp, `no-store`:
 ```
 { loai, cot: [{ma, nhan, nhom, kieu: 'chu'|'so'|'ngay'|'chon', sua: bool, chon?: [[mã, nhãn]]}],
   dong: [{k, o: {ma_cot: giá trị hiệu lực}}],
-  lech: {"<k>|<ma_cot>": {obc, luc, ai}},   // ô bản sửa đang thắng
-  moc: {anh_ton, lan_nap_gia} }
+  lech: {"<k>	<ma_cot>": {obc, luc, ai}},   // ô bản sửa đang thắng; khoá nối bằng TAB (mã cột / khoá có thể chứa '|')
+  anh_ton, lan_nap_gia }                      // cùng cấp với loai / cot / dong, KHÔNG nằm trong `moc`
 ```
 
 Nhóm cột:
@@ -148,6 +157,9 @@ Nhóm cột:
 ### `POST /api/kho-du-lieu/bang-du-lieu/luu`
 
 Thân: `{loai, o: [{k, cot, gia_tri, thay}]}`. `thay` = giá trị hiệu lực trình duyệt đã thấy.
+**Trình duyệt GHI LẠI `thay` ngay lúc ô vào chờ lưu lần đầu** (`logic.ts::ChoLuu.thay`), không đọc lại từ đệm lúc bấm Lưu: đệm có
+thể đã đổi (tải lại, "Lấy bản mới", dòng đọc lại mang số người khác vừa ghi) — đọc lúc lưu là lặng lẽ "rebase" ô lên số mới và
+409 không bao giờ nổ (mất cập nhật).
 
 Máy chủ làm theo thứ tự:
 1. Kiểm cờ quyền → 403.
@@ -159,7 +171,10 @@ Máy chủ làm theo thứ tự:
    - mỗi ô một dòng sổ, `gia_tri_obc` đọc từ `core` NGAY LÚC ĐÓ;
    - giá trị mới = OBC thì ghi `bo = true` (về OBC);
    - giá trị mới = hiệu lực hiện tại thì bỏ qua ô đó.
-5. Trả các ô sau khi lưu (hiệu lực + `lech`).
+5. Trả các ô sau khi lưu (hiệu lực + `lech`). Dòng đọc lại chỉ mang ô sửa được (`o`), KHÔNG mang khoá chỉ số chỉ-xem
+   (`dt_12t`, `ton_tong`, `lan_cuoi`): hai lượt đọc trong `luu()` bỏ hẳn CTE quét `mart.ban_den_moc`; trình duyệt giữ chỉ số cũ
+   của dòng khi trộn.
+   Lỗi 400 / 409 đánh khoá từng ô `"<k>	<cot>"` (cùng dạng khoá `lech`).
 
 Trần 2.000 ô mỗi lần lưu.
 
