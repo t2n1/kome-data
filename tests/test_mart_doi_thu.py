@@ -733,7 +733,7 @@ def test_070_dai_dien_la_gia_re_nhat_cho_khach_thuong_moi_mat_hang(conn, batch):
     r = {x[0]: x for x in _hh(conn, "NEXT")}
     assert [i for i, x in r.items() if x[3]] == [kho]                    # rẻ nhất trong mức khách thường
     assert {x[4] for x in r.values()} == {"h1"} and {x[6] for x in r.values()} == {5}
-    assert all(x[5] is None or float(x[5]) == 450 for x in r.values())   # pallet của mặt hàng = dòng muc 'pallet'
+    assert all(x[5] is not None and float(x[5]) == 450 for x in r.values())   # pallet của mặt hàng = dòng muc 'pallet', MỌI dòng
 
 
 def test_070_dai_dien_roi_ve_khi_khong_co_muc_khach_thuong(conn, batch):
@@ -799,3 +799,47 @@ def test_070_la_muc_khach_thuong(conn):
                                mart.la_muc_khach_thuong('pallet'), mart.la_muc_khach_thuong('khach_ngoai'),
                                mart.la_muc_khach_thuong('kyushu')""").fetchone()
     assert r == (True, True, False, False, False)
+
+
+def test_070_dai_dien_uu_tien_dong_dung_duoc_khong_phai_dong_het(conn, batch):
+    _hang(conn, batch)
+    het = _qs(conn, batch, "HETB", 400, hang="h3", trang="het")            # khách thường nhưng HẾT
+    ngoai = _qs(conn, batch, "HETB", 500, hang="h3")
+    _muc(conn, ngoai, muc="khach_ngoai")
+    assert [x[0] for x in _hh(conn, "HETB") if x[3]] == [ngoai]           # dòng còn hàng thắng dòng khách thường đã hết
+    assert het in {x[0] for x in _hh(conn, "HETB")}
+    s = conn.execute("SELECT so_ben, so_quan_sat, thap_nhat FROM mart.so_sanh_nhom WHERE nhom_khoa = 'ma:NT01'").fetchone()
+    assert (s[0], s[1], float(s[2])) == (1, 1, 500)                        # mặt hàng KHÔNG rơi khỏi so sánh
+
+
+def test_070_dai_dien_bo_qua_dong_bat_thuong(conn, batch):
+    _hang(conn, batch)
+    for ben, g in [("A", 540), ("B", 560), ("C", 580)]:
+        _qs(conn, batch, ben, g, hang=f"h{ben}")
+    cho = _qs(conn, batch, "D", 5, hang="hD")                              # chỗ giữ ¥5, khách thường
+    binh = _qs(conn, batch, "D", 520, hang="hD")
+    _muc(conn, binh, kenh="gui")
+    r = {x[0]: x for x in _hh(conn, "D")}
+    assert conn.execute("SELECT bat_thuong FROM mart.gia_doi_thu_hien_hanh WHERE id = %s AND nguon = 'nap'", (cho,)).fetchone()[0]
+    assert [i for i, x in r.items() if x[3]] == [binh]                     # không phải dòng ¥5 bất thường
+
+
+def test_070_gia_khach_ke_khong_bao_gio_la_dai_dien(conn, batch):
+    _hang(conn, batch)
+    _qs(conn, batch, "THAK", 540, hang="hK")
+    fid = _ke(conn, "202601010001", "ma:NT01", 700)
+    assert conn.execute("SELECT dai_dien FROM mart.gia_doi_thu_hien_hanh WHERE nguon = 'tay' AND id = %s",
+                        (fid,)).fetchone()[0] is False
+
+
+def test_070_trung_vi_va_so_ben_nhom_tinh_moi_mat_hang_mot_gia(conn, batch):
+    _hang(conn, batch)
+    a1 = _qs(conn, batch, "A", 500, hang="hA")
+    a2 = _qs(conn, batch, "A", 900, hang="hA")
+    _muc(conn, a2, muc="khach_ngoai")
+    _qs(conn, batch, "B", 560, hang="hB")
+    _qs(conn, batch, "C", 580, hang="hC")
+    rows = conn.execute("SELECT id, trung_vi_nhom, so_ben_nhom FROM mart.gia_doi_thu_hien_hanh WHERE nhom_khoa = 'ma:NT01'").fetchall()
+    assert len(rows) == 4
+    assert all(float(x[1]) == 560 and x[2] == 3 for x in rows)             # 900 của bên A không kéo trung vị lên
+    assert {a1, a2} <= {x[0] for x in rows}

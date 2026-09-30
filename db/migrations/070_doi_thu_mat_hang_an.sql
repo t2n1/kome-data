@@ -55,7 +55,7 @@ DROP VIEW mart.so_sanh_nhom;
 DROP VIEW mart.gia_doi_thu_hien_hanh;
 DROP VIEW mart.gia_doi_thu_quan_sat;
 
--- Thân = 067 (chép nguyên), thêm 070: sổ ẩn (an_), gộp tay (gop_), cột an / mat_hang_khoa / an_hien_hanh ở CUỐI.
+-- Thân = 067 (chép nguyên), thêm 070: sổ ẩn (an_), gộp tay (gop_), cột an / mat_hang_khoa / an_hien_hanh (sau `bac`, xem chú thích đầu file).
 CREATE VIEW mart.gia_doi_thu_quan_sat AS
 WITH dc AS (
     SELECT DISTINCT ON (fact_id, truong) fact_id, truong, gia_tri_moi
@@ -241,12 +241,16 @@ FROM k;
 --    / mart.gia_kome_bang chỉ được đánh giá MỘT lần mỗi câu): cột nhom_* giống nhau trên mọi dòng của một nhom_khoa.
 CREATE VIEW mart.gia_doi_thu_hien_hanh AS
 WITH q AS MATERIALIZED (SELECT * FROM mart.gia_doi_thu_quan_sat WHERE hien_hanh),
-mh AS (       -- 070: MỘT giá mỗi mặt hàng cho mốc "bất thường" — rẻ nhất cho khách thường, không hết, không khách kể
-    SELECT nhom_khoa, don_vi_so, ma_doi_thu, mat_hang_khoa, min(yen_chuan) AS gia
+mh AS (       -- 070: MỘT giá mỗi mặt hàng cho mốc "bất thường" — rẻ nhất cho khách thường còn hàng, không có thì rẻ nhất
+              -- không-pallet còn hàng (hai hạng đầu của đại diện, nhưng KHÔNG lọc bất thường — chính mốc này cần nó); không khách kể
+    SELECT nhom_khoa, don_vi_so, ma_doi_thu, mat_hang_khoa,
+           coalesce(min(yen_chuan) FILTER (WHERE mart.la_muc_khach_thuong(muc_gia)),
+                    min(yen_chuan) FILTER (WHERE coalesce(muc_gia, '') <> 'pallet')) AS gia
     FROM q
     WHERE nhom_khoa IS NOT NULL AND yen_chuan IS NOT NULL AND trang_thai <> 'het' AND loai_nguon <> 'khach_ke'
-      AND mart.la_muc_khach_thuong(muc_gia)
     GROUP BY 1, 2, 3, 4
+    HAVING coalesce(min(yen_chuan) FILTER (WHERE mart.la_muc_khach_thuong(muc_gia)),
+                    min(yen_chuan) FILTER (WHERE coalesce(muc_gia, '') <> 'pallet')) IS NOT NULL
 ),
 tv AS (
     SELECT nhom_khoa, don_vi_so,
@@ -315,16 +319,21 @@ CROSS JOIN LATERAL (
 )
 SELECT x.*,
        x.loai_nguon <> 'khach_ke' AND row_number() OVER mh_w = 1                             AS dai_dien,
-       min(x.gia_pallet) OVER (PARTITION BY x.nhom_khoa, x.don_vi_so, x.ma_doi_thu, x.mat_hang_khoa,
+       min(x.gia_pallet) FILTER (WHERE NOT x.bat_thuong) OVER (PARTITION BY x.nhom_khoa, x.don_vi_so, x.ma_doi_thu, x.mat_hang_khoa,
                                             (x.loai_nguon = 'khach_ke'))                    AS gia_pallet_mh,
        count(*) OVER (PARTITION BY x.nhom_khoa, x.don_vi_so, x.ma_doi_thu, x.mat_hang_khoa,
                                    (x.loai_nguon = 'khach_ke'))                             AS so_muc
 FROM x
 WINDOW mh_w AS (
     PARTITION BY x.nhom_khoa, x.don_vi_so, x.ma_doi_thu, x.mat_hang_khoa, (x.loai_nguon = 'khach_ke')
+    -- Hạng (nhỏ thắng), "dùng được" = còn hàng, có giá, không bất thường: 0 khách thường dùng được · 1 không-pallet dùng
+    -- được · 2 dùng được (pallet) · 3 khách thường (hết / bất thường) · 4 còn lại. (Đừng xếp dòng HẾT trên dòng còn hàng.)
     ORDER BY CASE WHEN mart.la_muc_khach_thuong(x.muc_gia) AND x.trang_thai <> 'het' AND x.yen_chuan IS NOT NULL
                        AND NOT x.bat_thuong THEN 0
-                  WHEN coalesce(x.muc_gia, '') <> 'pallet' THEN 1 ELSE 2 END,
+                  WHEN coalesce(x.muc_gia, '') <> 'pallet' AND x.trang_thai <> 'het' AND x.yen_chuan IS NOT NULL
+                       AND NOT x.bat_thuong THEN 1
+                  WHEN x.trang_thai <> 'het' AND x.yen_chuan IS NOT NULL AND NOT x.bat_thuong THEN 2
+                  WHEN mart.la_muc_khach_thuong(x.muc_gia) THEN 3 ELSE 4 END,
              x.yen_chuan NULLS LAST, x.nguon, x.id);
 
 -- Thân = 062, thêm giá KOME chuẩn / bảng / khuyến mãi (066) — khối "KOME của nhóm" nay ĐỌC các cột nhom_* của
