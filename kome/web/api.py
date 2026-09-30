@@ -933,6 +933,18 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import doi_thu as DT
         return await _dt_ghi(request, lambda c, b, n: DT.sua_mat_hang(c, b, n))
 
+    @r.post("/doi-thu/an")
+    async def dt_an(request: Request):
+        """{nguon, id, an, da_xem, ghi_de} -> {ok, nguon, id, sua_cuoi} (DT.dat_an). Người khác vừa sửa -> 409."""
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.dat_an(c, b, n))
+
+    @r.post("/doi-thu/gop-mat-hang")
+    async def dt_gop_mat_hang(request: Request):
+        """{ma_doi_thu, ma_hang_dt, vao_ma_hang_dt|null, da_xem, ghi_de} -> {ok, …, vao_ma_hang_dt} (DT.gop_mat_hang)."""
+        from kome import doi_thu as DT
+        return await _dt_ghi(request, lambda c, b, n: DT.gop_mat_hang(c, b, n))
+
     @r.post("/doi-thu/giao-hang")
     async def dt_sua_giao_hang(request: Request):
         """{ma_doi_thu, thay_doi, da_xem, ghi_de} -> {ok, sua_cuoi}."""
