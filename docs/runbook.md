@@ -25,16 +25,18 @@ python -m uvicorn kome.web.app:app --host 127.0.0.1 --port 8000
 ```
 
 Rồi mở trình duyệt vào <http://127.0.0.1:8000>. Trang kéo–thả file nằm ở
-mục **Kho dữ liệu → Nạp dữ liệu mới** (<http://127.0.0.1:8000/kho-du-lieu/nap>). Lệnh này **tự đọc `.env`** nên
+mục **Kho dữ liệu → Nạp dữ liệu** (<http://127.0.0.1:8000/kho-du-lieu>). Lệnh này **tự đọc `.env`** nên
 không cần nạp biến môi trường trước. Cứ để cửa sổ đó mở; đóng cửa sổ là trang
 tắt.
 
-Màn Kho dữ liệu có thanh trái: **Tổng quan độ phủ** (sức khoẻ, bảng phủ ngày /
-tháng) · **Nạp dữ liệu mới** · sơ đồ luồng · cột nối · dữ liệu đi đâu. Nạp có
-**hai bước**: thả file vào đúng ô của nó (hay thả cả 3 file 13:30 vào ô "Nạp
-nhiều file") → màn hiện kết quả 5 cổng kiểm, **chưa ghi gì** → bấm **Xác nhận nạp
-vào kho** (hay **Huỷ**). Quên bấm Xác nhận thì file nằm ở khối "Đang chờ xác
-nhận" tới 24 giờ. Bản trên mạng (Vercel) không có mục Nạp và không có nút
+Màn Kho dữ liệu (gọn lại 2026-09-30) có hai mục chính: **Nạp dữ liệu** (ba ô file
+13:30 · hàng nút file khác · lô gần nhất + hoàn tác · lịch dữ liệu theo tháng, bấm
+tháng xem từng ngày) và **Xem dữ liệu** (bảng tính Sản phẩm / Khách hàng). Mục
+**Nâng cao** (đóng sẵn): Tình trạng kho (sao lưu, lần nạp cuối, loại chưa vào kho,
+hạn chế) · sơ đồ luồng · cột nối · dữ liệu đi đâu · duyệt bảng. Nạp có **hai
+bước**: thả file vào đúng ô của nó (hay thả cả 3 file 13:30 vào nút "Nhiều file")
+→ màn hiện 5 chấm cổng kiểm, **chưa ghi gì** → bấm **Xác nhận nạp** (hay **Huỷ**).
+Quên bấm Xác nhận thì file nằm ở dòng ⏳ "đang chờ" tới 24 giờ. Bản trên mạng (Vercel) không có mục Nạp và không có nút
 **Hoàn tác** — xem [docs/trien-khai-vercel.md](trien-khai-vercel.md) để biết vì
 sao và cách đưa lên.
 
@@ -268,7 +270,7 @@ KOME (`mart.gia_kome_bang`) và điều kiện giao hàng hiện hành (`068`). 
    (`ColumnMismatch`):
    - `商品データ` phải có `荷姿１－荷姿区分コード` và `荷姿１－基準単位当り荷姿区分数`;
    - `取引単価データ` phải có `標準価格（税抜）` và `標準価格（税込）`.
-3. Nạp lại `商品データ` và `取引単価データ` MỚI NHẤT (màn `/kho-du-lieu/nap`). Chưa nạp lại thì `pack1_code` NULL
+3. Nạp lại `商品データ` và `取引単価データ` MỚI NHẤT (màn `/kho-du-lieu`). Chưa nạp lại thì `pack1_code` NULL
    (kg giữ luật cũ của `060`) và không có 標準価格.
 4. Sau khi nạp, soát các mã **không có 荷姿** (`pack1_code = ''`) mà bán bằng quy cách `'00'`: luật mới của `066`
    coi một `'00'` là CẢ sản phẩm như tên ghi (xốt Barona 80g × 20 × 4 = 6,4 kg) và áp cho MỌI mã như thế, nên ¥/kg

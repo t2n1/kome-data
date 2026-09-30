@@ -128,7 +128,7 @@ Mở địa chỉ Vercel bằng **cửa sổ ẩn danh** (Ctrl+Shift+N) rồi so
       Kho dữ liệu — đích mặc định sau đăng nhập là `/`, và không phải tài
       khoản nào cũng vào được Kho dữ liệu (xem dòng dưới).
 - [ ] Đăng nhập bằng một tài khoản **có** quyền `--kho-du-lieu`, mở
-      `/kho-du-lieu/nap` → thấy các ô thả file. Thả một file master nhỏ
+      `/kho-du-lieu` → thấy các ô thả file. Thả một file master nhỏ
       (vd `仕入先`) → Kiểm → Xác nhận → lô mới hiện trong "Lô nạp gần nhất" →
       Hoàn tác lô đó. Chọn một file > 4 MB → bị chặn ngay ở trình duyệt với câu
       "quá lớn cho bản web".

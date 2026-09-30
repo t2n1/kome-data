@@ -69,7 +69,7 @@ def test_xac_nhan_nap_day_du_va_xoa_file_cho(c, conn, tmp_path):
 def test_huy_xoa_file_cho_khong_nap(c, conn, tmp_path):
     ma = _kiem(c)["kiem"][0]["ma"]
     r = c.post("/upload/huy", data={"ma": [ma]}, follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/kho-du-lieu/nap"
+    assert r.status_code == 303 and r.headers["location"] == "/kho-du-lieu"
     assert nap_cho.doc(tmp_path / "kho", ma) is None
     conn.rollback()
     assert _dem(conn) == (0, 0)
@@ -121,7 +121,7 @@ def test_man_nap_va_duong_dan_cu(c):
     m = man(r.text)
     assert [n["ma"] for n in m["nguon"]] == [o["ma"] for o in KDL.O_NAP if o["ma"] in KDL.MA_DUNG]
     assert "lo" in m and m["cho"] == []
-    assert c.get("/nap", follow_redirects=False).headers["location"] == "/kho-du-lieu/nap"
+    assert c.get("/nap", follow_redirects=False).headers["location"] == "/kho-du-lieu"
     src = nguon("he_thong", "KhoDuLieu.tsx")
     assert 'action="/upload/kiem"' in src and 'action="/upload/xac-nhan"' in src and 'action="/upload/huy"' in src
 

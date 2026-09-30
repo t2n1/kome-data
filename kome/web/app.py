@@ -973,7 +973,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             return _cam(request)
         for m_ in ma:
             kho_cho.xoa(m_)
-        return RedirectResponse("/kho-du-lieu/nap", status_code=303)
+        return RedirectResponse("/kho-du-lieu", status_code=303)
 
     def _ghi_ai(conn, cot: str, batch_ids: list[int], nguoi) -> None:
         """Ghi AI nạp / AI hoàn tác vào meta.ingest_batch (033) cho Nhật ký
@@ -993,28 +993,23 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             _in(f"[nhat-ky] không ghi được {cot} cho lô {batch_ids}: {e!r}")
 
     def _du_lieu_kho(conn, ngay_thang: str | None = None):
-        """Mọi thứ màn Tổng quan độ phủ cần, gom một chỗ (đặc tả
-        2026-09-25-tong-quan-do-phu-luoi): lưới tháng × loại dữ liệu + tình
-        trạng từng nguồn + bảng lần nạp cuối. `ngay_thang` chỉ là tháng chọn sẵn
-        của khối chi tiết — mọi ngày của mọi tháng đã nằm trong `phu`."""
+        """Mọi thứ màn Kho dữ liệu › Nạp cần (2026-09-30: MỘT màn — ô nạp, file chờ, lô gần nhất + hoàn tác,
+        lịch dữ liệu), gom một chỗ; cũng là dữ liệu của Tình trạng kho. `ngay_thang` chỉ là tháng chọn sẵn
+        của khối từng ngày — mọi ngày của mọi tháng đã nằm trong `phu`."""
         from kome import coverage as COV, kho_du_lieu as KDL
         tuoi = tinh_tuoi(conn)
         status = trang_thai_nap(conn)
-        return {"man": "tong_quan", "status": status, "tuoi": tuoi,
+        return {"man": "nap", "status": status, "tuoi": tuoi,
                 "phu": COV.tinh_luoi_phu(conn, hom_nay=tuoi.hom_nay),
                 "ngay_thang": ngay_thang if ngay_thang and re.fullmatch(r"\d{4}-\d{2}", ngay_thang) else None,
                 "nguon": KDL.nut_nguon(status, tuoi, tuoi.hom_nay),
-                "thieu_bo_nap": COV.THIEU_BO_NAP}
-
-    def _du_lieu_nap(conn):
-        """Màn Nạp: các ô nạp (cùng danh sách với sơ đồ nguồn), file đang chờ
-        xác nhận, lô gần nhất + hoàn tác."""
-        from kome import kho_du_lieu as KDL, nap_cho
-        tuoi = tinh_tuoi(conn)
-        nguon = KDL.nut_nguon(trang_thai_nap(conn), tuoi, tuoi.hom_nay)
-        return {"man": "nap", "tuoi": tuoi, "nguon": nguon,
+                "thieu_bo_nap": COV.THIEU_BO_NAP,
                 "cho": [] if chi_doc else kho_cho.danh_sach(),
                 "lo": lo_nap_gan_nhat(conn)}
+
+    def _du_lieu_nap(conn):
+        """Kết quả POST /upload* vẽ lại chính màn Nạp."""
+        return _du_lieu_kho(conn)
 
     def _man_kho(request: Request, ctx: dict) -> HTMLResponse:
         """Màn Kho dữ liệu React. Ô tuổi dữ liệu đi qua `window.__KOME__.tuoi`
@@ -1029,32 +1024,34 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                                  "trang_thai": n.trang_thai, "tre": n.tre} for n in t.nguon]}
         return HTMLResponse(SPA.trang(_data_theme(_che_do_giao_dien(request)), kd))
 
-    @app.get("/kho-du-lieu/nap", response_class=HTMLResponse)
-    def kho_du_lieu_nap(request: Request):
-        try:
-            with open_conn() as conn:
-                ctx = _du_lieu_nap(conn)
-            return _man_kho(request, ctx)
-        except Exception as e:
-            return _loi(request, "mở màn nạp dữ liệu", e)
+    def _sao_luu():
+        # BACKUP_DIR đọc mỗi lần gọi, không chốt lúc tạo app — test và người vận hành đổi biến môi trường thì
+        # trang phải thấy ngay. Bản chỉ-đọc / máy chủ công khai KHÔNG nói gì về sao lưu: sao lưu chạy trên máy
+        # nội bộ, máy chủ công khai không nhìn thấy thư mục .zip đó nên sẽ luôn kết luận "chưa sao lưu" — một
+        # dải đỏ vĩnh viễn dạy người đọc bỏ qua dải đỏ (kể cả khi nạp được, 045).
+        return None if chi_doc or bao_mat.tren_mang() else backup_status(Path(os.environ.get("BACKUP_DIR", "./backups")))
 
+    # /kho-du-lieu và /kho-du-lieu/nap là CÙNG màn (2026-09-30) — đường cũ giữ cho dấu trang và biểu mẫu cũ.
     @app.get("/kho-du-lieu", response_class=HTMLResponse)
+    @app.get("/kho-du-lieu/nap", response_class=HTMLResponse)
     def kho_du_lieu(request: Request, ngay_thang: str | None = None):
         try:
-            # BACKUP_DIR đọc mỗi lần gọi, không chốt lúc tạo app — test và
-            # người vận hành đổi biến môi trường thì trang phải thấy ngay.
-            backup_dir = Path(os.environ.get("BACKUP_DIR", "./backups"))
             with open_conn() as conn:
                 ctx = _du_lieu_kho(conn, ngay_thang)
-            # Bản chỉ-đọc KHÔNG nói gì về sao lưu: sao lưu chạy trên máy nội
-            # bộ, máy chủ công khai không nhìn thấy thư mục .zip đó nên sẽ
-            # luôn kết luận "chưa sao lưu" — một dải đỏ vĩnh viễn dạy người
-            # đọc bỏ qua dải đỏ.
-            # Máy chủ công khai không thấy thư mục sao lưu — kể cả khi nạp được (045).
-            ctx["backup"] = None if chi_doc or bao_mat.tren_mang() else backup_status(backup_dir)
+            ctx["backup"] = _sao_luu()
             return _man_kho(request, ctx)
         except Exception as e:
             return _loi(request, "mở màn kho dữ liệu", e)
+
+    @app.get("/kho-du-lieu/tinh-trang", response_class=HTMLResponse)
+    def kho_du_lieu_tinh_trang(request: Request):
+        try:
+            with open_conn() as conn:
+                ctx = _du_lieu_kho(conn)
+            ctx["backup"] = _sao_luu()
+            return _man_kho(request, ctx)
+        except Exception as e:
+            return _loi(request, "mở tình trạng kho", e)
 
     # ---- Tài liệu sống (đợt 2b) -------------------------------------
     # 0 truy vấn: KHÔNG open_conn(). Nguồn là files.yml (lúc chạy) và ảnh
@@ -1115,11 +1112,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
 
     @app.get("/nap", include_in_schema=False)
     def _cu_nap():
-        return RedirectResponse("/kho-du-lieu/nap", status_code=301)
+        return RedirectResponse("/kho-du-lieu", status_code=301)
 
     @app.get("/health", include_in_schema=False)
     def _cu_health():
-        return RedirectResponse("/kho-du-lieu", status_code=301)
+        return RedirectResponse("/kho-du-lieu/tinh-trang", status_code=301)
 
     @app.get("/phu-du-lieu", include_in_schema=False)
     def _cu_phu_du_lieu():
@@ -1247,7 +1244,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 undo_batch(conn, batch_id)
                 _ghi_ai(conn, "huy_boi", [batch_id], getattr(request.state, "nguoi", None))
             anh_chup.lam_nong(open_app_conn)
-            return RedirectResponse("/kho-du-lieu/nap#lo-nap", status_code=303)
+            return RedirectResponse("/kho-du-lieu#lo-nap", status_code=303)
         except Exception as e:
             return _loi(request, "hoàn tác lần nạp dữ liệu", e)
 

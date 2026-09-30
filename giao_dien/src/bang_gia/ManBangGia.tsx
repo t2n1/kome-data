@@ -43,7 +43,7 @@ export default function ManBangGia() {
           <div className="phu">{so(coGia)}/{so(d.ma.length)} mã có giá · lần nạp 取引単価データ mới nhất {ngay(d.moi_nhat)} · giá <b>chưa thuế</b></div></div>
       </div>
       <p className="bg-chi-xem" role="note">Trang này <b>chỉ để xem</b>. Giá là dữ liệu của OBC: muốn đổi giá thì sửa trong OBC rồi
-        xuất lại <span className="ten-jp">取引単価データ</span> và nạp ở <a href="/kho-du-lieu/nap">Kho dữ liệu › Nạp</a>.
+        xuất lại <span className="ten-jp">取引単価データ</span> và nạp ở <a href="/kho-du-lieu">Kho dữ liệu › Nạp</a>.
         {!coStd && <> Chưa có cột <span className="ten-jp">標準価格</span> — file đã nạp là bản xuất cũ; xuất lại bản có cột đó để
           trang đối thủ so với giá chuẩn thay vì giá thực bán.</>}</p>
 

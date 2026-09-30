@@ -130,7 +130,7 @@ def test_health_liet_ke_ngay_lam_viec_bi_thieu(conn, test_db_url, batch):
     ban = next(d for d in man(r.text)["phu"]["dong"] if d["khoa"] == "ban")
     assert ban["dau"] == "2026-05-11" and ban["cuoi"] == "2026-05-13"   # kỳ dữ liệu
     assert ban["thieu"] == ["2026-05-12"]
-    assert "xuất\n      lại {d.ten_obc} của đúng những ngày đó" in nguon("he_thong", "KhoDuLieu.tsx")
+    assert "Xuất lại {v.d.ten_obc} của đúng những ngày đó" in nguon("he_thong", "KhoDuLieu.tsx")
     # cuối tuần 2026-05-09 (Bảy) / 2026-05-10 (CN) nằm ngoài kỳ, không được kể
 
 
@@ -375,7 +375,7 @@ def test_trang_phu_du_lieu_co_bang_theo_tung_ngay(conn, test_db_url, monkeypatch
     client = TestClient(create_app(db_url=test_db_url))
     r = client.get("/phu-du-lieu")
     assert r.status_code == 200
-    assert "<h2>Từng ngày — tháng {nhanThang(t.thang)}</h2>" in nguon("he_thong", "KhoDuLieu.tsx")
+    assert '<section id="theo-ngay">' in nguon("he_thong", "KhoDuLieu.tsx")
     p = man(r.text)["phu"]
     cuoi = p["thang"][-1]
     assert cuoi["thang"] == "2026-09" and len(cuoi["lich"]) == 17   # 1/9 → hôm nay 17/9
