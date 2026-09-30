@@ -19,7 +19,7 @@ import type { GiaoHang, Nhom, SoSanhApi } from "./kieu";
 import { dongMoSan } from "./loc";
 import { mauKomeSoTT } from "./mau";
 import { tenNganh } from "./nganh";
-import { batTat, demThieu, khoaNhom, LUA_CHON_GK, locDanhSach, macDinhSp, NHAN_SL, nhomChon, pcDau, soMatHang,
+import { batTat, demThieu, dongTrai, khoaNhom, LUA_CHON_GK, locDanhSach, macDinhSp, NHAN_SL, nhomChon, pcDau,
   type NutNhanh, type SoLuong } from "./so_sanh_logic";
 import { SuaMatHang } from "./SuaMatHang";
 import { SuaGiaoHang } from "./SuaNho";
@@ -67,7 +67,7 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, ben, phi, nhom, dat }:
   const daChon = useRef(sp.length > 0 || !!ben);
   const chonSp = useMemo(() => (sp.length || daChon.current ? sp : macDinhSp(tatCa ?? [])), [sp, tatCa]);
   const chon = useMemo(() => nhomChon(tatCa ?? [], chonSp), [tatCa, chonSp]);
-  const ds = useMemo(() => locDanhSach(tatCa ?? [], { nganh, tim, nhanh, ben }), [tatCa, nganh, tim, nhanh, ben]);
+  const ds = useMemo(() => dongTrai(locDanhSach(tatCa ?? [], { nganh, tim, nhanh, ben }), tatCa ?? []), [tatCa, nganh, tim, nhanh, ben]);
   // Một chip mỗi tên HIỂN THỊ (hai cách viết OBC của cùng ngành → một chip; locDanhSach so theo tên hiển thị).
   const dsNganh = useMemo(() => [...new Map((tatCa ?? []).map(n => [tenNganh(n.nganh), n.nganh ?? ""])).values()]
     .sort((a, b) => a.localeCompare(b, "ja")), [tatCa]);
@@ -140,18 +140,19 @@ export function TabSoSanh({ sp, sl, xem, gk, cung, nganh, ben, phi, nhom, dat }:
               aria-label={`Bỏ lọc bên ${tenBen}`} onClick={() => dat({ ben: "" })}>Bên: {tenBen} ✕</button></div>}
             <p className="dt-toi-da" role="status">{toiDa ? `Tối đa ${TOI_DA_SP}` : ""}</p>
             <ul className="dt-mhs">
-              {ds.map(n => {
+              {ds.map(({ n, soKg, soChuaQuy }) => {
                 const on = chonSp.includes(n.nhom_khoa);
                 const p = n.lech_trung_vi == null ? null : Math.round(n.lech_trung_vi * 100);
                 const ten = n.ten_nhom ?? n.nhom_khoa;
                 return (
-                  <li key={khoaNhom(n)}>
+                  <li key={n.nhom_khoa}>
                     <label className={"dt-mh" + (on ? " chon" : "")}>
                       <input type="checkbox" checked={on} onChange={() => batTatNhom(n.nhom_khoa)} />
                       <HinhMa ma={n.ma_kome?.[0]} ten={ten} co={34} trang_tri />
                       <span>
                         <b><i className={"dt-cham " + mauKomeSoTT(p)} aria-hidden="true" />{ten}</b>
-                        <small>KOME {pcDau(p)} · {soMatHang(n)} mặt hàng đối thủ</small>
+                        <small>KOME {pcDau(p)}{(soKg > 0 || !soChuaQuy) && ` · ${soKg} mặt hàng đối thủ`}
+                          {soChuaQuy > 0 && ` · ${soChuaQuy} chưa quy ra ¥/kg`}</small>
                       </span>
                     </label>
                   </li>);
