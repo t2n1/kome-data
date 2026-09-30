@@ -39,7 +39,8 @@ type SoSanhSo = { ma: string; nhan: string; co: boolean; tu: string; den: string
   tang_dt: number | null; tang_lg: number | null; tang_khach: number | null; chenh_ty_suat: number | null };
 type KhTT = { ma: string; ten: string; doanh_thu: number; thu_hang: number; ty_trong: number | null; luy_ke: number | null };
 type Nguoi = { ma: string; ten: string | null; thuc_te: number; muc_tieu: number | null; muc_tieu_den_hom_nay: number | null;
-  tien_do: number | null; muc_tieu_lg: number | null; thuc_te_lg: number; tien_do_lg: number | null };
+  tien_do: number | null; muc_tieu_lg: number | null; thuc_te_lg: number; tien_do_lg: number | null;
+  muc_tieu_lg_den_hom_nay: number | null };
 type ThangCty = { thang: string; thuc_te: number | null; ngan_sach: number | null; thuc_te_lg: number | null; ngan_sach_lg: number | null };
 type Td = { company_fy: number; thang: string; hom_nay: string | null; ngay_kd: number; ngay_kd_da_qua: number; thuc_te: number;
   muc_tieu: number | null; muc_tieu_den_hom_nay: number | null; tien_do: number | null; nguoi: Nguoi[]; co_ngan_sach: boolean;
@@ -285,7 +286,7 @@ export default function BaoCao() {
           </Khoi></The>}
         <The>
           <Khoi tieu_de="Người phụ trách" phu={td ? thNgan(td.thang) : undefined}
-            cach_tinh={<>Thanh đậm: {ten} đã có. Phần nhạt: dự báo thêm tới cuối tháng (cùng công thức chốt tháng). Vạch đen: ngân sách cá nhân.
+            cach_tinh={<>Mỗi thẻ một người. Thanh = ngân sách của chính người đó (đầy thanh = đạt 100%). Phần đậm: {ten} đã có; phần nhạt: dự báo thêm tới cuối tháng (cùng công thức chốt tháng). Vạch cam: mức lẽ ra phải đạt tới {nhanMoc} — ngân sách chia theo ngày làm việc đã qua.
               {ssNguoi && <> Vạch đứt: {nhanSs}.</>}</>}
             canh_bao={!td ? "Dạng Khoảng: không có ngân sách theo người." : null}>
             {td && <NguoiPhuTrach td={td} lg={lg} db={nguoiDb} ss={ssNguoi} nhan_ss={nhanSs} />}
@@ -398,29 +399,48 @@ function LuyKe({ v }: { v: VeChot }) {
 
 function NguoiPhuTrach({ td, lg, db, ss, nhan_ss }: { td: Td; lg: boolean; db: Record<string, NguoiDb>;
   ss: Record<string, number | null> | null; nhan_ss: string }) {
-  const dong = td.nguoi.map(n => {
+  const nhanMoc = useNhanMoc();
+  // Tháng đã qua hết ngày làm việc: mức "lẽ ra tới hôm nay" = chính ngân sách, không in dòng nhịp.
+  const conNgay = td.ngay_kd_da_qua < td.ngay_kd;
+  if (!td.nguoi.length) return <p className="phu">Chưa có dòng nào tháng này.</p>;
+  return <div className="dt-nguoi">{td.nguoi.map(n => {
     const f = db[n.ma];
     const tt = lg ? n.thuc_te_lg : n.thuc_te, mt = lg ? n.muc_tieu_lg : n.muc_tieu;
-    const cs = f ? (lg ? f.co_so_lg : f.co_so) : null;
-    return { n, tt, mt, cs, ss: ss?.[n.ma] ?? null, td_: lg ? n.tien_do_lg : n.tien_do };
-  });
-  const to = Math.max(1, ...dong.flatMap(x => [x.tt, x.mt ?? 0, x.cs ?? 0, x.ss ?? 0]));
-  const w = (v: number) => `${Math.max(0, Math.min(100, v / to * 100))}%`;
-  if (!dong.length) return <p className="phu">Chưa có dòng nào tháng này.</p>;
-  return <div className="dt-nguoi">{dong.map(({ n, tt, mt, cs, ss: s, td_ }) => (
-    <ONoi key={n.ma} nhan={n.ten ?? n.ma} className="dt-ng-dong" noi_dung={<><b>{n.ten ?? `${n.ma} (không có trong danh sách phụ trách)`}</b>
-      <DongNoi nhan="Đã có" gia={yen(tt)} />{cs != null && <DongNoi nhan="Dự kiến chốt" gia={yen(cs)} />}
-      <DongNoi nhan="Ngân sách" gia={mt != null ? yen(mt) : "chưa đặt"} />{td_ != null && <DongNoi nhan="Tiến độ" gia={p1(td_)} />}
-      {s != null && <DongNoi nhan={hoa(nhan_ss)} gia={yen(s)} />}</>}>
-      <span className="dt-ng-ten">{n.ten ?? n.ma}</span>
-      <span className="dt-ng-thanh" aria-hidden="true">
-        {cs != null && cs > tt && <span className="dt-ng-db" style={{ width: w(cs) }} />}
-        <span className="dt-ng-tt" style={{ width: w(tt) }} />
-        {mt != null && <span className="dt-ng-ns" style={{ left: w(mt) }} />}
-        {s != null && <span className="ss-vach" style={{ left: w(s) }} />}
-      </span>
-      <b className="so">{td_ != null ? p1(td_) : gon(tt)}</b>
-    </ONoi>))}</div>;
+    const moc = lg ? n.muc_tieu_lg_den_hom_nay : n.muc_tieu_den_hom_nay;
+    // Tháng đã khép: dự kiến chốt = đã có, không in lại.
+    const cs = f && conNgay ? (lg ? f.co_so_lg : f.co_so) : null;
+    const s = ss?.[n.ma] ?? null, td_ = lg ? n.tien_do_lg : n.tien_do;
+    // Thanh = 100% ngân sách của CHÍNH người này (không chung thước với người khác).
+    const w = (v: number) => `${Math.max(0, Math.min(100, v / (mt as number) * 100))}%`;
+    const coNs = mt != null && mt > 0;
+    const lech = moc != null ? tt - moc : null;
+    const ten = n.ten ?? n.ma;
+    return (
+      <ONoi key={n.ma} nhan={ten} className="dt-ng-the" noi_dung={<><b>{n.ten ?? `${n.ma} (không có trong danh sách phụ trách)`}</b>
+        <DongNoi nhan="Đã có" gia={yen(tt)} />{cs != null && <DongNoi nhan="Dự kiến chốt" gia={yen(cs)} />}
+        <DongNoi nhan="Ngân sách" gia={mt != null ? yen(mt) : "chưa đặt"} />
+        {conNgay && moc != null && <DongNoi nhan={`Lẽ ra ${nhanMoc}`} gia={yen(moc)} />}
+        {td_ != null && <DongNoi nhan="Tiến độ" gia={p1(td_)} />}
+        {s != null && <DongNoi nhan={hoa(nhan_ss)} gia={yen(s)} />}</>}>
+        <span className="dt-ng-ten">{ten}</span>
+        <b className="dt-ng-so">{gon(tt)}</b>
+        <span className="dt-ng-ns">{mt != null ? <>/ ngân sách {gon(mt)}</> : "chưa đặt ngân sách"}</span>
+        {coNs && <span className="dt-ng-thanh" aria-hidden="true">
+          {cs != null && cs > tt && <span className="dt-ng-db" style={{ width: w(cs) }} />}
+          <span className="dt-ng-tt" style={{ width: w(tt) }} />
+          {conNgay && moc != null && <span className="dt-ng-nhip" style={{ left: w(moc) }} />}
+          {s != null && <span className="ss-vach" style={{ left: w(s) }} />}
+        </span>}
+        {td_ != null && <span className="dt-ng-pt">{p1(td_)}</span>}
+        {conNgay && moc != null && lech != null && <span className={"dt-ng-lech " + (lech < 0 ? "thieu" : "vuot")}>
+          Lẽ ra {nhanMoc} {gon(moc)} · đang {lech < 0 ? "thiếu" : "vượt"} {gon(Math.abs(lech))}</span>}
+        <span className="dt-ng-phu">
+          {mt != null && (tt < mt ? <>Còn thiếu {gon(mt - tt)}</> : <>Đã đạt ngân sách ✓</>)}
+          {cs != null && <>{mt != null && " · "}dự kiến chốt {gon(cs)}</>}
+          {s != null && <>{(mt != null || cs != null) && " · "}{nhan_ss} {gon(s)}</>}
+        </span>
+      </ONoi>);
+  })}</div>;
 }
 
 function Pareto({ pa }: { pa: BaoCaoApi["pa"] }) {

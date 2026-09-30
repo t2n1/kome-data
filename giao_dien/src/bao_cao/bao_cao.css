@@ -68,15 +68,20 @@ details.bc-khoi > summary{cursor:pointer;font-weight:600;font-size:.88rem}
 /* Dự báo là nét LIỀN (nét đứt chỉ dành cho kỳ so). */
 .dt-luy .duong-cs{stroke-dasharray:none;opacity:.75}
 .dt-luy svg{display:block;height:auto}
-.dt-nguoi{display:grid;gap:.45rem}
-.dt-ng-dong,.dt-nc-dong{display:grid;grid-template-columns:minmax(5rem,9rem) minmax(0,1fr) auto;gap:.6rem;align-items:center;font-size:.78rem;color:inherit;text-decoration:none}
-.dt-ng-ten{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dt-ng-thanh{position:relative;height:14px;border-radius:4px;background:var(--nen-phu);overflow:hidden}
-.dt-ng-tt,.dt-ng-db{position:absolute;inset:0 auto 0 0}
+.dt-nguoi{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));gap:.6rem}
+.dt-ng-the{display:flex;flex-direction:column;gap:.2rem;padding:.7rem .8rem;border:1px solid var(--vien);border-radius:10px;font-size:.76rem;color:inherit;text-decoration:none;min-width:0}
+.dt-nc-dong{display:grid;grid-template-columns:minmax(5rem,9rem) minmax(0,1fr) auto;gap:.6rem;align-items:center;font-size:.78rem;color:inherit;text-decoration:none}
+.dt-ng-ten{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dt-ng-so{font-size:1.35rem;font-variant-numeric:tabular-nums;line-height:1.2}
+.dt-ng-ns,.dt-ng-phu{color:var(--chu-nhat)}
+.dt-ng-thanh{position:relative;height:12px;margin:.35rem 0 .1rem;border-radius:4px;background:var(--nen-phu)}
+.dt-ng-tt,.dt-ng-db{position:absolute;inset:0 auto 0 0;border-radius:4px}
 .dt-ng-tt{background:var(--lien-ket);opacity:.8}
 .dt-ng-db{background:var(--do-nen);border-right:2px solid var(--do)}
-.dt-ng-ns{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--chu)}
+.dt-ng-nhip{position:absolute;top:-3px;bottom:-3px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--canh-vien)}
 .dt-ng-thanh .ss-vach{top:0;bottom:0}
+.dt-ng-pt{font-weight:600;font-variant-numeric:tabular-nums}
+.dt-ng-lech.thieu{color:var(--loi-chu)} .dt-ng-lech.vuot{color:var(--ok-chu)}
 .dt-nguy-co{display:grid;gap:.4rem}
 .dt-nc-dong .thanh-nho{display:block}
 .dt-nc-dong .ten-jp{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
