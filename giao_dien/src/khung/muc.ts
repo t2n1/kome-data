@@ -8,6 +8,8 @@
 // gói thiết kế không có màn này.
 // "doithu" (Thị trường & đối thủ, 2026-09-29) — lộ trình §4.2 từng cắt, đặc tả
 // 2026-09-29-thi-truong-doi-thu-design.md §0 đảo lại; dùng icon "target", TA CHỌN (gói thiết kế không có màn này).
+// "banggia" (Bảng giá KOME, 2026-09-30) — TÁCH từ mục "Báo giá & bảng giá" của gói thiết kế: phần bảng giá đã có
+// (/bang-gia, chỉ xem), phần báo giá vẫn chưa; giữ icon "quote" của mục gốc cho cả hai.
 import { KD, TN } from "../khoi_dau";
 
 export type Muc = { ma: string; nhan: string; url: string | null; icon: string; ly_do?: string };
@@ -33,7 +35,8 @@ export function nhomDieuHuong(): Nhom[] {
       { ma: "crm", nhan: "Cần liên hệ", url: "/lien-he", icon: "crm" },
     ] },
     { ma: "banhang", ten: "BÁN HÀNG", muc: [
-      { ma: "baogia", nhan: "Báo giá & bảng giá", url: null, icon: "quote", ly_do: CHUA },
+      { ma: "banggia", nhan: "Bảng giá KOME", url: "/bang-gia", icon: "quote" },
+      { ma: "baogia", nhan: "Báo giá", url: null, icon: "quote", ly_do: CHUA },
       { ma: "lendon", nhan: "Lên đơn hàng", url: null, icon: "cart", ly_do: CHUA },
     ] },
     { ma: "giaothu", ten: "GIAO & THU TIỀN", muc: [

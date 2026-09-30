@@ -301,6 +301,19 @@ viết lại ba view `mart.gia_doi_thu_quan_sat`, `gia_doi_thu_hien_hanh`, `so_s
    - bảng tạo qua Supabase SQL Editor bị tự bật RLS không policy — nếu `kome_app` báo `permission denied` thì `ALTER TABLE ... DISABLE ROW LEVEL SECURITY` cho hai bảng mới.
 3. Mở `/doi-thu` → Dữ liệu › Duyệt / sửa: mỗi mặt hàng một dòng (chip "+n mức"), thử 🗑 rồi "Khôi phục" ở lọc "Đã xoá" trên một dòng thử.
 
+### Triển khai bảng giá KOME (migration `071`)
+
+`071` thêm view `mart.bang_gia_kome` (mã × quy cách × 売価No. của lần nạp `取引単価データ` mới nhất ≤ mốc, kèm lần nạp trước, cờ đổi /
+dưới giá vốn / hai cột thuế lệch) cho trang `/bang-gia`, và thay THÂN `mart.gia_kome_bang` bằng một câu đọc view đó (cột y hệt). Không
+tạo bảng, không nạp lại file nào.
+
+1. `python db/migrate.py` **bằng vai trò `postgres`** — TRƯỚC khi push/Redeploy (`/bang-gia`, tab Giá & lãi của `/san-pham/{mã}` đọc view mới).
+2. Kiểm sau khi chạy (vai trò chỉ đọc):
+   - `SELECT filename FROM meta.schema_migration WHERE filename LIKE '071%';` phải ra một dòng;
+   - `SELECT count(*) FROM mart.gia_kome_bang;` phải bằng số trước khi chạy (đo 2026-09-30: 787);
+   - `SELECT has_table_privilege('kome_app', 'mart.bang_gia_kome', 'SELECT');` phải `true`.
+3. Mở `/bang-gia`: có cột 売価No., chip "Đã đổi giá" đếm khớp số mã đổi giữa hai lần nạp gần nhất.
+
 ### Kiểm tay sau khi chạy migration `029` (đợt 5b — báo cáo phân tích + dashboard)
 
 Chủ doanh nghiệp làm năm việc này sau khi migration `029` chạy xong trên CSDL

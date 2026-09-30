@@ -232,6 +232,7 @@ KHOA_DANH_MUC = "san-pham/danh-muc"
 KHOA_DANH_MUC_KHOANG = "san-pham/khoang"
 KHOA_CONG_NO = "cong-no"
 KHOA_MUA_VU = "mua-vu"
+KHOA_BANG_GIA = "bang-gia"
 
 
 def _loi(thong_diep: str, ma: int = 500) -> JSONResponse:
@@ -725,6 +726,13 @@ def tao_api(open_app_conn) -> APIRouter:
         from kome import mua_vu as MV
         return _chup(request, KHOA_MUA_VU, MV.du_lieu,
                      "Không đọc được dữ liệu mùa vụ.", chi_nap=True)
+
+    # ---- Bảng giá KOME (071) -------------------------------------------
+    # Chỉ đọc core/mart, không theo khoảng xem (luôn lần nạp mới nhất) -> ảnh chụp theo phiên bản NẠP. Trúng: 1; trượt: 2.
+    @r.get("/bang-gia")
+    def bang_gia(request: Request):
+        from kome import bang_gia as BG
+        return _chup(request, KHOA_BANG_GIA, BG.du_lieu, "Không đọc được bảng giá.", chi_nap=True)
 
     # ---- Thị trường & đối thủ (059–060) --------------------------------
     # Đọc app (đính chính, giá tay, ghép) -> phiên bản ĐẦY ĐỦ (không chi_nap). Theo mốc của khoảng xem.

@@ -1,0 +1,19 @@
+/* Bảng giá KOME (/bang-gia). Tiền tố bg- — tránh lớp chung .o / .so. */
+.bg { display: flex; flex-direction: column; gap: 12px; }
+.bg-chi-xem { margin: 0; padding: 8px 12px; border: 1px solid var(--vien); border-radius: 8px; background: var(--nen-phu); color: var(--chu-nhat); }
+.bg-dau { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bg-dau .kh-tim { flex: 1 1 260px; max-width: 420px; }
+.bg-chip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.bg-khung { margin-top: 10px; max-height: 70vh; }
+.bg-bang thead th { position: sticky; top: 0; background: var(--nen-the); z-index: 1; white-space: nowrap; }
+.bg-bang td { vertical-align: top; }
+.bg-bang tr.bg-dau-ma td { border-top: 1px solid var(--vien-dam); }
+.bg-ten { min-width: 220px; max-width: 320px; }
+.bg code { display: inline; background: none; padding: 0; margin: 0; white-space: nowrap; font-family: var(--font-so); font-size: .92em; }
+.bg .ma-nho { font-size: .75rem; color: var(--chu-nhat); margin-top: 2px; }
+.bg-qc, .bg-ngay { white-space: nowrap; }
+.bg-ngay div { font-size: 0.85em; }
+.bg-o-doi { background: var(--canh-nen); }
+.bg-duoi { color: var(--do-chu); font-weight: 600; }
+.bg-mui { font-size: 0.8em; color: var(--canh-chu); }
+.bg-ghi { margin-top: 8px; }

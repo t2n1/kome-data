@@ -55,6 +55,7 @@ MAN_HINH = {
     "cai_dat": ("Cài đặt", "/cai-dat"), "kho_du_lieu": ("Kho dữ liệu", "/kho-du-lieu"),
     "mua_vu": ("Mùa vụ sản phẩm", "/mua-vu"),
     "doi_thu": ("Thị trường & đối thủ", "/doi-thu"),
+    "bang_gia": ("Bảng giá KOME", "/bang-gia"),
     "chung": ("Mã web chung (nhiều màn)", ""),
 }
 
@@ -68,7 +69,7 @@ MAN = {
     "kome/khach_thang.py": ["tong_quan", "lien_he", "khach"], "kome/khoang_xem.py": ["chung"],
     "kome/khoi_tong_quan.py": ["tong_quan"], "kome/lien_he.py": ["lien_he"],
     "kome/ngan_sach.py": ["ngan_sach"], "kome/nhat_ky.py": ["nhat_ky"],
-    "kome/mua_vu.py": ["mua_vu"],
+    "kome/mua_vu.py": ["mua_vu"], "kome/bang_gia.py": ["bang_gia"],
     "kome/doi_thu.py": ["doi_thu"],
     "kome/doi_thu_giao.py": ["doi_thu"],
     "kome/nhat_ky_nap.py": ["kho_du_lieu"], "kome/san_pham.py": ["san_pham", "kho_hang", "tong_quan"],
