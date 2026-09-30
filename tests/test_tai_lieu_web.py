@@ -92,7 +92,7 @@ def test_man_van_hanh_co_tab(conn, test_db_url):
     r = TestClient(A.create_app(db_url=test_db_url)).get("/kho-du-lieu")
     assert r.status_code == 200 and "man" in kd(r.text)
     src = nguon("he_thong", "KhoDuLieu.tsx")
-    assert '<KhungKho dang="tong-quan" lop="kdl">' in src and '<KhungKho dang="nap" lop="kdl">' in src
+    assert '<KhungKho dang="nap" lop="kdl kdl-gon-man">' in src and '<KhungKho dang="tinh-trang" lop="kdl">' in src
 
 
 def test_khong_co_quyen_kho_du_lieu_thi_tai_lieu_cung_403():

@@ -148,6 +148,6 @@ function LanNapTab({ t }: { t: ThongTin }) {
           <div><div className="khong-ap-dung">Tổng tiền</div>{l.tong_tien ? yen(l.tong_tien) : "—"}</div>
         </div>
       </div>))}</div>
-    {!KD.chi_doc && <p className="chu-thich">Hoàn tác một lô ở màn <a href="/kho-du-lieu/nap#lo-nap">Nạp dữ liệu mới</a> — ở đó có câu nói rõ sẽ xoá bao nhiêu dòng.</p>}
+    {!KD.chi_doc && <p className="chu-thich">Hoàn tác một lô ở màn <a href="/kho-du-lieu#lo-nap">Nạp dữ liệu</a> — ở đó có câu nói rõ sẽ xoá bao nhiêu dòng.</p>}
   </>);
 }

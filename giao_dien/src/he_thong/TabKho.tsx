@@ -1,52 +1,64 @@
 // Khung màn Kho dữ liệu theo gói thiết kế (Kho dữ liệu.dc.html, đợt B 2026-09-24):
 // thanh trái các mục · nội dung bên phải. Trên màn hẹp thanh trái thành một dải
 // cuộn ngang ở trên. Mục đang xem mang aria-current (bất biến "màu + chữ", không
-// chỉ đổi viền). Mục Nạp ẩn ở bản chỉ-đọc — bản đó không nạp được gì.
+// chỉ đổi viền). Mục Nạp hiện cả ở bản chỉ-đọc: trang đó còn là lịch dữ liệu,
+// chỉ các ô thả file tự ẩn.
 //
-// Đợt C: dưới các mục là "Duyệt bảng" — mọi bảng/view của core · mart · meta mà
-// vai trò đọc được SELECT (/api/kho-du-lieu/bang, 1 lượt hỏi, tải SAU khi màn đã
-// vẽ — các màn tài liệu vẫn 0 truy vấn ở máy chủ).
+// Đợt C: "Duyệt bảng" — mọi bảng/view của core · mart · meta mà vai trò đọc được
+// SELECT (/api/kho-du-lieu/bang, 1 lượt hỏi, tải khi mở danh sách — các màn tài
+// liệu vẫn 0 truy vấn ở máy chủ). Từ 2026-09-30 nằm trong "Nâng cao".
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { KD } from "../khoi_dau";
 import { lay } from "../api";
 import { so } from "../dinh_dang";
 
+// 2026-09-30 (chủ DN: "chủ yếu để upload và xem dữ liệu"): HAI mục chính — Nạp (kèm lịch dữ liệu) và Xem
+// dữ liệu — còn lại gom vào "Nâng cao", đóng sẵn trừ khi đang đứng ở một trang trong đó.
 const TAB = [
-  ["tong-quan", "/kho-du-lieu", "◆", "Tổng quan độ phủ"],
-  ["nap", "/kho-du-lieu/nap", "＋", "Nạp dữ liệu mới"],
-  ["bang-du-lieu", "/kho-du-lieu/bang-du-lieu", "▦", "Bảng dữ liệu"],
-  ["luong", "/kho-du-lieu/luong", "⇄", "Sơ đồ luồng dữ liệu"],
-  ["cot-noi", "/kho-du-lieu/cot-noi", "⋈", "Cột nối giữa các file"],
+  ["nap", "/kho-du-lieu", "＋", "Nạp dữ liệu"],
+  ["bang-du-lieu", "/kho-du-lieu/bang-du-lieu", "▦", "Xem dữ liệu"],
+] as const;
+const NANG_CAO = [
+  ["tinh-trang", "/kho-du-lieu/tinh-trang", "♥", "Tình trạng kho"],
+  ["luong", "/kho-du-lieu/luong", "⇄", "Sơ đồ luồng"],
+  ["cot-noi", "/kho-du-lieu/cot-noi", "⋈", "Cột nối"],
   ["duong-di", "/kho-du-lieu/duong-di", "↳", "Dữ liệu đi đâu"],
 ] as const;
 
-export type MucKho = typeof TAB[number][0] | "bang";
+export type MucKho = typeof TAB[number][0] | typeof NANG_CAO[number][0] | "bang";
 export type BangDs = { schema: string; ten: string; ngan: string; loai: "bang" | "view"; so_dong: number | null; mo_ta: string | null };
 
 const MO_TA_SCHEMA: Record<string, string> = { core: "đã làm sạch", mart: "chỉ số (view)", meta: "nhật ký nạp" };
 
 export function TabKho({ dang, bang }: { dang: MucKho; bang?: string }) {
+  const trongNangCao = dang === "bang" || NANG_CAO.some(([ma]) => ma === dang);
+  const muc = ([ma, duong, ky, nhan]: readonly [string, string, string, string]) => (
+    <a key={ma} href={duong} className={dang === ma ? "dang-xem" : undefined} aria-current={dang === ma ? "page" : undefined}>
+      <span className="kdl-nav-ky" aria-hidden="true">{ky}</span>{nhan}</a>);
   return (
     <nav className="kdl-nav" aria-label="Các phần của màn Kho dữ liệu">
       <div className="kdl-nav-ten">Kho dữ liệu</div>
-      {TAB.filter(([ma]) => ma !== "nap" || !KD.chi_doc).map(([ma, duong, ky, nhan]) => (
-        <a key={ma} href={duong} className={dang === ma ? "dang-xem" : undefined} aria-current={dang === ma ? "page" : undefined}>
-          <span className="kdl-nav-ky" aria-hidden="true">{ky}</span>{nhan}</a>))}
-      <DuyetBang dang={bang} />
+      {TAB.map(muc)}
+      <details className="kdl-nang-cao" open={trongNangCao || undefined}>
+        <summary className="kdl-nav-ten">Nâng cao</summary>
+        {NANG_CAO.map(muc)}
+        <DuyetBang dang={bang} />
+      </details>
     </nav>
   );
 }
 
 function DuyetBang({ dang }: { dang?: string }) {
-  const { data, isError } = useQuery({ queryKey: ["kdl-bang"], queryFn: () => lay<BangDs[]>("/api/kho-du-lieu/bang"), staleTime: 60_000 });
+  const [bat, datBat] = useState(dang != null);
+  // Tải danh sách khi mở lần đầu — trang Nạp / Xem dữ liệu không cần nó.
+  const { data, isError } = useQuery({ queryKey: ["kdl-bang"], queryFn: () => lay<BangDs[]>("/api/kho-du-lieu/bang"), staleTime: 60_000, enabled: bat });
   const [loc, datLoc] = useState("");
-  // Màn hẹp: mặc định ĐÓNG (danh sách ~60 bảng đẩy nội dung xuống quá xa); màn rộng: mở.
-  const [mo] = useState(() => typeof matchMedia === "undefined" || !matchMedia("(max-width: 860px)").matches);
+  // Nằm trong "Nâng cao": đóng sẵn, chỉ mở khi đang xem một bảng (~60 bảng đẩy mọi thứ xuống quá xa).
+  const mo = dang != null;
   const q = loc.trim().toLowerCase();
   const ds = (data ?? []).filter(b => !q || b.ten.includes(q) || (b.mo_ta ?? "").toLowerCase().includes(q));
   return (
-    <details className="kdl-duyet" open={mo}>
+    <details className="kdl-duyet" open={mo} onToggle={e => { if (e.currentTarget.open) datBat(true); }}>
       <summary className="kdl-nav-ten">Duyệt bảng</summary>
       <input type="search" className="kdl-duyet-tim" placeholder="Tìm bảng…" value={loc} onChange={e => datLoc(e.target.value)} aria-label="Tìm bảng" />
       {isError ? <p className="khong-ap-dung">Không đọc được danh sách bảng.</p>

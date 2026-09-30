@@ -99,7 +99,7 @@ def test_man_co_hai_neo_cho_dau_trang_cu(conn, test_db_url):
     #nap / #theo-thang. Neo không tồn tại thì người bấm rơi lên đầu trang
     và phải cuộn đi tìm — đúng thứ chuyển hướng sinh ra để tránh."""
     src = nguon(*KDL)
-    assert '<section id="nap">' in src        # màn Nạp (/nap cũ -> /kho-du-lieu/nap)
+    assert '<section id="nap"' in src         # màn Nạp (/nap cũ -> /kho-du-lieu)
     assert '<section id="lo-nap">' in src     # hoàn tác xong quay về đúng khối này
     assert '<section id="theo-thang"' in src
 
@@ -226,8 +226,8 @@ def test_ba_dia_chi_cu_chuyen_huong_301(conn, test_db_url):
     không tắt thì test này xanh cả khi route trả 200 mà chẳng chuyển hướng gì.
     """
     client = TestClient(create_app(db_url=test_db_url))
-    mong_doi = {"/health": "/kho-du-lieu",
-                "/nap": "/kho-du-lieu/nap",
+    mong_doi = {"/health": "/kho-du-lieu/tinh-trang",
+                "/nap": "/kho-du-lieu",
                 "/phu-du-lieu": "/kho-du-lieu#theo-thang"}
     for cu, moi in mong_doi.items():
         r = client.get(cu, follow_redirects=False)
@@ -411,3 +411,26 @@ def test_man_nap_va_so_do_nguon_bo_nguon_chua_dung(conn, test_db_url):
     cot = [d["khoa"] for d in man(client.get("/kho-du-lieu").text)["phu"]["dong"]]
     assert not {"shiiresaki", "tanka", "seikyu_motocho"} & set(cot)
     assert kd(client.get("/").text)["tinh_nang"]["cong_no"] is False
+
+
+def test_kho_du_lieu_gon_MOT_man_nap_va_tinh_trang_rieng(conn, test_db_url):
+    """2026-09-30 (chủ DN: "chủ yếu để upload dữ liệu và xem dữ liệu"): /kho-du-lieu và /kho-du-lieu/nap
+    là CÙNG một màn — ô nạp, lô gần nhất và lịch dữ liệu đi chung một lần tải; sức khoẻ / loại chưa vào kho /
+    hạn chế ở Tình trạng kho (mục Nâng cao). Gộp màn là lúc dễ đánh rơi một khối: đếm từng khoá."""
+    client = TestClient(create_app(db_url=test_db_url))
+    a, b = man(client.get("/kho-du-lieu").text), man(client.get("/kho-du-lieu/nap").text)
+    for khoa in ("nguon", "lo", "cho", "phu", "status", "backup"):
+        assert khoa in a and khoa in b, khoa
+    assert a["man"] == b["man"] == "nap"
+    r = client.get("/kho-du-lieu/tinh-trang")
+    assert r.status_code == 200
+    t = man(r.text)
+    for khoa in ("status", "backup", "thieu_bo_nap", "phu"):
+        assert khoa in t, khoa
+    main = nguon("main.tsx")
+    assert 'duong === "/kho-du-lieu/tinh-trang") return () => <TinhTrangKho />' in main
+    tab = nguon("he_thong", "TabKho.tsx")
+    assert '"/kho-du-lieu/tinh-trang"' in tab and '<details className="kdl-nang-cao"' in tab
+    # Hoàn tác / huỷ file chờ quay về màn gộp, không về địa chỉ cũ.
+    assert client.post("/upload/huy", data={"ma": []}, follow_redirects=False).headers["location"] == "/kho-du-lieu"
+
