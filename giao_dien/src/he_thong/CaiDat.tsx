@@ -1,6 +1,6 @@
 // Cài đặt (màn 21, Cài đặt.dc.html): danh mục mục bên trái, nội dung bên phải.
 // CHỈ dựng những mục có thứ thật đằng sau (xem đặc tả màn 20/21):
-//   * Người dùng & phân quyền — đổi ba cờ (chỉ người có duoc_quan_tri; máy
+//   * Người dùng & phân quyền — đổi bốn cờ (chỉ người có duoc_quan_tri; máy
 //     chưa bật đăng nhập thì từ chối). Biểu mẫu POST /cai-dat/quyen/{id} THẬT,
 //     không nhận mật khẩu bao giờ — tạo tài khoản / mật khẩu chỉ bằng script.
 //   * Ngân sách & ngày nghỉ, Quy tắc khách hàng, Nguồn, Hiển thị — đọc, trỏ về nơi thật.
@@ -35,7 +35,7 @@ export default function CaiDat() {
           <section id="nguoi-dung" className="the-cd">
             <h2>Người dùng &amp; phân quyền <span className="khong-ap-dung">ユーザー管理</span></h2>
             {!m.co_cong ? <p className="ngay-thieu tai-lieu">Máy này chưa bật đăng nhập (<code>KOME_SESSION_SECRET</code> trống) — ai mở được
-              trang cũng làm được mọi thứ, nên ba cờ bên dưới chưa bảo vệ được gì. Xem <code>docs/runbook.md</code>, mục "Bật đăng nhập trên máy
+              trang cũng làm được mọi thứ, nên các cờ bên dưới chưa bảo vệ được gì. Xem <code>docs/runbook.md</code>, mục "Bật đăng nhập trên máy
               trong công ty".</p>
               : !m.duoc_sua && <p className="ghi-chu">Bạn xem được danh sách nhưng không đổi được quyền — cần cờ <strong>quản trị</strong>.</p>}
             <div className="bang-cuon"><table>

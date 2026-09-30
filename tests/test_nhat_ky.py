@@ -225,5 +225,8 @@ def test_dong_thoi_gian_co_loai_du_lieu_tu_so_sua(conn):
     sua = next(d for d in ds if d.sau == "090-1")
     assert sua.doi_tuong == "khach: 000000009292" and sua.chi_tiet == "phone" and sua.truoc == "080-0"
     assert sua.noi_dung == "khach: 000000009292 · phone" and sua.nguoi == "an"
-    assert next(d for d in ds if d.sau == "(về OBC)").truoc == "090-1"
+    assert sua.truoc_sau == ("080-0", "090-1")
+    bo = next(d for d in ds if d.sau == "(về OBC)")
+    assert bo.truoc == "090-1" and bo.truoc_sau == ("090-1", "(về OBC)")
+    assert "080-0" in NK.csv(NK.dong_thoi_gian(conn, "du_lieu"))
     assert {d.loai for d in NK.dong_thoi_gian(conn, "du_lieu")} == {"du_lieu"}

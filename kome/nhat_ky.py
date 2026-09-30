@@ -137,6 +137,8 @@ class Dong:
             def bt(v):
                 return "có" if v == "true" else "không"
             return (bt(self.truoc), bt(self.sau))
+        if self.loai == "du_lieu":
+            return (self.truoc or "—", self.sau or "—")
         return None
 
 
