@@ -736,6 +736,18 @@ class MocLuyKe:
 
 
 @dataclass(frozen=True)
+class ThangCty:
+    """Một tháng của kỳ, công ty (mart.tien_do_cong_ty) — cột thực tế / đường ngân sách
+    của biểu đồ chính trang Doanh thu. `thuc_te` None = tháng sau mốc; `ngan_sach` None =
+    chưa đặt (KHÁC 0)."""
+    thang: str
+    thuc_te: int | None
+    ngan_sach: int | None
+    thuc_te_lg: int | None
+    ngan_sach_lg: int | None
+
+
+@dataclass(frozen=True)
 class TienDoNganSach:
     company_fy: int
     thang: str
@@ -754,6 +766,7 @@ class TienDoNganSach:
     muc_tieu_lg: int | None = None
     muc_tieu_lg_den_hom_nay: int | None = None
     tien_do_lg: float | None = None
+    thang_cty: list[ThangCty] = field(default_factory=list)
 
     @property
     def co_ngan_sach_lg(self) -> bool:
@@ -891,8 +904,16 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None,
         return int(v) if v is not None else None
 
     luy_ke, c_tt, c_ns, c_tl, c_nl, co_ns, co_nl = [], 0, 0, 0, 0, False, False
+    thang_cty = []
     for th in thang_ky:
         row = theo_thang.get(th)
+        da_co_ = th <= thang_hom_nay
+        thang_cty.append(ThangCty(
+            # Tháng không có dòng nào của view (trước khi kho có dữ liệu) = không biết, không phải 0.
+            thang=th, thuc_te=int(row[0] or 0) if da_co_ and row else None,
+            ngan_sach=_so(row[1]) if row else None,
+            thuc_te_lg=int(row[4] or 0) if da_co_ and row else None,
+            ngan_sach_lg=_so(row[5]) if row else None))
         c_tt += int(row[0] or 0) if row else 0
         c_tl += int(row[4] or 0) if row else 0
         if row and row[1] is not None:
@@ -917,7 +938,7 @@ def tien_do_ngan_sach(conn, company_fy: int | None = None,
         muc_tieu=_so(r_thang[1]) if r_thang else None,
         muc_tieu_den_hom_nay=_so(r_thang[2]) if r_thang else None,
         tien_do=float(r_thang[3]) if r_thang and r_thang[3] is not None else None,
-        nguoi=nguoi, luy_ke=luy_ke,
+        nguoi=nguoi, luy_ke=luy_ke, thang_cty=thang_cty,
         co_ngan_sach=bool(r_thang) and r_thang[1] is not None,
         thuc_te_lg=int(r_thang[4] or 0) if r_thang else 0,
         muc_tieu_lg=_so(r_thang[5]) if r_thang else None,

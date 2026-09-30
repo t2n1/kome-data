@@ -109,8 +109,11 @@ def test_muc_ngan_sach_an_khoi_thanh_dieu_huong_khi_khong_co_co(khach, conn, bat
     co = khach(ngan_sach=True)
     assert _khoi_dau(co.get("/bao-cao").text)["hien_ngan_sach"] is True
     assert _khoi_dau(co.get("/nhat-ky").text)["hien_ngan_sach"] is True
+    # 2026-09-30: màn nhập rời thanh bên (gộp vào trang Doanh thu) — lối vào DUY NHẤT là nút
+    # "✎ Sửa ngân sách", gác bởi CÙNG cờ (test ngay dưới). Không mục thanh bên nào trỏ /ngan-sach.
     muc = (NGUON / "khung" / "muc.ts").read_text(encoding="utf-8")
-    assert '...(KD.hien_ngan_sach ? [{ ma: "ngansach", nhan: "Ngân sách", url: "/ngan-sach"' in muc
+    assert 'url: "/ngan-sach"' not in muc
+    assert 'if (duong === "/ngan-sach" || duong.startsWith("/ngan-sach/")) return "baocao";' in muc
 
 
 def test_dat_chi_tieu_trong_khoi_bao_cao_gac_boi_hien_ngan_sach(khach, conn, batch):
@@ -136,9 +139,11 @@ def test_dat_chi_tieu_trong_khoi_bao_cao_gac_boi_hien_ngan_sach(khach, conn, bat
         td = c.get("/api/bao-cao?ky=2026").json()["td"]
         assert td["co_ngan_sach"] is False and td["company_fy"] == 2026
     src = (NGUON / "bao_cao" / "BaoCao.tsx").read_text(encoding="utf-8")
-    assert re.search(r'Chưa đặt ngân sách \{ten\} của công ty cho tháng này\.\{" "\}\s*'
-                     r'\{KD\.hien_ngan_sach && <><a href=\{`/ngan-sach\?ky=\$\{td\.company_fy\}`\}>Đặt chỉ tiêu</a>',
-                     src), "liên kết 'Đặt chỉ tiêu' phải gác bởi KD.hien_ngan_sach"
+    # Trang Doanh thu: MỌI liên kết /ngan-sach (nút "✎ Sửa ngân sách", "Đặt ngân sách" của ô
+    # Ngân sách) đi qua MỘT biến `lienNs`, gác bởi KD.hien_ngan_sach.
+    assert "const lienNs = KD.hien_ngan_sach ? `/ngan-sach?ky=" in src, \
+        "liên kết /ngan-sach phải gác bởi KD.hien_ngan_sach"
+    assert "{lienNs && <a className=\"nut-nho\" href={lienNs}>" in src and "lienNs ? <a href={lienNs}>" in src
     assert src.count("/ngan-sach?ky=") == 1, "mọi liên kết /ngan-sach?ky= phải đi qua đúng một chỗ đã gác"
 
 

@@ -122,6 +122,45 @@ def test_thang_KHONG_CO_DONG_NAO_khong_lam_thang_doi_chieu():
     assert not DB._day_du([n for n in _lich(date(2026, 8, 1), date(2026, 8, 31), hn, lambda d: 0)], date(2025, 1, 1))
 
 
+def _lich_lg(tu, den, hom_nay, dt_ngay, lg_ngay) -> list[DB.Ngay]:
+    ds = _lich(tu, den, hom_nay, dt_ngay)
+    for n in ds:
+        n.lg = (lg_ngay(n.ngay) if n.la_kd else 0) if n.dt is not None else None
+    return ds
+
+
+def test_du_bao_lai_gop_dung_CUNG_hai_cong_thuc_cua_doanh_thu():
+    """Trang Doanh thu (2026-09-30): lãi gộp dự báo bằng ĐÚNG hai công thức của doanh
+    thu, trên chuỗi lãi gộp — không hằng số mới. Chốt tháng = đã có + nhịp × ngày còn lại;
+    hệ số 12 tháng = TỶ SỐ CỦA CÁC TỔNG lãi gộp (một tháng lãi nhỏ ×3 không kéo cả năm)."""
+    hn = date(2026, 2, 13)
+
+    def lg(d):
+        if d.year == 2026 and d.month == 1:
+            return 33
+        if d.year == 2025 and d.month == 2:
+            return 1
+        if d.year == 2026 and d.month == 2:
+            return 3
+        return 30
+    ds = _lich_lg(date(2025, 1, 1), date(2026, 2, 28), hn, lambda d: 100, lg)
+    c = DB.chot_thang(ds, hn, cot="lg")
+    S = sum(n.lg or 0 for n in ds if n.ngay.year == 2026 and n.ngay.month == 2)
+    assert c.da_ban == S and c.co_so == round(DB.du_bao_chot(S, c.e, c.n))
+    # Tháng dùng để đo sai số xét theo DOANH THU — cùng tập với chốt doanh thu.
+    assert [k.thang for k in c.kiem] == [k.thang for k in DB.chot_thang(ds, hn).kiem]
+    m = DB.muoi_hai_thang(ds, date(2026, 1, 31), cot="lg")
+    A = {}
+    for n in ds:
+        if n.ngay <= date(2026, 1, 31):
+            A[DB.thang(n.ngay)] = A.get(DB.thang(n.ngay), 0) + (n.lg or 0)
+    assert m.doi_chieu == ["2026-01"]
+    assert m.he_so == pytest.approx(A["2026-01"] / A["2025-01"])
+    assert m.du_bao[0].thang == "2026-02" and m.du_bao[0].co_so == round(A["2025-02"] * m.he_so)
+    ve = VDB.ve_chot_thang(c, cot="lg")
+    assert ve["co"] and ve["tt"]
+
+
 def test_chua_du_13_thang_thi_khong_du_bao_nam():
     hn = date(2026, 5, 31)
     m = DB.muoi_hai_thang(_lich(date(2026, 1, 1), hn, hn), hn)
@@ -200,8 +239,10 @@ def test_trang_du_bao(conn, batch, test_db_url):
     của thanh bên Jinja cũ, nay ở giao_dien/src/khung/Nav.tsx)."""
     _nen(conn, batch)
     c = TestClient(create_app(db_url=test_db_url))
-    r = c.get("/du-bao")
-    assert r.status_code == 200 and 'id="goc"' in r.text
+    # 2026-09-30: màn Dự báo gộp vào trang Doanh thu (/bao-cao); /api/du-bao giữ nguyên.
+    r = c.get("/du-bao", follow_redirects=False)
+    assert r.status_code == 301 and r.headers["location"] == "/bao-cao"
+    assert 'id="goc"' in c.get("/bao-cao").text
     d = c.get("/api/du-bao").json()
     db = d["db"]
     assert db["chot"]["thang"] == "2026-07"                    # "Chốt tháng 07/2026"
@@ -209,16 +250,20 @@ def test_trang_du_bao(conn, batch, test_db_url):
     assert [k["ma"] for k in db["kh"]["ky_vong"]] == ["K0021"]  # đơn kỳ vọng 14 ngày
     assert {k["ma"] for k in db["kh"]["nguy_co"]} == {"K0022", "K0023"}   # nguy cơ ngừng mua
     assert isinstance(db["chot"]["kiem"], list)                # dự báo đã chuẩn tới đâu
-    src = (NGUON / "du_bao" / "DuBao.tsx").read_text(encoding="utf-8")
-    for khoi in ("<h2>Chốt tháng {tNhan(c.thang)}</h2>", "<h2>12 tháng tới</h2>",
-                 "<h2>Đơn kỳ vọng 14 ngày tới</h2>", "<h2>Nguy cơ ngừng mua</h2>",
-                 "<h2>Dự báo đã chuẩn tới đâu</h2>"):
+    assert d["ve_chot_lg"]["co"] and set(d["tong_lg"]) == set(DB.KICH_BAN)   # lãi gộp, cùng công thức
+    src = (NGUON / "bao_cao" / "BaoCao.tsx").read_text(encoding="utf-8")
+    # Trên trang Doanh thu: chốt tháng = ô "Dự kiến chốt" (+ ⓘ "Đã chuẩn tới đâu" + hình luỹ kế),
+    # 12 tháng tới = cột nền của biểu đồ chính (3 kịch bản), nguy cơ ngừng mua = khối riêng.
+    # "Đơn kỳ vọng 14 ngày" BỎ khỏi trang (dữ liệu vẫn ở API) — chủ DN chọn trang ít chữ.
+    for khoi in ("Dự kiến chốt {chot ? thNgan(chot.thang)", "<b>Đã chuẩn tới đâu</b>", "<LuyKe v=",
+                 "kieu: \"cot_nen\" as const", "cach_xem={coDuBao && f ? { ds: Object.entries(f.kich_ban)",
+                 '<Khoi tieu_de="Nguy cơ ngừng mua"'):
         assert khoi in src, khoi
     assert "const tNhan = (t: string) => `${t.slice(5)}/${t.slice(0, 4)}`;" in src   # 07/2026
-    assert 'url: "/du-bao"' in (NGUON / "khung" / "muc.ts").read_text(encoding="utf-8")
+    assert 'url: "/du-bao"' not in (NGUON / "khung" / "muc.ts").read_text(encoding="utf-8")
     nav = (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")
     assert 'aria-current={m.ma === dangMo ? "page" : undefined}' in nav
-    # Kịch bản lạ trên URL không làm trang nổ.
+    # Kịch bản lạ trên URL không làm trang nổ (địa chỉ cũ bỏ `kb`).
     assert c.get("/du-bao?kb=bay").status_code == 200
 
 
@@ -228,5 +273,7 @@ def test_trang_du_bao_kho_rong(conn, test_db_url):
     c = TestClient(create_app(db_url=test_db_url))
     assert c.get("/du-bao").status_code == 200
     assert c.get("/api/du-bao").json()["db"] is None
-    src = (NGUON / "du_bao" / "DuBao.tsx").read_text(encoding="utf-8")
-    assert "if (!d.db) return" in src and "chưa có gì để dự báo" in src
+    # Trang Doanh thu: không có dự báo -> ô "Dự kiến chốt" in "—" kèm lý do, khối nguy cơ không vẽ.
+    src = (NGUON / "bao_cao" / "BaoCao.tsx").read_text(encoding="utf-8")
+    assert "const db = f?.db ?? null;" in src and "{db && <The>" in src
+    assert "khoảng đang xem đã qua — không dự báo" in src

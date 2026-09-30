@@ -56,3 +56,28 @@
 .thanh-tien-do .moc{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--chu)}
 .bc-chi-tiet summary{cursor:pointer;font-weight:600;font-size:.84rem;margin:.3rem 0 .5rem}
 details.bc-khoi > summary{cursor:pointer;font-weight:600;font-size:.88rem}
+/* Trang Doanh thu (2026-09-30): gộp Báo cáo · Dự báo · Ngân sách. Khối dùng chung/Khoi (ⓘ, cảnh báo). */
+.dt .khoi-dau{cursor:auto;padding-right:0}
+.dt .tieu-de-trang .phu{font-size:.78rem}
+.dt-bong-c{opacity:.55;stroke:var(--nen-the);stroke-width:1;transition:opacity .12s}
+.dt-bong a:hover .dt-bong-c,.dt-bong a:focus .dt-bong-c{opacity:.9;stroke:var(--chu)}
+.dt-bong-chu{font-size:9.5px;fill:var(--chu);font-weight:600}
+.dt-ten-truc{font-size:10px;fill:var(--chu-mo)}
+.dt-moc{stroke:var(--vien-dam);stroke-width:1}
+.dt-noi{stroke:var(--vien-dam);stroke-width:1}
+/* Dự báo là nét LIỀN (nét đứt chỉ dành cho kỳ so). */
+.dt-luy .duong-cs{stroke-dasharray:none;opacity:.75}
+.dt-luy svg{display:block;height:auto}
+.dt-nguoi{display:grid;gap:.45rem}
+.dt-ng-dong,.dt-nc-dong{display:grid;grid-template-columns:minmax(5rem,9rem) minmax(0,1fr) auto;gap:.6rem;align-items:center;font-size:.78rem;color:inherit;text-decoration:none}
+.dt-ng-ten{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dt-ng-thanh{position:relative;height:14px;border-radius:4px;background:var(--nen-phu);overflow:hidden}
+.dt-ng-tt,.dt-ng-db{position:absolute;inset:0 auto 0 0}
+.dt-ng-tt{background:var(--lien-ket);opacity:.8}
+.dt-ng-db{background:var(--do-nen);border-right:2px solid var(--do)}
+.dt-ng-ns{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--chu)}
+.dt-ng-thanh .ss-vach{top:0;bottom:0}
+.dt-nguy-co{display:grid;gap:.4rem}
+.dt-nc-dong .thanh-nho{display:block}
+.dt-nc-dong .ten-jp{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dt-phi{font-size:.74rem;margin-top:.4rem}

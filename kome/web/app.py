@@ -1,7 +1,7 @@
 # kome/web/app.py
 import json, os, re, shutil, sys, tempfile, traceback
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 from fastapi import FastAPI, Form, UploadFile, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -779,11 +779,14 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         except Exception as e:
             return _loi(request, "đổi quyền", e)
 
-    # Giai đoạn 3: Dự báo, Cần liên hệ, Báo cáo là ứng dụng React — dữ liệu qua
-    # /api/du-bao, /api/lien-he, /api/bao-cao (kome/web/api.py).
-    @app.get("/du-bao", response_class=HTMLResponse)
+    # Giai đoạn 3: Cần liên hệ, Báo cáo là ứng dụng React — dữ liệu qua /api/lien-he,
+    # /api/bao-cao (kome/web/api.py). 2026-09-30: Dự báo gộp vào trang Doanh thu (/bao-cao,
+    # vẫn đọc /api/du-bao) — địa chỉ cũ 301, GIỮ khoảng xem trên query (bỏ `kb`: kịch bản nay
+    # là nút trên biểu đồ chính).
+    @app.get("/du-bao")
     def du_bao(request: Request):
-        return _man_khach(request)
+        q = urlencode([(k, v) for k, v in request.query_params.multi_items() if k != "kb"])
+        return RedirectResponse("/bao-cao" + ("?" + q if q else ""), status_code=301)
 
     @app.get("/lien-he", response_class=HTMLResponse)
     def lien_he(request: Request):

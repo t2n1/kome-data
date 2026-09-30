@@ -6,7 +6,7 @@ Chỉ TÍNH TOẠ ĐỘ, không định nghĩa chỉ số (công thức ở `kom
 from __future__ import annotations
 
 from kome import dinh_dang as DD
-from kome.du_bao import ChotThang, MuoiHaiThang
+from kome.du_bao import ChotThang, MuoiHaiThang, _gia
 
 
 def _bac(dinh: float, so_bac: int = 4) -> list[float]:
@@ -26,11 +26,12 @@ def _trieu(v: float) -> str:
     return DD.gon(v)
 
 
-def ve_chot_thang(c: ChotThang, rong: int = 960, cao: int = 280) -> dict:
+def ve_chot_thang(c: ChotThang, rong: int = 960, cao: int = 280, cot: str = "dt") -> dict:
     """Đường luỹ kế theo NGÀY LỊCH của tháng: thực tế tới hôm nay, rồi ba đường
     dự báo (cơ sở nét đứt, thấp/cao) và nhịp ngân sách (nếu đã đặt). Phần cộng
     thêm của mỗi ngày tương lai tăng theo SỐ NGÀY LÀM VIỆC tới ngày đó — thứ
-    Bảy/Chủ nhật là bậc phẳng, đúng như công thức chốt tháng."""
+    Bảy/Chủ nhật là bậc phẳng, đúng như công thức chốt tháng. `cot = "lg"`: chuỗi lãi
+    gộp (`c` là `chot_thang(..., cot="lg")`)."""
     trai, phai, tren, duoi = 64, 20, 16, 30
     ngay = c.ngay
     D = len(ngay)
@@ -58,7 +59,7 @@ def ve_chot_thang(c: ChotThang, rong: int = 960, cao: int = 280) -> dict:
         if n.la_kd:
             kd_qua += 1
         if n.ngay <= c.hom_nay:
-            luy_ke += n.dt or 0
+            luy_ke += _gia(n, cot)
             tt.append((X(i), Y(luy_ke)))
             i_nay = i
         else:

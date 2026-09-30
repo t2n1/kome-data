@@ -23,9 +23,9 @@ export function nhomDieuHuong(): Nhom[] {
   const nhom: Nhom[] = [
     { ma: "tongquan", ten: "TỔNG QUAN", muc: [
       { ma: "dashboard", nhan: "Dashboard", url: "/", icon: "dashboard" },
-      { ma: "baocao", nhan: "Báo cáo doanh thu", url: "/bao-cao", icon: "chart" },
-      { ma: "dubao", nhan: "Dự báo doanh thu", url: "/du-bao", icon: "target" },
-      ...(KD.hien_ngan_sach ? [{ ma: "ngansach", nhan: "Ngân sách", url: "/ngan-sach", icon: "yen" }] : []),
+      // 2026-09-30: Báo cáo · Dự báo · Ngân sách gộp thành MỘT trang "Doanh thu" (/du-bao → 301;
+      // màn nhập /ngan-sach vào bằng nút "✎ Sửa ngân sách" trên trang, vẫn đánh dấu mục này).
+      { ma: "baocao", nhan: "Doanh thu", url: "/bao-cao", icon: "chart" },
       { ma: "hieusuat", nhan: "Hiệu suất đội sale", url: null, icon: "team", ly_do: CHUA },
     ] },
     { ma: "khachhang", ten: "KHÁCH HÀNG", muc: [
@@ -65,6 +65,8 @@ export function nhomDieuHuong(): Nhom[] {
 
 /** Mục đang mở theo đường dẫn — dài nhất khớp trước ("/khach-hang/0001" -> kh360). */
 export function mucDangMo(duong: string): string {
+  // Màn nhập ngân sách không còn mục riêng — nó thuộc trang Doanh thu.
+  if (duong === "/ngan-sach" || duong.startsWith("/ngan-sach/")) return "baocao";
   let tot = "", dai = -1;
   for (const g of nhomDieuHuong()) for (const m of g.muc) {
     if (!m.url) continue;

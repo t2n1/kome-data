@@ -38,7 +38,7 @@ export default function ThongBao() {
         tháng doanh thu khỏi kho nếu bấm nhầm lô. Vì vậy nó chỉ mở cho người phụ trách nạp dữ liệu và chủ doanh nghiệp.</p>
       <p>Cần vào đây để làm việc? Nhờ người quản trị cấp quyền cho tài khoản {ten && <strong>{ten}</strong>}.</p>
       <p>Mọi số liệu bán hàng, khách hàng và báo cáo vẫn xem được bình thường:{" "}
-        <a href="/">Tổng quan</a> · <a href="/khach-hang">Khách hàng</a> · <a href="/bao-cao">Báo cáo doanh thu</a>.</p>
+        <a href="/">Tổng quan</a> · <a href="/khach-hang">Khách hàng</a> · <a href="/bao-cao">Doanh thu</a>.</p>
     </div>);
   if (tb.loai === "cam_ngan_sach") return (
     <div className="tb ngay-thieu">
@@ -46,7 +46,7 @@ export default function ThongBao() {
       <p>Màn <strong>Ngân sách</strong> là nơi đặt chỉ tiêu doanh thu cho từng nhân viên từng tháng. Con số đó là thước đo mà cả
         công ty được đánh giá theo, nên nó chỉ mở cho chủ doanh nghiệp.</p>
       <p>Cần đặt hoặc sửa chỉ tiêu? Nhờ người quản trị cấp quyền cho tài khoản {ten && <strong>{ten}</strong>}.</p>
-      <p>Tiến độ so với chỉ tiêu vẫn xem được bình thường ở <a href="/bao-cao">Báo cáo doanh thu</a>.</p>
+      <p>Tiến độ so với chỉ tiêu vẫn xem được bình thường ở <a href="/bao-cao">Doanh thu</a>.</p>
     </div>);
   // cam_cai_dat
   return (

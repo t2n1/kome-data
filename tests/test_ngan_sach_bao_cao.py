@@ -3,7 +3,8 @@
 Giai đoạn 3: /bao-cao là React (giao_dien/src/bao_cao/BaoCao.tsx) — các
 test "trang" kiểm dữ liệu /api/bao-cao (con số mà màn in ra) và, khi bất biến
 là cách IN (ô trống, "không có dữ liệu", không tự tính phần trăm), kiểm thẳng
-mã nguồn React."""
+mã nguồn React. Từ 2026-09-30 màn là trang Doanh thu (gộp Báo cáo · Dự báo · Ngân
+sách): ô "Ngân sách", đường ngân sách của biểu đồ chính và khối "Người phụ trách"."""
 from datetime import date
 from pathlib import Path
 
@@ -198,8 +199,8 @@ def test_trang_bao_cao_in_ro_thang_va_ngay_moc(client, conn, batch):
     assert td["thang"] == "2026-07"
     assert td["hom_nay"] == "2026-07-31"
     src = _src()
-    assert "<h2>Tiến độ ngân sách tháng {tNhan}</h2>" in src
-    assert "Số liệu đến {ngay(td.hom_nay)}" in src
+    assert '<div className="nhan">Ngân sách {td ? thNgan(td.thang) : ""}</div>' in src
+    assert "mốc {nhanMoc}" in src
 
 
 def test_trang_bao_cao_khong_co_chi_tieu_thi_moi_sang_man_ngan_sach(client, conn, batch):
@@ -209,8 +210,8 @@ def test_trang_bao_cao_khong_co_chi_tieu_thi_moi_sang_man_ngan_sach(client, conn
     td = _td(client)
     assert td["co_ngan_sach"] is False
     src = _src()
-    assert "{!v.co ? <div className=\"khoi-loi\">Chưa đặt ngân sách {ten} của công ty cho tháng này." in src
-    assert "href={`/ngan-sach?ky=${td.company_fy}`}" in src
+    assert '{td ? "Chưa đặt" : "—"}' in src and "<a href={lienNs}>Đặt ngân sách {ten}</a>" in src
+    assert "`/ngan-sach?ky=${td?.company_fy ?? bc.ky.company_fy}`" in src
 
 
 def test_tien_do_ngan_sach_khong_qua_3_truy_van(conn, batch, monkeypatch):
@@ -259,8 +260,9 @@ def test_trang_bao_cao_khong_no_khi_chi_tieu_bang_0(client, conn, batch):
     assert td["tien_do"] is None and td["rong_thanh"] is None
     assert _nguoi(td, "0104")["tien_do"] is None
     src = _src()
-    assert '{v.td != null ? p1(v.td) : "—"}' in src
-    assert 'if (rong == null) return <div className="phu">chưa có chỉ tiêu</div>;' in src
+    assert '{tienDo != null ? p1(tienDo) : "—"}' in src
+    # Không có mẫu số -> không vẽ thanh 0% (một thanh 0% nói dối là đã đo được tiến độ).
+    assert "if (rong == null) return null;" in src
 
 
 # ---- vòng soát cuối, việc 2/3: "So cùng kỳ" đọc từ mart, không tính lại ---
@@ -298,7 +300,6 @@ def test_trang_bao_cao_khong_hien_phan_tram_nguoc_dau_khi_cung_ky_am(client, con
     assert n["tang_truong"] is None
     src = _src()
     assert "n.thuc_te / n.cung_ky" not in src and "/ n.cung_ky" not in src
-    assert "{n.tang_truong != null ? <span" in src
 
 
 def test_cung_ky_TON_TAI_nhung_BAN_0_DONG_hien_0_khong_hien_khong_co_du_lieu(
@@ -328,7 +329,10 @@ def test_trang_bao_cao_hien_0_dong_khong_hien_khong_co_du_lieu(client, conn, bat
     # [Vòng soát cuối 3, việc 2] Không có dòng này, cái tên "hiện 0 đồng"
     # của test không còn được kiểm chứng.
     assert n["cung_ky"] == 0
-    assert '{n.co_cung_ky ? yen(n.cung_ky ?? 0) : "không có dữ liệu"}' in _src()
+    # Trang Doanh thu: kỳ so từng người là vạch + dòng ô nổi — xét `!= null`, KHÔNG xét
+    # truthiness (¥0 là số thật, không phải "không có").
+    src = _src()
+    assert "{s != null && <span className=\"ss-vach\"" in src and "{s != null && <DongNoi" in src
 
 
 # ---- vòng soát cuối 2: hồi quy do chính 027 gây ra -------------------------
@@ -384,9 +388,8 @@ def test_trang_bao_cao_hien_khong_co_du_lieu_khi_M12_khong_ton_tai(client, conn,
     _ban(conn, batch, date(2025, 4, 20), "0104")
     n = _nguoi(_td(client, 2025), "0104")
     assert n["co_cung_ky"] is False and n["cung_ky"] is None
-    src = _src()
-    assert '{n.co_cung_ky ? yen(n.cung_ky ?? 0) : "không có dữ liệu"}' in src
-    assert ': n.co_cung_ky ? "—" : "không có dữ liệu"}' in src
+    # Kỳ so từng người chỉ vẽ khi kỳ so CÓ dữ liệu (`ss[0]?.co`) — không có thì không vạch nào.
+    assert "kx?.loai === \"thang\" && ss[0]?.co && !lg ?" in _src()
 
 
 # ---- vòng soát cuối, việc 9: thanh tiến độ CSS thuần -----------------------
@@ -425,7 +428,9 @@ def test_trang_bao_cao_khong_ve_thanh_am_khi_thuc_te_am(client, conn, batch):
     assert td["thuc_te"] < 0
     assert td["rong_thanh"] == 0.0, "không được vẽ chiều rộng thanh ÂM"
     assert _nguoi(td, "0104")["rong_thanh"] == 0.0
-    assert 'style={{ width: `${rong}%` }}' in _src()
+    src = _src()
+    assert "const r = Math.max(0, Math.min(1, rong)) * 100;" in src
+    assert "`${Math.max(0, Math.min(100, v / to * 100))}%`" in src
 
 
 def test_trang_bao_cao_khong_ve_thanh_khi_chi_tieu_bang_0(client, conn, batch):
