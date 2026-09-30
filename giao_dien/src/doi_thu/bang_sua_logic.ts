@@ -2,7 +2,7 @@
 // cột, chữ hiện trong ô, thân POST của MỘT ô, di chuyển bằng bàn phím, ghép dòng sau khi lưu, tìm. Thân POST đi qua
 // CHÍNH sua_logic.ts::formTu + payload + kiemForm (một đường dựng thân với pop-up SuaMatHang — không viết lại luật).
 import { so_luong, yen } from "../dinh_dang";
-import { DON_VI, nhanDonVi, type QuanSat } from "./kieu";
+import { DON_VI, NHAN_MUC, nhanDonVi, type QuanSat } from "./kieu";
 import { boDau } from "./loc";
 import { formTu, kiemForm, payload, TRUONG_GIA, type FormMatHang } from "./sua_logic";
 
@@ -10,7 +10,7 @@ import { formTu, kiemForm, payload, TRUONG_GIA, type FormMatHang } from "./sua_l
 export type TruongO = "ten_goc" | "quy_cach_goc" | "so_goi_thung" | "kl_goi_g" | "gia_goc" | "don_vi_gia"
   | "kg_moi_don_vi_gia" | "thue"
   | "trang_thai" | "ma_kome" | "nhan";
-export type MaCot = TruongO | "ben" | "yen_kg";
+export type MaCot = TruongO | "ben" | "muc" | "yen_kg";
 /** `kieu` null = chỉ đọc. "so" = ô số, "chon" = ô chọn, "ma" = ô chữ có gợi ý mã KOME. */
 export type Cot = { ma: MaCot; nhan: string; kieu: "chu" | "so" | "chon" | "ma" | null; chon?: [string, string][] };
 
@@ -22,6 +22,7 @@ export const NHAN_O: [FormMatHang["nhan"], string][] = [["cung_hang", "cùng th�
 export const COT: Cot[] = [
   { ma: "ten_goc", nhan: "Tên hàng", kieu: "chu" },       // cột đầu — dính trái khi bảng cuộn ngang
   { ma: "ben", nhan: "Bên", kieu: null },
+  { ma: "muc", nhan: "Mức giá", kieu: null },   // 070: chỉ đọc — mỗi mức giá là một dòng của mặt hàng
   { ma: "quy_cach_goc", nhan: "Quy cách", kieu: "chu" },
   { ma: "so_goi_thung", nhan: "Gói/thùng", kieu: "so" },
   { ma: "kl_goi_g", nhan: "Tịnh 1 gói (g)", kieu: "so" },
@@ -38,6 +39,30 @@ export const COT: Cot[] = [
 
 /** Cột đang hiện: "Bên" chỉ khi xem mọi bên. */
 export const cotHien = (moiBen: boolean) => COT.filter(c => c.ma !== "ben" || moiBen);
+
+/** Mức giá của dòng: nhãn `muc_gia` · nhãn `kenh_gia` (có cái nào hiện cái đó); không có → "Thường"; mã lạ nguyên văn. */
+export function nhanMuc(q: Pick<QuanSat, "muc_gia" | "kenh_gia">): string {
+  const r = [q.muc_gia, q.kenh_gia].filter((m): m is string => !!m).map(m => NHAN_MUC[m] ?? m);
+  return r.length ? r.join(" · ") : "Thường";
+}
+
+/** Nhóm dòng bảng sửa theo MẶT HÀNG (bên + mat_hang_khoa), giữ thứ tự lần gặp đầu. `dau` = dòng đại diện (hoặc dòng đầu khi
+ *  không có cờ), `con` = các mức giá khác theo thứ tự đến. */
+export function nhomBang<T extends QuanSat>(ds: T[]): { dau: T; con: T[] }[] {
+  const theoBen = new Map<string, Map<string, T[]>>();   // lồng hai tầng — không ghép chuỗi khoá nên không thể trùng
+  const nhom: T[][] = [];
+  for (const q of ds) {
+    let m = theoBen.get(q.ma_doi_thu);
+    if (!m) theoBen.set(q.ma_doi_thu, m = new Map());
+    let g = m.get(q.mat_hang_khoa);
+    if (!g) { m.set(q.mat_hang_khoa, g = []); nhom.push(g); }
+    g.push(q);
+  }
+  return nhom.map(g => {
+    const dau = g.find(q => q.dai_dien) ?? g[0];
+    return { dau, con: g.filter(q => q !== dau) };
+  });
+}
 
 const laKhachKe = (q: QuanSat) => q.loai_nguon === "khach_ke";
 /** Giá khách kể đã mang nhóm (thẻ @hàng): máy chủ không ghép lại ở đây (doi_thu.sua_mat_hang). */
@@ -58,6 +83,7 @@ export function hienThi(q: QuanSat, c: Cot): { chu: string; hoi: boolean } {
   const thieuQc = (v: number | null) => ({ chu: v == null ? "" : so_luong(v, 1), hoi: v == null && !laKhachKe(q) });
   switch (c.ma) {
     case "ben": return { chu: q.ten_doi_thu ?? q.ma_doi_thu, hoi: false };
+    case "muc": return { chu: nhanMuc(q), hoi: false };
     case "ten_goc": return { chu: q.ten_goc, hoi: !q.ten_goc };
     case "quy_cach_goc": return { chu: q.quy_cach_goc ?? "", hoi: false };
     case "so_goi_thung": return thieuQc(q.so_goi_thung);
@@ -140,3 +166,57 @@ export function timDong(ds: QuanSat[], tim: string): QuanSat[] {
   if (!t) return ds;
   return ds.filter(q => boDau(`${q.ten_goc} ${q.quy_cach_goc ?? ""} ${q.ma_kome ?? ""} ${q.ma_doi_thu} ${q.ten_doi_thu ?? ""}`).includes(t));
 }
+
+/** Khoá NHÓM (mặt hàng) của một dòng — khoá của state mở / đóng. JSON hai phần tử: không ghép chuỗi nên không thể trùng. */
+export const khoaNhomBang = (q: Pick<QuanSat, "ma_doi_thu" | "mat_hang_khoa">) => JSON.stringify([q.ma_doi_thu, q.mat_hang_khoa]);
+
+/** Một dòng ĐANG HIỆN của bảng sửa: đầu nhóm (`soCon` = số mức giá khác, `mo` = đang mở, `ep` = mở vì dòng con đang lỗi /
+ *  409 — đóng không được) hoặc dòng con (`soCon` null). */
+export type DongHien<T extends QuanSat = QuanSat> = { q: T; kn: string; soCon: number | null; mo: boolean; ep: boolean };
+
+/** Danh sách dòng đang hiện: mỗi nhóm dòng đầu, rồi các dòng con ngay dưới khi nhóm mở (`mo` có khoá nhóm) HOẶC khi
+ *  `tuMo(con)` đúng với một dòng con (ô lỗi / 409 ở dòng con — không để lỗi nằm trong nhóm đang đóng). Chỉ số bàn phím
+ *  `d` của bảng chạy trên CHÍNH danh sách này. */
+export function dongHien<T extends QuanSat>(nhom: { dau: T; con: T[] }[], mo: ReadonlySet<string>,
+  tuMo: (q: T) => boolean = () => false): DongHien<T>[] {
+  const r: DongHien<T>[] = [];
+  for (const g of nhom) {
+    const kn = khoaNhomBang(g.dau);
+    const ep = g.con.some(tuMo);
+    const m = g.con.length > 0 && (ep || mo.has(kn));
+    r.push({ q: g.dau, kn, soCon: g.con.length, mo: m, ep });
+    if (m) for (const c of g.con) r.push({ q: c, kn, soCon: null, mo: true, ep });
+  }
+  return r;
+}
+
+/** Khoá hiển thị của một dòng bảng sửa: `_k` (dòng tay "đọc sai" mang id mới nhưng giữ khoá cũ) hoặc `nguon:id`. */
+export const khoaDong = (q: Pick<QuanSat, "nguon" | "id"> & { _k?: string }) => q._k ?? `${q.nguon}:${q.id}`;
+
+/** Ô NEO theo KHOÁ dòng + chỉ số cột: ô chọn / ô đang sửa không trượt sang dòng khác khi danh sách dòng đang hiện đổi
+ *  (ẩn một dòng, mở / đóng nhóm, tải lại). Chỉ số d chỉ suy ra lúc cần, từ danh sách khoá đang hiện. */
+export type Neo = { k: string; c: number };
+
+/** Vị trí (d, c) của ô neo trong danh sách khoá đang hiện; dòng không còn hiện → null. */
+export function viTriNeo(khoa: readonly string[], n: Neo | null): ViTri | null {
+  if (!n) return null;
+  const d = khoa.indexOf(n.k);
+  return d < 0 ? null : { d, c: n.c };
+}
+
+/** Ô neo kế tiếp theo hướng `h` (cùng luật oKeTiep); ô gốc không còn hiện hoặc hết bảng → null. */
+export function neoKeTiep(khoa: readonly string[], n: Neo, h: Huong, cots: Cot[]): Neo | null {
+  const v = viTriNeo(khoa, n);
+  const t = v && oKeTiep(v, h, khoa.length, cots);
+  return t ? { k: khoa[t.d], c: t.c } : null;
+}
+
+/** Đích của "Gộp vào…": các MẶT HÀNG khác (dòng đầu nhóm) cùng bên với `q`, lọc bằng ô tìm (cùng luật timDong). */
+export function dichGop<T extends QuanSat>(ds: T[], q: Pick<QuanSat, "ma_doi_thu" | "mat_hang_khoa">, tim: string): T[] {
+  const dau = nhomBang(ds.filter(x => x.ma_doi_thu === q.ma_doi_thu)).map(g => g.dau)
+    .filter(x => x.mat_hang_khoa !== q.mat_hang_khoa);
+  return timDong(dau, tim) as T[];
+}
+
+/** Dòng đã được gộp vào mặt hàng khác (khoá mặt hàng ≠ mã hàng của chính nó) — có nút "Tách ra". */
+export const daGop = (q: Pick<QuanSat, "mat_hang_khoa" | "ma_hang_dt">) => q.mat_hang_khoa !== q.ma_hang_dt;

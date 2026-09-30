@@ -6,8 +6,9 @@ import { ngay, so_luong, yen } from "../dinh_dang";
 import { NHAN_GHEP, type Nhom, type QuanSat } from "./kieu";
 import { laBatThuong, lyDoBatThuong, mauLech, NGAY_CU } from "./mau";
 import { daSua } from "./sua_logic";
-import { bangBac, giaKome, giaTai, LUA_CHON_GK, nhanKlGoi, pcDau, phiKome, phiMatHang, type PhiNoi, type PhiSoSanh,
-  type SoLuong } from "./so_sanh_logic";
+import { nhanMuc } from "./bang_sua_logic";
+import { bangBac, donViChuaQuy, giaKome, giaTai, LUA_CHON_GK, mucKhac, nhanKlGoi, pcDau, phiKome, phiMatHang, type PhiNoi,
+  type PhiSoSanh, type SoLuong } from "./so_sanh_logic";
 
 const kgChu = (v: number | null | undefined) => (v == null ? null : `${so_luong(v, 1)} kg`);
 
@@ -26,6 +27,30 @@ function DongPhi({ p }: { p: PhiNoi | null }) {
   return (
     <p className="dt-ng-chu">Kèm phí giao (đơn {p.thung} thùng, Kanto, daibiki): <b>{yen(p.gia)}/kg</b> — ship {yen(r.ship)}
       {r.vung ? ` · vùng ${yen(r.vung)}` : ""} · daibiki {yen(r.daibiki)}</p>);
+}
+
+/** 070: các mức giá KHÁC của cùng mặt hàng (mucKhac — cùng bên + mat_hang_khoa trong nhóm). CHỈ hiển thị: ¥/kg tại 1 đơn
+ *  vị (gia_1) khi nhóm so theo kg, không thì giá chuẩn theo đơn vị của nhóm. */
+function MucKhac({ n, q }: { n: Nhom; q: QuanSat }) {
+  const ds = mucKhac(n, q);
+  if (!ds.length) return null;
+  const dv = donViChuaQuy(n);
+  return (
+    <div className="dt-ng-muc">
+      <p className="dt-ng-chu"><b>Các mức giá khác của mặt hàng này</b> <small>(đang xem: {nhanMuc(q)})</small></p>
+      <table><tbody>
+        {ds.map(x => {
+          const g = dv == null ? x.gia_1 ?? x.yen_chuan : x.yen_chuan;
+          const bt = laBatThuong(x);   // B18: xám "⚠" + lý do, không tô màu lệch
+          return (
+            <tr key={`${x.nguon}:${x.id}`} className={bt ? "c-xam" : undefined}>
+              <td>{bt && <span className="c-xam" title={lyDoBatThuong(x)} aria-label={`bất thường: ${lyDoBatThuong(x)}`}>⚠ </span>}
+                {nhanMuc(x)}{x.trang_thai === "het" ? " · đang hết" : ""}</td>
+              <td className="r">{g == null ? "?" : `${yen(g)}/${dv ?? "kg"}`}</td>
+            </tr>);
+        })}
+      </tbody></table>
+    </div>);
 }
 
 /** Nội dung ô nổi của MỘT mặt hàng. */
@@ -84,6 +109,7 @@ export function NoiGia({ n, q, sl, gk, phi }: { n: Nhom; q: QuanSat; sl: SoLuong
       {sl === "pallet" && khongGhiPallet && <p className="dt-ng-chu">Bên này không ghi giá pallet — đang dùng giá lẻ</p>}
       {q.gom_ship === "co" && <p className="dt-ng-chu">🚚 Giá đã gồm ship</p>}
       <DongPhi p={pPhi} />
+      <MucKhac n={n} q={q} />
       <p className="dt-ng-chu">
         Giá gốc {q.gia_goc == null ? "?" : `${yen(q.gia_goc)}/${q.don_vi_gia ?? "?"}`}
         {q.gia_bac ? ` · bậc ghi: “${q.gia_bac}”` : ""}{q.kenh_gia ? ` · ${q.kenh_gia}` : ""} · {ngay(q.ngay_nguon)}

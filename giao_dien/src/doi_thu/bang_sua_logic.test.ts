@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { QuanSat } from "./kieu";
-import { COT, cotHien, ghepDong, giaTriSua, hienThi, oKeTiep, suaDuoc, thanO, timDong, type Cot } from "./bang_sua_logic";
+import { COT, cotHien, daGop, dichGop, dongHien, ghepDong, giaTriSua, hienThi, khoaDong, khoaNhomBang, neoKeTiep, nhanMuc, nhomBang, oKeTiep,
+  suaDuoc, viTriNeo, thanO, timDong, type Cot } from "./bang_sua_logic";
 
 let seq = 0;
 const qs = (o: Partial<QuanSat> = {}): QuanSat => ({
-  ma_doi_thu: "NEXT", ten_doi_thu: "Next", nguon: "nap", id: ++seq, ma_hang_dt: `h${seq}`, ngay_nguon: "2026-09-01",
+  ma_doi_thu: "NEXT", ten_doi_thu: "Next", nguon: "nap", id: ++seq, ma_hang_dt: `h${seq}`, mat_hang_khoa: `h${seq}`, an: false, ngay_nguon: "2026-09-01",
   hinh_thuc_nguon: "file", nguon_file: null, vi_tri: null, ten_goc: "Sứa ăn liền", quy_cach_goc: "30 gói", gia_goc: 285,
   don_vi_gia: "goi", kg_moi_don_vi_gia: null, thue: "chua", gom_ship: null, kenh_gia: null, muc_gia: null, gia_bac: null,
   gia_truoc_km: null, trang_thai: "con", khuyen_mai: null, loai_nguon: "bang_gia", ghi_chu: null, ma_kome: "XT02",
@@ -146,5 +147,100 @@ describe("ghepDong / timDong", () => {
     expect(timDong(ds, "tui 500").length).toBe(1);
     expect(timDong(ds, "cg01").length).toBe(1);
     expect(timDong(ds, "  ").length).toBe(2);
+  });
+});
+
+describe("070 — nhóm dòng theo mặt hàng", () => {
+  it("nhanMuc", () => {
+    expect(nhanMuc(qs({ kenh_gia: "tai_kho", muc_gia: null }))).toBe("Tại kho");
+    expect(nhanMuc(qs({ kenh_gia: null, muc_gia: "pallet" }))).toBe("Pallet");
+    expect(nhanMuc(qs({ kenh_gia: "tai_kho", muc_gia: "dac_biet" }))).toBe("Đặc biệt · Tại kho");
+    expect(nhanMuc(qs({ kenh_gia: null, muc_gia: null }))).toBe("Thường");
+    expect(nhanMuc(qs({ kenh_gia: "xyz", muc_gia: null }))).toBe("xyz");
+  });
+  it("nhomBang: đầu nhóm là dòng đại diện, giữ thứ tự lần gặp đầu", () => {
+    const a1 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: false } as Partial<QuanSat>);
+    const a2 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true } as Partial<QuanSat>);
+    const b1 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h2", dai_dien: true } as Partial<QuanSat>);
+    const c1 = qs({ ma_doi_thu: "M", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    const g = nhomBang([a1, b1, a2, c1]);
+    expect(g.map(x => [x.dau.id, x.con.map(y => y.id)])).toEqual([[a2.id, [a1.id]], [b1.id, []], [c1.id, []]]);
+  });
+  it("nhomBang: không dòng nào có dai_dien → đầu nhóm là dòng đầu tiên; bên khác cùng khoá mặt hàng là nhóm khác", () => {
+    const a = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    const b = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    const c = qs({ ma_doi_thu: "M", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    expect(nhomBang([a, b, c]).map(x => [x.dau.id, x.con.map(y => y.id)])).toEqual([[a.id, [b.id]], [c.id, []]]);
+  });
+  it("cột Mức giá chỉ đọc, đứng sau Bên", () => {
+    const c = cotHien(true).map(x => x.ma);
+    expect(c.indexOf("muc")).toBe(c.indexOf("ben") + 1);
+    expect(COT.find(x => x.ma === "muc")!.kieu).toBeNull();
+    expect(hienThi(qs({ kenh_gia: "gui" }), cot("muc"))).toEqual({ chu: "Gửi", hoi: false });
+  });
+});
+
+describe("nhóm theo mặt hàng (070)", () => {
+  const P = (o: Partial<QuanSat>) => qs(o as Partial<QuanSat>);
+  it("dongHien: mặc định đóng — chỉ dòng đầu; mở nhóm thì dòng con ngay dưới dòng đầu", () => {
+    const a1 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true }), a2 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: false });
+    const b = P({ ma_doi_thu: "N", mat_hang_khoa: "h2", dai_dien: true });
+    const g = nhomBang([a1, b, a2]);
+    const dong = dongHien(g, new Set());
+    expect(dong.map(x => [x.q.id, x.soCon, x.mo])).toEqual([[a1.id, 1, false], [b.id, 0, false]]);
+    const mo = dongHien(g, new Set([khoaNhomBang(a1)]));
+    expect(mo.map(x => [x.q.id, x.soCon])).toEqual([[a1.id, 1], [a2.id, null], [b.id, 0]]);
+    expect(mo[0].mo).toBe(true);
+  });
+  it("dongHien: nhóm có dòng con đang lỗi / 409 tự mở; nhóm không có dòng con không bao giờ 'mở'", () => {
+    const a1 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true }), a2 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1" });
+    const b = P({ ma_doi_thu: "N", mat_hang_khoa: "h2" });
+    const d = dongHien(nhomBang([a1, a2, b]), new Set([khoaNhomBang(b)]), q => q.id === a2.id);
+    expect(d.map(x => [x.q.id, x.mo, x.ep])).toEqual([[a1.id, true, true], [a2.id, true, true], [b.id, false, false]]);
+  });
+  it("khoaNhomBang: bên và khoá mặt hàng có '|' vẫn không trùng", () => {
+    expect(khoaNhomBang({ ma_doi_thu: "A|B", mat_hang_khoa: "C" })).not.toBe(khoaNhomBang({ ma_doi_thu: "A", mat_hang_khoa: "B|C" }));
+  });
+  it("viTriNeo: ô neo theo KHOÁ — dòng phía trên rời bảng thì chỉ số đổi nhưng vẫn là đúng dòng; dòng mất → null", () => {
+    expect(viTriNeo(["a", "b", "c"], { k: "c", c: 2 })).toEqual({ d: 2, c: 2 });
+    expect(viTriNeo(["b", "c"], { k: "c", c: 2 })).toEqual({ d: 1, c: 2 });   // "a" đã ẩn: ô đang sửa vẫn ở "c"
+    expect(viTriNeo(["b", "c"], { k: "a", c: 2 })).toBeNull();
+    expect(viTriNeo(["a"], null)).toBeNull();
+  });
+  it("viTriNeo trên dongHien: mở nhóm chèn dòng con — ô neo dưới nhóm vẫn chỉ đúng dòng của nó", () => {
+    const a1 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true } as Partial<QuanSat>);
+    const a2 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    const b = qs({ ma_doi_thu: "N", mat_hang_khoa: "h2" } as Partial<QuanSat>);
+    const g = nhomBang([a1, a2, b]);
+    const dong = (mo: Set<string>) => dongHien(g, mo).map(x => khoaDong(x.q));
+    const neo = { k: khoaDong(b), c: 1 };
+    expect(viTriNeo(dong(new Set()), neo)).toEqual({ d: 1, c: 1 });
+    expect(viTriNeo(dong(new Set([khoaNhomBang(a1)])), neo)).toEqual({ d: 2, c: 1 });
+  });
+  it("neoKeTiep: đi theo luật oKeTiep trên danh sách khoá; dòng gốc không còn hiện → null", () => {
+    const cots = cotHien(false);
+    expect(neoKeTiep(["a", "b"], { k: "a", c: 0 }, "xuong", cots)).toEqual({ k: "b", c: 0 });
+    expect(neoKeTiep(["a", "b"], { k: "b", c: 0 }, "xuong", cots)).toBeNull();
+    expect(neoKeTiep(["a", "b"], { k: "z", c: 0 }, "xuong", cots)).toBeNull();
+    expect(neoKeTiep(["a", "b"], { k: "a", c: cots.length - 1 }, "tab", cots)).toEqual({ k: "b", c: 0 });
+  });
+  it("khoaDong: _k thắng nguon:id", () => {
+    expect(khoaDong({ nguon: "tay", id: 5 })).toBe("tay:5");
+    expect(khoaDong({ nguon: "tay", id: 9, _k: "tay:5" })).toBe("tay:5");
+  });
+  it("dichGop: mặt hàng khác CÙNG bên (một dòng mỗi mặt hàng), lọc theo ô tìm", () => {
+    const a1 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true, ten_goc: "Sứa" });
+    const a2 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", ten_goc: "Sứa" });
+    const b1 = P({ ma_doi_thu: "N", mat_hang_khoa: "h2", ten_goc: "Bánh đa" });
+    const b2 = P({ ma_doi_thu: "N", mat_hang_khoa: "h2", dai_dien: true, ten_goc: "Bánh đa" });
+    const c = P({ ma_doi_thu: "N", mat_hang_khoa: "h3", ten_goc: "Phở khô" });
+    const m = P({ ma_doi_thu: "M", mat_hang_khoa: "h9", ten_goc: "Bánh đa" });
+    const ds = [a1, a2, b1, b2, c, m];
+    expect(dichGop(ds, a2, "").map(x => x.id)).toEqual([b2.id, c.id]);
+    expect(dichGop(ds, a1, "banh").map(x => x.id)).toEqual([b2.id]);
+  });
+  it("daGop: khoá mặt hàng khác mã hàng của chính dòng", () => {
+    expect(daGop({ mat_hang_khoa: "h1", ma_hang_dt: "h1" })).toBe(false);
+    expect(daGop({ mat_hang_khoa: "h1", ma_hang_dt: "h2" })).toBe(true);
   });
 });

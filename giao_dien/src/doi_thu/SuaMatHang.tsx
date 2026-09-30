@@ -20,7 +20,8 @@ const NHAN: [FormMatHang["nhan"], string][] = [["cung_hang", hoa(NHAN_GHEP.cung_
 const THUE: [string, string][] = [["co", "Đã gồm thuế"], ["chua", "Chưa thuế"], ["khong_ro", "Không rõ"]];
 const DV_SL: [Bac["don_vi_sl"], string][] = [["thung", "thùng"], ["kg", "kg"], ["goi", "gói"], ["pallet", "pallet"]];
 const DV_GIA_BAC: [Bac["don_vi_gia"], string][] = [["thung", "thùng"], ["kg", "kg"], ["goi", "gói"]];
-const NHAN_LOAI_NK: Record<string, string> = { xac_nhan: "xác nhận đúng", gia_moi: "giá mới", ghep: "ghép", sua: "sửa" };
+const NHAN_LOAI_NK: Record<string, string> = { xac_nhan: "xác nhận đúng", gia_moi: "giá mới", ghep: "ghép", sua: "sửa",
+  an: "ẩn", hien: "khôi phục", gop: "gộp mặt hàng" };
 const BAC_TOI_DA = 10;   // = kome.doi_thu.BAC_TOI_DA
 const BAC_TRONG: BacNhap = { tu: "", don_vi_sl: "thung", gia: "", don_vi_gia: "thung" };
 

@@ -1,6 +1,7 @@
 {
  "bang": {
   "app": [
+   "an_quan_sat",
    "anh_chup_api",
    "bang_tong_quan",
    "dinh_chinh_dieu_kien",
@@ -11,6 +12,7 @@
    "ghep_hang",
    "gia_doi_thu_tay",
    "giao_hang_kome",
+   "gop_mat_hang",
    "loai_nguon",
    "ngan_sach",
    "ngan_sach_cong_ty",

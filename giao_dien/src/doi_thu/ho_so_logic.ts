@@ -29,8 +29,8 @@ export function chipBen(tq: TongQuan): { ma: string; ten: string; so: number }[]
  *  (`so_dong`) → tên. Không có bên nào → "". Đúng là phần tử đầu của chipBen. */
 export const benMacDinh = (tq: TongQuan): string => chipBen(tq)[0]?.ma ?? "";
 
-/** Dòng hiện hành thuộc bảng giá của bên (khách kể không phải bảng giá của bên). */
-const cuaBang = (q: QsHs) => q.hien_hanh && q.loai_nguon !== "khach_ke";
+/** Dòng hiện hành thuộc bảng giá của bên (khách kể không phải bảng giá của bên), mỗi mặt hàng MỘT dòng đại diện (070). */
+const cuaBang = (q: QsHs) => q.hien_hanh && q.loai_nguon !== "khach_ke" && q.dai_dien !== false;
 
 /** Một dòng của biểu đồ "Giá bên này so với KOME": quan sát HIỆN HÀNH có `gia_kome_so` (không tính khách kể — không
  *  phải bảng giá của bên), nhóm KHÔNG có giá KOME lệch (`gia_kome_lech`: > 3× / < ⅓ trung vị — cùng cờ Tóm tắt bỏ khỏi
@@ -89,20 +89,23 @@ export function thuGon<T extends { p: number | null; bt?: boolean }>(dong: T[], 
 
 /** Bốn ô số (nhóm giá KOME lệch và giá bất thường KHÔNG tính): trùng KOME = số dòng KHÔNG bất thường của biểu đồ; rẻ hơn
  *  KOME > 5% (p < −5); đang hết (trong các dòng trùng, như bản phác);
- *  khuyến mãi = mọi dòng hiện hành có KM (cùng vị từ với tq.khuyen_mai: ghi chú KM hoặc giá trước KM), không tính khách kể. */
+ *  khuyến mãi = số MẶT HÀNG (070: ma_doi_thu + mat_hang_khoa) có KM ở ÍT NHẤT MỘT mức hiện hành — không chỉ dòng đại diện:
+ *  KM chỉ ở mức pallet vẫn đếm (cùng vị từ với tq.khuyen_mai: ghi chú KM hoặc giá trước KM), không tính khách kể. */
 export function o4(qs: QsHs[]): { trung: number; reHon: number; het: number; km: number } {
   const d = dongSoKome(qs).filter(x => !x.bt);
   return { trung: d.length, reHon: d.filter(x => x.p != null && x.p < -LECH_NGANG).length, het: d.filter(x => x.het).length,
-    km: qs.filter(q => cuaBang(q) && coKm(q)).length };
+    km: new Set(qs.filter(q => q.hien_hanh && q.loai_nguon !== "khach_ke" && coKm(q))
+      .map(q => JSON.stringify([q.ma_doi_thu, q.mat_hang_khoa ?? q.ma_hang_dt]))).size };
 }
 
 /** Lịch sử giá theo tháng của MỘT mặt hàng (cùng ma_hang_dt · kênh · mức giá · đơn vị so — cùng khoá hiện hành của
- *  mart): mỗi tháng lấy quan sát MỚI NHẤT có yen_chuan; tháng tăng dần. < 2 tháng → [] (không vẽ). */
+ *  mart): mỗi tháng lấy quan sát MỚI NHẤT có yen_chuan; tháng tăng dần. Dòng đã ẨN (070, `an`) không vẽ — rác đã xoá
+ *  khỏi bảng giá không được hiện lại thành một điểm lịch sử. < 2 tháng → [] (không vẽ). */
 export function lichSuThang(qs: QuanSat[], x: QuanSat): { thang: string; gia: number }[] {
   const theo = new Map<string, { ngay: string; gia: number }>();
   for (const y of qs) {
     if (y.ma_hang_dt !== x.ma_hang_dt || y.kenh_gia !== x.kenh_gia || y.muc_gia !== x.muc_gia || y.don_vi_so !== x.don_vi_so
-      || y.yen_chuan == null || y.loai_nguon === "khach_ke") continue;
+      || y.yen_chuan == null || y.loai_nguon === "khach_ke" || y.an === true) continue;
     const t = y.ngay_nguon.slice(0, 7), c = theo.get(t);
     if (!c || y.ngay_nguon > c.ngay) theo.set(t, { ngay: y.ngay_nguon, gia: y.yen_chuan });
   }
@@ -120,7 +123,7 @@ export function nganhBen(tq: TongQuan, ben: string): { nganh: string; so: number
 /** Đầu trang: ngày bảng giá mới nhất (dòng hiện hành, ưu tiên dòng nạp), số dòng hiện hành (không tính khách kể), và
  *  liên kết nguồn gốc của lô mới nhất — file: tìm file trong Drive; web: trang của bên. Không có → null. */
 export function dauBen(qs: QsHs[]): { ngay: string | null; soDong: number; nguon: { href: string; chu: string } | null } {
-  const hien = qs.filter(q => q.hien_hanh && q.loai_nguon !== "khach_ke");
+  const hien = qs.filter(cuaBang);
   const nap = hien.filter(q => q.nguon === "nap");
   const moi = [...(nap.length ? nap : hien)].sort((a, b) => (a.ngay_nguon < b.ngay_nguon ? 1 : a.ngay_nguon > b.ngay_nguon ? -1 : 0))[0];
   let nguon: { href: string; chu: string } | null = null;

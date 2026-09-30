@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { DaBo, GiaoHang, QuanSat } from "./kieu";
 import {
-  daSua, docSoNhap, docXungDot, doiGi, formGiao, formTu, kgThung, kiemForm, lucNgan, moTaThayBoi, payload, payloadGiao,
-  thanHoanTac,
+  daSua, docSoNhap, docXungDot, doiGi, formGiao, formTu, kgThung, kiemForm, lucNgan, moTaThayBoi, moTaXungDot, payload,
+  payloadGiao, thanHoanTac,
 } from "./sua_logic";
 
 function qs(o: Partial<QuanSat> = {}): QuanSat {
   return {
-    ma_doi_thu: "THAK", ten_doi_thu: "Thái Khang", nguon: "nap", id: 7, ma_hang_dt: "ten:gao", ngay_nguon: "2026-08-01",
+    ma_doi_thu: "THAK", ten_doi_thu: "Thái Khang", nguon: "nap", id: 7, ma_hang_dt: "ten:gao", mat_hang_khoa: "ten:gao", an: false, ngay_nguon: "2026-08-01",
     hinh_thuc_nguon: "file", nguon_file: "thak.pdf", vi_tri: null, ten_goc: "Gạo ST25", quy_cach_goc: "20 x 500g",
     gia_goc: 5300, don_vi_gia: "thung", kg_moi_don_vi_gia: 10, thue: "chua", gom_ship: "khong_ro", kenh_gia: null,
     muc_gia: null, gia_bac: null, gia_truoc_km: null, trang_thai: "con", khuyen_mai: null, loai_nguon: "bang_gia",
@@ -143,6 +143,12 @@ describe("xung đột", () => {
   it("doiGi liệt kê khoá của sau (nhãn Việt), bỏ khoá kỹ thuật", () => {
     expect(doiGi({ gia_goc: "1", kl_goi_g: "2", tay_moi: 9 })).toBe("giá, tịnh 1 gói");
     expect(doiGi(null)).toBe(""); expect(doiGi({ la: 1 })).toBe("la");
+  });
+  it("070: nhật ký ẩn / gộp hiện nhãn Việt, không hiện khoá thô", () => {
+    expect(doiGi({ an: true })).toBe("ẩn / khôi phục");
+    expect(doiGi({ vao: "h1" })).toBe("gộp mặt hàng");
+    expect(moTaXungDot({ ai: "Lan", luc: "2026-09-30T05:02:00+00:00", sau: { vao: null }, sua_cuoi: 3, thay_boi: null }))
+      .toBe("Lan vừa sửa lúc 14:02 30/09: gộp mặt hàng");
   });
 });
 

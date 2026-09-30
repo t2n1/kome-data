@@ -287,6 +287,20 @@ KOME (`mart.gia_kome_bang`) và điều kiện giao hàng hiện hành (`068`). 
            OR coalesce(s.gia_kome_chuan, s.gia_kome) < s.trung_vi / 3)
     ORDER BY gap_lan DESC;
 
+### Triển khai mặt hàng & mức giá của đối thủ (migration `070`)
+
+`070` (đặc tả `docs/superpowers/specs/2026-09-30-doi-thu-gop-mat-hang-design.md`) thêm hai sổ chỉ-thêm `app.an_quan_sat` (ẩn / khôi phục
+một dòng giá) và `app.gop_mat_hang` (gộp / tách mặt hàng), hàm `mart.la_muc_khach_thuong`, ba loại nhật ký mới (`an` / `hien` / `gop`), và
+viết lại ba view `mart.gia_doi_thu_quan_sat`, `gia_doi_thu_hien_hanh`, `so_sanh_nhom` (cột `dai_dien`, `mat_hang_khoa`, `gia_pallet_mh`…). Không nạp lại file nào.
+
+1. `python db/migrate.py` **bằng vai trò `postgres`** — TRƯỚC khi push/Redeploy (code mới đọc `app.an_quan_sat` và cột `dai_dien`; thiếu thì `/doi-thu` báo lỗi).
+2. Kiểm sau khi chạy (vai trò chỉ đọc):
+   - `SELECT filename FROM meta.schema_migration WHERE filename LIKE '070%';` phải ra một dòng (chạy tay trong SQL editor thì phải tự INSERT tên file);
+   - `SELECT nhom_khoa, don_vi_so, ma_doi_thu, mat_hang_khoa FROM mart.gia_doi_thu_hien_hanh WHERE loai_nguon <> 'khach_ke' GROUP BY 1,2,3,4 HAVING count(*) FILTER (WHERE dai_dien) <> 1;` phải trả về KHÔNG dòng nào — mỗi (bên, mặt hàng) đúng MỘT dòng đại diện;
+   - `SELECT has_table_privilege('kome_app', 'app.an_quan_sat', 'UPDATE');` phải `false` (sổ chỉ thêm), còn `'INSERT'` phải `true`;
+   - bảng tạo qua Supabase SQL Editor bị tự bật RLS không policy — nếu `kome_app` báo `permission denied` thì `ALTER TABLE ... DISABLE ROW LEVEL SECURITY` cho hai bảng mới.
+3. Mở `/doi-thu` → Dữ liệu › Duyệt / sửa: mỗi mặt hàng một dòng (chip "+n mức"), thử 🗑 rồi "Khôi phục" ở lọc "Đã xoá" trên một dòng thử.
+
 ### Kiểm tay sau khi chạy migration `029` (đợt 5b — báo cáo phân tích + dashboard)
 
 Chủ doanh nghiệp làm năm việc này sau khi migration `029` chạy xong trên CSDL

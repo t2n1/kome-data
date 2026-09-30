@@ -15,7 +15,7 @@ def _nen(conn, batch):
 
 
 @pytest.mark.parametrize("url, tran", [("/api/doi-thu/tong-quan", 2), ("/api/doi-thu/so-sanh", 2),
-                                        ("/api/doi-thu/ben/A", 2), ("/api/doi-thu/duyet?loc=bat_thuong", 2),
+                                        ("/api/doi-thu/ben/A", 2), ("/api/doi-thu/duyet?loc=bat_thuong", 2), ("/api/doi-thu/duyet?loc=da_xoa", 2),
                                         ("/api/san-pham/NT01/doi-thu", 2), ("/api/doi-thu/goi-y-nhac", 2),
                                         ("/api/khach-hang/K0001/doi-thu", 2),
                                         ("/api/doi-thu/mat-hang/nap/{fid}", 2),
@@ -469,3 +469,55 @@ def test_4b_ra_so_sanh_mang_da_bo(conn, batch, test_db_url):
     j = c.get("/api/doi-thu/so-sanh").json()
     assert [(x["id"], x["nhom_khoa"], x["nhan_cu"]) for x in j["da_bo"]] == [(fid, "ma:NT01", "thay_the")]
     assert all(q["id"] != fid for n in j["nhom"] for q in n["quan_sat"])
+
+
+# ---- 070: ẩn / khôi phục và gộp tay mặt hàng qua API ----------------------------------------------------
+
+@pytest.mark.parametrize("url", ["/api/doi-thu/an", "/api/doi-thu/gop-mat-hang"])
+def test_070_post_chi_nhan_json_va_than_phai_la_doi_tuong(test_db_url, url):
+    c = _web(test_db_url)
+    assert c.post(url, data={"ma": "THAK"}).status_code == 415
+    for than in ([], "x", 5):
+        r = c.post(url, json=than)
+        assert r.status_code == 400 and "loi" in r.json()
+
+
+def test_post_an_va_gop_mat_hang_chi_nhan_json_va_tra_409(conn, batch, test_db_url):
+    _hang(conn, batch)
+    fid_a = _qs(conn, batch, "THAK", 540, hang="hA")
+    _qs(conn, batch, "THAK", 560, hang="hB")
+    c = _web(test_db_url)
+    # 1) ẩn: 200, có sua_cuoi = mốc nhật ký mới nhất
+    r = c.post("/api/doi-thu/an", json={"nguon": "nap", "id": fid_a, "an": True, "da_xem": 0})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["ok"] and (j["nguon"], j["id"]) == ("nap", fid_a) and j["sua_cuoi"] == _max_nk(conn) > 0
+    # 2) gửi lại với da_xem cũ: 409 kèm xung_dot, không ghi thêm
+    n_truoc = _max_nk(conn)
+    r = c.post("/api/doi-thu/an", json={"nguon": "nap", "id": fid_a, "an": False, "da_xem": 0})
+    assert r.status_code == 409, r.text
+    x = r.json()["xung_dot"]
+    assert r.json()["loi"] == "Có người vừa sửa mục này." and x["sua_cuoi"] == j["sua_cuoi"] and "luc" in x
+    assert _max_nk(conn) == n_truoc
+    # ... ghi_de gửi lại được; dòng không có -> 400
+    assert c.post("/api/doi-thu/an", json={"nguon": "nap", "id": fid_a, "an": False, "da_xem": 0,
+                                           "ghi_de": True}).status_code == 200
+    assert c.post("/api/doi-thu/an", json={"nguon": "nap", "id": 999999, "an": True, "da_xem": 0}).status_code == 400
+    assert c.post("/api/doi-thu/an", json={"nguon": "nap", "id": fid_a, "an": "co", "da_xem": 0}).status_code == 400
+    # 3) không phải JSON: 415 như các POST cùng nhóm
+    assert c.post("/api/doi-thu/an", data="chữ thô").status_code == 415
+    assert c.post("/api/doi-thu/an", content="không phải json",
+                  headers={"content-type": "application/json"}).status_code == 400
+    # 4) gộp hB vào hA: 200 kèm đích đã quy; gửi lại với da_xem cũ -> 409; đích không có -> 400
+    r = c.post("/api/doi-thu/gop-mat-hang", json={"ma_doi_thu": "THAK", "ma_hang_dt": "hB",
+                                                   "vao_ma_hang_dt": "hA", "da_xem": 0})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["ok"] and j["vao_ma_hang_dt"] == "hA" and j["sua_cuoi"] == _max_nk(conn)
+    assert conn.execute("SELECT vao_ma_hang_dt FROM app.gop_mat_hang WHERE ma_hang_dt = 'hB'").fetchone()[0] == "hA"
+    r = c.post("/api/doi-thu/gop-mat-hang", json={"ma_doi_thu": "THAK", "ma_hang_dt": "hB",
+                                                   "vao_ma_hang_dt": None, "da_xem": 0})
+    assert r.status_code == 409 and "xung_dot" in r.json()
+    r = c.post("/api/doi-thu/gop-mat-hang", json={"ma_doi_thu": "THAK", "ma_hang_dt": "hB",
+                                                   "vao_ma_hang_dt": "khong-co", "da_xem": j["sua_cuoi"]})
+    assert r.status_code == 400

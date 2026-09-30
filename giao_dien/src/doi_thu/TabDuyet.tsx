@@ -17,7 +17,7 @@ import { cacThangCho, lienKetAnToan, nhanThang, thangCua } from "./nguon";
 import { SuaMatHang } from "./SuaMatHang";
 
 const LOC = [["", "Tất cả"], ["can_xem", "Cần xem"], ["bat_thuong", "Bất thường"], ["chua_xac_nhan", "Chưa ai xác nhận"],
-  ["chua_ghep", "Chưa ghép"], ["thieu_quy_cach", "Thiếu quy cách"]];
+  ["chua_ghep", "Chưa ghép"], ["thieu_quy_cach", "Thiếu quy cách"], ["da_xoa", "Đã xoá"]];
 // Ô chọn của form "Thêm hàng AI bỏ sót" (khớp CHECK của bảng).
 const CHON: Partial<Record<keyof QuanSat, string[][]>> = {
   thue: [["chua", "Chưa thuế"], ["co", "Đã gồm thuế"], ["khong_ro", "Không rõ"]],
@@ -98,10 +98,12 @@ export function TabDuyet({ ben, datBen }: { ben: string; datBen: (b: string) => 
     <div className="dt-duyet dt-duyet-mot">
       <section className="dt-khoi">
         <Khoi tieu_de="Mặt hàng đối thủ" dang_tai={q.isLoading} loi={q.error ? (q.error as Error).message : null} canh_bao={loi}
-          cach_tinh="Bấm một ô để sửa. Enter lưu và xuống dòng dưới, Tab lưu và sang ô bên phải, Esc bỏ. Sửa giá / đơn vị / thuế trong ô là sửa lỗi máy đọc; giá thật đã đổi thì dùng ⋯ (cần loại nguồn). ¥/kg máy tính lại sau khi lưu.">
+          cach_tinh="Bấm một ô để sửa. Enter lưu và xuống dòng dưới, Tab lưu và sang ô bên phải, Esc bỏ. Sửa giá / đơn vị / thuế trong ô là sửa lỗi máy đọc; giá thật đã đổi thì dùng ⋯ (cần loại nguồn). ¥/kg máy tính lại sau khi lưu. Mỗi mặt hàng một dòng — “+n mức” mở các mức giá khác; 🗑 ẩn dòng giá (xem lại / khôi phục ở “Đã xoá”); ⇲ gộp vào mặt hàng khác hoặc tách ra.">
           <div className="dt-bs-ben" role="group" aria-label="Bên">
             <button type="button" className="chip" aria-pressed={!ben} onClick={() => datBen("")}>Mọi bên</button>
-            {dsBen.map(b => <button key={b.ma} type="button" className="chip" aria-pressed={ben === b.ma} onClick={() => datBen(b.ma)}>
+            {/* 070: so_dong = số MẶT HÀNG của bên; so_muc = số dòng giá (mức giá) */}
+            {dsBen.map(b => <button key={b.ma} type="button" className="chip" aria-pressed={ben === b.ma} onClick={() => datBen(b.ma)}
+              title={b.so_muc != null ? `${so(b.so_muc)} mức giá` : undefined}>
               {b.ten}<small>{so(b.so_dong)}</small></button>)}
           </div>
           {cacThangCho(q.data?.dong ?? []).map(t => (
@@ -145,7 +147,7 @@ export function TabDuyet({ ben, datBen }: { ben: string; datBen: (b: string) => 
                 <button type="button" className="chip" onClick={() => { datMoThem(false); datLoiThem(null); }}>Đóng</button>
               </div>
             </fieldset>)}
-          {q.data && <BangSua key={khoaQ.join("|")} khoaQ={khoaQ} dong={q.data.dong} tim={tim} moiBen={!ben}
+          {q.data && <BangSua key={khoaQ.join("|")} khoaQ={khoaQ} dong={q.data.dong} tim={tim} moiBen={!ben} daXoa={loc === "da_xoa"}
             dangGui={dang_gui} taiLai={lamMoi} moPopup={moPopup} xacNhan={xacNhan} />}
         </Khoi>
       </section>
