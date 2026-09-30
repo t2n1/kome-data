@@ -131,7 +131,7 @@ def test_khach_360_doc_ten_da_sua(conn, batch):
 
 
 def _gia(conn, batch, ma, qc, lv, ex, inc, ngay=D2):
-    b = batch(abs(hash((ma, qc, lv, ex, ngay))) % 90_000, ngay)
+    b = batch(1, ngay)   # fixture tự đánh số digest — không băm (hash của str ngẫu nhiên theo tiến trình)
     conn.execute("""INSERT INTO core.fact_price_list (product_code, pack_code, price_level, valid_from, price_ex_tax,
                       price_in_tax, unit_cost, batch_id) VALUES (%s, %s, %s, %s, %s, %s, 1000, %s)""",
                  (ma, qc, lv, ngay, ex, inc, b))
@@ -151,7 +151,7 @@ def test_gia_sua_thang_khi_OBC_giu_nguyen_va_thua_khi_OBC_doi(conn, batch):
 
 
 def _ton(conn, batch, ma, kho, sl, han, ngay=D2):
-    b = batch(abs(hash((ma, kho, sl, ngay))) % 90_000, ngay)
+    b = batch(1, ngay)
     conn.execute("INSERT INTO core.dim_warehouse (warehouse_code, warehouse_name) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                  (kho, "Kho " + kho))
     conn.execute("""INSERT INTO core.fact_inventory_daily (snapshot_date, product_code, warehouse_code, best_before, stock_qty,
@@ -175,3 +175,77 @@ def test_so_rong_moi_view_y_nhu_truoc(conn, batch):
     _ton(conn, batch, "P1", "0001", 10, "2027年03月10日")
     r = conn.execute("SELECT so_luong, gia_tri, sua_so_luong, sua_han FROM mart.ton_hien_tai").fetchone()
     assert (float(r[0]), r[1], r[2], r[3]) == (10, 1000, False, False)
+
+
+@pytest.mark.parametrize("bang, cot, gia_tri", [
+    ("ton", "stock_qty", "abc"),               # không phải số
+    ("ton", "stock_qty", "12a"),
+    ("ton", "stock_qty", "1e20"),              # số mũ / tràn numeric(14,4)
+    ("ton", "stock_qty", "12345678901"),       # 11 chữ số phần nguyên — tràn numeric(14,4)
+    ("ton", "stock_qty", "1.23456"),           # quá 4 chữ số lẻ
+    ("ton", "stock_qty", "NaN"),
+    ("ton", "stock_qty", "Infinity"),
+    ("ton", "stock_qty", "-1"),
+    ("ton", "stock_qty", None),                # NULL ở cột số
+    ("san_pham", "case_qty", "x"),
+    ("san_pham", "pack1_base_qty", None),
+    ("gia", "gia_chua_thue", "NaN"),
+    ("gia", "gia_chua_thue", "Infinity"),
+    ("gia", "gia_chua_thue", "0"),             # giá phải > 0
+    ("gia", "gia_chua_thue", "0.00"),
+    ("gia", "gia_chua_thue", "abc"),
+    ("gia", "gia_chua_thue", None),
+    ("ton", "best_before", "2027年02月30日"),  # khớp regex của view nhưng không phải ngày có thật
+    ("ton", "best_before", "2027年13月10日"),
+    ("ton", "best_before", "2027-03-10"),
+])
+def test_so_tu_choi_gia_tri_lam_no_view(conn, bang, cot, gia_tri):
+    """Sổ chỉ thêm + kome_app INSERT thẳng được: một giá trị không ép được kiểu là mọi view phía trên nổ vĩnh viễn."""
+    with pytest.raises(psycopg.errors.CheckViolation):
+        conn.execute("INSERT INTO app.sua_du_lieu (bang, khoa, cot, gia_tri) VALUES (%s, 'P1|0001', %s, %s)",
+                     (bang, cot, gia_tri))
+    conn.rollback()
+
+
+@pytest.mark.parametrize("bang, cot, gia_tri", [
+    ("ton", "stock_qty", "12"), ("ton", "stock_qty", "83.75"), ("gia", "gia_chua_thue", "4629.6296296296296296"),
+    ("ton", "best_before", "2028年6月9日"), ("ton", "best_before", "賞味期限なし"), ("ton", "best_before", ""),
+    ("ton", "best_before", None), ("san_pham", "case_qty", "24"),
+])
+def test_so_nhan_gia_tri_hop_le(conn, bang, cot, gia_tri):
+    _sua(conn, bang, "P1|0001", cot, gia_tri, None)
+
+
+def test_dong_bo_ve_OBC_nhan_gia_tri_NULL(conn):
+    for bang, cot in (("ton", "stock_qty"), ("gia", "gia_chua_thue"), ("san_pham", "case_qty"), ("ton", "best_before")):
+        _sua(conn, bang, "P1|0001", cot, None, "10", bo=True)
+    assert conn.execute("SELECT count(*) FROM app.sua_du_lieu WHERE bo").fetchone()[0] == 4
+
+
+def test_la_ngay_obc(conn):
+    q = "SELECT mart.la_ngay_obc(%s)"
+    assert [conn.execute(q, (t,)).fetchone()[0] for t in
+            ("2028年06月09日", "2024年2月29日", "2027年02月29日", "2027年13月10日", "0000年01月01日", "x", None)] \
+        == [True, True, False, False, False, False, False]
+
+
+def test_chi_sua_han_giu_gia_tri_OBC(conn, batch):
+    _hang(conn, batch, "P1", "Hang 1")
+    _ton(conn, batch, "P1", "0001", 10, "2027年03月10日")
+    conn.execute("UPDATE core.fact_inventory_daily SET stock_value = 1234")    # stock_value OBC ≠ sl × đơn giá
+    conn.commit()
+    _sua(conn, "ton", "P1|0001", "best_before", "2027年04月01日", "2027年03月10日")
+    r = conn.execute("SELECT so_luong, gia_tri, best_before, sua_so_luong, sua_han FROM mart.ton_hien_tai").fetchone()
+    assert (float(r[0]), r[1], r[2], r[3], r[4]) == (10, 1234, "2027年04月01日", False, True)
+
+
+def test_doi_va_duoi_gia_von_tinh_tren_gia_hieu_luc(conn, batch):
+    _hang(conn, batch, "P1", "Hang 1")
+    _gia(conn, batch, "P1", "02", "01", 5000, 5400, ngay=D1)
+    _gia(conn, batch, "P1", "02", "01", 5000, 5400, ngay=D2)                  # lần nạp sau, OBC giữ giá
+    q = "SELECT gia_chua_thue, doi, duoi_gia_von, da_sua FROM mart.bang_gia_kome WHERE product_code='P1'"
+    r = conn.execute(q).fetchone()
+    assert (float(r[0]), r[1], r[2], r[3]) == (5000, False, False, False)
+    _sua(conn, "gia", "P1|02|01", "gia_chua_thue", "900", "5000")            # giá vốn 1000 trong _gia
+    r = conn.execute(q).fetchone()
+    assert (float(r[0]), r[1], r[2], r[3]) == (900, True, True, True)

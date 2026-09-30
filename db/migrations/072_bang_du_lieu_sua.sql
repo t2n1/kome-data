@@ -3,6 +3,23 @@
 -- mart.dim_product, mart.bang_gia_kome, mart.ton_hien_tai. Luật (chủ DN chốt 2026-09-30): OBC vẫn ghi đúng giá trị lúc sửa
 -- → bản sửa thắng; OBC ghi khác (người ta đã sửa trong OBC) → OBC thắng. Viết MỘT lần: mart.ap_sua / mart.lech_obc.
 
+-- Ngày OBC dạng 'YYYY年M月D日' mà là NGÀY CÓ THẬT. Regex của mart.ton_hien_tai cho '2027年02月30日' / '2027年13月10日' lọt
+-- qua rồi to_date nổ — dùng ở CHECK của app.sua_du_lieu bên dưới.
+CREATE FUNCTION mart.la_ngay_obc(t text) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE
+AS $$
+DECLARE m text[];
+BEGIN
+    m := regexp_match(t, '^([0-9]{4})年([0-9]{1,2})月([0-9]{1,2})日$');
+    IF m IS NULL THEN RETURN false; END IF;
+    PERFORM make_date(m[1]::int, m[2]::int, m[3]::int);
+    RETURN true;
+EXCEPTION WHEN others THEN
+    RETURN false;
+END
+$$;
+GRANT EXECUTE ON FUNCTION mart.la_ngay_obc(text) TO kome_app, kome_report, kome_ingest;
+
 CREATE TABLE app.sua_du_lieu (
     id            bigserial PRIMARY KEY,
     bang          text NOT NULL CHECK (bang IN ('khach', 'san_pham', 'gia', 'ton')),
@@ -21,7 +38,18 @@ CREATE TABLE app.sua_du_lieu (
                                        'compete_code', 'barcode', 'unit', 'case_qty', 'shelf_code', 'introduced_on',
                                        'pack1_code', 'pack1_base_qty'))
      OR (bang = 'gia' AND cot = 'gia_chua_thue')
-     OR (bang = 'ton' AND cot IN ('stock_qty', 'best_before')))
+     OR (bang = 'ton' AND cot IN ('stock_qty', 'best_before'))),
+    -- Giá trị phải ép được sang kiểu cột đích của view hiệu lực (::numeric(14,4), ::numeric, to_date). kome_app INSERT thẳng
+    -- được và sổ chỉ thêm, nên chặn ở CSDL chứ không chỉ ở Python: một dòng hỏng là mọi view phía trên nổ vĩnh viễn.
+    -- Không nhận số âm, 'NaN', 'Infinity', số mũ; giá phải > 0; hạn phải là ngày có thật.
+    CONSTRAINT sua_du_lieu_gia_tri_check CHECK (bo OR CASE
+        WHEN cot IN ('stock_qty', 'case_qty', 'pack1_base_qty')
+            THEN gia_tri IS NOT NULL AND gia_tri ~ '^[0-9]{1,10}(\.[0-9]{1,4})?$'
+        WHEN cot = 'gia_chua_thue'
+            THEN gia_tri IS NOT NULL AND gia_tri ~ '^[0-9]{1,12}(\.[0-9]{1,20})?$' AND gia_tri !~ '^0+(\.0+)?$'
+        WHEN cot = 'best_before'
+            THEN gia_tri IS NULL OR gia_tri = '' OR btrim(gia_tri, ' 　') = '賞味期限なし' OR mart.la_ngay_obc(gia_tri)
+        ELSE true END)
 );
 CREATE INDEX sua_du_lieu_o ON app.sua_du_lieu (bang, khoa, cot, id DESC);
 GRANT SELECT, INSERT ON app.sua_du_lieu TO kome_app;
@@ -146,7 +174,7 @@ GRANT EXECUTE ON FUNCTION mart.ap_sua(text, jsonb, text), mart.lech_obc(text, js
 -- "dim_customer.cot" khi bảng không bí danh — đổi schema thì tên đó vẫn trỏ đúng.
 -- Test canh: tests/test_bang_du_lieu_mart.py::test_KHONG_view_ham_mart_nao_con_doc_danh_muc_OBC_tho.
 DO $do$
-DECLARE r record; d text;
+DECLARE r record; d text; sp text := current_setting('search_path');
 BEGIN
     PERFORM set_config('search_path', 'pg_catalog', true);   -- mọi tên in ra đều có schema
     FOR r IN SELECT c.oid, c.relname FROM pg_class c
@@ -163,6 +191,7 @@ BEGIN
     LOOP
         EXECUTE regexp_replace(pg_get_functiondef(r.oid), '\mcore\.dim_(customer|product)\M', 'mart.dim_\1', 'g');
     END LOOP;
+    PERFORM set_config('search_path', sp, true);             -- trả lại cho phần còn lại của giao dịch migration
 END
 $do$;
 
