@@ -28,7 +28,7 @@ THUE = ("chua", "co", "khong_ro")
 SHIP = ("co", "khong", "khong_ro")
 TRANG_THAI = ("con", "het", "sap_ve", "khong_ro")
 NHAN = ("cung_hang", "thay_the", "khong")
-LOC_DUYET = ("", "can_xem", "bat_thuong", "chua_ghep", "chua_xac_nhan")
+LOC_DUYET = ("", "can_xem", "bat_thuong", "chua_ghep", "chua_xac_nhan", "thieu_quy_cach")
 DAI_TOI_DA = 300
 
 
@@ -1071,23 +1071,37 @@ def mat_hang(conn, nguon: str, id: int) -> dict | None:
 
 
 _DUYET = f"""
-SELECT coalesce(json_agg(to_json(h) ORDER BY h.bat_thuong DESC, h.trang_thai_duyet, h.ma_doi_thu, h.ten_goc), '[]')
-FROM (SELECT {_COT_QS} FROM mart.gia_doi_thu_hien_hanh h LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
-      WHERE (%(ben)s = '' OR ma_doi_thu = %(ben)s)
-        AND CASE %(loc)s WHEN 'can_xem' THEN trang_thai_duyet = 'can_xem'
-                         WHEN 'bat_thuong' THEN bat_thuong
-                         WHEN 'chua_ghep' THEN ma_kome IS NULL AND NOT {_KE_DA_NHOM} AND NOT EXISTS (
-                             SELECT 1 FROM app.ghep_hang g
-                             WHERE g.ma_doi_thu = h.ma_doi_thu AND g.ma_hang_dt = h.ma_hang_dt)
-                         WHEN 'chua_xac_nhan' THEN trang_thai_duyet IN ('ai_doc', 'can_xem')
-                         ELSE true END) h
+WITH h AS (
+    SELECT {_COT_QS}, count(*) OVER () AS tong_
+    FROM mart.gia_doi_thu_hien_hanh h LEFT JOIN mart.nguon_quan_sat USING (nguon, id)
+    WHERE (%(ben)s = '' OR ma_doi_thu = %(ben)s)
+      AND CASE %(loc)s WHEN 'can_xem' THEN trang_thai_duyet = 'can_xem'
+                       WHEN 'bat_thuong' THEN bat_thuong
+                       WHEN 'chua_ghep' THEN ma_kome IS NULL AND NOT {_KE_DA_NHOM} AND NOT EXISTS (
+                           SELECT 1 FROM app.ghep_hang g
+                           WHERE g.ma_doi_thu = h.ma_doi_thu AND g.ma_hang_dt = h.ma_hang_dt)
+                       WHEN 'chua_xac_nhan' THEN trang_thai_duyet IN ('ai_doc', 'can_xem')
+                       WHEN 'thieu_quy_cach' THEN loai_nguon <> 'khach_ke' AND (so_goi_thung IS NULL OR kl_goi_g IS NULL)
+                       ELSE true END
+    ORDER BY bat_thuong DESC, trang_thai_duyet, ma_doi_thu, ten_goc, nguon, id
+    LIMIT %(toi_da)s)
+SELECT coalesce(json_agg(to_jsonb(h) - 'tong_' ORDER BY h.bat_thuong DESC, h.trang_thai_duyet, h.ma_doi_thu, h.ten_goc,
+                         h.nguon, h.id), '[]'),
+       coalesce(max(h.tong_), 0)
+FROM h
 """
+# Trần (bảng sửa 2026-09-30): toàn bộ bảng giá thật = 5,26 MB JSON > trần phản hồi Vercel 4,5 MB. 800 ≥ bên lớn nhất
+# (NEXT 716 dòng, ~1 MB). `tong` = số dòng khớp bộ lọc TRƯỚC khi cắt — màn nói "đang hiện n / tong, chọn một bên".
+DONG_TOI_DA_DUYET = 800
 
 
 def duyet(conn, ben: str = "", loc: str = "") -> dict:
+    """Bảng Duyệt / sửa: {"dong": ≤ DONG_TOI_DA_DUYET quan sát hiện hành, "tong": số dòng khớp}. MỘT lượt hỏi.
+    `thieu_quy_cach` = thiếu gói/thùng hoặc tịnh 1 gói, không tính khách kể (= so_sanh_logic.ts::thieuQuyCach + veDuoc)."""
     if loc not in LOC_DUYET:
         loc = ""
-    return {"dong": conn.execute(_DUYET, {"ben": ben, "loc": loc}).fetchone()[0]}
+    dong, tong = conn.execute(_DUYET, {"ben": ben, "loc": loc, "toi_da": DONG_TOI_DA_DUYET}).fetchone()
+    return {"dong": dong, "tong": tong}
 
 
 _KHOI_SP = """
