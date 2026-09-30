@@ -23,6 +23,10 @@ export type QuanSat = {
   bo_nhom?: { nhom_khoa: string; ten_nhom: string | null; nhan_cu: "cung_hang" | "thay_the" } | null;
   // Chỉ /mat-hang (pop-up): dòng app.ghep_hang (kể cả nhãn 'khong') và bản MỚI NHẤT đã thay dòng này (B14).
   ma_ghep?: string | null; nhom_ghep?: number | null; thay_boi?: ThayBoi | null;
+  // 070: khoá MẶT HÀNG (mart.gia_doi_thu_quan_sat) + cờ đã ẩn. Chỉ dòng hiện hành có `dai_dien` (dòng rẻ nhất cho khách
+  // thường trong (nhóm, đơn vị so, bên, mặt hàng) — các mức giá khác không vẽ / không đếm), `gia_pallet_mh` (giá pallet
+  // của cả mặt hàng) và `so_muc` (số dòng của mặt hàng); dòng lịch sử không mang cờ.
+  mat_hang_khoa: string; an: boolean; dai_dien?: boolean; gia_pallet_mh?: number | null; so_muc?: number;
 };
 /** Bản mới đã thay một quan sát (dòng tay qua thay_cho_tay_id, dòng nạp qua fact_goc_id) — pop-up mở bản này. */
 export type ThayBoi = { nguon: "nap" | "tay"; id: number };
@@ -40,7 +44,7 @@ export type Nhom = {
   kome_kg_goi: number | null; kome_goi_thung: number | null; kome_kg_thung: number | null;
 };
 export type Ben = { ma: string; ten: string; web: string | null; ngay_moi: string | null; hinh_thuc: string | null;
-                    so_dong: number; cho_duyet: number };
+                    so_dong: number; cho_duyet: number; so_muc?: number };
 export type TongQuan = {
   ben: Ben[]; luoi: { ben: string; nganh: string; so_ma: number }[];
   khuyen_mai: { nguon: "nap" | "tay"; id: number; ma_hang_dt: string; ma_doi_thu: string; ben: string; ten_goc: string;
@@ -52,6 +56,9 @@ export type TongQuan = {
 };
 export const NHAN_DUYET: Record<QuanSat["trang_thai_duyet"], string> = {
   ai_doc: "AI đọc", can_xem: "Cần xem", da_xac_nhan: "Đã xác nhận", da_sua: "Đã sửa", nhap_tay: "Nhập tay" };
+/** Nhãn mức giá / kênh giá (`muc_gia`, `kenh_gia`); mã lạ hiện nguyên văn. */
+export const NHAN_MUC: Record<string, string> = { giao: "Giao tận nơi", gui: "Gửi", tai_kho: "Tại kho", pallet: "Pallet",
+  dac_biet: "Đặc biệt", khach_ngoai: "Khách ngoài", kyushu: "Kyushu" };
 export const NHAN_TRANG_THAI: Record<string, string> = { con: "Còn", het: "Hết", sap_ve: "Sắp về", khong_ro: "?" };
 export type NhomCoTen = { id: number; ten: string; ma: { ma: string; ten: string | null }[] };
 export type QuyCach = { ma: string; ten: string | null; nganh: string; kg_moi_goi: number | null; goi_moi_thung: number | null;

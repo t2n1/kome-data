@@ -7,7 +7,7 @@ import {
 
 function qs(o: Partial<QuanSat> = {}): QuanSat {
   return {
-    ma_doi_thu: "THAK", ten_doi_thu: "Thái Khang", nguon: "nap", id: 7, ma_hang_dt: "ten:gao", ngay_nguon: "2026-08-01",
+    ma_doi_thu: "THAK", ten_doi_thu: "Thái Khang", nguon: "nap", id: 7, ma_hang_dt: "ten:gao", mat_hang_khoa: "ten:gao", an: false, ngay_nguon: "2026-08-01",
     hinh_thuc_nguon: "file", nguon_file: "thak.pdf", vi_tri: null, ten_goc: "Gạo ST25", quy_cach_goc: "20 x 500g",
     gia_goc: 5300, don_vi_gia: "thung", kg_moi_don_vi_gia: 10, thue: "chua", gom_ship: "khong_ro", kenh_gia: null,
     muc_gia: null, gia_bac: null, gia_truoc_km: null, trang_thai: "con", khuyen_mai: null, loai_nguon: "bang_gia",

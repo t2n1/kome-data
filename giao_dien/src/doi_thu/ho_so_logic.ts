@@ -29,8 +29,8 @@ export function chipBen(tq: TongQuan): { ma: string; ten: string; so: number }[]
  *  (`so_dong`) → tên. Không có bên nào → "". Đúng là phần tử đầu của chipBen. */
 export const benMacDinh = (tq: TongQuan): string => chipBen(tq)[0]?.ma ?? "";
 
-/** Dòng hiện hành thuộc bảng giá của bên (khách kể không phải bảng giá của bên). */
-const cuaBang = (q: QsHs) => q.hien_hanh && q.loai_nguon !== "khach_ke";
+/** Dòng hiện hành thuộc bảng giá của bên (khách kể không phải bảng giá của bên), mỗi mặt hàng MỘT dòng đại diện (070). */
+const cuaBang = (q: QsHs) => q.hien_hanh && q.loai_nguon !== "khach_ke" && q.dai_dien !== false;
 
 /** Một dòng của biểu đồ "Giá bên này so với KOME": quan sát HIỆN HÀNH có `gia_kome_so` (không tính khách kể — không
  *  phải bảng giá của bên), nhóm KHÔNG có giá KOME lệch (`gia_kome_lech`: > 3× / < ⅓ trung vị — cùng cờ Tóm tắt bỏ khỏi
@@ -120,7 +120,7 @@ export function nganhBen(tq: TongQuan, ben: string): { nganh: string; so: number
 /** Đầu trang: ngày bảng giá mới nhất (dòng hiện hành, ưu tiên dòng nạp), số dòng hiện hành (không tính khách kể), và
  *  liên kết nguồn gốc của lô mới nhất — file: tìm file trong Drive; web: trang của bên. Không có → null. */
 export function dauBen(qs: QsHs[]): { ngay: string | null; soDong: number; nguon: { href: string; chu: string } | null } {
-  const hien = qs.filter(q => q.hien_hanh && q.loai_nguon !== "khach_ke");
+  const hien = qs.filter(cuaBang);
   const nap = hien.filter(q => q.nguon === "nap");
   const moi = [...(nap.length ? nap : hien)].sort((a, b) => (a.ngay_nguon < b.ngay_nguon ? 1 : a.ngay_nguon > b.ngay_nguon ? -1 : 0))[0];
   let nguon: { href: string; chu: string } | null = null;

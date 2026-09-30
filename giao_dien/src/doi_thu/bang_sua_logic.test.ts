@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { QuanSat } from "./kieu";
-import { COT, cotHien, ghepDong, giaTriSua, hienThi, oKeTiep, suaDuoc, thanO, timDong, type Cot } from "./bang_sua_logic";
+import { COT, cotHien, ghepDong, giaTriSua, hienThi, nhanMuc, nhomBang, oKeTiep, suaDuoc, thanO, timDong, type Cot } from "./bang_sua_logic";
 
 let seq = 0;
 const qs = (o: Partial<QuanSat> = {}): QuanSat => ({
-  ma_doi_thu: "NEXT", ten_doi_thu: "Next", nguon: "nap", id: ++seq, ma_hang_dt: `h${seq}`, ngay_nguon: "2026-09-01",
+  ma_doi_thu: "NEXT", ten_doi_thu: "Next", nguon: "nap", id: ++seq, ma_hang_dt: `h${seq}`, mat_hang_khoa: `h${seq}`, an: false, ngay_nguon: "2026-09-01",
   hinh_thuc_nguon: "file", nguon_file: null, vi_tri: null, ten_goc: "Sứa ăn liền", quy_cach_goc: "30 gói", gia_goc: 285,
   don_vi_gia: "goi", kg_moi_don_vi_gia: null, thue: "chua", gom_ship: null, kenh_gia: null, muc_gia: null, gia_bac: null,
   gia_truoc_km: null, trang_thai: "con", khuyen_mai: null, loai_nguon: "bang_gia", ghi_chu: null, ma_kome: "XT02",
@@ -146,5 +146,29 @@ describe("ghepDong / timDong", () => {
     expect(timDong(ds, "tui 500").length).toBe(1);
     expect(timDong(ds, "cg01").length).toBe(1);
     expect(timDong(ds, "  ").length).toBe(2);
+  });
+});
+
+describe("070 — nhóm dòng theo mặt hàng", () => {
+  it("nhanMuc", () => {
+    expect(nhanMuc(qs({ kenh_gia: "tai_kho", muc_gia: null }))).toBe("Tại kho");
+    expect(nhanMuc(qs({ kenh_gia: null, muc_gia: "pallet" }))).toBe("Pallet");
+    expect(nhanMuc(qs({ kenh_gia: "tai_kho", muc_gia: "dac_biet" }))).toBe("Đặc biệt · Tại kho");
+    expect(nhanMuc(qs({ kenh_gia: null, muc_gia: null }))).toBe("Thường");
+    expect(nhanMuc(qs({ kenh_gia: "xyz", muc_gia: null }))).toBe("xyz");
+  });
+  it("nhomBang: đầu nhóm là dòng đại diện, giữ thứ tự lần gặp đầu", () => {
+    const a1 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: false } as Partial<QuanSat>);
+    const a2 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true } as Partial<QuanSat>);
+    const b1 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h2", dai_dien: true } as Partial<QuanSat>);
+    const c1 = qs({ ma_doi_thu: "M", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    const g = nhomBang([a1, b1, a2, c1]);
+    expect(g.map(x => [x.dau.id, x.con.map(y => y.id)])).toEqual([[a2.id, [a1.id]], [b1.id, []], [c1.id, []]]);
+  });
+  it("cột Mức giá chỉ đọc, đứng sau Bên", () => {
+    const c = cotHien(true).map(x => x.ma);
+    expect(c.indexOf("muc")).toBe(c.indexOf("ben") + 1);
+    expect(COT.find(x => x.ma === "muc")!.kieu).toBeNull();
+    expect(hienThi(qs({ kenh_gia: "gui" }), cot("muc"))).toEqual({ chu: "Gửi", hoi: false });
   });
 });

@@ -17,7 +17,8 @@ export function giaTai(q: QuanSat, sl: SoLuong): { gia: number | null; khongGhiP
   if (sl === "1") return { gia: le, khongGhiPallet: false };
   if (sl === "5") return { gia: q.gia_5 ?? le, khongGhiPallet: false };
   if (sl === "10") return { gia: q.gia_10 ?? le, khongGhiPallet: false };
-  return q.gia_pallet != null ? { gia: q.gia_pallet, khongGhiPallet: false } : { gia: le, khongGhiPallet: true };
+  const pl = q.gia_pallet_mh ?? q.gia_pallet;   // 070: giá pallet của MẶT HÀNG (mức pallet có thể là dòng khác)
+  return pl != null ? { gia: pl, khongGhiPallet: false } : { gia: le, khongGhiPallet: true };
 }
 
 /** Giá KOME để so: "chuan" → 標準価格 (thiếu thì giá thực bán); "thuc" → thực bán 90 ngày; "01".."10" → bảng 売価No (thiếu → null). */
@@ -92,7 +93,13 @@ export function giaKomePhi(n: Nhom, gk: string, sl: SoLuong, phi?: PhiSoSanh | n
 }
 
 export const thieuQuyCach = (q: QuanSat) => q.so_goi_thung == null || q.kl_goi_g == null;
-const veDuoc = (q: QuanSat) => q.loai_nguon !== "khach_ke";
+/** MỘT chỗ quyết định dòng nào VẼ / ĐẾM: không khách kể, và (070) là dòng đại diện của mặt hàng — các mức giá khác của cùng
+ *  mặt hàng không vẽ thêm thanh. Dòng thiếu cờ (`dai_dien` undefined) vẫn vẽ. */
+export const veDuoc = (q: QuanSat) => q.loai_nguon !== "khach_ke" && q.dai_dien !== false;
+/** Các mức giá KHÁC của cùng mặt hàng (cùng bên + mat_hang_khoa) trong nhóm — để liệt kê trong ô nổi; rẻ trước. */
+export const mucKhac = (n: Nhom, q: QuanSat): QuanSat[] =>
+  n.quan_sat.filter(x => x !== q && x.loai_nguon !== "khach_ke" && x.ma_doi_thu === q.ma_doi_thu && x.mat_hang_khoa === q.mat_hang_khoa)
+    .sort((a, b) => (a.yen_chuan == null ? (b.yen_chuan == null ? 0 : 1) : b.yen_chuan == null ? -1 : a.yen_chuan - b.yen_chuan));
 const tenBen = (q: QuanSat) => q.ten_doi_thu ?? q.ma_doi_thu;
 /** So giá tăng dần, null xếp cuối (ổn định). */
 const theoGia = (a: number | null, b: number | null) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : a - b);

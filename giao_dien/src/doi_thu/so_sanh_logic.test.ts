@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Nhom, QuanSat } from "./kieu";
-import { LUA_CHON_GK, khoaNhom, khoaONhiet, NHAN_SL, bangBac, batTat, demThieu, dongCot, giaBacKg, giaKome, giaTai, locDanhSach, macDinhSp, matHangCuaBen,
+import { LUA_CHON_GK, khoaNhom, khoaONhiet, NHAN_SL, bangBac, batTat, demThieu, dongCot, giaBacKg, giaKome, giaTai, locDanhSach, mucKhac, veDuoc, macDinhSp, matHangCuaBen,
   nhanBac, nhanKlGoi, nhomChon, oNhiet, pcDau, soMatHang, thieuQuyCach, giaCoPhi, apPhi, bamONhiet, phiChuONhiet,
   donViChuaQuy, dongTrai, type PhiSoSanh } from "./so_sanh_logic";
 import type { DieuKienGiao } from "./phi_giao";
 
 let seq = 0;
 const qs = (o: Partial<QuanSat>): QuanSat => ({
-  ma_doi_thu: "a", ten_doi_thu: "Bên A", nguon: "nap", id: ++seq, ma_hang_dt: `h${seq}`, ngay_nguon: "2026-09-01",
+  ma_doi_thu: "a", ten_doi_thu: "Bên A", nguon: "nap", id: ++seq, ma_hang_dt: `h${seq}`, mat_hang_khoa: `h${seq}`, an: false, ngay_nguon: "2026-09-01",
   hinh_thuc_nguon: "web", nguon_file: null, vi_tri: null, ten_goc: `Hàng ${seq}`, quy_cach_goc: null, gia_goc: null,
   don_vi_gia: null, kg_moi_don_vi_gia: null, thue: "chua", gom_ship: null, kenh_gia: null, muc_gia: null, gia_bac: null,
   gia_truoc_km: null, trang_thai: "con", khuyen_mai: null, loai_nguon: "bang_gia", ghi_chu: null, ma_kome: "K1",
@@ -458,5 +458,26 @@ describe("dongTrai — MỘT dòng mỗi nhóm ở cột trái", () => {
     expect(dongTrai([goi], [goi])[0]).toMatchObject({ soKg: 0, soChuaQuy: 1 });
     const lech = { ...kg, gia_kome_lech: true };
     expect(dongTrai([goi], [lech, goi])[0]).toMatchObject({ soKg: 0, soChuaQuy: 1 });
+  });
+});
+
+describe("070 — mỗi mặt hàng một lần", () => {
+  it("veDuoc bỏ dòng không đại diện (mức giá khác của cùng mặt hàng); dòng thiếu cờ vẫn vẽ (tương thích)", () => {
+    expect(veDuoc(qs({ dai_dien: false } as Partial<QuanSat>))).toBe(false);
+    expect(veDuoc(qs({ dai_dien: true } as Partial<QuanSat>))).toBe(true);
+    expect(veDuoc(qs({}))).toBe(true);
+    const n = nh({ quan_sat: [qs({ dai_dien: true } as Partial<QuanSat>), qs({ dai_dien: false } as Partial<QuanSat>)] });
+    expect(soMatHang(n)).toBe(1);
+  });
+  it("giá pallet của mặt hàng", () => {
+    expect(giaTai(qs({ gia_1: 900, gia_pallet: null, gia_pallet_mh: 700 } as Partial<QuanSat>), "pallet"))
+      .toEqual({ gia: 700, khongGhiPallet: false });
+  });
+  it("mucKhac: các mức khác cùng bên + mặt hàng, rẻ trước", () => {
+    const a = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", yen_chuan: 600, dai_dien: true } as Partial<QuanSat>);
+    const b = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", yen_chuan: 650, kenh_gia: "giao", dai_dien: false } as Partial<QuanSat>);
+    const c = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", yen_chuan: 620, kenh_gia: "gui", dai_dien: false } as Partial<QuanSat>);
+    const d = qs({ ma_doi_thu: "M", mat_hang_khoa: "h1", yen_chuan: 500 } as Partial<QuanSat>);
+    expect(mucKhac(nh({ quan_sat: [a, b, c, d] }), a).map(x => x.id)).toEqual([c.id, b.id]);
   });
 });
