@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { QuanSat } from "./kieu";
-import { chonSauMoNhom, COT, cotHien, daGop, dichGop, dongHien, ghepDong, giaTriSua, hienThi, khoaNhomBang, nhanMuc, nhomBang, oKeTiep,
-  suaDuoc, thanO, timDong, type Cot } from "./bang_sua_logic";
+import { COT, cotHien, daGop, dichGop, dongHien, ghepDong, giaTriSua, hienThi, khoaDong, khoaNhomBang, neoKeTiep, nhanMuc, nhomBang, oKeTiep,
+  suaDuoc, viTriNeo, thanO, timDong, type Cot } from "./bang_sua_logic";
 
 let seq = 0;
 const qs = (o: Partial<QuanSat> = {}): QuanSat => ({
@@ -201,14 +201,32 @@ describe("nhóm theo mặt hàng (070)", () => {
   it("khoaNhomBang: bên và khoá mặt hàng có '|' vẫn không trùng", () => {
     expect(khoaNhomBang({ ma_doi_thu: "A|B", mat_hang_khoa: "C" })).not.toBe(khoaNhomBang({ ma_doi_thu: "A", mat_hang_khoa: "B|C" }));
   });
-  it("chonSauMoNhom: dòng dưới nhóm dời theo số dòng con; ô trong dòng con vừa đóng về dòng đầu", () => {
-    expect(chonSauMoNhom({ d: 5, c: 2 }, 3, 2, true)).toEqual({ d: 7, c: 2 });
-    expect(chonSauMoNhom({ d: 3, c: 2 }, 3, 2, true)).toEqual({ d: 3, c: 2 });
-    expect(chonSauMoNhom({ d: 1, c: 2 }, 3, 2, false)).toEqual({ d: 1, c: 2 });
-    expect(chonSauMoNhom({ d: 4, c: 1 }, 3, 2, false)).toEqual({ d: 3, c: 1 });
-    expect(chonSauMoNhom({ d: 5, c: 1 }, 3, 2, false)).toEqual({ d: 3, c: 1 });
-    expect(chonSauMoNhom({ d: 6, c: 1 }, 3, 2, false)).toEqual({ d: 4, c: 1 });
-    expect(chonSauMoNhom(null, 3, 2, false)).toBeNull();
+  it("viTriNeo: ô neo theo KHOÁ — dòng phía trên rời bảng thì chỉ số đổi nhưng vẫn là đúng dòng; dòng mất → null", () => {
+    expect(viTriNeo(["a", "b", "c"], { k: "c", c: 2 })).toEqual({ d: 2, c: 2 });
+    expect(viTriNeo(["b", "c"], { k: "c", c: 2 })).toEqual({ d: 1, c: 2 });   // "a" đã ẩn: ô đang sửa vẫn ở "c"
+    expect(viTriNeo(["b", "c"], { k: "a", c: 2 })).toBeNull();
+    expect(viTriNeo(["a"], null)).toBeNull();
+  });
+  it("viTriNeo trên dongHien: mở nhóm chèn dòng con — ô neo dưới nhóm vẫn chỉ đúng dòng của nó", () => {
+    const a1 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true } as Partial<QuanSat>);
+    const a2 = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    const b = qs({ ma_doi_thu: "N", mat_hang_khoa: "h2" } as Partial<QuanSat>);
+    const g = nhomBang([a1, a2, b]);
+    const dong = (mo: Set<string>) => dongHien(g, mo).map(x => khoaDong(x.q));
+    const neo = { k: khoaDong(b), c: 1 };
+    expect(viTriNeo(dong(new Set()), neo)).toEqual({ d: 1, c: 1 });
+    expect(viTriNeo(dong(new Set([khoaNhomBang(a1)])), neo)).toEqual({ d: 2, c: 1 });
+  });
+  it("neoKeTiep: đi theo luật oKeTiep trên danh sách khoá; dòng gốc không còn hiện → null", () => {
+    const cots = cotHien(false);
+    expect(neoKeTiep(["a", "b"], { k: "a", c: 0 }, "xuong", cots)).toEqual({ k: "b", c: 0 });
+    expect(neoKeTiep(["a", "b"], { k: "b", c: 0 }, "xuong", cots)).toBeNull();
+    expect(neoKeTiep(["a", "b"], { k: "z", c: 0 }, "xuong", cots)).toBeNull();
+    expect(neoKeTiep(["a", "b"], { k: "a", c: cots.length - 1 }, "tab", cots)).toEqual({ k: "b", c: 0 });
+  });
+  it("khoaDong: _k thắng nguon:id", () => {
+    expect(khoaDong({ nguon: "tay", id: 5 })).toBe("tay:5");
+    expect(khoaDong({ nguon: "tay", id: 9, _k: "tay:5" })).toBe("tay:5");
   });
   it("dichGop: mặt hàng khác CÙNG bên (một dòng mỗi mặt hàng), lọc theo ô tìm", () => {
     const a1 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true, ten_goc: "Sứa" });

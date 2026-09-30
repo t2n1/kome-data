@@ -190,12 +190,25 @@ export function dongHien<T extends QuanSat>(nhom: { dau: T; con: T[] }[], mo: Re
   return r;
 }
 
-/** Ô đang chọn sau khi mở (`mo` true) / đóng nhóm có dòng đầu ở `dau` và `n` dòng con: dòng dưới nhóm dời theo; ô đang
- *  nằm trong các dòng con vừa đóng về dòng đầu. */
-export function chonSauMoNhom(v: ViTri | null, dau: number, n: number, mo: boolean): ViTri | null {
-  if (!v || v.d <= dau || !n) return v;
-  if (mo) return { d: v.d + n, c: v.c };
-  return v.d <= dau + n ? { d: dau, c: v.c } : { d: v.d - n, c: v.c };
+/** Khoá hiển thị của một dòng bảng sửa: `_k` (dòng tay "đọc sai" mang id mới nhưng giữ khoá cũ) hoặc `nguon:id`. */
+export const khoaDong = (q: Pick<QuanSat, "nguon" | "id"> & { _k?: string }) => q._k ?? `${q.nguon}:${q.id}`;
+
+/** Ô NEO theo KHOÁ dòng + chỉ số cột: ô chọn / ô đang sửa không trượt sang dòng khác khi danh sách dòng đang hiện đổi
+ *  (ẩn một dòng, mở / đóng nhóm, tải lại). Chỉ số d chỉ suy ra lúc cần, từ danh sách khoá đang hiện. */
+export type Neo = { k: string; c: number };
+
+/** Vị trí (d, c) của ô neo trong danh sách khoá đang hiện; dòng không còn hiện → null. */
+export function viTriNeo(khoa: readonly string[], n: Neo | null): ViTri | null {
+  if (!n) return null;
+  const d = khoa.indexOf(n.k);
+  return d < 0 ? null : { d, c: n.c };
+}
+
+/** Ô neo kế tiếp theo hướng `h` (cùng luật oKeTiep); ô gốc không còn hiện hoặc hết bảng → null. */
+export function neoKeTiep(khoa: readonly string[], n: Neo, h: Huong, cots: Cot[]): Neo | null {
+  const v = viTriNeo(khoa, n);
+  const t = v && oKeTiep(v, h, khoa.length, cots);
+  return t ? { k: khoa[t.d], c: t.c } : null;
 }
 
 /** Đích của "Gộp vào…": các MẶT HÀNG khác (dòng đầu nhóm) cùng bên với `q`, lọc bằng ô tìm (cùng luật timDong). */

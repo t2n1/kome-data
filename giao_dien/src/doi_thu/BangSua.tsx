@@ -6,14 +6,16 @@
 // Lưu TUẦN TỰ theo dòng; lần sau đọc dòng MỚI NHẤT từ đệm lúc chạy (dòng tay "đọc sai" thành dòng tay mới — khoá hiển
 // thị `_k` giữ nguyên). Đổi ghép (mã KOME / thương hiệu) đụng mọi dòng cùng <bên>/<hàng> → tải lại cả bảng.
 // 070 (đặc tả 2026-09-30-doi-thu-gop-mat-hang-design.md §5): dòng NHÓM theo mặt hàng (bên + mat_hang_khoa) — dòng đầu là
-// dòng đại diện, chip "+n mức" mở các mức giá khác ngay dưới; chỉ số bàn phím `d` chạy trên danh sách dòng ĐANG HIỆN
-// (`hienRef`). 🗑 (ẩn) / Khôi phục đi CÙNG hàng đợi theo dòng với lưu ô (`guiHang`); "Gộp vào…" (⇲) mở HopThoai.
+// dòng đại diện, chip "+n mức" mở các mức giá khác ngay dưới. Ô chọn / ô đang sửa NEO theo KHOÁ dòng + cột (`Neo`):
+// ẩn một dòng, mở / đóng nhóm, tải lại đều làm chỉ số dòng trượt — neo theo chỉ số thì Enter lưu nhầm vào dòng khác. Chỉ số
+// d (di chuyển bằng bàn phím) suy ra lúc cần từ danh sách khoá ĐANG HIỆN (`khoaRef`: đầu nhóm + con đang mở).
+// 🗑 (ẩn) / Khôi phục đi CÙNG hàng đợi theo dòng với lưu ô (`guiHang`); "Gộp vào…" (⇲) mở HopThoai. Lọc "Đã xoá": CHỈ ĐỌC.
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { gui, lay } from "../api";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
-import { chonSauMoNhom, cotHien, daGop, dichGop, dongHien, ghepDong, giaTriSua, hienThi, NHAN_O, nhanMuc, nhomBang, oKeTiep,
-  suaDuoc, thanO, timDong, type Cot, type DongHien, type Huong, type TruongO, type ViTri } from "./bang_sua_logic";
+import { cotHien, daGop, dichGop, dongHien, ghepDong, giaTriSua, hienThi, khoaDong, NHAN_O, nhanMuc, neoKeTiep, nhomBang,
+  suaDuoc, thanO, timDong, type Cot, type DongHien, type Huong, type Neo, type TruongO } from "./bang_sua_logic";
 import { HopThoai } from "./HopThoai";
 import { NHAN_DUYET, type GoiYApi, type QuanSat, type XungDot } from "./kieu";
 import { lyDoBatThuong } from "./mau";
@@ -29,11 +31,11 @@ type TT = { kieu: "dang" | "xong" | "loi"; loi?: string; gt?: string };
 type Cho = { loai?: undefined; ma: TruongO; gt: string; nhan?: "cung_hang" | "thay_the" } | { loai: "an"; an: boolean };
 /** 409 của một dòng + MỌI thao tác của dòng đó từ lúc 409 (Ghi đè gửi hết, Lấy bản kia bỏ hết). */
 type Xung = { x: XungDot; ds: Cho[] };
-type Sua = { vt: ViTri; dau: string; phien: number };
+/** Ô đang sửa — NEO theo khoá dòng (không theo chỉ số dòng: ẩn / mở nhóm / tải lại làm chỉ số trượt). */
+type Sua = { n: Neo; dau: string; phien: number };
 /** Cách ô sửa đóng: ô kế tiếp (Enter / Tab) · ở lại ô này (chọn bằng chuột) · rời đi (blur). */
 type Ket = Huong | "giu" | null;
 
-const khoaDong = (q: Dong) => q._k ?? `${q.nguon}:${q.id}`;
 const MA_AN = "an";
 const coLoi = (t: Record<string, TT> | undefined) => Object.values(t ?? {}).some(x => x.kieu === "loi");
 
@@ -87,13 +89,13 @@ function NutXoa({ ten, khoiPhuc, dang, tat, bam }: { ten: string; khoiPhuc: bool
 }
 
 type PropsDong = {
-  q: Dong; k: string; d: number; cots: Cot[]; chonC: number; vaoDau: boolean; sua: Sua | null;
+  q: Dong; k: string; cots: Cot[]; chonC: number; vaoDau: boolean; sua: Sua | null;
   tt: Record<string, TT> | undefined; xung: Xung | undefined; canNhan: { gt: string } | null; goiY: string; dangGui: boolean;
   /** Nhóm: `soCon` null = dòng con; số = dòng đầu có bấy nhiêu mức giá khác. */
   kn: string; soCon: number | null; mo: boolean; ep: boolean; daXoa: boolean;
-  bam: (d: number, c: number) => void; vao: (d: number, c: number) => void;
-  xongSua: (d: number, c: number, gt: string, h: Ket) => void; boSua: () => void;
-  chonNhan: (d: number, n: "cung_hang" | "thay_the" | null) => void;
+  bam: (k: string, c: number) => void; vao: (k: string, c: number) => void;
+  xongSua: (k: string, c: number, gt: string, h: Ket) => void; boSua: () => void;
+  chonNhan: (k: string, n: "cung_hang" | "thay_the" | null) => void;
   ghiDe: (k: string) => void; layBanKia: (k: string) => void; moPopup: (q: QuanSat) => void; xacNhan: (q: QuanSat) => void;
   taiLai: () => void; moNhom: (kn: string) => void; datAn: (k: string, an: boolean) => void; moGop: (k: string) => void;
 };
@@ -103,31 +105,31 @@ const nhanCho = (c: Cho, nhanCot: (ma: string) => string) =>
 
 /** Một dòng — memo: chọn / sửa một ô chỉ vẽ lại dòng đó (bảng tới 800 dòng × 14 ô). */
 const DongBang = memo(function DongBang(p: PropsDong) {
-  const { q, d, cots } = p;
+  const { q, k, cots } = p;
   const thay = !!q.thay_boi;
   const loi = Object.entries(p.tt ?? {}).find(([, t]) => t.kieu === "loi");
   const nhanCot = (ma: string) => (ma === MA_AN ? (p.daXoa ? "Khôi phục" : "Xoá") : cots.find(c => c.ma === ma)?.nhan ?? ma);
   const cls = [q.bat_thuong ? "bt" : "", thay ? "thay" : "", p.soCon == null ? "bs-con" : ""].filter(Boolean).join(" ");
   return <>
-    <tr className={cls || undefined} data-k={p.k}>
+    <tr className={cls || undefined} data-k={k}>
       {cots.map((c, i) => {
         const t = c.kieu ? p.tt?.[c.ma] : undefined;
         const o = t?.kieu === "loi" && t.gt != null ? { chu: t.gt, hoi: false } : hienThi(q, c);
-        const dangSua = p.sua?.vt.c === i;
-        const cls = [c.kieu ? "bs-sd" : "bs-cd", i === p.chonC ? "bs-chon" : "", o.hoi ? "bs-hoi" : "", t ? "bs-tt-" + t.kieu : "",
+        const dangSua = p.sua?.n.c === i;
+        const cls = [c.kieu && !p.daXoa ? "bs-sd" : "bs-cd", i === p.chonC ? "bs-chon" : "", o.hoi ? "bs-hoi" : "", t ? "bs-tt-" + t.kieu : "",
           c.kieu === "so" || c.ma === "yen_kg" ? "bs-so" : ""].filter(Boolean).join(" ");
         return (
-          <td key={c.ma} className={cls} data-d={d} data-c={i} tabIndex={i === p.chonC || (p.vaoDau && i === 0) ? 0 : -1}
-            onClick={() => p.bam(d, i)} onFocus={e => { if (e.target === e.currentTarget) p.vao(d, i); }}
+          <td key={c.ma} className={cls} data-c={i} tabIndex={i === p.chonC || (p.vaoDau && i === 0) ? 0 : -1}
+            onClick={() => p.bam(k, i)} onFocus={e => { if (e.target === e.currentTarget) p.vao(k, i); }}
             aria-label={`${c.nhan}: ${o.chu || (o.hoi ? "còn thiếu" : "trống")}`}>
             {dangSua ? <OSua key={p.sua!.phien} cot={c} dau={p.sua!.dau} goiY={p.goiY}
-                xong={(gt, h) => p.xongSua(d, i, gt, h)} bo={p.boSua} />
+                xong={(gt, h) => p.xongSua(k, i, gt, h)} bo={p.boSua} />
               : <>
                 {c.ma === "ten_goc" && !!p.soCon && (
-                  <button type="button" className="chip bs-muc" aria-expanded={p.mo}
+                  <button type="button" className="chip bs-muc" aria-expanded={p.mo} aria-disabled={p.ep || undefined}
                     aria-label={`${p.mo ? "Đóng" : "Mở"} ${p.soCon} mức giá khác của ${q.ten_goc}`}
                     title={p.ep ? "Có dòng con đang lỗi / xung đột — nhóm mở tới khi xử lý xong" : `${p.soCon} mức giá khác của mặt hàng này`}
-                    onClick={e => { e.stopPropagation(); p.moNhom(p.kn); }}>{p.mo ? "−" : "+"}{p.soCon} mức</button>)}
+                    onClick={e => { e.stopPropagation(); if (!p.ep) p.moNhom(p.kn); }}>{p.mo ? "−" : "+"}{p.soCon} mức</button>)}
                 {c.ma === "ten_goc" && q.bat_thuong && <span className="dt-bs-bt" title={lyDoBatThuong(q)} aria-label="bất thường">⚠ </span>}
                 {o.hoi && !o.chu ? <span className="dt-hoi-o" aria-hidden="true">?</span> : o.chu}
                 {c.ma === "ten_goc" && daSua(q) && <span className="dt-nhat" aria-hidden="true"> ✎</span>}
@@ -136,29 +138,30 @@ const DongBang = memo(function DongBang(p: PropsDong) {
               </>}
             {c.ma === "ma_kome" && p.canNhan && (
               <span className="dt-bs-nhan" role="group" aria-label={`Ghép ${p.canNhan.gt}: chọn thương hiệu`}>
-                <button type="button" className="chip" autoFocus onClick={e => { e.stopPropagation(); p.chonNhan(d, "cung_hang"); }}>
+                <button type="button" className="chip" autoFocus onClick={e => { e.stopPropagation(); p.chonNhan(k, "cung_hang"); }}>
                   {NHAN_O[0][1]}</button>
-                <button type="button" className="chip" onClick={e => { e.stopPropagation(); p.chonNhan(d, "thay_the"); }}>
+                <button type="button" className="chip" onClick={e => { e.stopPropagation(); p.chonNhan(k, "thay_the"); }}>
                   {NHAN_O[1][1]}</button>
-                <button type="button" className="chip" onClick={e => { e.stopPropagation(); p.chonNhan(d, null); }}>Bỏ</button>
+                <button type="button" className="chip" onClick={e => { e.stopPropagation(); p.chonNhan(k, null); }}>Bỏ</button>
               </span>)}
           </td>);
       })}
       <td className="bs-cd dt-bs-duyet">
-        {q.nguon === "nap" && q.trang_thai_duyet !== "da_xac_nhan" && !thay
+        {q.nguon === "nap" && q.trang_thai_duyet !== "da_xac_nhan" && !thay && !p.daXoa
           ? <button type="button" className="chip dt-dung" disabled={p.dangGui} aria-label={`Đúng rồi: ${q.ten_goc}`}
               onClick={() => p.xacNhan(q)}>Đúng rồi</button>
           : <span className="dt-nhat">{NHAN_DUYET[q.trang_thai_duyet]}</span>}
       </td>
       <td className="bs-cd bs-nut">
-        <button type="button" className="chip" aria-label={`Mở pop-up sửa ${q.ten_goc}`} title="Bậc giá, khuyến mãi, giá đã đổi, lịch sử"
-          disabled={thay} onClick={() => p.moPopup(q)}>⋯</button>
+        {/* Ở "Đã xoá" dòng CHỈ ĐỌC: sửa một dòng ẩn (nhất là "giá đã đổi" → dòng tay mới an = false) là lặng lẽ hiện lại nó. */}
+        {!p.daXoa && <button type="button" className="chip" aria-label={`Mở pop-up sửa ${q.ten_goc}`} title="Bậc giá, khuyến mãi, giá đã đổi, lịch sử"
+          disabled={thay} onClick={() => p.moPopup(q)}>⋯</button>}
         {!p.daXoa && <button type="button" className="chip" aria-label={`Gộp ${q.ten_goc} vào mặt hàng khác / tách ra`}
-          title="Gộp vào mặt hàng khác / tách ra" disabled={thay} onClick={() => p.moGop(p.k)}>⇲</button>}
+          title="Gộp vào mặt hàng khác / tách ra" disabled={thay} onClick={() => p.moGop(k)}>⇲</button>}
       </td>
       <td className="bs-cd">
         <NutXoa ten={q.ten_goc} khoiPhuc={p.daXoa} dang={p.tt?.[MA_AN]?.kieu === "dang"} tat={thay}
-          bam={() => p.datAn(p.k, !p.daXoa)} />
+          bam={() => p.datAn(k, !p.daXoa)} />
       </td>
     </tr>
     {(loi || p.xung || thay) && (
@@ -166,8 +169,8 @@ const DongBang = memo(function DongBang(p: PropsDong) {
         {thay ? <span>Dòng này đã có bản mới hơn — không sửa bản cũ. <button type="button" className="chip" onClick={p.taiLai}>
             Tải bản mới</button></span>
           : p.xung ? <span role="alert">{moTaXungDot(p.xung.x)} — bạn vừa {p.xung.ds.some(c => c.loai !== "an") ? "gõ" : "bấm"}: {p.xung.ds.map(c => nhanCho(c, nhanCot)).join(", ")}.{" "}
-              <button type="button" className="nut-chinh" onClick={() => p.ghiDe(p.k)}>Ghi đè</button>{" "}
-              <button type="button" className="chip" onClick={() => p.layBanKia(p.k)}>Lấy bản {p.xung.x.ai ? `của ${p.xung.x.ai}` : "kia"}</button></span>
+              <button type="button" className="nut-chinh" onClick={() => p.ghiDe(k)}>Ghi đè</button>{" "}
+              <button type="button" className="chip" onClick={() => p.layBanKia(k)}>Lấy bản {p.xung.x.ai ? `của ${p.xung.x.ai}` : "kia"}</button></span>
           : <span role="alert" className="dt-loi">{nhanCot(loi![0])}: {loi![1].loi}</span>}
       </td></tr>)}
   </>;
@@ -225,10 +228,11 @@ export function BangSua({ khoaQ, dong, tim, moiBen, daXoa = false, moPopup, xacN
 }) {
   const qc = useQueryClient();
   const kx = chuoiKhoang(useKhoang());
-  const cots = cotHien(moiBen);
+  const cots = useMemo(() => cotHien(moiBen), [moiBen]);   // mảng ỔN ĐỊNH — không thì memo của DongBang vô tác dụng
   const hien = useMemo(() => timDong(dong as Dong[], tim) as Dong[], [dong, tim]);
 
-  const [chon, datChon] = useState<ViTri | null>(null);
+  // Ô chọn / ô sửa NEO theo khoá dòng (bang_sua_logic.ts::Neo); chỉ số d chỉ suy ra lúc cần từ `khoaRef`.
+  const [chon, datChon] = useState<Neo | null>(null);
   const [sua, datSua] = useState<Sua | null>(null);
   const [tt, datTT] = useState<Record<string, Record<string, TT>>>({});
   const [xung, datXung] = useState<Record<string, Xung>>({});
@@ -247,8 +251,12 @@ export function BangSua({ khoaQ, dong, tim, moiBen, daXoa = false, moPopup, xacN
     return !!xung[k] || coLoi(tt[k]) || canNhan?.k === k;
   }), [nhom, mo, tt, xung, canNhan]);
   const dongD = useMemo(() => dsHien.map(x => x.q), [dsHien]);
-  // MỌI ánh xạ chỉ số d → dòng đọc danh sách này (đầu nhóm + con đang mở), không đọc `hien`.
+  // MỌI ánh xạ chỉ số d ↔ dòng đọc danh sách này (đầu nhóm + con đang mở), không đọc `hien`.
   const hienRef = useRef<Dong[]>(dongD); hienRef.current = dongD;
+  const khoaD = useMemo(() => dongD.map(khoaDong), [dongD]);
+  const khoaRef = useRef(khoaD); khoaRef.current = khoaD;
+  const theoKhoa = useMemo(() => new Map(dongD.map(q => [khoaDong(q), q])), [dongD]);
+  const theoKhoaRef = useRef(theoKhoa); theoKhoaRef.current = theoKhoa;
   const dsHienRef = useRef<DongHien<Dong>[]>(dsHien); dsHienRef.current = dsHien;
   // Bản mới nhất của state cho các hàm xử lý ỔN ĐỊNH (memo của DongBang chỉ có tác dụng khi hàm không đổi mỗi lần vẽ).
   const suaRef = useRef(sua); suaRef.current = sua;
@@ -277,26 +285,20 @@ export function BangSua({ khoaQ, dong, tim, moiBen, daXoa = false, moPopup, xacN
   });
   // Trả tiêu điểm về ô SAU lần vẽ kế tiếp — useEffect chứ không requestAnimationFrame: rAF không chạy khi thẻ trình duyệt
   // bị ẩn, tiêu điểm rơi về <body> và phím mũi tên cuộn cả trang.
-  const choTapTrung = useRef<ViTri | null>(null);
-  const tapTrung = (v: ViTri | null) => { choTapTrung.current = v; };
+  // Ô theo khoá dòng. `cho` = khoá của dòng sắp rời bảng: ô đích chưa vẽ (dòng con của nhóm đang đóng — nó lên làm dòng
+  // đầu khi dòng kia đi) thì chờ tới lần vẽ mà dòng đó đã rời bảng.
+  const choTapTrung = useRef<(Neo & { cho?: string }) | null>(null);
+  const tapTrung = (n: (Neo & { cho?: string }) | null) => { choTapTrung.current = n; };
   useEffect(() => {
-    const v = choTapTrung.current;
-    if (!v) return;
+    const n = choTapTrung.current;
+    if (!n) return;
+    const td = bang.current?.querySelector<HTMLElement>(`tr[data-k="${CSS.escape(n.k)}"] > td[data-c="${n.c}"]`);
+    if (!td && n.cho && khoaRef.current.includes(n.cho)) return;
     choTapTrung.current = null;
-    bang.current?.querySelector<HTMLElement>(`td[data-d="${v.d}"][data-c="${v.c}"]`)?.focus();
+    td?.focus();
   });
-  // Tiêu điểm theo KHOÁ dòng, chờ tới lần vẽ mà dòng `bo` đã rời bảng (ẩn / khôi phục): chỉ số d chỉ đúng SAU khi bộ đệm
-  // đã bỏ dòng — mà lần vẽ đầu sau thao tác có thể vẫn còn nó (TanStack báo đổi đệm ở nhịp sau).
-  const choDong = useRef<{ k: string; c: number; bo: string } | null>(null);
-  useEffect(() => {
-    const p = choDong.current;
-    if (!p || hienRef.current.some(r => khoaDong(r) === p.bo)) return;
-    choDong.current = null;
-    const d = hienRef.current.findIndex(r => khoaDong(r) === p.k);
-    if (d < 0) return;
-    datChon({ d, c: p.c });
-    bang.current?.querySelector<HTMLElement>(`td[data-d="${d}"][data-c="${p.c}"]`)?.focus();
-  });
+  // Dòng của ô đang sửa không còn hiện (ẩn / tải lại đổi khoá) → đóng ô sửa; chữ đang gõ bỏ (dòng đã đi).
+  useEffect(() => { if (sua && !theoKhoa.has(sua.n.k)) datSua(null); }, [sua, theoKhoa]);
 
   /** Xếp một thao tác ghi của dòng `k` sau thao tác trước của CÙNG dòng (lưu ô, ẩn / khôi phục, gộp). */
   const guiHang = useCallback(<T,>(k: string, fn: () => Promise<T>): Promise<T> => {
@@ -365,10 +367,10 @@ export function BangSua({ khoaQ, dong, tim, moiBen, daXoa = false, moPopup, xacN
         // chính mặt hàng đó (nó lên làm dòng đầu), không thì dòng dưới, không nữa thì dòng trên.
         const tr = (document.activeElement as HTMLElement | null)?.closest?.("tr");
         if (tr && tr.getAttribute("data-k") === k) {
-          const i = hienRef.current.findIndex(r => khoaDong(r) === k);
+          const i = khoaRef.current.indexOf(k);
           const con = nhomRef.current.find(g => g.dau === hienRef.current[i])?.con[0];
           const ke = con ?? hienRef.current[i + 1] ?? hienRef.current[i - 1];
-          if (i >= 0 && ke) choDong.current = { k: khoaDong(ke), c: 0, bo: k };
+          if (i >= 0 && ke) { const n = { k: khoaDong(ke), c: 0 }; datChon(n); tapTrung({ ...n, cho: k }); }
         }
         qc.setQueryData<DuLieu>(khoaQ, d => d && ({ ...d, dong: d.dong.filter(r => khoaDong(r) !== k), tong: Math.max(0, d.tong - 1) }));
         datTT(s => { if (!s[k]) return s; const n = { ...s }; delete n[k]; return n; });
@@ -395,52 +397,55 @@ export function BangSua({ khoaQ, dong, tim, moiBen, daXoa = false, moPopup, xacN
     await qc.invalidateQueries({ queryKey: khoaQ, exact: true });
   }), [qc, khoaQ, guiHang]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const moSua = (v: ViTri, dau?: string) => {
-    const q = hienRef.current[v.d], c = cots[v.c];
-    if (!q || !suaDuoc(q, c)) return false;
-    const loiCu = ttRef.current[khoaDong(q)]?.[c.ma];
+  /** Mở ô sửa tại ô neo `n`. Ở lọc "Đã xoá" bảng CHỈ ĐỌC (di chuyển bằng bàn phím vẫn được). */
+  const moSua = (n: Neo, dau?: string) => {
+    const q = theoKhoaRef.current.get(n.k), c = cots[n.c];
+    if (daXoa || !q || !c || !suaDuoc(q, c)) return false;
+    const loiCu = ttRef.current[n.k]?.[c.ma];
     phien.current++;
-    datChon(v);
-    datSua({ vt: v, dau: dau ?? (loiCu?.kieu === "loi" && loiCu.gt != null ? loiCu.gt : giaTriSua(q, c.ma as TruongO)),
+    datChon(n);
+    datSua({ n, dau: dau ?? (loiCu?.kieu === "loi" && loiCu.gt != null ? loiCu.gt : giaTriSua(q, c.ma as TruongO)),
       phien: phien.current });
     return true;
   };
 
-  const bam = useCallback((d: number, c: number) => {
-    const v = { d, c }, s = suaRef.current;
-    if (s && s.vt.d === d && s.vt.c === c) return;
-    datChon(v);
-    if (!moSua(v)) tapTrung(v);
-  }, [moiBen]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const vao = useCallback((d: number, c: number) => {
-    datChon(v => (v && v.d === d && v.c === c ? v : { d, c }));
+  const bam = useCallback((k: string, c: number) => {
+    const n = { k, c }, s = suaRef.current;
+    if (s && s.n.k === k && s.n.c === c) return;
+    datChon(n);
+    if (!moSua(n)) tapTrung(n);
+  }, [cots, daXoa]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const vao = useCallback((k: string, c: number) => {
+    datChon(v => (v && v.k === k && v.c === c ? v : { k, c }));
   }, []);
 
-  const xongSua = useCallback((d: number, c: number, gt: string, h: Ket) => {
-    const q = hienRef.current[d];
+  /** Ô sửa đóng: lưu vào ĐÚNG dòng đã mở ô (khoá `k`), rồi (Enter / Tab) mở ô sửa được kế tiếp tính từ vị trí HIỆN TẠI
+   *  của dòng đó. */
+  const xongSua = useCallback((k: string, c: number, gt: string, h: Ket) => {
     datSua(null);
-    if (q) luu(khoaDong(q), cots[c].ma as TruongO, gt);
+    luu(k, cots[c].ma as TruongO, gt);
     if (h == null) return;                                  // rời ô bằng chuột: tiêu điểm đã ở chỗ người ta bấm
-    if (h === "giu") { datChon({ d, c }); tapTrung({ d, c }); return; }
+    const goc = { k, c };
+    if (h === "giu") { datChon(goc); tapTrung(goc); return; }
     // Enter / Tab: ô kế tiếp SỬA ĐƯỢC mở luôn để gõ tiếp (điền "tịnh 1 gói" cho cả loạt hàng).
-    let v = oKeTiep({ d, c }, h, hienRef.current.length, cots);
-    while (v && !suaDuoc(hienRef.current[v.d], cots[v.c])) v = oKeTiep(v, h, hienRef.current.length, cots);
-    if (v) moSua(v); else { datChon({ d, c }); tapTrung({ d, c }); }
-  }, [luu, moiBen]);   // eslint-disable-line react-hooks/exhaustive-deps
+    let n = neoKeTiep(khoaRef.current, goc, h, cots);
+    while (n && !suaDuoc(theoKhoaRef.current.get(n.k)!, cots[n.c])) n = neoKeTiep(khoaRef.current, n, h, cots);
+    if (n) moSua(n); else { datChon(goc); tapTrung(goc); }
+  }, [luu, cots, daXoa]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const boSua = useCallback(() => {
     const s = suaRef.current;
-    if (s) { datChon(s.vt); tapTrung(s.vt); }
+    if (s) { datChon(s.n); tapTrung(s.n); }
     datSua(null);
   }, []);
 
-  const chonNhan = useCallback((d: number, n: "cung_hang" | "thay_the" | null) => {
-    const q = hienRef.current[d], cn = canNhanRef.current;
+  const chonNhan = useCallback((k: string, n: "cung_hang" | "thay_the" | null) => {
+    const cn = canNhanRef.current;
     datCanNhan(null);
-    if (q && cn && n) luu(khoaDong(q), "ma_kome", cn.gt, { nhan: n });
-    tapTrung({ d, c: cots.findIndex(c => c.ma === "ma_kome") });
-    datChon({ d, c: cots.findIndex(c => c.ma === "ma_kome") });
-  }, [luu, moiBen]);   // eslint-disable-line react-hooks/exhaustive-deps
+    if (cn && n) luu(k, "ma_kome", cn.gt, { nhan: n });
+    const o = { k, c: cots.findIndex(c => c.ma === "ma_kome") };
+    tapTrung(o); datChon(o);
+  }, [luu, cots]);
 
   const ghiDe = useCallback((k: string) => {
     const x = xungRef.current[k];
@@ -459,15 +464,19 @@ export function BangSua({ khoaQ, dong, tim, moiBen, daXoa = false, moPopup, xacN
     docLai(k, q.nguon, q.id).catch(() => taiLai());
   }, [kx, taiLai]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Mở / đóng nhóm: dòng dưới nhóm đổi chỉ số → ô đang chọn dời theo (nhóm bị ép mở vì lỗi thì không đổi gì trên màn). */
+  /** Mở / đóng nhóm (ô chọn neo theo khoá nên không dời). Đóng nhóm mà ô chọn nằm ở dòng con → về dòng đầu. Nhóm bị ép
+   *  mở (dòng con đang lỗi / 409) thì không đóng được. */
   const moNhom = useCallback((kn: string) => {
     const ds = dsHienRef.current;
-    const dau = ds.findIndex(x => x.kn === kn && x.soCon != null);
-    const x = ds[dau];
-    if (!x || !x.soCon) return;
+    const x = ds.find(y => y.kn === kn && y.soCon != null);
+    if (!x || !x.soCon || x.ep) return;
     const moi = !x.mo;
     datMo(s => { const n = new Set(s); if (moi) n.add(kn); else n.delete(kn); return n; });
-    if (!x.ep) datChon(v => chonSauMoNhom(v, dau, x.soCon!, moi));
+    if (!moi) {
+      const con = new Set(ds.filter(y => y.kn === kn && y.soCon == null).map(y => khoaDong(y.q)));
+      const dau = khoaDong(x.q);
+      datChon(v => (v && con.has(v.k) ? { k: dau, c: v.c } : v));
+    }
   }, []);
 
   const moGop = useCallback((k: string) => datGop(k), []);
@@ -478,7 +487,7 @@ export function BangSua({ khoaQ, dong, tim, moiBen, daXoa = false, moPopup, xacN
     const h: Huong | null = e.key === "ArrowDown" ? "xuong" : e.key === "ArrowUp" ? "len" : e.key === "ArrowLeft" ? "trai"
       : e.key === "ArrowRight" ? "phai" : e.key === "Tab" ? (e.shiftKey ? "tab_lui" : "tab") : null;
     if (h) {
-      const v = oKeTiep(chon, h, hienRef.current.length, cots);
+      const v = neoKeTiep(khoaRef.current, chon, h, cots);
       if (!v && e.key === "Tab") return;          // ra khỏi bảng bằng Tab như bình thường
       e.preventDefault();
       if (v) { datChon(v); tapTrung(v); }
@@ -490,6 +499,7 @@ export function BangSua({ khoaQ, dong, tim, moiBen, daXoa = false, moPopup, xacN
     }
   };
 
+  const chonHien = !!chon && theoKhoa.has(chon.k);   // ô chọn thuộc dòng đã rời bảng → dòng đầu nhận Tab vào bảng
   const qGop = gop ? (dong as Dong[]).find(r => khoaDong(r) === gop) : undefined;
   const goiY = "dt-bs-goi-y";
   if (!hien.length) return <p className="dt-nhat">Không có dòng nào{tim.trim() ? " khớp ô tìm" : ""}.</p>;
@@ -501,9 +511,9 @@ export function BangSua({ khoaQ, dong, tim, moiBen, daXoa = false, moPopup, xacN
           {c.nhan}</th>)}<th scope="col">Duyệt</th><th scope="col"><span className="dt-an">Sửa thêm</span></th>
           <th scope="col"><span className="dt-an">{daXoa ? "Khôi phục" : "Xoá"}</span></th></tr></thead>
         <tbody>
-          {dsHien.map(({ q, kn, soCon, mo: m, ep }, d) => { const k = khoaDong(q); return (
-            <DongBang key={k} k={k} q={q} d={d} cots={cots} chonC={chon?.d === d ? chon.c : -1} vaoDau={!chon && d === 0}
-              sua={sua?.vt.d === d ? sua : null} tt={tt[k]} xung={xung[k]} canNhan={canNhan?.k === k ? canNhan : null}
+          {dsHien.map(({ q, kn, soCon, mo: m, ep }, d) => { const k = khoaD[d]; return (
+            <DongBang key={k} k={k} q={q} cots={cots} chonC={chon?.k === k ? chon.c : -1} vaoDau={!chonHien && d === 0}
+              sua={sua?.n.k === k ? sua : null} tt={tt[k]} xung={xung[k]} canNhan={canNhan?.k === k ? canNhan : null}
               goiY={goiY} dangGui={dangGui} kn={kn} soCon={soCon} mo={m} ep={ep} daXoa={daXoa}
               bam={bam} vao={vao} xongSua={xongSua} boSua={boSua} chonNhan={chonNhan}
               ghiDe={ghiDe} layBanKia={layBanKia} moPopup={moPopup} xacNhan={xacNhan} taiLai={taiLai}

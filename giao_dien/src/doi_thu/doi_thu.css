@@ -454,6 +454,7 @@ table.dt-bs{border-collapse:separate;border-spacing:0;width:max-content;min-widt
 .dt-bs tr.bs-con td:first-child{padding-left:1.4rem}
 .dt-bs tr.bs-con td{background:var(--nen-phu)}
 .dt-bs .bs-muc{font-size:.68rem;padding:0 .4rem;margin-right:5px;line-height:1.5;vertical-align:1px}
+.dt-bs .bs-muc[aria-disabled="true"]{opacity:.6;cursor:default}
 .dt-bs td.bs-nut .chip + .chip{margin-left:4px}
 .dt-bs .bs-xoa{padding:.1rem .45rem}
 .bs-xoa-hoi{color:var(--do-chu);font-weight:700}

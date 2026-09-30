@@ -39,11 +39,16 @@ function MucKhac({ n, q }: { n: Nhom; q: QuanSat }) {
     <div className="dt-ng-muc">
       <p className="dt-ng-chu"><b>Các mức giá khác của mặt hàng này</b> <small>(đang xem: {nhanMuc(q)})</small></p>
       <table><tbody>
-        {ds.map(x => (
-          <tr key={`${x.nguon}:${x.id}`}>
-            <td>{nhanMuc(x)}{x.trang_thai === "het" ? " · đang hết" : ""}</td>
-            <td className="r">{dv == null ? `${yen(x.gia_1 ?? x.yen_chuan)}/kg` : `${yen(x.yen_chuan)}/${dv}`}</td>
-          </tr>))}
+        {ds.map(x => {
+          const g = dv == null ? x.gia_1 ?? x.yen_chuan : x.yen_chuan;
+          const bt = laBatThuong(x);   // B18: xám "⚠" + lý do, không tô màu lệch
+          return (
+            <tr key={`${x.nguon}:${x.id}`} className={bt ? "c-xam" : undefined}>
+              <td>{bt && <span className="c-xam" title={lyDoBatThuong(x)} aria-label={`bất thường: ${lyDoBatThuong(x)}`}>⚠ </span>}
+                {nhanMuc(x)}{x.trang_thai === "het" ? " · đang hết" : ""}</td>
+              <td className="r">{g == null ? "?" : `${yen(g)}/${dv ?? "kg"}`}</td>
+            </tr>);
+        })}
       </tbody></table>
     </div>);
 }
