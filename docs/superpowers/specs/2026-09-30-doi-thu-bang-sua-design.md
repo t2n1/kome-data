@@ -42,6 +42,7 @@ cần thấy cả danh sách của một bên như bảng giá gốc và điền
 | Tịnh 1 gói (g) | `kl_goi_g` | số (phẩy = thập phân) |
 | Giá | `gia_goc` | số — **"Máy đọc sai"** |
 | Đơn vị | `don_vi_gia` | chọn (`DON_VI`) — "Máy đọc sai" |
+| kg / đơn vị | `kg_moi_don_vi_gia` | số (phẩy = thập phân), > 0 — xem §6 |
 | Thuế | `thue` | chọn — "Máy đọc sai" |
 | Tình trạng | `trang_thai` | chọn (`NHAN_TRANG_THAI`) |
 | Mã KOME | `ma_kome` (hoặc `ma_ghep`) | chữ + gợi ý (`/goi-y-nhac`) |
@@ -82,3 +83,15 @@ Chọn nhiều dòng để "Đúng rồi" một lượt; dán khối từ Excel;
   ghép dòng sau khi lưu (giữ cột thiếu, thay id), tìm bỏ dấu.
 - Trình duyệt trên dữ liệu thật (bản chỉ đọc ở máy, không bấm lưu thật): bảng một bên, di chuyển bàn phím, 375 px,
   sáng / tối. Lưu + 409 kiểm trên CSDL test ở máy.
+
+## 6. Phát hiện khi kiểm (2026-09-30): "tịnh 1 gói" KHÔNG quy giá ra ¥/kg
+
+`mart.gia_doi_thu_quan_sat` (060/067) quy giá ra ¥/kg CHỈ bằng `kg_moi_don_vi_gia` (`don_vi_so = 'kg'` khi cột đó > 0);
+`so_goi_thung` / `kl_goi_g` chỉ dùng cho `kg_thung_dt` và giá bậc. Điền "tịnh 1 gói = 200 g" cho giá ¥285/gói vẫn để dòng
+ở `don_vi:goi` (đo trên CSDL giả: `yen_chuan` 285, `don_vi_so` 'don_vi:goi'); điền `kg_moi_don_vi_gia = 0,2` thì ra
+¥1.425/kg. Vì vậy:
+- Bảng có cột "kg / đơn vị" (`FormMatHang.kg_moi_don_vi_gia`, không thuộc TRUONG_GIA — không cần "vì sao đổi giá").
+- Câu trên thẻ nhóm "giá theo gói, chưa quy ra ¥/kg" của So sánh (`BieuDoCot.tsx::DauNhom`) trước ghi "điền gói / thùng
+  + tịnh 1 gói" — sai; nay trỏ tới cột "kg / đơn vị" của bảng này.
+- CHƯA đổi mart: suy `kg_moi_don_vi_gia` từ `kl_goi_g` khi `don_vi_gia = 'goi'` (và từ `so_goi_thung × kl_goi_g` khi
+  `'thung'`) là đổi định nghĩa quy đổi ở 060/067 → migration mới + chạy trên CSDL thật, chờ chủ DN quyết.

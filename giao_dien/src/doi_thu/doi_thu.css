@@ -9,7 +9,6 @@
 .dt-bang th,.dt-bang td{text-align:left}
 .dt-o.co{background:var(--lam-nen);color:var(--lam-chu);text-align:center}
 .dt-dong th button{text-align:left}
-.dt-ben{margin:0 0 8px}
 .dt-con td{font-size:.9em}
 .dt-con.bat-thuong td{color:var(--do-chu)}
 .dt-loc{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
@@ -17,8 +16,6 @@
   border:1px solid var(--vien-dam);border-radius:8px;background:var(--nen-the);color:var(--chu);min-width:0}
 .dt-ds{list-style:none;padding:0;margin:0;max-height:420px;overflow:auto;font-size:.82rem}
 .dt-ds li{padding:.25rem 0;border-bottom:1px solid var(--vien-phu)}
-.dt-chon button{width:100%;text-align:left;font:inherit;font-size:.8rem;background:none;border:0;padding:.3rem .2rem;color:var(--chu);cursor:pointer}
-.dt-chon button[aria-pressed="true"]{background:var(--nen-phu);font-weight:600}
 .dt-duyet{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
 .dt-sua label{display:grid;grid-template-columns:160px minmax(0,1fr);gap:8px;margin:4px 0;font-size:.8rem}
 .dt-sua fieldset{border:1px solid var(--vien);border-radius:8px;margin:10px 0;padding:.5rem .7rem;display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -400,11 +397,6 @@ button.dt-tt-ten{cursor:pointer} button.dt-tt-ten:hover{text-decoration:underlin
 
 /* ---- Duyệt / sửa một cột (đợt 4b task 9): bấm dòng mở SuaMatHang, "Đúng rồi" trên dòng ---- */
 .dt-duyet.dt-duyet-mot{grid-template-columns:minmax(0,1fr)}
-.dt-duyet-ds li{display:flex;gap:8px;align-items:center}
-.dt-duyet-ds li>button:first-child{flex:1;min-width:0}
-.dt-duyet-ds li>button:first-child:hover,.dt-duyet-ds li>button:first-child:focus-visible{background:var(--nen-phu)}
-.dt-duyet-ds li>button:focus-visible{outline:2px solid var(--dt-cam);outline-offset:1px}
-.dt-duyet-ds .dt-dung{flex:none;width:auto;font-size:.72rem;padding:.15rem .55rem;border:1px solid var(--vien-dam);border-radius:999px}
 /* "?" phí giao chưa cộng (Tính cả phí giao — tab So sánh). */
 .dt-svg .dt-hoi-phi{outline:none}
 .dt-svg .dt-hoi-phi circle{fill:var(--nen-the);stroke:var(--dt-cam)}
@@ -418,3 +410,43 @@ button.dt-tt-ten{cursor:pointer} button.dt-tt-ten:hover{text-decoration:underlin
 .dt-da-bo-mh{white-space:normal}
 .dt-da-bo .lien-ket{font-size:inherit}
 .dt-da-bo .dt-loi{flex-basis:100%;margin:0}
+
+/* ---- Bảng sửa mặt hàng đối thủ (Dữ liệu › Duyệt / sửa, 2026-09-30) — BangSua.tsx. Ô chọn viền --lien-ket; "?" thiếu
+   --dt-cam; đang lưu mờ + vòng quay; lỗi --do-chu; ✓ --ok-chu. Khung cuộn cả hai chiều, đầu bảng + cột đầu dính. ---- */
+.dt-bs-khung{overflow:auto;max-height:70vh;border:1px solid var(--vien);border-radius:8px;margin-top:8px}
+table.dt-bs{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:.8rem;font-variant-numeric:tabular-nums}
+.dt-bs th{font-family:var(--font-ui);position:sticky;top:0;z-index:2;background:var(--nen-phu);text-align:left;font-weight:600;padding:.35rem .5rem;
+  border-bottom:1px solid var(--vien);white-space:nowrap}
+.dt-bs th.bs-so,.dt-bs td.bs-so{text-align:right}
+.dt-bs td{padding:.28rem .5rem;font-weight:400;font-family:var(--font-ui);border-bottom:1px solid var(--vien-phu);background:var(--nen-the);white-space:nowrap;
+  max-width:18rem;overflow:hidden;text-overflow:ellipsis;position:relative;outline:none}
+.dt-bs th:first-child,.dt-bs td:first-child{position:sticky;left:0;z-index:1;border-right:1px solid var(--vien-phu)}
+.dt-bs th:first-child{z-index:3}
+.dt-bs td.bs-sd{cursor:cell}
+.dt-bs td.bs-sd:hover{background:var(--nen-phu)}
+.dt-bs td.bs-chon{box-shadow:inset 0 0 0 2px var(--lien-ket)}
+.dt-bs td.bs-hoi .dt-hoi-o,.dt-bs td.bs-hoi{color:var(--dt-cam);font-weight:700}
+.dt-bs td.bs-tt-dang{opacity:.6}
+.dt-bs td.bs-tt-loi{box-shadow:inset 0 0 0 2px var(--do-chu)}
+.dt-bs td:has(input),.dt-bs td:has(select){padding:0;overflow:visible}
+.dt-bs td input,.dt-bs td select{font:inherit;width:100%;min-width:7rem;box-sizing:border-box;padding:.24rem .45rem;margin:0;
+  border:2px solid var(--lien-ket);border-radius:0;background:var(--nen-the);color:var(--chu)}
+.dt-bs td input.bs-so{text-align:right;min-width:5rem}
+.dt-bs tr.bt td{color:var(--chu-nhat)}
+.dt-bs tr.thay td{opacity:.5}
+.dt-bs-bt{color:var(--canh-chu)}
+.dt-bs-ok{color:var(--ok-chu);margin-left:4px}
+.dt-bs-quay{display:inline-block;width:.7em;height:.7em;margin-left:4px;border:2px solid var(--vien-dam);border-top-color:var(--lien-ket);
+  border-radius:50%;animation:dt-quay .8s linear infinite;vertical-align:-1px}
+@keyframes dt-quay{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.dt-bs-quay{animation:none}}
+.dt-bs-nhan{position:absolute;z-index:4;left:0;top:100%;display:flex;gap:4px;padding:6px;background:var(--nen-the);
+  border:1px solid var(--vien-dam);border-radius:8px;box-shadow:0 4px 14px rgb(0 0 0 / .18)}
+.dt-bs tr.dt-bs-phu td{white-space:normal;background:var(--nen-phu);font-size:.78rem;position:static}
+.dt-bs tr.dt-bs-phu td:first-child{position:static}
+.dt-bs-duyet .chip{padding:.1rem .5rem}
+.dt-bs-dau{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.dt-bs-dau input[type=search]{font:inherit;font-size:.82rem;padding:.3rem .5rem;border:1px solid var(--vien-dam);border-radius:8px;
+  background:var(--nen-the);color:var(--chu);min-width:0;flex:1 1 220px}
+.dt-bs-ben{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.dt-bs-ben small{color:var(--chu-nhat);margin-left:3px}

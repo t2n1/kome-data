@@ -118,7 +118,7 @@ export default function ManDoiThu() {
       {t.tab === "tin" && <TabTin moBen={b => doi({ tab: "ben", ben: b })}
         moSoSanh={sp => doi({ tab: "so_sanh", sp, nganh: "", ben: "", nhom: "" })} />}
       {t.tab === "nhom" && <TabNhomQuyCach />}
-      {t.tab === "duyet" && <TabDuyet ben={t.ben} boBen={() => doi({ ben: "" })} />}
+      {t.tab === "duyet" && <TabDuyet ben={t.ben} datBen={b => doi({ ben: b })} />}
       {t.tab === "giao_hang" && <TabGiaoHang />}
       {t.tab === "lech" && <TabGiaKomeLech />}
     </div>

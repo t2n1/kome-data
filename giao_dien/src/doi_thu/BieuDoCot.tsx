@@ -41,7 +41,7 @@ export function DauNhom({ n, sl, neo }: { n: Nhom; sl: SoLuong; neo?: (e: HTMLEl
       <HinhMa ma={n.ma_kome?.[0]} ten={ten} co={30} trang_tri />
       {ten}
       <small>{qc} · {(n.ma_kome ?? []).join(", ") || n.nhom_khoa} · {dv
-        ? <><b>giá theo {dv}, chưa quy ra ¥/kg</b> — điền gói / thùng + tịnh 1 gói (dấu <b className="t-cam">?</b>)</>
+        ? <><b>giá theo {dv}, chưa quy ra ¥/kg</b> — cần số kg của 1 {dv}: cột <b>kg / đơn vị</b> ở Dữ liệu › Duyệt / sửa</>
         : <>giá đối thủ khi khách mua <b>{NHAN_SL[sl]}</b></>}</small>
     </h3>
   );

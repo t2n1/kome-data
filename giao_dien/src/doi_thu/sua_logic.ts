@@ -5,9 +5,11 @@ import { gio_tokyo } from "../dinh_dang";
 import type { Bac, DaBo, GiaoHang, QuanSat, ThayBoi, XungDot } from "./kieu";
 
 export type BacNhap = { tu: string; don_vi_sl: Bac["don_vi_sl"]; gia: string; don_vi_gia: Bac["don_vi_gia"] };
-/** `ma_kome` / `nhom_id`: ô "Mã KOME" và "Nhóm so sánh" của phần So với (B13 — thay khung "Ghép với KOME" cũ của Duyệt);
+/** `ten_goc` / `quy_cach_goc` / `kg_moi_don_vi_gia`: chỉ bảng sửa (TabDuyet › BangSua) đổi — pop-up không vẽ hai ô này, nên chúng luôn bằng lúc mở.
+ *  `ma_kome` / `nhom_id`: ô "Mã KOME" và "Nhóm so sánh" của phần So với (B13 — thay khung "Ghép với KOME" cũ của Duyệt);
  *  `nhom_id` "" = theo mã KOME (không nhóm ghép tường minh). */
 export type FormMatHang = { nhan: "cung_hang" | "thay_the" | "khong"; ma_kome: string; nhom_id: string;
+  ten_goc: string; quy_cach_goc: string; kg_moi_don_vi_gia: string;
   trang_thai: string; khuyen_mai: string;
   gia_truoc_km: string; so_goi_thung: string; kl_goi_g: string; gia_goc: string; don_vi_gia: string; thue: string; bac: BacNhap[];
   vi_sao_gia: "" | "doc_sai" | "da_doi"; loai_nguon: string; lien_ket_bang_chung: string };
@@ -37,6 +39,7 @@ const chu = (n: number | null | undefined) => (n == null ? "" : String(n));
 export function formTu(q: QuanSat): FormMatHang {
   return {
     nhan: q.nhan ?? "khong", ma_kome: q.ma_kome ?? q.ma_ghep ?? "", nhom_id: q.nhom_ghep == null ? "" : String(q.nhom_ghep),
+    ten_goc: q.ten_goc ?? "", quy_cach_goc: q.quy_cach_goc ?? "", kg_moi_don_vi_gia: chu(q.kg_moi_don_vi_gia),
     trang_thai: q.trang_thai, khuyen_mai: q.khuyen_mai ?? "",
     gia_truoc_km: chu(q.gia_truoc_km),
     so_goi_thung: chu(q.so_goi_thung), kl_goi_g: chu(q.kl_goi_g), gia_goc: chu(q.gia_goc),
@@ -69,6 +72,9 @@ function bacGui(ds: BacNhap[]) {
 /** Những trường ĐÃ ĐỔI so với lúc mở (formTu(q)), dạng máy chủ nhận. */
 function thayDoi(q: QuanSat, f: FormMatHang): Record<string, unknown> {
   const g = formTu(q), d: Record<string, unknown> = {};
+  if (f.ten_goc.trim() !== g.ten_goc.trim()) d.ten_goc = f.ten_goc.trim();
+  if (f.quy_cach_goc.trim() !== g.quy_cach_goc.trim()) d.quy_cach_goc = f.quy_cach_goc.trim();
+  if (!cungSo(f.kg_moi_don_vi_gia, g.kg_moi_don_vi_gia, true)) d.kg_moi_don_vi_gia = f.kg_moi_don_vi_gia.trim();
   if (f.trang_thai !== g.trang_thai) d.trang_thai = f.trang_thai;
   if (f.khuyen_mai.trim() !== g.khuyen_mai.trim()) d.khuyen_mai = f.khuyen_mai.trim();
   if (!cungSo(f.gia_truoc_km, g.gia_truoc_km)) d.gia_truoc_km = f.gia_truoc_km.trim();     // "" = xoá (TRUONG_XOA_DUOC)
@@ -128,7 +134,7 @@ export function kiemForm(q: QuanSat, f: FormMatHang): string | null {
   if ((gh.nhan || gh.ma || gh.nhom) && f.nhan !== "khong" && !f.ma_kome.trim()) return "Nhập mã KOME trước.";
   const d = thayDoi(q, f);
   const daDoi = f.vi_sao_gia === "da_doi" && TRUONG_GIA.some(k => k in d);
-  if (q.nguon === "nap" && !daDoi && (["so_goi_thung", "kl_goi_g", "gia_goc"] as const).some(k => k in d && !f[k].trim()))
+  if (q.nguon === "nap" && !daDoi && (["ten_goc", "quy_cach_goc", "kg_moi_don_vi_gia", "so_goi_thung", "kl_goi_g", "gia_goc"] as const).some(k => k in d && !f[k].trim()))
     return "Để trống không xoá được số máy đã đọc — nhập số đúng, hoặc chọn “Giá đã đổi” nếu bảng giá mới khác.";
   if ("so_goi_thung" in d && f.so_goi_thung.trim()) {
     const n = docSoNhap(f.so_goi_thung);
@@ -138,6 +144,10 @@ export function kiemForm(q: QuanSat, f: FormMatHang): string | null {
   if ("kl_goi_g" in d && f.kl_goi_g.trim()) {
     const g = docSoNhap(f.kl_goi_g, true);
     if (g === null || !(g > 0) || g > KL_GOI_TOI_DA) return `Tịnh 1 gói (g) phải lớn hơn 0 và tối đa ${KL_GOI_TOI_DA.toLocaleString("ja-JP")}.`;
+  }
+  if ("kg_moi_don_vi_gia" in d && f.kg_moi_don_vi_gia.trim()) {
+    const x = docSoNhap(f.kg_moi_don_vi_gia, true);
+    if (x === null || !(x > 0)) return "Số kg / đơn vị giá phải lớn hơn 0.";
   }
   if ("gia_goc" in d && f.gia_goc.trim()) {
     const x = docSoNhap(f.gia_goc);
