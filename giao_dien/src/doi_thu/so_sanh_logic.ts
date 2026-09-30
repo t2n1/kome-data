@@ -98,7 +98,7 @@ export const thieuQuyCach = (q: QuanSat) => q.so_goi_thung == null || q.kl_goi_g
 export const veDuoc = (q: QuanSat) => q.loai_nguon !== "khach_ke" && q.dai_dien !== false;
 /** Các mức giá KHÁC của cùng mặt hàng (cùng bên + mat_hang_khoa) trong nhóm — để liệt kê trong ô nổi; rẻ trước. */
 export const mucKhac = (n: Nhom, q: QuanSat): QuanSat[] =>
-  n.quan_sat.filter(x => x !== q && x.loai_nguon !== "khach_ke" && x.ma_doi_thu === q.ma_doi_thu && x.mat_hang_khoa === q.mat_hang_khoa)
+  n.quan_sat.filter(x => !(x.nguon === q.nguon && x.id === q.id) && x.loai_nguon !== "khach_ke" && x.ma_doi_thu === q.ma_doi_thu && x.mat_hang_khoa === q.mat_hang_khoa)
     .sort((a, b) => (a.yen_chuan == null ? (b.yen_chuan == null ? 0 : 1) : b.yen_chuan == null ? -1 : a.yen_chuan - b.yen_chuan));
 const tenBen = (q: QuanSat) => q.ten_doi_thu ?? q.ma_doi_thu;
 /** So giá tăng dần, null xếp cuối (ổn định). */

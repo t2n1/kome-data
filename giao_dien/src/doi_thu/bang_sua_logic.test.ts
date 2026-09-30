@@ -165,6 +165,12 @@ describe("070 — nhóm dòng theo mặt hàng", () => {
     const g = nhomBang([a1, b1, a2, c1]);
     expect(g.map(x => [x.dau.id, x.con.map(y => y.id)])).toEqual([[a2.id, [a1.id]], [b1.id, []], [c1.id, []]]);
   });
+  it("nhomBang: không dòng nào có dai_dien → đầu nhóm là dòng đầu tiên; bên khác cùng khoá mặt hàng là nhóm khác", () => {
+    const a = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    const b = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    const c = qs({ ma_doi_thu: "M", mat_hang_khoa: "h1" } as Partial<QuanSat>);
+    expect(nhomBang([a, b, c]).map(x => [x.dau.id, x.con.map(y => y.id)])).toEqual([[a.id, [b.id]], [c.id, []]]);
+  });
   it("cột Mức giá chỉ đọc, đứng sau Bên", () => {
     const c = cotHien(true).map(x => x.ma);
     expect(c.indexOf("muc")).toBe(c.indexOf("ben") + 1);

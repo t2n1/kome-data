@@ -473,6 +473,18 @@ describe("070 — mỗi mặt hàng một lần", () => {
     expect(giaTai(qs({ gia_1: 900, gia_pallet: null, gia_pallet_mh: 700 } as Partial<QuanSat>), "pallet"))
       .toEqual({ gia: 700, khongGhiPallet: false });
   });
+  it("giá pallet: rơi về gia_pallet khi mặt hàng không có; cả hai null → giá lẻ + khongGhiPallet", () => {
+    expect(giaTai(qs({ gia_1: 900, gia_pallet: 750, gia_pallet_mh: null } as Partial<QuanSat>), "pallet"))
+      .toEqual({ gia: 750, khongGhiPallet: false });
+    expect(giaTai(qs({ gia_1: 900, gia_pallet: null, gia_pallet_mh: null } as Partial<QuanSat>), "pallet"))
+      .toEqual({ gia: 900, khongGhiPallet: true });
+  });
+  it("mucKhac bỏ khách kể và bản sao (clone) của chính q", () => {
+    const a = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", yen_chuan: 600, dai_dien: true } as Partial<QuanSat>);
+    const ke = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", yen_chuan: 400, loai_nguon: "khach_ke" } as Partial<QuanSat>);
+    const b = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", yen_chuan: 650, dai_dien: false } as Partial<QuanSat>);
+    expect(mucKhac(nh({ quan_sat: [{ ...a }, ke, b] }), a).map(x => x.id)).toEqual([b.id]);
+  });
   it("mucKhac: các mức khác cùng bên + mặt hàng, rẻ trước", () => {
     const a = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", yen_chuan: 600, dai_dien: true } as Partial<QuanSat>);
     const b = qs({ ma_doi_thu: "N", mat_hang_khoa: "h1", yen_chuan: 650, kenh_gia: "giao", dai_dien: false } as Partial<QuanSat>);
