@@ -518,3 +518,15 @@ def test_khong_ve_hien_du_khi_khong_co_gi_de_ve(client, conn, batch):
     assert i_canh < i_bong, "câu 'Không vẽ' phải là prop của Khoi, không phải con của nhánh vẽ"
 
 
+
+
+def test_nguoi_phu_trach_la_THE_theo_ngan_sach_rieng_co_so_tien_va_nhip():
+    """Chủ DN 2026-10-01: khối Người phụ trách "không hiện số tiền, mục tiêu khó theo dõi" → mỗi người một thẻ: số đã bán,
+    ngân sách, còn thiếu in thẳng; thanh theo ngân sách của CHÍNH người đó (không chung thước — người bán ít có thanh đọc
+    được); vạch nhịp = `muc_tieu_den_hom_nay` (đúng cột máy chủ, không tự chia ngày ở trình duyệt), nói bằng TIỀN."""
+    src = _src()
+    for chu in ('className="dt-ng-the"', "v / (mt as number) * 100",
+                "const moc = lg ? n.muc_tieu_lg_den_hom_nay : n.muc_tieu_den_hom_nay;",
+                'className="dt-ng-nhip"', "Còn thiếu {gon(mt - tt)}", '"chưa đặt ngân sách"'):
+        assert chu in src, chu
+    assert "const to = Math.max(1, ...dong" not in src   # thước chung cũ đã bỏ
