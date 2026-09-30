@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Cot, Dong, Lech } from "./kieu";
-import { cotMacDinh, dan, datO, docCotDaChon, ghiCotDaChon, giaTri, hienThi, khoaO, khungNhin, kiemO, locDong, loiCho,
-  suaDuocO, tachO, thanLuu } from "./logic";
+import { boCho, CHO_RONG, cotMacDinh, dan, datChoO, datO, docCotDaChon, ghiCotDaChon, ghiDeCho, giaTri, hienThi, khoaO,
+  khungNhin, kiemO, locDong, loiCho, sauLuu, suaDuocO, tachO, thanLuu } from "./logic";
 
 const cot = (ma: string, kieu: Cot["kieu"], sua = true, chon?: [string, string][]): Cot =>
   ({ ma, nhan: ma, nhom: "x", kieu, sua, ...(chon ? { chon } : {}) });
@@ -158,12 +158,46 @@ describe("loiCho / suaDuocO", () => {
 });
 
 describe("thanLuu", () => {
-  it("thay = ĐÚNG chữ máy chủ (null nếu null); bỏ ô của dòng không còn", () => {
-    const dongs = [d("A", { "ton:0001": "20.0000", product_name: null })];
-    const cho = { [khoaO("A", "ton:0001")]: "25", [khoaO("A", "product_name")]: "Gạo", [khoaO("Z", "product_name")]: "?" };
-    expect(thanLuu("sp", cho, dongs)).toEqual({ loai: "sp", o: [
+  it("thay = ĐÚNG chữ máy chủ đã thấy (null nếu null); bỏ ô của dòng không còn", () => {
+    const x = d("A", { "ton:0001": "20.0000", product_name: null });
+    let s = datChoO(CHO_RONG, x, SL, "25");
+    s = datChoO(s, x, TEN, "Gạo");
+    s = { cho: { ...s.cho, [khoaO("Z", "product_name")]: "?" }, thay: { ...s.thay, [khoaO("Z", "product_name")]: "?" } };
+    expect(thanLuu("sp", s, [x])).toEqual({ loai: "sp", o: [
       { k: "A", cot: "ton:0001", gia_tri: "25", thay: "20.0000" },
       { k: "A", cot: "product_name", gia_tri: "Gạo", thay: null }] });
+  });
+});
+
+describe("thay ghi lại lúc ô VÀO chờ (chống mất cập nhật)", () => {
+  const ko = khoaO("A", "ton:0001");
+  const v1 = d("A", { "ton:0001": "20.0000" }), v2 = d("A", { "ton:0001": "30.0000" });   // v2 = đệm sau khi tải lại
+  it("đệm đổi (tải lại / dòng đọc lại) KHÔNG đổi thay; thanLuu gửi giá trị đã ghi → máy chủ báo 409", () => {
+    const s = datChoO(CHO_RONG, v1, SL, "25");
+    expect(s).toEqual({ cho: { [ko]: "25" }, thay: { [ko]: "20.0000" } });
+    expect(thanLuu("sp", s, [v2]).o).toEqual([{ k: "A", cot: "ton:0001", gia_tri: "25", thay: "20.0000" }]);
+    const s2 = datChoO(s, v2, SL, "26");                              // gõ lại sau khi đệm đổi: thay vẫn là cái đã thấy
+    expect(s2.thay).toEqual({ [ko]: "20.0000" });
+    expect(datChoO(s, v2, SL, "20")).toEqual(CHO_RONG);               // bằng giá trị ĐÃ THẤY → rời chờ
+    expect(datChoO(s, v2, SL, "30").cho).toEqual({ [ko]: "30" });     // bằng số mới của người khác: vẫn chờ (so với đã thấy)
+  });
+  it("rời chờ thì thay cũng đi; boCho", () => {
+    const s = datChoO(datChoO(CHO_RONG, v1, SL, "25"), v1, TEN, "x");
+    expect(boCho(s, [ko])).toEqual({ cho: { [khoaO("A", "product_name")]: "x" }, thay: { [khoaO("A", "product_name")]: null } });
+  });
+  it("sauLuu: ô đã gửi rời chờ; ô gõ lại trong lúc lưu vẫn chờ với thay = giá trị vừa lưu (dạng máy chủ)", () => {
+    const s = datChoO(CHO_RONG, v1, SL, "25");
+    const gui = thanLuu("sp", s, [v1]).o;
+    expect(sauLuu(s, gui, [d("A", { "ton:0001": "25.0000" })])).toEqual(CHO_RONG);
+    const goLai = datChoO(s, v1, SL, "27");                           // gõ lại trong lúc chờ máy chủ
+    expect(sauLuu(goLai, gui, [d("A", { "ton:0001": "25.0000" })])).toEqual({ cho: { [ko]: "27" }, thay: { [ko]: "25.0000" } });
+    expect(sauLuu(goLai, gui, []).thay).toEqual({ [ko]: "25" });      // không có dòng đọc lại → chữ đã gửi
+  });
+  it("ghiDeCho: chỉ ô xung đột nhận thay mới", () => {
+    const kt = khoaO("A", "product_name");
+    const s = datChoO(datChoO(CHO_RONG, v1, SL, "25"), d("A", { product_name: "cũ" }), TEN, "mới");
+    expect(ghiDeCho(s, [{ k: "A", cot: "ton:0001", gia_tri: "30.0000" }, { k: "Z", cot: "x", gia_tri: "?" }]))
+      .toEqual({ cho: s.cho, thay: { [ko]: "30.0000", [kt]: "cũ" } });
   });
 });
 

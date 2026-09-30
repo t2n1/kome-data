@@ -1,8 +1,9 @@
 // Kho dữ liệu › Bảng dữ liệu (đặc tả 2026-09-30-bang-du-lieu-sua §6): bảng tính Sản phẩm / Khách hàng, sửa thẳng trong
 // ô, lưu vào sổ app.sua_du_lieu (chồng lên OBC — core vẫn chỉ đọc). Dữ liệu LÀ bộ đệm của truy vấn ["bdl", loai] (không có
-// bản sao riêng); ô chưa lưu là `cho` (khoaO → chữ đã chuẩn hoá). Lưu xong VÁ các dòng máy chủ đọc lại vào đệm — dòng đọc
-// lại KHÔNG mang chỉ số chỉ xem (dt_12t, lan_cuoi) nên GỘP `o` vào dòng cũ, không thay cả dòng. `thay` của mỗi ô = ĐÚNG
-// chữ trong đệm (logic.ts::thanLuu) — máy chủ so với nó để báo 409.
+// bản sao riêng); ô chưa lưu là `s.cho` (khoaO → chữ đã chuẩn hoá). Lưu xong VÁ các dòng máy chủ đọc lại vào đệm — dòng
+// đọc lại KHÔNG mang chỉ số chỉ xem (dt_12t, lan_cuoi) nên GỘP `o` vào dòng cũ, không thay cả dòng. `thay` của mỗi ô =
+// chữ máy chủ GHI LẠI lúc ô vào chờ (`s.thay`, logic.ts::datChoO) — KHÔNG đọc lại từ đệm lúc lưu: đệm bị thay (tải lại,
+// "Lấy bản mới", dòng đọc lại mang số người khác vừa ghi) thì ô đang chờ vẫn so với cái người sửa đã thấy → 409 đúng lúc.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { gui, lay, LoiApi } from "../api";
@@ -12,8 +13,9 @@ import "../he_thong/he_thong.css";
 import { giuKhoang } from "../khung/khoang";
 import { BangTinh } from "./BangTinh";
 import "./bang_du_lieu.css";
-import type { BangApi, Cho, Cot, Dong, Lech } from "./kieu";
-import { cotMacDinh, docCotDaChon, ghiCotDaChon, hienThi, khoaO, locDong, loiCho, tachO, thanLuu } from "./logic";
+import type { BangApi, ChoLuu, Cot, Dong, Lech } from "./kieu";
+import { boCho, CHO_RONG, cotMacDinh, docCotDaChon, ghiCotDaChon, ghiDeCho, hienThi, khoaO, locDong, loiCho, sauLuu, tachO,
+  thanLuu } from "./logic";
 
 type Loai = "sp" | "kh";
 type XungDot = { k: string; cot: string; gia_tri: string | null; ai: string | null; luc: string | null };
@@ -31,12 +33,16 @@ export default function ManBangDuLieu() {
   const qc = useQueryClient();
   const [loai, datLoai] = useState<Loai>(docLoai);
   const khoaQ = useMemo(() => ["bdl", loai], [loai]);
+  // Không tự tải lại (đổi cửa sổ / có mạng lại): tải lại thay đệm giữa lúc đang sửa — `thay` đã ghi nên không mất cập nhật,
+  // nhưng ô chờ sẽ 409 vô cớ nếu chính mình vừa lưu ở thẻ khác. Tải lại chỉ khi người ta chọn ("Lấy bản mới", F5).
   const q = useQuery({ queryKey: khoaQ, queryFn: () => lay<BangApi>("/api/kho-du-lieu/bang-du-lieu?loai=" + loai),
-    refetchOnWindowFocus: false });
+    refetchOnWindowFocus: false, refetchOnReconnect: false });
   const data = q.data;
 
-  const [cho, datCho] = useState<Cho>({});
-  const choRef = useRef(cho); choRef.current = cho;
+  const [s, datS] = useState<ChoLuu>(CHO_RONG);
+  const sRef = useRef(s); sRef.current = s;
+  const cho = s.cho;
+  const [muonLuu, datMuonLuu] = useState(false);   // yêu cầu lưu SAU lần vẽ kế (khi chờ đã nhận ô vừa đóng)
   const [oLoi, datOLoi] = useState<Record<string, string>>({});
   const [xung, datXung] = useState<XungDot[] | null>(null);
   const [tim, datTim] = useState("");
@@ -57,9 +63,9 @@ export default function ManBangDuLieu() {
 
   const doiTab = (l: Loai) => {
     if (l === loai) return;
-    if (choRef.current && Object.keys(choRef.current).length
-      && !confirm(`Còn ${so(Object.keys(choRef.current).length)} ô chưa lưu — bỏ các ô đó và chuyển bảng?`)) return;
-    datCho({}); datOLoi({}); datXung(null); datBao(null); datChiLech(false); datTim("");   // ô tìm của bảng kia vô nghĩa ở đây
+    const n = Object.keys(sRef.current.cho).length;
+    if (n && !confirm(`Còn ${so(n)} ô chưa lưu — bỏ các ô đó và chuyển bảng?`)) return;
+    datS(CHO_RONG); datOLoi({}); datXung(null); datBao(null); datChiLech(false); datTim("");   // ô tìm của bảng kia vô nghĩa ở đây
     datLoai(l);
     const p = new URLSearchParams(location.search);
     if (l === "kh") p.set("loai", "kh"); else p.delete("loai");
@@ -88,8 +94,8 @@ export default function ManBangDuLieu() {
   const dongs = useMemo(() => (data ? locDong(data.dong, tim, chiLech, data.lech) : []), [data, tim, chiLech]);
   const soLech = data ? Object.keys(data.lech).length : 0;
 
-  const doiCho = useCallback((f: (c: Cho) => Cho, ko: string[]) => {
-    datCho(f);
+  const doiCho = useCallback((f: (x: ChoLuu) => ChoLuu, ko: string[]) => {
+    datS(f);
     if (ko.length) datOLoi(o => (ko.some(k => k in o) ? boKhoa(o, ko) : o));
   }, []);
 
@@ -106,18 +112,18 @@ export default function ManBangDuLieu() {
   const luu = async () => {
     const d = qc.getQueryData<BangApi>(khoaQ);
     if (!d || dangLuu || !d.sua_duoc) return;
-    const hienCho = choRef.current;
-    const than = thanLuu(loai, hienCho, d.dong);
+    const hien = sRef.current;
+    const than = thanLuu(loai, hien, d.dong);
     if (!than.o.length) return;
     const cotTheoMa = new Map(d.cot.map(c => [c.ma, c]));
-    const sai = than.o.filter(x => { const c = cotTheoMa.get(x.cot); return !c || loiCho(c, khoaO(x.k, x.cot), hienCho, d.lech) != null; });
+    const sai = than.o.filter(x => { const c = cotTheoMa.get(x.cot); return !c || loiCho(c, khoaO(x.k, x.cot), hien.cho, d.lech) != null; });
     if (sai.length) { datBao(`${so(sai.length)} ô chưa hợp lệ (viền đỏ) — sửa lại hoặc Huỷ trước khi lưu.`); return; }
     datDangLuu(true); datBao(null);
     try {
       const r = await gui<KetQuaLuu>("/api/kho-du-lieu/bang-du-lieu/luu", than);
       va(r);
-      // Bỏ khỏi chờ đúng các ô ĐÃ GỬI mà chưa bị gõ lại trong lúc chờ máy chủ.
-      datCho(c => { const n = { ...c }; for (const x of than.o) { const ko = khoaO(x.k, x.cot); if (n[ko] === x.gia_tri) delete n[ko]; } return n; });
+      // Ô ĐÃ GỬI rời chờ; ô bị gõ lại trong lúc chờ máy chủ vẫn chờ, `thay` = giá trị vừa lưu.
+      datS(x => sauLuu(x, than.o, r.dong));
       datOLoi({}); datXung(null);
       datBao(`Đã lưu ${so(r.so_o)} ô.`);
       qc.invalidateQueries({ predicate: x => x.queryKey[0] !== "bdl" });   // màn khác đọc số hiệu lực mới
@@ -143,31 +149,31 @@ export default function ManBangDuLieu() {
   const layBanMoi = () => {
     if (!xung) return;
     const ko = xung.map(x => khoaO(x.k, x.cot));
-    datCho(c => boKhoa(c, ko)); datOLoi({}); datXung(null);
+    // CHỈ các ô xung đột rời chờ; ô chờ khác giữ `thay` đã ghi (tải lại không "rebase" chúng lên số mới).
+    datS(x => boCho(x, ko)); datOLoi({}); datXung(null);
     qc.invalidateQueries({ queryKey: khoaQ, exact: true });
     datBao("Đã tải bản mới — các ô xung đột bỏ phần bạn đã gõ.");
   };
   const ghiDe = () => {
     if (!xung) return;
-    // Giá trị máy chủ hiện giờ vào đệm → `thay` của lần gửi lại khớp máy chủ; `cho` giữ nguyên.
-    const theoK = new Map<string, XungDot[]>();
-    for (const x of xung) theoK.set(x.k, [...(theoK.get(x.k) ?? []), x]);
-    qc.setQueryData<BangApi>(khoaQ, d => d && ({ ...d, dong: d.dong.map(r => {
-      const xs = theoK.get(r.k);
-      if (!xs) return r;
-      const o = { ...r.o };
-      for (const x of xs) o[x.cot] = x.gia_tri;
-      return { ...r, o };
-    }) }));
-    datXung(null); datOLoi({});
-    void luu();
+    // `thay` của ĐÚNG các ô xung đột = giá trị máy chủ hiện giờ, rồi gửi lại cùng `cho` (sau lần vẽ kế).
+    const x0 = xung;
+    datS(x => ghiDeCho(x, x0)); datXung(null); datOLoi({});
+    datMuonLuu(true);
   };
   const huy = () => {
     if (soCho && !confirm(`Bỏ ${so(soCho)} ô chưa lưu?`)) return;
-    datCho({}); datOLoi({}); datXung(null); datBao(null);
+    datS(CHO_RONG); datOLoi({}); datXung(null); datBao(null);
   };
+  // Lưu theo yêu cầu (Ctrl+S trong ô sửa, Ghi đè): chạy SAU lần vẽ mà `s` đã nhận mọi thay đổi vừa đặt.
+  useEffect(() => {
+    if (!muonLuu) return;
+    datMuonLuu(false);
+    void luu();
+  });   // eslint-disable-line react-hooks/exhaustive-deps
+  const yeuCauLuu = useCallback(() => datMuonLuu(true), []);
 
-  // Ctrl/⌘+S = Lưu (trình duyệt mặc định là "lưu trang").
+  // Ctrl/⌘+S = Lưu (trình duyệt mặc định là "lưu trang"). Trong ô sửa: OSua đóng ô rồi gọi `yeuCauLuu`.
   const phimMan = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s" && data?.sua_duoc) { e.preventDefault(); void luu(); }
   };
@@ -197,7 +203,7 @@ export default function ManBangDuLieu() {
               <button type="button" className="kdl-chip" aria-expanded={moCot} aria-controls="bdl-chon-cot"
                 onClick={() => datMoCot(v => !v)}>Chọn cột ({so(cots.length)}/{so(data.cot.length)})</button>
               <button type="button" className="kdl-chip" aria-pressed={chiLech} onClick={() => datChiLech(v => !v)}>
-                Đã sửa trên web, OBC chưa có ({so(soLech)})</button>
+                Đã sửa trên web, OBC chưa có ({so(soLech)} ô)</button>
               <span className="bdl-dem-dong">{so(dongs.length)}{dongs.length !== data.dong.length ? ` / ${so(data.dong.length)}` : ""} dòng</span>
               {data.sua_duoc && <>
                 <span className="bdl-so-cho" aria-live="polite">{soCho ? `${so(soCho)} ô chưa lưu` : ""}</span>
@@ -239,8 +245,8 @@ export default function ManBangDuLieu() {
                         </label>))}
                     </fieldset>))}
                 </div>)}
-              <BangTinh cots={cots} dongs={dongs} cho={cho} lech={data.lech} oLoi={oLoi} suaDuoc={data.sua_duoc}
-                doiCho={doiCho} bao={datBao} />
+              <BangTinh cots={cots} dongs={dongs} s={s} lech={data.lech} oLoi={oLoi} suaDuoc={data.sua_duoc}
+                doiCho={doiCho} bao={datBao} luu={yeuCauLuu} />
             </div>
             <div className="bdl-chu-thich">
               <p><span className="bdl-mau bdl-mau-cho" aria-hidden="true" /> nền vàng = chưa lưu ·{" "}

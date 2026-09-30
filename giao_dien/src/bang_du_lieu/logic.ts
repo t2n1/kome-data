@@ -2,7 +2,7 @@
 // Máy chủ (kome/bang_du_lieu.py) vẫn kiểm lại mọi ô — `kiemO` chỉ để báo lỗi sớm và gửi chữ ĐÃ chuẩn hoá.
 import { so_luong, yen } from "../dinh_dang";
 import { bo_dau } from "../san_pham/loc";
-import type { Cho, Cot, Dong, Lech } from "./kieu";
+import type { Cho, ChoLuu, Cot, Dong, Lech } from "./kieu";
 
 export const khoaO = (k: string, cot: string): string => `${k}\t${cot}`;
 
@@ -108,8 +108,8 @@ function cungGiaTri(c: Cot, a: string | null, b: string | null): boolean {
 
 /** Ô vừa gõ xong: nếu (sau chuẩn hoá) bằng giá trị máy chủ thì BỎ khỏi `cho`. Hợp lệ → lưu chữ ĐÃ chuẩn hoá (để
  *  `thanLuu` gửi đúng dạng máy chủ nhận — vd "¥1,000" → "1000"); không hợp lệ → giữ nguyên chữ gõ để giao diện báo lỗi. */
-export function datO(cho: Cho, d: Dong, c: Cot, chu: string): Cho {
-  const ko = khoaO(d.k, c.ma), goc = d.o[c.ma] ?? null;
+export function datO(cho: Cho, d: Dong, c: Cot, chu: string, goc: string | null = d.o[c.ma] ?? null): Cho {
+  const ko = khoaO(d.k, c.ma);
   const ra = { ...cho };
   if (chu.trim() === (goc ?? "")) { delete ra[ko]; return ra; }       // gõ lại đúng chữ máy chủ (kể cả rỗng ≡ null)
   const r = kiemO(c, chu);
@@ -149,14 +149,63 @@ export function loiCho(c: Cot, ko: string, cho: Cho, lech: Lech): string | null 
   return "loi" in r ? r.loi : null;
 }
 
-export function thanLuu(loai: "sp" | "kh", cho: Cho, dongs: Dong[]):
+// ---- `thay` GHI LẠI lúc ô VÀO chờ ----------------------------------------------------------------------------------
+// `thay` (chữ máy chủ người sửa đã THẤY) phải là giá trị lúc ô bắt đầu được sửa, KHÔNG đọc lại từ đệm lúc lưu: đệm có thể bị
+// thay (tải lại, "Lấy bản mới", dòng đọc lại sau một lần lưu mang giá trị người khác vừa ghi) — đọc lúc lưu là lặng lẽ
+// "rebase" ô đang chờ lên số mới và 409 không bao giờ nổ (mất cập nhật). `ChoLuu.thay` có ĐÚNG các khoá của `cho`.
+
+const co = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+export const CHO_RONG: ChoLuu = { cho: {}, thay: {} };
+
+/** `datO` qua trạng thái chờ: giá trị đã thấy = `thay` đã ghi (ô đang chờ) hoặc giá trị đệm LÚC NÀY (ô mới vào chờ);
+ *  "bằng máy chủ → bỏ" so với giá trị đã thấy đó. */
+export function datChoO(s: ChoLuu, d: Dong, c: Cot, chu: string): ChoLuu {
+  const ko = khoaO(d.k, c.ma);
+  const thay0 = co(s.thay, ko) ? s.thay[ko] : d.o[c.ma] ?? null;
+  const cho = datO(s.cho, d, c, chu, thay0);
+  const thay = { ...s.thay };
+  if (co(cho, ko)) thay[ko] = thay0; else delete thay[ko];
+  return { cho, thay };
+}
+
+/** Bỏ các ô khỏi chờ (cả `cho` lẫn `thay`). */
+export function boCho(s: ChoLuu, ko: Iterable<string>): ChoLuu {
+  const cho = { ...s.cho }, thay = { ...s.thay };
+  for (const k of ko) { delete cho[k]; delete thay[k]; }
+  return { cho, thay };
+}
+
+/** Sau 200: ô đã gửi mà chưa bị gõ lại → rời chờ; ô bị gõ lại trong lúc chờ máy chủ → vẫn chờ, `thay` = giá trị VỪA LƯU
+ *  (chữ máy chủ đọc lại nếu có — dạng máy chủ so khi báo 409, vd "24.0000" — không thì chữ đã gửi). */
+export function sauLuu(s: ChoLuu, da_gui: { k: string; cot: string; gia_tri: string }[], dong_moi: Dong[]): ChoLuu {
+  const moi = new Map(dong_moi.map(d => [d.k, d]));
+  const cho = { ...s.cho }, thay = { ...s.thay };
+  for (const x of da_gui) {
+    const ko = khoaO(x.k, x.cot);
+    if (!co(cho, ko)) continue;
+    if (cho[ko] === x.gia_tri) { delete cho[ko]; delete thay[ko]; continue; }
+    const m = moi.get(x.k);
+    thay[ko] = m && co(m.o, x.cot) ? m.o[x.cot] : x.gia_tri;
+  }
+  return { cho, thay };
+}
+
+/** "Ghi đè" sau 409: `thay` của ĐÚNG các ô xung đột = giá trị máy chủ hiện giờ; ô khác giữ nguyên. */
+export function ghiDeCho(s: ChoLuu, xung: { k: string; cot: string; gia_tri: string | null }[]): ChoLuu {
+  const thay = { ...s.thay };
+  for (const x of xung) { const ko = khoaO(x.k, x.cot); if (co(s.cho, ko)) thay[ko] = x.gia_tri; }
+  return { cho: s.cho, thay };
+}
+
+export function thanLuu(loai: "sp" | "kh", s: ChoLuu, dongs: Dong[]):
   { loai: string; o: { k: string; cot: string; gia_tri: string; thay: string | null }[] } {
   const theoK = new Map(dongs.map(d => [d.k, d]));
   const o: { k: string; cot: string; gia_tri: string; thay: string | null }[] = [];
-  for (const [ko, gia_tri] of Object.entries(cho)) {
+  for (const [ko, gia_tri] of Object.entries(s.cho)) {
     const [k, cot] = tachO(ko), d = theoK.get(k);
     if (!d) continue;
-    o.push({ k, cot, gia_tri, thay: d.o[cot] ?? null });               // `thay` = ĐÚNG chữ máy chủ đã trả
+    // `thay` = chữ máy chủ đã thấy LÚC Ô VÀO CHỜ (ghi lại); thiếu (không nên xảy ra) mới rơi về đệm.
+    o.push({ k, cot, gia_tri, thay: co(s.thay, ko) ? s.thay[ko] : d.o[cot] ?? null });
   }
   return { loai, o };
 }

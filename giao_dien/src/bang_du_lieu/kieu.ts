@@ -10,3 +10,6 @@ export type BangApi = {
   anh_ton: string | null; lan_nap_gia: string | null;
 };
 export type Cho = Record<string, string>;          // khoaO -> chữ đang gõ (chưa lưu)
+/** khoaO -> chữ máy chủ người sửa đã THẤY lúc ô vào chờ (gửi làm `thay`). Cùng tập khoá với `Cho`. */
+export type Thay = Record<string, string | null>;
+export type ChoLuu = { cho: Cho; thay: Thay };
