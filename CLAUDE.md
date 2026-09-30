@@ -1128,7 +1128,7 @@ Có test canh: `tests/test_doi_thu_bang.py`, `tests/test_mart_doi_thu.py`, `test
     còn hàng → trung vị / số bên / mốc bất thường tính trên các giá đó. Giá pallet của mặt hàng `gia_pallet_mh` = min trên dòng không bất thường
     (`giaTai` của pallet đọc cột đó). `so_sanh_nhom` chỉ đọc dòng `dai_dien`. `tong_quan` bên: `so_dong` = số mặt hàng, `so_muc` = số dòng.
   - **Ẩn = sổ CHỈ THÊM** `app.an_quan_sat (nguon, quan_sat_id, an)`, trạng thái MỚI NHẤT thắng; `kome_app` REVOKE UPDATE/DELETE (cùng nếp 030/063). `rn` tính
-    CẢ dòng ẩn ⇒ ẩn dòng mới nhất KHÔNG làm dòng cũ hơn sống lại; lô mới nạp là quan sát KHÁC (id khác) nên tự hiện lại. Không lọc theo mốc (như đính chính).
+    CẢ dòng ẩn ⇒ ẩn dòng mới nhất KHÔNG làm dòng cũ hơn sống lại; lô mới nạp là quan sát KHÁC (id khác) nên tự hiện lại. Không lọc theo mốc — cùng `app.dinh_chinh_gia` (cũng không lọc mốc), KHÁC `thay` (lọc mốc).
     `mart.gia_doi_thu_hien_hanh` loại dòng ẩn; `an_hien_hanh` = dòng ẩn đang là "mới nhất" (để liệt kê / khôi phục). Đường ghi: `POST /api/doi-thu/an` (`DT.dat_an`,
     chỉ nhận dòng `hien_hanh` hoặc `an_hien_hanh`; nhật ký `an` / `hien` trên khoá `gia:` / `tay:`).
   - **Gộp tay luôn MỘT bước** (`app.gop_mat_hang (ma_doi_thu, ma_hang_dt, vao_ma_hang_dt)`, chỉ thêm; `vao` NULL = tách ra): `POST /api/doi-thu/gop-mat-hang`
