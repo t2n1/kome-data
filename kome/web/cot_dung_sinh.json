@@ -11,6 +11,7 @@
      "ly_do": "khoá của file",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -23,6 +24,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -56,6 +58,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_cua và 8 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -68,6 +71,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -101,6 +105,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_cua và 8 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -113,6 +118,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -156,6 +162,7 @@
      "ly_do": "khoá của file",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -168,6 +175,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -201,6 +209,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_cua và 8 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -213,6 +222,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -246,6 +256,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_cua và 8 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -258,6 +269,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -291,6 +303,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_cua và 8 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -303,6 +316,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -336,6 +350,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_cua và 8 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -348,6 +363,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -381,6 +397,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_san_pham, mart.khach_mat_hang, mart.khach_mat_hang_cua và 8 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -393,6 +410,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -426,6 +444,7 @@
      "ly_do": "cột kiểm số lượng × đơn giá = tiền (cổng 3)",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -438,6 +457,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -471,6 +491,7 @@
      "ly_do": "cột kiểm số lượng × đơn giá = tiền (cổng 3)",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -483,6 +504,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -516,6 +538,7 @@
      "ly_do": "cột tổng tiền — cổng 4/5 đối chiếu",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -528,6 +551,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "doi_thu",
@@ -570,6 +594,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -583,6 +608,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -628,6 +654,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -641,6 +668,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -686,6 +714,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -699,6 +728,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -744,6 +774,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -757,6 +788,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -802,6 +834,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -815,6 +848,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -860,6 +894,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -873,6 +908,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -918,6 +954,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -931,6 +968,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -976,6 +1014,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -989,6 +1028,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -1034,6 +1074,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -1047,6 +1088,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -1092,6 +1134,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -1105,6 +1148,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -1150,6 +1194,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -1163,6 +1208,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -1208,6 +1254,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -1221,6 +1268,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -1266,6 +1314,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -1279,6 +1328,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -1324,6 +1374,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -1337,6 +1388,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -1382,6 +1434,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -1395,6 +1448,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -1440,6 +1494,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -1453,6 +1508,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "cong_no",
       "doi_thu",
@@ -4516,6 +4572,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -4531,6 +4588,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "chung",
       "cong_no",
@@ -4607,6 +4665,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
@@ -4628,6 +4687,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -4758,6 +4818,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
@@ -4778,6 +4839,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -4901,6 +4963,7 @@
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nhan_vien, mart.ban_theo_nhan_vien_thang và 5 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
@@ -4910,6 +4973,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "du_bao",
       "ho_so",
@@ -4957,6 +5021,7 @@
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 36 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
       "kome/doi_thu_giao.py",
@@ -4970,6 +5035,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "chung",
       "doi_thu",
@@ -5030,12 +5096,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.gia_doi_thu_hien_hanh và 5 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
+      "bang_du_lieu",
       "chung",
       "doi_thu",
       "lien_he",
@@ -5056,11 +5124,17 @@
      "core": "core.fact_sales_line.case_qty",
      "he": "case_qty",
      "ja": "入数",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc",
+     "ma": [
+      "kome/bang_du_lieu.py"
+     ],
+     "man": [
+      "bang_du_lieu"
+     ],
+     "view": [
+      "mart.ban_den_moc"
+     ]
     },
     {
      "core": "core.fact_sales_line.qty",
@@ -5152,6 +5226,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
@@ -5170,6 +5245,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "chung",
       "doi_thu",
@@ -5246,6 +5322,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
@@ -5264,6 +5341,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "chung",
       "doi_thu",
@@ -5350,6 +5428,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
@@ -5366,6 +5445,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "chung",
       "doi_thu",
@@ -5461,11 +5541,17 @@
      "core": "core.fact_sales_line.closing_day_code",
      "he": "closing_day_code",
      "ja": "請求締日コード",
-     "loai": "luu",
-     "ly_do": "chỉ lưu trong kho, chưa màn nào hiện",
-     "ma": [],
-     "man": [],
-     "view": []
+     "loai": "man",
+     "ly_do": "màn hình đọc qua mart.ban_den_moc",
+     "ma": [
+      "kome/bang_du_lieu.py"
+     ],
+     "man": [
+      "bang_du_lieu"
+     ],
+     "view": [
+      "mart.ban_den_moc"
+     ]
     },
     {
      "core": null,
@@ -7943,6 +8029,7 @@
      "ly_do": "khoá của file",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -7957,6 +8044,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8003,6 +8091,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8017,6 +8106,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8063,6 +8153,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8077,6 +8168,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8123,6 +8215,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8137,6 +8230,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8183,6 +8277,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8197,6 +8292,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8243,6 +8339,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8257,6 +8354,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8303,6 +8401,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8317,6 +8416,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8363,6 +8463,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8377,6 +8478,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8423,6 +8525,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8437,6 +8540,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8483,6 +8587,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8497,6 +8602,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8543,6 +8649,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8557,6 +8664,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8603,6 +8711,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8617,6 +8726,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8663,6 +8773,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8677,6 +8788,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8723,6 +8835,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8737,6 +8850,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8783,6 +8897,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8797,6 +8912,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8843,6 +8959,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8857,6 +8974,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -8903,6 +9021,7 @@
      "ly_do": "màn hình đọc qua mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh, mart.ban_theo_san_pham và 20 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
@@ -8917,6 +9036,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -11115,12 +11235,14 @@
      "loai": "nap",
      "ly_do": "khoá của file",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11140,12 +11262,14 @@
      "loai": "nap",
      "ly_do": "khoá của file",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11165,12 +11289,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11190,12 +11316,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11215,12 +11343,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11240,12 +11370,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11265,12 +11397,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11290,12 +11424,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11315,12 +11451,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11340,12 +11478,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11365,12 +11505,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11390,12 +11532,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11415,12 +11559,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11440,12 +11586,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11465,12 +11613,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11490,12 +11640,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11515,12 +11667,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11540,12 +11694,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11565,12 +11721,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11590,12 +11748,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11615,12 +11775,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11640,12 +11802,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11665,12 +11829,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11690,12 +11856,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11715,12 +11883,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.bang_gia_kome, mart.gia_doi_thu_hien_hanh, mart.gia_kome_bang và 1 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py"
      ],
      "man": [
+      "bang_du_lieu",
       "bang_gia",
       "doi_thu",
       "lien_he",
@@ -11940,6 +12110,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
       "kome/doi_thu.py",
@@ -11955,6 +12126,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "chung",
       "cong_no",
@@ -12010,6 +12182,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
@@ -12031,6 +12204,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -12141,6 +12315,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bang_gia.py",
       "kome/bao_cao.py",
       "kome/cong_no.py",
@@ -12161,6 +12336,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bang_gia",
       "bao_cao",
       "chung",
@@ -12263,6 +12439,7 @@
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nhan_vien, mart.ban_theo_nhan_vien_thang và 5 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/du_bao.py",
       "kome/khach_hang.py",
@@ -12272,6 +12449,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "du_bao",
       "ho_so",
@@ -12299,6 +12477,7 @@
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.ban_theo_nganh_thang, mart.ban_theo_nganh_thang_so_sanh và 36 chỉ số khác",
      "ma": [
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/doi_thu.py",
       "kome/doi_thu_giao.py",
@@ -12312,6 +12491,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "chung",
       "doi_thu",
@@ -12372,12 +12552,14 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.gia_doi_thu_hien_hanh và 5 chỉ số khác",
      "ma": [
+      "kome/bang_du_lieu.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
+      "bang_du_lieu",
       "chung",
       "doi_thu",
       "lien_he",
@@ -12474,6 +12656,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
@@ -12492,6 +12675,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "chung",
       "doi_thu",
@@ -12568,6 +12752,7 @@
      "ma": [
       "kome/ban_do.py",
       "kome/ban_khoang.py",
+      "kome/bang_du_lieu.py",
       "kome/bao_cao.py",
       "kome/coverage.py",
       "kome/doi_thu.py",
@@ -12584,6 +12769,7 @@
      ],
      "man": [
       "ban_do",
+      "bang_du_lieu",
       "bao_cao",
       "chung",
       "doi_thu",
@@ -14380,6 +14566,10 @@
    "duong": "/ban-do",
    "ten": "Bản đồ"
   },
+  "bang_du_lieu": {
+   "duong": "/kho-du-lieu/bang-du-lieu",
+   "ten": "Bảng dữ liệu"
+  },
   "bang_gia": {
    "duong": "/bang-gia",
    "ten": "Bảng giá KOME"
@@ -14452,6 +14642,7 @@
  "view_man": {
   "mart.ban_den_moc": [
    "ban_do",
+   "bang_du_lieu",
    "bang_gia",
    "bao_cao",
    "chung",
@@ -14503,6 +14694,7 @@
    "tong_quan"
   ],
   "mart.bang_gia_kome": [
+   "bang_du_lieu",
    "bang_gia",
    "doi_thu",
    "lien_he",
@@ -14525,6 +14717,7 @@
   ],
   "mart.dau_hieu_khach": [
    "ban_do",
+   "bang_du_lieu",
    "doi_thu",
    "du_bao",
    "ho_so",
@@ -14538,6 +14731,7 @@
   ],
   "mart.dim_customer": [
    "ban_do",
+   "bang_du_lieu",
    "bao_cao",
    "cong_no",
    "doi_thu",
@@ -14551,6 +14745,7 @@
   ],
   "mart.dim_product": [
    "ban_do",
+   "bang_du_lieu",
    "bang_gia",
    "bao_cao",
    "chung",
@@ -14564,7 +14759,8 @@
    "tong_quan"
   ],
   "mart.doanh_thu_12t": [
-   "ban_do"
+   "ban_do",
+   "bang_du_lieu"
   ],
   "mart.dong_ban": [
    "ban_do",
@@ -14611,6 +14807,7 @@
   ],
   "mart.khach_360": [
    "ban_do",
+   "bang_du_lieu",
    "du_bao",
    "ho_so",
    "khach",
@@ -14696,6 +14893,7 @@
   ],
   "mart.khoang_cach_mua": [
    "ban_do",
+   "bang_du_lieu",
    "doi_thu",
    "du_bao",
    "ho_so",
@@ -14710,6 +14908,7 @@
   ],
   "mart.lan_mua": [
    "ban_do",
+   "bang_du_lieu",
    "bao_cao",
    "doi_thu",
    "du_bao",
@@ -14751,6 +14950,7 @@
   ],
   "mart.moc_lui": [
    "ban_do",
+   "bang_du_lieu",
    "bang_gia",
    "bao_cao",
    "chung",
@@ -14768,6 +14968,7 @@
   ],
   "mart.moc_thoi_gian": [
    "ban_do",
+   "bang_du_lieu",
    "bang_gia",
    "bao_cao",
    "chung",
@@ -14845,6 +15046,7 @@
   ],
   "mart.nhip_mua": [
    "ban_do",
+   "bang_du_lieu",
    "doi_thu",
    "du_bao",
    "ho_so",
@@ -14965,6 +15167,7 @@
   ],
   "mart.ton_hien_tai": [
    "ban_do",
+   "bang_du_lieu",
    "bang_gia",
    "bao_cao",
    "doi_thu",

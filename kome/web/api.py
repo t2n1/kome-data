@@ -1102,6 +1102,53 @@ def tao_api(open_app_conn) -> APIRouter:
             return _loi("Bảng / view này tính quá lâu (quá 20 giây) — thử lọc hẹp hơn." if het_gio
                         else "Không đọc được dữ liệu bảng.")
 
+    # ---- Kho dữ liệu → Bảng dữ liệu sửa trực tiếp (072) -----------------
+    # Dưới /api/kho-du-lieu → middleware gác bằng duoc_vao_kho_du_lieu; LƯU cần thêm cờ duoc_sua_du_lieu (không có cổng
+    # đăng nhập = mở, cùng nếp các cờ khác). kome_app chỉ INSERT vào sổ app.sua_du_lieu — core vẫn chỉ đọc.
+
+    def _co_sua_du_lieu(request: Request) -> bool:
+        nguoi = getattr(request.state, "nguoi", None)
+        return nguoi is None or nguoi.duoc_sua_du_lieu
+
+    @r.get("/kho-du-lieu/bang-du-lieu")
+    def kdl_bang_du_lieu(request: Request, loai: str = "sp"):
+        from kome import bang_du_lieu as BDL
+        try:
+            with open_app_conn() as conn:
+                return _jd(BDL.doc(conn, loai, sua_duoc=_co_sua_du_lieu(request)))
+        except BDL.LoiO as e:
+            return _loi(str(e), 400)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được bảng dữ liệu.")
+
+    @r.post("/kho-du-lieu/bang-du-lieu/luu")
+    async def kdl_bang_du_lieu_luu(request: Request):
+        from kome import bang_du_lieu as BDL
+        if not request.headers.get("content-type", "").startswith("application/json"):
+            return _loi("Chỉ nhận JSON.", 415)
+        try:
+            b = await request.json()
+        except Exception:
+            return _loi("Thân yêu cầu không phải JSON.", 400)
+        if not isinstance(b, dict):
+            return _loi("Thân yêu cầu phải là một đối tượng JSON.", 400)
+        nguoi = getattr(request.state, "nguoi", None)
+        try:
+            with open_app_conn() as conn:
+                ra = BDL.luu(conn, b.get("loai"), b.get("o"), nguoi.id if nguoi else None, _co_sua_du_lieu(request))
+                conn.commit()
+        except BDL.KhongDuQuyen as e:
+            return _loi(str(e), 403)
+        except BDL.LoiO as e:
+            return JSONResponse({"loi": str(e), "o_loi": e.o_loi}, status_code=400)
+        except BDL.XungDotO as e:
+            return JSONResponse({"loi": str(e), "xung_dot": e.xung_dot}, status_code=409)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không lưu được.")
+        return _jd(ra)
+
     @r.get("/kho-du-lieu/bang/{ten}/csv")
     def kdl_csv(ten: str, tim: str = "", chip: str = "tat_ca"):
         from kome import bang_kho as BK

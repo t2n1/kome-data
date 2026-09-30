@@ -1090,6 +1090,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     def kho_du_lieu_bang(request: Request, ten: str):
         return _spa(request, man={"bang": ten})
 
+    # Bảng dữ liệu sửa trực tiếp (072): vỏ React, dữ liệu qua /api/kho-du-lieu/bang-du-lieu. 0 truy vấn.
+    @app.get("/kho-du-lieu/bang-du-lieu", response_class=HTMLResponse)
+    def kho_du_lieu_bang_du_lieu(request: Request):
+        return _spa(request, man={})
+
     # "Dữ liệu đi đâu" (2026-09-24): cột OBC nào bỏ được ở lần xuất sau. 0 truy
     # vấn — ảnh chụp kome/web/cot_dung_sinh.json (scripts/sinh_cot_dung.py).
     @app.get("/kho-du-lieu/duong-di", response_class=HTMLResponse)
