@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Cot, Dong, Lech } from "./kieu";
 import { boCho, CHO_RONG, cotMacDinh, dan, datChoO, datO, docCotDaChon, ghiCotDaChon, ghiDeCho, giaTri, hienThi, khoaO,
-  khungNhin, kiemO, locDong, loiCho, sauLuu, suaDuocO, tachO, thanLuu } from "./logic";
+  khungNhin, kiemO, locDong, loiCho, loiQuaNhieuO, sauLuu, suaDuocO, tachO, thanLuu, TOI_DA_O } from "./logic";
 
 const cot = (ma: string, kieu: Cot["kieu"], sua = true, chon?: [string, string][]): Cot =>
   ({ ma, nhan: ma, nhom: "x", kieu, sua, ...(chon ? { chon } : {}) });
@@ -261,5 +261,14 @@ describe("cột đã chọn (localStorage)", () => {
     expect(docCotDaChon("kh")).toBeNull();
     kho["kome_bdl_cot_v1:kh"] = "{hỏng"; expect(docCotDaChon("kh")).toBeNull();
     kho["kome_bdl_cot_v1:kh"] = "[1,2]"; expect(docCotDaChon("kh")).toBeNull();
+  });
+});
+
+describe("loiQuaNhieuO", () => {
+  it("đúng trần thì cho lưu, quá trần thì báo số ô (phẩy nghìn) và không gửi", () => {
+    expect(TOI_DA_O).toBe(2000);
+    expect(loiQuaNhieuO(0)).toBeNull();
+    expect(loiQuaNhieuO(2000)).toBeNull();
+    expect(loiQuaNhieuO(2001)).toBe("Tối đa 2,000 ô mỗi lần lưu — đang có 2,001 ô; lưu bớt rồi lưu tiếp");
   });
 });

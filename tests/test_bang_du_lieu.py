@@ -207,6 +207,16 @@ def test_400_than_sai_dang(conn):
             BDL.luu(conn, loai, o, None, True)
 
 
+def test_tran_2000_o_cua_giao_dien_BANG_hang_so_may_chu():
+    """Giao diện không gửi lô quá trần — hằng số ở logic.ts phải BẰNG BDL.TOI_DA_O (sửa một bên là sửa cả hai)."""
+    import re
+    from pathlib import Path
+    ts = (Path(__file__).resolve().parent.parent / "giao_dien" / "src" / "bang_du_lieu" / "logic.ts").read_text(encoding="utf-8")
+    m = re.search(r"export const TOI_DA_O = (\d+);", ts)
+    assert m, "logic.ts thiếu `export const TOI_DA_O`"
+    assert int(m.group(1)) == BDL.TOI_DA_O
+
+
 def test_chuan_hoa_so(conn, batch):
     _sp(conn, batch)
     BDL.luu(conn, "sp", [{"k": "NT01", "cot": "ton:0001", "gia_tri": "1,234.56789", "thay": "10.0000"},

@@ -1,3 +1,7 @@
+-- Migration lấy khoá AccessExclusive trên app.nguoi_dung và ~20 view của mart; không có hạn chờ thì nó có thể xếp hàng sau một
+-- truy vấn đọc dài và kéo cả trang web đứng theo. LOCAL = chỉ trong giao dịch này, không bao giờ lan qua Supavisor.
+SET LOCAL lock_timeout = '10s';
+
 -- 072 — Bảng dữ liệu sửa trực tiếp (Kho dữ liệu › Bảng dữ liệu). Đặc tả 2026-09-30-bang-du-lieu-sua-design.md.
 -- core VẪN chỉ đọc với web: bản sửa ở sổ CHỈ THÊM app.sua_du_lieu; mọi chỉ số đọc GIÁ TRỊ HIỆU LỰC qua mart.dim_customer,
 -- mart.dim_product, mart.bang_gia_kome, mart.ton_hien_tai. Luật (chủ DN chốt 2026-09-30): OBC vẫn ghi đúng giá trị lúc sửa
@@ -51,17 +55,13 @@ CREATE TABLE app.sua_du_lieu (
             THEN gia_tri IS NULL OR gia_tri = '' OR btrim(gia_tri, ' 　') = '賞味期限なし' OR mart.la_ngay_obc(gia_tri)
         ELSE true END)
 );
+-- Supabase SQL Editor tự bật RLS (không policy) trên bảng mới — xem lý do ở 061; chạy qua db/migrate.py thì vô hại.
+ALTER TABLE app.sua_du_lieu DISABLE ROW LEVEL SECURITY;
 CREATE INDEX sua_du_lieu_o ON app.sua_du_lieu (bang, khoa, cot, id DESC);
 GRANT SELECT, INSERT ON app.sua_du_lieu TO kome_app;
 GRANT USAGE ON SEQUENCE app.sua_du_lieu_id_seq TO kome_app;
 REVOKE UPDATE, DELETE ON app.sua_du_lieu FROM kome_app;
 GRANT SELECT ON app.sua_du_lieu TO kome_report, kome_ingest;
-
--- Cờ quyền thứ tư (đặc tả §4). Sổ đổi quyền nhận thêm cờ đó.
-ALTER TABLE app.nguoi_dung ADD COLUMN duoc_sua_du_lieu boolean NOT NULL DEFAULT false;
-ALTER TABLE app.nhat_ky_quyen DROP CONSTRAINT nhat_ky_quyen_co_check;
-ALTER TABLE app.nhat_ky_quyen ADD CONSTRAINT nhat_ky_quyen_co_check
-    CHECK (co IN ('duoc_vao_kho_du_lieu', 'duoc_sua_ngan_sach', 'duoc_quan_tri', 'duoc_sua_du_lieu'));
 
 -- Dòng MỚI NHẤT của từng ô; bo = true nghĩa là không còn bản sửa (về OBC).
 CREATE VIEW mart.sua_moi_nhat AS
@@ -282,3 +282,10 @@ SELECT h.product_code, h.warehouse_code, w.warehouse_name AS ten_kho,
 FROM h
 JOIN core.dim_warehouse w ON w.warehouse_code = h.warehouse_code
 CROSS JOIN mart.moc_thoi_gian m;
+
+-- Cờ quyền thứ tư (đặc tả §4). Sổ đổi quyền nhận thêm cờ đó. Đặt Ở CUỐI FILE có chủ ý: ALTER TABLE app.nguoi_dung giữ khoá
+-- AccessExclusive trên bảng đăng nhập tới hết giao dịch — để nó sau mọi việc khác thì khoá đó giữ ngắn nhất có thể.
+ALTER TABLE app.nguoi_dung ADD COLUMN duoc_sua_du_lieu boolean NOT NULL DEFAULT false;
+ALTER TABLE app.nhat_ky_quyen DROP CONSTRAINT nhat_ky_quyen_co_check;
+ALTER TABLE app.nhat_ky_quyen ADD CONSTRAINT nhat_ky_quyen_co_check
+    CHECK (co IN ('duoc_vao_kho_du_lieu', 'duoc_sua_ngan_sach', 'duoc_quan_tri', 'duoc_sua_du_lieu'));

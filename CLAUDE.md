@@ -136,6 +136,9 @@ OBC ở Kho dữ liệu › Bảng dữ liệu (đặc tả `2026-09-30-bang-du-
   `gia_tri`, `gia_tri_obc`, `bo`): `kome_app` bị `REVOKE UPDATE, DELETE`. CSDL CÓ `CHECK` trên giá trị (cột được phép theo bảng; số
   ≥ 0 / giá > 0 / hạn là ngày CÓ THẬT qua `mart.la_ngay_obc`) — `kome_app` INSERT thẳng được, và một dòng sổ sai kiểu là mọi view
   hiệu lực phía trên nổ VĨNH VIỄN (sổ không xoá được). Mã khách / mã hàng không sửa được (khoá nối); không thêm / xoá dòng.
+- **Bản sửa tồn (`ton`) và giá (`gia`) KHÔNG mang ngày:** nó áp lên ảnh chụp / lần nạp nào đang hiện hành tại mốc được chọn, miễn là giá trị OBC ở đó
+  BẰNG `gia_tri_obc` — nên xem lùi về một ngày cũ mà OBC ghi cùng giá trị thì cũng thấy bản sửa (chấp nhận có chủ ý); giá trị OBC mới khác đi
+  luôn thắng.
 - **Luật hiệu lực viết ĐÚNG MỘT LẦN:** `mart.ap_sua(obc, j, cột)` / `mart.lech_obc(...)` — OBC vẫn ghi ĐÚNG giá trị lúc sửa
   (`gia_tri_obc`) → bản sửa thắng; OBC đã ghi KHÁC (người ta đã sửa trong OBC) → OBC thắng, bản sửa tự hết hiệu lực không cần dọn;
   dòng `bo = true` → OBC. Không view nào viết lại điều kiện đó. **`gia_tri_obc` phải là ĐÚNG chữ `::text` mà view so**

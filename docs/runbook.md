@@ -322,7 +322,13 @@ tạo bảng, không nạp lại file nào.
 `core.dim_customer` / `core.dim_product` sang `mart.dim_*` (khối `DO` đọc định nghĩa sống). Không nạp lại file nào.
 
 1. `python db/migrate.py` **bằng vai trò `postgres`** — TRƯỚC khi push/Redeploy (mọi trang đọc `mart.dim_*`; thiếu thì lỗi ở khắp nơi).
-   Migration này đụng NHIỀU view — chạy một lần, ngoài giờ nạp 13:30.
+   Migration này đụng NHIỀU view và lấy khoá AccessExclusive trên `app.nguoi_dung` — chạy một lần, **NGOÀI GIỜ** (không phải lúc nạp 13:30, không phải giờ
+   làm việc). File mở đầu bằng `SET LOCAL lock_timeout = '10s'`: nếu bị một truy vấn đọc dài chặn quá 10 giây thì nó tự huỷ cả giao dịch (không để lại gì) —
+   chạy lại sau.
+   - **Đo trước / sau** (vai trò chỉ đọc, mỗi câu trong `BEGIN READ ONLY; EXPLAIN ANALYZE …; ROLLBACK;`): `mart.khach_360` (cả bảng, và lọc MỘT khách),
+     `mart.san_pham_360`, `mart.so_sanh_nhom`, `mart.khach_mat_hang` (MỘT khách), `mart.uu_tien_lien_he`. Số TRƯỚC 072 (đo 2026-09-30):
+     khach_360 410 ms · một khách 2 ms · san_pham_360 1928 ms · so_sanh_nhom 1920 ms · khach_mat_hang một khách 4 ms · uu_tien_lien_he 1031 ms.
+     Đo lại SAU khi chạy 072 (cùng máy, cùng CSDL, đo vài lần lấy lần nhanh nhất): **chậm hơn ~10 % ở bất kỳ câu nào = KHÔNG triển khai** (báo lại để xem kế hoạch truy vấn).
 2. Kiểm sau khi chạy (vai trò chỉ đọc):
    - `SELECT filename FROM meta.schema_migration WHERE filename LIKE '072%';` phải ra một dòng (chạy tay trong SQL editor thì phải tự INSERT tên file);
    - test canh danh mục trên CSDL THẬT — phải trả về **KHÔNG dòng nào** (còn dòng = view đó vẫn đọc OBC thô, bản sửa không có tác dụng ở màn đó):
@@ -334,7 +340,8 @@ tạo bảng, không nạp lại file nào.
      ```
    - `SELECT has_table_privilege('kome_app', 'app.sua_du_lieu', 'UPDATE');` phải `false` (sổ chỉ thêm; cũng `'DELETE'` = `false`), còn `'INSERT'` phải `true`;
    - `SELECT count(*) FROM mart.gia_kome_bang;` và `SELECT count(*) FROM mart.ton_hien_tai;` bằng số trước khi chạy (sổ rỗng ⇒ mọi số y như trước);
-   - bảng tạo qua Supabase SQL Editor bị tự bật RLS không policy — nếu `kome_app` báo `permission denied` thì `ALTER TABLE app.sua_du_lieu DISABLE ROW LEVEL SECURITY`.
+   - bảng tạo qua Supabase SQL Editor bị tự bật RLS không policy (migration đã có sẵn `DISABLE ROW LEVEL SECURITY`, nhưng nếu lệnh đó không chạy) — triệu chứng: lưu báo
+     `new row violates row-level security policy` → `ALTER TABLE app.sua_du_lieu DISABLE ROW LEVEL SECURITY` (chỉ cần khi chạy qua SQL Editor).
 3. Cấp cờ cho người được sửa (mặc định KHÔNG ai có): `python scripts/tao_nguoi_dung.py quyen <tên> --sua-du-lieu` (thu lại: `--bo-sua-du-lieu`). Xem cờ hiện có bằng `python scripts/tao_nguoi_dung.py` (không tham số), hoặc ở `/cai-dat`.
 4. Mở Kho dữ liệu › Bảng dữ liệu: bảng hiện đủ dòng (232 mã, ~2.100 khách); sửa thử một ô trên CSDL thử rồi "Về giá trị OBC". Ô lệch OBC có vạch xanh.
 

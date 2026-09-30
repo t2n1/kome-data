@@ -14,7 +14,7 @@ import { giuKhoang } from "../khung/khoang";
 import { BangTinh } from "./BangTinh";
 import "./bang_du_lieu.css";
 import type { BangApi, ChoLuu, Cot, Dong, Lech } from "./kieu";
-import { boCho, CHO_RONG, cotMacDinh, docCotDaChon, ghiCotDaChon, ghiDeCho, hienThi, khoaO, locDong, loiCho, sauLuu, tachO,
+import { boCho, CHO_RONG, cotMacDinh, docCotDaChon, ghiCotDaChon, ghiDeCho, hienThi, khoaO, locDong, loiCho, loiQuaNhieuO, sauLuu, tachO,
   thanLuu } from "./logic";
 
 type Loai = "sp" | "kh";
@@ -115,6 +115,8 @@ export default function ManBangDuLieu() {
     const hien = sRef.current;
     const than = thanLuu(loai, hien, d.dong);
     if (!than.o.length) return;
+    const qua = loiQuaNhieuO(than.o.length);
+    if (qua) { datBao(qua); return; }
     const cotTheoMa = new Map(d.cot.map(c => [c.ma, c]));
     const sai = than.o.filter(x => { const c = cotTheoMa.get(x.cot); return !c || loiCho(c, khoaO(x.k, x.cot), hien.cho, d.lech) != null; });
     if (sai.length) { datBao(`${so(sai.length)} ô chưa hợp lệ (viền đỏ) — sửa lại hoặc Huỷ trước khi lưu.`); return; }

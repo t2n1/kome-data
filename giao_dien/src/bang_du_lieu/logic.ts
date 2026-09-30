@@ -1,6 +1,6 @@
 // Logic thuần của bảng tính "Bảng dữ liệu" (đặc tả 2026-09-30-bang-du-lieu-sua §6). Không đọc DOM, không gọi mạng.
 // Máy chủ (kome/bang_du_lieu.py) vẫn kiểm lại mọi ô — `kiemO` chỉ để báo lỗi sớm và gửi chữ ĐÃ chuẩn hoá.
-import { so_luong, yen } from "../dinh_dang";
+import { so, so_luong, yen } from "../dinh_dang";
 import { bo_dau } from "../san_pham/loc";
 import type { Cho, ChoLuu, Cot, Dong, Lech } from "./kieu";
 
@@ -208,6 +208,14 @@ export function thanLuu(loai: "sp" | "kh", s: ChoLuu, dongs: Dong[]):
     o.push({ k, cot, gia_tri, thay: co(s.thay, ko) ? s.thay[ko] : d.o[cot] ?? null });
   }
   return { loai, o };
+}
+
+/** Số ô tối đa mỗi lần lưu — BẰNG `kome/bang_du_lieu.py::TOI_DA_O` (có test pytest đọc dòng này). */
+export const TOI_DA_O = 2000;
+
+/** Lời nhắn khi số ô đang chờ vượt trần của máy chủ (không gửi, khỏi chờ một 400 cả lô); null nếu còn trong trần. */
+export function loiQuaNhieuO(n: number): string | null {
+  return n > TOI_DA_O ? `Tối đa ${so(TOI_DA_O)} ô mỗi lần lưu — đang có ${so(n)} ô; lưu bớt rồi lưu tiếp` : null;
 }
 
 export function locDong(ds: Dong[], tim: string, chiLech: boolean, lech: Lech): Dong[] {

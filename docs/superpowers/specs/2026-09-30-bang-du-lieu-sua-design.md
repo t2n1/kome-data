@@ -94,6 +94,8 @@ Mọi view hiệu lực gọi hai hàm đó — không view nào viết lại đ
   - `loai_han` / `han_con_lai` tính trên hạn hiệu lực.
   - `ton_theo_lo`, `san_pham_360`, `ma_ngung_ban_an`, `/kho-hang`, cận hạn tự đi theo.
   - Số tồn đổi gần như mỗi ngày, nên bản sửa số tồn thường chỉ sống tới ảnh chụp sau. Màn nói ra điều này.
+  - **Bản sửa tồn và giá KHÔNG mang ngày**: nó áp lên ảnh chụp / lần nạp nào đang hiện hành tại mốc được chọn, miễn là giá trị OBC ở đó bằng
+    `gia_tri_obc`. Xem lùi về ngày cũ mà OBC ghi cùng giá trị thì cũng thấy bản sửa (chấp nhận có chủ ý); giá trị OBC mới khác đi luôn thắng.
 
 ### 3.1 Chuyển mọi chỗ đọc sang view hiệu lực
 
