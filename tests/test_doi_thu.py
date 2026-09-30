@@ -87,6 +87,41 @@ def test_duyet_loc_bat_thuong(conn, batch):
     assert [d["ma_doi_thu"] for d in DT.duyet(conn, loc="bat_thuong")["dong"]] == ["D"]
 
 
+def test_duyet_thieu_quy_cach_bo_khach_ke_va_dong_du_hai_o(conn, batch):
+    """Bảng sửa (2026-09-30): 'thieu_quy_cach' = thiếu gói/thùng HOẶC tịnh 1 gói — cùng định nghĩa
+    so_sanh_logic.ts::thieuQuyCach; giá khách kể không có quy cách để điền nên không vào."""
+    from kome import lien_he as LH
+    _nen_tin(conn, batch)                                              # NT01 + khách K0001 (giá khách kể)
+    du = _qs(conn, batch, "A", 540, hang="hA")
+    mot = _qs(conn, batch, "B", 560, hang="hB")
+    _qs(conn, batch, "C", 580, hang="hC")
+    conn.execute("UPDATE core.fact_gia_doi_thu SET so_goi_thung = 20, kl_goi_g = 500 WHERE id = %s", (du,))
+    conn.execute("UPDATE core.fact_gia_doi_thu SET so_goi_thung = 20 WHERE id = %s", (mot,))
+    cau = "Khách nói @THAK bán @Basa rẻ"
+    LH.ghi_kem_nhac(conn, "K0001", None, "goi", "tot", cau, "", _the_kep(cau, "THAK", "ma:NT01"),
+                    [_gia_ke("THAK", "ma:NT01", 560)])
+    conn.commit()
+    r = DT.duyet(conn, loc="thieu_quy_cach")
+    assert sorted(x["ma_hang_dt"] for x in r["dong"]) == ["hB", "hC"]
+    assert r["tong"] == 2
+    assert "thieu_quy_cach" in DT.LOC_DUYET
+
+
+def test_duyet_cat_o_tran_va_tra_tong_truoc_khi_cat(conn, batch, monkeypatch):
+    """Toàn bộ bảng giá thật = 5,26 MB > trần phản hồi Vercel 4,5 MB: mỗi lần tối đa DONG_TOI_DA_DUYET dòng, `tong` =
+    số dòng khớp bộ lọc trước khi cắt (màn nói "đang hiện n / tong — chọn một bên"). Vẫn MỘT lượt hỏi."""
+    _hang(conn, batch)
+    for i, ben in enumerate("ABCDE"):
+        _qs(conn, batch, ben, 500 + i)
+    monkeypatch.setattr(DT, "DONG_TOI_DA_DUYET", 3)
+    dem = _dem(conn, monkeypatch)
+    r = DT.duyet(conn)
+    assert dem["n"] == 1
+    assert len(r["dong"]) == 3 and r["tong"] == 5
+    assert DT.duyet(conn, ben="A")["tong"] == 1
+    assert DT.duyet(conn, loc="bat_thuong") == {"dong": [], "tong": 0}
+
+
 # ---------------------------------------------------------------- vòng sửa 1
 
 def test_duyet_chua_ghep_khong_giu_lai_dong_da_chon_khong_ghep(conn, batch):

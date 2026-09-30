@@ -1,21 +1,23 @@
-// Dữ liệu › Duyệt / sửa (đặc tả giao diện mới §4.6): danh sách dòng AI đọc (lọc cần xem · bất thường · chưa ai xác nhận ·
-// chưa ghép) — bấm dòng mở CÙNG pop-up SuaMatHang như tab So sánh (thay khung sửa hai cột cũ); "Đúng rồi" (xác nhận) ngay
-// trên dòng; "Thêm hàng AI bỏ sót" và thư mục Drive theo tháng giữ như cũ.
+// Dữ liệu › Duyệt / sửa (đặc tả giao diện mới §4.6; bảng sửa 2026-09-30-doi-thu-bang-sua-design.md): BẢNG mọi mặt hàng
+// đối thủ của bên đang chọn (chip bên · lọc · tìm), sửa thẳng trong ô (BangSua.tsx); ⋯ mở CÙNG pop-up SuaMatHang như tab
+// So sánh; "Đúng rồi" (xác nhận) ngay trên dòng; "Thêm hàng AI bỏ sót" và thư mục Drive theo tháng giữ như cũ. Máy chủ
+// trả tối đa DONG_TOI_DA_DUYET dòng (`tong` = trước khi cắt) — bảng giá thật cả công ty vượt trần phản hồi Vercel.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { gui, lay } from "../api";
 import type { TongQuan } from "./kieu";
 import { Khoi } from "../chung/Khoi";
-import { yen } from "../dinh_dang";
+import { so } from "../dinh_dang";
 import { chuoiKhoang, useKhoang } from "../khung/khoang";
 import type { QuanSat } from "./kieu";
-import { LOAI_NGUON, NHAN_DUYET } from "./kieu";
+import { LOAI_NGUON } from "./kieu";
+import { BangSua } from "./BangSua";
 import { Ra } from "./NguonDong";
 import { cacThangCho, lienKetAnToan, nhanThang, thangCua } from "./nguon";
 import { SuaMatHang } from "./SuaMatHang";
-import { daSua } from "./sua_logic";
 
-const LOC = [["", "Tất cả"], ["can_xem", "Cần xem"], ["bat_thuong", "Bất thường"], ["chua_xac_nhan", "Chưa ai xác nhận"], ["chua_ghep", "Chưa ghép"]];
+const LOC = [["", "Tất cả"], ["can_xem", "Cần xem"], ["bat_thuong", "Bất thường"], ["chua_xac_nhan", "Chưa ai xác nhận"],
+  ["chua_ghep", "Chưa ghép"], ["thieu_quy_cach", "Thiếu quy cách"]];
 // Ô chọn của form "Thêm hàng AI bỏ sót" (khớp CHECK của bảng).
 const CHON: Partial<Record<keyof QuanSat, string[][]>> = {
   thue: [["chua", "Chưa thuế"], ["co", "Đã gồm thuế"], ["khong_ro", "Không rõ"]],
@@ -61,12 +63,15 @@ function ThuMucThang({ thang, hien, xong }: { thang: string; hien: string | null
     </p>);
 }
 
-export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
+export function TabDuyet({ ben, datBen }: { ben: string; datBen: (b: string) => void }) {
   const kx = chuoiKhoang(useKhoang());
   const qc = useQueryClient();
-  const [loc, datLoc] = useState("can_xem");
+  const [loc, datLoc] = useState("");
+  const [tim, datTim] = useState("");
   const url = `/api/doi-thu/duyet?${new URLSearchParams({ ben, loc })}${kx ? "&" + kx : ""}`;
-  const q = useQuery({ queryKey: ["doi-thu", "duyet", ben, loc, kx], queryFn: () => lay<{ dong: QuanSat[] }>(url) });
+  // Bảng sửa vá thẳng vào bộ đệm của truy vấn này (BangSua.tsx) — không tự tải lại khi quay về cửa sổ (đóng ô đang gõ).
+  const khoaQ = useMemo(() => ["doi-thu", "duyet", ben, loc, kx], [ben, loc, kx]);
+  const q = useQuery({ queryKey: khoaQ, queryFn: () => lay<{ dong: QuanSat[]; tong: number }>(url), refetchOnWindowFocus: false });
   const [sua, datSua] = useState<{ nguon: "nap" | "tay"; id: number; tru_o?: string } | null>(null);
   const [loi, datLoi] = useState<string | null>(null);          // lỗi của nút "Đúng rồi" trên dòng
   const [loiThem, datLoiThem] = useState<string | null>(null);  // lỗi của form thêm hàng
@@ -75,26 +80,42 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
   const [moi, datMoi] = useState(HANG_MOI_TRONG);
   const tq = useQuery({ queryKey: ["doi-thu", "tong-quan", kx],
     queryFn: () => lay<TongQuan>(`/api/doi-thu/tong-quan${kx ? "?" + kx : ""}`) });
-  const tenBen = tq.data?.ben.find(b => b.ma === ben)?.ten ?? ben;
-  const lamMoi = () => qc.invalidateQueries({ queryKey: ["doi-thu"] });
+  const dsBen = useMemo(() => [...(tq.data?.ben ?? [])].filter(b => b.so_dong > 0).sort((a, b) => b.so_dong - a.so_dong), [tq.data]);
+  const lamMoi = useCallback(() => { qc.invalidateQueries({ queryKey: ["doi-thu"] }); }, [qc]);
   // Chống bấm đúp: mọi nút ghi khoá tới khi yêu cầu xong (thành công hay lỗi).
   const lam = (gui_di: () => Promise<unknown>, sau: () => void, datL: (l: string | null) => void) => {
     if (dang_gui) return;
     datDangGui(true); datL(null);
     gui_di().then(sau).catch((e: Error) => datL(e.message)).finally(() => datDangGui(false));
   };
+  // Hàm ỔN ĐỊNH cho bảng (memo từng dòng): đọc bản mới nhất qua ref.
+  const lamRef = useRef(lam); lamRef.current = lam;
+  const xacNhan = useCallback((x: QuanSat) =>
+    lamRef.current(() => gui("/api/doi-thu/xac-nhan", { fact_id: x.id }), lamMoi, datLoi), [lamMoi]);
+  const moPopup = useCallback((x: QuanSat) => datSua({ nguon: x.nguon, id: x.id,
+    tru_o: x.gia_goc == null ? "gia_goc" : x.ma_kome == null && x.nhom_khoa == null ? "ma_kome" : undefined }), []);
   return (
     <div className="dt-duyet dt-duyet-mot">
       <section className="dt-khoi">
-        <Khoi tieu_de="Dòng cần duyệt" dang_tai={q.isLoading} loi={q.error ? (q.error as Error).message : null} canh_bao={loi}>
-          {ben && <p className="dt-ben"><button type="button" className="chip" aria-label={`Bỏ lọc đối thủ ${tenBen}`} onClick={boBen}>
-            Đối thủ: {tenBen} ✕</button></p>}
+        <Khoi tieu_de="Mặt hàng đối thủ" dang_tai={q.isLoading} loi={q.error ? (q.error as Error).message : null} canh_bao={loi}
+          cach_tinh="Bấm một ô để sửa. Enter lưu và xuống dòng dưới, Tab lưu và sang ô bên phải, Esc bỏ. Sửa giá / đơn vị / thuế trong ô là sửa lỗi máy đọc; giá thật đã đổi thì dùng ⋯ (cần loại nguồn). ¥/kg máy tính lại sau khi lưu.">
+          <div className="dt-bs-ben" role="group" aria-label="Bên">
+            <button type="button" className="chip" aria-pressed={!ben} onClick={() => datBen("")}>Mọi bên</button>
+            {dsBen.map(b => <button key={b.ma} type="button" className="chip" aria-pressed={ben === b.ma} onClick={() => datBen(b.ma)}>
+              {b.ten}<small>{so(b.so_dong)}</small></button>)}
+          </div>
           {cacThangCho(q.data?.dong ?? []).map(t => (
             <ThuMucThang key={t} thang={t} xong={lamMoi}
               hien={lienKetAnToan(q.data?.dong.find(d => thangCua(d.thang_lo) === t && d.lien_ket_thu_muc)?.lien_ket_thu_muc)} />))}
-          <div className="dt-loc" role="group" aria-label="Lọc">
-            {LOC.map(([m, n]) => <button key={m} type="button" className="chip" aria-pressed={loc === m} onClick={() => datLoc(m)}>{n}</button>)}
+          <div className="dt-bs-dau">
+            <div className="dt-loc" role="group" aria-label="Lọc">
+              {LOC.map(([m, n]) => <button key={m} type="button" className="chip" aria-pressed={loc === m} onClick={() => datLoc(m)}>{n}</button>)}
+            </div>
+            <input type="search" placeholder="🔍 Tìm tên hàng, quy cách, mã KOME…" aria-label="Tìm mặt hàng" value={tim}
+              onChange={e => datTim(e.target.value)} />
           </div>
+          {q.data && q.data.tong > q.data.dong.length && <p className="dt-nhat" role="status">
+            Đang hiện {so(q.data.dong.length)} / {so(q.data.tong)} dòng — chọn một bên để xem hết.</p>}
           <p><button type="button" className="chip" aria-expanded={moThem} onClick={() => { datMoThem(!moThem); datLoiThem(null); }}>
             Thêm hàng AI bỏ sót</button></p>
           {moThem && (
@@ -124,21 +145,8 @@ export function TabDuyet({ ben, boBen }: { ben: string; boBen: () => void }) {
                 <button type="button" className="chip" onClick={() => { datMoThem(false); datLoiThem(null); }}>Đóng</button>
               </div>
             </fieldset>)}
-          <ul className="dt-ds dt-chon dt-duyet-ds">{q.data?.dong.map(x => (
-            <li key={x.nguon + x.id}>
-              {/* Chưa ghép → con trỏ vào ô Mã KOME; chưa có giá → ô giá (cùng "?" cam như mọi chỗ khác). */}
-              <button type="button" aria-label={`Sửa ${x.ma_doi_thu} · ${x.ten_goc}${x.gia_goc == null ? " (chưa có giá)" : ""}${daSua(x) ? " (đã sửa)" : ""}`}
-                onClick={() => datSua({ nguon: x.nguon, id: x.id,
-                  tru_o: x.gia_goc == null ? "gia_goc" : x.ma_kome == null && x.nhom_khoa == null ? "ma_kome" : undefined })}>
-                <b>{x.ma_doi_thu}</b> · {x.ten_goc}{daSua(x) && <span className="dt-nhat" aria-hidden="true"> ✎</span>} ·{" "}
-                {x.gia_goc != null ? yen(x.gia_goc) : <span className="dt-hoi-cam" aria-hidden="true">?</span>}/{x.don_vi_gia ?? "?"} ·{" "}
-                {NHAN_DUYET[x.trang_thai_duyet]}{x.bat_thuong ? " · bất thường" : ""}</button>
-              {x.nguon === "nap" && x.trang_thai_duyet !== "da_xac_nhan" && (
-                <button type="button" className="chip dt-dung" disabled={dang_gui} aria-label={`Đúng rồi: ${x.ma_doi_thu} · ${x.ten_goc}`}
-                  onClick={() => lam(() => gui("/api/doi-thu/xac-nhan", { fact_id: x.id }), lamMoi, datLoi)}>Đúng rồi</button>)}
-            </li>))}
-            {q.data && !q.data.dong.length && <li className="dt-nhat">Không có dòng nào.</li>}
-          </ul>
+          {q.data && <BangSua key={khoaQ.join("|")} khoaQ={khoaQ} dong={q.data.dong} tim={tim} moiBen={!ben}
+            dangGui={dang_gui} taiLai={lamMoi} moPopup={moPopup} xacNhan={xacNhan} />}
         </Khoi>
       </section>
       {sua && <SuaMatHang nguon={sua.nguon} id={sua.id} tru_o={sua.tru_o} dong={() => datSua(null)} xong={() => datSua(null)} />}
