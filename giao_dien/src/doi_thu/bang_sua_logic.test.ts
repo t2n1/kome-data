@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { QuanSat } from "./kieu";
-import { COT, cotHien, ghepDong, giaTriSua, hienThi, nhanMuc, nhomBang, oKeTiep, suaDuoc, thanO, timDong, type Cot } from "./bang_sua_logic";
+import { chonSauMoNhom, COT, cotHien, daGop, dichGop, dongHien, ghepDong, giaTriSua, hienThi, khoaNhomBang, nhanMuc, nhomBang, oKeTiep,
+  suaDuoc, thanO, timDong, type Cot } from "./bang_sua_logic";
 
 let seq = 0;
 const qs = (o: Partial<QuanSat> = {}): QuanSat => ({
@@ -176,5 +177,52 @@ describe("070 — nhóm dòng theo mặt hàng", () => {
     expect(c.indexOf("muc")).toBe(c.indexOf("ben") + 1);
     expect(COT.find(x => x.ma === "muc")!.kieu).toBeNull();
     expect(hienThi(qs({ kenh_gia: "gui" }), cot("muc"))).toEqual({ chu: "Gửi", hoi: false });
+  });
+});
+
+describe("nhóm theo mặt hàng (070)", () => {
+  const P = (o: Partial<QuanSat>) => qs(o as Partial<QuanSat>);
+  it("dongHien: mặc định đóng — chỉ dòng đầu; mở nhóm thì dòng con ngay dưới dòng đầu", () => {
+    const a1 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true }), a2 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: false });
+    const b = P({ ma_doi_thu: "N", mat_hang_khoa: "h2", dai_dien: true });
+    const g = nhomBang([a1, b, a2]);
+    const dong = dongHien(g, new Set());
+    expect(dong.map(x => [x.q.id, x.soCon, x.mo])).toEqual([[a1.id, 1, false], [b.id, 0, false]]);
+    const mo = dongHien(g, new Set([khoaNhomBang(a1)]));
+    expect(mo.map(x => [x.q.id, x.soCon])).toEqual([[a1.id, 1], [a2.id, null], [b.id, 0]]);
+    expect(mo[0].mo).toBe(true);
+  });
+  it("dongHien: nhóm có dòng con đang lỗi / 409 tự mở; nhóm không có dòng con không bao giờ 'mở'", () => {
+    const a1 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true }), a2 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1" });
+    const b = P({ ma_doi_thu: "N", mat_hang_khoa: "h2" });
+    const d = dongHien(nhomBang([a1, a2, b]), new Set([khoaNhomBang(b)]), q => q.id === a2.id);
+    expect(d.map(x => [x.q.id, x.mo, x.ep])).toEqual([[a1.id, true, true], [a2.id, true, true], [b.id, false, false]]);
+  });
+  it("khoaNhomBang: bên và khoá mặt hàng có '|' vẫn không trùng", () => {
+    expect(khoaNhomBang({ ma_doi_thu: "A|B", mat_hang_khoa: "C" })).not.toBe(khoaNhomBang({ ma_doi_thu: "A", mat_hang_khoa: "B|C" }));
+  });
+  it("chonSauMoNhom: dòng dưới nhóm dời theo số dòng con; ô trong dòng con vừa đóng về dòng đầu", () => {
+    expect(chonSauMoNhom({ d: 5, c: 2 }, 3, 2, true)).toEqual({ d: 7, c: 2 });
+    expect(chonSauMoNhom({ d: 3, c: 2 }, 3, 2, true)).toEqual({ d: 3, c: 2 });
+    expect(chonSauMoNhom({ d: 1, c: 2 }, 3, 2, false)).toEqual({ d: 1, c: 2 });
+    expect(chonSauMoNhom({ d: 4, c: 1 }, 3, 2, false)).toEqual({ d: 3, c: 1 });
+    expect(chonSauMoNhom({ d: 5, c: 1 }, 3, 2, false)).toEqual({ d: 3, c: 1 });
+    expect(chonSauMoNhom({ d: 6, c: 1 }, 3, 2, false)).toEqual({ d: 4, c: 1 });
+    expect(chonSauMoNhom(null, 3, 2, false)).toBeNull();
+  });
+  it("dichGop: mặt hàng khác CÙNG bên (một dòng mỗi mặt hàng), lọc theo ô tìm", () => {
+    const a1 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", dai_dien: true, ten_goc: "Sứa" });
+    const a2 = P({ ma_doi_thu: "N", mat_hang_khoa: "h1", ten_goc: "Sứa" });
+    const b1 = P({ ma_doi_thu: "N", mat_hang_khoa: "h2", ten_goc: "Bánh đa" });
+    const b2 = P({ ma_doi_thu: "N", mat_hang_khoa: "h2", dai_dien: true, ten_goc: "Bánh đa" });
+    const c = P({ ma_doi_thu: "N", mat_hang_khoa: "h3", ten_goc: "Phở khô" });
+    const m = P({ ma_doi_thu: "M", mat_hang_khoa: "h9", ten_goc: "Bánh đa" });
+    const ds = [a1, a2, b1, b2, c, m];
+    expect(dichGop(ds, a2, "").map(x => x.id)).toEqual([b2.id, c.id]);
+    expect(dichGop(ds, a1, "banh").map(x => x.id)).toEqual([b2.id]);
+  });
+  it("daGop: khoá mặt hàng khác mã hàng của chính dòng", () => {
+    expect(daGop({ mat_hang_khoa: "h1", ma_hang_dt: "h1" })).toBe(false);
+    expect(daGop({ mat_hang_khoa: "h1", ma_hang_dt: "h2" })).toBe(true);
   });
 });

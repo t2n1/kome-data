@@ -450,3 +450,20 @@ table.dt-bs{border-collapse:separate;border-spacing:0;width:max-content;min-widt
   background:var(--nen-the);color:var(--chu);min-width:0;flex:1 1 220px}
 .dt-bs-ben{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .dt-bs-ben small{color:var(--chu-nhat);margin-left:3px}
+/* 070: nhóm mức giá theo mặt hàng — dòng con thụt lề, nền phụ; chip "+n mức" nhỏ trong ô Tên hàng; 🗑 hỏi lại "Xoá?". */
+.dt-bs tr.bs-con td:first-child{padding-left:1.4rem}
+.dt-bs tr.bs-con td{background:var(--nen-phu)}
+.dt-bs .bs-muc{font-size:.68rem;padding:0 .4rem;margin-right:5px;line-height:1.5;vertical-align:1px}
+.dt-bs td.bs-nut .chip + .chip{margin-left:4px}
+.dt-bs .bs-xoa{padding:.1rem .45rem}
+.bs-xoa-hoi{color:var(--do-chu);font-weight:700}
+.dt-gop-tim{font:inherit;font-size:.85rem;width:100%;box-sizing:border-box;margin:8px 0;padding:.35rem .5rem;
+  border:1px solid var(--vien-dam);border-radius:8px;background:var(--nen-the);color:var(--chu)}
+.dt-gop-tach{margin:8px 0}
+.dt-gop-ds{list-style:none;margin:0;padding:0;max-height:50vh;overflow:auto;border:1px solid var(--vien);border-radius:8px}
+.dt-gop-ds li + li{border-top:1px solid var(--vien-phu)}
+.dt-gop-ds button{font:inherit;font-size:.85rem;display:block;width:100%;text-align:left;padding:.4rem .6rem;border:0;
+  background:var(--nen-the);color:var(--chu);cursor:pointer}
+.dt-gop-ds button:hover,.dt-gop-ds button:focus-visible{background:var(--nen-phu)}
+.dt-gop-ds small{color:var(--chu-nhat)}
+.dt-ng-muc{margin-top:6px}

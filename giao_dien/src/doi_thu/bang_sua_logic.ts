@@ -48,9 +48,9 @@ export function nhanMuc(q: Pick<QuanSat, "muc_gia" | "kenh_gia">): string {
 
 /** Nhóm dòng bảng sửa theo MẶT HÀNG (bên + mat_hang_khoa), giữ thứ tự lần gặp đầu. `dau` = dòng đại diện (hoặc dòng đầu khi
  *  không có cờ), `con` = các mức giá khác theo thứ tự đến. */
-export function nhomBang(ds: QuanSat[]): { dau: QuanSat; con: QuanSat[] }[] {
-  const theoBen = new Map<string, Map<string, QuanSat[]>>();   // lồng hai tầng — không ghép chuỗi khoá nên không thể trùng
-  const nhom: QuanSat[][] = [];
+export function nhomBang<T extends QuanSat>(ds: T[]): { dau: T; con: T[] }[] {
+  const theoBen = new Map<string, Map<string, T[]>>();   // lồng hai tầng — không ghép chuỗi khoá nên không thể trùng
+  const nhom: T[][] = [];
   for (const q of ds) {
     let m = theoBen.get(q.ma_doi_thu);
     if (!m) theoBen.set(q.ma_doi_thu, m = new Map());
@@ -166,3 +166,44 @@ export function timDong(ds: QuanSat[], tim: string): QuanSat[] {
   if (!t) return ds;
   return ds.filter(q => boDau(`${q.ten_goc} ${q.quy_cach_goc ?? ""} ${q.ma_kome ?? ""} ${q.ma_doi_thu} ${q.ten_doi_thu ?? ""}`).includes(t));
 }
+
+/** Khoá NHÓM (mặt hàng) của một dòng — khoá của state mở / đóng. JSON hai phần tử: không ghép chuỗi nên không thể trùng. */
+export const khoaNhomBang = (q: Pick<QuanSat, "ma_doi_thu" | "mat_hang_khoa">) => JSON.stringify([q.ma_doi_thu, q.mat_hang_khoa]);
+
+/** Một dòng ĐANG HIỆN của bảng sửa: đầu nhóm (`soCon` = số mức giá khác, `mo` = đang mở, `ep` = mở vì dòng con đang lỗi /
+ *  409 — đóng không được) hoặc dòng con (`soCon` null). */
+export type DongHien<T extends QuanSat = QuanSat> = { q: T; kn: string; soCon: number | null; mo: boolean; ep: boolean };
+
+/** Danh sách dòng đang hiện: mỗi nhóm dòng đầu, rồi các dòng con ngay dưới khi nhóm mở (`mo` có khoá nhóm) HOẶC khi
+ *  `tuMo(con)` đúng với một dòng con (ô lỗi / 409 ở dòng con — không để lỗi nằm trong nhóm đang đóng). Chỉ số bàn phím
+ *  `d` của bảng chạy trên CHÍNH danh sách này. */
+export function dongHien<T extends QuanSat>(nhom: { dau: T; con: T[] }[], mo: ReadonlySet<string>,
+  tuMo: (q: T) => boolean = () => false): DongHien<T>[] {
+  const r: DongHien<T>[] = [];
+  for (const g of nhom) {
+    const kn = khoaNhomBang(g.dau);
+    const ep = g.con.some(tuMo);
+    const m = g.con.length > 0 && (ep || mo.has(kn));
+    r.push({ q: g.dau, kn, soCon: g.con.length, mo: m, ep });
+    if (m) for (const c of g.con) r.push({ q: c, kn, soCon: null, mo: true, ep });
+  }
+  return r;
+}
+
+/** Ô đang chọn sau khi mở (`mo` true) / đóng nhóm có dòng đầu ở `dau` và `n` dòng con: dòng dưới nhóm dời theo; ô đang
+ *  nằm trong các dòng con vừa đóng về dòng đầu. */
+export function chonSauMoNhom(v: ViTri | null, dau: number, n: number, mo: boolean): ViTri | null {
+  if (!v || v.d <= dau || !n) return v;
+  if (mo) return { d: v.d + n, c: v.c };
+  return v.d <= dau + n ? { d: dau, c: v.c } : { d: v.d - n, c: v.c };
+}
+
+/** Đích của "Gộp vào…": các MẶT HÀNG khác (dòng đầu nhóm) cùng bên với `q`, lọc bằng ô tìm (cùng luật timDong). */
+export function dichGop<T extends QuanSat>(ds: T[], q: Pick<QuanSat, "ma_doi_thu" | "mat_hang_khoa">, tim: string): T[] {
+  const dau = nhomBang(ds.filter(x => x.ma_doi_thu === q.ma_doi_thu)).map(g => g.dau)
+    .filter(x => x.mat_hang_khoa !== q.mat_hang_khoa);
+  return timDong(dau, tim) as T[];
+}
+
+/** Dòng đã được gộp vào mặt hàng khác (khoá mặt hàng ≠ mã hàng của chính nó) — có nút "Tách ra". */
+export const daGop = (q: Pick<QuanSat, "mat_hang_khoa" | "ma_hang_dt">) => q.mat_hang_khoa !== q.ma_hang_dt;
