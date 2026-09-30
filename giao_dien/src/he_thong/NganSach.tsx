@@ -1,24 +1,28 @@
-// Ngân sách theo tháng (041) — thiết kế lại 2026-09-25: ô số + biểu đồ tổng thể, lưới XOAY
-// (tháng là dòng, không cuộn ngang), hai tab Công ty | Từng người, điền nhanh theo cột, dán
-// khối từ Excel, thanh Lưu dính chỉ hiện khi có ô đã sửa.
+// Ngân sách theo tháng (041) — thiết kế lại 2026-10-01 (chủ DN: "tập trung vào nhập ngân sách công ty
+// và chia cho từng sale", "nhiều chữ, rối mắt"; chọn kết hợp "một bảng" + "đặt theo năm, tháng tự chia"):
+//   * trên: đặt số cả kỳ — tổng doanh thu công ty + biên lãi gộp + thanh chia % cho từng sale (kéo vạch
+//     hoặc gõ %) — rồi "↓ Điền vào 12 tháng" (logic thuần `ngan_sach_logic.ts`, có test);
+//   * dưới: MỘT bảng 12 tháng — Công ty · từng sale · "còn" (xanh đủ / vàng thiếu / đỏ vượt), gạt
+//     Doanh thu | Lãi gộp, sửa thẳng từng ô, dán khối Excel, Enter / ↑↓ đi dòng.
 //
 // Vẫn là biểu mẫu POST /ngan-sach THẬT (một giao dịch; một ô rác => không ô nào được lưu, máy
 // chủ trả lại đúng những gì vừa gõ — `da_go` — và đánh dấu ô sai). Tên ô:
-// `o-<đối tượng>-<chỉ số>-<tháng>`. MỌI ô của cả hai tab / cả hai chỉ số đều nằm trong DOM
-// (tab ẩn bằng `hidden`), nên Lưu gửi đủ. Ô của người ĐANG ẨN thì không vẽ => không gửi =>
-// `luu()` không đụng tới (nó chỉ ghi khoá được gửi lên, và người bị ẩn không có chỉ tiêu nào
-// trong kỳ — `ngan_sach.bang_nhap` luôn hiện người đã có số).
+// `o-<đối tượng>-<chỉ số>-<tháng>`. MỌI ô của cả hai chỉ số đều nằm trong DOM (bảng chỉ số kia
+// ẩn bằng `hidden`), nên Lưu gửi đủ. Ô của người ĐANG ẨN thì không vẽ => không gửi => `luu()`
+// không đụng tới (người bị ẩn không có chỉ tiêu nào trong kỳ — `ngan_sach.bang_nhap` luôn hiện
+// người đã có số). "Điền vào 12 tháng" chỉ đổi Ô — chưa lưu gì cho tới khi bấm Lưu.
 //
 // Ngân sách công ty là số NHẬP THẲNG, không phải tổng từng người — màn in hai số cạnh nhau
-// và phần chưa chia, không bao giờ tự cộng thay. `inputMode="numeric"` chứ KHÔNG
+// và phần chưa chia ("còn"), không bao giờ tự cộng thay. `inputMode="numeric"` chứ KHÔNG
 // `type="number"`: cuộn chuột trên ô number là đổi số. Ô chưa đặt TRỐNG, không 0 — "chưa đặt"
-// khác "bằng không". Tổng in "—" khi không ô nào đứng sau nó. Tiền dấu CHẤM — khớp /bao-cao.
+// khác "bằng không". Tổng in "—" khi không ô nào đứng sau nó.
 // "Năm trước" = thực tế cùng tháng kỳ trước (`mart.dong_ban_khoang`), chỉ để tham khảo.
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import type { ClipboardEvent, KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ClipboardEvent, KeyboardEvent, PointerEvent as PE } from "react";
 import { KD } from "../khoi_dau";
-import { gon, ngay, pc, thang_nhan, yen } from "../dinh_dang";
-import { BieuDo } from "../chung/BieuDo";
+import { gon, ngay, pc, yen } from "../dinh_dang";
+import { ONoi } from "../chung/ONoi";
+import { chiaPhanTram, chiaTheoTrongSo, keoVach, phanTramTheo, trongSoMua } from "./ngan_sach_logic";
 import "../san_pham/san_pham.css";
 import "./he_thong.css";
 
@@ -30,24 +34,30 @@ type Man = {
 type ChiSo = "doanh_thu" | "lai_gop";
 const TEN_CS: Record<ChiSo, string> = { doanh_thu: "Doanh thu", lai_gop: "Lãi gộp" };
 const HAI_CS: ChiSo[] = ["doanh_thu", "lai_gop"];
+// Màu từng sale trên thanh chia (theo thứ tự) — biến CSS, không mã màu.
+const MAU_SALE = ["var(--ok-vien)", "var(--lien-ket)", "var(--canh-vien)", "var(--do)", "var(--chu-mo)"];
 
 const cham = (n: number) => n.toLocaleString("ja-JP");
 // Đọc thử ở trình duyệt — chỉ để tính tổng / đánh dấu ô sai TRƯỚC khi gửi. Máy chủ
 // (`ngan_sach.doc_so`) vẫn là trọng tài; hàm này chép CÙNG luật nhóm ba chữ số (`1.5` là
 // SAI chứ không phải 15), để ô Tổng không in một con số mà máy chủ sẽ từ chối.
-const PHAN_CACH = /[.,\s_\u00a0\u3000\u202f]/g;
-const NHOM = /^[0-9]{1,3}(?:[.,\s_\u00a0\u3000\u202f][0-9]{3})*$/;
+const PHAN_CACH = /[.,\s_ 　 ]/g;
+const NHOM = /^[0-9]{1,3}(?:[.,\s_ 　 ][0-9]{3})*$/;
 function docSo(s: string): number | null | "sai" {
   const t = s.trim();
   if (!t) return null;
   return /^[0-9]+$/.test(t) || NHOM.test(t) ? Number(t.replace(PHAN_CACH, "")) : "sai";
 }
+/** Ô % (biên, phần của sale): nhận cả chấm lẫn phẩy thập phân. */
+const docPt = (s: string): number | null => {
+  const v = Number(s.trim().replace(",", ".").replace("%", ""));
+  return s.trim() && Number.isFinite(v) && v >= 0 ? v : null;
+};
 const khoa = (doi: string, cs: ChiSo, th: string) => `${doi}-${cs}-${th}`;
 const cong = (ds: number[]) => ds.reduce((s, v) => s + v, 0);
 const tong = (ds: number[]) => ds.length ? yen(cong(ds)) : "—";
 const thangCung = (th: string) => { const [y, m] = th.split("-"); return `${+y - 1}-${m}`; };
-
-type Menu = { luoi: string; c: number; kieu: "chia" | "nam_truoc" | "bien" | null } | null;
+const laSo = (v: number | null | undefined): v is number => v != null;
 
 export default function NganSach() {
   const m = KD.man as Man;
@@ -75,15 +85,12 @@ export default function NganSach() {
   });
   const loiMay = new Set(m.loi.map(k => { const p = k.split("-"); return p.length === 3 ? `${p[0]}-doanh_thu-${p[1]}-${p[2]}` : k; }));
 
-  const [tab, datTab] = useState<"cong_ty" | "nguoi">(() => {
-    try { return sessionStorage.getItem("ns-tab") === "nguoi" ? "nguoi" : "cong_ty"; } catch { return "cong_ty"; }
+  const [cs, datCs] = useState<ChiSo>(() => {
+    try { return sessionStorage.getItem("ns-cs") === "lai_gop" ? "lai_gop" : "doanh_thu"; } catch { return "doanh_thu"; }
   });
-  const [csNguoi, datCsNguoi] = useState<ChiSo>("doanh_thu");
   const [hienHet, datHienHet] = useState(false);
-  const [menu, datMenu] = useState<Menu>(null);
-  const [thamSo, datThamSo] = useState("");
   const dangGui = useRef(false);
-  useEffect(() => { try { sessionStorage.setItem("ns-tab", tab); } catch { /* không lưu được thì thôi */ } }, [tab]);
+  useEffect(() => { try { sessionStorage.setItem("ns-cs", cs); } catch { /* không lưu được thì thôi */ } }, [cs]);
   useEffect(() => { document.title = "KOME — ngân sách"; }, []);
 
   const so = (k: string): number | null => { const v = docSo(gt[k] ?? ""); return typeof v === "number" ? v : null; };
@@ -99,23 +106,21 @@ export default function NganSach() {
 
   const nguoiHien = m.nguoi.filter(n => n.hien || hienHet);
   const nguoiAn = m.nguoi.filter(n => !n.hien);
-  const tt = (doi: string, cs: ChiSo, th: string): number | undefined => m.thuc_te[khoa(doi, cs, th)];
-  const namTruoc = (doi: string, cs: ChiSo, th: string) => tt(doi, cs, thangCung(th));
-  const cuaNguoi = (cs: ChiSo, th: string) => nguoiHien.map(n => so(khoa(n.ma, cs, th))).filter((v): v is number => v != null);
+  const tt = (doi: string, c: ChiSo, th: string): number | undefined => m.thuc_te[khoa(doi, c, th)];
+  const namTruoc = (doi: string, c: ChiSo, th: string) => tt(doi, c, thangCung(th));
+  const cuaNguoi = (c: ChiSo, th: string) => nguoiHien.map(n => so(khoa(n.ma, c, th))).filter(laSo);
 
-  // ---- lưới: mỗi lưới là ma trận khoá ô [dòng tháng][cột] — cho phím mũi tên, dán khối, điền nhanh.
-  const luoi: Record<string, string[][]> = {
-    cong_ty: m.thang.map(th => HAI_CS.map(cs => khoa(ct, cs, th))),
-    doanh_thu: m.thang.map(th => nguoiHien.map(n => khoa(n.ma, "doanh_thu", th))),
-    lai_gop: m.thang.map(th => nguoiHien.map(n => khoa(n.ma, "lai_gop", th))),
+  // ---- lưới: mỗi chỉ số một ma trận khoá ô [dòng tháng][cột: công ty, rồi từng sale] — cho phím, dán khối.
+  const luoi: Record<ChiSo, string[][]> = {
+    doanh_thu: m.thang.map(th => [ct, ...nguoiHien.map(n => n.ma)].map(d => khoa(d, "doanh_thu", th))),
+    lai_gop: m.thang.map(th => [ct, ...nguoiHien.map(n => n.ma)].map(d => khoa(d, "lai_gop", th))),
   };
-  const cotCuaLuoi = (l: string, c: number) => luoi[l].map(h => h[c]);
 
   const dat = (thay: Record<string, string>) => datGt(g => ({ ...g, ...thay }));
   const oTai = (l: string, r: number, c: number) =>
     document.querySelector<HTMLInputElement>(`input[data-luoi="${l}"][data-r="${r}"][data-c="${c}"]`);
 
-  const phim = (l: string, r: number, c: number) => (e: KeyboardEvent<HTMLInputElement>) => {
+  const phim = (l: ChiSo, r: number, c: number) => (e: KeyboardEvent<HTMLInputElement>) => {
     const di: Record<string, [number, number]> = { Enter: [e.shiftKey ? -1 : 1, 0], ArrowDown: [1, 0], ArrowUp: [-1, 0] };
     const d = di[e.key];
     if (!d) return;
@@ -124,7 +129,7 @@ export default function NganSach() {
     if (o) { o.focus(); o.select(); }
   };
   // Dán một khối Excel (tab giữa cột, xuống dòng giữa dòng) bắt đầu từ ô đang đứng.
-  const dan = (l: string, r: number, c: number) => (e: ClipboardEvent<HTMLInputElement>) => {
+  const dan = (l: ChiSo, r: number, c: number) => (e: ClipboardEvent<HTMLInputElement>) => {
     const txt = e.clipboardData.getData("text/plain");
     if (!/[\t\n]/.test(txt.replace(/\r?\n$/, ""))) return;   // một ô: để trình duyệt dán như thường
     e.preventDefault();
@@ -134,148 +139,186 @@ export default function NganSach() {
     dat(thay);
   };
 
-  const oNhap = (l: string, r: number, c: number, nhan: string) => {
+  const oNhap = (l: ChiSo, r: number, c: number, nhan: string, nen?: number | null) => {
     const k = luoi[l][r][c];
     const saiO = loiMay.has(k) || docSo(gt[k] ?? "") === "sai";
     const lop = [saiO ? "sai" : "", (gt[k] ?? "") !== (goc[k] ?? "") ? "da-sua" : ""].filter(Boolean).join(" ");
+    // Vạch nền = thực tế năm trước của tháng đó (tỷ lệ trên tháng năm trước lớn nhất) — không cột chữ.
+    const style = nen != null && nen > 0 ? { backgroundSize: `${Math.min(100, nen * 100).toFixed(1)}% 100%` } : undefined;
     return <input type="text" inputMode="numeric" autoComplete="off" name={"o-" + k} data-luoi={l} data-r={r} data-c={c}
-      aria-label={nhan} className={lop || undefined} aria-invalid={saiO ? true : undefined} value={gt[k] ?? ""}
+      aria-label={nhan} className={[lop, nen != null ? "ns-nen" : ""].filter(Boolean).join(" ") || undefined}
+      aria-invalid={saiO ? true : undefined} value={gt[k] ?? ""} style={style} placeholder="chưa đặt"
       onChange={e => dat({ [k]: e.target.value })} onKeyDown={phim(l, r, c)} onPaste={dan(l, r, c)}
       onFocus={e => e.target.select()} />;
   };
 
-  // ---- điền nhanh (chỉ đổi ô; chưa lưu gì cho tới khi bấm Lưu)
-  const apDung = (l: string, c: number, lam: (k: string, i: number) => string | undefined) => {
-    const thay: Record<string, string> = {};
-    cotCuaLuoi(l, c).forEach((k, i) => { const v = lam(k, i); if (v !== undefined) thay[k] = v; });
-    dat(thay); datMenu(null); datThamSo("");
-  };
-  const doiTuongCot = (l: string, c: number): [string, ChiSo] =>
-    l === "cong_ty" ? [ct, HAI_CS[c]] : [nguoiHien[c].ma, l as ChiSo];
-  const chiaDeu = (l: string, c: number, tongKy: number) => {
-    const moi = Math.floor(tongKy / 12), du = tongKy - moi * 12;   // phần dư dồn vào tháng cuối => cộng lại ĐÚNG bằng tổng gõ
-    apDung(l, c, (_, i) => cham(i === 11 ? moi + du : moi));
-  };
-  const theoNamTruoc = (l: string, c: number, phanTram: number) => {
-    const [doi, cs] = doiTuongCot(l, c);
-    apDung(l, c, (_, i) => { const v = namTruoc(doi, cs, m.thang[i]); return v == null ? undefined : cham(Math.max(0, Math.round(v * phanTram / 100))); });
-  };
-  const theoBien = (l: string, c: number, phanTram: number) => {
-    const [doi] = doiTuongCot(l, c);
-    apDung(l, c, (_, i) => { const dt = so(khoa(doi, "doanh_thu", m.thang[i])); return dt == null ? undefined : cham(Math.round(dt * phanTram / 100)); });
-  };
-  const dienXuong = (l: string, c: number) => {
-    let tren = "";
-    apDung(l, c, k => { const v = gt[k] ?? ""; if (v.trim()) { tren = v; return undefined; } return tren || undefined; });
-  };
-
-  const dauCot = (l: string, c: number, ten: string, phu?: string) => {
-    const [doi, cs] = doiTuongCot(l, c);
-    const coNT = m.thang.some(th => namTruoc(doi, cs, th) != null);
-    const mo = menu && menu.luoi === l && menu.c === c ? menu : null;
-    // KHÔNG phải <form>: nằm trong biểu mẫu Lưu, form lồng form là HTML sai. Enter ở đây điền, không gửi.
-    const nhapSo = (goi: (n: number) => void, nhan: string, mau: string) => {
-      const chay = () => { const v = docSo(thamSo); if (typeof v === "number") goi(v); };
-      return <div className="ns-menu-so">
-        <label>{nhan}<input autoFocus inputMode="numeric" value={thamSo} placeholder={mau} onChange={e => datThamSo(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); chay(); } }} /></label>
-        <button type="button" className="nut-nho chinh" onClick={chay}>Điền</button>
-      </div>;
-    };
-    return (
-      <th className="ns-cot">
-        <div className="ns-cot-dau"><span>{ten}{phu && <small className="nhat-chu">{phu}</small>}</span>
-          <button type="button" className="ns-nut-menu" aria-haspopup="true" aria-expanded={!!mo}
-            aria-label={`Điền nhanh cột ${ten}`} title="Điền nhanh cả cột"
-            onClick={() => { datMenu(mo ? null : { luoi: l, c, kieu: null }); datThamSo(""); }}>⋯</button></div>
-        {mo && <div className="ns-menu" role="menu" onKeyDown={e => { if (e.key === "Escape") datMenu(null); }}>
-          {mo.kieu === null && <>
-            <button type="button" role="menuitem" onClick={() => datMenu({ ...mo, kieu: "chia" })}>Chia đều một tổng cho 12 tháng…</button>
-            <button type="button" role="menuitem" disabled={!coNT} title={coNT ? undefined : "Không có thực tế năm trước cho cột này"}
-              onClick={() => { datMenu({ ...mo, kieu: "nam_truoc" }); datThamSo("100"); }}>Theo thực tế năm trước × %…</button>
-            {cs === "lai_gop" && <button type="button" role="menuitem" onClick={() => datMenu({ ...mo, kieu: "bien" })}>Lãi gộp = doanh thu × biên %…</button>}
-            <button type="button" role="menuitem" onClick={() => dienXuong(l, c)}>Điền ô trống bằng ô phía trên</button>
-            <button type="button" role="menuitem" className="giam" onClick={() => apDung(l, c, () => "")}>Xoá cả cột (thành chưa đặt)</button>
-          </>}
-          {mo.kieu === "chia" && nhapSo(n => chiaDeu(l, c, n), "Tổng cả kỳ (¥)", "120,000,000")}
-          {mo.kieu === "nam_truoc" && nhapSo(n => theoNamTruoc(l, c, n), "Bằng bao nhiêu % năm trước", "105")}
-          {mo.kieu === "bien" && nhapSo(n => theoBien(l, c, n), "Biên gộp (%)", "22")}
-          {mo.kieu !== null && <p className="nhat-chu">Chỉ điền vào ô — chưa lưu cho tới khi bấm Lưu.
-            {mo.kieu === "nam_truoc" && " Tháng không có thực tế năm trước giữ nguyên."}
-            {mo.kieu === "bien" && " Tháng chưa có doanh thu giữ nguyên."}</p>}
-        </div>}
-      </th>);
-  };
-
-  // ---- tổng hợp cho ô số + biểu đồ (theo số ĐANG GÕ, không chỉ số đã lưu)
+  // ---- số cả kỳ (theo số ĐANG GÕ)
   const ctDt = m.thang.map(th => so(khoa(ct, "doanh_thu", th)));
   const ctLg = m.thang.map(th => so(khoa(ct, "lai_gop", th)));
-  const coDt = ctDt.filter((v): v is number => v != null);
-  const coLg = ctLg.filter((v): v is number => v != null);
-  // Biên gộp là TỶ SỐ CỦA CÁC TỔNG, chỉ trên các tháng có đủ cả hai số.
-  const du2 = m.thang.map((_, i) => i).filter(i => ctDt[i] != null && ctLg[i] != null);
-  const bienKy = du2.length ? cong(du2.map(i => ctLg[i]!)) / cong(du2.map(i => ctDt[i]!)) : null;
   const ntDt = m.thang.map(th => namTruoc(ct, "doanh_thu", th) ?? null);
   const ntLg = m.thang.map(th => namTruoc(ct, "lai_gop", th) ?? null);
-  // So năm trước CHỈ trên các tháng mà cả hai phía có số — không đem 3 tháng ngân sách so 12 tháng thực tế.
-  const soNT = m.thang.map((_, i) => i).filter(i => ctDt[i] != null && ntDt[i] != null);
-  const tangNT = soNT.length && cong(soNT.map(i => ntDt[i]!)) > 0
-    ? cong(soNT.map(i => ctDt[i]!)) / cong(soNT.map(i => ntDt[i]!)) - 1 : null;
-  const ngDt = m.thang.map(th => { const d = cuaNguoi("doanh_thu", th); return d.length ? cong(d) : null; });
-  const daChia = cong(ngDt.filter((v): v is number => v != null));
-  const coNgDt = ngDt.some(v => v != null);
-  const thucKy = m.thang.map(th => tt(ct, "doanh_thu", th) ?? null);
-  const coNTDt = ntDt.filter((v): v is number => v != null);
-  const coNTLg = ntLg.filter((v): v is number => v != null);
+  const coDt = ctDt.filter(laSo);
+  // Biên gộp là TỶ SỐ CỦA CÁC TỔNG, chỉ trên các tháng có đủ cả hai số.
+  const du2 = m.thang.map((_, i) => i).filter(i => ctDt[i] != null && ctLg[i] != null);
+  const bienKy = du2.length && cong(du2.map(i => ctDt[i]!)) ? cong(du2.map(i => ctLg[i]!)) / cong(du2.map(i => ctDt[i]!)) : null;
+  const tongNT = cong(ntDt.filter(laSo)), tongNTLg = cong(ntLg.filter(laSo));
+  const bienNT = tongNT > 0 ? tongNTLg / tongNT : null;
+  const ntSale = (ma: string) => cong(m.thang.map(th => namTruoc(ma, "doanh_thu", th)).filter(laSo));
+
+  // ---- bảng điều khiển trên (chỉ là ĐỀ XUẤT — số thật nằm trong ô)
+  // Chỉ điền sẵn khi cả 12 tháng đã đặt — tổng của vài tháng đem so cả năm trước là số nói sai.
+  const [tongTxt, datTongTxt] = useState(() => (coDt.length === m.thang.length ? cham(cong(coDt)) : ""));
+  const [bienTxt, datBienTxt] = useState(() => {
+    const b = bienKy ?? bienNT;
+    return b != null ? String(Math.round(b * 1000) / 10) : "";
+  });
+  const [pt, datPt] = useState<Record<string, number>>(() => {
+    const ds = m.nguoi.filter(n => n.hien);
+    const tongCt = cong(coDt);
+    const cua = ds.map(n => cong(m.thang.map(th => so(khoa(n.ma, "doanh_thu", th))).filter(laSo)));
+    // Đã chia rồi -> giữ đúng tỷ lệ đang có (không cần cộng đủ 100); chưa -> theo năm trước.
+    const p = tongCt > 0 && cong(cua) > 0 ? cua.map(v => Math.round(v / tongCt * 100)) : phanTramTheo(ds.map(n => ntSale(n.ma)));
+    return Object.fromEntries(ds.map((n, i) => [n.ma, p[i] ?? 0]));
+  });
+  const ptDs = nguoiHien.map(n => pt[n.ma] ?? 0);
+  const tongPt = cong(ptDs);
+  const tongGo = (() => { const v = docSo(tongTxt); return typeof v === "number" ? v : null; })();
+  const bienGo = docPt(bienTxt);
+
+  const dienThang = () => {
+    if (tongGo == null) return;
+    const dt = chiaTheoTrongSo(tongGo, trongSoMua(ntDt));
+    const lg = bienGo != null ? chiaTheoTrongSo(Math.round(tongGo * bienGo / 100), dt) : null;
+    const thay: Record<string, string> = {};
+    m.thang.forEach((th, i) => {
+      thay[khoa(ct, "doanh_thu", th)] = cham(dt[i]);
+      if (lg) thay[khoa(ct, "lai_gop", th)] = cham(lg[i]);
+      const pd = chiaPhanTram(dt[i], ptDs), pl = lg ? chiaPhanTram(lg[i], ptDs) : null;
+      nguoiHien.forEach((n, j) => {
+        if (!ptDs[j]) return;       // người 0% không bị ghi đè thành 0 — ô giữ nguyên (chưa đặt ≠ 0)
+        thay[khoa(n.ma, "doanh_thu", th)] = cham(pd[j]);
+        if (pl) thay[khoa(n.ma, "lai_gop", th)] = cham(pl[j]);
+      });
+    });
+    const de = Object.entries(thay).filter(([k, v]) => (gt[k] ?? "").trim() && gt[k] !== v).length;
+    if (de && !confirm(`${de} ô đang có số sẽ bị thay bằng số chia mới. Chưa lưu gì cho tới khi bấm Lưu. Tiếp tục?`)) return;
+    dat(thay);
+  };
+
+  // Kéo vạch giữa hai sale trên thanh chia.
+  const thanh = useRef<HTMLDivElement>(null);
+  const keo = useRef<{ i: number; x0: number; w: number; p0: number[] } | null>(null);
+  const batDauKeo = (i: number) => (e: PE<HTMLSpanElement>) => {
+    if (!thanh.current) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    keo.current = { i, x0: e.clientX, w: thanh.current.getBoundingClientRect().width, p0: ptDs };
+  };
+  const dangKeo = (e: PE<HTMLSpanElement>) => {
+    const k = keo.current;
+    if (!k || !k.w) return;
+    const moi = keoVach(k.p0, k.i, (e.clientX - k.x0) / k.w * 100);
+    datPt(p => ({ ...p, ...Object.fromEntries(nguoiHien.map((n, j) => [n.ma, moi[j]])) }));
+  };
+  const phimVach = (i: number) => (e: KeyboardEvent<HTMLSpanElement>) => {
+    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    datPt(p => {   // đọc % MỚI NHẤT (giữ phím là nhiều lần bấm trước một lần vẽ)
+      const moi = keoVach(nguoiHien.map(n => p[n.ma] ?? 0), i, d);
+      return { ...p, ...Object.fromEntries(nguoiHien.map((n, j) => [n.ma, moi[j]])) };
+    });
+  };
 
   const ky0 = m.thang[0], ky1 = m.thang[m.thang.length - 1];
   const tenThang = (th: string) => { const [y, t] = th.split("-"); return `T${+t}/${y}`; };
+  const thNgan = (th: string) => `T${+th.slice(5)}`;
+  const maxNT = (c: ChiSo) => Math.max(1, ...(c === "doanh_thu" ? ntDt : ntLg).filter(laSo));
+
+  const conO = (c: ChiSo, th: string) => {
+    const tc = so(khoa(ct, c, th)), ng = cuaNguoi(c, th);
+    if (tc == null) return <span className="ns-con trong">—</span>;
+    if (!ng.length) return <span className="ns-con thieu" title="Chưa chia cho ai">chưa chia</span>;
+    const d = tc - cong(ng);
+    return d === 0 ? <span className="ns-con du" title="Chia đủ">✓</span>
+      : d > 0 ? <span className="ns-con thieu" title={`Còn ${yen(d)} chưa chia`}>{gon(d)}</span>
+      : <span className="ns-con vuot" title={`Chia vượt ${yen(-d)}`}>vượt {gon(-d)}</span>;
+  };
 
   return (
     <div className="sp ns">
       <div className="tieu-de-trang">
-        <div><h1>Ngân sách</h1>
-          <div className="phu">Chỉ tiêu doanh thu &amp; lãi gộp (粗利益) theo tháng — kỳ {m.ky}: {tenThang(ky0)} → {tenThang(ky1)}.
-            Tổng quan, Báo cáo và Dự báo so tiến độ với <b>ngân sách công ty</b>; chỉ tiêu từng người dùng cho thanh tiến độ từng người.</div></div>
+        <div><h1>Ngân sách · Kỳ {m.ky}</h1>
+          <div className="phu">{tenThang(ky0)} → {tenThang(ky1)} · <a href={`/bao-cao?ky=${m.ky}`}>← Doanh thu</a>{" "}
+            <ONoi nhan="Cách dùng" className="khoi-i" noi_dung={<div className="o-noi-chu">
+              Ngân sách công ty là số NHẬP THẲNG — Tổng quan, Doanh thu và Dự báo so tiến độ với nó; chỉ tiêu từng sale dùng cho thanh
+              tiến độ từng người (không bắt buộc). Ô trống = chưa đặt (khác 0). Enter / ↑↓ đi dòng · dán được cả khối từ Excel.
+              "Điền vào 12 tháng" chỉ đổi ô, chưa lưu gì cho tới khi bấm Lưu.</div>}>ⓘ</ONoi></div></div>
         <nav className="sp-dau-phai ns-ky" aria-label="Kỳ kế toán">
-          {m.moi_ky.map(k => <a key={k} href={`/ngan-sach?ky=${k}`} className="nut-nho"
-            aria-current={k === m.ky ? "page" : undefined}>Kỳ {k}</a>)}
+          {/* Chỉ kỳ trước · kỳ này · kỳ sau — 11 nút kỳ là 11 chữ không ai đọc. */}
+          {m.moi_ky.filter(k => Math.abs(k - m.ky) <= 1).map(k => <a key={k} href={`/ngan-sach?ky=${k}`} className="nut-nho"
+            aria-current={k === m.ky ? "page" : undefined}>{k < m.ky ? "‹ " : ""}Kỳ {k}{k > m.ky ? " ›" : ""}</a>)}
         </nav>
       </div>
 
       {m.loi.length > 0 && <div className="ngay-thieu" role="alert">Có {m.loi.length} ô không đọc được thành số —{" "}
-        <strong>chưa ô nào được lưu</strong>. Sửa những ô viền đỏ rồi bấm Lưu lại. Chỉ nhận chữ số; dấu chấm, dấu phẩy và dấu cách
-        đều bỏ qua được.</div>}
+        <strong>chưa ô nào được lưu</strong>. Sửa những ô viền đỏ rồi bấm Lưu lại.</div>}
 
-      <div className="o-kpi-luoi sp-kpi">
-        <div className={"o-kpi" + (coDt.length ? "" : " chua")}><div className="nhan">Ngân sách doanh thu cả kỳ</div>
-          <div className="gia">{coDt.length ? gon(cong(coDt)) : "Chưa đặt"}</div>
-          <div className="dong-phu nhat-chu">{coDt.length}/12 tháng đã đặt
-            {tangNT != null && <> · <span className={tangNT >= 0 ? "ns-len" : "giam"}>{tangNT >= 0 ? "▲" : "▼"}{pc(Math.abs(tangNT))}</span> so năm trước ({soNT.length} tháng đối chiếu)</>}</div></div>
-        <div className={"o-kpi" + (coLg.length ? "" : " chua")}><div className="nhan">Ngân sách lãi gộp cả kỳ</div>
-          <div className="gia">{coLg.length ? gon(cong(coLg)) : "Chưa đặt"}</div>
-          <div className="dong-phu nhat-chu">biên gộp dự kiến {pc(bienKy)}{du2.length > 0 && du2.length < 12 && ` (${du2.length} tháng đủ hai số)`}</div></div>
-        <div className={"o-kpi" + (coNgDt ? "" : " chua")}><div className="nhan">Đã chia cho người phụ trách</div>
-          <div className="gia">{coNgDt ? gon(daChia) : "Chưa chia"}</div>
-          <div className="dong-phu nhat-chu">{coNgDt && coDt.length ? <>{pc(daChia / cong(coDt), 0)} ngân sách doanh thu công ty · còn {gon(cong(coDt) - daChia)} chưa chia</>
-            : "không bắt buộc"}</div></div>
-        <div className={"o-kpi" + (coNTDt.length ? "" : " chua")}><div className="nhan">Thực tế kỳ {m.ky - 1} (tham khảo)</div>
-          <div className="gia">{coNTDt.length ? gon(cong(coNTDt)) : "Không có số"}</div>
-          <div className="dong-phu nhat-chu">{coNTDt.length ? <>{coNTDt.length}/12 tháng có dữ liệu · lãi gộp {gon(cong(coNTLg))} · biên {pc(cong(coNTDt) ? cong(coNTLg) / cong(coNTDt) : null)}</>
-            : "kho chưa có dữ liệu bán của kỳ trước"}</div></div>
-      </div>
-
-      <section className="kh-the ns-bieu-do">
-        <div className="sp-dm-dau"><h2>12 tháng của kỳ {m.ky}</h2>
-          <span className="phu">cập nhật ngay khi gõ · bấm chú giải để bật/tắt</span></div>
-        <BieuDo nhan={m.thang.map(thang_nhan)} cao={190} mo_ta={`Ngân sách doanh thu công ty theo tháng của kỳ ${m.ky}, so với thực tế năm trước`}
-          dinh_dang={v => v == null ? "—" : yen(v)} dinh_dang_truc={v => gon(v)}
-          chuoi={[
-            { ten: "Ngân sách công ty", kieu: "cot", mau: "var(--do)", gia_tri: ctDt },
-            { ten: "Thực tế kỳ này", kieu: "cot_nen", mau: "var(--ok-nen)", gia_tri: thucKy, an_mac_dinh: !thucKy.some(v => v != null) },
-            { ten: "Thực tế năm trước", kieu: "duong", mau: "var(--lien-ket)", gia_tri: ntDt },
-            { ten: "Tổng chỉ tiêu từng người", kieu: "duong_dut", mau: "var(--canh-vien)", gia_tri: ngDt },
-          ]} />
+      <section className="kh-the ns-dat">
+        <div className="ns-dat-hai">
+          <div>
+            <div className="ns-nhan">① Công ty cả kỳ {tongNT > 0 && <span className="nhat-chu">· năm trước {gon(tongNT)}</span>}
+              {coDt.length > 0 && coDt.length < m.thang.length && <span className="nhat-chu"> · đã đặt {coDt.length}/12 tháng ({gon(cong(coDt))})</span>}</div>
+            <div className="ns-dong">
+              <input className="ns-o-lon" inputMode="numeric" aria-label="Tổng doanh thu công ty cả kỳ"
+                placeholder={tongNT > 0 ? cham(tongNT) : "1,560,000,000"}
+                value={tongTxt} onChange={e => datTongTxt(e.target.value)} />
+              {tongGo != null && tongNT > 0 && <span className={tongGo >= tongNT ? "tang" : "giam"}>{tongGo >= tongNT ? "+" : ""}{pc(tongGo / tongNT - 1)}</span>}
+            </div>
+            <div className="ns-dong">
+              <label className="nhat-chu">Biên lãi gộp <input className="ns-o-pt" inputMode="decimal" aria-label="Biên lãi gộp %" value={bienTxt}
+                placeholder={bienNT != null ? String(Math.round(bienNT * 1000) / 10) : "28"} onChange={e => datBienTxt(e.target.value)} />%</label>
+              {tongGo != null && bienGo != null && <span className="nhat-chu">= {gon(Math.round(tongGo * bienGo / 100))}</span>}
+            </div>
+            <MuaNamTruoc v={ntDt} />
+          </div>
+          <div>
+            <div className="ns-nhan">② Chia cho {nguoiHien.length} sale</div>
+            {nguoiHien.length > 0 ? <>
+              <div className="ns-chia" ref={thanh} role="group" aria-label="Tỷ lệ chia cho từng sale">
+                {nguoiHien.map((n, j) => <span key={n.ma} className="ns-chia-phan"
+                  style={{ flexGrow: Math.max(ptDs[j], 0.0001), background: MAU_SALE[j % MAU_SALE.length] }}>
+                  {ptDs[j] >= 8 && <b>{n.ten.split(" ").slice(-1)[0]} {ptDs[j]}%</b>}
+                  {j < nguoiHien.length - 1 && <span className="ns-vach" role="slider" tabIndex={0} aria-label={`Vạch giữa ${n.ten} và ${nguoiHien[j + 1].ten}`}
+                    aria-valuenow={ptDs[j]} aria-valuemin={0} aria-valuemax={100}
+                    onPointerDown={batDauKeo(j)} onPointerMove={dangKeo} onPointerUp={() => { keo.current = null; }} onKeyDown={phimVach(j)} />}
+                </span>)}
+                {tongPt < 100 && <span className="ns-chia-phan con" style={{ flexGrow: 100 - tongPt }} />}
+              </div>
+              <div className="ns-sale-luoi">
+                {nguoiHien.map((n, j) => { const nt = ntSale(n.ma); return (
+                  <div key={n.ma}>
+                    <div className="ns-sale-ten"><i style={{ background: MAU_SALE[j % MAU_SALE.length] }} />{n.ten}</div>
+                    <label><input className="ns-o-pt" inputMode="decimal" aria-label={`% của ${n.ten}`} value={String(ptDs[j])}
+                      onChange={e => { const v = docPt(e.target.value); datPt(p => ({ ...p, [n.ma]: v == null ? 0 : Math.min(100, Math.round(v)) })); }} />%</label>
+                    <b className="so">{tongGo != null ? gon(Math.round(tongGo * ptDs[j] / 100)) : "—"}</b>
+                    <div className="nhat-chu">{nt > 0 && tongNT > 0 ? `năm trước ${Math.round(nt / tongNT * 100)}%` : "năm trước —"}</div>
+                  </div>); })}
+              </div>
+              <div className={"ns-con-pt " + (tongPt === 100 ? "du" : tongPt < 100 ? "thieu" : "vuot")}>
+                {tongPt === 100 ? "✓ chia đủ 100%" : tongPt < 100 ? `còn ${100 - tongPt}% chưa chia` : `vượt ${tongPt - 100}%`}
+                {tongGo != null && tongPt !== 100 && ` · ${gon(Math.abs(Math.round(tongGo * (100 - tongPt) / 100)))}`}
+                {" "}<button type="button" className="nut-nho" onClick={() => {
+                  const p = phanTramTheo(nguoiHien.map(n => ntSale(n.ma)));
+                  datPt(q => ({ ...q, ...Object.fromEntries(nguoiHien.map((n, j) => [n.ma, p[j]])) }));
+                }}>Theo năm trước</button>
+              </div>
+            </> : <p className="nhat-chu">Chưa có sale nào đang bán.</p>}
+          </div>
+        </div>
+        <div className="ns-dat-cuoi">
+          <button type="button" className="nut-chinh" disabled={tongGo == null} onClick={dienThang}
+            title={tongGo == null ? "Gõ tổng cả kỳ trước" : "Chia tổng theo mùa năm trước, lãi gộp theo biên, từng sale theo %"}>↓ Điền vào 12 tháng</button>
+        </div>
       </section>
 
       <form method="post" action="/ngan-sach" className="ns-form" onSubmit={e => {
@@ -284,75 +327,39 @@ export default function NganSach() {
       }}>
         <input type="hidden" name="ky" value={m.ky} />
 
-        <div className="ns-thanh-tab">
-          <div className="tab-pill" role="tablist" aria-label="Bảng nhập">
-            <button type="button" role="tab" aria-pressed={tab === "cong_ty"} aria-selected={tab === "cong_ty"} onClick={() => datTab("cong_ty")}>Công ty</button>
-            <button type="button" role="tab" aria-pressed={tab === "nguoi"} aria-selected={tab === "nguoi"} onClick={() => datTab("nguoi")}>
-              Từng người phụ trách ({nguoiHien.length})</button>
-          </div>
-          {tab === "nguoi" && <div className="tab-pill" role="group" aria-label="Chỉ số">
-            {HAI_CS.map(cs => <button key={cs} type="button" aria-pressed={csNguoi === cs} onClick={() => datCsNguoi(cs)}>{TEN_CS[cs]}</button>)}
-          </div>}
-          <span className="phu ns-meo">Ô trống = <b>chưa đặt</b> (khác <code>0</code>) · Enter / ↑↓ đi dòng · dán được cả khối từ Excel · <b>⋯</b> ở đầu cột để điền nhanh</span>
-        </div>
-
-        {/* TAB CÔNG TY */}
-        <section className="kh-the ns-the" hidden={tab !== "cong_ty"}>
-          <div className="bang-cuon">
-            <table className="bang ns-bang">
-              <thead><tr><th>Tháng</th>{dauCot("cong_ty", 0, "Doanh thu")}<th className="so ns-tk">Năm trước</th>
-                {dauCot("cong_ty", 1, "Lãi gộp")}<th className="so ns-tk">Năm trước</th><th className="so">Biên gộp</th>
-                <th className="so ns-tk">Thực tế kỳ này</th></tr></thead>
-              <tbody>
-                {m.thang.map((th, r) => {
-                  const dt = ctDt[r], lg = ctLg[r];
-                  return <tr key={th}><th scope="row" className="ns-thang">{tenThang(th)}</th>
-                    <td>{oNhap("cong_ty", r, 0, `Công ty — Doanh thu — ${th}`)}</td>
-                    <td className="so ns-tk">{yen(ntDt[r])}</td>
-                    <td>{oNhap("cong_ty", r, 1, `Công ty — Lãi gộp — ${th}`)}</td>
-                    <td className="so ns-tk">{yen(ntLg[r])}</td>
-                    <td className="so">{dt != null && lg != null && dt ? pc(lg / dt) : "—"}</td>
-                    <td className="so ns-tk">{yen(thucKy[r])}</td></tr>;
-                })}
-              </tbody>
-              <tfoot><tr className="tong"><th scope="row">Cả kỳ</th><td className="so">{tong(coDt)}</td><td className="so ns-tk">{tong(coNTDt)}</td>
-                <td className="so">{tong(coLg)}</td><td className="so ns-tk">{tong(coNTLg)}</td><td className="so">{pc(bienKy)}</td>
-                <td className="so ns-tk">{tong(thucKy.filter((v): v is number => v != null))}</td></tr></tfoot>
-            </table>
-          </div>
-          <p className="ghi-chu">Số của cả công ty, <b>nhập thẳng</b> — không cộng từ chỉ tiêu từng người. "Năm trước" / "Thực tế kỳ này" là
-            doanh thu thuần &amp; lãi gộp đã bán (cùng số với Báo cáo), chỉ để tham khảo khi đặt số.</p>
-        </section>
-
-        {/* TAB TỪNG NGƯỜI — cả hai chỉ số luôn trong DOM để Lưu gửi đủ */}
-        {HAI_CS.map(cs => (
-          <section key={cs} className="kh-the ns-the" hidden={tab !== "nguoi" || csNguoi !== cs}>
+        {/* Cả hai chỉ số luôn trong DOM để Lưu gửi đủ — bảng chỉ số kia ẩn bằng `hidden`. */}
+        {HAI_CS.map(c => (
+          <section key={c} className="kh-the ns-the" hidden={cs !== c}>
+            <div className="ns-bang-dau"><h2>12 tháng</h2>
+              <div className="tab-pill" role="group" aria-label="Chỉ số">
+                {HAI_CS.map(x => <button key={x} type="button" aria-pressed={cs === x} onClick={() => datCs(x)}>{TEN_CS[x]}</button>)}
+              </div>
+              <span className="nhat-chu ns-meo">vạch nền = năm trước</span>
+            </div>
             <div className="bang-cuon">
               <table className="bang ns-bang">
-                <thead><tr><th>Tháng</th>
-                  {nguoiHien.map((n, c) => <Fragment key={n.ma}>{dauCot(cs, c, n.ten, n.ma + (n.con_ban ? "" : ` · không bán ${m.ngay_con_ban} ngày`))}</Fragment>)}
-                  <th className="so">Tổng từng người</th><th className="so ns-tk">Công ty</th><th className="so">Chưa chia</th></tr></thead>
+                <thead><tr><th>Tháng</th><th className="ns-cot-ct">Công ty</th>
+                  {nguoiHien.map(n => <th key={n.ma} title={n.ma + (n.con_ban ? "" : ` · không bán ${m.ngay_con_ban} ngày`)}>{n.ten}</th>)}
+                  <th>còn</th></tr></thead>
                 <tbody>
                   {m.thang.map((th, r) => {
-                    const ng = cuaNguoi(cs, th), c = so(khoa(ct, cs, th));
-                    return <tr key={th}><th scope="row" className="ns-thang">{tenThang(th)}</th>
-                      {nguoiHien.map((n, ci) => <td key={n.ma}>{oNhap(cs, r, ci, `${n.ten} — ${TEN_CS[cs]} — ${th}`)}
-                        <small className="ns-nt" title="Thực tế cùng tháng năm trước">{namTruoc(n.ma, cs, th) != null ? "NT " + gon(namTruoc(n.ma, cs, th)!) : " "}</small></td>)}
-                      <td className="so">{tong(ng)}</td><td className="so ns-tk">{c != null ? yen(c) : "—"}</td>
-                      <td className={"so" + (c != null && ng.length && c - cong(ng) < 0 ? " giam" : "")}>{c != null && ng.length ? yen(c - cong(ng)) : "—"}</td></tr>;
+                    const nt = namTruoc(ct, c, th);
+                    return <tr key={th}><th scope="row" className="ns-thang" title={nt != null ? `Năm trước ${yen(nt)}` : "Năm trước: không có số"}>{thNgan(th)}</th>
+                      <td className="ns-cot-ct">{oNhap(c, r, 0, `Công ty — ${TEN_CS[c]} — ${th}`, nt != null ? nt / maxNT(c) : null)}</td>
+                      {nguoiHien.map((n, ci) => <td key={n.ma}>{oNhap(c, r, ci + 1, `${n.ten} — ${TEN_CS[c]} — ${th}`)}</td>)}
+                      <td className="so">{conO(c, th)}</td></tr>;
                   })}
                 </tbody>
-                <tfoot><tr className="tong"><th scope="row">Cả kỳ</th>
-                  {nguoiHien.map(n => <td key={n.ma} className="so">{tong(m.thang.map(th => so(khoa(n.ma, cs, th))).filter((v): v is number => v != null))}</td>)}
-                  <td className="so">{tong(m.thang.flatMap(th => cuaNguoi(cs, th)))}</td>
-                  <td className="so ns-tk">{tong(m.thang.map(th => so(khoa(ct, cs, th))).filter((v): v is number => v != null))}</td><td></td></tr></tfoot>
+                <tfoot><tr className="tong"><th scope="row">Kỳ</th>
+                  <td className="so">{tong(m.thang.map(th => so(khoa(ct, c, th))).filter(laSo))}
+                    {c === "lai_gop" && bienKy != null && <small className="ns-nt">biên {pc(bienKy)}</small>}</td>
+                  {nguoiHien.map(n => <td key={n.ma} className="so">{tong(m.thang.map(th => so(khoa(n.ma, c, th))).filter(laSo))}</td>)}
+                  <td /></tr></tfoot>
               </table>
             </div>
-            <p className="ghi-chu">Không bắt buộc. "Chưa chia" = ngân sách công ty − tổng từng người (âm = chỉ tiêu từng người cộng lại vượt
-              ngân sách công ty). "NT" = thực tế cùng tháng năm trước của người đó.</p>
           </section>))}
 
-        {nguoiAn.length > 0 && tab === "nguoi" && <p className="ns-an">
+        {nguoiAn.length > 0 && <p className="ns-an">
           {hienHet ? "Đang hiện cả" : "Đang ẩn"} {nguoiAn.length} người không có doanh số trong {m.ngay_con_ban} ngày tới mốc dữ liệu:{" "}
           {nguoiAn.map((n, i) => <span key={n.ma}>{i > 0 && ", "}<b>{n.ten}</b> <span className="nhat-chu">({n.ban_cuoi ? `bán lần cuối ${ngay(n.ban_cuoi)}` : "chưa có doanh số với khách"})</span></span>)}
           {" "}<button type="button" className="nut-nho" onClick={() => datHienHet(!hienHet)}>{hienHet ? "Ẩn lại" : "Hiện"}</button></p>}
@@ -368,4 +375,17 @@ export default function NganSach() {
       </form>
     </div>
   );
+}
+
+/** 12 cột nhỏ: mùa của năm trước — hình dáng mà "Điền vào 12 tháng" sẽ chia theo. */
+function MuaNamTruoc({ v }: { v: (number | null)[] }) {
+  const w = trongSoMua(v), mx = Math.max(...w, 1);
+  if (!v.some(laSo)) return <p className="nhat-chu ns-mua-chu">Không có số năm trước — sẽ chia đều 12 tháng.</p>;
+  return <>
+    <svg viewBox="0 0 240 40" className="ns-mua" role="img" aria-label="Tỷ trọng từng tháng của năm trước">
+      {w.map((x, i) => <rect key={i} x={i * 20 + 2} y={40 - (x / mx) * 38} width={15} height={(x / mx) * 38} rx={2}
+        className={v[i] == null ? "ns-mua-tb" : "ns-mua-c"}><title>{v[i] == null ? "không có số năm trước — lấy trung bình" : yen(v[i])}</title></rect>)}
+    </svg>
+    <div className="nhat-chu ns-mua-chu">chia 12 tháng theo mùa năm trước</div>
+  </>;
 }
