@@ -1568,6 +1568,10 @@ def test_gop_mat_hang_mot_buoc_va_chep_ghep(conn, batch):
     conn.commit()
     k = dict(conn.execute("SELECT ma_hang_dt, mat_hang_khoa FROM mart.gia_doi_thu_hien_hanh WHERE ma_doi_thu='THAK'").fetchall())
     assert k == {"h1": "h3", "h2": "h3", "h3": "h3"}
+    # h2 bị chuyển đích ngầm: nhật ký 'gop' trên khoá của CHÍNH h2 (để 409 / lịch sử của h2 thấy)
+    nk = conn.execute("SELECT truoc, sau FROM app.doi_thu_nhat_ky WHERE doi_tuong = 'THAK/h2' AND loai = 'gop' "
+                      "ORDER BY id DESC LIMIT 1").fetchone()
+    assert nk == ({"vao": "h1"}, {"vao": "h3"})
     # gộp h3 vào h2: đích h2 đang trỏ h3 → quy về h3 = chính nó → từ chối
     with pytest.raises(DT.LoiNhap):
         DT.gop_mat_hang(conn, {"ma_doi_thu": "THAK", "ma_hang_dt": "h3", "vao_ma_hang_dt": "h2", "da_xem": None}, None)
@@ -1598,3 +1602,23 @@ def test_duyet_va_tong_quan_mang_cot_mat_hang_va_dem_mat_hang(conn, batch, monke
     dem = _dem(conn, monkeypatch)
     DT.duyet(conn, loc="da_xoa")
     assert dem["n"] == 1
+
+
+def test_gop_mat_hang_ben_khong_co_la_LoiNhap_khong_phai_loi_khoa_ngoai(conn, batch):
+    _hang(conn, batch)
+    _qs(conn, batch, "ZZZ", 500, hang="h1")
+    _qs(conn, batch, "ZZZ", 480, hang="h2")
+    with pytest.raises(DT.LoiNhap, match="Không có đối thủ này"):
+        DT.gop_mat_hang(conn, {"ma_doi_thu": "ZZZ", "ma_hang_dt": "h2", "vao_ma_hang_dt": "h1", "da_xem": None}, None)
+
+
+def test_dat_an_tu_choi_dong_lich_su_da_bi_dong_moi_hon_thay(conn, batch):
+    from datetime import date
+    _hang(conn, batch)
+    cu = _qs(conn, batch, "THAK", 540, hang="hA", ngay=date(2026, 6, 20))
+    moi = _qs(conn, batch, "THAK", 560, hang="hA", ngay=date(2026, 7, 20))     # cùng phân vùng, lô mới hơn
+    with pytest.raises(DT.LoiNhap, match="Chỉ ẩn"):
+        DT.dat_an(conn, {"nguon": "nap", "id": cu, "an": True, "da_xem": None}, None)
+    assert conn.execute("SELECT count(*) FROM app.doi_thu_nhat_ky").fetchone()[0] == 0
+    assert conn.execute("SELECT count(*) FROM app.an_quan_sat").fetchone()[0] == 0
+    DT.dat_an(conn, {"nguon": "nap", "id": moi, "an": True, "da_xem": None}, None)   # dòng đang hiện vẫn ẩn được

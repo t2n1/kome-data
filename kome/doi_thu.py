@@ -769,9 +769,12 @@ def dat_an(conn, b: dict, nguoi) -> dict:
         raise LoiNhap("an phải là true / false.")
     khoa = f"{'gia' if nguon == 'nap' else 'tay'}:{id_}"
     kiem_xung_dot(conn, [khoa], None if b.get("da_xem") is None else doc_da_xem(b["da_xem"]), b.get("ghi_de") is True)
-    r = conn.execute("SELECT an FROM mart.gia_doi_thu_quan_sat WHERE nguon = %s AND id = %s", (nguon, id_)).fetchone()
+    r = conn.execute("SELECT an, hien_hanh, an_hien_hanh FROM mart.gia_doi_thu_quan_sat WHERE nguon = %s AND id = %s",
+                     (nguon, id_)).fetchone()
     if r is None:
         raise LoiNhap("Không tìm thấy dòng giá này (có thể lô đã bị hoàn tác).")
+    if not (r[1] or r[2]):       # dòng lịch sử / đã bị thay: ẩn không có tác dụng nhìn thấy mà vẫn ghi nhật ký
+        raise LoiNhap("Chỉ ẩn / khôi phục được dòng đang hiện (hoặc đang bị ẩn).")
     conn.execute("INSERT INTO app.an_quan_sat (nguon, quan_sat_id, an, nguoi_dung_id) VALUES (%s, %s, %s, %s)",
                  (nguon, id_, an, nguoi))
     _ghi_nhat_ky(conn, "an" if an else "hien", khoa, {"an": r[0]}, {"an": an}, nguoi)
@@ -800,6 +803,11 @@ def gop_mat_hang(conn, b: dict, nguoi) -> dict:
         raise LoiNhap("Mặt hàng đích phải là chữ hoặc null (tách ra).")
     vao = _doc_ten_hang(vao, "Mặt hàng đích") if vao is not None and vao.strip() else None
     khoa = f"{ben}/{hang}"
+    if conn.execute("SELECT 1 FROM app.doi_thu WHERE ma = %s", (ben,)).fetchone() is None:
+        raise LoiNhap("Không có đối thủ này.")
+    # Hai lần gộp cùng một bên chạy song song có thể đọc cùng trạng thái rồi ghi chéo nhau (phá bất biến "luôn một bước"):
+    # khoá cố vấn theo bên, tự nhả cuối giao dịch — TRƯỚC mọi lần đọc bên dưới.
+    conn.execute("SELECT pg_advisory_xact_lock(hashtext('gop_mat_hang:' || %s))", (ben,))
     kiem_xung_dot(conn, [khoa], None if b.get("da_xem") is None else doc_da_xem(b["da_xem"]), b.get("ghi_de") is True)
     if conn.execute("SELECT 1 FROM mart.gia_doi_thu_quan_sat WHERE ma_doi_thu = %s AND ma_hang_dt = %s LIMIT 1",
                     (ben, hang)).fetchone() is None:
@@ -829,6 +837,7 @@ def gop_mat_hang(conn, b: dict, nguoi) -> dict:
                    WHERE vao_ma_hang_dt = %s ORDER BY ma_hang_dt""", (ben, hang)).fetchall()]:
             conn.execute("INSERT INTO app.gop_mat_hang (ma_doi_thu, ma_hang_dt, vao_ma_hang_dt, nguoi_dung_id) "
                          "VALUES (%s, %s, %s, %s)", (ben, x, dich, nguoi))
+            _ghi_nhat_ky(conn, "gop", f"{ben}/{x}", {"vao": hang}, {"vao": dich}, nguoi)     # nhật ký trên khoá của chính X
         if conn.execute("SELECT 1 FROM app.ghep_hang WHERE ma_doi_thu = %s AND ma_hang_dt = %s", (ben, hang)).fetchone() is None:
             g = conn.execute("SELECT product_code, nhom_id, nhan FROM app.ghep_hang WHERE ma_doi_thu = %s AND ma_hang_dt = %s",
                              (ben, dich)).fetchone()
