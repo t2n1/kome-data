@@ -135,6 +135,29 @@ def test_ban_sua_qua_luu_CO_HIEU_LUC_o_ca_bon_loai_bang(conn, batch):
     assert (round(float(r[0]), 2), r[1]) == (4629.63, False)
 
 
+def test_luu_KHONG_tinh_chi_so_chi_xem(conn, batch, monkeypatch):
+    """mart.doanh_thu_12t dựng trên khach_360 (~1,2 s trên CSDL thật) — lưu (một phần đang giữ khoá advisory) không
+    được tính lại chỉ số chỉ xem. Dòng đọc lại không mang dt_12t / lan_cuoi (trình duyệt giữ giá trị đã có)."""
+    _sp(conn, batch)
+    _khach(conn, batch, "K1", "Quán A")
+    sql = []
+    that = conn.execute
+
+    def ghi_lai(q, *a, **k):
+        sql.append(str(q))
+        return that(q, *a, **k)
+    monkeypatch.setattr(conn, "execute", ghi_lai)
+    ra = BDL.luu(conn, "kh", [{"k": "K1", "cot": "phone", "gia_tri": "06-1", "thay": None}], None, True)
+    assert ra["so_o"] == 1 and "dt_12t" not in ra["dong"][0]["o"] and "lan_cuoi" not in ra["dong"][0]["o"]
+    ra = BDL.luu(conn, "sp", [{"k": "NT01", "cot": "ton:0001", "gia_tri": "12", "thay": "10.0000"}], None, True)
+    o = ra["dong"][0]["o"]
+    assert "dt_12t" not in o and o["ton_tong"] == "12.0000" and o["ton:0001"] == "12.0000"
+    assert len(sql) == 6 and not [q for q in sql if "doanh_thu_12t" in q or "ban_den_moc" in q or "lan_mua" in q]
+    sql.clear()
+    assert "dt_12t" in _dong(BDL.doc(conn, "kh"), "K1")["o"] and "ban_den_moc" in BDL._sql_sp(True)
+    assert len(sql) == 1 and "mart.doanh_thu_12t" in sql[0]
+
+
 def test_luu_bang_OBC_la_ve_OBC(conn, batch):
     _sp(conn, batch)
     BDL.luu(conn, "sp", [{"k": "NT01", "cot": "case_qty", "gia_tri": "24", "thay": "20.0000"}], None, True)

@@ -121,8 +121,15 @@ def _cot_e(loai: str) -> str:
     return ", ".join(f"e.{c}" for c in COT_DANH_MUC[loai])
 
 
-def _sql_sp() -> str:
+def _sql_sp(chi_so: bool) -> str:
     dm = ", ".join(f"p.{c}::text" for c in COT_DANH_MUC["sp"])
+    # Chỉ số chỉ xem đắt (quét mart.ban_den_moc) — chỉ GET cần; hai lượt đọc trong luu() bỏ hẳn CTE này.
+    b = """b AS (SELECT s.product_code AS k, sum(s.amount - s.tax_amount)::text AS dt
+      FROM mart.ban_den_moc s CROSS JOIN mart.moc_thoi_gian m
+      WHERE s.sales_date > m.hom_nay - 365 AND s.sales_date <= m.hom_nay
+        AND (%(ma)s::text[] IS NULL OR s.product_code = ANY(%(ma)s::text[]))
+      GROUP BY s.product_code),""" if chi_so else ""
+    b_cot, b_noi = ("b.dt", "LEFT JOIN b ON b.k = e.k") if chi_so else ("NULL", "")
     return f"""
 WITH bg AS MATERIALIZED (
     SELECT g.product_code, g.pack_code, g.price_level, g.gia_chua_thue, g.gia_obc, g.da_sua, g.tu_ngay
@@ -153,11 +160,7 @@ t AS (SELECT product_code AS k,
              jsonb_object_agg(warehouse_code, jsonb_build_array(so_luong::text, best_before)) AS ton,
              sum(so_luong)::text AS ton_tong
       FROM th GROUP BY product_code),
-b AS (SELECT s.product_code AS k, sum(s.amount - s.tax_amount)::text AS dt
-      FROM mart.ban_den_moc s CROSS JOIN mart.moc_thoi_gian m
-      WHERE s.sales_date > m.hom_nay - 365 AND s.sales_date <= m.hom_nay
-        AND (%(ma)s::text[] IS NULL OR s.product_code = ANY(%(ma)s::text[]))
-      GROUP BY s.product_code),
+{b}
 lech AS (
     SELECT sm.k, sm.cot AS ma_cot, {_obc_case('o', 'sp', 'sm.cot')} AS obc, sm.ai, sm.luc
     FROM sm JOIN core.dim_product o ON o.product_code = sm.khoa
@@ -191,8 +194,8 @@ obc AS (
     LEFT JOIN sm ON sm.bang = can.bang AND sm.khoa = can.khoa AND sm.cot = can.cot
 )
 SELECT
-    (SELECT json_agg(json_build_array(e.k, {_cot_e('sp')}, g.gia, t.ton, b.dt, t.ton_tong) ORDER BY e.k)
-     FROM e LEFT JOIN g ON g.k = e.k LEFT JOIN t ON t.k = e.k LEFT JOIN b ON b.k = e.k),
+    (SELECT json_agg(json_build_array(e.k, {_cot_e('sp')}, g.gia, t.ton, {b_cot}, t.ton_tong) ORDER BY e.k)
+     FROM e LEFT JOIN g ON g.k = e.k LEFT JOIN t ON t.k = e.k {b_noi}),
     (SELECT json_agg(json_build_array(k, ma_cot, obc, ai, luc)) FROM lech),
     (SELECT json_agg(json_build_array(bang, khoa, cot, raw, co, m_obc, m_bo, ai, luc)) FROM obc),
     json_build_object(
@@ -217,8 +220,14 @@ SELECT
 """
 
 
-def _sql_kh() -> str:
+def _sql_kh(chi_so: bool) -> str:
     dm = ", ".join(f"c.{x}::text" for x in COT_DANH_MUC["kh"])
+    # mart.doanh_thu_12t dựng trên mart.khach_360 (~1,2 s trên CSDL thật) — chỉ GET cần; luu() bỏ hai CTE này.
+    dl = """d AS (SELECT x.customer_code AS k, x.dt_12t::text AS dt FROM mart.doanh_thu_12t x
+      WHERE %(ma)s::text[] IS NULL OR x.customer_code = ANY(%(ma)s::text[])),
+l AS (SELECT x.customer_code AS k, max(x.sales_date)::text AS lan_cuoi FROM mart.lan_mua x
+      WHERE %(ma)s::text[] IS NULL OR x.customer_code = ANY(%(ma)s::text[]) GROUP BY x.customer_code),""" if chi_so else ""
+    dl_cot, dl_noi = ("d.dt, l.lan_cuoi", "LEFT JOIN d ON d.k = e.k LEFT JOIN l ON l.k = e.k") if chi_so else ("NULL, NULL", "")
     return f"""
 WITH sm AS MATERIALIZED (
     SELECT m.bang, m.khoa, m.cot, m.gia_tri, m.gia_tri_obc, m.bo, m.luc, u.ten_dang_nhap AS ai, m.khoa AS k
@@ -230,10 +239,7 @@ e AS (
     SELECT c.customer_code AS k, {dm} FROM mart.dim_customer c
     WHERE c.is_current AND (%(ma)s::text[] IS NULL OR c.customer_code = ANY(%(ma)s::text[]))
 ),
-d AS (SELECT x.customer_code AS k, x.dt_12t::text AS dt FROM mart.doanh_thu_12t x
-      WHERE %(ma)s::text[] IS NULL OR x.customer_code = ANY(%(ma)s::text[])),
-l AS (SELECT x.customer_code AS k, max(x.sales_date)::text AS lan_cuoi FROM mart.lan_mua x
-      WHERE %(ma)s::text[] IS NULL OR x.customer_code = ANY(%(ma)s::text[]) GROUP BY x.customer_code),
+{dl}
 lech AS (
     SELECT sm.k, sm.cot AS ma_cot, {_obc_case('o', 'kh', 'sm.cot')} AS obc, sm.ai, sm.luc
     FROM sm JOIN core.dim_customer o ON o.is_current AND o.customer_code = sm.khoa
@@ -250,8 +256,8 @@ obc AS (
     LEFT JOIN sm ON sm.bang = can.bang AND sm.khoa = can.khoa AND sm.cot = can.cot
 )
 SELECT
-    (SELECT json_agg(json_build_array(e.k, {_cot_e('kh')}, d.dt, l.lan_cuoi) ORDER BY e.k)
-     FROM e LEFT JOIN d ON d.k = e.k LEFT JOIN l ON l.k = e.k),
+    (SELECT json_agg(json_build_array(e.k, {_cot_e('kh')}, {dl_cot}) ORDER BY e.k)
+     FROM e {dl_noi}),
     (SELECT json_agg(json_build_array(k, ma_cot, obc, ai, luc)) FROM lech),
     (SELECT json_agg(json_build_array(bang, khoa, cot, raw, co, m_obc, m_bo, ai, luc)) FROM obc),
     json_build_object(
@@ -269,22 +275,29 @@ SELECT
 """
 
 
-def _doc_tho(conn, loai: str, ma: list[str] | None = None, can: list | None = None) -> dict:
-    """ĐÚNG MỘT lượt hỏi. `ma` None = mọi dòng; `can` = [(bang, khoa, cot)] cần giá trị OBC + dòng sổ mới nhất (khi lưu)."""
-    sql = _sql_sp() if loai == "sp" else _sql_kh()
+def _doc_tho(conn, loai: str, ma: list[str] | None = None, can: list | None = None, chi_so: bool = True) -> dict:
+    """ĐÚNG MỘT lượt hỏi. `ma` None = mọi dòng; `can` = [(bang, khoa, cot)] cần giá trị OBC + dòng sổ mới nhất (khi lưu).
+
+    `chi_so=False` (hai lượt đọc của luu()): KHÔNG tính chỉ số chỉ xem đắt — `dt_12t` (cả sp lẫn kh, đọc
+    mart.ban_den_moc / mart.doanh_thu_12t) và `lan_cuoi` (kh) — và dòng trả về KHÔNG mang các khoá đó. `ton_tong` (sp)
+    vẫn có: nó cộng từ chính CTE tồn đã đọc (không tốn thêm) và đổi theo ô tồn vừa sửa."""
+    sql = _sql_sp(chi_so) if loai == "sp" else _sql_kh(chi_so)
     dong, lech, obc, phu = conn.execute(sql, {"ma": ma, "can": Jsonb([list(x) for x in (can or [])])}).fetchone()
     n = len(COT_DANH_MUC[loai])
     ra = {}
     for r in dong or []:
         o = dict(zip(COT_DANH_MUC[loai], r[1:1 + n]))
         if loai == "sp":
-            gia, ton, o["dt_12t"], o["ton_tong"] = r[1 + n:]
+            gia, ton, dt, o["ton_tong"] = r[1 + n:]
+            if chi_so:
+                o["dt_12t"] = dt
             for kq, v in (gia or {}).items():
                 o[f"gia:{kq}"] = v
             for kho, (sl, bb) in (ton or {}).items():
                 o[f"ton:{kho}"], o[f"han:{kho}"] = sl, bb
         else:
-            o["dt_12t"], o["lan_cuoi"] = r[1 + n:]
+            if chi_so:
+                o["dt_12t"], o["lan_cuoi"] = r[1 + n:]
         ra[r[0]] = o
     return {"dong": ra, "lech": lech or [], "obc": obc or [], "phu": phu}
 
@@ -412,7 +425,11 @@ def _chuan(kieu: str, v) -> str:
 
 
 def luu(conn, loai: str, o: list[dict], nguoi_id: int | None, co_quyen: bool) -> dict:
-    """POST — kiểm quyền → kiểm dạng → khoá advisory → đọc (1 lượt) → lỗi ô (400) → xung đột (409) → ghi. Commit do route."""
+    """POST — kiểm quyền → kiểm dạng → khoá advisory → đọc (1 lượt) → lỗi ô (400) → xung đột (409) → ghi. Commit do route.
+
+    Trả `{dong, lech, so_o}`. `dong` = các dòng đã đọc lại để trình duyệt VÁ bộ đệm: CHỈ mang cột danh mục / giá / tồn /
+    hạn (+ `ton_tong` của sp) — KHÔNG mang chỉ số chỉ xem `dt_12t` / `lan_cuoi` (không tính lại khi lưu; trình duyệt giữ
+    giá trị đã có). Cả hai lượt đọc ở đây dùng `chi_so=False`: không đụng mart.doanh_thu_12t / mart.ban_den_moc."""
     if not co_quyen:
         raise KhongDuQuyen("Bạn cần cờ 'Sửa dữ liệu' để lưu.")
     if loai not in LOAI:
@@ -423,15 +440,17 @@ def luu(conn, loai: str, o: list[dict], nguoi_id: int | None, co_quyen: bool) ->
         raise LoiO(f"Tối đa {TOI_DA_O} ô mỗi lần lưu")
     loi: dict[str, str] = {}
     o_hl = []                                                   # (khoá dây, k, ma_cot, bang, khoa, cot, kieu, gia_tri gốc, thay)
+    da_thay: set[str] = set()                                   # khoá dây đã gặp — phát hiện ô lặp trong O(n)
     for i, x in enumerate(o):
         if not isinstance(x, dict) or not isinstance(x.get("k"), str) or not isinstance(x.get("cot"), str) \
                 or not x["k"] or len(x["k"]) > 64 or "|" in x["k"] or "thay" not in x or "gia_tri" not in x:
             loi[f"#{i}"] = "Ô thiếu hoặc sai k / cot / gia_tri / thay"
             continue
         kd = f"{x['k']}\t{x['cot']}"
-        if kd in {y[0] for y in o_hl} or kd in loi:
+        if kd in da_thay:
             loi[kd] = "Ô lặp trong cùng một lần lưu"
             continue
+        da_thay.add(kd)
         try:
             bang, khoa, cot, kieu = _dich(loai, x["k"], x["cot"])
         except ValueError as e:
@@ -445,7 +464,7 @@ def luu(conn, loai: str, o: list[dict], nguoi_id: int | None, co_quyen: bool) ->
         return {"dong": [], "lech": {}, "so_o": 0}
 
     conn.execute("SELECT pg_advisory_xact_lock(hashtext('bang_du_lieu:' || %s))", (loai,))
-    tho = _doc_tho(conn, loai, sorted({y[1] for y in o_hl}), [(y[3], y[4], y[5]) for y in o_hl])
+    tho = _doc_tho(conn, loai, sorted({y[1] for y in o_hl}), [(y[3], y[4], y[5]) for y in o_hl], chi_so=False)
     obc = {(r[0], r[1], r[2]): r for r in tho["obc"]}
     chon = {c: {str(x[0]) for x in (tho["phu"].get(c) or [])} for c, _, kieu in _DM[loai] if kieu == "chon"}
 
@@ -487,5 +506,5 @@ def luu(conn, loai: str, o: list[dict], nguoi_id: int | None, co_quyen: bool) ->
             cur.executemany("""INSERT INTO app.sua_du_lieu (bang, khoa, cot, gia_tri, gia_tri_obc, gia_tri_truoc, bo,
                                                             nguoi_dung_id)
                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", ghi)
-    dong, lech = _dong_va_lech(_doc_tho(conn, loai, sorted({y[1] for y in o_hl})))
+    dong, lech = _dong_va_lech(_doc_tho(conn, loai, sorted({y[1] for y in o_hl}), chi_so=False))
     return {"dong": dong, "lech": lech, "so_o": len(ghi)}

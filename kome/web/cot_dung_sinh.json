@@ -5096,14 +5096,12 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.gia_doi_thu_hien_hanh và 5 chỉ số khác",
      "ma": [
-      "kome/bang_du_lieu.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
-      "bang_du_lieu",
       "chung",
       "doi_thu",
       "lien_he",
@@ -12552,14 +12550,12 @@
      "loai": "man",
      "ly_do": "màn hình đọc qua mart.ban_den_moc, mart.dong_ban, mart.gia_doi_thu_hien_hanh và 5 chỉ số khác",
      "ma": [
-      "kome/bang_du_lieu.py",
       "kome/doi_thu.py",
       "kome/lien_he.py",
       "kome/san_pham_360.py",
       "kome/web/api.py"
      ],
      "man": [
-      "bang_du_lieu",
       "chung",
       "doi_thu",
       "lien_he",
