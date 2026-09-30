@@ -40,6 +40,13 @@ class Ngay:
     ngay: date
     la_kd: bool
     dt: int | None          # None = sau mốc hôm nay (chưa có dữ liệu)
+    lg: int | None = None   # lãi gộp cùng ngày (None khi dt None) — dự báo lãi gộp, trang Doanh thu
+
+
+def _gia(n: Ngay, cot: str) -> int:
+    """Giá trị của MỘT chỉ số (`dt` doanh thu / `lg` lãi gộp) trong ngày — cả hai
+    công thức dự báo đọc qua đây nên lãi gộp dùng ĐÚNG công thức của doanh thu."""
+    return (n.lg if cot == "lg" else n.dt) or 0
 
 
 def thang(d: date) -> str:
@@ -57,9 +64,9 @@ def doc_lich(conn) -> tuple[list[Ngay], date | None]:
     nay, kèm cờ ngày làm việc và doanh thu (NULL sau mốc). `mart.ban_theo_ngay`
     vào CTE MATERIALIZED vì câu lệnh tham chiếu nó hai lần (bất biến CTE-trùng)."""
     rows = conn.execute(
-        """WITH b AS MATERIALIZED (SELECT ngay, doanh_thu_thuan FROM mart.ban_theo_ngay),
+        """WITH b AS MATERIALIZED (SELECT ngay, doanh_thu_thuan, lai_gop FROM mart.ban_theo_ngay),
                 m AS (SELECT hom_nay FROM mart.moc_thoi_gian)
-           SELECT l.ngay, l.la_ngay_kd, b.doanh_thu_thuan, m.hom_nay
+           SELECT l.ngay, l.la_ngay_kd, b.doanh_thu_thuan, m.hom_nay, b.lai_gop
            FROM mart.lich_kinh_doanh l
            CROSS JOIN m
            LEFT JOIN b ON b.ngay = l.ngay
@@ -69,7 +76,8 @@ def doc_lich(conn) -> tuple[list[Ngay], date | None]:
     if not rows:
         return [], None
     hom_nay = rows[0][3]
-    return [Ngay(r[0], bool(r[1]), int(r[2]) if r[2] is not None and r[0] <= hom_nay else None)
+    return [Ngay(r[0], bool(r[1]), int(r[2]) if r[2] is not None and r[0] <= hom_nay else None,
+                 int(r[4] or 0) if r[2] is not None and r[0] <= hom_nay else None)
             for r in rows], hom_nay
 
 
@@ -107,12 +115,12 @@ def _day_du(ngay_thang: list[Ngay], tu: date) -> bool:
     return True
 
 
-def _luy_ke_toi(ngay_thang: list[Ngay], e: int) -> tuple[int, int] | None:
-    """(doanh thu luỹ kế tới HẾT ngày làm việc thứ e, số ngày làm việc cả tháng)."""
+def _luy_ke_toi(ngay_thang: list[Ngay], e: int, cot: str = "dt") -> tuple[int, int] | None:
+    """(luỹ kế chỉ số `cot` tới HẾT ngày làm việc thứ e, số ngày làm việc cả tháng)."""
     n = sum(1 for x in ngay_thang if x.la_kd)
     dem = tong = 0
     for x in ngay_thang:
-        tong += x.dt or 0
+        tong += _gia(x, cot)
         if x.la_kd:
             dem += 1
             if dem == e:
@@ -161,13 +169,16 @@ class ChotThang:
         return self.co_so - self.ngan_sach if self.ngan_sach else None
 
 
-def chot_thang(ds: list[Ngay], hom_nay: date, ngan_sach: int | None = None) -> ChotThang | None:
+def chot_thang(ds: list[Ngay], hom_nay: date, ngan_sach: int | None = None,
+               cot: str = "dt") -> ChotThang | None:
+    """`cot = "lg"`: CÙNG công thức trên chuỗi lãi gộp (trang Doanh thu). Tháng "đủ ngày"
+    (tháng dùng để đo sai số) vẫn xét theo doanh thu — một tập tháng cho cả hai chỉ số."""
     if not ds or hom_nay is None:
         return None
     tt = _theo_thang(ds)
     th = thang(hom_nay)
     nay = tt.get(th, [])
-    S = sum(x.dt or 0 for x in nay)
+    S = sum(_gia(x, cot) for x in nay)
     e = sum(1 for x in nay if x.la_kd and x.ngay <= hom_nay)
     n = sum(1 for x in nay if x.la_kd)
     F = du_bao_chot(S, e, n)
@@ -178,11 +189,11 @@ def chot_thang(ds: list[Ngay], hom_nay: date, ngan_sach: int | None = None) -> C
     q = []
     if 0 < e < n:
         for k in cu:
-            lk = _luy_ke_toi(tt[k], e)
+            lk = _luy_ke_toi(tt[k], e, cot)
             if lk is None:
                 continue
             s_p, n_p = lk
-            A = sum(x.dt or 0 for x in tt[k])
+            A = sum(_gia(x, cot) for x in tt[k])
             them = (s_p / e) * (n_p - e)
             if them > 0:
                 q.append((A - s_p) / them)
@@ -196,12 +207,12 @@ def chot_thang(ds: list[Ngay], hom_nay: date, ngan_sach: int | None = None) -> C
     moc = e if 0 < e < n else MOC_KIEM_GIUA_THANG
     kiem = []
     for k in cu[-SO_THANG_KIEM:]:
-        lk = _luy_ke_toi(tt[k], moc)
+        lk = _luy_ke_toi(tt[k], moc, cot)
         if lk is None:
             continue
         s_p, n_p = lk
         kiem.append(Kiem(k, round(du_bao_chot(s_p, moc, n_p)),
-                         sum(x.dt or 0 for x in tt[k])))
+                         sum(_gia(x, cot) for x in tt[k])))
     return ChotThang(thang=th, hom_nay=hom_nay, da_ban=S, e=e, n=n, co_so=round(F),
                      thap=thap, cao=cao, ngay=nay, kiem=kiem, moc_kiem=moc,
                      ngan_sach=ngan_sach)
@@ -245,10 +256,12 @@ class MuoiHaiThang:
         return sum(v for _, v in self.lich_su)
 
 
-def muoi_hai_thang(ds: list[Ngay], hom_nay: date) -> MuoiHaiThang:
+def muoi_hai_thang(ds: list[Ngay], hom_nay: date, cot: str = "dt") -> MuoiHaiThang:
+    """`cot = "lg"`: lãi gộp cùng tháng năm trước × hệ số lãi gộp (TỶ SỐ CỦA CÁC TỔNG lãi
+    gộp). Tháng đủ ngày xét theo doanh thu như chốt tháng."""
     tt = _theo_thang(ds) if ds else {}
     tu = ds[0].ngay if ds else None
-    A = {k: sum(x.dt or 0 for x in v) for k, v in tt.items() if tu and _day_du(v, tu)}
+    A = {k: sum(_gia(x, cot) for x in v) for k, v in tt.items() if tu and _day_du(v, tu)}
     ky = sorted(A)
     lich_su = [(k, A[k]) for k in ky[-12:]]
     doi = [k for k in ky if cong_thang(k, -12) in A][-12:]
@@ -277,39 +290,50 @@ class DuBaoNguoi:
     da_ban: int
     co_so: int
     ngan_sach: int | None
+    # Lãi gộp — cùng công thức chốt tháng (trang Doanh thu, công tắc Lãi gộp).
+    da_ban_lg: int = 0
+    co_so_lg: int = 0
+    ngan_sach_lg: int | None = None
 
     @property
     def tien_do(self) -> float | None:
         return self.co_so / self.ngan_sach if self.ngan_sach else None
 
+    @property
+    def tien_do_lg(self) -> float | None:
+        return self.co_so_lg / self.ngan_sach_lg if self.ngan_sach_lg else None
 
-def theo_nguoi(conn, th: str) -> tuple[list[DuBaoNguoi], int | None]:
+
+def theo_nguoi(conn, th: str) -> tuple[list[DuBaoNguoi], int | None, int | None]:
     """Một lượt hỏi: `mart.tien_do_ngan_sach` của tháng đang xét (FULL JOIN
     chỉ tiêu ↔ thực tế — người có chỉ tiêu mà bán 0 đồng vẫn có dòng), kèm ngân sách
     doanh thu CÔNG TY của tháng (041, `mart.ngan_sach_cong_ty_thang` — số nhập thẳng,
     không phải tổng từng người). Dòng `c` luôn có đúng một dòng, nên ngân sách công ty
     vẫn đọc được khi tháng chưa có dòng nào theo người."""
-    ra, ns_ct = [], None
-    for co, ma, ten, tt, ns, kd, qua, nsc in conn.execute(
-            """WITH c AS (SELECT (SELECT doanh_thu FROM mart.ngan_sach_cong_ty_thang
-                                   WHERE thang = %s) AS ns_ct)
+    ra, ns_ct, ns_lg = [], None, None
+    for co, ma, ten, tt, ns, kd, qua, nsc, tl, nl, nscl in conn.execute(
+            """WITH c AS (SELECT n.doanh_thu AS ns_ct, n.lai_gop AS ns_lg
+                         FROM (SELECT 1) x LEFT JOIN mart.ngan_sach_cong_ty_thang n ON n.thang = %s)
                SELECT t.co, t.salesperson_code, t.ten, t.thuc_te, t.muc_tieu,
-                      t.ngay_kd, t.ngay_kd_da_qua, c.ns_ct
+                      t.ngay_kd, t.ngay_kd_da_qua, c.ns_ct, t.thuc_te_lg, t.muc_tieu_lg, c.ns_lg
                FROM c LEFT JOIN (
                    SELECT true AS co, t.salesperson_code, s.ten, t.thuc_te, t.muc_tieu,
-                          t.ngay_kd, t.ngay_kd_da_qua
+                          t.ngay_kd, t.ngay_kd_da_qua, t.thuc_te_lg, t.muc_tieu_lg
                    FROM mart.tien_do_ngan_sach t
                    LEFT JOIN core.dim_salesperson s ON s.salesperson_code = t.salesperson_code
                    WHERE t.thang = %s) t ON true
                ORDER BY t.thuc_te DESC NULLS LAST, t.salesperson_code""", (th, th)).fetchall():
         ns_ct = int(nsc) if nsc is not None else None
+        ns_lg = int(nscl) if nscl is not None else None
         if not co:
             continue
-        tt = int(tt or 0)
+        tt, tl = int(tt or 0), int(tl or 0)
         ra.append(DuBaoNguoi(ma=ma, ten=ten, da_ban=tt,
                              co_so=round(du_bao_chot(tt, int(qua or 0), int(kd or 0))),
-                             ngan_sach=int(ns) if ns is not None else None))
-    return ra, ns_ct
+                             ngan_sach=int(ns) if ns is not None else None,
+                             da_ban_lg=tl, co_so_lg=round(du_bao_chot(tl, int(qua or 0), int(kd or 0))),
+                             ngan_sach_lg=int(nl) if nl is not None else None))
+    return ra, ns_ct, ns_lg
 
 
 # ---- 3 + 4. Khách: đơn kỳ vọng + nguy cơ ngừng mua --------------------------
@@ -410,6 +434,9 @@ class DuBao:
     nam: MuoiHaiThang
     nguoi: list[DuBaoNguoi]
     kh: Khach
+    # Lãi gộp: CÙNG hai công thức (trang Doanh thu). None khi không có dữ liệu.
+    chot_lg: ChotThang | None = None
+    nam_lg: MuoiHaiThang | None = None
 
 
 def du_bao(conn) -> DuBao | None:
@@ -417,7 +444,9 @@ def du_bao(conn) -> DuBao | None:
     ds, hom_nay = doc_lich(conn)
     if hom_nay is None:
         return None
-    nguoi, ns_ct = theo_nguoi(conn, thang(hom_nay))
+    nguoi, ns_ct, ns_lg = theo_nguoi(conn, thang(hom_nay))
     # Chốt tháng so với ngân sách CÔNG TY (041) — không cộng từ từng người.
     return DuBao(chot=chot_thang(ds, hom_nay, ns_ct),
-                 nam=muoi_hai_thang(ds, hom_nay), nguoi=nguoi, kh=khach(conn))
+                 nam=muoi_hai_thang(ds, hom_nay), nguoi=nguoi, kh=khach(conn),
+                 chot_lg=chot_thang(ds, hom_nay, ns_lg, cot="lg"),
+                 nam_lg=muoi_hai_thang(ds, hom_nay, cot="lg"))

@@ -97,15 +97,15 @@ def thanh_json(o, bo: tuple[str, ...] = ()):
     return o
 
 
-def _luy_ke_ky_so(bc, td, kx) -> tuple[list | None, list | None]:
-    """Luỹ kế KỲ SO theo từng tháng của `td.luy_ke` (doanh thu, lãi gộp) — cộng từ số
-    đã có (0 lượt hỏi): dạng Kỳ từ `bc.thang[].dt_cung_ky` (cùng tháng năm trước;
-    không có lãi gộp cùng kỳ ⇒ đường lãi gộp không có); dạng Tháng / Khoảng từ
-    `bc.thang_ss` (tháng dời `lech_thang`). Tháng đang xem dở dang (dạng Tháng) dùng
-    tổng ĐÚNG dải so đã cắt cùng ngày (`bc.so_sanh[0]`), không trọn tháng dời. Chỉ
-    cộng tới tháng đã có thực tế; tháng không so được làm đường dừng (None)."""
+def _ky_so_thang(bc, td, kx) -> tuple[dict | None, bool]:
+    """KỲ SO của từng tháng của `td.luy_ke`: {tháng đang xem: [dt, lg]} — cộng từ số đã
+    có (0 lượt hỏi): dạng Kỳ từ `bc.thang[].dt_cung_ky` (cùng tháng năm trước; không có
+    lãi gộp cùng kỳ ⇒ `co_lg` False); dạng Tháng / Khoảng từ `bc.thang_ss` (tháng dời
+    `lech_thang`). Tháng đang xem dở dang (dạng Tháng) dùng tổng ĐÚNG dải so đã cắt cùng
+    ngày (`bc.so_sanh[0]`), không trọn tháng dời. Dùng cho luỹ kế kỳ so VÀ cột ma của
+    biểu đồ chính trang Doanh thu — MỘT cách lấy số kỳ so theo tháng."""
     if td is None or not kx.so_sanh or not kx.so_sanh[0].co:
-        return None, None
+        return None, False
     s = kx.so_sanh[0]
     if bc.thang_ss or kx.loai != "ky" or kx.tu_chon:
         thang = dict(bc.thang_ss)
@@ -116,7 +116,7 @@ def _luy_ke_ky_so(bc, td, kx) -> tuple[list | None, list | None]:
         thang = {o.thang: [o.dt_cung_ky, None] for o in bc.thang if o.co_cung_ky}
         co_lg = False
     if s.lech_thang is None:
-        return None, None
+        return None, False
     # Tháng dời nằm TRONG dải dữ liệu mà không có phiếu nào = bán 0 đồng (không phải
     # "không biết") — không có dòng ngành × tháng nào để cộng.
     dau = kx.ngay_dau.strftime("%Y-%m")
@@ -124,6 +124,16 @@ def _luy_ke_ky_so(bc, td, kx) -> tuple[list | None, list | None]:
         t = int(m.thang[:4]) * 12 + int(m.thang[5:7]) - 1 - s.lech_thang
         if m.thuc_te is not None and m.thang not in thang and f"{t // 12:04d}-{t % 12 + 1:02d}" >= dau:
             thang[m.thang] = [0, 0 if co_lg else None]
+    return thang, co_lg
+
+
+def _luy_ke_ky_so(bc, td, kx) -> tuple[list | None, list | None]:
+    """Luỹ kế KỲ SO theo từng tháng của `td.luy_ke` (doanh thu, lãi gộp) từ
+    `_ky_so_thang`. Chỉ cộng tới tháng đã có thực tế; tháng không so được làm đường
+    dừng (None)."""
+    thang, co_lg = _ky_so_thang(bc, td, kx)
+    if thang is None:
+        return None, None
     # Một tháng đã có thực tế mà không so được -> hai đường luỹ kế không cùng gốc:
     # không vẽ còn hơn vẽ lệch (cùng luật khối ngân sách của Tổng quan).
     if any(thang.get(m.thang) is None or thang[m.thang][0] is None
@@ -152,6 +162,7 @@ def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
                               tinh_bao_cao, ve_bieu_do, ve_luy_ke)
     from kome.ngan_sach import thang_cua_ky
     from kome.ve_phan_tich import ve_cay_o, ve_dong_gop, ve_duong_nho, ve_nhiet, ve_pareto
+    from kome import ve_doanh_thu as VDT
     kx = KX.giai_conn(c, ts or KX.ThamSo())
     if kx is None:
         bc = tinh_bao_cao(c, None)
@@ -166,6 +177,8 @@ def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
     thang_dau = kx.ngay_dau.strftime("%Y-%m")
     s = kx.so_sanh[0] if kx.so_sanh else None
     ss_dt, ss_lg = _luy_ke_ky_so(bc, td, kx)
+    ss_thang, ss_co_lg = _ky_so_thang(bc, td, kx)
+    ts_ = bc.ky.ty_suat
     return thanh_json({
         "khoang": kx,
         "bc": bc, "td": td, "bd": ve_bieu_do(bc.thang), "lk": ve_luy_ke(td, ss=ss_dt),
@@ -183,6 +196,11 @@ def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
         "ngay_dau_du_lieu": kx.ngay_dau,
         "td_phu": chi_so_phu(td) if td else None,
         "td_phu_lg": chi_so_phu(td, lg=True) if td else None,
+        # Trang Doanh thu (2026-09-30): hình học tính trên số đã có — 0 lượt hỏi thêm.
+        "ss_thang": {"thang": ss_thang or {}, "co_lg": ss_co_lg},
+        "cau_noi": VDT.ve_cau_noi(bc.nganh_ky),
+        "bong_nganh": {"dt": VDT.bong_danh_muc(bc.nganh_ky, ts_), "lg": VDT.bong_danh_muc(bc.nganh_ky, ts_, lg=True)},
+        "bong_ma": {"dt": VDT.bong_mat_hang(bc.hang_theo_nganh, ts_), "lg": VDT.bong_mat_hang(bc.hang_theo_nganh, ts_, lg=True)},
     })
 
 
@@ -210,6 +228,10 @@ def du_lieu_du_bao(c) -> dict:
         "theo": {kb: [t.theo(kb) for t in m.du_bao] for kb in DB.KICH_BAN},
         "ve_chot": VDB.ve_chot_thang(db.chot) if db.chot else {"co": False},
         "ve_nam": {kb: VDB.ve_muoi_hai_thang(m, kb) for kb in DB.KICH_BAN} if m.du_bao else None,
+        # Lãi gộp (trang Doanh thu): CÙNG hai công thức trên chuỗi lãi gộp.
+        "tong_lg": {kb: db.nam_lg.tong(kb) for kb in DB.KICH_BAN},
+        "theo_lg": {kb: [t.theo(kb) for t in db.nam_lg.du_bao] for kb in DB.KICH_BAN},
+        "ve_chot_lg": VDB.ve_chot_thang(db.chot_lg, cot="lg") if db.chot_lg else {"co": False},
     }, bo=("ngay",))
 
 
