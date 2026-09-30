@@ -27,7 +27,7 @@ export function chuoiLocSp(b: LocSp): string {
   return q.toString();
 }
 
-const bo_dau = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\u0111/g, "d").replace(/\u0110/g, "D").toLowerCase();
+export const bo_dau = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\u0111/g, "d").replace(/\u0110/g, "D").toLowerCase();
 
 export function khopTim(m: { ma: string; ten: string; nganh?: string | null }, tim: string): boolean {
   const t = bo_dau(tim.trim());

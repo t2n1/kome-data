@@ -1,0 +1,76 @@
+/* Kho dữ liệu › Bảng dữ liệu (đặc tả 2026-09-30-bang-du-lieu-sua §6). Tiền tố bdl- (lớp chung .o / .so đã có chỗ khác
+   dùng). Chỉ biến màu của kome.css — sáng / tối tự đổi. Dòng cao CỐ ĐỊNH 30px: BangTinh.tsx::CAO_DONG tính khung nhìn
+   theo đúng số này. */
+.bdl-dau{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;margin-bottom:.3rem}
+.bdl-dau h1{margin:0}
+.bdl-tab{display:flex;gap:.3rem}
+.bdl-chi-xem{background:var(--nen-phu);border:1px solid var(--vien);border-radius:8px;padding:.45rem .7rem;font-size:.84rem;
+  color:var(--chu-nhat);margin:.3rem 0 .5rem}
+.bdl-cong-cu{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;margin:.5rem 0}
+.bdl-cong-cu input[type="search"]{flex:1 1 16rem;min-width:0;font:inherit;padding:.38rem .6rem;border:1px solid var(--vien);
+  border-radius:7px;background:var(--nen-the);color:var(--chu)}
+.bdl-dem-dong,.bdl-so-cho{font-size:.8rem;color:var(--chu-nhat);white-space:nowrap}
+.bdl-so-cho:empty{display:none}
+.bdl-bao{font-size:.84rem;margin:.2rem 0 .5rem}
+.bdl-xung{border:1px solid var(--do);border-radius:8px;background:var(--nen-the);padding:.5rem .75rem;margin:.3rem 0 .6rem;
+  font-size:.84rem}
+.bdl-xung p{margin:0 0 .3rem}
+.bdl-xung ul{margin:.2rem 0 .5rem;padding-left:1.2rem}
+
+.bdl-than{display:flex;gap:.7rem;align-items:flex-start;min-width:0}
+.bdl-chon-cot{flex:0 0 15rem;box-sizing:border-box;max-height:70vh;overflow:auto;border:1px solid var(--vien);border-radius:8px;
+  background:var(--nen-the);padding:.5rem .65rem;font-size:.82rem}
+.bdl-chon-cot-nut{display:flex;gap:.3rem;margin-bottom:.4rem}
+.bdl-chon-cot fieldset{border:0;margin:0 0 .55rem;padding:0;min-width:0}
+.bdl-chon-cot legend{padding:0;margin-bottom:.15rem;font-size:.74rem;font-weight:600;letter-spacing:.04em;color:var(--chu-nhat)}
+.bdl-chon-cot label{display:flex;gap:.35rem;align-items:center;padding:.12rem 0;cursor:pointer}
+
+.bdl-khung{flex:1 1 auto;min-width:0;height:70vh;overflow:auto;border:1px solid var(--vien);border-radius:8px;
+  background:var(--nen-the);outline:none;position:relative}
+.bdl-khung:focus-visible{box-shadow:0 0 0 2px var(--lien-ket)}
+.bdl-bang{border-collapse:separate;border-spacing:0;font-size:.8rem;width:max-content;min-width:100%}
+.bdl-bang tr{height:30px}
+.bdl-bang th,.bdl-bang td{height:30px;box-sizing:border-box;padding:0 .5rem;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:18rem;border-bottom:1px solid var(--vien);border-right:1px solid var(--vien);
+  color:var(--chu);text-align:left;font-weight:400}
+.bdl-bang thead th{position:sticky;top:0;z-index:2;background:var(--nen-phu);color:var(--chu-nhat);font-size:.74rem;
+  font-weight:600;border-bottom-color:var(--vien-dam)}
+.bdl-bang .bdl-ma{position:sticky;left:0;z-index:1;background:var(--nen-the);font-variant-numeric:tabular-nums;
+  border-right-color:var(--vien-dam)}
+.bdl-bang thead th.bdl-ma{z-index:3;background:var(--nen-phu)}
+.bdl-bang .bdl-so{text-align:right;font-variant-numeric:tabular-nums}
+.bdl-bang td{cursor:cell;position:relative}
+.bdl-bang td:focus{outline:none}
+.bdl-bang td.bdl-khoa{color:var(--chu-nhat);cursor:default}
+.bdl-bang td.bdl-khong{background:var(--nen-phu);cursor:default}
+.bdl-bang td.bdl-cho{background:var(--canh-nen)}
+.bdl-bang td.bdl-lech{box-shadow:inset 3px 0 0 var(--lien-ket)}
+.bdl-bang td.bdl-chon{box-shadow:inset 0 0 0 2px var(--lien-ket)}
+.bdl-bang td.bdl-lech.bdl-chon{box-shadow:inset 3px 0 0 var(--lien-ket),inset 0 0 0 2px var(--lien-ket)}
+.bdl-bang td.bdl-loi{box-shadow:inset 0 0 0 2px var(--do)}
+.bdl-bang td.bdl-loi.bdl-chon{box-shadow:inset 0 0 0 2px var(--do),inset 0 0 0 4px var(--lien-ket)}
+.bdl-bang td.bdl-dang-sua{padding:0;overflow:visible;max-width:none}
+.bdl-bang tr.bdl-dem td{height:auto;padding:0;border:0}
+.bdl-sua{width:100%;min-width:7rem;height:28px;box-sizing:border-box;font:inherit;border:0;border-radius:0;padding:0 .4rem;
+  background:var(--nen-the);color:var(--chu);outline:2px solid var(--lien-ket);outline-offset:-2px}
+.bdl-sua.bdl-so{text-align:right}
+.bdl-sua-ngay{display:flex;align-items:center;gap:2px;height:28px}
+.bdl-sua-ngay .bdl-sua{min-width:9rem}
+.bdl-khong-han{font:inherit;font-size:.7rem;white-space:nowrap;padding:.1rem .4rem;border:1px solid var(--vien-dam);border-radius:6px;
+  background:var(--nen-phu);color:var(--chu);cursor:pointer}
+.bdl-khong-han[aria-pressed="true"]{border-color:var(--lien-ket)}
+.bdl-ve{font:inherit;font-size:.72rem;line-height:1;margin-left:.3rem;padding:.1rem .3rem;border:1px solid var(--vien);border-radius:5px;
+  background:var(--nen-the);color:var(--lien-ket);cursor:pointer;vertical-align:1px}
+.bdl-rong{padding:1rem;color:var(--chu-nhat);margin:0}
+
+.bdl-chu-thich{font-size:.8rem;color:var(--chu-nhat);margin-top:.6rem}
+.bdl-chu-thich p{margin:.2rem 0}
+.bdl-mau{display:inline-block;width:.9rem;height:.9rem;vertical-align:-2px;border:1px solid var(--vien);background:var(--nen-the)}
+.bdl-mau-cho{background:var(--canh-nen)}
+.bdl-mau-lech{box-shadow:inset 3px 0 0 var(--lien-ket)}
+
+@media (max-width:860px){
+  .bdl-than{flex-direction:column}
+  .bdl-chon-cot{flex:none;width:100%;max-height:14rem}
+  .bdl-khung{width:100%;height:65vh}
+}

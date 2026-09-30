@@ -180,7 +180,7 @@ def danh_sach(conn, hom_nay: date, sale: str | None = None,
                        k.dt_tb_3_thang, NULL, NULL, NULL,
                        '{COT_THANG}', 4, k.so_thang_mua_3, k.dt_thang_truoc
                   FROM mart.khach_thang_nay k
-                  LEFT JOIN core.dim_customer d
+                  LEFT JOIN mart.dim_customer d
                          ON d.customer_code = k.customer_code AND d.is_current
                  WHERE k.nhan = 'tre' {dk2})
             SELECT u.customer_code, u.ten, u.prefecture, u.phone,
@@ -286,7 +286,7 @@ _COT_LTX = """n.kieu, n.ket_qua, n.noi_dung, n.thoi_diem, n.hen_lai,
               coalesce(s.ten, nd.ten_dang_nhap), n.customer_code, c.customer_name"""
 
 _TU_LTX = """FROM app.nhat_ky_tiep_xuc n
-             LEFT JOIN core.dim_customer c
+             LEFT JOIN mart.dim_customer c
                     ON c.customer_code = n.customer_code AND c.is_current
              LEFT JOIN app.nguoi_dung nd ON nd.id = n.nguoi_dung_id
              LEFT JOIN core.dim_salesperson s ON s.salesperson_code = nd.salesperson_code"""
@@ -317,7 +317,7 @@ def hen_goi_lai(conn, hom_nay: date, sale: str | None = None) -> list[LanTiepXuc
             FROM (SELECT DISTINCT ON (customer_code) *
                   FROM app.nhat_ky_tiep_xuc
                   ORDER BY customer_code, thoi_diem DESC, id DESC) n
-            LEFT JOIN core.dim_customer c
+            LEFT JOIN mart.dim_customer c
                    ON c.customer_code = n.customer_code AND c.is_current
             LEFT JOIN app.nguoi_dung nd ON nd.id = n.nguoi_dung_id
             LEFT JOIN core.dim_salesperson s ON s.salesperson_code = nd.salesperson_code
@@ -363,7 +363,7 @@ def ghi(conn, ma: str, nguoi_id: int | None, kieu: str, ket_qua: str,
     Không commit — người gọi quyết định giao dịch."""
     kieu, ket_qua, noi_dung, hen = doc_bieu_mau(kieu, ket_qua, noi_dung, hen_lai)
     co = conn.execute(
-        "SELECT 1 FROM core.dim_customer WHERE customer_code = %s AND is_current",
+        "SELECT 1 FROM mart.dim_customer WHERE customer_code = %s AND is_current",
         (ma,)).fetchone()
     if co is None:
         raise LoiNhap(f"Không có khách mã {ma}.")
@@ -433,7 +433,7 @@ def _kiem_the(conn, noi_dung: str, nhac: list[dict]) -> list[tuple]:
     for a, b in zip(ra, ra[1:]):
         if a[2] + a[3] > b[2]:
             raise LoiNhap("Hai thẻ @ chồng lên nhau.")
-    # Tồn tại: đối thủ trong app.doi_thu; nhóm 'ma:' trong core.dim_product, 'n:' trong app.nhom_so_sanh.
+    # Tồn tại: đối thủ trong app.doi_thu; nhóm 'ma:' trong mart.dim_product, 'n:' trong app.nhom_so_sanh.
     dt = sorted({k for l, k, _, _ in ra if l == "doi_thu"})
     if dt:
         co = {r[0] for r in conn.execute("SELECT ma FROM app.doi_thu WHERE ma = ANY(%s)", (dt,))}
@@ -442,7 +442,7 @@ def _kiem_the(conn, noi_dung: str, nhac: list[dict]) -> list[tuple]:
                 raise LoiNhap(f"Không có đối thủ '{k}'.")
     ma = sorted({k[3:] for l, k, _, _ in ra if l == "nhom" and k.startswith("ma:")})
     if ma:
-        co = {r[0] for r in conn.execute("SELECT product_code FROM core.dim_product WHERE product_code = ANY(%s)", (ma,))}
+        co = {r[0] for r in conn.execute("SELECT product_code FROM mart.dim_product WHERE product_code = ANY(%s)", (ma,))}
         for k in ma:
             if k not in co:
                 raise LoiNhap(f"Không có mã KOME '{k}'.")

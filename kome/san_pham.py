@@ -174,7 +174,7 @@ class Kho:
 
 # Bộ cột CHUNG của mọi nhánh lượt hỏi 2 của kho_hang() (UNION ALL đòi cùng cột):
 # `_COT_LO` trong nhánh (bí danh t = mart.ton_theo_lo, s = mart.san_pham_360,
-# p = core.dim_product), `_COT_LO_NGOAI` ở lớp ngoài — cùng thứ tự với `_dong`.
+# p = mart.dim_product), `_COT_LO_NGOAI` ở lớp ngoài — cùng thứ tự với `_dong`.
 _COT_LO = """t.product_code AS ma, coalesce(s.ten_hang, t.product_code) AS ten,
              t.warehouse_code AS kho, t.ten_kho, t.so_luong, t.gia_tri,
              t.best_before, t.loai_han, t.han_con_lai, s.trang_thai, s.nhom,
@@ -190,7 +190,7 @@ _COT_LO_NGOAI = """ma, ten, kho, ten_kho, so_luong, gia_tri, best_before, loai_h
              sap_chuyen_lo"""
 _TU_LO = """FROM t
                LEFT JOIN s ON s.product_code = t.product_code
-               LEFT JOIN core.dim_product p ON p.product_code = t.product_code"""
+               LEFT JOIN mart.dim_product p ON p.product_code = t.product_code"""
 
 
 _COT = """product_code, ten_hang, nhom, doanh_thu_thuan, lai_gop, ty_suat,
@@ -466,7 +466,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
     # mâu thuẫn mà ô tổng quan sinh ra để tránh — ô nói "12 lô cận hạn" còn
     # bảng ngay dưới nó chỉ liệt kê 10.
     #
-    # LEFT JOIN san_pham_360 (và core.dim_product để lấy ngành): một mã có trong bản xuất tồn kho nhưng chưa có
+    # LEFT JOIN san_pham_360 (và mart.dim_product để lấy ngành): một mã có trong bản xuất tồn kho nhưng chưa có
     # trong 商品マスタ vẫn phải hiện ở bảng tồn. INNER JOIN làm nó biến mất khỏi
     # đúng màn hình lẽ ra phải phát hiện ra nó.
     #
@@ -529,7 +529,7 @@ def kho_hang(conn, kho: str = "", loc: str = "") -> Kho:
                 # Ba cột của CẢ MÃ (mọi kho, san_pham_360) — giao diện React ghi
                 # rõ "của cả mã": không có "đủ bán" riêng từng kho ở mart.
                 "nhom": r[11], "du_ban_ngay": _so(r[12]), "toc_do": _so(r[13]),
-                # Ngành hàng = 食品分類名 của 商品データ (core.dim_product), qua
+                # Ngành hàng = 食品分類名 của 商品データ (mart.dim_product), qua
                 # ĐÚNG hàm mart.ten_nganh — cùng nhãn "(chưa phân loại)" với Báo
                 # cáo / Sản phẩm. KHÔNG đọc 食品分類 của chính file 在庫一覧 (từ
                 # 2026-09-24 bản xuất có kèm hai cột đó): một khái niệm một
@@ -564,13 +564,13 @@ def lo_can_han(conn, gioi_han: int = 5) -> tuple[list[dict], int]:
     NẶNG NHẤT của mart (kéo theo mart.ty_suat_mat_hang và hai lượt quét
     fact_sales_line, xem chú thích ở đầu kho_hang()) — chỉ để lấy 5 dòng cận
     hạn và một con số đếm. `lo_can_han()` chỉ cần TÊN HÀNG và HẠN SỬ DỤNG, cả
-    hai đều có sẵn ở nguồn rẻ hơn nhiều: `mart.ton_hien_tai` + `core.dim_product`.
+    hai đều có sẵn ở nguồn rẻ hơn nhiều: `mart.ton_hien_tai` + `mart.dim_product`.
 
     TÊN HÀNG tái tạo ĐÚNG công thức của `san_pham_360.ten_hang`
     (`coalesce(nullif(product_name, ''), product_code)`, migration 023) bằng
-    cách LEFT JOIN thẳng `core.dim_product` — không phải chép một biểu thức
-    tương tự rồi hy vọng nó khớp. `san_pham_360` dựng TỪ `core.dim_product`
-    (`FROM core.dim_product p`), nên với MỌI mã có trong `dim_product`, biểu
+    cách LEFT JOIN thẳng `mart.dim_product` — không phải chép một biểu thức
+    tương tự rồi hy vọng nó khớp. `san_pham_360` dựng TỪ `mart.dim_product`
+    (`FROM mart.dim_product p`), nên với MỌI mã có trong `dim_product`, biểu
     thức ở đây cho ra đúng con số mà `kho_hang()::_dong` hiện
     (`coalesce(s.ten_hang, t.product_code)`). Ca hiếm mã tồn kho không có
     trong `dim_product` (dữ liệu bất thường) cũng khớp: `p` là NULL qua LEFT
@@ -592,7 +592,7 @@ def lo_can_han(conn, gioi_han: int = 5) -> tuple[list[dict], int]:
                         t.warehouse_code AS kho, t.ten_kho, t.han_con_lai,
                         row_number() OVER (ORDER BY t.han_con_lai) AS xep
                    FROM t
-                   LEFT JOIN core.dim_product p ON p.product_code = t.product_code
+                   LEFT JOIN mart.dim_product p ON p.product_code = t.product_code
                   WHERE {VI_TU_CAN_HAN}
              ),
              qua AS (SELECT count(*) AS n FROM t WHERE {VI_TU_QUA_HAN})
@@ -628,7 +628,7 @@ def danh_muc(conn) -> dict:
         một định nghĩa "12 tháng" cho cả dự án. `san_pham_360.doanh_thu_thuan`
         là LUỸ KẾ, hai cột cùng tồn tại và trang ghi rõ cột nào là cột nào.
       * `thang` — 12 THÁNG LỊCH gần nhất (tới tháng mốc) cho đường xu hướng.
-      * `nganh` — ngành hàng (`core.dim_product.food_category_name`).
+      * `nganh` — ngành hàng (`mart.dim_product.food_category_name`).
     Cả hai đọc MỘT CTE trên `mart.dong_ban` (không đi qua
     `mart.san_pham_theo_thang`, thứ đọc lại `dong_ban` một lần nữa) — cùng lý lẽ
     bất biến CTE-trùng.
@@ -664,7 +664,7 @@ def danh_muc(conn) -> dict:
           FROM s CROSS JOIN m
           LEFT JOIN d12 ON d12.product_code = s.product_code
           LEFT JOIN th ON th.product_code = s.product_code
-          LEFT JOIN core.dim_product p ON p.product_code = s.product_code
+          LEFT JOIN mart.dim_product p ON p.product_code = s.product_code
          ORDER BY s.doanh_thu_thuan DESC NULLS LAST, s.product_code
     """).fetchall()
     hom_nay = rows[0][-1] if rows else None

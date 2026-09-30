@@ -1,6 +1,6 @@
 // Cài đặt (màn 21, Cài đặt.dc.html): danh mục mục bên trái, nội dung bên phải.
 // CHỈ dựng những mục có thứ thật đằng sau (xem đặc tả màn 20/21):
-//   * Người dùng & phân quyền — đổi ba cờ (chỉ người có duoc_quan_tri; máy
+//   * Người dùng & phân quyền — đổi bốn cờ (chỉ người có duoc_quan_tri; máy
 //     chưa bật đăng nhập thì từ chối). Biểu mẫu POST /cai-dat/quyen/{id} THẬT,
 //     không nhận mật khẩu bao giờ — tạo tài khoản / mật khẩu chỉ bằng script.
 //   * Ngân sách & ngày nghỉ, Quy tắc khách hàng, Nguồn, Hiển thị — đọc, trỏ về nơi thật.
@@ -35,7 +35,7 @@ export default function CaiDat() {
           <section id="nguoi-dung" className="the-cd">
             <h2>Người dùng &amp; phân quyền <span className="khong-ap-dung">ユーザー管理</span></h2>
             {!m.co_cong ? <p className="ngay-thieu tai-lieu">Máy này chưa bật đăng nhập (<code>KOME_SESSION_SECRET</code> trống) — ai mở được
-              trang cũng làm được mọi thứ, nên ba cờ bên dưới chưa bảo vệ được gì. Xem <code>docs/runbook.md</code>, mục "Bật đăng nhập trên máy
+              trang cũng làm được mọi thứ, nên các cờ bên dưới chưa bảo vệ được gì. Xem <code>docs/runbook.md</code>, mục "Bật đăng nhập trên máy
               trong công ty".</p>
               : !m.duoc_sua && <p className="ghi-chu">Bạn xem được danh sách nhưng không đổi được quyền — cần cờ <strong>quản trị</strong>.</p>}
             <div className="bang-cuon"><table>
@@ -53,11 +53,12 @@ export default function CaiDat() {
                         <span className="sr">{nhan} cho {n.ten_dang_nhap}</span><span aria-hidden="true">{n[co] ? "có" : "—"}</span></label></td>))}
                     <td>{m.duoc_sua && <button type="submit" form={"q" + n.id} className="nut-nap">Lưu</button>}</td>
                   </tr>))}
-                {!m.nguoi_dung.length && <tr><td colSpan={6} className="khong-ap-dung">Chưa có tài khoản nào — tạo bằng <code>python scripts/tao_nguoi_dung.py them &lt;tên&gt;</code>.</td></tr>}
+                {!m.nguoi_dung.length && <tr><td colSpan={7} className="khong-ap-dung">Chưa có tài khoản nào — tạo bằng <code>python scripts/tao_nguoi_dung.py them &lt;tên&gt;</code>.</td></tr>}
               </tbody>
             </table></div>
             <p className="ghi-chu"><strong>Kho dữ liệu</strong> = nạp file và bấm Hoàn tác (xoá được cả một tháng doanh thu) ·{" "}
-              <strong>Ngân sách</strong> = đặt chỉ tiêu cả công ty · <strong>Quản trị</strong> = đổi ba cờ này của người khác.
+              <strong>Ngân sách</strong> = đặt chỉ tiêu cả công ty · <strong>Sửa dữ liệu</strong> = sửa đè giá trị OBC ở Bảng dữ liệu (OBC vẫn giữ nguyên) ·{" "}
+              <strong>Quản trị</strong> = đổi các cờ này của người khác.
               Tạo tài khoản, đổi mật khẩu: <code>python scripts/tao_nguoi_dung.py</code> (không làm trên web).
               Lọc "khách của tôi" là mặc định tiện dụng, không phải hàng rào — ai cũng xem được mọi khách.</p>
           </section>

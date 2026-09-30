@@ -127,3 +127,28 @@ def test_liet_ke_khong_tra_ve_hash_hay_salt(conn):
     ds = ND.liet_ke(conn)
     assert [n.ten_dang_nhap for n in ds] == ["an", "binh"]
     assert not any(hasattr(n, t) for n in ds for t in ("mat_khau_hash", "mat_khau_salt"))
+
+
+def test_dat_quyen_sua_du_lieu_bat_tat_va_ghi_so(conn):
+    """072: cờ thứ tư — mặc định False, đổi thật mới ghi app.nhat_ky_quyen, không đụng ba cờ kia."""
+    assert ND.CO_QUYEN[-1] == "duoc_sua_du_lieu"
+    an = ND.tao(conn, "an", MK)
+    conn.commit()
+    assert ND.kiem_tra(conn, "an", MK).duoc_sua_du_lieu is False
+    assert ND.dat_quyen(conn, "an", sua_du_lieu=True) is True
+    ND.dat_quyen(conn, "an", sua_du_lieu=True)          # bấm lại đúng giá trị: không ghi gì
+    conn.commit()
+    n = ND.kiem_tra(conn, "an", MK)
+    assert n.duoc_sua_du_lieu is True and n.duoc_vao_kho_du_lieu is False and n.duoc_quan_tri is False
+    assert ND.theo_id(conn, an).duoc_sua_du_lieu is True
+    assert conn.execute("SELECT co, gia_tri_cu, gia_tri_moi FROM app.nhat_ky_quyen").fetchall() == [
+        ("duoc_sua_du_lieu", False, True)]
+    ND.dat_quyen(conn, "an", sua_du_lieu=False)
+    conn.commit()
+    assert next(x for x in ND.liet_ke(conn)).duoc_sua_du_lieu is False
+
+
+def test_tao_nhan_sua_du_lieu(conn):
+    ND.tao(conn, "sd", MK, sua_du_lieu=True)
+    conn.commit()
+    assert ND.kiem_tra(conn, "sd", MK).duoc_sua_du_lieu is True

@@ -357,7 +357,7 @@ def han_su_dung(conn, sale=None, ts=None) -> dict:
             SELECT t.product_code, coalesce(nullif(p.product_name, ''), t.product_code),
                    t.warehouse_code, t.ten_kho, t.best_before, t.han_con_lai,
                    t.so_luong, t.gia_tri
-              FROM t LEFT JOIN core.dim_product p ON p.product_code = t.product_code
+              FROM t LEFT JOIN mart.dim_product p ON p.product_code = t.product_code
              WHERE ({SP.VI_TU_CAN_HAN}) OR ({SP.VI_TU_QUA_HAN})
              ORDER BY t.han_con_lai LIMIT 40""", [SP.CAN_HAN_NGAY]).fetchall()
     return {"can_han_ngay": SP.CAN_HAN_NGAY, "lo": [{

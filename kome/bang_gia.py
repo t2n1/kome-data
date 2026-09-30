@@ -16,7 +16,7 @@ _SQL = """
 WITH dm AS (
     SELECT p.product_code AS ma, coalesce(nullif(p.product_name, ''), p.product_code) AS ten,
            mart.ten_nganh(p.food_category_name) AS nganh, mart.la_ngung_ban(p.rank_code, p.product_name) AS ngung_ban
-    FROM core.dim_product p
+    FROM mart.dim_product p
     WHERE NOT mart.khong_phai_hang(p.product_code, p.kind_code, p.food_category_name)
       AND NOT EXISTS (SELECT 1 FROM mart.ma_ngung_ban_an a WHERE a.product_code = p.product_code)
 )

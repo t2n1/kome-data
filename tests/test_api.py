@@ -126,7 +126,7 @@ def test_anh_chup_trung_thi_khong_tinh_lai(kho, conn, bat_anh_chup):
     assert len(goi) == 1 and json.loads(a) == json.loads(b) and pb1 == pb2 and pb1
 
 
-@pytest.mark.parametrize("doi", ["lo_nap", "hoan_tac", "ngan_sach", "tiep_xuc"])
+@pytest.mark.parametrize("doi", ["lo_nap", "hoan_tac", "ngan_sach", "tiep_xuc", "sua_du_lieu"])
 def test_moi_nguon_doi_la_tinh_lai(kho, conn, batch, bat_anh_chup, doi):
     """Không bao giờ trả số cũ hơn dữ liệu: nạp, hoàn tác, sửa ngân sách, ghi
     tiếp xúc — nguồn nào đổi cũng làm phiên bản đổi."""
@@ -141,6 +141,9 @@ def test_moi_nguon_doi_la_tinh_lai(kho, conn, batch, bat_anh_chup, doi):
         conn.execute("INSERT INTO core.dim_salesperson (salesperson_code, ten) VALUES ('0104', 'Lan') ON CONFLICT DO NOTHING")
         conn.execute("""INSERT INTO app.ngan_sach_nhat_ky (salesperson_code, thang, muc_tieu_cu, muc_tieu_moi)
                         VALUES ('0104', '2026-07-01', NULL, 100)""")
+    elif doi == "sua_du_lieu":
+        conn.execute("""INSERT INTO app.sua_du_lieu (bang, khoa, cot, gia_tri, gia_tri_obc, gia_tri_truoc)
+                        VALUES ('khach', '000000009292', 'phone', '090-1', '080-0', '080-0')""")
     else:
         conn.execute("""INSERT INTO app.nhat_ky_tiep_xuc (customer_code, kieu, ket_qua, noi_dung)
                         VALUES ('000000009292', 'goi', 'tot', 'thử')""")
@@ -248,3 +251,17 @@ def test_khoi_khong_vuot_ngan_sach_truy_van(kho, conn, monkeypatch, khoi):
     monkeypatch.setattr(conn, "execute", demo)
     KTQ.KHOI[khoi][0](conn, None)
     assert dem["n"] <= NGAN_SACH_TRUY_VAN[khoi], f"{khoi} chạy {dem['n']} truy vấn"
+
+
+def test_phien_ban_chi_nap_cung_doi_khi_so_sua_co_dong_moi(kho, conn, bat_anh_chup):
+    """072: chi_nap=True vẫn thấy sổ sửa — bản sửa đè OBC là dữ liệu mới như một lần nạp."""
+    goi = []
+    tinh = lambda c: goi.append(1) or {"n": len(goi)}
+    anh_chup.lay(conn, "thu-nap", tinh, chi_nap=True)
+    anh_chup.lay(conn, "thu-nap", tinh, chi_nap=True)
+    assert len(goi) == 1
+    conn.execute("""INSERT INTO app.sua_du_lieu (bang, khoa, cot, gia_tri, gia_tri_obc, gia_tri_truoc)
+                    VALUES ('khach', '000000009292', 'phone', '090-1', '080-0', '080-0')""")
+    conn.commit()
+    ra, _ = anh_chup.lay(conn, "thu-nap", tinh, chi_nap=True)
+    assert len(goi) == 2 and json.loads(ra) == {"n": 2}

@@ -9,6 +9,7 @@ export type NguoiDung = {
   duoc_vao_kho_du_lieu: boolean;
   duoc_sua_ngan_sach: boolean;
   duoc_quan_tri: boolean;
+  duoc_sua_du_lieu?: boolean;
 };
 
 // Một ô của lưới Tổng quan 12 cột (2026-09-29): toạ độ + cỡ theo ô lưới, `xem` = cách xem

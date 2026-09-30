@@ -208,3 +208,25 @@ def test_nhat_ky_doi_thu_co_nhan_cho_giao_hang_va_dieu_kien(chi_tiet, nhan):
     from datetime import datetime, timezone
     d = NK.Dong("doi_thu", datetime(2026, 9, 29, tzinfo=timezone.utc), None, "giao:IMAI", chi_tiet, None, None)
     assert d.noi_dung == f"{nhan} · giao:IMAI"
+
+
+def test_dong_thoi_gian_co_loai_du_lieu_tu_so_sua(conn):
+    """072: app.sua_du_lieu là nguồn thứ sáu của Nhật ký — chỉ thêm một nhánh UNION, không thêm truy vấn."""
+    an = ND.tao(conn, "an", MK)
+    conn.execute(
+        """INSERT INTO app.sua_du_lieu (bang, khoa, cot, gia_tri, gia_tri_obc, gia_tri_truoc, nguoi_dung_id)
+           VALUES ('khach', '000000009292', 'phone', '090-1', '080-0', '080-0', %s)""", (an,))
+    conn.execute(
+        """INSERT INTO app.sua_du_lieu (bang, khoa, cot, gia_tri, gia_tri_obc, gia_tri_truoc, bo, nguoi_dung_id)
+           VALUES ('khach', '000000009292', 'phone', NULL, '080-0', '090-1', true, %s)""", (an,))
+    conn.commit()
+    ds = [d for d in NK.dong_thoi_gian(conn) if d.loai == "du_lieu"]
+    assert len(ds) == 2 and NK.LOAI["du_lieu"][1] == "Sửa dữ liệu"
+    sua = next(d for d in ds if d.sau == "090-1")
+    assert sua.doi_tuong == "khach: 000000009292" and sua.chi_tiet == "phone" and sua.truoc == "080-0"
+    assert sua.noi_dung == "khach: 000000009292 · phone" and sua.nguoi == "an"
+    assert sua.truoc_sau == ("080-0", "090-1")
+    bo = next(d for d in ds if d.sau == "(về OBC)")
+    assert bo.truoc == "090-1" and bo.truoc_sau == ("090-1", "(về OBC)")
+    assert "080-0" in NK.csv(NK.dong_thoi_gian(conn, "du_lieu"))
+    assert {d.loai for d in NK.dong_thoi_gian(conn, "du_lieu")} == {"du_lieu"}
