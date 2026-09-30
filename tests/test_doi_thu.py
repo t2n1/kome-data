@@ -1736,3 +1736,67 @@ def test_duyet_xep_theo_TEN_mat_hang_cac_muc_lien_nhau(conn, batch):
         DT.dat_an(conn, {"nguon": "nap", "id": f, "an": True, "da_xem": None}, None)
     conn.commit()
     assert [x["id"] for x in DT.duyet(conn, ben="THAK", loc="da_xoa")["dong"]] == [c, d]   # alpha, Beta (không phân hoa)
+
+
+# ---- 070, việc theo sau: gộp nối chuỗi, mã AI không có trong danh mục, "giá đã đổi" trên dòng ẩn ------------------
+
+def _nhom(conn, ben, hang):
+    return conn.execute("SELECT nhom_khoa FROM mart.gia_doi_thu_quan_sat WHERE ma_doi_thu = %s AND ma_hang_dt = %s "
+                        "AND hien_hanh", (ben, hang)).fetchone()[0]
+
+
+def test_gop_noi_chuoi_ghep_chep_tu_dong_theo_dich_moi(conn, batch):
+    """B gộp vào A (B nhận ghép chép từ A = NT01), rồi A gộp vào C (C mang NT02): B bị chuyển đích theo và ghép TỰ CHÉP
+    của nó (trùng ghép hiệu lực của đích cũ A) phải đổi theo C — không thì mặt hàng C nằm ở hai nhóm. Ghép B do NGƯỜI
+    chọn (khác ghép của đích cũ) thì giữ."""
+    _hang(conn, batch)
+    _hang(conn, batch, "NT02", "Ca tra phi le (1kg x 10)")
+    _qs(conn, batch, "THAK", 500, hang="hA", ma="NT01")
+    _qs(conn, batch, "THAK", 480, hang="hB", ma=None)
+    _qs(conn, batch, "THAK", 470, hang="hC", ma="NT02")
+    DT.gop_mat_hang(conn, {"ma_doi_thu": "THAK", "ma_hang_dt": "hB", "vao_ma_hang_dt": "hA", "da_xem": None}, None)
+    conn.commit()
+    assert _nhom(conn, "THAK", "hB") == "ma:NT01"
+    DT.gop_mat_hang(conn, {"ma_doi_thu": "THAK", "ma_hang_dt": "hA", "vao_ma_hang_dt": "hC", "da_xem": None}, None)
+    conn.commit()
+    assert {_nhom(conn, "THAK", h) for h in ("hA", "hB", "hC")} == {"ma:NT02"}
+    assert conn.execute("SELECT count(*) FROM mart.gia_doi_thu_hien_hanh WHERE ma_doi_thu = 'THAK' AND dai_dien"
+                        ).fetchone()[0] == 1
+
+
+def test_gop_lai_nguon_da_gop_ghep_tu_chep_theo_dich_moi_ghep_nguoi_chon_thi_giu(conn, batch):
+    _hang(conn, batch)
+    _hang(conn, batch, "NT02", "Ca tra phi le (1kg x 10)")
+    _qs(conn, batch, "THAK", 500, hang="hA", ma="NT01")
+    _qs(conn, batch, "THAK", 480, hang="hB", ma=None)
+    _qs(conn, batch, "THAK", 470, hang="hC", ma="NT02")
+    _qs(conn, batch, "THAK", 460, hang="hD", ma=None)
+    DT.gop_mat_hang(conn, {"ma_doi_thu": "THAK", "ma_hang_dt": "hB", "vao_ma_hang_dt": "hA", "da_xem": None}, None)
+    DT.gop_mat_hang(conn, {"ma_doi_thu": "THAK", "ma_hang_dt": "hB", "vao_ma_hang_dt": "hC", "da_xem": None}, None)
+    conn.commit()
+    assert _nhom(conn, "THAK", "hB") == "ma:NT02"                     # ghép tự chép từ hA → theo hC
+    DT.dat_ghep(conn, "THAK", "hD", "NT01", None, "cung_hang", None)  # người chọn NT01 cho hD
+    DT.gop_mat_hang(conn, {"ma_doi_thu": "THAK", "ma_hang_dt": "hD", "vao_ma_hang_dt": "hC", "da_xem": None}, None)
+    conn.commit()
+    assert _nhom(conn, "THAK", "hD") == "ma:NT01"                     # ghép của người giữ nguyên
+
+
+def test_gop_bo_qua_ma_AI_khong_co_trong_danh_muc(conn, batch):
+    """Đích chỉ có mã AI đề xuất mà mã đó không có trong core.dim_product: không chép (dat_ghep sẽ từ chối), gộp vẫn xong."""
+    _hang(conn, batch)
+    _qs(conn, batch, "THAK", 500, hang="hA", ma="ZZ99")                # mã AI lạ
+    _qs(conn, batch, "THAK", 480, hang="hB", ma=None)
+    r = DT.gop_mat_hang(conn, {"ma_doi_thu": "THAK", "ma_hang_dt": "hB", "vao_ma_hang_dt": "hA", "da_xem": None}, None)
+    conn.commit()
+    assert r["vao_ma_hang_dt"] == "hA"
+    assert conn.execute("SELECT count(*) FROM app.ghep_hang WHERE ma_hang_dt = 'hB'").fetchone()[0] == 0
+
+
+def test_gia_moi_tu_choi_dong_goc_dang_an(conn, batch):
+    _hang(conn, batch)
+    fid = _qs(conn, batch, "THAK", 500, hang="hA")
+    DT.dat_an(conn, {"nguon": "nap", "id": fid, "an": True, "da_xem": None}, None)
+    conn.commit()
+    with pytest.raises(DT.LoiNhap, match="đang bị ẩn"):
+        DT.gia_moi(conn, {"fact_goc_id": fid, "gia_goc": "550", "loai_nguon": "to_roi"}, None)
+    assert conn.execute("SELECT count(*) FROM app.gia_doi_thu_tay").fetchone()[0] == 0

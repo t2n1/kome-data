@@ -1131,11 +1131,14 @@ Có test canh: `tests/test_doi_thu_bang.py`, `tests/test_mart_doi_thu.py`, `test
     CẢ dòng ẩn ⇒ ẩn dòng mới nhất KHÔNG làm dòng cũ hơn sống lại; lô mới nạp là quan sát KHÁC (id khác) nên tự hiện lại. Không lọc theo mốc — cùng `app.dinh_chinh_gia` (cũng không lọc mốc), KHÁC `thay` (lọc mốc).
     `mart.gia_doi_thu_hien_hanh` loại dòng ẩn; `an_hien_hanh` = dòng ẩn đang là "mới nhất" (để liệt kê / khôi phục). Đường ghi: `POST /api/doi-thu/an` (`DT.dat_an`,
     chỉ nhận dòng `hien_hanh` hoặc `an_hien_hanh`; nhật ký `an` / `hien` trên khoá `gia:` / `tay:`). Dòng đang ẩn KHÔNG sửa / xác nhận được ở máy chủ
-    (`sua_mat_hang`, `xac_nhan` → `LoiNhap(DT.LOI_DANG_AN)`) — chỉ khôi phục; sửa nó là dòng tay mới (id khác, không có trong sổ ẩn) lặng lẽ hiện lại.
+    (`sua_mat_hang`, `xac_nhan`, "giá đã đổi" cũ `gia_moi(fact_goc_id)` → `LoiNhap(DT.LOI_DANG_AN)`) — chỉ khôi phục; sửa nó là dòng tay mới (id khác, không có trong sổ ẩn) lặng lẽ hiện lại.
   - **Gộp tay luôn MỘT bước** (`app.gop_mat_hang (ma_doi_thu, ma_hang_dt, vao_ma_hang_dt)`, chỉ thêm; `vao` NULL = tách ra): `POST /api/doi-thu/gop-mat-hang`
     (`DT.gop_mat_hang`) giải đích về khoá cuối, dời MỌI dòng đang trỏ vào nguồn (mỗi dòng một nhật ký `gop`), chép ghép HIỆU LỰC của đích (`_ghep_hieu_luc`: tường minh, không
-    thì mã / nhãn AI của dòng đại diện — nhãn trống → `thay_the`; đích không mã thì chỉ chép `'khong'` tường minh) qua `dat_ghep` cho nguồn và mọi dòng dời
-    theo khi chúng chưa có ghép tường minh (chỉ chép tường minh thì mặt hàng nằm ở hai `nhom_khoa` — hai đại diện, đếm hai lần); khoá advisory theo bên trong giao dịch; `LoiNhap` khi bên lạ / tự gộp / đích không có dòng hiện hành. Giao diện: bảng sửa gom theo
+    thì mã / nhãn AI của dòng hiện hành ưu tiên mức khách thường — mã AI phải có trong `core.dim_product`, nhãn trống → `thay_the`; đích không mã thì chỉ chép
+    `'khong'` tường minh; đọc `gia_doi_thu_quan_sat` lọc (bên, hàng), KHÔNG dựng `gia_doi_thu_hien_hanh` — đo thật 1,75 s → 0,7 ms; tính MỘT lần mỗi lệnh gộp) qua
+    `dat_ghep` cho nguồn và mọi dòng dời theo khi chúng chưa có ghép tường minh HOẶC ghép tường minh TRÙNG ghép hiệu lực của đích CŨ (= tự chép ở lần gộp
+    trước — gộp nối chuỗi không bỏ hàng lại nhóm cũ); ghép tường minh khác đích cũ = người chọn, giữ (chỉ chép tường minh thì mặt hàng nằm ở hai `nhom_khoa`
+    — hai đại diện, đếm hai lần); khoá advisory theo bên trong giao dịch; `LoiNhap` khi bên lạ / tự gộp / đích không có dòng hiện hành. Giao diện: bảng sửa gom theo
     (bên, `mat_hang_khoa`) — chip "+n mức", cột "Mức giá" (`bang_sua_logic.ts::nhanMuc`), chọn / ô sửa neo theo KHOÁ dòng (không theo chỉ số), 🗑 bấm hai lần → ẩn, lọc
     "Đã xoá" chỉ đọc kèm "Khôi phục", ⇲ "Gộp vào… / Tách ra" (409 hiện TRONG hộp thoại); ô nổi `ONoiGia` thêm "Các mức giá khác" (chỉ để xem, ⚠ cho bất thường). `duyet`:
     lọc `da_xoa`, xếp bên → tên mặt hàng (`min(lower(ten_goc))` của các mức đang lọc) → `mat_hang_khoa` → `dai_dien` giảm → giá. `tong_quan` đếm theo mặt hàng
