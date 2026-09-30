@@ -256,8 +256,10 @@ def test_cot_ra_cua_quan_sat_giu_nguyen_thu_tu_060(conn):
     assert cols[:5] == ["nguon", "id", "batch_id", "ma_doi_thu", "ten_doi_thu"]
     i = cols.index("tuoi_ngay")                        # cột 060 giữ thứ tự; 067 chỉ THÊM ở cuối
     assert cols[i - 2:i + 1] == ["nen_gia", "hien_hanh", "tuoi_ngay"]
-    assert cols[i + 1:] == ["so_goi_thung", "kl_goi_g", "bac", "kg_thung_dt", "gia_goi", "gia_thung",
-                            "gia_1", "gia_5", "gia_10", "gia_pallet"]
+    # 070 thêm an / mat_hang_khoa / an_hien_hanh ngay sau `bac` (cuối CTE r, trước các cột dẫn xuất kg_thung_dt…) — cột
+    # cũ vẫn giữ nguyên thứ tự tương đối; giao diện và máy chủ đọc theo TÊN cột.
+    assert cols[i + 1:] == ["so_goi_thung", "kl_goi_g", "bac", "an", "mat_hang_khoa", "an_hien_hanh", "kg_thung_dt",
+                            "gia_goi", "gia_thung", "gia_1", "gia_5", "gia_10", "gia_pallet"]
 
 
 def test_nguon_quan_sat_thang_lo_theo_DATA_DATE_cua_lo_khong_theo_ngay_nguon(conn, batch):
@@ -705,3 +707,95 @@ def test_B18_nhom_co_ten_dung_gia_chuan_CO_TRONG_SO_cua_nhom(conn, batch):
     chuan = conn.execute("SELECT gia_kome_chuan FROM mart.so_sanh_nhom WHERE nhom_khoa=%s", (f"n:{n}",)).fetchone()[0]
     assert bt["HSC"][:2] == (True, "kome") and bt["HSC"][2] == pytest.approx(float(chuan))
     assert bt["A"][0] is False
+
+
+# ---------------------------------------------------------------- 070: mặt hàng · đại diện · ẩn · gộp tay
+
+def _muc(conn, fid, kenh=None, muc=None):
+    conn.execute("UPDATE core.fact_gia_doi_thu SET kenh_gia = %s, muc_gia = %s WHERE id = %s", (kenh, muc, fid))
+    conn.commit()
+
+
+def _hh(conn, ben):
+    return conn.execute("""SELECT id, kenh_gia, muc_gia, dai_dien, mat_hang_khoa, gia_pallet_mh, so_muc
+                           FROM mart.gia_doi_thu_hien_hanh WHERE ma_doi_thu = %s ORDER BY id""", (ben,)).fetchall()
+
+
+def test_070_dai_dien_la_gia_re_nhat_cho_khach_thuong_moi_mat_hang(conn, batch):
+    _hang(conn, batch)
+    giao = _qs(conn, batch, "NEXT", 650, hang="h1")
+    gui = _qs(conn, batch, "NEXT", 600, hang="h1")
+    kho = _qs(conn, batch, "NEXT", 580, hang="h1")
+    ngoai = _qs(conn, batch, "NEXT", 500, hang="h1")
+    pal = _qs(conn, batch, "NEXT", 450, hang="h1")
+    _muc(conn, giao, kenh="giao"); _muc(conn, gui, kenh="gui"); _muc(conn, kho, kenh="tai_kho")
+    _muc(conn, ngoai, muc="khach_ngoai"); _muc(conn, pal, muc="pallet")
+    r = {x[0]: x for x in _hh(conn, "NEXT")}
+    assert [i for i, x in r.items() if x[3]] == [kho]                    # rẻ nhất trong mức khách thường
+    assert {x[4] for x in r.values()} == {"h1"} and {x[6] for x in r.values()} == {5}
+    assert all(x[5] is None or float(x[5]) == 450 for x in r.values())   # pallet của mặt hàng = dòng muc 'pallet'
+
+
+def test_070_dai_dien_roi_ve_khi_khong_co_muc_khach_thuong(conn, batch):
+    _hang(conn, batch)
+    ngoai = _qs(conn, batch, "VC", 300, hang="h2")
+    pal = _qs(conn, batch, "VC", 280, hang="h2")
+    _muc(conn, ngoai, muc="khach_ngoai"); _muc(conn, pal, muc="pallet")
+    assert [x[0] for x in _hh(conn, "VC") if x[3]] == [ngoai]            # không phải pallet trước
+
+
+def test_070_so_sanh_nhom_dem_moi_mat_hang_mot_lan(conn, batch):
+    _hang(conn, batch)
+    for ben, g in [("A", 540), ("B", 560), ("C", 580)]:
+        _qs(conn, batch, ben, g, hang=f"h{ben}")
+    for i, g in enumerate((700, 720)):                                    # bên A thêm 2 mức của CÙNG mặt hàng
+        f = _qs(conn, batch, "A", g, hang="hA")
+        _muc(conn, f, kenh=("giao", "gui")[i])
+    s = conn.execute("SELECT so_ben, so_quan_sat, trung_vi, thap_nhat FROM mart.so_sanh_nhom WHERE nhom_khoa = 'ma:NT01'").fetchone()
+    assert (s[0], s[1]) == (3, 3)
+    assert float(s[2]) == 560 and float(s[3]) == 540
+
+
+def test_070_an_khong_lam_dong_cu_song_lai_va_lo_moi_hien_lai(conn, batch):
+    _hang(conn, batch)
+    cu = _qs(conn, batch, "A", 500, hang="hX", ngay=date(2026, 7, 1))
+    moi = _qs(conn, batch, "A", 520, hang="hX", ngay=date(2026, 8, 1))
+    conn.execute("INSERT INTO app.an_quan_sat (nguon, quan_sat_id, an) VALUES ('nap', %s, true)", (moi,))
+    conn.commit()
+    assert _hh(conn, "A") == []                                           # không dòng nào hiện hành, kể cả dòng cũ
+    assert conn.execute("SELECT id FROM mart.gia_doi_thu_quan_sat WHERE an_hien_hanh").fetchall() == [(moi,)]
+    moi2 = _qs(conn, batch, "A", 530, hang="hX", ngay=date(2026, 9, 1))
+    assert [x[0] for x in _hh(conn, "A")] == [moi2]
+    conn.execute("INSERT INTO app.an_quan_sat (nguon, quan_sat_id, an) VALUES ('nap', %s, false)", (moi,))
+    conn.commit()
+    assert [x[0] for x in _hh(conn, "A")] == [moi2]                      # khôi phục dòng cũ hơn: lô mới vẫn thắng
+
+
+def test_070_gop_tay_mot_buoc(conn, batch):
+    # bên phải có thật trong app.doi_thu (gop_mat_hang.ma_doi_thu có khoá ngoại, khác fact_gia_doi_thu) — THAI-DUONG do 059 gieo
+    _hang(conn, batch)
+    a = _qs(conn, batch, "THAI-DUONG", 285, hang="bun|a")
+    b = _qs(conn, batch, "THAI-DUONG", 240, hang="bun|b")
+    _muc(conn, b, muc="dac_biet")
+    conn.execute("INSERT INTO app.gop_mat_hang (ma_doi_thu, ma_hang_dt, vao_ma_hang_dt) VALUES ('THAI-DUONG', 'bun|b', 'bun|a')")
+    conn.commit()
+    r = {x[0]: x for x in _hh(conn, "THAI-DUONG")}
+    assert r[a][4] == r[b][4] == "bun|a"
+    assert [i for i, x in r.items() if x[3]] == [b]                       # 'dac_biet' là khách thường, rẻ hơn
+    conn.execute("INSERT INTO app.gop_mat_hang (ma_doi_thu, ma_hang_dt, vao_ma_hang_dt) VALUES ('THAI-DUONG', 'bun|b', NULL)")
+    conn.commit()
+    assert {x[4] for x in _hh(conn, "THAI-DUONG")} == {"bun|a", "bun|b"}
+
+
+def test_070_hai_so_chi_them_kome_app_khong_sua_khong_xoa(conn):
+    for bang in ("app.an_quan_sat", "app.gop_mat_hang"):
+        for quyen in ("UPDATE", "DELETE"):
+            assert not conn.execute("SELECT has_table_privilege('kome_app', %s, %s)", (bang, quyen)).fetchone()[0]
+        assert conn.execute("SELECT has_table_privilege('kome_app', %s, 'INSERT')", (bang,)).fetchone()[0]
+
+
+def test_070_la_muc_khach_thuong(conn):
+    r = conn.execute("""SELECT mart.la_muc_khach_thuong(NULL), mart.la_muc_khach_thuong('dac_biet'),
+                               mart.la_muc_khach_thuong('pallet'), mart.la_muc_khach_thuong('khach_ngoai'),
+                               mart.la_muc_khach_thuong('kyushu')""").fetchone()
+    assert r == (True, True, False, False, False)
