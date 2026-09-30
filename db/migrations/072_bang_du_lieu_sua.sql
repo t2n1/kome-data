@@ -138,3 +138,118 @@ GRANT SELECT ON mart.sua_moi_nhat, mart.sua_theo_khoa, mart.dim_customer, mart.d
     TO kome_app, kome_report, kome_ingest;
 GRANT EXECUTE ON FUNCTION mart.ap_sua(text, jsonb, text), mart.lech_obc(text, jsonb, text)
     TO kome_app, kome_report, kome_ingest;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Phần 2 — mọi view / hàm của mart đang đọc danh mục OBC THÔ chuyển sang view hiệu lực. Đọc định nghĩa SỐNG trong danh mục
+-- Postgres (không chép thân từ file cũ), đổi chuỗi, tạo lại. Cột ra y hệt (mart.dim_* cùng kiểu với core.dim_*) nên
+-- CREATE OR REPLACE không phải DROP view phụ thuộc. Tên view hiệu lực TRÙNG tên bảng có chủ ý: pg_get_viewdef in
+-- "dim_customer.cot" khi bảng không bí danh — đổi schema thì tên đó vẫn trỏ đúng.
+-- Test canh: tests/test_bang_du_lieu_mart.py::test_KHONG_view_ham_mart_nao_con_doc_danh_muc_OBC_tho.
+DO $do$
+DECLARE r record; d text;
+BEGIN
+    PERFORM set_config('search_path', 'pg_catalog', true);   -- mọi tên in ra đều có schema
+    FOR r IN SELECT c.oid, c.relname FROM pg_class c
+             WHERE c.relnamespace = 'mart'::regnamespace AND c.relkind = 'v'
+               AND c.relname NOT IN ('dim_customer', 'dim_product')
+               AND pg_get_viewdef(c.oid) ~ '\mcore\.dim_(customer|product)\M'
+    LOOP
+        d := regexp_replace(pg_get_viewdef(r.oid), '\mcore\.dim_(customer|product)\M', 'mart.dim_\1', 'g');
+        d := regexp_replace(d, ';\s*$', '');
+        EXECUTE format('CREATE OR REPLACE VIEW mart.%I AS %s', r.relname, d);
+    END LOOP;
+    FOR r IN SELECT p.oid FROM pg_proc p
+             WHERE p.pronamespace = 'mart'::regnamespace AND p.prosrc ~ '\mcore\.dim_(customer|product)\M'
+    LOOP
+        EXECUTE regexp_replace(pg_get_functiondef(r.oid), '\mcore\.dim_(customer|product)\M', 'mart.dim_\1', 'g');
+    END LOOP;
+END
+$do$;
+
+-- Giá hiệu lực (đặc tả §3): khoa sổ = mã|quy cách|bậc; chỉ áp lên dòng hiện hành; hai_cot_lech giữ theo OBC.
+-- CTE f … lv chép NGUYÊN VĂN 071; chỉ câu SELECT cuối đổi. 14 cột đầu y hệt 071, gia_obc / da_sua thêm ở CUỐI.
+CREATE OR REPLACE VIEW mart.bang_gia_kome AS
+WITH f AS (
+    SELECT f.*, max(f.batch_id) OVER (PARTITION BY f.product_code, f.pack_code, f.valid_from) AS b_max
+    FROM core.fact_price_list f
+    WHERE f.valid_from <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))
+),
+s AS (
+    SELECT f.product_code, f.pack_code, f.price_level, f.valid_from, f.price_ex_tax, f.price_in_tax, f.unit_cost,
+           CASE WHEN f.price_ex_tax > 0 AND NOT (f.price_in_tax > 0 AND f.price_in_tax < f.price_ex_tax)
+                THEN f.price_ex_tax::numeric ELSE f.price_in_tax / 1.08 END                  AS gia_chua_thue,
+           (f.price_ex_tax > 0 AND f.price_in_tax > 0 AND f.price_in_tax < f.price_ex_tax)    AS hai_cot_lech
+    FROM f
+    WHERE f.batch_id = f.b_max AND (f.price_ex_tax > 0 OR f.price_in_tax > 0)
+),
+d AS (
+    SELECT x.product_code, x.pack_code, x.valid_from,
+           row_number() OVER (PARTITION BY x.product_code, x.pack_code ORDER BY x.valid_from DESC) AS thu
+    FROM (SELECT DISTINCT product_code, pack_code, valid_from FROM f WHERE batch_id = b_max) x
+),
+k AS (
+    SELECT n.product_code, n.pack_code, n.valid_from AS tu_ngay, t.valid_from AS tu_ngay_truoc
+    FROM d n LEFT JOIN d t ON t.product_code = n.product_code AND t.pack_code = n.pack_code AND t.thu = 2
+    WHERE n.thu = 1
+),
+nay AS (SELECT s.* FROM s JOIN k ON k.product_code = s.product_code AND k.pack_code = s.pack_code AND s.valid_from = k.tu_ngay),
+truoc AS (SELECT s.* FROM s JOIN k ON k.product_code = s.product_code AND k.pack_code = s.pack_code AND s.valid_from = k.tu_ngay_truoc),
+lv AS (SELECT product_code, pack_code, price_level FROM nay UNION SELECT product_code, pack_code, price_level FROM truoc),
+hl AS (
+    SELECT k.product_code, k.pack_code, lv.price_level, n.product_code IS NOT NULL AS hien_hanh,
+           k.tu_ngay, k.tu_ngay_truoc, n.price_ex_tax, n.price_in_tax, n.hai_cot_lech, n.unit_cost,
+           n.gia_chua_thue AS gia_obc, t.gia_chua_thue AS gia_truoc,
+           CASE WHEN n.product_code IS NOT NULL
+                THEN mart.ap_sua(n.gia_chua_thue::text, sk.j, 'gia_chua_thue')::numeric END AS gia_hl,
+           n.product_code IS NOT NULL AND mart.lech_obc(n.gia_chua_thue::text, sk.j, 'gia_chua_thue') AS da_sua
+    FROM k
+    JOIN lv ON lv.product_code = k.product_code AND lv.pack_code = k.pack_code
+    LEFT JOIN nay n ON n.product_code = lv.product_code AND n.pack_code = lv.pack_code AND n.price_level = lv.price_level
+    LEFT JOIN truoc t ON t.product_code = lv.product_code AND t.pack_code = lv.pack_code AND t.price_level = lv.price_level
+    LEFT JOIN mart.sua_theo_khoa sk
+           ON sk.bang = 'gia' AND sk.khoa = k.product_code || '|' || k.pack_code || '|' || lv.price_level
+)
+SELECT product_code, pack_code, price_level, hien_hanh, tu_ngay, tu_ngay_truoc, price_ex_tax, price_in_tax,
+       gia_hl AS gia_chua_thue, coalesce(hai_cot_lech, false) AS hai_cot_lech, nullif(unit_cost, 0) AS gia_von,
+       gia_truoc,
+       (tu_ngay_truoc IS NOT NULL AND gia_hl IS DISTINCT FROM gia_truoc) AS doi,
+       coalesce(unit_cost > 0 AND gia_hl < unit_cost, false) AS duoi_gia_von,
+       gia_obc, da_sua
+FROM hl;
+
+-- Tồn / hạn hiệu lực (đặc tả §3): khoa sổ = mã|kho, áp lên ảnh chụp ≤ mốc đang chọn (điều kiện ngày chụp y hệt 040).
+-- gia_tri = stock_value của OBC, hoặc round(số lượng hiệu lực × stock_unit_cost) khi số lượng bị sửa. loai_han /
+-- han_con_lai trên hạn hiệu lực. 8 cột đầu y hệt 040; bốn cột *_obc / sua_* thêm ở CUỐI.
+CREATE OR REPLACE VIEW mart.ton_hien_tai AS
+WITH i AS (
+    SELECT i.*, sk.j
+    FROM core.fact_inventory_daily i
+    LEFT JOIN mart.sua_theo_khoa sk ON sk.bang = 'ton' AND sk.khoa = i.product_code || '|' || i.warehouse_code
+    -- Ảnh chụp mới nhất KHÔNG SAU mốc đang xem (040). Chưa có ảnh chụp nào tới lúc đó ⇒ không dòng nào.
+    WHERE i.snapshot_date = (SELECT max(snapshot_date) FROM core.fact_inventory_daily
+                              WHERE snapshot_date <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date)))
+),
+h AS (
+    SELECT i.*,
+           mart.ap_sua(i.stock_qty::text, i.j, 'stock_qty')::numeric(14,4) AS sl,
+           mart.ap_sua(i.best_before, i.j, 'best_before')                    AS bb,
+           mart.lech_obc(i.stock_qty::text, i.j, 'stock_qty')                AS sua_sl,
+           mart.lech_obc(i.best_before, i.j, 'best_before')                  AS sua_bb
+    FROM i
+)
+SELECT h.product_code, h.warehouse_code, w.warehouse_name AS ten_kho,
+       h.sl AS so_luong,
+       CASE WHEN h.sua_sl THEN round(h.sl * h.stock_unit_cost)::bigint ELSE h.stock_value END AS gia_tri,
+       h.bb AS best_before,
+       CASE WHEN h.bb ~ '^[0-9]{4}年[0-9]{1,2}月[0-9]{1,2}日$' THEN 'ngay'
+            -- btrim với danh sách ký tự tường minh (dấu cách thường VÀ dấu cách toàn giác U+3000) — xem 040.
+            WHEN btrim(h.bb, ' 　') = '賞味期限なし'            THEN 'khong_han'
+            WHEN coalesce(h.bb, '') = ''                     THEN 'trong'
+            ELSE 'khong_ro' END AS loai_han,
+       CASE WHEN h.bb ~ '^[0-9]{4}年[0-9]{1,2}月[0-9]{1,2}日$'
+            THEN to_date(h.bb, 'YYYY"年"MM"月"DD"日"') - m.hom_nay
+       END AS han_con_lai,
+       h.stock_qty AS so_luong_obc, h.best_before AS best_before_obc, h.sua_sl AS sua_so_luong, h.sua_bb AS sua_han
+FROM h
+JOIN core.dim_warehouse w ON w.warehouse_code = h.warehouse_code
+CROSS JOIN mart.moc_thoi_gian m;

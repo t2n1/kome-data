@@ -110,3 +110,68 @@ def test_co_quyen_moi_va_so_quyen_nhan_co_do(conn):
                            AND table_name='nguoi_dung' AND column_name='duoc_sua_du_lieu'""").fetchone()[0] == "false"
     d = conn.execute("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='nhat_ky_quyen_co_check'").fetchone()[0]
     assert "duoc_sua_du_lieu" in d
+
+
+def test_KHONG_view_ham_mart_nao_con_doc_danh_muc_OBC_tho(conn):
+    """Test canh: migration sau chép thân view từ file cũ sẽ lặng lẽ đưa core.dim_* trở lại — bản sửa mất tác dụng ở màn đó."""
+    v = conn.execute(r"""SELECT c.relname FROM pg_class c WHERE c.relnamespace = 'mart'::regnamespace AND c.relkind = 'v'
+                         AND c.relname NOT IN ('dim_customer', 'dim_product')
+                         AND pg_get_viewdef(c.oid) ~ '\mcore\.dim_(customer|product)\M'""").fetchall()
+    f = conn.execute(r"""SELECT p.proname FROM pg_proc p WHERE p.pronamespace = 'mart'::regnamespace
+                         AND p.prosrc ~ '\mcore\.dim_(customer|product)\M'""").fetchall()
+    assert v == [] and f == []
+
+
+def test_khach_360_doc_ten_da_sua(conn, batch):
+    from tests.test_khach_hang import _mua
+    _khach(conn, batch, "202601010001", "Quán A")
+    _mua(conn, batch, "202601010001", D2)
+    _sua(conn, "khach", "202601010001", "customer_name", "Quán A mới", "Quán A")
+    assert conn.execute("SELECT ten FROM mart.khach_360 WHERE customer_code='202601010001'").fetchone()[0] == "Quán A mới"
+
+
+def _gia(conn, batch, ma, qc, lv, ex, inc, ngay=D2):
+    b = batch(abs(hash((ma, qc, lv, ex, ngay))) % 90_000, ngay)
+    conn.execute("""INSERT INTO core.fact_price_list (product_code, pack_code, price_level, valid_from, price_ex_tax,
+                      price_in_tax, unit_cost, batch_id) VALUES (%s, %s, %s, %s, %s, %s, 1000, %s)""",
+                 (ma, qc, lv, ngay, ex, inc, b))
+    conn.commit()
+
+
+def test_gia_sua_thang_khi_OBC_giu_nguyen_va_thua_khi_OBC_doi(conn, batch):
+    _hang(conn, batch, "P1", "Hang 1")
+    _gia(conn, batch, "P1", "02", "01", 5000, 5400)
+    obc = conn.execute("SELECT gia_obc::text FROM mart.bang_gia_kome WHERE product_code='P1'").fetchone()[0]
+    _sua(conn, "gia", "P1|02|01", "gia_chua_thue", "5200", obc)
+    r = conn.execute("SELECT gia_chua_thue, gia_obc, da_sua FROM mart.bang_gia_kome WHERE product_code='P1'").fetchone()
+    assert (float(r[0]), float(r[1]), r[2]) == (5200, 5000, True)
+    _gia(conn, batch, "P1", "02", "01", 5100, 5508, ngay=date(2026, 9, 20))       # lần nạp mới, OBC đổi giá
+    r = conn.execute("SELECT gia_chua_thue, da_sua FROM mart.bang_gia_kome WHERE product_code='P1' AND hien_hanh").fetchone()
+    assert (float(r[0]), r[1]) == (5100, False)
+
+
+def _ton(conn, batch, ma, kho, sl, han, ngay=D2):
+    b = batch(abs(hash((ma, kho, sl, ngay))) % 90_000, ngay)
+    conn.execute("INSERT INTO core.dim_warehouse (warehouse_code, warehouse_name) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                 (kho, "Kho " + kho))
+    conn.execute("""INSERT INTO core.fact_inventory_daily (snapshot_date, product_code, warehouse_code, best_before, stock_qty,
+                      stock_unit_cost, stock_value, batch_id) VALUES (%s, %s, %s, %s, %s, 100, %s, %s)""",
+                 (ngay, ma, kho, han, sl, int(sl * 100), b))
+    conn.commit()
+
+
+def test_ton_va_han_sua_di_theo_gia_tri_va_loai_han(conn, batch):
+    _hang(conn, batch, "P1", "Hang 1")
+    _ton(conn, batch, "P1", "0001", 10, "2027年03月10日")
+    _sua(conn, "ton", "P1|0001", "stock_qty", "12", "10.0000")
+    _sua(conn, "ton", "P1|0001", "best_before", "賞味期限なし", "2027年03月10日")
+    r = conn.execute("""SELECT so_luong, gia_tri, best_before, loai_han, sua_so_luong, sua_han, so_luong_obc
+                        FROM mart.ton_hien_tai WHERE product_code='P1'""").fetchone()
+    assert (float(r[0]), r[1], r[2], r[3], r[4], r[5], float(r[6])) == (12, 1200, "賞味期限なし", "khong_han", True, True, 10)
+
+
+def test_so_rong_moi_view_y_nhu_truoc(conn, batch):
+    _hang(conn, batch, "P1", "Hang 1")
+    _ton(conn, batch, "P1", "0001", 10, "2027年03月10日")
+    r = conn.execute("SELECT so_luong, gia_tri, sua_so_luong, sua_han FROM mart.ton_hien_tai").fetchone()
+    assert (float(r[0]), r[1], r[2], r[3]) == (10, 1000, False, False)
