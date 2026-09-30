@@ -268,11 +268,14 @@ def gia_moi(conn, du_lieu: dict, nguoi) -> int:
         except (TypeError, ValueError):
             raise LoiNhap("Mã dòng giá gốc không hợp lệ.")
         goc = conn.execute("""SELECT ma_doi_thu, ma_hang_dt, ten_goc, quy_cach_goc, don_vi_gia, kg_moi_don_vi_gia,
-                                     thue, gom_ship, kenh_gia, muc_gia, so_goi_thung, kl_goi_g
+                                     thue, gom_ship, kenh_gia, muc_gia, so_goi_thung, kl_goi_g, an
                               FROM mart.gia_doi_thu_quan_sat WHERE nguon='nap' AND id=%s""",
                            (fact_goc,)).fetchone()
         if goc is None:
             raise LoiNhap("Không tìm thấy dòng giá gốc.")
+        if goc[-1]:                                   # dòng tay mới sẽ không ẩn → dòng đã xoá lặng lẽ hiện lại (070)
+            raise LoiNhap(LOI_DANG_AN)
+        goc = goc[:-1]
     k = ("ma_doi_thu", "ma_hang_dt", "ten_goc", "quy_cach_goc", "don_vi_gia", "kg_moi_don_vi_gia",
          "thue", "gom_ship", "kenh_gia", "muc_gia", "so_goi_thung", "kl_goi_g")
     v = dict(zip(k, goc)) if goc else {}
@@ -802,35 +805,39 @@ def _doc_ten_hang(v, ten: str) -> str:
 
 def _ghep_hieu_luc(conn, ben: str, dich: str):
     """(product_code, nhom_id, nhan) mà hàng `dich` của bên ĐANG mang, hoặc None. Ghép tường minh (app.ghep_hang, kể cả
-    'khong') nếu có; không thì ghép AI của dòng hiện hành (ưu tiên dòng đại diện, rồi dòng không ẩn / không khách kể):
-    mã KOME + nhãn (nhãn null khi có mã → 'thay_the', cùng mặc định của 067); không có mã → None (không có gì để chép —
-    'khong' chỉ chép khi nó là ghép tường minh)."""
+    'khong') nếu có; không thì ghép AI của dòng hiện hành (không ẩn / không khách kể, ưu tiên mức cho khách thường rẻ nhất
+    — gần với dòng đại diện mà KHÔNG phải dựng mart.gia_doi_thu_hien_hanh, view nặng): mã KOME + nhãn (nhãn null khi có
+    mã → 'thay_the', cùng mặc định của 067). Mã AI phải có trong core.dim_product (dat_ghep từ chối mã lạ — mã AI chưa
+    kiểm lúc nạp). Không có mã dùng được → None ('khong' chỉ chép khi nó là ghép tường minh). Đọc
+    mart.gia_doi_thu_quan_sat lọc theo (bên, hàng) — hai cột nằm trong mọi PARTITION BY của view nên vị từ được đẩy xuống."""
     g = conn.execute("SELECT product_code, nhom_id, nhan FROM app.ghep_hang WHERE ma_doi_thu = %s AND ma_hang_dt = %s",
                      (ben, dich)).fetchone()
     if g is not None:
         return tuple(g)
     r = conn.execute("""SELECT q.ma_kome, q.nhan
-                        FROM mart.gia_doi_thu_quan_sat q
-                        LEFT JOIN mart.gia_doi_thu_hien_hanh h ON h.nguon = q.nguon AND h.id = q.id
-                        WHERE q.ma_doi_thu = %s AND q.ma_hang_dt = %s AND q.hien_hanh
-                        ORDER BY coalesce(h.dai_dien, false) DESC, q.an, (q.loai_nguon = 'khach_ke'), (q.ma_kome IS NULL),
-                                 q.nguon, q.id
+                        FROM mart.gia_doi_thu_quan_sat q JOIN core.dim_product p ON p.product_code = q.ma_kome
+                        WHERE q.ma_doi_thu = %s AND q.ma_hang_dt = %s AND q.hien_hanh AND q.loai_nguon <> 'khach_ke'
+                        ORDER BY mart.la_muc_khach_thuong(q.muc_gia) DESC, (q.trang_thai = 'het'),
+                                 q.yen_chuan NULLS LAST, q.nguon, q.id
                         LIMIT 1""", (ben, dich)).fetchone()
-    if r is None or r[0] is None:
+    if r is None:
         return None
     return (r[0], None, r[1] if r[1] in NHAN else "thay_the")
 
 
-def _chep_ghep(conn, ben: str, hang: str, dich: str, nguoi) -> None:
-    """Gộp `hang` vào `dich`: `hang` chưa có ghép tường minh → chép ghép HIỆU LỰC của đích qua dat_ghep (409 / nhật ký
-    'ghep' trên '<bên>/<hàng>' như mọi lần ghép). Chỉ chép ghép tường minh thì đích mang ghép AI (ma_kome_de_xuat) để
-    hai hàng ở HAI nhom_khoa — một mặt hàng hai dòng đại diện, đếm hai lần. Ghép tường minh sẵn có của `hang` giữ
-    nguyên (người đã chọn)."""
-    if conn.execute("SELECT 1 FROM app.ghep_hang WHERE ma_doi_thu = %s AND ma_hang_dt = %s", (ben, hang)).fetchone():
+def _chep_ghep(conn, ben: str, hang: str, g_dich, g_dich_cu, nguoi) -> None:
+    """Gộp `hang` vào một đích mang ghép hiệu lực `g_dich` (tính MỘT lần ở gop_mat_hang, trước mọi lần ghi): chép `g_dich`
+    qua dat_ghep (409 / nhật ký 'ghep' trên '<bên>/<hàng>' như mọi lần ghép) khi `hang` CHƯA có ghép tường minh, HOẶC
+    ghép tường minh của nó TRÙNG ghép hiệu lực của đích CŨ `g_dich_cu` (tức là ghép TỰ CHÉP ở lần gộp trước — gộp nối
+    chuỗi A→…→C không được để hàng ở lại nhóm của A). Ghép tường minh KHÁC đích cũ = người đã chọn → giữ nguyên.
+    Không chép thì đích mang ghép AI (ma_kome_de_xuat) để hai hàng ở HAI nhom_khoa — một mặt hàng hai đại diện."""
+    if g_dich is None:
         return
-    g = _ghep_hieu_luc(conn, ben, dich)
-    if g is not None:
-        dat_ghep(conn, ben, hang, g[0], g[1], g[2], nguoi)
+    co = conn.execute("SELECT product_code, nhom_id, nhan FROM app.ghep_hang WHERE ma_doi_thu = %s AND ma_hang_dt = %s",
+                      (ben, hang)).fetchone()
+    if co is not None and (g_dich_cu is None or tuple(co) != tuple(g_dich_cu) or tuple(co) == tuple(g_dich)):
+        return
+    dat_ghep(conn, ben, hang, g_dich[0], g_dich[1], g_dich[2], nguoi)
 
 
 def gop_mat_hang(conn, b: dict, nguoi) -> dict:
@@ -873,6 +880,11 @@ def gop_mat_hang(conn, b: dict, nguoi) -> dict:
         if conn.execute("SELECT 1 FROM mart.gia_doi_thu_quan_sat WHERE ma_doi_thu = %s AND ma_hang_dt = %s AND hien_hanh "
                         "LIMIT 1", (ben, dich)).fetchone() is None:
             raise LoiNhap("Mặt hàng đích không có dòng giá hiện hành của đối thủ này.")
+    # Ghép hiệu lực đọc TRƯỚC mọi lần ghi (đích mới; hàng này — đích cũ của các X; đích cũ của chính hàng này), mỗi cái
+    # MỘT lần — không mỗi X một lần.
+    g_dich = _ghep_hieu_luc(conn, ben, dich) if dich is not None else None
+    g_hang = _ghep_hieu_luc(conn, ben, hang) if dich is not None else None
+    g_cu = _ghep_hieu_luc(conn, ben, cu) if dich is not None and cu is not None else None
     conn.execute("INSERT INTO app.gop_mat_hang (ma_doi_thu, ma_hang_dt, vao_ma_hang_dt, nguoi_dung_id) VALUES (%s, %s, %s, %s)",
                  (ben, hang, dich, nguoi))
     if dich is not None:
@@ -885,8 +897,8 @@ def gop_mat_hang(conn, b: dict, nguoi) -> dict:
             conn.execute("INSERT INTO app.gop_mat_hang (ma_doi_thu, ma_hang_dt, vao_ma_hang_dt, nguoi_dung_id) "
                          "VALUES (%s, %s, %s, %s)", (ben, x, dich, nguoi))
             _ghi_nhat_ky(conn, "gop", f"{ben}/{x}", {"vao": hang}, {"vao": dich}, nguoi)     # nhật ký trên khoá của chính X
-            _chep_ghep(conn, ben, x, dich, nguoi)
-        _chep_ghep(conn, ben, hang, dich, nguoi)
+            _chep_ghep(conn, ben, x, g_dich, g_hang, nguoi)
+        _chep_ghep(conn, ben, hang, g_dich, g_cu, nguoi)
     _ghi_nhat_ky(conn, "gop", khoa, {"vao": cu}, {"vao": dich}, nguoi)
     return {"ma_doi_thu": ben, "ma_hang_dt": hang, "vao_ma_hang_dt": dich, "sua_cuoi": sua_cuoi_cua(conn, [khoa])}
 
