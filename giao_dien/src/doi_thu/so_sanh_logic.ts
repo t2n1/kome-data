@@ -228,6 +228,20 @@ export function locDanhSach(ds: Nhom[], o: { nganh: string; tim: string; nhanh: 
 /** Số mặt hàng đối thủ VẼ được của nhóm (không tính khách kể) — "n mặt hàng đối thủ" ở cột trái. */
 export const soMatHang = (n: Nhom) => n.quan_sat.filter(veDuoc).length;
 
+/** Một dòng cột trái = MỘT nhóm. mart.so_sanh_nhom trả mỗi (nhom_khoa, don_vi_so) một dòng — giá đối thủ không quy được
+ *  ra ¥/kg (ghi theo gói mà thiếu tịnh 1 gói…) là dòng thứ hai cùng nhóm; hiện cả hai là trông như hai sản phẩm (thấy trên
+ *  dữ liệu thật: 88/137 nhóm). `loc` (đã lọc + xếp) quyết định nhóm nào hiện và thứ tự (lần gặp đầu); số đếm và dòng đại diện
+ *  (dòng 'kg' — mang % KOME) lấy từ MỌI dòng của nhóm trong `tatCa`, trừ dòng `gia_kome_lech` (cột trái không bao giờ hiện). */
+export type DongTrai = { n: Nhom; soKg: number; soChuaQuy: number };
+export function dongTrai(loc: Nhom[], tatCa: Nhom[]): DongTrai[] {
+  return [...new Set(loc.map(n => n.nhom_khoa))].map(k => {
+    const c = tatCa.filter(n => n.nhom_khoa === k && !n.gia_kome_lech);
+    const kg = c.find(n => n.don_vi_so === "kg");
+    const soChuaQuy = c.filter(n => n.don_vi_so !== "kg").reduce((t, n) => t + soMatHang(n), 0);
+    return { n: kg ?? c[0] ?? loc.find(n => n.nhom_khoa === k)!, soKg: kg ? soMatHang(kg) : 0, soChuaQuy };
+  });
+}
+
 /** "+12%" · "−8%" · "0%"; null → "—". Dấu trừ là "−" (U+2212), cùng nếp `yen` của dinh_dang.ts. */
 export const pcDau = (p: number | null | undefined) =>
   p == null ? "—" : `${p > 0 ? "+" : p < 0 ? "−" : ""}${so(Math.abs(p))}%`;

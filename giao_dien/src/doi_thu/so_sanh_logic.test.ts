@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Nhom, QuanSat } from "./kieu";
 import { LUA_CHON_GK, khoaNhom, khoaONhiet, NHAN_SL, bangBac, batTat, demThieu, dongCot, giaBacKg, giaKome, giaTai, locDanhSach, macDinhSp, matHangCuaBen,
   nhanBac, nhanKlGoi, nhomChon, oNhiet, pcDau, soMatHang, thieuQuyCach, giaCoPhi, apPhi, bamONhiet, phiChuONhiet,
-  donViChuaQuy, type PhiSoSanh } from "./so_sanh_logic";
+  donViChuaQuy, dongTrai, type PhiSoSanh } from "./so_sanh_logic";
 import type { DieuKienGiao } from "./phi_giao";
 
 let seq = 0;
@@ -424,5 +424,39 @@ describe("thẻ nhóm chưa quy ra ¥/kg (F2)", () => {
     const { dong } = dongCot(g, { sl: "1", gk: "chuan", chiCung: false, moRong: true });
     expect(dong.find(d => d.kome)!.gia).toBeNull();
     expect(dong.every(d => d.p == null)).toBe(true);
+  });
+});
+
+describe("dongTrai — MỘT dòng mỗi nhóm ở cột trái", () => {
+  // Nhóm Sứa thật (XT02): 7 giá theo kg + 1 giá Thái Dương theo gói (không ghi tịnh) → mart trả HAI dòng cùng nhom_khoa.
+  const kg = nh({ nhom_khoa: "ma:XT02", ten_nhom: "Sứa", so_ben: 4, lech_trung_vi: 0.6,
+    quan_sat: [qs({}), qs({}), qs({ loai_nguon: "khach_ke" })] });
+  const goi = nh({ nhom_khoa: "ma:XT02", ten_nhom: "Sứa", don_vi_so: "don_vi:goi", so_ben: 1, lech_trung_vi: null,
+    quan_sat: [qs({ don_vi_so: "don_vi:goi" })] });
+  const khac = nh({ nhom_khoa: "ma:B1", ten_nhom: "Bún", so_ben: 2, lech_trung_vi: -0.1, quan_sat: [qs({})] });
+
+  it("gộp hai dòng đơn vị của cùng nhóm; % và số mặt hàng lấy từ dòng kg, phần chưa quy ghi riêng", () => {
+    const r = dongTrai([kg, khac, goi], [kg, goi, khac]);
+    expect(r.map(d => d.n.nhom_khoa)).toEqual(["ma:XT02", "ma:B1"]);
+    expect(r[0].n.don_vi_so).toBe("kg");
+    expect(r[0].soKg).toBe(2);
+    expect(r[0].soChuaQuy).toBe(1);
+    expect(r[1]).toMatchObject({ soKg: 1, soChuaQuy: 0 });
+  });
+  it("bộ lọc chỉ khớp dòng gói → nhóm vẫn hiện, số lấy từ MỌI dòng của nhóm", () => {
+    const r = dongTrai([goi], [kg, goi, khac]);
+    expect(r).toHaveLength(1);
+    expect(r[0].n.don_vi_so).toBe("kg");
+    expect(r[0]).toMatchObject({ soKg: 2, soChuaQuy: 1 });
+  });
+  it("nhiều đơn vị chưa quy → cộng thành MỘT số", () => {
+    const thung = nh({ nhom_khoa: "ma:XT02", don_vi_so: "don_vi:thung", so_ben: 1,
+      quan_sat: [qs({ don_vi_so: "don_vi:thung" }), qs({ don_vi_so: "don_vi:thung" })] });
+    expect(dongTrai([kg], [kg, goi, thung])[0]).toMatchObject({ soKg: 2, soChuaQuy: 3 });
+  });
+  it("nhóm chỉ có giá theo gói → soKg 0; dòng giá KOME lệch không bao giờ làm đại diện", () => {
+    expect(dongTrai([goi], [goi])[0]).toMatchObject({ soKg: 0, soChuaQuy: 1 });
+    const lech = { ...kg, gia_kome_lech: true };
+    expect(dongTrai([goi], [lech, goi])[0]).toMatchObject({ soKg: 0, soChuaQuy: 1 });
   });
 });
