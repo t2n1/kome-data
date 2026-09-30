@@ -47,13 +47,15 @@ vào đâu. Từ chối: gộp vào chính mình (sau khi quy đích), đích kh
 ### 3.4 `mart.gia_doi_thu_hien_hanh` (DROP + CREATE cùng `so_sanh_nhom`, như 067)
 Thêm `dai_dien boolean`: mỗi (nhom_khoa, don_vi_so, ma_doi_thu, mat_hang_khoa) ĐÚNG MỘT dòng `dai_dien = true` trong số
 dòng không khách kể:
-1. ưu tiên dòng `la_muc_khach_thuong(muc_gia)`, `trang_thai <> 'het'`, `yen_chuan IS NOT NULL`, KHÔNG bất thường;
-2. không có → dòng không phải `muc_gia = 'pallet'` rẻ nhất (kể cả mức khác / hết), rồi mọi dòng;
-3. trong cùng hạng: `yen_chuan` tăng dần (NULL cuối), rồi `nguon`, `id`.
+"Dùng được" = `trang_thai <> 'het'`, `yen_chuan IS NOT NULL`, KHÔNG bất thường. Hạng (nhỏ thắng):
+0. khách thường VÀ dùng được; 1. không phải pallet VÀ dùng được (vd khách ngoài khi giá thường đang hết); 2. dùng được
+(pallet); 3. khách thường (hết / bất thường); 4. còn lại. Trong cùng hạng: `yen_chuan` tăng dần (NULL cuối), `nguon`,
+`id`. (Sửa sau rà Task 1: bản đầu xếp dòng HẾT lên trên dòng khách ngoài còn hàng → cả mặt hàng rơi khỏi so sánh.)
 Khách kể: `dai_dien = false` (không vẽ, không đếm — như nay). Thêm `gia_pallet_mh numeric` = min `gia_pallet` các dòng
-của mặt hàng (giá cho "Khách mua: 1 pallet"), `so_muc int` = số dòng của mặt hàng.
-Mốc "bất thường" (`tv`): trung vị và số bên tính trên giá RẺ NHẤT cho khách thường của MỖI MẶT HÀNG (không lọc bất
-thường — tránh vòng; không hàng hết; không khách kể), không còn trên từng dòng. Cờ `bat_thuong` vẫn theo TỪNG dòng.
+KHÔNG bất thường của mặt hàng (giá cho "Khách mua: 1 pallet"), `so_muc int` = số dòng của mặt hàng.
+Mốc "bất thường" (`tv`): trung vị và số bên tính trên MỘT giá mỗi mặt hàng = rẻ nhất cho khách thường còn hàng, không có
+thì rẻ nhất không-pallet còn hàng (cùng hai hạng đầu của đại diện, nhưng KHÔNG lọc bất thường — tránh vòng; không khách
+kể), không còn trên từng dòng. Cờ `bat_thuong` vẫn theo TỪNG dòng.
 
 ### 3.5 `mart.so_sanh_nhom`
 Đọc `WHERE dai_dien AND NOT bat_thuong AND trang_thai <> 'het'` (thay cho mọi dòng). `so_quan_sat` = số mặt hàng.
