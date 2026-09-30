@@ -844,6 +844,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     def man_mua_vu(request: Request):
         return _man_khach(request)
 
+    # Bảng giá KOME — dữ liệu qua /api/bang-gia (kome/bang_gia.py -> mart.bang_gia_kome, 071). Chỉ xem: giá sửa trong OBC.
+    @app.get("/bang-gia", response_class=HTMLResponse)
+    def man_bang_gia(request: Request):
+        return _man_khach(request)
+
     # Thị trường & đối thủ — dữ liệu qua /api/doi-thu/* (kome/doi_thu.py -> mart, 059–060). NGOÀI
     # DUONG_KHO_DU_LIEU: mọi người đăng nhập vào và sửa được (đặc tả §2 "Ai sửa được": A).
     @app.get("/doi-thu", response_class=HTMLResponse)

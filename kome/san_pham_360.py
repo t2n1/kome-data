@@ -175,34 +175,15 @@ NHAN_BAC = {"std": "標準価格", "10": "10 · khuyến mãi"}   # 売価No.10 
 
 
 def _bac_gia(conn, ma: str) -> list[dict]:
-    """Giá theo bậc — dòng MỚI NHẤT mỗi (bậc, quy cách) của lần nạp mới nhất ≤ mốc. 1 lượt hỏi. 標準価格 đứng đầu.
-    Giá chưa thuế: cột chưa thuế nếu > 0 và không mâu thuẫn cột gồm thuế; không thì gồm thuế ÷ 1,08 — BẢN CHÉP BẮT BUỘC
-    của luật hai cột trong mart.gia_kome_bang (066) (ở đây hiện giá theo TỪNG quy cách nên không đọc view được);
-    sửa một bên là sửa cả hai."""
-    # Chỉ lần nạp MỚI NHẤT của từng (mã, quy cách) ≤ mốc (valid_from lớn nhất RỒI batch_id lớn nhất trong ngày đó — file
-    # sửa cùng ngày được upsert, bậc bị bỏ giữ batch_id cũ): kome/loaders/price.py BỎ bậc 0/0 nên khi
-    # một bậc (vd 売価No.10) hết hạn, không có dòng mới nào ghi đè dòng cũ — không giới hạn thì bậc đã hết ở lại mãi.
-    # Cùng luật với mart.gia_kome_bang (066) và cùng mốc lùi `mart.moc_lui()` (040).
-    # core.fact_price_list giữ LỊCH SỬ giá — mỗi lần nạp master là một dòng MỚI; DISTINCT ON … valid_from DESC
-    # còn lại chỉ để chọn trong cùng lần nạp. Không lọc thì sau ba lần nạp, một bậc giá hiện ba
-    # con số khác nhau dưới nhãn "giá đáng lẽ phải bán", trên đúng màn hình
-    # người ta nhìn TRƯỚC KHI báo giá cho khách.
+    """Giá theo bậc — dòng hiện hành của `mart.bang_gia_kome` (071: lần nạp MỚI NHẤT ≤ mốc của từng quy cách + luật hai
+    cột thuế, ĐỊNH NGHĨA MỘT LẦN — cùng view mà `mart.gia_kome_bang` đọc). 1 lượt hỏi. 標準価格 đứng đầu."""
+    # core.fact_price_list giữ LỊCH SỬ giá — không lọc lần nạp mới nhất thì sau ba lần nạp, một bậc giá hiện ba con số
+    # khác nhau dưới nhãn "giá đáng lẽ phải bán", trên đúng màn hình người ta nhìn TRƯỚC KHI báo giá cho khách.
     rows = conn.execute(
-        """SELECT DISTINCT ON (price_level, pack_code)
-                  price_level, pack_code, price_ex_tax, price_in_tax, valid_from
-           FROM (SELECT f.*, rank() OVER (PARTITION BY f.pack_code ORDER BY f.valid_from DESC, f.batch_id DESC) = 1
-                            AS moi_nhat
-                 FROM core.fact_price_list f
-                 WHERE f.product_code = %s
-                   AND f.valid_from <= (SELECT coalesce(mart.moc_lui(), 'infinity'::date))) t
-           WHERE moi_nhat AND (price_ex_tax > 0 OR price_in_tax > 0)
-           ORDER BY price_level, pack_code, valid_from DESC, batch_id DESC""", (ma,)).fetchall()
-
-    def gia(ex, inc):
-        return int(ex) if ex > 0 and not (0 < inc < ex) else round(inc / 1.08)
-
+        """SELECT price_level, pack_code, round(gia_chua_thue), tu_ngay FROM mart.bang_gia_kome
+           WHERE product_code = %s AND hien_hanh ORDER BY price_level, pack_code""", (ma,)).fetchall()
     ra = [{"bac": NHAN_BAC.get(g[0], g[0]), "quy_cach": QUY_CACH.get(g[1], g[1]), "pack_code": g[1],
-           "gia": gia(g[2], g[3]), "tu_ngay": g[4]} for g in rows]
+           "gia": int(g[2]), "tu_ngay": g[3]} for g in rows]
     return sorted(ra, key=lambda x: (x["bac"] != "標準価格",))
 
 
