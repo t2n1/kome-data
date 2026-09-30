@@ -99,12 +99,16 @@ def test_chua_dang_nhap_thi_401_json(test_db_url, monkeypatch, url):
 
 
 def test_ba_route_tra_vo_react_co_data_theme_tu_cookie(conn, c):
-    for duong in ("/bao-cao", "/bao-cao?ky=2026", "/du-bao", "/du-bao?kb=cao",
-                  "/lien-he", "/lien-he?tat_ca=1"):
+    for duong in ("/bao-cao", "/bao-cao?ky=2026", "/lien-he", "/lien-he?tat_ca=1"):
         r = c.get(duong, cookies={"kome_giao_dien": "toi"})
         assert r.status_code == 200, duong
         assert 'id="goc"' in r.text and '<html lang="vi" data-theme="toi"' in r.text, duong
         assert "window.__KOME__=" in r.text, duong
+    # 2026-09-30: Dự báo gộp vào trang Doanh thu — địa chỉ cũ 301, GIỮ khoảng xem, bỏ `kb`.
+    for cu, moi in (("/du-bao", "/bao-cao"), ("/du-bao?kb=cao", "/bao-cao"),
+                    ("/du-bao?thang=2026-05&kb=thap", "/bao-cao?thang=2026-05")):
+        r = c.get(cu, follow_redirects=False)
+        assert r.status_code == 301 and r.headers["location"] == moi, cu
 
 
 def test_du_bao_tra_tong_CUA_CA_BA_kich_ban(conn, batch, c):

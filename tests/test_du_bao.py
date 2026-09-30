@@ -239,8 +239,10 @@ def test_trang_du_bao(conn, batch, test_db_url):
     của thanh bên Jinja cũ, nay ở giao_dien/src/khung/Nav.tsx)."""
     _nen(conn, batch)
     c = TestClient(create_app(db_url=test_db_url))
-    r = c.get("/du-bao")
-    assert r.status_code == 200 and 'id="goc"' in r.text
+    # 2026-09-30: màn Dự báo gộp vào trang Doanh thu (/bao-cao); /api/du-bao giữ nguyên.
+    r = c.get("/du-bao", follow_redirects=False)
+    assert r.status_code == 301 and r.headers["location"] == "/bao-cao"
+    assert 'id="goc"' in c.get("/bao-cao").text
     d = c.get("/api/du-bao").json()
     db = d["db"]
     assert db["chot"]["thang"] == "2026-07"                    # "Chốt tháng 07/2026"
@@ -248,16 +250,20 @@ def test_trang_du_bao(conn, batch, test_db_url):
     assert [k["ma"] for k in db["kh"]["ky_vong"]] == ["K0021"]  # đơn kỳ vọng 14 ngày
     assert {k["ma"] for k in db["kh"]["nguy_co"]} == {"K0022", "K0023"}   # nguy cơ ngừng mua
     assert isinstance(db["chot"]["kiem"], list)                # dự báo đã chuẩn tới đâu
-    src = (NGUON / "du_bao" / "DuBao.tsx").read_text(encoding="utf-8")
-    for khoi in ("<h2>Chốt tháng {tNhan(c.thang)}</h2>", "<h2>12 tháng tới</h2>",
-                 "<h2>Đơn kỳ vọng 14 ngày tới</h2>", "<h2>Nguy cơ ngừng mua</h2>",
-                 "<h2>Dự báo đã chuẩn tới đâu</h2>"):
+    assert d["ve_chot_lg"]["co"] and set(d["tong_lg"]) == set(DB.KICH_BAN)   # lãi gộp, cùng công thức
+    src = (NGUON / "bao_cao" / "BaoCao.tsx").read_text(encoding="utf-8")
+    # Trên trang Doanh thu: chốt tháng = ô "Dự kiến chốt" (+ ⓘ "Đã chuẩn tới đâu" + hình luỹ kế),
+    # 12 tháng tới = cột nền của biểu đồ chính (3 kịch bản), nguy cơ ngừng mua = khối riêng.
+    # "Đơn kỳ vọng 14 ngày" BỎ khỏi trang (dữ liệu vẫn ở API) — chủ DN chọn trang ít chữ.
+    for khoi in ("Dự kiến chốt {chot ? thNgan(chot.thang)", "<b>Đã chuẩn tới đâu</b>", "<LuyKe v=",
+                 "kieu: \"cot_nen\" as const", "cach_xem={coDuBao && f ? { ds: Object.entries(f.kich_ban)",
+                 '<Khoi tieu_de="Nguy cơ ngừng mua"'):
         assert khoi in src, khoi
     assert "const tNhan = (t: string) => `${t.slice(5)}/${t.slice(0, 4)}`;" in src   # 07/2026
-    assert 'url: "/du-bao"' in (NGUON / "khung" / "muc.ts").read_text(encoding="utf-8")
+    assert 'url: "/du-bao"' not in (NGUON / "khung" / "muc.ts").read_text(encoding="utf-8")
     nav = (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")
     assert 'aria-current={m.ma === dangMo ? "page" : undefined}' in nav
-    # Kịch bản lạ trên URL không làm trang nổ.
+    # Kịch bản lạ trên URL không làm trang nổ (địa chỉ cũ bỏ `kb`).
     assert c.get("/du-bao?kb=bay").status_code == 200
 
 
@@ -267,5 +273,7 @@ def test_trang_du_bao_kho_rong(conn, test_db_url):
     c = TestClient(create_app(db_url=test_db_url))
     assert c.get("/du-bao").status_code == 200
     assert c.get("/api/du-bao").json()["db"] is None
-    src = (NGUON / "du_bao" / "DuBao.tsx").read_text(encoding="utf-8")
-    assert "if (!d.db) return" in src and "chưa có gì để dự báo" in src
+    # Trang Doanh thu: không có dự báo -> ô "Dự kiến chốt" in "—" kèm lý do, khối nguy cơ không vẽ.
+    src = (NGUON / "bao_cao" / "BaoCao.tsx").read_text(encoding="utf-8")
+    assert "const db = f?.db ?? null;" in src and "{db && <The>" in src
+    assert "khoảng đang xem đã qua — không dự báo" in src

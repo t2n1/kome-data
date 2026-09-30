@@ -1,22 +1,26 @@
-// Báo cáo doanh thu (/bao-cao) — bố cục Báo cáo.dc.html. Mọi con số + hình học
-// biểu đồ từ /api/bao-cao: hình học vẫn tính ở kome/bao_cao.py và
-// kome/ve_phan_tich.py (các bất biến đối soát / "không vẽ" / cắt đường khi
-// không có cùng kỳ có test ở đó) — màn này chỉ vẽ và thêm tương tác.
-// Lệch có chủ ý so với gói thiết kế: tab "Lãi gộp" của khối ngân sách vô hiệu
-// (chỉ có ngân sách DOANH THU); "Khách hiện hữu / khách mới" chưa có định nghĩa
-// trong mart; điểm dự báo trên đường luỹ kế nằm ở /du-bao (không bịa ở đây).
-// Kỳ so (đặc tả 2026-09-28): MỘT kỳ so cho cả trang = `khoang.so_sanh[0]`, nhãn của
-// máy chủ. Kỳ so luôn vẽ viền đứt / nét đứt (cột ma, đường nhỏ, luỹ kế, vạch trên
-// thanh) — nét đứt không dùng cho thứ gì khác (nhịp ngân sách là nét liền).
-import { useState } from "react";
+// Trang Doanh thu (/bao-cao, 2026-09-30) — GỘP Báo cáo · Dự báo · Ngân sách (đặc tả
+// 2026-09-30-doanh-thu-gop-design.md; chủ DN: "ít chữ, nhiều graph", "phải có lợi nhuận",
+// "bubble graph"). Hai nguồn song song, KHÔNG endpoint mới: /api/bao-cao (số + hình học của
+// kome/bao_cao.py, kome/ve_phan_tich.py, kome/ve_doanh_thu.py) và /api/du-bao (kome/du_bao.py).
+// Công tắc Doanh thu | Lãi gộp đổi cả trang; khối chưa có số lãi gộp nói ra ở nhãn.
+// Luật chữ như Tổng quan: câu định nghĩa cách tính vào ⓘ, câu ngoại lệ luôn hiện; nhãn kỳ so
+// luôn hiện và mỗi phép so in số tháng đối chiếu (bất biến 5b).
+// Kỳ so = NÉT ĐỨT / CỘT MA / VẠCH ĐỨT — nét đứt không dùng cho thứ gì khác (ngân sách và
+// dự báo là nét liền / cột nền).
+// Lệch có chủ ý so với gói thiết kế: KHÔNG "% chắc chắn" / "% nguy cơ" (bất biến đợt 8);
+// "Khách hiện hữu / khách mới" chưa có định nghĩa trong mart.
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { lay } from "../api";
-import { chuoiKhoang, useKhoang, voiKhoang, type KhoangMayChu } from "../khung/khoang";
-import { ChuaCoDuLieu } from "../chung/Khoi";
+import { chuoiKhoang, useKhoang, useNhanMoc, voiKhoang, type KhoangMayChu } from "../khung/khoang";
+import { BieuDo, type Chuoi } from "../chung/BieuDo";
+import { Khoi } from "../chung/Khoi";
+import { DongNoi, ONoi } from "../chung/ONoi";
 import { MauSs } from "../chung/SoSanh";
 import { gon, ngay, so, yen } from "../dinh_dang";
 import { KD } from "../khoi_dau";
+import { Bong, CauNoi, dongBong, type BongDiem, type BongVe, type CauNoiVe } from "./Bong";
 import "./bao_cao.css";
 
 // 048 / 049: nhóm KHÔNG phải hàng (phí & điều chỉnh, hàng tặng POSM) — tổng do mart cộng.
@@ -35,64 +39,71 @@ type SoSanhSo = { ma: string; nhan: string; co: boolean; tu: string; den: string
   tang_dt: number | null; tang_lg: number | null; tang_khach: number | null; chenh_ty_suat: number | null };
 type KhTT = { ma: string; ten: string; doanh_thu: number; thu_hang: number; ty_trong: number | null; luy_ke: number | null };
 type Nguoi = { ma: string; ten: string | null; thuc_te: number; muc_tieu: number | null; muc_tieu_den_hom_nay: number | null;
-  tien_do: number | null; cung_ky: number | null; co_cung_ky: boolean; tang_truong: number | null; rong_thanh: number | null; rong_moc: number | null;
-  muc_tieu_lg: number | null; thuc_te_lg: number; muc_tieu_lg_den_hom_nay: number | null; tien_do_lg: number | null;
-  rong_thanh_lg: number | null; rong_moc_lg: number | null };
+  tien_do: number | null; muc_tieu_lg: number | null; thuc_te_lg: number; tien_do_lg: number | null };
+type ThangCty = { thang: string; thuc_te: number | null; ngan_sach: number | null; thuc_te_lg: number | null; ngan_sach_lg: number | null };
 type Td = { company_fy: number; thang: string; hom_nay: string | null; ngay_kd: number; ngay_kd_da_qua: number; thuc_te: number;
   muc_tieu: number | null; muc_tieu_den_hom_nay: number | null; tien_do: number | null; nguoi: Nguoi[]; co_ngan_sach: boolean;
-  rong_thanh: number | null; rong_moc: number | null; pct_moc_chi_tieu: number | null;
-  // 041: lãi gộp của CÔNG TY (ngân sách công ty nhập thẳng).
-  co_ngan_sach_lg: boolean; thuc_te_lg: number; muc_tieu_lg: number | null; muc_tieu_lg_den_hom_nay: number | null;
-  tien_do_lg: number | null; rong_thanh_lg: number | null; rong_moc_lg: number | null; pct_moc_chi_tieu_lg: number | null };
+  pct_moc_chi_tieu: number | null; co_ngan_sach_lg: boolean; thuc_te_lg: number; muc_tieu_lg: number | null;
+  tien_do_lg: number | null; pct_moc_chi_tieu_lg: number | null; thang_cty: ThangCty[] };
 type Spark = { co: boolean; rong: number; cao: number; doan: string[]; diem_don: [number, number][]; doan_ss?: string[] };
 type BaoCaoApi = {
   khoang: KhoangMayChu | null;
-  bc: { ky: Ky; moi_ky: Ky[]; thang: O[]; hang: { ma: string; ten: string; nhom: string; doanh_thu: number | null; lai_gop: number | null; ty_suat: number | null; so_khach: number }[];
-    nhan_vien: { ma: string | null; doanh_thu: number; lai_gop: number; ty_suat: number | null; so_khach: number; so_phieu: number;
-      dt_ss?: number | null; dt_nay_ss?: number | null }[];
-    khong_co_du_lieu: boolean; canh_bao: string[]; cung_ky: CungKy | null; so_sanh: SoSanhSo[]; tap_trung: { dong: KhTT[]; so_khach: number; luy_ke_top10: number | null } | null;
+  bc: { ky: Ky; thang: O[];
+    nhan_vien: { ma: string | null; doanh_thu: number; lai_gop: number; dt_ss?: number | null; dt_nay_ss?: number | null }[];
+    khong_co_du_lieu: boolean; canh_bao: string[]; cung_ky: CungKy | null; so_sanh: SoSanhSo[];
+    tap_trung: { dong: KhTT[]; so_khach: number; luy_ke_top10: number | null } | null;
     phi: NhomRieng; hang_tang: NhomRieng };
   td: Td | null;
-  td_phu: { ngay_kd_con_lai: number; can_ban_moi_ngay: number | null; nhip_chuan: number | null; thieu_moc: number | null } | null;
   so_nho: Record<"dt" | "lg" | "ts" | "kh", Spark>;
-  lk_lg: BaoCaoApi["lk"]; td_phu_lg: BaoCaoApi["td_phu"];
-  lk: { co: boolean; rong: number; cao: number; ngan_sach: string; thuc_te: string; so_sanh?: string; nhan: { x: number; thang: string; hien: boolean }[]; dinh: number };
-  bd: { co: boolean; rong: number; cao: number; cot: { x: number; y: number; w: number; h: number; o: O }[]; diem: [number, number, O][];
-    duong: string; duong_ck: string[]; ts_lo: number; ts_hi: number;
-    cot_ck: { x: number; y: number; w: number; h: number; thang: string; dt: number }[] };
-  dg: { co: boolean; rong: number; cao: number; x0: number; cao_hang: number; thanh: { nganh: string; x: number; w: number; y: number; am: boolean;
-    tang_truong: number | null; nhan: string; nhan_x: number; nhan_neo: string; nhan_trong: boolean }[] };
-  co: { co: boolean; rong: number; cao: number; khong_ve: number; so_ma_khong_ve: number; nganh: { nganh: string; x: number; y: number; w: number; h: number;
-    bac: string; doanh_thu: number; tang_truong: number | null; ma: { ten: string; x: number; y: number; w: number; h: number; doanh_thu: number; nhan: string }[] }[] };
   nh: { co: boolean; thang: string[]; thang_dau_du_lieu: string | null; hang: { nganh: string; o: { thang: string; nganh: string; bac: string;
     tang_truong: number | null; doanh_thu: number; co_the_ck?: boolean }[] }[] };
   pa: { co: boolean; rong: number; cao: number; cot: { x: number; y: number; w: number; h: number; khach: KhTT }[]; doan: string[];
     diem: { x: number; y: number; khach: KhTT }[]; dinh: number; truc_pct: { y: number; nhan: string }[] };
   ngay_dau_du_lieu: string | null;
+  ss_thang: { thang: Record<string, [number | null, number | null]>; co_lg: boolean };
+  cau_noi: CauNoiVe;
+  bong_nganh: Record<"dt" | "lg", BongVe>;
+  bong_ma: Record<"dt" | "lg", BongVe>;
+};
+
+type Kiem = { thang: string; du_bao: number; thuc_te: number; lech: number | null };
+type Chot = { thang: string; hom_nay: string; da_ban: number; e: number; n: number; co_so: number; thap: number | null;
+  cao: number | null; kiem: Kiem[]; moc_kiem: number; ngan_sach: number | null; xong: boolean };
+type ThangDb = { thang: string; co_so: number; thap: number; cao: number; cung_ky: number };
+type Nam = { du_bao: ThangDb[]; he_so: number | null; doi_chieu: string[]; tong_cung_ky: number };
+type NguoiDb = { ma: string; ten: string | null; da_ban: number; co_so: number; ngan_sach: number | null;
+  da_ban_lg: number; co_so_lg: number; ngan_sach_lg: number | null };
+type NguyCo = { ma: string; ten: string; so_ngay_im_lang: number; ty_le: number; doanh_thu: number; trang_thai: string };
+type VeChot = { co: boolean; rong: number; cao: number; trai: number; phai: number; truc: { y: number; nhan: string }[]; dai?: string; ns?: string;
+  cao_?: string; thap?: string; cs?: string; tt: string; x_nay: number; y_nay: number; x_cuoi: number; y_cuoi: number;
+  day_truc: number; nhan_ngay: { x: number; nhan: string }[] };
+type DuBaoApi = {
+  db: null | { chot: Chot | null; nam: Nam; nguoi: NguoiDb[]; chot_lg: Chot | null; nam_lg: Nam | null;
+    kh: { nguy_co: NguyCo[]; so_nguy_co: number; tien_nguy_co: number } };
+  kich_ban: Record<string, string>; tong: Record<string, number>; theo: Record<string, number[]>;
+  tong_lg: Record<string, number>; theo_lg: Record<string, number[]>;
+  ve_chot: VeChot; ve_chot_lg: VeChot;
 };
 
 const p1 = (v: number) => (v * 100).toFixed(1) + "%";
 const hoa = (s: string) => s.replace(/^./, c => c.toUpperCase());
-/** % thay đổi so kỳ so — mẫu số ≤ 0 (赤伝) thì không tính được, không phải 0. */
-const tdSs = (a: number | null | undefined, b: number | null | undefined) => (a != null && b != null && b > 0 ? a / b - 1 : null);
 const dau = (v: number) => (v >= 0 ? "+" : "") + (v * 100).toFixed(1);
-const mauTd = (tien_do: number | null, moc: number | null) =>
-  tien_do == null ? "nhat-chu" : (moc ? tien_do / moc : tien_do) >= 1 ? "tang" : (moc ? tien_do / moc : tien_do) >= 0.85 ? "canh-chu" : "giam";
+const tNhan = (t: string) => `${t.slice(5)}/${t.slice(0, 4)}`;
+const thNgan = (t: string) => `T${+t.slice(5, 7)}`;
+/** Câu ngoại lệ của khối: rỗng → null (không vẽ dải cảnh báo trống). */
+const cb = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(" ") || null;
 
-function SoCungKy({ ck, tang, don_vi, khach = false, ngay_dau }: { ck: CungKy | null; tang: number | null; don_vi: string; khach?: boolean; ngay_dau: string | null }) {
+function SoCungKy({ ck, tang, don_vi, ngay_dau }: { ck: CungKy | null; tang: number | null; don_vi: string; ngay_dau: string | null }) {
   if (!ck || ck.so_thang <= 0) return <>chưa có cùng kỳ để so{ngay_dau ? ` — dữ liệu bắt đầu ${ngay(ngay_dau)}` : ""}</>;
   return <>{tang != null ? <span className={tang >= 0 ? "tang" : "giam"}>{dau(tang)}{don_vi}</span>
-    : <span title={khach ? "Không có khách nào cùng kỳ năm trước — không tính được, không phải bằng 0"
-      : "Mẫu số cùng kỳ ≤ 0 (赤伝 — phiếu đỏ có thể làm doanh thu/lãi gộp cùng kỳ âm) — không tính được %, không phải bằng 0"}>—</span>}
+    : <span title="Mẫu số cùng kỳ ≤ 0 (赤伝) — không tính được %, không phải bằng 0">—</span>}
     {" "}<MauSs />so cùng kỳ · {ck.so_thang} tháng đối chiếu ({ck.tu} → {ck.den})</>;
 }
 
-/** Dạng Tháng / Khoảng: mỗi phép so một dòng, luôn in dải ngày nó so (bất biến 5b). */
-function SoSanhDong({ ss, lay_tang, don_vi, khach = false }: { ss: SoSanhSo[]; lay_tang: (s: SoSanhSo) => number | null; don_vi: string; khach?: boolean }) {
+/** Dạng Tháng / Khoảng: phép so in luôn dải ngày nó so (bất biến 5b). */
+function SoSanhDong({ ss, lay_tang, don_vi }: { ss: SoSanhSo[]; lay_tang: (s: SoSanhSo) => number | null; don_vi: string }) {
   return <>{ss.map(s => <div key={s.ma}>{!s.co ? <span className="nhat-chu">{s.nhan}: không có dữ liệu để so</span> : <>
-    {lay_tang(s) != null ? <span className={lay_tang(s)! >= 0 ? "tang" : "giam"}>{dau(lay_tang(s)!)}{don_vi}</span>
-      : <span title={khach ? "Không có khách nào ở dải so sánh — không tính được, không phải bằng 0"
-        : "Mẫu số ≤ 0 (赤伝 — phiếu đỏ có thể làm doanh thu/lãi gộp âm) — không tính được %, không phải bằng 0"}>—</span>}
+    {lay_tang(s) != null ? <span className={lay_tang(s)! >= 0 ? "tang" : "giam"}>{dau(lay_tang(s)!)}{don_vi}</span> : <span>—</span>}
     {" "}so <MauSs />{s.nhan} ({ngay(s.tu)} → {ngay(s.den)})</>}</div>)}</>;
 }
 
@@ -107,267 +118,324 @@ function SparkSvg({ s, mau }: { s: Spark; mau: string }) {
     </svg>);
 }
 
+function The({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <section className={"kh-the bc-khoi " + className}>{children}</section>;
+}
+
 export default function BaoCao() {
   const kxs = chuoiKhoang(useKhoang());
+  const nhanMoc = useNhanMoc();
+  const [cs, datCs] = useState<"dt" | "lg">("dt");
+  const [kb, datKb] = useState("cs");
   const { data: d, error, isFetching } = useQuery<BaoCaoApi>({
     queryKey: ["bao-cao", kxs], queryFn: () => lay<BaoCaoApi>(voiKhoang("/api/bao-cao")), placeholderData: keepPreviousData,
   });
+  // Dự báo: cùng khoảng xem (mốc của khoảng) — ảnh chụp riêng, tải song song, không chặn trang.
+  const { data: f } = useQuery<DuBaoApi>({
+    queryKey: ["du-bao", kxs], queryFn: () => lay<DuBaoApi>(voiKhoang("/api/du-bao")), placeholderData: keepPreviousData,
+  });
 
-  if (error) return <div className="khoi-loi">Không tải được báo cáo: {(error as Error).message}</div>;
+  if (error) return <div className="khoi-loi">Không tải được trang Doanh thu: {(error as Error).message}</div>;
   if (!d) return <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div>;
-  const { bc, td, td_phu } = d;
-  if (bc.khong_co_du_lieu) return <><h1>Báo cáo doanh thu</h1>
+  const { bc, td } = d;
+  if (bc.khong_co_du_lieu) return <><h1>Doanh thu</h1>
     <div className="khoi-loi">Chưa có dòng bán hàng nào trong kho dữ liệu. Hãy nạp file <b>売上伝票データ</b> trước.</div></>;
+  const lg = cs === "lg";
+  const ten = lg ? "lãi gộp" : "doanh thu";
   const ck = bc.cung_ky;
   const kx = d.khoang;
-  // Dạng Kỳ = màn Báo cáo cũ (so cùng kỳ trên các tháng đối chiếu); dạng Tháng /
-  // Khoảng so theo `bc.so_sanh` (năm trước + tháng trước / khoảng liền trước).
-  // Dạng Kỳ có kỳ so sánh tự chọn cũng đi `bc.so_sanh` (máy chủ đã đi nhánh khoảng).
   const theoKy = !kx || (kx.loai === "ky" && !kx.tu_chon);
   const ss = bc.so_sanh ?? [];
-  const chinh = ss[0];
-  // Nhãn kỳ so của MÁY CHỦ — dạng Kỳ là "cùng kỳ năm trước".
   const nhanSs = kx?.so_sanh[0]?.nhan ?? "cùng kỳ năm trước";
   const lechSs = kx?.so_sanh[0]?.lech_thang ?? 12;
   const theoNgay = bc.thang.length > 0 && bc.thang[0].thang.length === 10;
-  const nhanX = (t: string) => t.length === 10 ? String(+t.slice(8)) : t.slice(5);
+
+  // Dự báo chỉ áp khi tháng của mốc nằm trong khoảng đang xem (dạng Tháng: đúng tháng đó; dạng Kỳ:
+  // tháng thuộc kỳ). Dạng Khoảng không có ngân sách / dự báo theo tháng.
+  const db = f?.db ?? null;
+  const chot = db ? (lg ? db.chot_lg : db.chot) : null;
+  const trongKy = (t: string) => !!td?.thang_cty.some(x => x.thang === t);
+  const coDuBao = !!chot && !!kx && (kx.loai === "thang" ? kx.thang === chot.thang : kx.loai === "ky" && trongKy(chot.thang));
+  const nam = db ? (lg ? db.nam_lg : db.nam) : null;
+  const theo = f ? (lg ? f.theo_lg : f.theo)[kb] ?? [] : [];
 
   const xuatCsv = () => {
-    const cot = [theoNgay ? "Ngày" : "Tháng", "Doanh thu thuần", "Lãi gộp", "Tỷ suất", hoa(nhanSs), `So ${nhanSs}`, "Số phiếu", "Khách có đơn"];
-    const dong = bc.thang.map(o => [o.thang, o.doanh_thu, o.lai_gop, o.ty_suat ?? "", o.co_cung_ky ? o.dt_cung_ky ?? "" : "",
-      o.tang_truong ?? "", o.so_phieu, o.so_khach]);
+    const cot = [theoNgay ? "Ngày" : "Tháng", "Doanh thu thuần", "Lãi gộp", "Tỷ suất", hoa(nhanSs), "Số phiếu", "Khách có đơn"];
+    const dong = bc.thang.map(o => [o.thang, o.doanh_thu, o.lai_gop, o.ty_suat ?? "", o.co_cung_ky ? o.dt_cung_ky ?? "" : "", o.so_phieu, o.so_khach]);
     const csv = "﻿" + [cot, ...dong].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\r\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    a.download = theoKy ? `bao-cao-ky-${bc.ky.so_ky}.csv` : `bao-cao-${kx!.tu}_${kx!.den}.csv`; a.click(); URL.revokeObjectURL(a.href);
+    a.download = theoKy ? `doanh-thu-ky-${bc.ky.so_ky}.csv` : `doanh-thu-${kx!.tu}_${kx!.den}.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
 
+  // ---- Ô số ----
+  const tienDo = td ? (lg ? td.tien_do_lg : td.tien_do) : null;
+  const moc = td ? (lg ? td.pct_moc_chi_tieu_lg : td.pct_moc_chi_tieu) : null;
+  const coNs = td ? (lg ? td.co_ngan_sach_lg : td.co_ngan_sach) : false;
+  const lienNs = KD.hien_ngan_sach ? `/ngan-sach?ky=${td?.company_fy ?? bc.ky.company_fy}` : null;
+
+  // ---- Biểu đồ chính: 12 tháng của kỳ ----
+  const chuoiChinh = (): { nhan: string[]; chuoi: Chuoi[]; vach: { i: number; chu: string } | null } => {
+    if (td && td.thang_cty.length) {
+      const th = td.thang_cty.map(t => t.thang);
+      const iDb = (t: string) => nam?.du_bao.findIndex(x => x.thang === t) ?? -1;
+      const duBao = th.map(t => {
+        if (!coDuBao || !chot) return null;
+        if (t === chot.thang) return chot.co_so;
+        const i = iDb(t);
+        return t > chot.thang && i >= 0 ? theo[i] ?? null : null;
+      });
+      const ssk = d.ss_thang.thang;
+      const ky_so = th.map(t => ssk[t] ? (lg ? (d.ss_thang.co_lg ? ssk[t][1] : null) : ssk[t][0]) : null);
+      const iNay = coDuBao && chot ? th.indexOf(chot.thang) : -1;
+      return {
+        nhan: th.map(thNgan),
+        chuoi: [
+          { ten: "Thực tế", kieu: "cot", mau: "var(--lien-ket)", gia_tri: td.thang_cty.map(t => lg ? t.thuc_te_lg : t.thuc_te) },
+          ...(duBao.some(v => v != null) ? [{ ten: `Dự báo (${f!.kich_ban[kb]})`, kieu: "cot_nen" as const, mau: "var(--do-nen)", gia_tri: duBao }] : []),
+          { ten: "Ngân sách", kieu: "duong", mau: "var(--do)", gia_tri: td.thang_cty.map(t => lg ? t.ngan_sach_lg : t.ngan_sach) },
+          ...(ky_so.some(v => v != null) ? [{ ten: hoa(nhanSs), kieu: "cot_ma" as const, mau: "var(--vien-dam)", gia_tri: ky_so, so_voi: 0 }] : []),
+        ],
+        vach: iNay >= 0 ? { i: iNay, chu: nhanMoc } : null,
+      };
+    }
+    return {
+      nhan: bc.thang.map(o => o.thang.length === 10 ? String(+o.thang.slice(8)) : thNgan(o.thang)),
+      chuoi: [
+        { ten: "Thực tế", kieu: "cot", mau: "var(--lien-ket)", gia_tri: bc.thang.map(o => lg ? o.lai_gop : o.doanh_thu) },
+        { ten: hoa(nhanSs), kieu: "cot_ma", mau: "var(--vien-dam)", so_voi: 0,
+          gia_tri: bc.thang.map(o => o.co_cung_ky ? (lg ? o.lg_cung_ky : o.dt_cung_ky) : null) },
+      ],
+      vach: null,
+    };
+  };
+  const bd = chuoiChinh();
+  const tongNam = f ? (lg ? f.tong_lg : f.tong)[kb] : null;
+
+  const bn = d.bong_nganh[cs], bm = d.bong_ma[cs];
+  const nguoiDb = db && coDuBao ? Object.fromEntries(db.nguoi.map(n => [n.ma ?? "", n])) : {};
+  const ssNguoi = kx?.loai === "thang" && ss[0]?.co && !lg ? Object.fromEntries(bc.nhan_vien.map(n => [n.ma ?? "", n.dt_ss ?? null])) : null;
+
   return (
-    <div className={"bc" + (isFetching ? " dang-tai" : "")}>
+    <div className={"bc dt" + (isFetching ? " dang-tai" : "")}>
       <div className="tieu-de-trang">
-        <div><h1>Báo cáo doanh thu</h1>
-          <div className="phu">📅 <b>{bc.ky.nhan}</b>{theoKy
-            ? <> · kỳ kế toán 1/8 → 31/7 · dữ liệu từ {ngay(bc.ky.ngay_dau)} đến {ngay(bc.ky.ngay_cuoi)} ({bc.ky.so_thang}/12 tháng)</>
-            : <> · {ngay(kx!.tu)} → {ngay(kx!.den)} · đổi tháng / kỳ / khoảng ở thanh KHOẢNG XEM phía trên</>}</div></div>
+        <div><h1>Doanh thu</h1>
+          <div className="phu">{bc.ky.nhan}{theoKy ? ` · ${bc.ky.so_thang}/12 tháng` : ` · ${ngay(kx!.tu)} → ${ngay(kx!.den)}`}</div></div>
         <div className="bc-dk">
-          <button type="button" className="nut-nho" onClick={xuatCsv}>⤓ Xuất CSV theo {theoNgay ? "ngày" : "tháng"}</button>
+          <div className="tab-pill" role="group" aria-label="Chỉ số">
+            <button type="button" aria-pressed={!lg} onClick={() => datCs("dt")}>Doanh thu</button>
+            <button type="button" aria-pressed={lg} onClick={() => datCs("lg")}>Lãi gộp</button></div>
+          {lienNs && <a className="nut-nho" href={lienNs}>✎ Sửa ngân sách</a>}
+          <button type="button" className="nut-nho" onClick={xuatCsv} title={`Xuất CSV theo ${theoNgay ? "ngày" : "tháng"}`}>⤓ CSV</button>
         </div>
       </div>
       {bc.canh_bao.map(c => <div key={c} className="khoi-loi">⚠️ {c}</div>)}
 
       <div className="o-kpi-luoi bc-kpi">
-        <div className="o-kpi"><div className="nhan">Doanh thu thuần</div><div className="gia">{gon(bc.ky.doanh_thu)}</div>
-          <SparkSvg s={d.so_nho.dt} mau="var(--ok-vien)" />
-          <div className="bc-ck">{theoKy ? <SoCungKy ck={ck} tang={ck?.tang_dt ?? null} don_vi="%" ngay_dau={d.ngay_dau_du_lieu} /> : <SoSanhDong ss={ss} lay_tang={s => s.tang_dt} don_vi={"%"} />}</div></div>
-        <div className="o-kpi"><div className="nhan">Lãi gộp</div><div className="gia">{gon(bc.ky.lai_gop)}</div>
-          <SparkSvg s={d.so_nho.lg} mau="var(--ok-vien)" />
-          <div className="bc-ck">{theoKy ? <SoCungKy ck={ck} tang={ck?.tang_lg ?? null} don_vi="%" ngay_dau={d.ngay_dau_du_lieu} /> : <SoSanhDong ss={ss} lay_tang={s => s.tang_lg} don_vi={"%"} />}</div></div>
-        <div className="o-kpi"><div className="nhan">Tỷ suất lãi gộp</div><div className="gia">{bc.ky.ty_suat != null ? p1(bc.ky.ty_suat) : "—"}</div>
-          <SparkSvg s={d.so_nho.ts} mau="var(--lien-ket)" />
-          <div className="bc-ck">{theoKy ? <SoCungKy ck={ck} tang={ck?.chenh_ty_suat ?? null} don_vi=" điểm" ngay_dau={d.ngay_dau_du_lieu} /> : <SoSanhDong ss={ss} lay_tang={s => s.chenh_ty_suat} don_vi={" điểm"} />}</div></div>
-        <div className="o-kpi"><div className="nhan">Khách có đơn</div><div className="gia">{so(bc.ky.so_khach)}</div>
-          <SparkSvg s={d.so_nho.kh} mau="var(--do)" />
-          <div className="bc-ck">{theoKy ? <SoCungKy ck={ck} tang={ck?.tang_khach ?? null} don_vi="%" khach ngay_dau={d.ngay_dau_du_lieu} /> : <SoSanhDong ss={ss} lay_tang={s => s.tang_khach} don_vi={"%"} khach />}</div></div>
+        <div className="o-kpi"><div className="nhan">{lg ? "Lãi gộp" : "Đã bán"}</div><div className="gia">{gon(lg ? bc.ky.lai_gop : bc.ky.doanh_thu)}</div>
+          <SparkSvg s={lg ? d.so_nho.lg : d.so_nho.dt} mau="var(--lien-ket)" />
+          <div className="bc-ck">{theoKy ? <SoCungKy ck={ck} tang={(lg ? ck?.tang_lg : ck?.tang_dt) ?? null} don_vi="%" ngay_dau={d.ngay_dau_du_lieu} />
+            : <SoSanhDong ss={ss} lay_tang={s => lg ? s.tang_lg : s.tang_dt} don_vi="%" />}</div></div>
+        <div className="o-kpi"><div className="nhan">Dự kiến chốt {chot ? thNgan(chot.thang) : "tháng"}{" "}
+          {coDuBao && chot && <ONoi nhan="Cách tính" className="khoi-i" noi_dung={<div className="o-noi-chu">
+            Đã có + ({ten} đã có ÷ {chot.e} ngày làm việc đã qua) × {chot.n - chot.e} ngày làm việc còn lại. Khoảng thấp – cao là sai số thật
+            của chính cách tính này trên các tháng trước.
+            {chot.kiem.length > 0 && <><br /><b>Đã chuẩn tới đâu</b> (lập sau {chot.moc_kiem} ngày làm việc):
+              {chot.kiem.map(k => <DongNoi key={k.thang} nhan={tNhan(k.thang)} gia={k.lech != null ? dau(k.lech) + "%" : "—"} />)}</>}
+          </div>}>ⓘ</ONoi>}</div>
+          {coDuBao && chot ? <>
+            <div className="gia">{gon(chot.co_so)}</div>
+            <div className="dong-phu nhat-chu">{chot.xong ? "tháng đã đủ ngày" : chot.thap != null && chot.cao != null
+              ? `${gon(chot.thap)} – ${gon(chot.cao)}` : "chưa đủ 3 tháng cũ để đo sai số"}</div></>
+            : <><div className="gia nhat-chu">—</div>
+              <div className="dong-phu nhat-chu">{!f ? "đang tải dự báo…" : kx?.loai === "khoang" ? "dạng Khoảng không dự báo theo tháng" : "khoảng đang xem đã qua — không dự báo"}</div></>}</div>
+        <div className="o-kpi"><div className="nhan">Ngân sách {td ? thNgan(td.thang) : ""}</div>
+          {td && coNs ? <>
+            <div className="gia">{tienDo != null ? p1(tienDo) : "—"}</div>
+            <Thanh rong={tienDo} moc={moc != null ? moc / 100 : null} />
+            <div className="dong-phu nhat-chu">mốc {nhanMoc} {moc != null ? p1(moc / 100) : "—"}</div></>
+            : <><div className="gia nhat-chu">{td ? "Chưa đặt" : "—"}</div>
+              <div className="dong-phu nhat-chu">{!td ? "ngân sách chỉ theo tháng / kỳ" : lienNs ? <a href={lienNs}>Đặt ngân sách {ten}</a> : `chưa đặt ngân sách ${ten}`}</div></>}</div>
+        <div className="o-kpi"><div className="nhan">Biên lãi gộp</div><div className="gia">{bc.ky.ty_suat != null ? p1(bc.ky.ty_suat) : "—"}</div>
+          <SparkSvg s={d.so_nho.ts} mau="var(--ok-vien)" />
+          <div className="bc-ck">{theoKy ? <SoCungKy ck={ck} tang={ck?.chenh_ty_suat ?? null} don_vi=" điểm" ngay_dau={d.ngay_dau_du_lieu} />
+            : <SoSanhDong ss={ss} lay_tang={s => s.chenh_ty_suat} don_vi=" điểm" />}</div></div>
       </div>
-      <p className="ghi-chu">Doanh thu thuần đã trừ thuế tiêu dùng. Phiếu đỏ (hàng trả lại) được tính vào như số âm — cố ý, vì hàng trả lại là doanh thu âm thật.</p>
 
-      {td ? <NganSach td={td} phu={td_phu} lk={d.lk} phu_lg={d.td_phu_lg} lk_lg={d.lk_lg} nhan_ss={nhanSs}
-          ss_nguoi={kx?.loai === "thang" && chinh?.co ? Object.fromEntries(bc.nhan_vien.map(n => [n.ma ?? "", n.dt_ss ?? null])) : null} />
-        : kx?.loai === "khoang" && <section className="kh-the bc-khoi"><div className="kh-the-dau"><h2>Tiến độ ngân sách</h2></div>
-          <p className="phu">Chỉ tiêu chỉ đặt theo tháng — chọn dạng <b>Tháng</b> hoặc <b>Kỳ</b> ở thanh KHOẢNG XEM để xem tiến độ.</p></section>}
-
-      <section className="kh-the bc-khoi">
-        <div className="kh-the-dau"><h2>{theoKy ? "Doanh thu 12 tháng so cùng kỳ"
-          : `Doanh thu theo ${theoNgay ? "ngày" : "tháng"} · ${bc.ky.nhan}`}</h2></div>
-        {!theoKy && chinh && <p className="phu">Cột viền đứt: {chinh.co ? `${chinh.nhan} (${ngay(chinh.tu)} → ${ngay(chinh.den)}), khớp theo thứ tự ${theoNgay ? "ngày" : "tháng"}` : `${chinh.nhan} — không có dữ liệu để so`}{chinh.co && !d.bd.cot_ck?.length ? " — hai kỳ khác độ dài nên chỉ so tổng" : ""}.</p>}
-        {d.bd.co ? <>
-          <svg viewBox={`0 0 ${d.bd.rong} ${d.bd.cao}`} width="100%" className="bc-svg" role="img" aria-label={`Doanh thu và tỷ suất lãi gộp, kèm ${nhanSs}`}>
-            {d.bd.cot.map((c, i) => <g key={c.o.thang} className="bc-cot">
-              <rect x={c.x} y={c.y} width={c.w} height={c.h} rx={2} fill={c.o.la_thang_chot ? "var(--do)" : "var(--lien-ket)"} opacity={0.72}>
-                <title>{c.o.thang}: {yen(c.o.doanh_thu)}{c.o.co_cung_ky && c.o.dt_cung_ky != null ? ` · ${nhanSs} ${yen(c.o.dt_cung_ky)}` : ""}{c.o.tang_truong != null ? ` (${dau(c.o.tang_truong)}%)` : ""}</title></rect>
-              {(!theoNgay || d.bd.cot.length <= 31 || i % 7 === 0) &&
-                <text x={c.x + c.w / 2} y={d.bd.cao - 20} fontSize={10} textAnchor="middle" fill="var(--chu-nhat)">{nhanX(c.o.thang)}</text>}
-              {(i === 0 || i === d.bd.cot.length - 1 || c.o.la_thang_chot) &&
-                <text x={c.x + c.w / 2} y={d.bd.cao - 8} fontSize={9} textAnchor="middle" fill="var(--chu-nhat)">{c.o.thang.slice(0, 4)}</text>}
-            </g>)}
-            {/* Kỳ so = CỘT MA (viền đứt, không nền) đè lên cột thật — thấy được cả khi thấp hơn. */}
-            {(d.bd.cot_ck ?? []).map(c => { const o = d.bd.cot.find(x => x.o.thang === c.thang)?.o;
-              return <rect key={"ck" + c.thang} x={c.x} y={c.y} width={c.w} height={Math.max(c.h, 0.5)} rx={2}
-                fill="none" stroke="var(--vien-dam)" strokeWidth={1.4} strokeDasharray="4 3">
-                <title>{c.thang}: {nhanSs} {yen(c.dt)}{o ? ` · kỳ này ${yen(o.doanh_thu)}` : ""}{o?.tang_truong != null ? ` (${dau(o.tang_truong)}%)` : ""}</title></rect>; })}
-            <polyline points={d.bd.duong} fill="none" stroke="var(--ok-vien)" strokeWidth={2} />
-            {d.bd.diem.map(([x, y, o]) => <circle key={o.thang} cx={x} cy={y} r={3.5} fill="var(--ok-vien)" className="bc-diem">
-              <title>{o.thang}: tỷ suất {o.ty_suat != null ? p1(o.ty_suat) : "—"}</title></circle>)}
-          </svg>
-          <div className="chu-giai bc-cg">
-            <span><i className="mau" style={{ background: "var(--lien-ket)", opacity: .72 }} /> Doanh thu thuần (cột)</span>
-            {!theoNgay && <span><i className="mau" style={{ background: "var(--do)", opacity: .72 }} /> Tháng 7 — chốt kỳ</span>}
-            <span><i className="mau" style={{ background: "var(--ok-vien)" }} /> Tỷ suất lãi gộp (đường)</span>
-            <span><i className="mau mau-ma" /> Doanh thu {nhanSs} (cột viền đứt)</span>
-            <span>Trục tỷ suất từ {Math.round(d.bd.ts_lo * 100)}% đến {Math.round(d.bd.ts_hi * 100)}%, không từ 0% — nếu từ 0 thì đường gần như phẳng và giấu mất chỗ cần nhìn.</span>
-          </div></> : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
-      </section>
+      <The className="dt-chinh">
+        <Khoi tieu_de={td ? "12 tháng của kỳ" : `Theo ${theoNgay ? "ngày" : "tháng"}`}
+          phu={<><MauSs />{nhanSs}</>}
+          cach_tinh={<>Cột: {ten} thực tế. {coDuBao && <>Cột nhạt: dự báo — tháng này = chốt dự kiến, các tháng sau = {ten} cùng tháng năm trước ×
+            hệ số (tỷ số các tổng của {nam?.doi_chieu.length ?? 0} tháng đối chiếu).{tongNam != null && nam && nam.tong_cung_ky > 0 &&
+            <> Tổng {nam.du_bao.length} tháng tới: {gon(tongNam)} ({dau(tongNam / nam.tong_cung_ky - 1)}% so cùng các tháng năm trước).</>} </>}
+            Đường: ngân sách công ty (nhập thẳng ở màn Ngân sách). Viền đứt: {nhanSs}.</>}
+          canh_bao={!td ? "Dạng Khoảng: ngân sách và dự báo chỉ có theo tháng / kỳ." : !coNs ? `Chưa đặt ngân sách ${ten} tháng này.` : null}
+          cach_xem={coDuBao && f ? { ds: Object.entries(f.kich_ban).map(([id, nhan]) => ({ id, nhan })), chon: kb, dat: datKb } : undefined}>
+          <BieuDo nhan={bd.nhan} chuoi={bd.chuoi} cao={230} vach={bd.vach} mo_ta={`${hoa(ten)} theo tháng, ngân sách, dự báo và ${nhanSs}`}
+            dinh_dang={v => v == null ? "—" : yen(v)} dinh_dang_truc={v => gon(v)} />
+        </Khoi>
+      </The>
 
       <div className="bc-hai">
-        <section className="kh-the bc-khoi">
-          <div className="kh-the-dau"><h2>Ngành hàng kéo doanh thu lên/xuống</h2></div>
-          {(theoKy ? ck && ck.so_thang > 0 : chinh?.co) ? <>
-            <p className="phu">{theoKy ? <>Chênh lệch so cùng kỳ trên {ck!.so_thang} tháng đối chiếu ({ck!.tu} → {ck!.den})</>
-              : <>Chênh lệch so {chinh!.nhan} ({ngay(chinh!.tu)} → {ngay(chinh!.den)})</>} — phải trục kéo LÊN, trái kéo XUỐNG.</p>
-            {d.dg.co ? <svg viewBox={`0 0 ${d.dg.rong} ${d.dg.cao}`} width="100%" className="bc-svg" role="group" aria-label={`Chênh lệch doanh thu theo ngành so ${nhanSs}`}>
-              <line x1={d.dg.x0} y1={0} x2={d.dg.x0} y2={d.dg.cao} stroke="var(--vien-dam)" />
-              {d.dg.thanh.map(t => <g key={t.nganh} className="bc-thanh">
-                <rect x={t.x} y={t.y} width={t.w} height={d.dg.cao_hang} rx={2} fill={t.am ? "var(--loi-vien)" : "var(--ok-vien)"}>
-                  <title>{t.nganh}: {t.nhan} so {nhanSs}{t.tang_truong != null ? ` (${dau(t.tang_truong)}%)` : ""}</title></rect>
-                <text x={t.am ? d.dg.x0 + 4 : d.dg.x0 - 4} y={t.y + d.dg.cao_hang / 2 + 3} fontSize={10} fill="var(--chu-nhat)" textAnchor={t.am ? "start" : "end"}>{t.nganh}</text>
-                <text x={t.nhan_x} y={t.y + d.dg.cao_hang / 2 + 3} fontSize={9.5} textAnchor={t.nhan_neo as "start" | "end"}
-                  fill={t.nhan_trong ? (t.am ? "var(--dg-chu-am)" : "var(--nen-the)") : "var(--chu-nhat)"}>{t.nhan}</text>
-              </g>)}
-            </svg> : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
-          </> : <p className="phu">{theoKy ? "Kỳ này không có tháng nào để so cùng kỳ." : `${hoa(nhanSs)}: không có dữ liệu để so.`}</p>}
-        </section>
-
-        <section className="kh-the bc-khoi">
-          <div className="kh-the-dau"><h2>Doanh thu đến từ danh mục nào</h2></div>
-          <p className="phu">Diện tích mỗi ô tỷ lệ với doanh thu {theoKy ? "cả kỳ" : "cả khoảng xem"}; màu theo tăng trưởng của ngành so {nhanSs}{theoKy ? " (cùng dải tháng đối chiếu)" : ""}. Ngành không có số để so tô màu trung tính.</p>
-          {d.co.co ? <svg viewBox={`0 0 ${d.co.rong} ${d.co.cao}`} width="100%" className="bc-svg" role="group" aria-label="Doanh thu theo ngành hàng và mặt hàng">
-            {d.co.nganh.map(n => {
-              const tt = n.tang_truong != null ? ` · ${dau(n.tang_truong)}% so ${nhanSs}` : ` · không có số ${nhanSs} để so`;
-              const tt2 = n.tang_truong != null ? ` (${dau(n.tang_truong)}% so ${nhanSs})` : ` (không có số ${nhanSs} để so)`;
-              return <g key={n.nganh}>
-                <rect x={n.x} y={n.y} width={n.w} height={n.h} className={"cay-o-nganh bac-" + n.bac}><title>{n.nganh}: {yen(n.doanh_thu)}{tt}</title></rect>
-                {n.ma.map(m => <g key={m.ten} className="bc-o-ma">
-                  <rect x={m.x} y={m.y} width={m.w} height={m.h} className="cay-o-ma" fill="var(--nen-the)" opacity={0.18}>
-                    <title>{n.nganh}{tt2} — {m.ten}: {yen(m.doanh_thu)}</title></rect>
-                  {m.nhan && <text x={m.x + 3} y={m.y + 11} fontSize={11} fill="var(--chu)" pointerEvents="none">{m.nhan}</text>}
-                </g>)}
-                {!n.ma.length && n.w > 55 && n.h > 16 && <text x={n.x + 4} y={n.y + 13} fontSize={10.5} fontWeight={600} fill="var(--chu)" pointerEvents="none">{n.nganh}</text>}
-              </g>;
-            })}
-          </svg> : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
-          {d.co.khong_ve !== 0 && <p className="phu">Không vẽ: {yen(d.co.khong_ve)} của {d.co.so_ma_khong_ve} mã (doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)</p>}
-          {bc.phi.dong.length > 0 && <p className="phu">Không gồm phí &amp; điều chỉnh ({yen(bc.phi.doanh_thu)}) — không phải hàng, xem khối riêng bên dưới.</p>}
-          {bc.hang_tang.dong.length > 0 && <p className="phu">Không gồm hàng tặng POSM ({bc.hang_tang.dong.length} mã, lãi gộp {yen(bc.hang_tang.lai_gop)}) — xem khối riêng bên dưới.</p>}
-        </section>
+        {coDuBao && (lg ? f!.ve_chot_lg : f!.ve_chot).co && <The>
+          <Khoi tieu_de={`Luỹ kế ${chot ? thNgan(chot.thang) : ""}`} phu={`${chot!.e}/${chot!.n} ngày làm việc`}
+            cach_tinh={<>Đường xanh: {ten} cộng dồn tới {nhanMoc}. Đường đỏ: dự báo cơ sở tới cuối tháng, vùng xám là khoảng thấp – cao.
+              Đường xám: nhịp ngân sách theo ngày làm việc (đã trừ thứ Bảy, Chủ nhật, ngày lễ — chưa trừ ngày nghỉ riêng của công ty).</>}>
+            <LuyKe v={lg ? f!.ve_chot_lg : f!.ve_chot} />
+          </Khoi></The>}
+        <The>
+          <Khoi tieu_de="Người phụ trách" phu={td ? thNgan(td.thang) : undefined}
+            cach_tinh={<>Thanh đậm: {ten} đã có. Phần nhạt: dự báo thêm tới cuối tháng (cùng công thức chốt tháng). Vạch đen: ngân sách cá nhân.
+              {ssNguoi && <> Vạch đứt: {nhanSs}.</>}</>}
+            canh_bao={!td ? "Dạng Khoảng: không có ngân sách theo người." : null}>
+            {td && <NguoiPhuTrach td={td} lg={lg} db={nguoiDb} ss={ssNguoi} nhan_ss={nhanSs} />}
+          </Khoi></The>
       </div>
-
-      <section className="kh-the bc-khoi">
-        <div className="kh-the-dau"><h2>Tăng trưởng theo tháng và ngành</h2></div>
-        <p className="phu">{!theoKy && bc.ky.so_ky > 0 ? `Cả Kỳ ${bc.ky.so_ky} chứa khoảng đang xem · ` : ""}mỗi ô so {kx?.so_sanh[0]?.lech_thang == null && !theoKy
-          ? <b>— {nhanSs} không lệch tròn tháng, không so theo tháng được</b>
-          : <>cùng ngành ở tháng {lechSs === 12 ? "cùng kỳ năm trước" : lechSs === 1 ? "liền trước" : `lùi ${lechSs} tháng`} ({nhanSs})</>}.</p>
-        {d.nh.co ? <>
-          <div className="bang-cuon"><table className="nhiet-bang">
-            <thead><tr><th scope="col" />{d.nh.thang.map(t => <th key={t} scope="col">{t.slice(5)}</th>)}</tr></thead>
-            <tbody>{d.nh.hang.map(h => <tr key={h.nganh}><th scope="row">{h.nganh}</th>{h.o.map(o => <ONhiet key={o.thang} o={o} dau_du_lieu={d.nh.thang_dau_du_lieu} nhan_ss={nhanSs} />)}</tr>)}</tbody>
-          </table></div>
-          <div className="chu-giai bc-cg">
-            <span><i className="mau bac-g2" /> ≤ −20%</span><span><i className="mau bac-g1" /> −20…−5%</span><span><i className="mau bac-0" /> −5…+5%</span>
-            <span><i className="mau bac-t1" /> +5…+20%</span><span><i className="mau bac-t2" /> ≥ +20%</span>
-            <span><i className="mau bac-khong" /> có số để so, không tính được %</span><span><i className="mau bac-khong_ck" /> không có số để so</span>
-            <span><i className="mau bac-khong_ban" /> không bán tháng này</span><span><i className="mau bac-chua_toi" /> chưa tới tháng / chưa có dữ liệu{d.nh.thang_dau_du_lieu ? ` (trước ${d.nh.thang_dau_du_lieu})` : ""}</span>
-          </div></> : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
-      </section>
-
-      <section className="kh-the bc-khoi">
-        <div className="kh-the-dau"><h2>Doanh thu tập trung ở khách nào</h2></div>
-        {bc.tap_trung && bc.tap_trung.luy_ke_top10 != null &&
-          <p className="phu">10 khách lớn nhất = <b>{p1(bc.tap_trung.luy_ke_top10)}</b> {theoKy ? <>doanh thu kỳ này, trên {so(bc.tap_trung.so_khach)} khách có phát sinh trong kỳ.</>
-            : <>doanh thu khoảng này, trên {so(bc.tap_trung.so_khach)} khách có phát sinh trong khoảng.</>}</p>}
-        <div className="bc-pareto">
-          {d.pa.co ? <div><svg viewBox={`0 0 ${d.pa.rong} ${d.pa.cao}`} width="100%" className="bc-svg" role="group" aria-label="Doanh thu và luỹ kế của 20 khách hàng lớn nhất">
-            {d.pa.truc_pct.map(t => <g key={t.y}><line x1={0} y1={t.y} x2={d.pa.rong} y2={t.y} stroke="var(--vien)" strokeWidth={1} strokeDasharray="2 3" />
-              <text x={d.pa.rong - 4} y={t.y - 3} fontSize={9} textAnchor="end" fill="var(--chu-nhat)">{t.nhan}</text></g>)}
-            {d.pa.cot.map(c => <a key={c.khach.ma} href={`/khach-hang/${encodeURIComponent(c.khach.ma)}`}>
-              <rect x={c.x} y={c.y} width={c.w} height={c.h} rx={2} fill="var(--lien-ket)" opacity={0.72} className="bc-cot-kh">
-                <title>Thứ {c.khach.thu_hang} — {c.khach.ten}: {yen(c.khach.doanh_thu)} · bấm để mở hồ sơ</title></rect></a>)}
-            {d.pa.doan.map((s, i) => <polyline key={i} points={s} fill="none" stroke="var(--do)" strokeWidth={2} />)}
-            {d.pa.diem.map(p => <circle key={p.khach.ma} cx={p.x} cy={p.y} r={2.5} fill="var(--do)">
-              <title>Thứ {p.khach.thu_hang} — {p.khach.ten}: luỹ kế {p.khach.luy_ke != null ? p1(p.khach.luy_ke) : "—"}</title></circle>)}
-          </svg>
-            <div className="chu-giai bc-cg"><span><i className="mau" style={{ background: "var(--lien-ket)", opacity: .72 }} /> Doanh thu (cột)</span>
-              <span><i className="mau" style={{ background: "var(--do)" }} /> Luỹ kế (đường, trục 0–100%)</span><span>Đỉnh trục cột: {yen(d.pa.dinh)}</span></div></div>
-            : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
-          <div className="bang-cuon bc-bang-kh"><table className="bang">
-            <thead><tr><th className="so">#</th><th>Khách hàng</th><th className="so">Doanh thu thuần</th><th className="so">Tỷ trọng</th><th className="so">Luỹ kế</th></tr></thead>
-            <tbody>{(bc.tap_trung?.dong ?? []).map(k => <tr key={k.ma}><td className="so">{k.thu_hang}</td>
-              <td className="ten-jp"><a href={`/khach-hang/${encodeURIComponent(k.ma)}`}>{k.ten}</a></td><td className="so">{yen(k.doanh_thu)}</td>
-              <td className="so">{k.ty_trong != null ? p1(k.ty_trong) : "—"}</td><td className="so">{k.luy_ke != null ? p1(k.luy_ke) : "—"}</td></tr>)}</tbody>
-          </table></div>
-        </div>
-      </section>
 
       <div className="bc-hai">
-        <section className="kh-the bc-khoi">
-          <div className="kh-the-dau"><h2>10 mặt hàng lãi gộp cao nhất</h2></div>
-          <div className="bang-cuon"><table className="bang">
-            <thead><tr><th>Mặt hàng</th><th className="so">Doanh thu thuần</th><th className="so">Lãi gộp</th><th className="so">Tỷ suất</th><th className="so">Khách mua</th></tr></thead>
-            <tbody>{bc.hang.map(h => <tr key={h.ma}><td className="ten-jp"><a href={`/san-pham/${encodeURIComponent(h.ma)}`}>{h.ten}</a></td>
-              <td className="so">{h.doanh_thu != null ? yen(h.doanh_thu) : "—"}</td><td className="so">{h.lai_gop != null ? yen(h.lai_gop) : "—"}</td>
-              <td className="so">{h.ty_suat != null ? p1(h.ty_suat) : "—"}</td><td className="so">{so(h.so_khach)}</td></tr>)}</tbody>
-          </table></div>
-        </section>
-        <section className="kh-the bc-khoi">
-          <div className="kh-the-dau"><h2>Theo người phụ trách khách (担当者)</h2></div>
-          <div className="bang-cuon"><table className="bang">
-            <thead><tr><th>Mã</th><th className="so">Doanh thu thuần</th><th className="so"><MauSs />{hoa(nhanSs)}</th><th className="so">So</th>
-              <th className="so">Lãi gộp</th><th className="so">Tỷ suất</th><th className="so">Khách</th><th className="so">Phiếu</th></tr></thead>
-            <tbody>{bc.nhan_vien.map((n, i) => { const td_ = tdSs(n.dt_nay_ss ?? n.doanh_thu, n.dt_ss); return <tr key={(n.ma ?? "") + i}><td>{n.ma || "(trống)"}</td>
-              <td className="so">{yen(n.doanh_thu)}</td>
-              <td className="so nhat-chu">{n.dt_ss != null ? yen(n.dt_ss) : "—"}</td>
-              <td className={"so " + (td_ == null ? "" : td_ >= 0 ? "tang" : "giam")}>{td_ != null ? `${dau(td_)}%` : "—"}</td>
-              <td className="so">{yen(n.lai_gop)}</td><td className="so">{n.ty_suat != null ? p1(n.ty_suat) : "—"}</td>
-              <td className="so">{so(n.so_khach)}</td><td className="so">{so(n.so_phieu)}</td></tr>; })}</tbody>
-          </table></div>
-          {(() => { const s0 = kx?.so_sanh[0]; if (!s0) return null;
-            if (!s0.co) return <p className="phu">{hoa(s0.nhan)}: không có dữ liệu để so.</p>;
-            // Dạng Kỳ dữ liệu bắt đầu giữa chừng: cột kỳ so chỉ phủ phần đối chiếu được.
-            return (s0.tu_nay !== kx!.tu || s0.den_nay !== kx!.den) &&
-              <p className="phu">Cột {nhanSs} = {ngay(s0.tu)} → {ngay(s0.den)}; "So" tính trên cùng dải {ngay(s0.tu_nay)} → {ngay(s0.den_nay)} của kỳ này, không trên cả kỳ.</p>; })()}
-        </section>
+        <The>
+          <Khoi tieu_de="Vì sao tăng / giảm" phu={<><MauSs />{nhanSs}</>}
+            cach_tinh={<>Từ doanh thu {nhanSs} (cột viền đứt), mỗi danh mục cộng hoặc trừ phần chênh, ra kỳ này — cùng dải
+              {theoKy && ck ? ` ${ck.so_thang} tháng đối chiếu` : " ngày so"}. Trục không bắt đầu từ 0.</>}
+            canh_bao={cb(lg && "Cầu nối theo doanh thu (chưa có lãi gộp kỳ so theo danh mục).",
+              !!d.cau_noi.co && !!d.cau_noi.khong_so && d.cau_noi.khong_so.so > 0 && `${d.cau_noi.khong_so.so} danh mục không có số so (${yen(d.cau_noi.khong_so.tien)}) — không vào cầu.`)}>
+            <CauNoi v={d.cau_noi} nhan_ss={nhanSs} />
+          </Khoi></The>
+        <The>
+          <Khoi tieu_de="Danh mục" phu="tăng/giảm × biên"
+            cach_tinh={<>Mỗi bóng một danh mục (食品分類). Ngang: tăng / giảm doanh thu so {nhanSs}; dọc: biên lãi gộp;
+              cỡ bóng: {ten}. Đường chữ thập: 0% và biên của cả công ty. Góc trên phải = tăng và lãi dày.</>}
+            canh_bao={bn.so_khong_ve > 0 ? `Không vẽ: ${yen(bn.khong_ve)} của ${bn.so_khong_ve} danh mục (${ten} ≤ 0 hoặc không có số so).` : null}>
+            <Bong v={bn} nhan_x={x => dau(x) + "%"} ten_x={`so ${nhanSs}`} ten_y="biên" mo_ta={`Danh mục theo tăng trưởng và biên lãi gộp, cỡ theo ${ten}`}
+              mau={b => b.x >= 0 && (bn.y_moc == null || b.cy <= bn.y_moc) ? "var(--ok-vien)" : b.x < 0 && bn.y_moc != null && b.cy > bn.y_moc ? "var(--loi-vien)" : "var(--lien-ket)"}
+              noi={b => <><DongNoi nhan={hoa(ten)} gia={yen(b.kich)} />{dongBong.tang(b, nhanSs)}{dongBong.bien(b)}</>} />
+          </Khoi></The>
       </div>
 
-      {bc.phi.dong.length > 0 && <section className="kh-the bc-khoi">
-        <div className="kh-the-dau"><h2>Phí &amp; điều chỉnh — không phải hàng</h2></div>
-        <p className="phu">Phí thu hộ (代引手数料), phí gửi (配送料), giảm giá / phiếu giảm giá (値引き・クーポン) — mã OBC đánh dấu 無形 — và dòng làm tròn không mã hàng.
-          Tiền của chúng VẪN nằm trong tổng doanh thu và lãi gộp ở trên (khớp sổ OBC), nhưng không tính vào ngành hàng hay xếp hạng mặt hàng.</p>
-        <div className="bang-cuon"><table className="bang">
-          <thead><tr><th>Khoản</th><th className="so">Doanh thu thuần</th><th className="so">Lãi gộp</th><th className="so">Khách</th></tr></thead>
-          <tbody>{bc.phi.dong.map(h => <tr key={h.ma || "(khong-ma)"}><td className="ten-jp">{h.ten}</td>
-            <td className="so">{h.doanh_thu != null ? yen(h.doanh_thu) : "—"}</td><td className="so">{h.lai_gop != null ? yen(h.lai_gop) : "—"}</td>
-            <td className="so">{so(h.so_khach)}</td></tr>)}
-            <tr><th scope="row">Cộng</th><td className="so"><b>{yen(bc.phi.doanh_thu)}</b></td><td className="so"><b>{yen(bc.phi.lai_gop)}</b></td><td /></tr></tbody>
-        </table></div>
-      </section>}
+      <div className="bc-hai">
+        <The>
+          <Khoi tieu_de="Mặt hàng" phu={`top ${bm.so_ma ?? 0} theo doanh thu`}
+            cach_tinh={<>Mỗi bóng một mã. Ngang: số khách mua; dọc: biên lãi gộp; cỡ bóng: {ten}. Bóng bên phải mà thấp = nhiều người mua nhưng lãi
+              mỏng — nên xem lại giá. Bấm bóng mở trang mã. Không gồm phí, hàng tặng POSM, hàng ※終売※ đã hết tồn.</>}
+            canh_bao={bm.so_khong_ve > 0 ? `Không vẽ: ${bm.so_khong_ve} mã (${ten} ≤ 0 hoặc thiếu số).` : null}>
+            <Bong v={bm} nhan_x={x => so(Math.round(x))} ten_x="khách mua" ten_y="biên" mo_ta={`Mặt hàng theo số khách mua và biên lãi gộp, cỡ theo ${ten}`}
+              mau={() => "var(--lien-ket)"} href={b => `/san-pham/${encodeURIComponent(b.ma)}`} so_nhan={6}
+              noi={(b: BongDiem) => <><DongNoi nhan={hoa(ten)} gia={yen(b.kich)} />{dongBong.khach(b)}{dongBong.bien(b)}</>} />
+          </Khoi></The>
+        <The>
+          <Khoi tieu_de="Khách lớn" phu={bc.tap_trung?.luy_ke_top10 != null ? `10 khách = ${p1(bc.tap_trung.luy_ke_top10)}` : undefined}
+            cach_tinh={<>Cột: doanh thu 20 khách lớn nhất; đường: luỹ kế % trên tổng ({so(bc.tap_trung?.so_khach ?? 0)} khách có đơn). Bấm cột mở hồ sơ khách.</>}
+            canh_bao={lg ? "Theo doanh thu (Pareto chưa có lãi gộp)." : null}>
+            <Pareto pa={d.pa} />
+          </Khoi></The>
+      </div>
 
-      {bc.hang_tang.dong.length > 0 && <section className="kh-the bc-khoi">
-        <div className="kh-the-dau"><h2>Hàng tặng (POSM) — không phải hàng bán</h2></div>
-        <p className="phu">Ngành OBC 雑貨_VNM: poster, túi, ly, wobbler… đi tặng khách, doanh thu ¥0. Giá vốn của chúng (lãi gộp âm) VẪN nằm trong lãi gộp ở trên
-          (khớp sổ OBC), nhưng không tính vào ngành hàng hay xếp hạng mặt hàng.</p>
-        <div className="bang-cuon"><table className="bang">
-          <thead><tr><th>Mã</th><th className="so">Số lượng tặng</th><th className="so">Khách nhận</th><th className="so">Doanh thu thuần</th><th className="so">Lãi gộp</th></tr></thead>
-          <tbody>{bc.hang_tang.dong.map(h => <tr key={h.ma}><td className="ten-jp">{h.ten}<div className="ma-nho"><code>{h.ma}</code></div></td>
-            <td className="so">{h.so_luong != null ? so(h.so_luong) : "—"}</td><td className="so">{so(h.so_khach)}</td>
-            <td className="so">{h.doanh_thu != null ? yen(h.doanh_thu) : "—"}</td><td className="so">{h.lai_gop != null ? yen(h.lai_gop) : "—"}</td></tr>)}
-            <tr><th scope="row">Cộng</th><td /><td /><td className="so"><b>{yen(bc.hang_tang.doanh_thu)}</b></td><td className="so"><b>{yen(bc.hang_tang.lai_gop)}</b></td></tr></tbody>
-        </table></div>
-      </section>}
+      <The>
+        <Khoi tieu_de="Danh mục × tháng" phu={<><MauSs />{lechSs === 12 ? "cùng tháng năm trước" : lechSs === 1 ? "tháng liền trước" : `lùi ${lechSs} tháng`}</>}
+          cach_tinh={<>Mỗi ô: doanh thu của danh mục trong tháng so với cùng danh mục ở tháng {nhanSs}. Rê ô để xem số.</>}
+          canh_bao={cb(kx?.so_sanh[0]?.lech_thang == null && !theoKy && `${hoa(nhanSs)} không lệch tròn tháng — không so theo tháng được.`,
+            lg && "Theo doanh thu.")}>
+          {d.nh.co ? <>
+            <div className="bang-cuon"><table className="nhiet-bang">
+              <thead><tr><th scope="col" />{d.nh.thang.map(t => <th key={t} scope="col">{t.slice(5)}</th>)}</tr></thead>
+              <tbody>{d.nh.hang.map(h => <tr key={h.nganh}><th scope="row">{h.nganh}</th>{h.o.map(o => <ONhiet key={o.thang} o={o} dau_du_lieu={d.nh.thang_dau_du_lieu} nhan_ss={nhanSs} />)}</tr>)}</tbody>
+            </table></div>
+            <div className="chu-giai bc-cg">
+              <span><i className="mau bac-g2" /> ≤ −20%</span><span><i className="mau bac-g1" /> −20…−5%</span><span><i className="mau bac-0" /> ±5%</span>
+              <span><i className="mau bac-t1" /> +5…+20%</span><span><i className="mau bac-t2" /> ≥ +20%</span>
+              <span><i className="mau bac-khong_ck" /> không có số để so</span><span><i className="mau bac-chua_toi" /> chưa có dữ liệu</span>
+            </div></> : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
+        </Khoi></The>
 
-      <details className="kh-the bc-khoi">
-        <summary>Bảng số chi tiết theo {theoNgay ? "ngày" : "tháng"} ({bc.thang.length} {theoNgay ? "ngày" : "tháng"})</summary>
-        <div className="bang-cuon"><table className="bang">
-          <thead><tr><th>{theoNgay ? "Ngày" : "Tháng"}</th><th className="so">Doanh thu thuần</th><th className="so">Lãi gộp</th><th className="so">Tỷ suất</th>
-            <th className="so">{hoa(nhanSs)}</th><th className="so">So</th><th className="so">Số phiếu</th></tr></thead>
-          <tbody>{bc.thang.map(o => <tr key={o.thang}><td>{o.thang}{o.la_thang_chot ? " 🏁" : ""}</td>
-            <td className="so">{yen(o.doanh_thu)}</td><td className="so">{yen(o.lai_gop)}</td><td className="so">{o.ty_suat != null ? p1(o.ty_suat) : "—"}</td>
-            <td className="so">{o.co_cung_ky && o.dt_cung_ky != null ? yen(o.dt_cung_ky) : "—"}</td>
-            <td className="so">{!o.co_cung_ky ? <span className="nhat-chu" title={`Dải ${nhanSs} không có trong kho dữ liệu`}>không có</span>
-              : o.tang_truong != null ? <span className={o.tang_truong >= 0 ? "tang" : "giam"}>{dau(o.tang_truong)}%</span> : "—"}</td>
-            <td className="so">{so(o.so_phieu)}</td></tr>)}</tbody>
-        </table></div>
-      </details>
+      {db && <The>
+        <Khoi tieu_de="Nguy cơ ngừng mua" phu={`${db.kh.so_nguy_co} khách · ${gon(db.kh.tien_nguy_co)}`} lien_ket={{ href: "/lien-he?tat_ca=1", chu: "Gọi lại" }}
+          cach_tinh={<>Khách đang im lặng quá 2 lần nhịp mua riêng — cùng định nghĩa "khách đang rời đi" với Cần liên hệ. Xếp theo doanh thu luỹ kế;
+            thanh = số lần nhịp đã im lặng.</>} canh_bao={lg ? "Theo doanh thu." : null}>
+          <div className="dt-nguy-co">
+            {db.kh.nguy_co.map(k => (
+              <ONoi key={k.ma} href={`/khach-hang/${encodeURIComponent(k.ma)}`} nhan={k.ten} className="dt-nc-dong"
+                noi_dung={<><b>{k.ten}</b><DongNoi nhan="Im lặng" gia={`${k.so_ngay_im_lang} ngày`} />
+                  <DongNoi nhan="So nhịp mua riêng" gia={`${k.ty_le.toFixed(1)}×`} /><DongNoi nhan="Doanh thu luỹ kế" gia={yen(k.doanh_thu)} /></>}>
+                <span className="ten-jp">{k.ten}</span>
+                <span className={"thanh-nho " + (k.trang_thai === "da_roi_bo" ? "loi" : "canh")}><span className="thanh-nho-nen">
+                  <span style={{ display: "block", height: "100%", width: `${(Math.min(k.ty_le / 4, 1) * 100).toFixed(1)}%` }} /></span></span>
+                <b className="so">{gon(k.doanh_thu)}</b>
+              </ONoi>))}
+            {!db.kh.nguy_co.length && <p className="phu">Không khách nào đang im lặng quá 2 lần nhịp.</p>}
+          </div>
+        </Khoi></The>}
+
+      {(bc.phi.dong.length > 0 || bc.hang_tang.dong.length > 0) && <p className="phu dt-phi">
+        Đã gồm trong tổng, không vào danh mục:{" "}
+        {bc.phi.dong.length > 0 && <ONoi nhan="Phí & điều chỉnh" noi_dung={<><b>Phí &amp; điều chỉnh (無形 / làm tròn)</b>
+          {bc.phi.dong.slice(0, 8).map(h => <DongNoi key={h.ma || h.ten} nhan={h.ten} gia={h.doanh_thu != null ? yen(h.doanh_thu) : "—"} />)}</>}>
+          Phí &amp; điều chỉnh {yen(bc.phi.doanh_thu)}</ONoi>}
+        {bc.phi.dong.length > 0 && bc.hang_tang.dong.length > 0 && " · "}
+        {bc.hang_tang.dong.length > 0 && <ONoi nhan="Hàng tặng POSM" noi_dung={<><b>Hàng tặng POSM (雑貨_VNM)</b>
+          {bc.hang_tang.dong.slice(0, 8).map(h => <DongNoi key={h.ma} nhan={h.ten} gia={h.lai_gop != null ? yen(h.lai_gop) : "—"} />)}</>}>
+          Hàng tặng POSM · lãi gộp {yen(bc.hang_tang.lai_gop)}</ONoi>}
+      </p>}
     </div>
   );
+}
+
+function LuyKe({ v }: { v: VeChot }) {
+  return (
+    <div className="dt-luy">
+      <svg viewBox={`0 0 ${v.rong} ${v.cao}`} width="100%" role="img" aria-label="Luỹ kế tháng và dự báo chốt tháng">
+        {v.truc.map(t => <g key={t.y}><line x1={v.trai} y1={t.y} x2={v.phai} y2={t.y} className="luoi-truc" />
+          <text x={v.trai - 8} y={t.y + 4} textAnchor="end" className="chu-truc">{t.nhan}</text></g>)}
+        {v.dai && <path d={v.dai} className="dai-db" />}
+        {v.ns && <polyline points={v.ns} className="duong-ns" />}
+        {v.cs && <polyline points={v.cs} className="duong-cs" />}
+        <polyline points={v.tt} className="duong-tt" />
+        <circle cx={v.x_nay} cy={v.y_nay} r={4.5} className="cham-tt" />
+        {v.cs && <circle cx={v.x_cuoi} cy={v.y_cuoi} r={4.5} className="cham-cs" />}
+        {v.nhan_ngay.map(n => <text key={n.x} x={n.x} y={v.cao - 10} textAnchor="middle" className="chu-truc">{n.nhan}</text>)}
+      </svg>
+    </div>);
+}
+
+function NguoiPhuTrach({ td, lg, db, ss, nhan_ss }: { td: Td; lg: boolean; db: Record<string, NguoiDb>;
+  ss: Record<string, number | null> | null; nhan_ss: string }) {
+  const dong = td.nguoi.map(n => {
+    const f = db[n.ma];
+    const tt = lg ? n.thuc_te_lg : n.thuc_te, mt = lg ? n.muc_tieu_lg : n.muc_tieu;
+    const cs = f ? (lg ? f.co_so_lg : f.co_so) : null;
+    return { n, tt, mt, cs, ss: ss?.[n.ma] ?? null, td_: lg ? n.tien_do_lg : n.tien_do };
+  });
+  const to = Math.max(1, ...dong.flatMap(x => [x.tt, x.mt ?? 0, x.cs ?? 0, x.ss ?? 0]));
+  const w = (v: number) => `${Math.max(0, Math.min(100, v / to * 100))}%`;
+  if (!dong.length) return <p className="phu">Chưa có dòng nào tháng này.</p>;
+  return <div className="dt-nguoi">{dong.map(({ n, tt, mt, cs, ss: s, td_ }) => (
+    <ONoi key={n.ma} nhan={n.ten ?? n.ma} className="dt-ng-dong" noi_dung={<><b>{n.ten ?? `${n.ma} (không có trong danh sách phụ trách)`}</b>
+      <DongNoi nhan="Đã có" gia={yen(tt)} />{cs != null && <DongNoi nhan="Dự kiến chốt" gia={yen(cs)} />}
+      <DongNoi nhan="Ngân sách" gia={mt != null ? yen(mt) : "chưa đặt"} />{td_ != null && <DongNoi nhan="Tiến độ" gia={p1(td_)} />}
+      {s != null && <DongNoi nhan={hoa(nhan_ss)} gia={yen(s)} />}</>}>
+      <span className="dt-ng-ten">{n.ten ?? n.ma}</span>
+      <span className="dt-ng-thanh" aria-hidden="true">
+        {cs != null && cs > tt && <span className="dt-ng-db" style={{ width: w(cs) }} />}
+        <span className="dt-ng-tt" style={{ width: w(tt) }} />
+        {mt != null && <span className="dt-ng-ns" style={{ left: w(mt) }} />}
+        {s != null && <span className="ss-vach" style={{ left: w(s) }} />}
+      </span>
+      <b className="so">{td_ != null ? p1(td_) : gon(tt)}</b>
+    </ONoi>))}</div>;
+}
+
+function Pareto({ pa }: { pa: BaoCaoApi["pa"] }) {
+  if (!pa.co) return <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>;
+  return (
+    <svg viewBox={`0 0 ${pa.rong} ${pa.cao}`} width="100%" className="bc-svg" role="group" aria-label="Doanh thu và luỹ kế của 20 khách hàng lớn nhất">
+      {pa.truc_pct.map(t => <g key={t.y}><line x1={0} y1={t.y} x2={pa.rong} y2={t.y} stroke="var(--vien)" strokeWidth={1} />
+        <text x={pa.rong - 4} y={t.y - 3} fontSize={9} textAnchor="end" fill="var(--chu-nhat)">{t.nhan}</text></g>)}
+      {pa.cot.map(c => <a key={c.khach.ma} href={`/khach-hang/${encodeURIComponent(c.khach.ma)}`}>
+        <rect x={c.x} y={c.y} width={c.w} height={c.h} rx={2} fill="var(--lien-ket)" opacity={0.72} className="bc-cot-kh">
+          <title>Thứ {c.khach.thu_hang} — {c.khach.ten}: {yen(c.khach.doanh_thu)}{c.khach.ty_trong != null ? ` (${p1(c.khach.ty_trong)})` : ""} · bấm để mở hồ sơ</title></rect></a>)}
+      {pa.doan.map((s, i) => <polyline key={i} points={s} fill="none" stroke="var(--do)" strokeWidth={2} />)}
+      {pa.diem.map(p => <circle key={p.khach.ma} cx={p.x} cy={p.y} r={2.5} fill="var(--do)">
+        <title>Thứ {p.khach.thu_hang} — {p.khach.ten}: luỹ kế {p.khach.luy_ke != null ? p1(p.khach.luy_ke) : "—"}</title></circle>)}
+    </svg>);
 }
 
 function ONhiet({ o, dau_du_lieu, nhan_ss }: { o: BaoCaoApi["nh"]["hang"][0]["o"][0]; dau_du_lieu: string | null; nhan_ss: string }) {
@@ -380,109 +448,9 @@ function ONhiet({ o, dau_du_lieu, nhan_ss }: { o: BaoCaoApi["nh"]["hang"][0]["o"
   return <td className="bac-khong" title={`${nhan}: ${nhan_ss} ≤ 0, không tính được % (${yen(o.doanh_thu)})`}>—</td>;
 }
 
-function NganSach({ td, phu: phuDt, lk: lkDt, phu_lg, lk_lg, nhan_ss, ss_nguoi }: { td: Td; phu: BaoCaoApi["td_phu"]; lk: BaoCaoApi["lk"];
-  phu_lg: BaoCaoApi["td_phu"]; lk_lg: BaoCaoApi["lk"]; nhan_ss: string;
-  /** Doanh thu KỲ SO của từng người — chỉ dạng Tháng (tháng của ngân sách = tháng đang xem). */
-  ss_nguoi: Record<string, number | null> | null }) {
-  // 041: Doanh thu / Lãi gộp — cùng khối, cùng công thức, đổi cột (ngân sách CÔNG TY nhập thẳng).
-  const [cs, datCs] = useState<"dt" | "lg">("dt");
-  const lg = cs === "lg";
-  const v = lg
-    ? { co: td.co_ngan_sach_lg, tt: td.thuc_te_lg, mt: td.muc_tieu_lg, den: td.muc_tieu_lg_den_hom_nay, td: td.tien_do_lg,
-        pct: td.pct_moc_chi_tieu_lg, rong: td.rong_thanh_lg, rmoc: td.rong_moc_lg }
-    : { co: td.co_ngan_sach, tt: td.thuc_te, mt: td.muc_tieu, den: td.muc_tieu_den_hom_nay, td: td.tien_do,
-        pct: td.pct_moc_chi_tieu, rong: td.rong_thanh, rmoc: td.rong_moc };
-  const vn = (n: Nguoi) => lg
-    ? { tt: n.thuc_te_lg, mt: n.muc_tieu_lg, den: n.muc_tieu_lg_den_hom_nay, td: n.tien_do_lg, rong: n.rong_thanh_lg, rmoc: n.rong_moc_lg }
-    : { tt: n.thuc_te, mt: n.muc_tieu, den: n.muc_tieu_den_hom_nay, td: n.tien_do, rong: n.rong_thanh, rmoc: n.rong_moc };
-  const phu = lg ? phu_lg : phuDt;
-  const lk = lg ? lk_lg : lkDt;
-  const ten = lg ? "lãi gộp" : "doanh thu";
-  const moc = v.pct != null ? v.pct / 100 : null;
-  const tNhan = `${td.thang.slice(5)}/${td.thang.slice(0, 4)}`;
-  return (
-    <section className="kh-the bc-khoi bc-ns">
-      <div className="kh-the-dau"><h2>Tiến độ ngân sách tháng {tNhan}</h2>
-        <div className="tab-pill" role="group" aria-label="Chỉ số">
-          <button type="button" aria-pressed={!lg} onClick={() => datCs("dt")}>Doanh thu</button>
-          <button type="button" aria-pressed={lg} onClick={() => datCs("lg")}>Lãi gộp</button></div>
-        {phu && <span className="kh-the-goc"><span className="nhan-vien do">Còn {phu.ngay_kd_con_lai} ngày kinh doanh</span></span>}</div>
-      <p className="phu">Số liệu đến {ngay(td.hom_nay)} · {td.ngay_kd_da_qua}/{td.ngay_kd} ngày làm việc của tháng (đã trừ thứ Bảy, Chủ nhật và ngày lễ quốc gia Nhật — chưa trừ ngày nghỉ riêng của công ty) · công ty = mart.tien_do_cong_ty (ngân sách công ty nhập thẳng), từng người = mart.tien_do_ngan_sach</p>
-      {!v.co ? <div className="khoi-loi">Chưa đặt ngân sách {ten} của công ty cho tháng này.{" "}
-        {KD.hien_ngan_sach && <><a href={`/ngan-sach?ky=${td.company_fy}`}>Đặt chỉ tiêu</a> rồi quay lại đây.</>}</div> : <>
-        <div className="o-kpi-luoi bc-ns-o">
-          <div className="o-kpi"><div className="nhan">Tiến độ tháng</div>
-            <div className={"gia " + mauTd(v.td, moc)}>{v.td != null ? p1(v.td) : "—"}</div>
-            <div className="dong-phu nhat-chu">mốc hôm nay {moc != null ? p1(moc) : "—"}</div></div>
-          <div className="o-kpi"><div className="nhan">Thực tế ({ten})</div><div className="gia">{yen(v.tt)}</div>
-            <div className="dong-phu nhat-chu">trên ngân sách {v.mt != null ? yen(v.mt) : "—"}</div></div>
-          <div className="o-kpi"><div className="nhan">{phu?.thieu_moc != null && phu.thieu_moc > 0 ? "Thiếu so mốc hôm nay" : "Vượt mốc hôm nay"}</div>
-            <div className={"gia " + (phu?.thieu_moc != null && phu.thieu_moc > 0 ? "giam" : "tang")}>{phu?.thieu_moc != null ? yen(Math.abs(phu.thieu_moc)) : "—"}</div>
-            <div className="dong-phu nhat-chu">{phu?.thieu_moc != null && v.den ? `${p1(Math.abs(phu.thieu_moc) / v.den)} của mốc ${yen(v.den)}` : "—"}</div></div>
-          <div className="o-kpi"><div className="nhan">{lg ? "Cần lãi gộp mỗi ngày" : "Cần bán mỗi ngày"}</div>
-            <div className="gia canh-chu">{phu?.can_ban_moi_ngay != null ? yen(phu.can_ban_moi_ngay) : "—"}</div>
-            <div className="dong-phu nhat-chu">{phu ? `${phu.ngay_kd_con_lai} ngày còn lại` : ""}{phu?.can_ban_moi_ngay != null && phu.nhip_chuan ? ` · gấp ${(phu.can_ban_moi_ngay / phu.nhip_chuan).toFixed(2)}× nhịp chuẩn` : ""}</div></div>
-        </div>
-        <div className="bc-ns-hai">
-          <div>
-            <h3>Luỹ kế thực tế so với nhịp ngân sách ({ten}) — cả kỳ</h3>
-            {lk.co ? <><svg viewBox={`0 0 ${lk.rong} ${lk.cao}`} width="100%" className="bc-svg" role="img" aria-label="Luỹ kế doanh thu so với nhịp ngân sách">
-              {/* Nét đứt dành riêng cho KỲ SO — nhịp ngân sách là nét liền mảnh. */}
-              <polyline points={lk.ngan_sach} fill="none" stroke="var(--chu-nhat)" strokeWidth={1.5} opacity={0.8} />
-              {lk.so_sanh && <polyline points={lk.so_sanh} fill="none" stroke="var(--vien-dam)" strokeWidth={2} strokeDasharray="5 4" />}
-              <polyline points={lk.thuc_te} fill="none" stroke="var(--do)" strokeWidth={2.5} />
-              {lk.nhan.filter(n => n.hien).map(n => <text key={n.thang} x={n.x} y={lk.cao - 8} fontSize={9} textAnchor="middle" fill="var(--chu-nhat)">{n.thang.slice(5)}</text>)}
-            </svg>
-              <div className="chu-giai bc-cg"><span><i className="mau" style={{ background: "var(--do)" }} />Luỹ kế thực tế</span>
-                <span><i className="mau" style={{ background: "var(--chu-nhat)" }} />Nhịp ngân sách</span>
-                {lk.so_sanh ? <span><MauSs />Luỹ kế {nhan_ss}</span>
-                  : <span className="nhat-chu">Không vẽ luỹ kế {nhan_ss}{lg ? " (chỉ có cho doanh thu ở dạng Kỳ)" : ""} — thiếu số để so ở ít nhất một tháng, hoặc kỳ so không lệch tròn tháng.</span>}
-                <span>Đỉnh trục: {yen(lk.dinh)}</span>
-                <span>Luỹ kế theo NGÀY trong tháng + dự báo chốt: <a href="/du-bao">Dự báo</a></span></div></> : <p className="phu">Chưa đủ dữ liệu.</p>}
-          </div>
-          <div>
-            <h3>Tiến độ theo nhân viên</h3>
-            <div className="bc-bullet tong"><div className="bc-bl-dau"><b>Toàn công ty</b>
-              <span>{yen(v.tt)} / {v.mt != null ? yen(v.mt) : "—"} · <b className={mauTd(v.td, moc)}>{v.td != null ? p1(v.td) : "—"}</b></span></div>
-              <Thanh rong={v.rong} moc={v.rmoc} lon /></div>
-            {td.nguoi.map(n => { const x = vn(n); return (
-              <div key={n.ma} className="bc-bullet"><div className="bc-bl-dau"><span>{n.ten ?? <>{n.ma} <small className="nhat-chu">(mã không có trong danh sách phụ trách)</small></>}</span>
-                <span>{yen(x.tt)} / {x.mt != null ? yen(x.mt) : "—"}{x.td != null && <> · <b className={x.td >= 1 ? "tang" : "giam"}>{p1(x.td)}</b></>}</span></div>
-                <Thanh rong={x.rong} moc={x.rmoc}
-                  ss={!lg && ss_nguoi && x.mt ? Math.min(100, Math.max(0, (ss_nguoi[n.ma] ?? 0) / x.mt * 100)) : null} ss_nhan={nhan_ss} /></div>); })}
-            <p className="phu">Vạch đen là mốc đáng lẽ đạt tới hôm nay.{!lg && ss_nguoi ? ` Vạch đứt = doanh thu ${nhan_ss}.` : ""}</p>
-          </div>
-        </div>
-      </>}
-      <div className="bc-ns-hai">
-        <ChuaCoDuLieuBoc tieu_de="Khách hiện hữu và khách mới" ly_do="Chưa có định nghĩa 既存 / 新規得意先 theo kỳ trong mart — không tự suy diễn." />
-        <details className="bc-chi-tiet"><summary>Bảng số chi tiết theo nhân viên — tháng {tNhan}</summary>
-          <div className="bang-cuon"><table className="bang">
-            <thead><tr><th>Nhân viên</th><th className="so">Thực tế</th><th className="so">Chỉ tiêu</th><th className="so">Tiến độ</th>
-              <th className="so">Mốc đến hôm nay</th><th className="so">{ss_nguoi ? hoa(nhan_ss) : "Cùng tháng năm trước"}</th><th className="so">So</th><th className="so">Tỷ trọng</th></tr></thead>
-            <tbody>{td.nguoi.map(n => <tr key={n.ma}><td>{n.ten ?? n.ma}<br /><small className="nhat-chu">{n.ten ? n.ma : "(mã không có trong danh sách phụ trách)"}</small></td>
-              <td className="so">{yen(n.thuc_te)}</td><td className="so">{n.muc_tieu != null ? yen(n.muc_tieu) : "—"}</td>
-              <td className="so">{n.tien_do != null ? <span className={n.tien_do >= 1 ? "tang" : "giam"}>{p1(n.tien_do)}</span> : "—"}</td>
-              <td className="so">{n.muc_tieu_den_hom_nay != null ? yen(n.muc_tieu_den_hom_nay) : "—"}</td>
-              {ss_nguoi ? (() => { const v = ss_nguoi[n.ma] ?? 0, t = tdSs(n.thuc_te, v); return <>
-                <td className="so">{yen(v)}</td>
-                <td className="so">{t != null ? <span className={t >= 0 ? "tang" : "giam"}>{dau(t)}%</span> : "—"}</td></>; })() : <>
-              <td className="so">{n.co_cung_ky ? yen(n.cung_ky ?? 0) : "không có dữ liệu"}</td>
-              <td className="so">{n.tang_truong != null ? <span className={n.tang_truong >= 0 ? "tang" : "giam"}>{dau(n.tang_truong)}%</span> : n.co_cung_ky ? "—" : "không có dữ liệu"}</td></>}
-              <td className="so">{td.thuc_te ? p1(n.thuc_te / td.thuc_te) : "—"}</td></tr>)}</tbody>
-          </table></div></details>
-      </div>
-    </section>);
-}
-
-function Thanh({ rong, moc, lon = false, ss = null, ss_nhan = "" }: { rong: number | null; moc: number | null; lon?: boolean;
-  ss?: number | null; ss_nhan?: string }) {
-  if (rong == null) return <div className="phu">chưa có chỉ tiêu</div>;
-  return <div className={"thanh-tien-do" + (lon ? "" : " vua")} role="img" aria-label={`${rong.toFixed(1)}% chỉ tiêu`}>
-    <div className="day" style={{ width: `${rong}%` }} />{moc != null && <div className="moc" style={{ left: `${moc}%` }} />}
-    {ss != null && <span className="ss-vach" style={{ left: `${ss}%` }} title={ss_nhan} aria-hidden="true" />}</div>;
-}
-
-function ChuaCoDuLieuBoc(p: { tieu_de: string; ly_do: string }) {
-  return <div className="kh-chua-co"><ChuaCoDuLieu {...p} /></div>;
+function Thanh({ rong, moc }: { rong: number | null; moc: number | null }) {
+  if (rong == null) return null;
+  const r = Math.max(0, Math.min(1, rong)) * 100;
+  return <div className="thanh-tien-do vua" role="img" aria-label={`${r.toFixed(1)}% ngân sách`}>
+    <div className="day" style={{ width: `${r}%` }} />{moc != null && <div className="moc" style={{ left: `${Math.max(0, Math.min(1, moc)) * 100}%` }} />}</div>;
 }

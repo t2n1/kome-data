@@ -32,11 +32,12 @@ def _moc(lo: float, hi: float, so: int = 4) -> list[float]:
 
 
 def ve_bong(diem: list[dict], rong: int = 520, cao: int = 320, x_moc: float | None = None,
-            y_moc: float | None = None, kep_x: float | None = None) -> dict:
+            y_moc: float | None = None, kep_x: float | None = None, co_bong: float = .11) -> dict:
     """`diem`: mỗi phần tử `{ma, ten, x, y, kich, tien}` — `kich` quyết định cỡ bóng,
     `tien` là số dùng để đối soát / nói "không vẽ". Bóng thiếu `x`/`y` hoặc `kich ≤ 0`
     không vẽ được (diện tích âm vô nghĩa). `x_moc`/`y_moc`: đường chữ thập (0% tăng
-    trưởng · biên của cả công ty). `kep_x`: kẹp |x| ở mép trục."""
+    trưởng · biên của cả công ty). `kep_x`: kẹp |x| ở mép trục. `co_bong`: bán kính bóng lớn nhất
+    / cạnh ngắn của khung."""
     trai, phai, tren, duoi = 44, 14, 12, 26
     ve, khong_ve, so_khong_ve = [], 0, 0
     for d in diem:
@@ -58,7 +59,7 @@ def ve_bong(diem: list[dict], rong: int = 520, cao: int = 320, x_moc: float | No
     dx, dy = (x_hi - x_lo) or abs(x_hi) or 1, (y_hi - y_lo) or abs(y_hi) or 1
     x_lo, x_hi, y_lo, y_hi = x_lo - dx * .12, x_hi + dx * .12, y_lo - dy * .15, y_hi + dy * .15
     k_max = max(d["kich"] for d in ve)
-    r_min, r_max = 4.0, min(rong, cao) * .11
+    r_min, r_max = 4.0, min(rong, cao) * co_bong
 
     def X(v: float) -> float:
         return trai + (v - x_lo) / (x_hi - x_lo) * (rong - trai - phai)
@@ -98,7 +99,7 @@ def bong_mat_hang(hang_theo_nganh: list[dict], ty_suat_cty: float | None, lg: bo
     ra = ve_bong([{"ma": h["ma"], "ten": h["ten"], "x": h["so_khach"], "y": h["ty_suat"],
                    "kich": h["lai_gop"] if lg else h["doanh_thu"],
                    "tien": h["lai_gop"] if lg else h["doanh_thu"], "nhom": h.get("nhom")}
-                  for h in hang], y_moc=ty_suat_cty)
+                  for h in hang], y_moc=ty_suat_cty, co_bong=.075)
     ra["so_ma"] = len(hang)
     return ra
 

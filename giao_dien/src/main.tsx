@@ -24,7 +24,6 @@ const HoSo = lazy(() => import("./khach/HoSo"));
 // Giai đoạn 3.
 const LienHe = lazy(() => import("./lien_he/LienHe"));
 const BaoCao = lazy(() => import("./bao_cao/BaoCao"));
-const DuBao = lazy(() => import("./du_bao/DuBao"));
 // Giai đoạn 4.
 const ManSanPham = lazy(() => import("./san_pham/ManSanPham"));
 const HoSoMa = lazy(() => import("./san_pham/ho_so/HoSoMa"));
@@ -57,7 +56,6 @@ function man(duong: string): (() => React.ReactElement) | null {
   if (duong === "/khach-hang" || duong === "/ban-do") return () => <ManKhach />;
   if (duong === "/lien-he") return () => <LienHe />;
   if (duong === "/bao-cao") return () => <BaoCao />;
-  if (duong === "/du-bao") return () => <DuBao />;
   if (duong === "/san-pham") return () => <ManSanPham />;
   const mSp = duong.match(/^\/san-pham\/([^/]+)$/);
   if (mSp) { const ma = decodeURIComponent(mSp[1]); return () => <HoSoMa ma={ma} />; }
@@ -92,7 +90,7 @@ function boChon(duong: string): { hien: boolean; mo?: string } {
   if (KD.thong_bao || !KD.nguoi && KD.co_dang_nhap) return { hien: false };
   if (duong === "/" || duong === "/bao-cao") return { hien: true };
   // Từ migration 040 ("mọi thứ quay về tháng đó") cả bốn màn này cũng theo mốc của khoảng.
-  if (["/cong-no", "/kho-hang", "/lien-he", "/du-bao", "/doi-thu"].includes(duong)) return { hien: true };
+  if (["/cong-no", "/kho-hang", "/lien-he", "/doi-thu"].includes(duong)) return { hien: true };
   if (duong === "/khach-hang" || duong === "/ban-do" || /^\/khach-hang\//.test(duong)) return { hien: true };
   if (/^\/san-pham(\/|$)/.test(duong)) return { hien: true };
   return { hien: false };

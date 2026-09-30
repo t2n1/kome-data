@@ -94,18 +94,17 @@ def test_kho_rong_tra_200(client, conn):
 
 
 def test_kho_hai_nam_tra_200_va_hien_khoi_moi(client, conn, batch):
-    """Giai đoạn 3: bốn khối có DỮ LIỆU để vẽ (API) và có tiêu đề trên màn (React)."""
+    """Trang Doanh thu (2026-09-30): các khối phân tích có DỮ LIỆU để vẽ (API) và có tiêu
+    đề trên màn (React). Cầu nối + bong bóng danh mục THAY "ngành kéo lên/xuống" và cây ô."""
     _hai_nam(conn, batch)
     assert client.get("/bao-cao?ky=2026").status_code == 200
     d = _api(client)
-    for khoi in ("dg", "co", "nh", "pa"):
+    for khoi in ("cau_noi", "nh", "pa"):
         assert d[khoi]["co"] is True, f"khối {khoi} không có gì để vẽ"
+    assert d["bong_nganh"]["dt"]["co"] is True and d["bong_ma"]["dt"]["co"] is True
     src = _src()
-    for tieu_de in ("Ngành hàng kéo doanh thu lên/xuống",
-                    "Doanh thu đến từ danh mục nào",
-                    "Tăng trưởng theo tháng và ngành",
-                    "Doanh thu tập trung ở khách nào"):
-        assert f"<h2>{tieu_de}</h2>" in src, tieu_de
+    for tieu_de in ("Vì sao tăng / giảm", "Danh mục", "Mặt hàng", "Danh mục × tháng", "Khách lớn"):
+        assert f'<Khoi tieu_de="{tieu_de}"' in src, tieu_de
 
 
 def test_co_doi_chieu_hien_dung_cau(client, conn, batch):
@@ -127,42 +126,33 @@ def test_co_doi_chieu_hien_dung_cau(client, conn, batch):
 def test_khong_co_doi_chieu_hien_dung_cau(client, conn, batch):
     """[Chữ bắt buộc] Không có tháng đối chiếu: 'chưa có cùng kỳ để so'.
 
-    Giai đoạn 3: API nói "không có đối chiếu" (so_thang 0 hoặc không có dòng
-    cùng kỳ) — đúng điều kiện mà React in hai câu bắt buộc."""
+    API nói "không có đối chiếu" (so_thang 0 hoặc không có dòng cùng kỳ) — đúng điều kiện mà
+    React in câu bắt buộc. Khối cầu nối (thay "ngành kéo lên/xuống") vẫn có tiêu đề và NÓI RA
+    là không có số so — không ẩn khối."""
     _nganh(conn, batch, "AA01", "Đồ khô")
     _ban(conn, batch, date(2026, 5, 11), "AA01")
     assert client.get("/bao-cao?ky=2026").status_code == 200
-    ck = _api(client)["bc"]["cung_ky"]
+    d = _api(client)
+    ck = d["bc"]["cung_ky"]
     assert ck is None or ck["so_thang"] <= 0
+    assert d["cau_noi"]["co"] is False
     src = _src()
-    # Ô chỉ số: nhánh `!ck || ck.so_thang <= 0` in đúng câu.
     assert re.search(r"if \(!ck \|\| ck\.so_thang <= 0\) return <>chưa có cùng kỳ để so", src)
-    # Khối "Ngành hàng kéo doanh thu lên/xuống" cũng phải nói ra, KHÔNG ẩn
-    # tiêu đề: tiêu đề đứng TRƯỚC (ngoài) nhánh điều kiện, câu nằm ở nhánh
-    # "không có".
-    # Khoảng xem: điều kiện gộp dạng Kỳ (`ck.so_thang > 0`) và dạng Tháng /
-    # Khoảng (`chinh?.co`); nhánh rỗng vẫn nói ra cho CẢ HAI dạng.
-    m = re.search(r"<h2>Ngành hàng kéo doanh thu lên/xuống</h2></div>\s*"
-                  r"\{\(theoKy \? ck && ck\.so_thang > 0 : chinh\?\.co\) \? <>.*?</> : "
-                  r'<p className="phu">\{theoKy \? "Kỳ này không có tháng nào để so cùng kỳ\." : ', src, re.S)
-    assert m, "tiêu đề khối đóng góp phải ở ngoài điều kiện, và nhánh rỗng phải nói ra"
+    assert '<Khoi tieu_de="Vì sao tăng / giảm"' in src and "<CauNoi v={d.cau_noi} nhan_ss={nhanSs} />" in src
+    bong = (THU_MUC_GD / "Bong.tsx").read_text(encoding="utf-8")
+    assert 'if (!v.co) return <p className="phu">{nhan_ss}: không có số để so theo danh mục.</p>;' in bong
 
 
 def test_ty_suat_so_bang_diem_khong_bang_phan_tram(client, conn, batch):
-    """[M-7 soát chặt] Tỷ suất so cùng kỳ dùng chữ 'điểm' — kiểm NGAY TRONG
-    ô chỉ số 'Tỷ suất lãi gộp', không phải bất kỳ đâu trên trang (một chữ
-    'điểm' lạc ở khối khác vẫn làm test cũ xanh giả).
-
-    Giai đoạn 3: số API đưa cho ô đó là HIỆU (`chenh_ty_suat` = tỷ suất −
-    tỷ suất cùng kỳ), không phải tỷ lệ tăng; và React truyền đúng trường đó
-    với đơn vị " điểm" trong CHÍNH ô 'Tỷ suất lãi gộp'."""
+    """[M-7 soát chặt] Tỷ suất so cùng kỳ dùng chữ 'điểm' — kiểm NGAY TRONG ô chỉ số 'Biên lãi
+    gộp' (tên ô trên trang Doanh thu), không phải bất kỳ đâu trên trang. Số API đưa cho ô đó
+    là HIỆU (`chenh_ty_suat` = tỷ suất − tỷ suất cùng kỳ), không phải tỷ lệ tăng."""
     _hai_nam(conn, batch)
     ck = _api(client)["bc"]["cung_ky"]
     assert ck["chenh_ty_suat"] is not None
     assert ck["chenh_ty_suat"] == pytest.approx(ck["ty_suat"] - ck["ty_suat_ck"])
-    m = re.search(r'<div className="nhan">Tỷ suất lãi gộp</div>(.*?)<div className="o-kpi">',
-                  _src(), re.S)
-    assert m, "không tìm thấy ô chỉ số Tỷ suất lãi gộp"
+    m = re.search(r'<div className="nhan">Biên lãi gộp</div>(.*?)<The className="dt-chinh">', _src(), re.S)
+    assert m, "không tìm thấy ô chỉ số Biên lãi gộp"
     khoi = m.group(1)
     assert 'tang={ck?.chenh_ty_suat ?? null} don_vi=" điểm"' in khoi
     assert 'don_vi="%"' not in khoi, "tỷ suất phải so bằng ĐIỂM, không phải %"
@@ -196,40 +186,33 @@ def test_nganh_trong_khop_chu_view_tra_ra(conn, batch):
 
 
 def test_khong_ve_hien_dung_cau_khi_co_doanh_thu_am(client, conn, batch):
-    """[Chữ bắt buộc, phán quyết controller] Ngành có TỔNG ÂM (không chỉ mã
-    lẻ âm) cũng phải rơi vào 'Không vẽ' — chữ chính xác đã chốt:
-    'Không vẽ: ¥{khong_ve:,} của {so_ma_khong_ve} mã (doanh thu âm hoặc
-    bằng 0, hoặc thuộc ngành có tổng âm)'.
-
-    Giai đoạn 3: API trả số tiền bị bỏ THẬT (ngành Phí −¥4.500) và số mã;
-    React in đúng câu đã chốt từ hai trường đó."""
+    """[Chữ bắt buộc] Bong bóng danh mục (thay cây ô) không vẽ được bóng ≤ 0 — phần bị bỏ PHẢI
+    in ra kèm số tiền thật, cùng luật cây ô: Σ bóng vẽ + khong_ve = Σ doanh thu danh mục."""
     _nganh(conn, batch, "AA01", "Đồ khô")
     _ban(conn, batch, date(2026, 5, 11), "AA01")
     _nganh(conn, batch, "PH01", "Phí")
     _ban(conn, batch, date(2026, 5, 11), "PH01", khach="000000009294",
          amount=-5_000, tax=-500, gp=-1_000, n=77)
-    co = _api(client)["co"]
-    assert co["khong_ve"] == -4_500 and co["so_ma_khong_ve"] == 1
-    assert ("Không vẽ: {yen(d.co.khong_ve)} của {d.co.so_ma_khong_ve} mã "
-            "(doanh thu âm hoặc bằng 0, hoặc thuộc ngành có tổng âm)") in _src()
+    d = _api(client)
+    b = d["bong_nganh"]["dt"]
+    tong = sum(n["doanh_thu"] for n in d["bc"]["nganh_ky"])
+    assert sum(x["tien"] for x in b.get("bong", [])) + b["khong_ve"] == tong
+    assert b["so_khong_ve"] >= 1 and b["khong_ve"] <= 100_000 - 4_500
+    assert ("Không vẽ: ${yen(bn.khong_ve)} của ${bn.so_khong_ve} danh mục (${ten} ≤ 0 hoặc không có số so).") in _src()
 
 
 def test_khong_hien_khong_ve_khi_khong_co_am(client, conn, batch):
-    """Giai đoạn 3: không có doanh thu âm -> `khong_ve` = 0, và React chỉ in
-    dòng "Không vẽ" khi `khong_ve !== 0`."""
+    """Không có danh mục ≤ 0 và có số so -> `khong_ve` = 0, và React chỉ in "Không vẽ" khi
+    `so_khong_ve > 0`."""
     _hai_nam(conn, batch)
-    assert _api(client)["co"]["khong_ve"] == 0
-    assert '{d.co.khong_ve !== 0 && <p className="phu">Không vẽ:' in _src()
+    assert _api(client)["bong_nganh"]["dt"]["khong_ve"] == 0
+    assert "canh_bao={bn.so_khong_ve > 0 ? `Không vẽ:" in _src()
 
 
 def test_pareto_cau_tom_tat(client, conn, batch):
-    """[Chữ bắt buộc, sửa vòng soát cuối M2] '10 khách lớn nhất = {x}%
-    doanh thu kỳ này, trên {so_khach} khách có phát sinh trong kỳ' — KHÔNG
-    phải 'khách có doanh thu': `so_khach` đếm mọi khách có dòng trong
-    `mart.dong_ban`, kể cả khách net <= 0 (赤伝 có thể làm net âm/bằng
-    không), nên gọi họ "có doanh thu" là sai.
-
-    Giai đoạn 3: API trả `luy_ke_top10` và `so_khach` = 12; React ghép câu."""
+    """[Chữ bắt buộc, sửa vòng soát cuối M2] '10 khách = {x}%' trên {so_khach} khách CÓ ĐƠN —
+    KHÔNG phải 'khách có doanh thu': `so_khach` đếm mọi khách có dòng trong `mart.dong_ban`, kể
+    cả khách net <= 0 (赤伝). API trả `luy_ke_top10` và `so_khach` = 12; React ghép câu."""
     for i in range(12):
         khach = f"00000000{9300 + i}"
         _ban(conn, batch, date(2026, 5, 11), "AA01", khach=khach,
@@ -237,8 +220,8 @@ def test_pareto_cau_tom_tat(client, conn, batch):
     tt = _api(client)["bc"]["tap_trung"]
     assert tt["so_khach"] == 12 and 0 < tt["luy_ke_top10"] < 1
     src = _src()
-    assert "10 khách lớn nhất = <b>{p1(bc.tap_trung.luy_ke_top10)}</b>" in src
-    assert "doanh thu kỳ này, trên {so(bc.tap_trung.so_khach)} khách có phát sinh trong kỳ" in src
+    assert "`10 khách = ${p1(bc.tap_trung.luy_ke_top10)}`" in src
+    assert "({so(bc.tap_trung?.so_khach ?? 0)} khách có đơn)" in src
     assert "khách có doanh thu" not in src
 
 
@@ -272,51 +255,35 @@ def test_khong_co_ma_mau_hex_trong_template():
 
 
 def test_moi_rect_circle_du_lieu_co_title(client, conn, batch):
-    """[M-7 soát chặt] Mọi <rect>/<circle> DỮ LIỆU trong các SVG (đóng góp,
-    cây ô, Pareto — bản đồ nhiệt nay là <table>, xem I-2/test riêng bên
-    dưới) phải có <title> ghi số thật. Bắt CẢ dạng tự đóng (`<rect .../>`,
-    không thể mang <title> con) lẫn cặp mở/đóng thiếu <title> — bản trước
-    chỉ bắt cặp mở/đóng, một phần tử tự đóng lọt qua hoàn toàn không bị
-    phát hiện.
-
-    Giai đoạn 3: SVG vẽ bằng React — kiểm mã nguồn của từng SVG (thêm cả
-    biểu đồ 12 tháng, cũng có cột/điểm dữ liệu), và kiểm API có dữ liệu để
-    các SVG đó THẬT SỰ được vẽ với bộ dữ liệu này."""
+    """[M-7 soát chặt] Mọi <rect>/<circle> DỮ LIỆU của SVG Pareto phải có <title> ghi số thật
+    (bắt cả dạng tự đóng). Bong bóng và cầu nối (trang Doanh thu) dùng ô nổi `ONoi` thay cho
+    <title>: mỗi phần tử dữ liệu nằm TRONG một `<ONoi … svg nhan=…>` (tên đọc được + ô nổi số
+    thật). Biểu đồ chính là `BieuDo` (ô nổi riêng). API có dữ liệu để các hình THẬT SỰ được vẽ."""
     _nganh(conn, batch, "AA01", "Đồ khô")
     _hai_nam(conn, batch)
-    _nganh(conn, batch, "PH01", "Phí")
-    _ban(conn, batch, date(2026, 5, 11), "PH01", khach="000000009294",
-         amount=-5_000, tax=-500, gp=-1_000, n=77)
     for i in range(12):
         khach = f"00000000{9300 + i}"
         _ban(conn, batch, date(2026, 5, 20), "AA01", khach=khach,
              amount=(50_000 + i * 1_000), tax=5_000, gp=15_000, n=200 + i)
 
     d = _api(client)
-    assert d["bd"]["cot"] and d["dg"]["thanh"] and d["co"]["nganh"] and d["pa"]["cot"]
+    assert d["pa"]["cot"] and d["cau_noi"]["cot"] and d["bong_nganh"]["dt"]["bong"] and d["bong_ma"]["dt"]["bong"]
     src = _src()
-    # Hai nhãn đầu mang tên KỲ SO của máy chủ (đặc tả 2026-09-28) — nhãn là mẫu `${nhanSs}`.
-    nhan = ("Doanh thu và tỷ suất lãi gộp, kèm ${nhanSs}",
-            "Chênh lệch doanh thu theo ngành so ${nhanSs}",
-            "Doanh thu theo ngành hàng và mặt hàng",
-            "Doanh thu và luỹ kế của 20 khách hàng lớn nhất")
-    for n in nhan:
-        thuoc_tinh = (rf'aria-label=\{{`{re.escape(n)}`\}}' if "${" in n else rf'aria-label="{re.escape(n)}"')
-        m_svg = re.search(thuoc_tinh + r'>(.*?)</svg>', src, re.S)
-        assert m_svg, f"không tìm thấy SVG '{n}'"
-        khoi = m_svg.group(1)
-        dem = 0
-        for tag in ("rect", "circle"):
-            # Dạng tự đóng — không thể chứa <title> con, nên CHÍNH việc tự
-            # đóng đã là lỗi cho một phần tử dữ liệu.
-            for m in re.finditer(rf"<{tag}\b[^>]*?/>", khoi):
-                pytest.fail(f"<{tag}> tự đóng trong '{n}', không thể có "
-                            f"<title>: {m.group(0)[:120]!r}")
-            for m in re.finditer(rf"<{tag}\b[^>]*>((?:(?!</{tag}>).)*)</{tag}>", khoi, re.S):
-                dem += 1
-                assert "<title>" in m.group(1), \
-                    f"<{tag}> trong '{n}' không có <title>: {m.group(0)[:120]!r}"
-        assert dem, f"SVG '{n}' không có <rect>/<circle> dữ liệu nào — regex hỏng?"
+    n = "Doanh thu và luỹ kế của 20 khách hàng lớn nhất"
+    m_svg = re.search(rf'aria-label="{re.escape(n)}">(.*?)</svg>', src, re.S)
+    assert m_svg, f"không tìm thấy SVG '{n}'"
+    khoi = m_svg.group(1)
+    dem = 0
+    for tag in ("rect", "circle"):
+        for m in re.finditer(rf"<{tag}\b[^>]*?/>", khoi):
+            pytest.fail(f"<{tag}> tự đóng trong '{n}', không thể có <title>: {m.group(0)[:120]!r}")
+        for m in re.finditer(rf"<{tag}\b[^>]*>((?:(?!</{tag}>).)*)</{tag}>", khoi, re.S):
+            dem += 1
+            assert "<title>" in m.group(1), f"<{tag}> trong '{n}' không có <title>: {m.group(0)[:120]!r}"
+    assert dem, "SVG Pareto không có <rect>/<circle> dữ liệu nào — regex hỏng?"
+    bong = (THU_MUC_GD / "Bong.tsx").read_text(encoding="utf-8")
+    assert re.search(r"<ONoi key=\{b\.ma\} svg href=\{href\?\.\(b\)\} nhan=\{b\.ten\}.*?<circle", bong, re.S)
+    assert re.search(r"<ONoi key=\{i\} svg nhan=\{c\.nhan\}.*?<rect", bong, re.S)
 
 
 def _hai_nam_do_dang(conn, batch, ma="AA01", ngành="Đồ khô"):
@@ -446,13 +413,9 @@ def test_hai_khoi_mau_toi_trong_css_van_xanh():
 
 
 def test_ba_khoi_ngan_sach_5a_va_bang_nhan_vien_con_nguyen(client, conn, batch):
-    """Bộ test 5a hiện có phải xanh nguyên — kiểm nhanh các khối đó vẫn còn
-    mặt trên trang.
-
-    Giai đoạn 3: API có đủ dữ liệu cho ba khối ngân sách + bảng người phụ
-    trách, và mã React có đủ tiêu đề. (Bảng "Kết quả theo từng nhân viên"
-    của bản Jinja nay là "Tiến độ theo nhân viên" + bảng chi tiết trong
-    <details> — cùng dữ liệu `td.nguoi`.)"""
+    """Ngân sách trên trang Doanh thu (2026-09-30): ô "Ngân sách", đường ngân sách của biểu đồ
+    chính (`td.thang_cty`) và khối "Người phụ trách" đọc đúng dữ liệu `td` (công ty nhập thẳng
+    + từng người). Bảng chi tiết cũ đã bỏ — số từng người trong ô nổi."""
     _ban(conn, batch, date(2026, 7, 31), "XT07", sale="0104")
     conn.execute(
         "INSERT INTO app.ngan_sach (salesperson_code, thang, muc_tieu) "
@@ -464,24 +427,24 @@ def test_ba_khoi_ngan_sach_5a_va_bang_nhan_vien_con_nguyen(client, conn, batch):
     d = _api(client)
     assert d["td"]["co_ngan_sach"] is True
     assert any(n["ma"] == "0104" and n["muc_tieu"] == 6_000_000 for n in d["td"]["nguoi"])
-    assert d["lk"]["co"] is True
-    assert any(n["ma"] == "0104" for n in d["bc"]["nhan_vien"])
+    t7 = next(t for t in d["td"]["thang_cty"] if t["thang"] == "2026-07")
+    assert t7["ngan_sach"] == 6_000_000 and t7["thuc_te"] > 0
+    # Tháng chưa đặt = None (chưa đặt ≠ 0), tháng chưa tới mốc = thực tế None.
+    assert all(t["ngan_sach"] is None for t in d["td"]["thang_cty"] if t["thang"] != "2026-07")
     src = _src()
-    for chu in ("Tiến độ ngân sách tháng", "Luỹ kế thực tế so với nhịp ngân sách",
-                "Tiến độ theo nhân viên", "Bảng số chi tiết theo nhân viên",
-                "Theo người phụ trách khách"):
+    for chu in ('<div className="nhan">Ngân sách {td ? thNgan(td.thang) : ""}</div>', '{ ten: "Ngân sách", kieu: "duong"',
+                '<Khoi tieu_de="Người phụ trách"', "<NguoiPhuTrach td={td}"):
         assert chu in src, chu
 
 
-def test_bang_chi_tiet_theo_thang_dong_trong_details(client, conn, batch):
-    """Giai đoạn 3: bảng chi tiết theo tháng vẫn nằm trong <details> (đóng
-    sẵn), dòng lấy từ `bc.thang` của API."""
+def test_bang_chi_tiet_theo_thang_van_xuat_duoc_csv(client, conn, batch):
+    """Trang Doanh thu không còn bảng số theo tháng ("ít chữ") — số từng tháng vẫn lấy được bằng
+    nút ⤓ CSV, dòng từ `bc.thang` của API."""
     _hai_nam(conn, batch)
     assert len(_api(client)["bc"]["thang"]) == 12
     src = _src()
-    # Khoảng xem: nhãn "theo ngày / theo tháng" đổi theo chuỗi của API.
-    assert re.search(r"<details[^>]*>\s*<summary>Bảng số chi tiết theo \{theoNgay \? \"ngày\" : \"tháng\"\}", src)
-    assert "<details open" not in src
+    assert "const dong = bc.thang.map(o => [o.thang, o.doanh_thu, o.lai_gop" in src and "onClick={xuatCsv}" in src
+    assert "<details" not in src
 
 
 # ---- Vòng soát 1 vòng 2 -----------------------------------------------------
@@ -541,20 +504,17 @@ def test_pareto_truc_pct_tra_toa_do_khong_con_hang_so_cung_trong_template(conn, 
 
 
 def test_khong_ve_hien_du_khi_khong_co_gi_de_ve(client, conn, batch):
-    """[M-3] Dòng 'Không vẽ' đứng NGOÀI điều kiện `co.co` — cả kỳ chỉ có
-    ĐÚNG MỘT ngành và ngành đó ÂM (cây ô rỗng hoàn toàn, co.co=False) vẫn
-    phải in ra số tiền bị bỏ, không được im lặng chỉ vì không có gì để
-    VẼ.
-
-    Giai đoạn 3: API trả co.co=False KÈM khong_ve thật; trong React dòng
-    "Không vẽ" đứng SAU khi nhánh `d.co.co ? … : …` đã đóng."""
+    """[M-3] Dòng 'Không vẽ' đứng NGOÀI điều kiện vẽ — cả kỳ chỉ có ĐÚNG MỘT danh mục và nó
+    ÂM (không bóng nào, co=False) vẫn phải in số tiền bị bỏ. API trả co=False KÈM khong_ve
+    thật; trong React câu đó là `canh_bao` của Khoi (luôn hiện), không nằm trong `Bong`."""
     _nganh(conn, batch, "PH01", "Phí")
     _ban(conn, batch, date(2026, 5, 11), "PH01", amount=-5_000, tax=-500, gp=-1_000)
-    co = _api(client)["co"]
-    assert co["co"] is False
-    assert co["khong_ve"] == -4_500 and co["so_ma_khong_ve"] == 1
-    assert re.search(r'\{d\.co\.co \? <svg.*?</svg> : <p className="phu">Chưa có dữ liệu để vẽ khối này\.</p>\}'
-                     r'\s*\{d\.co\.khong_ve !== 0 && <p className="phu">Không vẽ:', _src(), re.S), \
-        "dòng 'Không vẽ' phải nằm NGOÀI nhánh co.co"
+    b = _api(client)["bong_nganh"]["dt"]
+    assert b["co"] is False
+    assert b["khong_ve"] == -4_500 and b["so_khong_ve"] == 1
+    src = _src()
+    i_canh = src.index("canh_bao={bn.so_khong_ve > 0 ? `Không vẽ:")
+    i_bong = src.index("<Bong v={bn}")
+    assert i_canh < i_bong, "câu 'Không vẽ' phải là prop của Khoi, không phải con của nhánh vẽ"
 
 
