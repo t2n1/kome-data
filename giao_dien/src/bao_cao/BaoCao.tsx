@@ -21,6 +21,7 @@ import { MauSs } from "../chung/SoSanh";
 import { gon, ngay, so, yen } from "../dinh_dang";
 import { KD } from "../khoi_dau";
 import { Bong, CauNoi, dongBong, type BongDiem, type BongVe, type CauNoiVe } from "./Bong";
+import { tinhThe } from "./nguoi_logic";
 import "./bao_cao.css";
 
 // 048 / 049: nhóm KHÔNG phải hàng (phí & điều chỉnh, hàng tặng POSM) — tổng do mart cộng.
@@ -286,7 +287,10 @@ export default function BaoCao() {
           </Khoi></The>}
         <The>
           <Khoi tieu_de="Người phụ trách" phu={td ? thNgan(td.thang) : undefined}
-            cach_tinh={<>Mỗi thẻ một người. Thanh = ngân sách của chính người đó (đầy thanh = đạt 100%). Phần đậm: {ten} đã có; phần nhạt: dự báo thêm tới cuối tháng (cùng công thức chốt tháng). Vạch cam: mức lẽ ra phải đạt tới {nhanMoc} — ngân sách chia theo ngày làm việc đã qua.
+            cach_tinh={<>Mỗi thẻ một người. Thanh = ngân sách của chính người đó (đầy thanh = đạt 100%); có số vượt ngân sách thì
+              thanh dài tới số lớn nhất và vạch xám đậm đánh dấu ngân sách. Phần đậm: {ten} đã có.
+              {Object.keys(nguoiDb).length > 0 && <> Phần nhạt: dự báo thêm tới cuối tháng (cùng công thức chốt tháng).</>}
+              {td && td.ngay_kd_da_qua < td.ngay_kd && <> Vạch cam: mức lẽ ra phải có {nhanMoc} — ngân sách chia theo ngày làm việc đã qua.</>}
               {ssNguoi && <> Vạch đứt: {nhanSs}.</>}</>}
             canh_bao={!td ? "Dạng Khoảng: không có ngân sách theo người." : null}>
             {td && <NguoiPhuTrach td={td} lg={lg} db={nguoiDb} ss={ssNguoi} nhan_ss={nhanSs} />}
@@ -410,10 +414,8 @@ function NguoiPhuTrach({ td, lg, db, ss, nhan_ss }: { td: Td; lg: boolean; db: R
     // Tháng đã khép: dự kiến chốt = đã có, không in lại.
     const cs = f && conNgay ? (lg ? f.co_so_lg : f.co_so) : null;
     const s = ss?.[n.ma] ?? null, td_ = lg ? n.tien_do_lg : n.tien_do;
-    // Thanh = 100% ngân sách của CHÍNH người này (không chung thước với người khác).
-    const w = (v: number) => `${Math.max(0, Math.min(100, v / (mt as number) * 100))}%`;
-    const coNs = mt != null && mt > 0;
-    const lech = moc != null ? tt - moc : null;
+    // Thước theo ngân sách của CHÍNH người này, dài ra khi có số vượt — xem nguoi_logic.ts.
+    const { thanh, lech, con } = tinhThe({ tt, mt, moc, cs, ss: s, conNgay });
     const ten = n.ten ?? n.ma;
     return (
       <ONoi key={n.ma} nhan={ten} className="dt-ng-the" noi_dung={<><b>{n.ten ?? `${n.ma} (không có trong danh sách phụ trách)`}</b>
@@ -425,19 +427,22 @@ function NguoiPhuTrach({ td, lg, db, ss, nhan_ss }: { td: Td; lg: boolean; db: R
         <span className="dt-ng-ten">{ten}</span>
         <b className="dt-ng-so">{gon(tt)}</b>
         <span className="dt-ng-ns">{mt != null ? <>/ ngân sách {gon(mt)}</> : "chưa đặt ngân sách"}</span>
-        {coNs && <span className="dt-ng-thanh" aria-hidden="true">
-          {cs != null && cs > tt && <span className="dt-ng-db" style={{ width: w(cs) }} />}
-          <span className="dt-ng-tt" style={{ width: w(tt) }} />
-          {conNgay && moc != null && <span className="dt-ng-nhip" style={{ left: w(moc) }} />}
-          {s != null && <span className="ss-vach" style={{ left: w(s) }} />}
+        {thanh && <span className="dt-ng-thanh" aria-hidden="true">
+          {thanh.db != null && <span className="dt-ng-db" style={{ width: `${thanh.db}%` }} />}
+          <span className="dt-ng-tt" style={{ width: `${thanh.tt}%` }} />
+          {thanh.ns != null && <span className="dt-ng-vns" style={{ left: `${thanh.ns}%` }} />}
+          {thanh.nhip != null && <span className="dt-ng-nhip" style={{ left: `${thanh.nhip}%` }} />}
+          {thanh.ss != null && <span className="ss-vach" style={{ left: `${thanh.ss}%` }} />}
         </span>}
         {td_ != null && <span className="dt-ng-pt">{p1(td_)}</span>}
-        {conNgay && moc != null && lech != null && <span className={"dt-ng-lech " + (lech < 0 ? "thieu" : "vuot")}>
-          Lẽ ra {nhanMoc} {gon(moc)} · đang {lech < 0 ? "thiếu" : "vượt"} {gon(Math.abs(lech))}</span>}
+        {lech && moc != null && <span className={"dt-ng-lech " + lech.kieu}>
+          Lẽ ra {nhanMoc} {gon(moc)} · {lech.kieu === "dung" ? "đúng nhịp" : <>đang {lech.kieu === "thieu" ? "thiếu" : "vượt"} {gon(lech.so)}</>}</span>}
         <span className="dt-ng-phu">
-          {mt != null && (tt < mt ? <>Còn thiếu {gon(mt - tt)}</> : <>Đã đạt ngân sách ✓</>)}
-          {cs != null && <>{mt != null && " · "}dự kiến chốt {gon(cs)}</>}
-          {s != null && <>{(mt != null || cs != null) && " · "}{nhan_ss} {gon(s)}</>}
+          {con && (con.kieu === "thieu" ? <>Còn thiếu {gon(con.so)}</>
+            : con.kieu === "vuot" ? <>Đã đạt ngân sách ✓ · vượt {gon(con.so)}</>
+            : con.kieu === "dat" ? <>Đã đạt ngân sách ✓</> : <>Ngân sách đặt bằng 0</>)}
+          {cs != null && <>{con && " · "}dự kiến chốt {gon(cs)}</>}
+          {s != null && <>{(con || cs != null) && " · "}{nhan_ss} {gon(s)}</>}
         </span>
       </ONoi>);
   })}</div>;
