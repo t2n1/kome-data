@@ -525,8 +525,10 @@ def test_nguoi_phu_trach_la_THE_theo_ngan_sach_rieng_co_so_tien_va_nhip():
     ngân sách, còn thiếu in thẳng; thanh theo ngân sách của CHÍNH người đó (không chung thước — người bán ít có thanh đọc
     được); vạch nhịp = `muc_tieu_den_hom_nay` (đúng cột máy chủ, không tự chia ngày ở trình duyệt), nói bằng TIỀN."""
     src = _src()
-    for chu in ('className="dt-ng-the"', "v / (mt as number) * 100",
+    # Hành vi của thẻ (thước, vượt ngân sách, đúng nhịp, ngân sách 0) có test ở giao_dien/src/bao_cao/nguoi_logic.test.ts;
+    # ở đây chỉ canh nguồn số: vạch nhịp đọc đúng cột máy chủ và thẻ đi qua hàm thuần đó.
+    for chu in ('className="dt-ng-the"', "tinhThe({ tt, mt, moc, cs, ss: s, conNgay })",
                 "const moc = lg ? n.muc_tieu_lg_den_hom_nay : n.muc_tieu_den_hom_nay;",
-                'className="dt-ng-nhip"', "Còn thiếu {gon(mt - tt)}", '"chưa đặt ngân sách"'):
+                'className="dt-ng-nhip"', '"chưa đặt ngân sách"'):
         assert chu in src, chu
     assert "const to = Math.max(1, ...dong" not in src   # thước chung cũ đã bỏ
