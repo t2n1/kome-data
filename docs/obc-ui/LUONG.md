@@ -66,4 +66,17 @@ bấm vào một dòng trong danh sách (lấy focus) → `Home` → `Down` × (
 売上出荷数量, 在庫残数, 在庫単価, 在庫金額` — đủ 13 cột `files.yml` khai cho `zaiko` + 2 cột `食品分類` (đã biết, bẫy #6 /
 bất biến 042). File tồn KHÔNG có cột ngày ⇒ không kiểm ngày bằng nội dung được; lớp kiểm là header (pattern sai → cột lệch).
 
+## Chạy thật `obc_bot xuat` (2026-10-15, máy chủ DN)
+
+- `--muc ban`: tự mở 売上明細表 → pattern dòng 1 → gõ 2026/10/15 ~ 2026/10/15 → データ作成 → 出力開始 → lấy sổ Excel mới →
+  kiểm → `売上明細表_20261015.xlsx`. Qua ĐỦ 5 cổng (`pipeline.kiem` trên CSDL test): 221 dòng, ¥1,839,460.
+- `--muc ton`: xuất được `在庫一覧_20261015.xlsx` (307 dòng) nhưng **cổng 3 CHẶN: 84 dòng trùng khoá
+  (商品コード, 倉庫コード)** — dữ liệu THẬT: cùng mã cùng kho có tồn ở CẢ `00` (lẻ) và `02` (thùng), vd `BS01`/0001: 24 lẻ +
+  295 thùng. File xuất tay 16/9, 24/9 chỉ có `02` cho các mã đó. Khoá của web (`files.yml` `keys` và PK
+  `core.fact_inventory_daily (snapshot_date, product_code, warehouse_code)`, 005) KHÔNG có `pack_code` ⇒ ngày nào OBC có
+  tồn lẻ thì file xuất TAY cũng bị chặn y hệt. Không phải lỗi `obc_bot`; cần chủ DN quyết (thêm `pack_code` vào khoá = migration
+  mới + soát mọi view đọc tồn).
+- Hai lỗi đã sửa khi chạy thật: (1) Excel chưa phục vụ COM ngay → thử lại 60 s; (2) Excel tạo nhiều `XLMAIN` ẨN không chứa sổ
+  → chỉ tính cửa sổ đang hiện có `XLDESK › EXCEL7`.
+
 Không dùng ô `本日分` (nghĩa chưa chắc: có thể là "phiếu nhập/sửa hôm nay", không phải ngày bán).

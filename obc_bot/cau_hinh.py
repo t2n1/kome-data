@@ -21,7 +21,7 @@ class CauHinh:
     tai_khoan_web: str              # "" = web không có cổng đăng nhập (máy công ty để trống khoá)
     thu_muc_ra: Path
     thu_muc_bao_loi: Path | None
-    pattern: dict[str, int]         # mục -> số 出力パターン trong OBC
+    pattern: dict[str, int]         # mục -> VỊ TRÍ dòng trong hộp thoại パターン選択 (1 = dòng đầu)
     dem_nguoc_giay: int
     ten_may: str
 
@@ -46,7 +46,7 @@ def doc(duong: Path) -> CauHinh:
     for m in muc:
         v = pattern.get(m)
         if not isinstance(v, int) or isinstance(v, bool) or v <= 0:
-            raise CauHinhSai(f"Thiếu [pattern] {m} = <số 出力パターン > 0>.")
+            raise CauHinhSai(f"Thiếu [pattern] {m} = <vị trí dòng trong パターン選択, 1 = dòng đầu>.")
     if not d.get("thu_muc_ra"):
         raise CauHinhSai("Thiếu `thu_muc_ra` (thư mục lưu file xuất).")
     dem = d.get("dem_nguoc_giay", 0)

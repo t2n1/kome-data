@@ -1,10 +1,11 @@
-# Máy B (máy riêng) — tài khoản OBC của chủ DN. Chép thành may_b.toml rồi sửa.
+﻿# Máy B (máy riêng) — tài khoản OBC của chủ DN. Chép thành may_b.toml rồi sửa.
 muc = ["ban", "ton"]
 web_url = "https://<địa chỉ bản Vercel>"
 tai_khoan_web = "obc-bot"
 thu_muc_ra = "C:/KOME/obc_xuat"
 thu_muc_bao_loi = "C:/Users/<người dùng>/OneDrive - 株式会社KOME/KOME自動取込"
 
-[pattern]          # số 出力パターン đã tạo trong OBC
-ban = 1
-ton = 1
+[pattern]          # VỊ TRÍ dòng trong hộp thoại パターン選択 (1 = dòng đầu) — đo 2026-10-15
+ban = 1            # 903.売上明細表
+ton = 6            # BIG-DATA-TON-KHO (ứng dụng thứ hai, 在庫一覧表)
+
