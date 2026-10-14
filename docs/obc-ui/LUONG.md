@@ -55,6 +55,12 @@ cần lấy, không thì không nạp.
 | 5 | như trên | `[Button] データ作成(E)...` → cửa sổ `… データ作成条件設定` → `[Button] 出力開始(E)` | bấm |
 | 6 | Excel | tiến trình Excel MỚI, sổ chưa lưu, sheet `在庫一覧表` | lưu qua COM như `売上明細表` |
 
+**Chọn pattern (đo 2026-10-15):** mở lại màn thì OBC CHỌN SẴN pattern dùng lần trước (nhưng pattern là `個人利用` của
+tài khoản OBC — ai dùng pattern khác trên cùng tài khoản là lần sau lệch). Bàn phím chọn được dù danh sách không đọc được:
+bấm vào một dòng trong danh sách (lấy focus) → `Home` → `Down` × (vị trí − 1) → `OK`. Đã thử: `Home` + `Down 5` dừng đúng
+`BIG-DATA-TON-KHO`. ⇒ cấu hình mang VỊ TRÍ dòng (1 = dòng đầu), và header của file ra là lớp kiểm (pattern lệch → cột lệch).
+`売上明細表`: `903.売上明細表` là dòng 1.
+
 **Đo thật file ra (2026-10-15, `BIG-DATA-TON-KHO`, 15/10 ~ 15/10):** sheet `在庫一覧表`, 307 dòng, 15 cột:
 `食品分類コード, 食品分類名, 商品コード, 商品名, 荷姿区分コード, 荷姿区分名, 倉庫コード, 倉庫名, 日本語, 単位, 賞味期限,
 売上出荷数量, 在庫残数, 在庫単価, 在庫金額` — đủ 13 cột `files.yml` khai cho `zaiko` + 2 cột `食品分類` (đã biết, bẫy #6 /
