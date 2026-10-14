@@ -1,0 +1,10 @@
+# Máy của Long — tài khoản OBC của Long (quyền 得意先). Chép thành may_long.toml rồi sửa.
+muc = ["khach"]
+web_url = "https://<địa chỉ bản Vercel>"
+tai_khoan_web = "obc-bot"
+thu_muc_ra = "C:/KOME/obc_xuat"
+thu_muc_bao_loi = "C:/Users/<người dùng>/OneDrive - 株式会社KOME/KOME自動取込"
+dem_nguoc_giay = 30   # Long đang ở máy: báo trước khi chiếm chuột
+
+[pattern]
+khach = 1

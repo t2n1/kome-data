@@ -1306,6 +1306,15 @@ lần, đúng lớp lỗi của bất biến CTE-trùng đã ghi ở trên. Có 
 `tests/test_bao_cao_phan_tich.py::test_bao_cao_khong_qua_11_truy_van`,
 `tests/test_tong_quan.py::test_trang_chu_khong_qua_9_truy_van`.
 
+**Bất biến (obc_bot, tự động lấy OBC — chủ DN chốt 2026-10-14):** `obc_bot/` bấm 商奉行クラウド (pywinauto, chọn
+điều khiển theo TÊN) trên máy Windows có OBC rồi nạp qua `POST /api/kho-du-lieu/nap` bằng tài khoản web `obc-bot`
+(cờ `duoc_vao_kho_du_lieu`) — KHÔNG ghi CSDL trực tiếp, KHÔNG ghi gì vào OBC; 5 cổng y như kéo thả tay (cùng thân
+`_nap_mot_buoc` với `POST /upload`). Hai máy chia theo 権限 OBC: máy B `ban`+`ton`, máy Long `khach`. Ngày làm việc
+và "đã có hôm nay" hỏi web (`GET /api/kho-du-lieu/hom-nay` = `tinh_tuoi`), không tự giữ lịch. `obc_bot/ten_file.py`
+là bản chép của `files.yml` (test canh qua `pipeline.identify`; `MUC_SPEC` = `app.MUC_HANG_NGAY`). Mỗi lượt kết thúc
+ở MỘT kết cục (`chay.KetCuc`); kết cục cần báo ghi tệp vào thư mục OneDrive dùng chung. Web không nhập `obc_bot`,
+`obc_bot` không nhập `kome` (ngoài test); `.vercelignore` loại nó. Đặc tả: `docs/superpowers/specs/2026-10-14-tu-dong-lay-obc-design.md`.
+
 ## Hai bản chạy của web app
 | | Máy trong công ty | Vercel (công khai) |
 |---|---|---|
