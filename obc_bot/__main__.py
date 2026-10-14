@@ -56,9 +56,14 @@ def lenh_chay(ch: CH.CauHinh) -> int:
                    khoi_dong_lai_obc=obc.khoi_dong_lai, mat_khau=mat_khau_web,
                    thong_bao=bao_cao.thong_bao_windows, ngu=time.sleep)
     kc = chay(ch, KhachWeb(ch.web_url), mt)
-    tep = bao_cao.ghi(ch, kc, date.today())
-    bao_cao.thong_bao_windows(f"OBC → web: {kc.loai}",
-                              (kc.chi_tiet[0] if kc.chi_tiet else "") + (f" — {tep}" if tep else ""))
+    tep = None
+    try:
+        tep = bao_cao.ghi(ch, kc, date.today())
+    except OSError as e:
+        print(f"KHÔNG GHI ĐƯỢC BÁO CÁO: {e}")
+    if kc.can_bao or kc.loai == "xong":
+        bao_cao.thong_bao_windows(f"OBC → web: {kc.loai}",
+                                  (kc.chi_tiet[0] if kc.chi_tiet else "") + (f" — {tep}" if tep else ""))
     print(kc.loai)
     for d in kc.chi_tiet:
         print("  " + d)

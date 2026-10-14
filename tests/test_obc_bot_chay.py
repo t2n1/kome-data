@@ -2,8 +2,6 @@
 from datetime import date
 from pathlib import Path
 
-import pytest
-
 from obc_bot import bao_cao
 from obc_bot.cau_hinh import CauHinh
 from obc_bot.chay import KetCuc, LoiObc, MoiTruong, chay
@@ -150,3 +148,60 @@ def test_bao_cao_ghi_log_va_tep_loi_chi_khi_can_bao(tmp_path):
     assert "dưới min_rows" in p.read_text(encoding="utf-8")
     log = (tmp_path / "ra" / "log" / "2026-10-14.log").read_text(encoding="utf-8")
     assert "xong" in log and "cong_chan" in log
+
+
+def test_tu_choi_khong_ly_do_van_la_cong_chan(tmp_path):
+    mt, _ = _mt()
+    w = WebGia()
+    w.nap = lambda files: [{"ten_file": "x.xlsx", "ok": False, "skipped": False,
+                            "row_count": 0, "blockers": []}]
+    kc = chay(_ch(tmp_path, muc=("ton",)), w, mt)
+    assert kc.loai == "cong_chan" and "web từ chối" in kc.chi_tiet[0]
+
+
+def _mt_no(loi_lan):
+    """xuat nổ RuntimeError `loi_lan[muc]` lần rồi mới được."""
+    mt, ghi = _mt()
+    goc = mt.xuat
+    dem = dict(loi_lan)
+
+    def xuat(muc, ngay, thu_muc, pattern):
+        if dem.get(muc, 0) > 0:
+            dem[muc] -= 1
+            ghi["xuat"].append(muc)
+            raise RuntimeError("timeout")
+        return goc(muc, ngay, thu_muc, pattern)
+
+    mt.xuat = xuat
+    return mt, ghi
+
+
+def test_loi_la_hai_lan_la_loi_obc_muc_khac_van_nap(tmp_path):
+    mt, ghi = _mt_no({"ban": 2})
+    w = WebGia()
+    kc = chay(_ch(tmp_path), w, mt)
+    assert kc.loai == "loi_obc" and "không lường trước" in kc.chi_tiet[0]
+    assert [p.name for p in w.da_nap] == ["在庫一覧_20261014.xlsx"]
+
+
+def test_loi_la_mot_lan_roi_thanh_cong(tmp_path):
+    mt, ghi = _mt_no({"ban": 1})
+    kc = chay(_ch(tmp_path), WebGia(), mt)
+    assert kc.loai == "xong" and ghi["khoi_dong_lai"] == 1
+
+
+def test_khoi_dong_lai_no_thi_dung_thu_lai(tmp_path):
+    mt, ghi = _mt_no({"ban": 5})
+
+    def nghe():
+        raise OSError("không mở được OBC")
+
+    mt.khoi_dong_lai_obc = nghe
+    kc = chay(_ch(tmp_path, muc=("ban",)), WebGia(), mt)
+    assert kc.loai == "loi_obc" and ghi["xuat"] == ["ban"]
+
+
+def test_khoa_man_hinh_nhung_da_co_du_thi_bo_qua(tmp_path):
+    mt, ghi = _mt(khoa=True)
+    kc = chay(_ch(tmp_path), WebGia(da_co={"ban": True, "ton": True}), mt)
+    assert kc.loai == "bo_qua" and ghi["xuat"] == []

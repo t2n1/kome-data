@@ -42,21 +42,33 @@ class MoiTruong:
     ngu: Callable[[int], None]
 
 
+def _lan_xuat(mt: MoiTruong, muc: str, ngay: date, thu_muc: Path, pattern: int) -> Path:
+    try:
+        return mt.xuat(muc, ngay, thu_muc, pattern)
+    except LoiObc:
+        raise
+    except Exception as e:
+        raise LoiObc("không lường trước", repr(e)) from e
+
+
 def _xuat_thu_lai(ch: CauHinh, mt: MoiTruong, muc: str, ngay: date, thu_muc: Path) -> Path:
     """Hỏng lần đầu -> mở lại OBC rồi thử ĐÚNG một lần nữa (không giành phiên qua lại)."""
     try:
-        p = mt.xuat(muc, ngay, thu_muc, ch.pattern[muc])
+        p = _lan_xuat(mt, muc, ngay, thu_muc, ch.pattern[muc])
     except LoiObc:
-        mt.khoi_dong_lai_obc()
-        p = mt.xuat(muc, ngay, thu_muc, ch.pattern[muc])
+        try:
+            mt.khoi_dong_lai_obc()
+        except LoiObc:
+            raise
+        except Exception as e:
+            raise LoiObc("không lường trước", repr(e)) from e
+        p = _lan_xuat(mt, muc, ngay, thu_muc, ch.pattern[muc])
     if p.name != ten_file(muc, ngay) or not p.exists():
         raise LoiObc("kiểm file ra", f"được {p}, cần {ten_file(muc, ngay)}")
     return p
 
 
 def chay(ch: CauHinh, web, mt: MoiTruong) -> KetCuc:
-    if mt.man_hinh_khoa():
-        return KetCuc("man_hinh_khoa", ["Windows đang khoá màn hình hoặc ngủ — không bấm được OBC."])
     try:
         if ch.tai_khoan_web:
             web.dang_nhap(ch.tai_khoan_web, mt.mat_khau(ch.tai_khoan_web))
@@ -68,6 +80,9 @@ def chay(ch: CauHinh, web, mt: MoiTruong) -> KetCuc:
     can = [m for m in ch.muc if not hn["da_co"][m]]
     if not can:
         return KetCuc("bo_qua", [f"Hôm nay đã có đủ: {', '.join(ch.muc)}."])
+
+    if mt.man_hinh_khoa():
+        return KetCuc("man_hinh_khoa", ["Windows đang khoá màn hình hoặc ngủ — không bấm được OBC."])
 
     ngay = date.fromisoformat(hn["ngay"])
     thu_muc = ch.thu_muc_ra / f"{ngay:%Y-%m}"
@@ -96,7 +111,9 @@ def chay(ch: CauHinh, web, mt: MoiTruong) -> KetCuc:
                                 + (" (đã có, bỏ qua)" if k["skipped"] else ""))
                 else:
                     van_de += [("cong_chan", f"{k['ten_file']}: cổng {b['cong']}: {b['loi']}")
-                               for b in k["blockers"]]
+                               for b in k["blockers"]] or [(
+                        "cong_chan",
+                        f"{k.get('ten_file')}: web từ chối (không có lý do cổng): {k}")]
         except LoiWeb as e:
             van_de.append(("loi_web", f"{e} — file đã xuất nằm ở {thu_muc}, nạp tay được."))
 
