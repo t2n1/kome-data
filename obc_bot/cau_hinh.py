@@ -27,8 +27,11 @@ class CauHinh:
 
 
 def doc(duong: Path) -> CauHinh:
-    with open(duong, "rb") as f:
-        d = tomllib.load(f)
+    try:
+        with open(duong, "rb") as f:
+            d = tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        raise CauHinhSai(f"File cấu hình không phải TOML hợp lệ: {e}") from e
     muc = tuple(d.get("muc", ()))
     if not muc:
         raise CauHinhSai("`muc` phải có ít nhất một mục (ban / ton / khach).")
@@ -41,12 +44,18 @@ def doc(duong: Path) -> CauHinh:
         raise CauHinhSai(f"`web_url` phải là https:// (http chỉ cho máy nội bộ): {url!r}")
     pattern = {k: v for k, v in d.get("pattern", {}).items()}
     for m in muc:
-        if not isinstance(pattern.get(m), int) or pattern[m] <= 0:
+        v = pattern.get(m)
+        if not isinstance(v, int) or isinstance(v, bool) or v <= 0:
             raise CauHinhSai(f"Thiếu [pattern] {m} = <số 出力パターン > 0>.")
+    if not d.get("thu_muc_ra"):
+        raise CauHinhSai("Thiếu `thu_muc_ra` (thư mục lưu file xuất).")
+    dem = d.get("dem_nguoc_giay", 0)
+    if not isinstance(dem, int) or isinstance(dem, bool) or dem < 0:
+        raise CauHinhSai(f"`dem_nguoc_giay` phải là số nguyên >= 0: {dem!r}")
     loi = d.get("thu_muc_bao_loi")
     return CauHinh(
         muc=muc, web_url=url, tai_khoan_web=str(d.get("tai_khoan_web", "")),
         thu_muc_ra=Path(d["thu_muc_ra"]), thu_muc_bao_loi=Path(loi) if loi else None,
         pattern={m: pattern[m] for m in muc},
-        dem_nguoc_giay=int(d.get("dem_nguoc_giay", 0)),
+        dem_nguoc_giay=dem,
         ten_may=str(d.get("ten_may") or socket.gethostname()))

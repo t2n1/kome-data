@@ -129,3 +129,30 @@ def test_hom_nay_chua_dang_nhap_401(co_cong):
 def test_muc_hang_ngay_trung_nguon_hang_ngay_cua_tuoi_du_lieu():
     from kome.web.app import MUC_HANG_NGAY
     assert sorted(MUC_HANG_NGAY.values()) == sorted(TD.NGUON_HANG_NGAY)
+
+
+def test_loi_la_tra_500_chung_chung_khong_lo_chuoi_goc(web, monkeypatch):
+    def hong(c):
+        raise RuntimeError("bí mật-db-host")
+    monkeypatch.setattr(TD, "tinh_tuoi", hong)
+    r = web.get("/api/kho-du-lieu/hom-nay")
+    assert r.status_code == 500 and "RuntimeError" in r.json()["loi"]
+    assert "bí mật-db-host" not in r.text
+
+
+def test_nap_loi_la_tra_500_chung_chung(web, monkeypatch):
+    import kome.pipeline as P
+
+    def hong(*a, **k):
+        raise RuntimeError("bí mật-db-host")
+    monkeypatch.setattr(P, "ingest", hong)
+    r = _nap(web)
+    assert r.status_code == 500 and "RuntimeError" in r.json()["loi"]
+    assert "bí mật-db-host" not in r.text
+
+
+def test_nhieu_file_mot_lan_post(web):
+    r = web.post("/api/kho-du-lieu/nap", files=[
+        ("files", (TEN, OK.read_bytes())), ("files", ("khong_ro.xlsx", OK.read_bytes()))])
+    a, b = r.json()["ket_qua"]
+    assert a["ok"] and not b["ok"] and b["blockers"][0]["cong"] == 1

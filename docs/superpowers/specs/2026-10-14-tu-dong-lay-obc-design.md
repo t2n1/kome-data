@@ -58,7 +58,7 @@ máy B  (Task Scheduler, 13:30)              máy Long (Task Scheduler, giờ ri
 
 Thư mục `obc_bot/` ở gốc repo — **tách khỏi `kome/`**: web không nhập nó, nó không
 nhập `kome` (máy chạy không cần pandas / psycopg / CSDL). Thêm vào `.vercelignore`.
-Gói riêng `obc_bot/requirements.txt`: `pywinauto`, `httpx`, `keyring`.
+Gói riêng `obc_bot/requirements.txt`: `pywinauto`, `requests`, `keyring`, `pillow`.
 
 ```
 obc_bot/
@@ -67,7 +67,7 @@ obc_bot/
   ten_file.py      tên file ra ĐÚNG mẫu config/files.yml (bản chép, có test canh)
   web.py           đăng nhập, GET /api/kho-du-lieu/hom-nay, POST /api/kho-du-lieu/nap
   man_hinh.py      kiểm màn hình khoá, chụp màn hình khi lỗi
-  obc/
+  obc/             (phien.py, ban.py, ton.py, khach.py và lệnh `xuat` làm ở Task 7)
     phien.py       tìm / mở cửa sổ 奉行クラウド, đóng hộp thoại lạ, chờ sẵn sàng
     ban.py         売上明細表  → Path
     ton.py         在庫一覧   → Path
@@ -98,8 +98,8 @@ hình ảnh, và ghi rõ trong mã bước nào dùng hình.
 - `売上明細表`: **chỉ ngày hôm nay** (chủ DN, 2026-10-14) → `売上明細表_YYYYMMDD.xlsx`.
   Nạp lại cùng ngày là an toàn: bộ nạp upsert theo `(slip_no, line_seq, source)`.
 - Mỗi loại file xuất theo **出力パターン đánh số** mà chủ DN đã tạo sẵn trong OBC —
-  chương trình chọn pattern theo SỐ ghi trong cấu hình (`pattern_ban`, `pattern_ton`,
-  `pattern_khach`), không tự đặt cột. Đổi cột xuất = sửa pattern trong OBC, và cổng 2
+  chương trình chọn pattern theo SỐ ghi trong cấu hình (bảng `[pattern]`: `ban = 1`,
+  `ton = 2`, `khach = 3`), không tự đặt cột. Đổi cột xuất = sửa pattern trong OBC, và cổng 2
   vẫn chặn nếu pattern lệch `config/files.yml`.
 - `在庫一覧`, `得意先全情報`: ảnh chụp hiện tại, tên `<loại>_YYYYMMDD.xlsx` theo ngày Tokyo.
 - Tên ra phải khớp `filename_pattern` của `config/files.yml` — nhận diện loại file
@@ -128,6 +128,7 @@ tách thành MỘT hàm dùng cho cả hai route (không chép).
 lịch lễ). `da_co` đọc `meta.ingest_batch.data_date` = hôm nay theo Tokyo, cùng luật
 với ô "hôm nay đã có dữ liệu chưa" (`kome/tuoi_du_lieu.py`). Chương trình dùng nó để:
 không chạy ngày nghỉ, và **không chiếm chuột** khi người đã kéo thả tay rồi.
+`da_co.ban` cũng đúng khi `売上伝票データ` (uriage) của hôm nay đã nạp (cùng luật `CUNG_O` với ô 13:30).
 
 ### 5.3 Tài khoản `obc-bot`
 
@@ -207,7 +208,7 @@ Kết quả ghi vào cuối đặc tả này (mục "Đo thật") rồi mới vi
   / `skipped`). Chạy bằng pytest như phần còn lại.
 - Web: `tests/test_nap_tu_dong.py` — `/api/kho-du-lieu/nap` nạp được và trả đúng
   `blockers`; 401 chưa đăng nhập, 403 thiếu cờ, 403 bản chỉ-đọc; `/upload` cũ trả
-  y như trước (cùng hàm thân); `/hom-nay` 1 lượt hỏi, `la_ngay_kd` khớp
+  y như trước (cùng hàm thân); `/hom-nay` 2 lượt hỏi (đọc lại tinh_tuoi), `la_ngay_kd` khớp
   `mart.lich_kinh_doanh`, `da_co` khớp `tuoi_du_lieu`.
 - Phần bấm OBC: KHÔNG có test tự động (không có OBC trong CI). Có danh sách kiểm tay
   `docs/runbook.md` mục mới: chạy `obc_bot xuat` từng loại, so file với file xuất tay

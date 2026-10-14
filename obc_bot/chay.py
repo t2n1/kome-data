@@ -68,11 +68,32 @@ def _xuat_thu_lai(ch: CauHinh, mt: MoiTruong, muc: str, ngay: date, thu_muc: Pat
     return p
 
 
+def _kiem_hom_nay(hn, muc: tuple[str, ...]) -> None:
+    ok = (isinstance(hn, dict) and isinstance(hn.get("ngay"), str)
+          and isinstance(hn.get("la_ngay_kd"), bool) and isinstance(hn.get("da_co"), dict)
+          and all(m in hn["da_co"] for m in muc))
+    if not ok:
+        raise LoiWeb(f"Web trả /hom-nay sai dạng (cần ngay, la_ngay_kd, da_co đủ {list(muc)}): {hn!r}")
+    try:
+        date.fromisoformat(hn["ngay"])
+    except ValueError as e:
+        raise LoiWeb(f"Web trả /hom-nay có ngày không đọc được: {hn['ngay']!r}") from e
+
+
+def _kiem_ket_qua_nap(ket) -> None:
+    ok = isinstance(ket, list) and all(
+        isinstance(k, dict) and "ok" in k and "ten_file" in k
+        and isinstance(k.get("blockers"), list) for k in ket)
+    if not ok:
+        raise LoiWeb(f"Web trả kết quả nạp sai dạng (cần ok, ten_file, blockers): {ket!r}")
+
+
 def chay(ch: CauHinh, web, mt: MoiTruong) -> KetCuc:
     try:
         if ch.tai_khoan_web:
             web.dang_nhap(ch.tai_khoan_web, mt.mat_khau(ch.tai_khoan_web))
         hn = web.hom_nay()
+        _kiem_hom_nay(hn, ch.muc)
     except LoiWeb as e:
         return KetCuc("loi_web", [str(e)])
     if not hn["la_ngay_kd"]:
@@ -81,7 +102,11 @@ def chay(ch: CauHinh, web, mt: MoiTruong) -> KetCuc:
     if not can:
         return KetCuc("bo_qua", [f"Hôm nay đã có đủ: {', '.join(ch.muc)}."])
 
-    if mt.man_hinh_khoa():
+    try:
+        khoa = mt.man_hinh_khoa()
+    except Exception as e:
+        return KetCuc("man_hinh_khoa", [f"Không kiểm được màn hình khoá: {e!r}"])
+    if khoa:
         return KetCuc("man_hinh_khoa", ["Windows đang khoá màn hình hoặc ngủ — không bấm được OBC."])
 
     ngay = date.fromisoformat(hn["ngay"])
@@ -105,10 +130,12 @@ def chay(ch: CauHinh, web, mt: MoiTruong) -> KetCuc:
     xong: list[str] = []
     if files:
         try:
-            for k in web.nap(files):
+            ket = web.nap(files)
+            _kiem_ket_qua_nap(ket)
+            for k in ket:
                 if k["ok"]:
-                    xong.append(f"{k['ten_file']}: {k['row_count']} dòng"
-                                + (" (đã có, bỏ qua)" if k["skipped"] else ""))
+                    xong.append(f"{k['ten_file']}: {k.get('row_count')} dòng"
+                                + (" (đã có, bỏ qua)" if k.get("skipped") else ""))
                 else:
                     van_de += [("cong_chan", f"{k['ten_file']}: cổng {b['cong']}: {b['loi']}")
                                for b in k["blockers"]] or [(

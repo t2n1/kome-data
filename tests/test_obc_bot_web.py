@@ -79,3 +79,32 @@ def test_file_khong_doc_duoc_thanh_LoiWeb(khach, tmp_path):
     w = khach()
     with pytest.raises(LoiWeb, match="Không đọc được file"):
         w.nap([tmp_path / "khong_co.xlsx"])
+
+
+def test_200_khong_phai_json_thanh_LoiWeb():
+    class R:
+        status_code = 200
+        text = "<html>"
+
+        def json(self):
+            raise ValueError("no json")
+
+    class P:
+        def get(self, *a, **k):
+            return R()
+    with pytest.raises(LoiWeb, match="không phải JSON"):
+        KhachWeb("http://x", phien=P()).hom_nay()
+
+
+def test_keyring_hong_thanh_LoiWeb(monkeypatch):
+    import sys
+    import types
+    from obc_bot.web import mat_khau_web
+    kr = types.ModuleType("keyring")
+
+    def nem(*a):
+        raise RuntimeError("backend")
+    kr.get_password = nem
+    monkeypatch.setitem(sys.modules, "keyring", kr)
+    with pytest.raises(LoiWeb, match="Credential Manager"):
+        mat_khau_web("obc-bot")

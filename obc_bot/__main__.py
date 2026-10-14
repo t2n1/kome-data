@@ -51,11 +51,14 @@ def lenh_chay(ch: CH.CauHinh) -> int:
     import time
     from datetime import date
     from obc_bot import bao_cao, man_hinh, obc
-    from obc_bot.chay import MoiTruong, chay
+    from obc_bot.chay import KetCuc, MoiTruong, chay
     mt = MoiTruong(man_hinh_khoa=man_hinh.dang_khoa, xuat=obc.xuat,
                    khoi_dong_lai_obc=obc.khoi_dong_lai, mat_khau=mat_khau_web,
                    thong_bao=bao_cao.thong_bao_windows, ngu=time.sleep)
-    kc = chay(ch, KhachWeb(ch.web_url), mt)
+    try:
+        kc = chay(ch, KhachWeb(ch.web_url), mt)
+    except Exception as e:                      # lưới cuối: luôn ra MỘT kết cục + báo
+        kc = KetCuc("loi_obc", [f"Lỗi không lường trước: {e!r}"])
     tep = None
     try:
         tep = bao_cao.ghi(ch, kc, date.today())
@@ -71,6 +74,9 @@ def lenh_chay(ch: CH.CauHinh) -> int:
 
 
 def main(argv=None) -> int:
+    for luong in (sys.stdout, sys.stderr):      # Task Scheduler chuyển hướng theo cp932
+        if hasattr(luong, "reconfigure"):
+            luong.reconfigure(encoding="utf-8", errors="replace")
     p = argparse.ArgumentParser(prog="obc_bot")
     sub = p.add_subparsers(dest="lenh", required=True)
     s = sub.add_parser("do")

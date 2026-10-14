@@ -205,3 +205,44 @@ def test_khoa_man_hinh_nhung_da_co_du_thi_bo_qua(tmp_path):
     mt, ghi = _mt(khoa=True)
     kc = chay(_ch(tmp_path), WebGia(da_co={"ban": True, "ton": True}), mt)
     assert kc.loai == "bo_qua" and ghi["xuat"] == []
+
+
+def test_hom_nay_sai_dang_la_loi_web(tmp_path):
+    for xau in ({}, {"ngay": "2026-10-14", "la_ngay_kd": True},
+                {"ngay": "2026-10-14", "la_ngay_kd": "yes", "da_co": {"ban": False, "ton": False}},
+                {"ngay": "2026-10-14", "la_ngay_kd": True, "da_co": {"ban": False}}):
+        w = WebGia()
+        w.hom_nay = lambda xau=xau: xau
+        mt, ghi = _mt()
+        kc = chay(_ch(tmp_path), w, mt)
+        assert kc.loai == "loi_web" and "sai dạng" in kc.chi_tiet[0] and ghi["xuat"] == []
+
+
+def test_ket_qua_nap_thieu_khoa_la_loi_web(tmp_path):
+    w = WebGia()
+    w.nap = lambda files: [{"ok": True}]
+    mt, _ = _mt()
+    kc = chay(_ch(tmp_path), w, mt)
+    assert kc.loai == "loi_web" and "sai dạng" in kc.chi_tiet[0]
+
+
+def test_man_hinh_khoa_nem_loi_thanh_ket_cuc_man_hinh_khoa(tmp_path):
+    mt, ghi = _mt()
+
+    def nem():
+        raise OSError("không mở được desktop")
+    mt.man_hinh_khoa = nem
+    kc = chay(_ch(tmp_path), WebGia(), mt)
+    assert kc.loai == "man_hinh_khoa" and "OSError" in kc.chi_tiet[0] and ghi["xuat"] == []
+
+
+def test_lenh_chay_bat_loi_cuoi_van_ghi_bao_cao_va_thong_bao(tmp_path, monkeypatch):
+    import obc_bot.chay as C
+    from obc_bot import __main__ as M
+    ghi = []
+    monkeypatch.setattr(C, "chay", lambda *a: (_ for _ in ()).throw(RuntimeError("hỏng")))
+    monkeypatch.setattr(bao_cao, "thong_bao_windows", lambda t, n: ghi.append((t, n)))
+    assert M.lenh_chay(_ch(tmp_path)) == 1
+    tep = list((tmp_path / "loi").glob("*_loi_obc.txt"))
+    assert len(tep) == 1 and "Lỗi không lường trước" in tep[0].read_text(encoding="utf-8")
+    assert ghi and "loi_obc" in ghi[0][0]

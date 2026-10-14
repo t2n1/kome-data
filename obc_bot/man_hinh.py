@@ -6,6 +6,10 @@ def dang_khoa() -> bool:
     """Khoá / màn đăng nhập / ngủ = không mở được bàn làm việc nhận phím chuột."""
     import ctypes
     u = ctypes.windll.user32
+    u.OpenInputDesktop.restype = ctypes.c_void_p
+    u.OpenInputDesktop.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+    u.SwitchDesktop.argtypes = [ctypes.c_void_p]
+    u.CloseDesktop.argtypes = [ctypes.c_void_p]
     h = u.OpenInputDesktop(0, False, 0x0100)          # DESKTOP_SWITCHDESKTOP
     if not h:
         return True

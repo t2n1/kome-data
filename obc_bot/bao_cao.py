@@ -27,6 +27,10 @@ def ghi(ch: CauHinh, kc, ngay: date) -> Path | None:
     return tep
 
 
+# AUMID đã đăng ký của PowerShell — id lạ thì Windows 10/11 lặng lẽ bỏ thông báo.
+_AUMID = r"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"
+
+
 def thong_bao_windows(tieu_de: str, noi_dung: str) -> None:
     """Thông báo góc màn hình — cố gắng hết sức, không bao giờ làm hỏng lượt chạy."""
     ps = ("[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, "
@@ -35,7 +39,8 @@ def thong_bao_windows(tieu_de: str, noi_dung: str) -> None:
           "$t = $x.GetElementsByTagName('text');"
           f"$t.Item(0).AppendChild($x.CreateTextNode({_ps(tieu_de)})) > $null;"
           f"$t.Item(1).AppendChild($x.CreateTextNode({_ps(noi_dung)})) > $null;"
-          "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('KOME obc_bot')"
+          "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier"
+          f"({_ps(_AUMID)})"
           ".Show([Windows.UI.Notifications.ToastNotification]::new($x))")
     try:
         subprocess.run(["powershell", "-NoProfile", "-Command", ps], timeout=15,

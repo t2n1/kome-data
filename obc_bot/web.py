@@ -60,7 +60,10 @@ class KhachWeb:
         finally:
             for f in mo:
                 f.close()
-        return self._json(r)["ket_qua"]
+        j = self._json(r)
+        if not isinstance(j, dict) or "ket_qua" not in j:
+            raise LoiWeb(f"Web trả kết quả nạp thiếu `ket_qua`: {str(j)[:200]}")
+        return j["ket_qua"]
 
     @staticmethod
     def _json(r) -> dict:
@@ -70,12 +73,18 @@ class KhachWeb:
             raise LoiWeb(f"Web từ chối: {_loi(r)}")
         if r.status_code != 200:
             raise LoiWeb(f"Web lỗi {r.status_code}: {_loi(r)}")
-        return r.json()
+        try:
+            return r.json()
+        except Exception as e:
+            raise LoiWeb(f"Web trả về không phải JSON (mã 200): {r.text[:200]!r}") from e
 
 
 def mat_khau_web(ten: str) -> str:
-    import keyring
-    mk = keyring.get_password(DICH_VU_KEYRING, ten)
+    try:
+        import keyring
+        mk = keyring.get_password(DICH_VU_KEYRING, ten)
+    except Exception as e:
+        raise LoiWeb(f"Không đọc được mật khẩu từ Windows Credential Manager: {e!r}") from e
     if not mk:
         raise LoiWeb(f"Chưa lưu mật khẩu web cho {ten!r} trên máy này — chạy: "
                      "python -m obc_bot luu-mat-khau --cau-hinh <file>.toml")

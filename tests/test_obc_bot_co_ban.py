@@ -55,6 +55,12 @@ def test_doc_cau_hinh_hop_le(tmp_path):
     (("ton = 5", ""), "pattern"),
     (("ton = 5", "ton = 0"), "pattern"),
     (('https://kome.example.vercel.app/', 'http://kome.example.com'), "https"),
+    (("ton = 5", "ton = true"), "pattern"),
+    (("ton = 5", "ton = -1"), "pattern"),
+    (("ten_may", "dem_nguoc_giay = -3\nten_may"), "dem_nguoc_giay"),
+    (("ten_may", 'dem_nguoc_giay = "x"\nten_may'), "dem_nguoc_giay"),
+    (('thu_muc_ra = "C:/KOME/obc_xuat"\n', ""), "thu_muc_ra"),
+    (('muc = ["ban"', 'muc = ["ban" ??'), "TOML"),
 ])
 def test_cau_hinh_sai_noi_ro_cho_sai(tmp_path, sua, cau):
     with pytest.raises(CH.CauHinhSai, match=cau):

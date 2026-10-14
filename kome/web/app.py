@@ -914,7 +914,12 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
         try:
             ket = _nap_mot_buoc(request, files)
         except Exception as e:
-            return JSONResponse({"loi": f"Nạp file lỗi: {e}"}, status_code=500)
+            # Chuỗi ngoại lệ gốc CHỈ vào nhật ký máy chủ (như `_loi`) — nó có
+            # thể mang địa chỉ / tên CSDL; client chỉ nhận tên lớp lỗi.
+            _in("[KOME] lỗi khi nạp file (api):\n" + traceback.format_exc())
+            return JSONResponse(
+                {"loi": f"Nạp file lỗi ({type(e).__name__}) — xem nhật ký máy chủ."},
+                status_code=500)
 
         def _cong(ds):
             return [{"cong": x.gate, "loi": x.message} for x in ds]
@@ -970,8 +975,10 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             with open_app_conn() as c:
                 t = TD.tinh_tuoi(c)
         except Exception as e:
-            return JSONResponse({"loi": f"Không đọc được tình trạng hôm nay: {e}"},
-                                status_code=500)
+            _in("[KOME] lỗi khi đọc tình trạng hôm nay (api):\n" + traceback.format_exc())
+            return JSONResponse(
+                {"loi": f"Không đọc được tình trạng hôm nay ({type(e).__name__}) "
+                        "— xem nhật ký máy chủ."}, status_code=500)
         theo = {n.spec: n.trang_thai for n in t.nguon}
         return {"ngay": t.hom_nay.isoformat(),
                 "la_ngay_kd": "nghi" not in theo.values(),
