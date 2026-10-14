@@ -73,12 +73,22 @@ def lenh_chay(ch: CH.CauHinh) -> int:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="obc_bot")
     sub = p.add_subparsers(dest="lenh", required=True)
+    s = sub.add_parser("do")
+    s.add_argument("--ra", required=True, type=Path)
+    s.add_argument("--tieu-de", default=".*奉行クラウド.*")
+    s.add_argument("--sau", type=int, default=12)
     for ten in ("nap", "chay", "luu-mat-khau"):
         s = sub.add_parser(ten)
         s.add_argument("--cau-hinh", required=True, type=Path)
         if ten == "nap":
             s.add_argument("files", nargs="+", type=Path)
     a = p.parse_args(argv)
+    if a.lenh == "do":
+        from obc_bot.obc.do import do_cay
+        a.ra.parent.mkdir(parents=True, exist_ok=True)
+        a.ra.write_text(do_cay(a.tieu_de, a.sau), encoding="utf-8")
+        print(f"Đã ghi {a.ra}")
+        return 0
     try:
         ch = CH.doc(a.cau_hinh)
     except CH.CauHinhSai as e:
