@@ -48,6 +48,15 @@ def _nut(cua_so, ten: str):
     return ds[0]
 
 
+def _bam(nut) -> None:
+    """Bấm nút qua UIA (InvokePattern) — KHÔNG theo toạ độ: OBC hay mở hộp thoại ở màn hình thứ hai, nơi
+    click_input bấm trượt (đo thật 2026-10-15, toạ độ x > 3000). Nút không hỗ trợ invoke mới dùng chuột."""
+    try:
+        nut.invoke()
+    except Exception:
+        nut.click_input()
+
+
 def _con(top, chua: str):
     try:
         return next((w for w in top.children(control_type="Window") if chua in w.window_text()), None)
@@ -73,12 +82,12 @@ def dong_bao_cao(tieu_de: str) -> None:
         if not con:
             break
         try:
-            _nut(con[0], "キャンセル").click_input()
+            _bam(_nut(con[0], "キャンセル"))
         except LoiObc:
             break
         time.sleep(1.5)
     if top.exists(timeout=1):
-        _nut(top, "閉じる").click_input()
+        _bam(_nut(top, "閉じる"))
         time.sleep(2)
 
 
@@ -101,7 +110,7 @@ def mo_bao_cao(man: Man) -> object:
     chinh.set_focus()
     dong_bao_cao(man.cua_so)
     chon_ung_dung(chinh, man.ung_dung, man.nut)
-    _nut(chinh, man.nut).click_input()
+    _bam(_nut(chinh, man.nut))
     top = _desk().window(title=man.cua_so, control_type="Window")
     _cho(lambda: top.exists(timeout=0) and top.children(control_type="Window"),
          CHO_GIAY, f"mở {man.nut}", f"cửa sổ {man.cua_so!r} không mở")
@@ -121,7 +130,7 @@ def chon_pattern(top, vi_tri: int) -> None:
     time.sleep(0.5)
     send_keys("{HOME}" + ("{DOWN %d}" % (vi_tri - 1) if vi_tri > 1 else ""))
     time.sleep(0.5)
-    _nut(hop, "OK").click_input()
+    _bam(_nut(hop, "OK"))
     _cho(lambda: _con(top, "条件設定"), CHO_GIAY, "chọn pattern", "bấm OK mà không tới màn 条件設定")
 
 
@@ -142,6 +151,6 @@ def xuat_sang_excel(top) -> None:
     dk = _con(top, "条件設定")
     if dk is None:
         raise LoiObc("データ作成", "không thấy màn 条件設定")
-    _nut(dk, "データ作成(E)...").click_input()
+    _bam(_nut(dk, "データ作成(E)..."))
     hop = _cho(lambda: _con(top, "データ作成条件設定"), CHO_GIAY, "データ作成", "không mở hộp thoại データ作成条件設定")
-    _nut(hop, "出力開始(E)").click_input()
+    _bam(_nut(hop, "出力開始(E)"))
