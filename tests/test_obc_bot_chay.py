@@ -2,6 +2,8 @@
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from obc_bot import bao_cao
 from obc_bot.cau_hinh import CauHinh
 from obc_bot.chay import KetCuc, LoiObc, MoiTruong, chay
@@ -11,10 +13,10 @@ from obc_bot.web import LoiWeb
 NGAY = date(2026, 10, 14)
 
 
-def _ch(tmp_path, muc=("ban", "ton"), dem=0, tai_khoan="obc-bot"):
+def _ch(tmp_path, muc=("ban", "ton"), dem=0, tai_khoan="obc-bot", hoi=False):
     return CauHinh(muc=muc, web_url="https://x", tai_khoan_web=tai_khoan,
                    thu_muc_ra=tmp_path / "ra", thu_muc_bao_loi=tmp_path / "loi",
-                   pattern={m: 1 for m in muc}, dem_nguoc_giay=dem, ten_may="may-b")
+                   pattern={m: 1 for m in muc}, dem_nguoc_giay=dem, ten_may="may-b", hoi_truoc=hoi)
 
 
 class WebGia:
@@ -42,7 +44,7 @@ class WebGia:
                  if p.name in self.chan else []} for p in files]
 
 
-def _mt(khoa=False, hong=None, ghi=None):
+def _mt(khoa=False, hong=None, ghi=None, tra_loi=True):
     """`hong`: {muc: số lần xuất hỏng liên tiếp trước khi được}."""
     hong = dict(hong or {})
     ghi = ghi if ghi is not None else {"xuat": [], "khoi_dong_lai": 0, "thong_bao": [], "ngu": []}
@@ -62,7 +64,8 @@ def _mt(khoa=False, hong=None, ghi=None):
 
     return MoiTruong(man_hinh_khoa=lambda: khoa, xuat=xuat, khoi_dong_lai_obc=khoi_dong_lai,
                      mat_khau=lambda ten: "mk", thong_bao=lambda t, n: ghi["thong_bao"].append(t),
-                     ngu=lambda s: ghi["ngu"].append(s)), ghi
+                     ngu=lambda s: ghi["ngu"].append(s),
+                     hoi=lambda t, n: ghi.setdefault("hoi", []).append(t) or tra_loi), ghi
 
 
 def test_man_hinh_khoa_dung_ngay_khong_bam_gi(tmp_path):
@@ -246,3 +249,40 @@ def test_lenh_chay_bat_loi_cuoi_van_ghi_bao_cao_va_thong_bao(tmp_path, monkeypat
     tep = list((tmp_path / "loi").glob("*_loi_obc.txt"))
     assert len(tep) == 1 and "Lỗi không lường trước" in tep[0].read_text(encoding="utf-8")
     assert ghi and "loi_obc" in ghi[0][0]
+
+
+# ---- Hỏi trước (chủ DN 2026-10-15: "13:30 hiện thông báo hỏi có muốn lấy dữ liệu chưa, bấm có mới chạy") ----
+
+def test_hoi_truoc_bam_khong_thi_bo_qua_khong_bam_OBC(tmp_path):
+    mt, ghi = _mt(tra_loi=False)
+    kc = chay(_ch(tmp_path, hoi=True), WebGia(), mt)
+    assert kc.loai == "bo_qua" and ghi["xuat"] == [] and ghi["hoi"]
+
+
+def test_hoi_truoc_bam_co_thi_chay_binh_thuong(tmp_path):
+    mt, ghi = _mt(tra_loi=True)
+    kc = chay(_ch(tmp_path, hoi=True), WebGia(), mt)
+    assert kc.loai == "xong" and ghi["xuat"] == ["ban", "ton"] and len(ghi["hoi"]) == 1
+
+
+def test_khong_hoi_khi_ngay_nghi_hoac_da_co_du(tmp_path):
+    for web in (WebGia(la_ngay_kd=False), WebGia(da_co={"ban": True, "ton": True})):
+        mt, ghi = _mt(tra_loi=True)
+        assert chay(_ch(tmp_path, hoi=True), web, mt).loai == "bo_qua"
+        assert "hoi" not in ghi
+
+
+def test_khong_bat_hoi_truoc_thi_khong_hoi(tmp_path):
+    mt, ghi = _mt(tra_loi=False)
+    assert chay(_ch(tmp_path), WebGia(), mt).loai == "xong" and "hoi" not in ghi
+
+
+def test_cau_hinh_doc_hoi_truoc(tmp_path):
+    from obc_bot import cau_hinh as CH
+    p = tmp_path / "c.toml"
+    p.write_text('muc = ["ban"]\nweb_url = "https://x"\nthu_muc_ra = "C:/x"\nhoi_truoc = true\n[pattern]\nban = 1\n',
+                 encoding="utf-8")
+    assert CH.doc(p).hoi_truoc is True
+    p.write_text(p.read_text(encoding="utf-8").replace("hoi_truoc = true", 'hoi_truoc = "co"'), encoding="utf-8")
+    with pytest.raises(CH.CauHinhSai, match="hoi_truoc"):
+        CH.doc(p)

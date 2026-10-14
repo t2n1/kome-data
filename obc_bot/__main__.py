@@ -70,7 +70,7 @@ def lenh_chay(ch: CH.CauHinh) -> int:
     from obc_bot.chay import KetCuc, MoiTruong, chay
     mt = MoiTruong(man_hinh_khoa=man_hinh.dang_khoa, xuat=obc.xuat,
                    khoi_dong_lai_obc=obc.khoi_dong_lai, mat_khau=mat_khau_web,
-                   thong_bao=bao_cao.thong_bao_windows, ngu=time.sleep)
+                   thong_bao=bao_cao.thong_bao_windows, ngu=time.sleep, hoi=man_hinh.hoi)
     try:
         kc = chay(ch, KhachWeb(ch.web_url), mt)
     except Exception as e:                      # lưới cuối: luôn ra MỘT kết cục + báo

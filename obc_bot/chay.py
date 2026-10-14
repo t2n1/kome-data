@@ -40,6 +40,7 @@ class MoiTruong:
     mat_khau: Callable[[str], str]
     thong_bao: Callable[[str, str], None]
     ngu: Callable[[int], None]
+    hoi: Callable[[str, str], bool] = lambda tieu_de, noi_dung: True   # hộp Có / Không (chỉ khi `hoi_truoc`)
 
 
 def _lan_xuat(mt: MoiTruong, muc: str, ngay: date, thu_muc: Path, pattern: int) -> Path:
@@ -101,6 +102,14 @@ def chay(ch: CauHinh, web, mt: MoiTruong) -> KetCuc:
     can = [m for m in ch.muc if not hn["da_co"][m]]
     if not can:
         return KetCuc("bo_qua", [f"Hôm nay đã có đủ: {', '.join(ch.muc)}."])
+
+    # Hỏi SAU khi biết thật sự cần lấy (ngày nghỉ / đã đủ thì không làm phiền ai) và TRƯỚC khi kiểm màn hình:
+    # người bấm Có là đang ngồi ở máy.
+    if ch.hoi_truoc and not mt.hoi(
+            "KOME — lấy dữ liệu OBC",
+            f"Lấy {', '.join(can)} của {hn['ngay']} từ OBC và nạp lên web bây giờ?\n"
+            "Chương trình sẽ dùng chuột và bàn phím khoảng 2–3 phút."):
+        return KetCuc("bo_qua", ["Người dùng chọn Không — chưa lấy dữ liệu."])
 
     try:
         khoa = mt.man_hinh_khoa()
