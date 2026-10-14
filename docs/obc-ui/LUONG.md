@@ -29,6 +29,14 @@ kiểm MỌI dòng `売上日付` = ngày hôm nay — lệch → `LoiObc("kiể
 | 6 | như trên | `[Button] 出力開始(E)` | bấm | `03_ban_xuat.txt` |
 | 7 | Excel | sổ MỚI chưa lưu (`Book1`, `Path = ''`), sheet `売上明細表` | OBC KHÔNG hỏi nơi lưu — nó đẩy dữ liệu thẳng vào Excel đang mở. `obc_bot` lấy sổ qua COM (`win32com`), `SaveAs` → `thu_muc/売上明細表_YYYYMMDD.xlsx` (FileFormat 51), rồi `Close` | đo COM 2026-10-15 |
 
+**MỖI lần xuất OBC mở một TIẾN TRÌNH Excel MỚI** (đo 2026-10-15: `Book1` ở tiến trình 22:55, `Book2` ở tiến trình 00:24).
+`GetActiveObject("Excel.Application")` chỉ bám MỘT tiến trình (cái đăng ký trước) ⇒ đọc nhầm sổ cũ. Cách đúng: ghi lại các
+cửa sổ `XLMAIN` có TRƯỚC khi bấm `出力開始`, chờ cửa sổ `XLMAIN` MỚI xuất hiện, lấy sổ qua chính cửa sổ đó
+(`XLMAIN` › `XLDESK` › `EXCEL7`, `AccessibleObjectFromWindow(OBJID_NATIVEOM = -16)` → `Window.Parent` = Workbook), rồi
+`SaveAs` + `Close` + thoát đúng tiến trình đó. Đọc giá trị bằng `UsedRange.Value2` (qua comtypes `.Value` có tham số nên
+lỗi COM); ngày trả về là SỐ NGÀY Excel (46310 = 2026-10-15) — so với `(ngay - date(1899, 12, 30)).days`.
+Lần thử thứ hai (đã gõ 2026/10/15): `Book2`, 221 dòng, cả hai cột `売上日付` = 46310 ⇒ chuỗi phím ngày ĐÚNG.
+
 **Đo thật file ra (COM, 2026-10-15):** 20 cột, header dòng 1:
 `売上日付, 売上区分, 伝票No., 売上日付, 売上区分コード, 売上区分, 得意先コード, 得意先名, 担当者コード, 担当者名, 荷姿区分コード,
 荷姿区分名, 商品名, 商品コード, 日本語, 単価, 税抜純売上高, 粗利益, 粗利益率, 純売上数量` (khớp bẫy #8). 618 dòng — TOÀN BỘ
