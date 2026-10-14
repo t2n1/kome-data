@@ -95,3 +95,37 @@ def test_co_co_thi_nap_duoc_va_ghi_ai_nap(co_cong, conn):
     ai = conn.execute("""SELECT n.ten_dang_nhap FROM meta.ingest_batch b
                          JOIN app.nguoi_dung n ON n.id = b.nap_boi""").fetchone()[0]
     assert ai == "obc-bot"
+
+
+from datetime import datetime
+
+from kome import tuoi_du_lieu as TD
+from kome.pipeline import ingest
+
+
+def _dong_ho(monkeypatch, *args):
+    monkeypatch.setattr(TD, "_bay_gio", lambda: datetime(*args, tzinfo=TD.MUI_GIO))
+
+
+def test_hom_nay_noi_muc_nao_da_co(web, conn, tmp_path, monkeypatch):
+    p = tmp_path / TEN
+    p.write_bytes(OK.read_bytes())
+    assert ingest(conn, p, None).ok
+    _dong_ho(monkeypatch, 2026, 9, 16, 14, 0)        # thứ Tư
+    j = web.get("/api/kho-du-lieu/hom-nay").json()
+    assert j == {"ngay": "2026-09-16", "la_ngay_kd": True,
+                 "da_co": {"ban": False, "ton": True, "khach": False}}
+
+
+def test_hom_nay_ngay_nghi(web, monkeypatch):
+    _dong_ho(monkeypatch, 2026, 9, 19, 14, 0)        # thứ Bảy
+    assert web.get("/api/kho-du-lieu/hom-nay").json()["la_ngay_kd"] is False
+
+
+def test_hom_nay_chua_dang_nhap_401(co_cong):
+    assert co_cong(None).get("/api/kho-du-lieu/hom-nay").status_code == 401
+
+
+def test_muc_hang_ngay_trung_nguon_hang_ngay_cua_tuoi_du_lieu():
+    from kome.web.app import MUC_HANG_NGAY
+    assert sorted(MUC_HANG_NGAY.values()) == sorted(TD.NGUON_HANG_NGAY)

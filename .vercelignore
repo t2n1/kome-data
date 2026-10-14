@@ -21,6 +21,9 @@ kome_data.egg-info/
 # commit). Để package.json lên Vercel là mời nó nhận nhầm dự án là Node.
 giao_dien/
 
+# Chương trình bấm OBC chạy trên máy Windows trong công ty — web không nhập nó.
+obc_bot/
+
 # pyproject.toml khai đầy đủ pandas + python-calamine cho máy trong công ty.
 # Vercel chấp nhận CẢ pyproject.toml lẫn requirements.txt để cài thư viện; để
 # cả hai là mập mờ không biết bên nào thắng. Giấu đi thì chỉ còn một nguồn.

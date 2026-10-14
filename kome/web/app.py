@@ -118,6 +118,11 @@ def _thuoc_kho_du_lieu(duong: str) -> bool:
     return any(duong == d or duong.startswith(d + "/") for d in DUONG_KHO_DU_LIEU)
 
 
+# Ba mục mà obc_bot xuất hằng ngày -> spec của ô 13:30 (`tuoi_du_lieu.NGUON_HANG_NGAY`).
+# `obc_bot/ten_file.py::MUC_SPEC` là bản chép bắt buộc (có test canh).
+MUC_HANG_NGAY = {"ban": "meisai", "ton": "zaiko", "khach": "tokuisaki"}
+
+
 # Màn Ngân sách: đặt và sửa chỉ tiêu doanh thu của cả công ty. Cùng nếp
 # DUONG_KHO_DU_LIEU — gác cả cửa đọc lẫn cửa ghi. Gác mỗi GET là để nguyên
 # cửa ghi mở toang cho ai biết gõ `curl`.
@@ -954,6 +959,23 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 "co_tien": bool(sp and sp.total_column), "data_date": kq.data_date,
                 "blockers": kq.blockers, "warnings": kq.warnings,
                 "cong": KDL.dong_cong(kq, TEN_CONG)}
+
+    @app.get("/api/kho-du-lieu/hom-nay")
+    def api_hom_nay():
+        """Cho obc_bot: hôm nay (giờ Tokyo) có phải ngày làm việc không, và mục
+        nào ĐÃ có dữ liệu mang ngày hôm nay — đọc lại `tinh_tuoi`, cùng luật với
+        ô 13:30 của /kho-du-lieu (không định nghĩa thứ hai)."""
+        from kome import tuoi_du_lieu as TD
+        try:
+            with open_app_conn() as c:
+                t = TD.tinh_tuoi(c)
+        except Exception as e:
+            return JSONResponse({"loi": f"Không đọc được tình trạng hôm nay: {e}"},
+                                status_code=500)
+        theo = {n.spec: n.trang_thai for n in t.nguon}
+        return {"ngay": t.hom_nay.isoformat(),
+                "la_ngay_kd": "nghi" not in theo.values(),
+                "da_co": {m: theo[s] == "xanh" for m, s in MUC_HANG_NGAY.items()}}
 
     @app.post("/upload/kiem", response_class=HTMLResponse)
     def upload_kiem(request: Request, files: list[UploadFile], o: str = Form("")):

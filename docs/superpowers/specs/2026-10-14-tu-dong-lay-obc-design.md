@@ -121,7 +121,7 @@ tách thành MỘT hàm dùng cho cả hai route (không chép).
 - Nạp một bước (không kiểm → xác nhận): bước xác nhận chỉ có nghĩa khi có người nhìn
   5 chấm; ở đây `ingest` vẫn chạy đủ 5 cổng và vẫn chặn y như vậy.
 
-### 5.2 `GET /api/kho-du-lieu/hom-nay` — 1 lượt hỏi
+### 5.2 `GET /api/kho-du-lieu/hom-nay` — 2 lượt hỏi (đọc lại tinh_tuoi)
 
 `{ngay, la_ngay_kd, da_co: {ban, ton, khach}}`. `la_ngay_kd` đọc
 `mart.lich_kinh_doanh` (định nghĩa ngày làm việc DUY NHẤT — chương trình không tự giữ
