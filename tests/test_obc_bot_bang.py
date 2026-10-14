@@ -57,6 +57,19 @@ def test_bang_chi_co_header_la_khong_dong():
     assert bang.kiem_bang("ban", _ban(), NGAY) == 0
 
 
+def test_ton_bo_dong_don_vi_khac_KG_va_ケース_nhu_chu_DN_xoa_tay():
+    """Chủ DN 2026-10-15: file tồn chỉ giữ 単位 = KG / ケース. Đo thật: còn lại 袋 / 本 / 個 / 缶 / trống là
+    dòng LẺ trùng khoá (商品コード, 倉庫コード) với dòng thùng → cổng 3 chặn cả file."""
+    hdr = ("商品コード", "倉庫コード", "単位")
+    v = (hdr, ("BS01", "0001", "ケース"), ("BS01", "0001", "缶"), ("R1", "0001", "KG"), ("X", "0001", ""),
+         ("Y", "0001", None), ("Z", "0001", "袋"))
+    assert bang.dong_bo("ton", v) == [1, 3, 4, 5]          # chỉ số dòng dữ liệu (0 = dòng ngay dưới header)
+
+
+def test_ban_khong_bo_dong_nao():
+    assert bang.dong_bo("ban", _ban((SO, "1", SO))) == []
+
+
 def test_bang_rong_la_loi():
     with pytest.raises(LoiObc):
         bang.kiem_bang("ban", (), NGAY)

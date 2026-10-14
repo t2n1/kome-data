@@ -70,6 +70,13 @@ def gia_tri(wb, sheet: str):
     return wb.Worksheets(sheet).UsedRange.Value2
 
 
+def xoa_dong(wb, sheet: str, chi_so: list[int]) -> None:
+    """Xoá dòng dữ liệu `chi_so` (0 = dòng ngay dưới header) — từ DƯỚI lên để chỉ số không trượt."""
+    ws = wb.Worksheets(sheet)
+    for k in sorted(chi_so, reverse=True):
+        ws.Rows(k + 2).Delete()
+
+
 def luu_va_dong(wb, duong: Path) -> Path:
     duong.parent.mkdir(parents=True, exist_ok=True)
     app = wb.Application

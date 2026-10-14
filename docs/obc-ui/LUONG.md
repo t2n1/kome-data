@@ -74,8 +74,10 @@ bất biến 042). File tồn KHÔNG có cột ngày ⇒ không kiểm ngày b�
   (商品コード, 倉庫コード)** — dữ liệu THẬT: cùng mã cùng kho có tồn ở CẢ `00` (lẻ) và `02` (thùng), vd `BS01`/0001: 24 lẻ +
   295 thùng. File xuất tay 16/9, 24/9 chỉ có `02` cho các mã đó. Khoá của web (`files.yml` `keys` và PK
   `core.fact_inventory_daily (snapshot_date, product_code, warehouse_code)`, 005) KHÔNG có `pack_code` ⇒ ngày nào OBC có
-  tồn lẻ thì file xuất TAY cũng bị chặn y hệt. Không phải lỗi `obc_bot`; cần chủ DN quyết (thêm `pack_code` vào khoá = migration
-  mới + soát mọi view đọc tồn).
+  tồn lẻ thì file xuất TAY cũng bị chặn y hệt.
+  **Chủ DN chốt (2026-10-15): "cột 単位 chỉ lấy KG và ケース, còn lại xoá hết thì mới nhập lên web app được"** — việc người ta vẫn
+  làm tay. `obc_bot` làm đúng việc đó (`bang.DON_VI_GIU`, xoá dòng trong sổ Excel TRƯỚC khi lưu): chạy lại → 198 dòng, 0 trùng
+  khoá, qua ĐỦ 5 cổng, ¥158,710,234. File xuất tay 16/9, 24/9 cũng chỉ có KG / ケース (174 + 3, 173 + 2).
 - Hai lỗi đã sửa khi chạy thật: (1) Excel chưa phục vụ COM ngay → thử lại 60 s; (2) Excel tạo nhiều `XLMAIN` ẨN không chứa sổ
   → chỉ tính cửa sổ đang hiện có `XLDESK › EXCEL7`.
 

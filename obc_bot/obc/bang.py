@@ -24,7 +24,21 @@ COT_CAN = {
 # Cột ngày phải TRÙNG ngày cần lấy (mọi cột cùng tên — 売上明細表 có hai cột 売上日付).
 COT_NGAY = {"ban": "売上日付"}
 
+# Dòng GIỮ theo cột 単位 — chủ DN 2026-10-15: "cột 単位 chỉ lấy KG và ケース, còn lại xoá hết thì mới nhập lên web
+# app được" (việc người ta vẫn làm tay mỗi ngày). Đo thật: các đơn vị khác (袋 / 本 / 個 / 缶 / trống) là dòng LẺ trùng
+# khoá (商品コード, 倉庫コード) với dòng thùng → cổng 3 chặn cả file; file xuất tay 16/9, 24/9 chỉ có KG / ケース.
+DON_VI_GIU = {"ton": frozenset({"KG", "ケース"})}
+
 _GOC_EXCEL = date(1899, 12, 30)
+
+
+def dong_bo(muc: str, gia_tri) -> list[int]:
+    """Chỉ số (0 = dòng ngay dưới header) các dòng dữ liệu phải XOÁ trước khi lưu file nạp."""
+    giu = DON_VI_GIU.get(muc)
+    if not giu or not gia_tri:
+        return []
+    i = [str(h).strip() if h is not None else "" for h in gia_tri[0]].index("単位")
+    return [k for k, r in enumerate(gia_tri[1:]) if (str(r[i]).strip() if r[i] is not None else "") not in giu]
 
 
 def so_ngay_excel(ngay: date) -> int:

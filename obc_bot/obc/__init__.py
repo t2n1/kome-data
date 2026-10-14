@@ -35,6 +35,9 @@ def xuat(muc: str, ngay: date, thu_muc: Path, pattern: int) -> Path:
         if h is None:
             raise LoiObc("chờ Excel", f"sau {CHO_EXCEL_GIAY} s không thấy Excel mở sổ mới")
         wb = excel.so_cua(h)
+        bo = bang.dong_bo(muc, excel.gia_tri(wb, bang.SHEET[muc]))
+        if bo:                                 # việc người ta vẫn làm tay (vd tồn: chỉ giữ 単位 KG / ケース)
+            excel.xoa_dong(wb, bang.SHEET[muc], bo)
         bang.kiem_bang(muc, excel.gia_tri(wb, bang.SHEET[muc]), ngay)
         duong = excel.luu_va_dong(wb, thu_muc / ten_file(muc, ngay))
         wb = None
