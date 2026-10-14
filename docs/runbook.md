@@ -527,3 +527,39 @@ python -m ops.restore_check
 
 Kết quả phải là `{'ok': True, 'mismatches': {}, ...}`. Một bản sao lưu chưa
 từng được thử khôi phục thì không phải bản sao lưu.
+
+## Tự động lấy dữ liệu OBC (`obc_bot`, cài 2026-10-15)
+
+Đặc tả: `docs/superpowers/specs/2026-10-14-tu-dong-lay-obc-design.md` · luồng bấm đo thật: `docs/obc-ui/LUONG.md`.
+
+**Đang cài trên máy chủ DN (`NGUYEN-KOME`) — đóng vai máy B, lấy `売上明細表` + `在庫一覧`:**
+
+| Thứ | Ở đâu |
+|---|---|
+| Chương trình | `C:\KOME\app\obc_bot` — bản CHÉP từ `master` (không chạy thẳng từ repo, để sửa code không làm hỏng lịch) |
+| Cấu hình | `C:\KOME\may_b.toml` (`hoi_truoc = true`, pattern `ban = 1` / `ton = 6`) |
+| Lịch | Task Scheduler `KOME\LayDuLieuOBC` — 13:30 thứ Hai–Sáu, chỉ khi đang đăng nhập; gọi `C:\KOME\chay_obc.cmd` |
+| Tài khoản web | `obc-bot` (chỉ cờ `--kho-du-lieu`); mật khẩu chỉ nằm trong Windows Credential Manager, dịch vụ `kome-obc-bot` |
+| File đã xuất | `C:\KOME\obc_xuat\YYYY-MM\` (ảnh chụp khi lỗi: `…\_loi\`) |
+| Nhật ký | `C:\KOME\obc_xuat\log\YYYY-MM-DD.log` + `task.log` |
+| Báo lỗi | OneDrive `KOME自動取込\` — mỗi lần hỏng một tệp `YYYY-MM-DD_<máy>_<kết cục>.txt` |
+
+Mỗi ngày: 13:30 hiện hộp **"KOME — lấy dữ liệu OBC"**. Bấm **Có** → chương trình dùng chuột / bàn phím 2–3 phút (đừng
+chạm), xuất từ OBC, nạp qua 5 cổng như kéo thả tay. Bấm **Không** → bỏ qua hôm đó (nạp tay như cũ). Ngày nghỉ hoặc đã có
+dữ liệu hôm nay thì hộp KHÔNG hiện. OBC phải đang mở và đăng nhập.
+
+**Khi hỏng:** đọc tệp trong `KOME自動取込\`. File đã xuất nằm ở `C:\KOME\obc_xuat\YYYY-MM\` — nạp tay bằng kéo thả, hoặc
+`cd C:\KOME\app && python -m obc_bot nap --cau-hinh C:\KOME\may_b.toml <file>`. Thử riêng phần bấm OBC (không nạp):
+`python -m obc_bot xuat --cau-hinh C:\KOME\may_b.toml --muc ban` (hay `ton`).
+
+**Pattern lệch** (lỗi "kiểm cột (pattern)"): ai đó đổi thứ tự danh sách pattern cá nhân trong OBC. Mở báo cáo, đếm lại dòng
+của `903.売上明細表` / `BIG-DATA-TON-KHO` trong hộp パターン選択, sửa số ở `[pattern]` của `C:\KOME\may_b.toml`.
+
+**Cập nhật chương trình** sau khi `master` có bản mới:
+
+```powershell
+git -C <repo> archive master obc_bot -o C:\KOME\app\obc_bot.tar
+Remove-Item -Recurse C:\KOME\app\obc_bot; tar -xf C:\KOME\app\obc_bot.tar -C C:\KOME\app; Remove-Item C:\KOME\app\obc_bot.tar
+```
+
+**Chưa làm:** `得意先全情報` trên máy Long (tài khoản OBC của chủ DN không có quyền xuất) — cần đo luồng bấm trên máy đó.
