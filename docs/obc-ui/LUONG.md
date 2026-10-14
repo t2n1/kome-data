@@ -44,4 +44,20 @@ Lần thử thứ hai (đã gõ 2026/10/15): `Book2`, 221 dòng, cả hai cột 
 nhưng cho thấy đúng loại sai lặng lẽ mà lớp kiểm (b) chặn: đọc lại file, mọi `売上日付` (cả cột 0 và cột 3) phải = ngày
 cần lấy, không thì không nạp.
 
+## 在庫一覧 (máy B, mục `ton`) — Claude tự đo trên máy chủ DN, 2026-10-15
+
+| # | Cửa sổ | Điều khiển | Việc |
+|---|---|---|---|
+| 1 | `奉行クラウド` | ứng dụng THỨ HAI ở cột trái (hai `Button` không tên trong `ScrollViewer` có `LineUp`; hint `Q2`) — menu có `在庫管理`, `仕入管理` | bấm nút thứ hai |
+| 2 | như trên | `[Button] 在庫一覧表` (thanh công cụ của ứng dụng thứ hai) | bấm |
+| 3 | `在庫一覧表` › `在庫一覧表 ‐ パターン選択` | danh sách KHÔNG đọc được qua UIA (ảnh chụp: 12 pattern; dòng 6 = `BIG-DATA-TON-KHO`) + `[Button] OK` | chọn `BIG-DATA-TON-KHO` → `OK` |
+| 4 | `在庫一覧表` › `在庫一覧表 ‐ 条件設定` | hai ô 集計期間 cùng kiểu `売上日付` (năm/tháng/ngày, `Tab` sang ô thứ hai) | gõ hôm nay ~ hôm nay |
+| 5 | như trên | `[Button] データ作成(E)...` → cửa sổ `… データ作成条件設定` → `[Button] 出力開始(E)` | bấm |
+| 6 | Excel | tiến trình Excel MỚI, sổ chưa lưu, sheet `在庫一覧表` | lưu qua COM như `売上明細表` |
+
+**Đo thật file ra (2026-10-15, `BIG-DATA-TON-KHO`, 15/10 ~ 15/10):** sheet `在庫一覧表`, 307 dòng, 15 cột:
+`食品分類コード, 食品分類名, 商品コード, 商品名, 荷姿区分コード, 荷姿区分名, 倉庫コード, 倉庫名, 日本語, 単位, 賞味期限,
+売上出荷数量, 在庫残数, 在庫単価, 在庫金額` — đủ 13 cột `files.yml` khai cho `zaiko` + 2 cột `食品分類` (đã biết, bẫy #6 /
+bất biến 042). File tồn KHÔNG có cột ngày ⇒ không kiểm ngày bằng nội dung được; lớp kiểm là header (pattern sai → cột lệch).
+
 Không dùng ô `本日分` (nghĩa chưa chắc: có thể là "phiếu nhập/sửa hôm nay", không phải ngày bán).
