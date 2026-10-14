@@ -27,6 +27,12 @@ kiểm MỌI dòng `売上日付` = ngày hôm nay — lệch → `LoiObc("kiể
 | 4 | như trên | `[Button] データ作成(E)...` | bấm | `02_ban_dieu_kien.txt` |
 | 5 | `売上明細表` › `売上明細表 - データ作成条件設定` | `[RadioButton] Excel形式のファイル` (đang chọn), `基本条件だけ出力する` (đang chọn), `罫線を付ける` / `色を付ける` (đang tick) | giữ nguyên | `03_ban_xuat.txt` |
 | 6 | như trên | `[Button] 出力開始(E)` | bấm | `03_ban_xuat.txt` |
-| 7 | (hộp thoại lưu?) | — | **CHƯA đo** | — |
+| 7 | Excel | sổ MỚI chưa lưu (`Book1`, `Path = ''`), sheet `売上明細表` | OBC KHÔNG hỏi nơi lưu — nó đẩy dữ liệu thẳng vào Excel đang mở. `obc_bot` lấy sổ qua COM (`win32com`), `SaveAs` → `thu_muc/売上明細表_YYYYMMDD.xlsx` (FileFormat 51), rồi `Close` | đo COM 2026-10-15 |
+
+**Đo thật file ra (COM, 2026-10-15):** 20 cột, header dòng 1:
+`売上日付, 売上区分, 伝票No., 売上日付, 売上区分コード, 売上区分, 得意先コード, 得意先名, 担当者コード, 担当者名, 荷姿区分コード,
+荷姿区分名, 商品名, 商品コード, 日本語, 単価, 税抜純売上高, 粗利益, 粗利益率, 純売上数量` (khớp bẫy #8). 618 dòng — TOÀN BỘ
+`売上日付` = `2026-09-30` dù người thử vừa gõ 2026/10/15 ở màn 条件設定: bằng chứng thật cho lớp kiểm (b) — đọc lại file,
+mọi `売上日付` (cả cột 0 và cột 3) phải = ngày cần lấy, không thì không nạp.
 
 Không dùng ô `本日分` (nghĩa chưa chắc: có thể là "phiếu nhập/sửa hôm nay", không phải ngày bán).
