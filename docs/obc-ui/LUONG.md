@@ -32,7 +32,8 @@ kiểm MỌI dòng `売上日付` = ngày hôm nay — lệch → `LoiObc("kiể
 **Đo thật file ra (COM, 2026-10-15):** 20 cột, header dòng 1:
 `売上日付, 売上区分, 伝票No., 売上日付, 売上区分コード, 売上区分, 得意先コード, 得意先名, 担当者コード, 担当者名, 荷姿区分コード,
 荷姿区分名, 商品名, 商品コード, 日本語, 単価, 税抜純売上高, 粗利益, 粗利益率, 純売上数量` (khớp bẫy #8). 618 dòng — TOÀN BỘ
-`売上日付` = `2026-09-30` dù người thử vừa gõ 2026/10/15 ở màn 条件設定: bằng chứng thật cho lớp kiểm (b) — đọc lại file,
-mọi `売上日付` (cả cột 0 và cột 3) phải = ngày cần lấy, không thì không nạp.
+`売上日付` = `2026-09-30` vì lần xuất đó chạy TRƯỚC khi người thử đổi ngày (chủ DN xác nhận) — không phải lỗi gõ phím,
+nhưng cho thấy đúng loại sai lặng lẽ mà lớp kiểm (b) chặn: đọc lại file, mọi `売上日付` (cả cột 0 và cột 3) phải = ngày
+cần lấy, không thì không nạp.
 
 Không dùng ô `本日分` (nghĩa chưa chắc: có thể là "phiếu nhập/sửa hôm nay", không phải ngày bán).
