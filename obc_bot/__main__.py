@@ -1,6 +1,7 @@
 """python -m obc_bot <lệnh> --cau-hinh <máy>.toml ...
 
   nap FILE...      chỉ nạp file đã có (xuất tay) — lối dự phòng khi phần bấm OBC hỏng
+  chay   một lượt đầy đủ: kiểm -> xuất OBC -> nạp -> báo (Task Scheduler gọi lệnh này)
   luu-mat-khau     lưu mật khẩu web của tai_khoan_web vào Windows Credential Manager
 """
 import argparse
@@ -46,10 +47,28 @@ def lenh_luu_mat_khau(ch: CH.CauHinh) -> int:
     return 0
 
 
+def lenh_chay(ch: CH.CauHinh) -> int:
+    import time
+    from datetime import date
+    from obc_bot import bao_cao, man_hinh, obc
+    from obc_bot.chay import MoiTruong, chay
+    mt = MoiTruong(man_hinh_khoa=man_hinh.dang_khoa, xuat=obc.xuat,
+                   khoi_dong_lai_obc=obc.khoi_dong_lai, mat_khau=mat_khau_web,
+                   thong_bao=bao_cao.thong_bao_windows, ngu=time.sleep)
+    kc = chay(ch, KhachWeb(ch.web_url), mt)
+    tep = bao_cao.ghi(ch, kc, date.today())
+    bao_cao.thong_bao_windows(f"OBC → web: {kc.loai}",
+                              (kc.chi_tiet[0] if kc.chi_tiet else "") + (f" — {tep}" if tep else ""))
+    print(kc.loai)
+    for d in kc.chi_tiet:
+        print("  " + d)
+    return 0 if kc.loai in ("xong", "bo_qua") else 1
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="obc_bot")
     sub = p.add_subparsers(dest="lenh", required=True)
-    for ten in ("nap", "luu-mat-khau"):
+    for ten in ("nap", "chay", "luu-mat-khau"):
         s = sub.add_parser(ten)
         s.add_argument("--cau-hinh", required=True, type=Path)
         if ten == "nap":
@@ -62,6 +81,8 @@ def main(argv=None) -> int:
         return 2
     if a.lenh == "nap":
         return lenh_nap(ch, a.files)
+    if a.lenh == "chay":
+        return lenh_chay(ch)
     return lenh_luu_mat_khau(ch)
 
 
