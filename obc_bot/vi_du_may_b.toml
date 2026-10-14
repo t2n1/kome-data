@@ -1,0 +1,10 @@
+# Máy B (máy riêng) — tài khoản OBC của chủ DN. Chép thành may_b.toml rồi sửa.
+muc = ["ban", "ton"]
+web_url = "https://<địa chỉ bản Vercel>"
+tai_khoan_web = "obc-bot"
+thu_muc_ra = "C:/KOME/obc_xuat"
+thu_muc_bao_loi = "C:/Users/<người dùng>/OneDrive - 株式会社KOME/KOME自動取込"
+
+[pattern]          # số 出力パターン đã tạo trong OBC
+ban = 1
+ton = 1

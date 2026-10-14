@@ -1,0 +1,4 @@
+requests>=2.32
+pywinauto>=0.6.9
+keyring>=25
+pillow>=10
