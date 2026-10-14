@@ -866,29 +866,59 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     def man_cong_no(request: Request):
         return _man_khach(request)
 
+    def _nap_mot_buoc(request: Request, files: list[UploadFile]) -> list:
+        """Thân CHUNG của POST /upload (màn React) và POST /api/kho-du-lieu/nap
+        (obc_bot): `ingest` đầy đủ — 5 cổng, chặn trùng theo mã băm — rồi ghi AI
+        nạp và làm nóng ảnh chụp. Trả [(tên file, IngestResult)]. Hai route chỉ
+        khác cách TRẢ kết quả; viết thân hai lần là hai luồng nạp trôi khỏi nhau."""
+        from kome.pipeline import ingest
+        ket = []
+        with open_conn() as conn:
+            for f in files:
+                ten = Path(f.filename or "").name
+                with tempfile.TemporaryDirectory() as tmp:
+                    staged = Path(tmp) / ten
+                    with staged.open("wb") as out:
+                        shutil.copyfileobj(f.file, out)
+                    ket.append((ten, ingest(conn, staged, archive_luu)))
+            _ghi_ai(conn, "nap_boi", [r.batch_id for _, r in ket if r.batch_id],
+                    getattr(request.state, "nguoi", None))
+        if any(r.batch_id for _, r in ket):
+            anh_chup.lam_nong(open_app_conn)
+        return ket
+
     @app.post("/upload", response_class=HTMLResponse)
     def upload(request: Request, files: list[UploadFile]):
         if chi_doc:
             return _cam(request)
         try:
-            from kome.pipeline import ingest
-            results = []
-            with open_conn() as conn:
-                for f in files:
-                    with tempfile.TemporaryDirectory() as tmp:
-                        staged = Path(tmp) / f.filename
-                        with staged.open("wb") as out:
-                            shutil.copyfileobj(f.file, out)
-                        results.append(ingest(conn, staged, archive_luu))
-                _ghi_ai(conn, "nap_boi", [r.batch_id for r in results if r.batch_id],
-                        getattr(request.state, "nguoi", None))
-            if any(r.batch_id for r in results):
-                anh_chup.lam_nong(open_app_conn)
+            results = [r for _, r in _nap_mot_buoc(request, files)]
             with open_conn() as conn:
                 ctx = _du_lieu_nap(conn)
             return _man_kho(request, {**ctx, "results": results})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e)
+
+    # Nạp tự động (obc_bot, đặc tả 2026-10-14): CÙNG thân với /upload, trả JSON.
+    # Nằm dưới /api/kho-du-lieu nên middleware tự gác: 401 JSON khi chưa đăng
+    # nhập, 403 JSON khi thiếu duoc_vao_kho_du_lieu — không gác tay ở đây.
+    @app.post("/api/kho-du-lieu/nap")
+    def api_nap(request: Request, files: list[UploadFile]):
+        if chi_doc:
+            return JSONResponse({"loi": "Bản này chỉ đọc — không nạp được."}, status_code=403)
+        try:
+            ket = _nap_mot_buoc(request, files)
+        except Exception as e:
+            return JSONResponse({"loi": f"Nạp file lỗi: {e}"}, status_code=500)
+
+        def _cong(ds):
+            return [{"cong": x.gate, "loi": x.message} for x in ds]
+        return {"ket_qua": [{
+            "ten_file": ten, "ok": r.ok, "skipped": r.skipped, "spec_name": r.spec_name,
+            "data_date": r.data_date.isoformat() if r.data_date else None,
+            "row_count": r.row_count, "batch_id": r.batch_id,
+            "blockers": _cong(r.blockers), "warnings": _cong(r.warnings),
+        } for ten, r in ket]}
 
     # ---- Nạp hai bước (đợt B, 2026-09-24) ------------------------------
     # Kiểm: chép file vào thư mục chờ + 5 cổng (pipeline.kiem, KHÔNG ghi CSDL).
