@@ -1,6 +1,7 @@
 """python -m obc_bot <lệnh> --cau-hinh <máy>.toml ...
 
   nap FILE...      chỉ nạp file đã có (xuất tay) — lối dự phòng khi phần bấm OBC hỏng
+  xuat --muc ban|ton [--ngay YYYY-MM-DD]   chỉ bấm OBC ra file (không nạp) — để thử / xuất tay có kiểm
   chay   một lượt đầy đủ: kiểm -> xuất OBC -> nạp -> báo (Task Scheduler gọi lệnh này)
   luu-mat-khau     lưu mật khẩu web của tai_khoan_web vào Windows Credential Manager
 """
@@ -47,6 +48,21 @@ def lenh_luu_mat_khau(ch: CH.CauHinh) -> int:
     return 0
 
 
+def lenh_xuat(ch: CH.CauHinh, muc: str, ngay) -> int:
+    from obc_bot import obc
+    from obc_bot.chay import LoiObc
+    if muc not in ch.pattern:
+        print(f"Cấu hình máy này không có mục {muc!r} ([pattern] {muc} = ...)")
+        return 2
+    try:
+        p = obc.xuat(muc, ngay, ch.thu_muc_ra / f"{ngay:%Y-%m}", ch.pattern[muc])
+    except LoiObc as e:
+        print(f"LỖI OBC — bước '{e.buoc}': {e.loi}" + (f"\n  ảnh: {e.anh}" if e.anh else ""))
+        return 1
+    print(f"OK   {p}")
+    return 0
+
+
 def lenh_chay(ch: CH.CauHinh) -> int:
     import time
     from datetime import date
@@ -83,11 +99,14 @@ def main(argv=None) -> int:
     s.add_argument("--ra", required=True, type=Path)
     s.add_argument("--tieu-de", default=".*奉行クラウド.*")
     s.add_argument("--sau", type=int, default=12)
-    for ten in ("nap", "chay", "luu-mat-khau"):
+    for ten in ("nap", "xuat", "chay", "luu-mat-khau"):
         s = sub.add_parser(ten)
         s.add_argument("--cau-hinh", required=True, type=Path)
         if ten == "nap":
             s.add_argument("files", nargs="+", type=Path)
+        if ten == "xuat":
+            s.add_argument("--muc", required=True, choices=["ban", "ton", "khach"])
+            s.add_argument("--ngay", default=None, help="mặc định: hôm nay giờ Tokyo")
     a = p.parse_args(argv)
     if a.lenh == "do":
         from obc_bot.obc.do import do_cay
@@ -102,6 +121,11 @@ def main(argv=None) -> int:
         return 2
     if a.lenh == "nap":
         return lenh_nap(ch, a.files)
+    if a.lenh == "xuat":
+        from datetime import date, datetime
+        from zoneinfo import ZoneInfo
+        ngay = date.fromisoformat(a.ngay) if a.ngay else datetime.now(ZoneInfo("Asia/Tokyo")).date()
+        return lenh_xuat(ch, a.muc, ngay)
     if a.lenh == "chay":
         return lenh_chay(ch)
     return lenh_luu_mat_khau(ch)

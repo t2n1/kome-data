@@ -6,5 +6,5 @@ thu_muc_ra = "C:/KOME/obc_xuat"
 thu_muc_bao_loi = "C:/Users/<người dùng>/OneDrive - 株式会社KOME/KOME自動取込"
 dem_nguoc_giay = 30   # Long đang ở máy: báo trước khi chiếm chuột
 
-[pattern]
+[pattern]          # VỊ TRÍ dòng trong パターン選択 — CHƯA đo trên máy Long
 khach = 1
