@@ -19,6 +19,14 @@ def dang_khoa() -> bool:
         u.CloseDesktop(h)
 
 
+def hoi(tieu_de: str, noi_dung: str) -> bool:
+    """Hộp Có / Không của Windows, nổi trên mọi cửa sổ; chờ tới khi người bấm. Có → True."""
+    import ctypes
+    MB_YESNO, MB_ICONQUESTION, MB_SETFOREGROUND, MB_TOPMOST = 0x4, 0x20, 0x10000, 0x40000
+    return ctypes.windll.user32.MessageBoxW(
+        None, noi_dung, tieu_de, MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND | MB_TOPMOST) == 6   # IDYES
+
+
 def chup(duong: Path) -> Path | None:
     try:
         from PIL import ImageGrab

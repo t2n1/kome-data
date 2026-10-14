@@ -24,6 +24,7 @@ class CauHinh:
     pattern: dict[str, int]         # mục -> VỊ TRÍ dòng trong hộp thoại パターン選択 (1 = dòng đầu)
     dem_nguoc_giay: int
     ten_may: str
+    hoi_truoc: bool = False         # hiện hộp "lấy dữ liệu OBC bây giờ?" — chỉ chạy khi bấm Có (chủ DN 2026-10-15)
 
 
 def doc(duong: Path) -> CauHinh:
@@ -52,8 +53,12 @@ def doc(duong: Path) -> CauHinh:
     dem = d.get("dem_nguoc_giay", 0)
     if not isinstance(dem, int) or isinstance(dem, bool) or dem < 0:
         raise CauHinhSai(f"`dem_nguoc_giay` phải là số nguyên >= 0: {dem!r}")
+    hoi = d.get("hoi_truoc", False)
+    if not isinstance(hoi, bool):
+        raise CauHinhSai(f"`hoi_truoc` phải là true / false: {hoi!r}")
     loi = d.get("thu_muc_bao_loi")
     return CauHinh(
+        hoi_truoc=hoi,
         muc=muc, web_url=url, tai_khoan_web=str(d.get("tai_khoan_web", "")),
         thu_muc_ra=Path(d["thu_muc_ra"]), thu_muc_bao_loi=Path(loi) if loi else None,
         pattern={m: pattern[m] for m in muc},
