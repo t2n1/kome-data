@@ -16,6 +16,11 @@ Nguồn cho Task 7 (`obc_bot/obc/*.py`). Mỗi bước ghi: cửa sổ (title UI
 - Hai ô `売上日付`: chỉ lộ một `[Edit] TextBox` giá trị `2026` (phần năm); tháng / ngày không đọc được.
 - Nút có tên (`データ作成(E)...`, `出力開始(E)`, `OK`, `キャンセル`) bấm theo tên được.
 
+**Bàn phím trong ô `売上日付` (chủ DN thử tay 2026-10-15):** mỗi ô ngày là BA phần — năm → `Tab` → tháng → `Tab` → ngày
+(phần năm chính là `[Edit] TextBox` đọc được `2026`). Gõ số THAY HẲN giá trị cũ của phần đó (đã thử). `Tab` sau phần ngày của ô đầu SANG phần năm của ô thứ hai (đã thử).
+⇒ Chuỗi phím chốt: focus `[Edit] TextBox` (phần năm ô đầu) rồi gõ
+`YYYY{TAB}MM{TAB}DD{TAB}YYYY{TAB}MM{TAB}DD` (cùng một ngày cả hai ô).
+
 Hệ quả cho Task 7: ngày nhập bằng BÀN PHÍM (không đặt giá trị); không đọc lại được để kiểm trên màn hình, nên kiểm ở
 hai lớp: (a) pattern sai → cột lệch → cổng 2 (`ColumnMismatch`) của web chặn; (b) sau khi xuất, `obc_bot` mở file Excel và
 kiểm MỌI dòng `売上日付` = ngày hôm nay — lệch → `LoiObc("kiểm ngày trong file")`, không nạp.
