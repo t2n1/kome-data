@@ -95,9 +95,12 @@ hình ảnh, và ghi rõ trong mã bước nào dùng hình.
 
 ### 4.2 Khoảng ngày và tên file
 
-- `売上明細表`: **cùng khoảng ngày mà người xuất tay đang dùng** — đo ở §8 trước khi
-  viết `ban.py` (tên file cũ `売上明細表_20260901~24` gợi ý "mùng 1 → hôm nay"). Nạp
-  lại ngày đã có là an toàn: bộ nạp upsert theo `(slip_no, line_seq, source)`.
+- `売上明細表`: **chỉ ngày hôm nay** (chủ DN, 2026-10-14) → `売上明細表_YYYYMMDD.xlsx`.
+  Nạp lại cùng ngày là an toàn: bộ nạp upsert theo `(slip_no, line_seq, source)`.
+- Mỗi loại file xuất theo **出力パターン đánh số** mà chủ DN đã tạo sẵn trong OBC —
+  chương trình chọn pattern theo SỐ ghi trong cấu hình (`pattern_ban`, `pattern_ton`,
+  `pattern_khach`), không tự đặt cột. Đổi cột xuất = sửa pattern trong OBC, và cổng 2
+  vẫn chặn nếu pattern lệch `config/files.yml`.
 - `在庫一覧`, `得意先全情報`: ảnh chụp hiện tại, tên `<loại>_YYYYMMDD.xlsx` theo ngày Tokyo.
 - Tên ra phải khớp `filename_pattern` của `config/files.yml` — nhận diện loại file
   chỉ dựa vào tên. `ten_file.py` là bản chép; test canh chạy từng tên nó sinh qua
@@ -169,9 +172,10 @@ Không có gửi email / LINE ở đợt này (chưa có kênh nào cấu hình 
 - **Máy Long — giờ chạy đề xuất 12:05** (giờ nghỉ trưa, ít đụng chuột). Trước khi bấm,
   thông báo đếm ngược 30 giây "sắp lấy dữ liệu OBC, đừng dùng chuột". `得意先全情報` là
   danh mục (SCD2), không cần đúng 13:30.
-- **Phiên OBC trùng tài khoản**: máy B dùng tài khoản OBC của chủ DN. Nếu 奉行クラウド
-  không cho một tài khoản đăng nhập hai nơi, chủ DN đang dùng OBC lúc 13:30 có thể bị
-  đá ra (hoặc máy B bị đá → `loi_obc`). Đo ở §8 trước khi chốt giờ.
+- **Phiên OBC trùng tài khoản**: 奉行クラウド đá phiên cũ khi cùng tài khoản đăng nhập
+  nơi khác. Máy B và máy Long dùng hai tài khoản khác nhau nên không đá nhau; chủ DN tự
+  tránh mở OBC bằng tài khoản của mình lúc máy B chạy. Bị đá giữa chừng → thử lại 1 lần
+  (§6) rồi `loi_obc` — không giành phiên qua lại.
 - **OBC cập nhật giao diện** → `loi_obc` tới khi sửa `obc/*.py`. Kéo thả tay là dự phòng.
 
 ## 8. Bước đầu tiên: thử nghiệm (trước khi viết phần bấm)
@@ -187,6 +191,14 @@ Ba câu hỏi phải có câu trả lời ĐO THẬT trên máy có 奉行クラ
 3. **Đăng nhập trùng tài khoản** có đá phiên kia không (§7).
 
 Kết quả ghi vào cuối đặc tả này (mục "Đo thật") rồi mới viết tiếp.
+
+### Đo thật (chủ DN trả lời 2026-10-14)
+
+1. UIA **thấy** điều khiển của 奉行クラウド; mỗi loại file có 出力パターン đánh số riêng.
+   Vẫn chạy `obc_bot do` một lần để lấy đúng tên điều khiển trước khi viết `obc/*.py`.
+2. `売上明細表`: **ngày hôm nay**.
+3. Đăng nhập trùng tài khoản: **có đá phiên kia ra** — hai máy dùng hai tài khoản khác
+   nhau nên không phải vấn đề (§7).
 
 ## 9. Kiểm thử
 
