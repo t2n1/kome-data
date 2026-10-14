@@ -58,3 +58,24 @@ def test_thieu_co_kho_du_lieu_noi_ro(khach, tmp_path):
     w.dang_nhap("obc-bot", MK)
     with pytest.raises(LoiWeb, match="từ chối"):
         w.nap([_file(tmp_path)])
+
+
+class _PhienHong:
+    def get(self, *a, **k):
+        raise ConnectionError("down")
+
+    post = get
+
+
+def test_loi_mang_thanh_LoiWeb(tmp_path):
+    w = KhachWeb("http://x", phien=_PhienHong())
+    f = _file(tmp_path)
+    for goi in (lambda: w.dang_nhap("a", "b"), w.hom_nay, lambda: w.nap([f])):
+        with pytest.raises(LoiWeb, match="Không kết nối"):
+            goi()
+
+
+def test_file_khong_doc_duoc_thanh_LoiWeb(khach, tmp_path):
+    w = khach()
+    with pytest.raises(LoiWeb, match="Không đọc được file"):
+        w.nap([tmp_path / "khong_co.xlsx"])

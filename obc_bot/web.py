@@ -21,27 +21,42 @@ def _loi(r) -> str:
 
 class KhachWeb:
     def __init__(self, base_url: str, phien=None):
+        self._kw = {}
         if phien is None:
             import requests
             phien = requests.Session()
+            self._kw = {"timeout": 120}
         self.base = base_url.rstrip("/")
         self.phien = phien
 
+    def _goi(self, phuong_thuc: str, url: str, **kw):
+        try:
+            return getattr(self.phien, phuong_thuc)(url, **kw, **self._kw)
+        except LoiWeb:
+            raise
+        except Exception as e:
+            raise LoiWeb(f"Không kết nối được web {self.base}: {e}") from e
+
     def dang_nhap(self, ten: str, mat_khau: str) -> None:
-        r = self.phien.post(self.base + "/dang-nhap", data={"ten": ten, "mat_khau": mat_khau})
+        r = self._goi("post", self.base + "/dang-nhap", data={"ten": ten, "mat_khau": mat_khau})
         if r.status_code == 401:
             raise LoiWeb(f"Sai tên hoặc mật khẩu tài khoản web {ten!r}.")
         if r.status_code >= 400:
             raise LoiWeb(f"Đăng nhập web lỗi {r.status_code}: {_loi(r)}")
 
     def hom_nay(self) -> dict:
-        return self._json(self.phien.get(self.base + "/api/kho-du-lieu/hom-nay"))
+        return self._json(self._goi("get", self.base + "/api/kho-du-lieu/hom-nay"))
 
     def nap(self, files: list[Path]) -> list[dict]:
-        mo = [open(p, "rb") for p in files]
+        mo = []
         try:
-            r = self.phien.post(self.base + "/api/kho-du-lieu/nap",
-                                files=[("files", (p.name, f, _XLSX)) for p, f in zip(files, mo)])
+            for p in files:
+                try:
+                    mo.append(open(p, "rb"))
+                except OSError as e:
+                    raise LoiWeb(f"Không đọc được file {p}: {e}") from e
+            r = self._goi("post", self.base + "/api/kho-du-lieu/nap",
+                          files=[("files", (p.name, f, _XLSX)) for p, f in zip(files, mo)])
         finally:
             for f in mo:
                 f.close()
