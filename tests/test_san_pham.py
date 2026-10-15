@@ -104,6 +104,75 @@ def test_kho_hang_co_loc_van_khong_qua_2_truy_van(conn, batch, monkeypatch):
     assert dem["n"] <= 2, f"kho_hang(có lọc) chạy {dem['n']} truy vấn"
 
 
+def _bon_ma_kho(conn, batch):
+    """het_hang (tồn 0, vẫn bán trong 90 ngày, hai lô) · sap_thieu · ton_chet · đủ."""
+    for ma in ("P060", "P061", "P062", "P063"):
+        _san_pham(conn, batch, ma)
+        _ho_so_khach(conn, batch, "K" + ma, "Quán " + ma)
+    _ton(conn, batch, "P060", sl=0)
+    _ton(conn, batch, "P060", kho="1002", sl=0, han="2028年07月01日")
+    _mua(conn, batch, "KP060", HOM_NAY - timedelta(days=5), hang="P060")
+    _ton(conn, batch, "P061", sl=5)
+    for i in range(5):
+        _mua(conn, batch, "KP061", HOM_NAY - timedelta(days=i * 7), hang="P061")
+    _ton(conn, batch, "P062", sl=10)
+    _mua(conn, batch, "KP062", HOM_NAY - timedelta(days=200), hang="P062")
+    _ton(conn, batch, "P063", sl=30)
+    _ton(conn, batch, "P063", kho="1002", sl=40, han="2028年07月01日")
+    for i in range(10):
+        _mua(conn, batch, "KP063", HOM_NAY - timedelta(days=i * 3), hang="P063")
+    _neo(conn, batch)
+
+
+def test_o_het_hang_sap_thieu_BANG_dem_tren_san_pham_360(conn, batch):
+    """Từ 2026-10-15 hai ô này đếm MÃ trên các dòng tồn (không dựng lại
+    san_pham_360 ở lượt riêng). Đủ, không xấp xỉ: cả hai trạng thái đòi `ton`
+    không NULL, tức mã có dòng tồn. Mã hai lô chỉ đếm MỘT lần."""
+    _bon_ma_kho(conn, batch)
+    dem = dict(conn.execute("""SELECT trang_thai, count(*) FROM mart.san_pham_360
+                                WHERE trang_thai IN ('het_hang', 'sap_thieu') GROUP BY 1""").fetchall())
+    assert dem.get("het_hang") == 1 and dem.get("sap_thieu") == 1, dem
+    for kho in ("", "0001", "1002"):
+        for loc in ("", "het_hang", "ton_chet"):
+            o = SP.kho_hang(conn, kho=kho, loc=loc).o_tong_quan
+            assert (o["het_hang"], o["sap_thieu"]) == (1, 1), (kho, loc, o)
+
+
+def test_loc_kho_tren_anh_chup_GIONG_kho_hang_co_loc_va_khong_sua_anh_chup(conn, batch):
+    """API lọc MỘT ảnh chụp không lọc (`loc_kho` trên dict JSON đã giải mã, thứ
+    `anh_chup.lay_du_lieu` nhớ trong tiến trình). Hai điều: ra đúng như
+    `kho_hang(kho, loc)`, và KHÔNG sửa ảnh chụp — sửa tại chỗ là lượt gọi sau
+    với bộ lọc khác đọc phải dữ liệu đã lọc."""
+    import json
+    from kome.web.api import du_lieu_kho_hang
+    _bon_ma_kho(conn, batch)
+    anh = json.loads(json.dumps(du_lieu_kho_hang(conn), default=str))
+    goc = json.dumps(anh, sort_keys=True)
+    from kome.web.api import thanh_json
+    for kho in ("", "0001", "1002", "khong_co"):
+        for loc in ("", *SP.TRANG_THAI_TON, "rac"):
+            k = {**anh["k"], **SP.loc_kho(anh["k"], kho, loc)}
+            mong = json.loads(json.dumps(thanh_json(SP.kho_hang(conn, kho=kho, loc=loc)), default=str))
+            assert k == mong, (kho, loc)
+    assert json.dumps(anh, sort_keys=True) == goc, "loc_kho đã sửa ảnh chụp dùng chung"
+
+
+def test_api_kho_hang_mot_anh_chup_cho_moi_bo_loc(conn, batch, test_db_url, monkeypatch):
+    """Đổi chip kho / trạng thái không tính lại dữ liệu: route chỉ gọi
+    `du_lieu_kho_hang` (không tham số lọc) — bộ lọc áp sau."""
+    import kome.web.api as API
+    _bon_ma_kho(conn, batch)
+    goi = []
+    that = API.du_lieu_kho_hang
+    monkeypatch.setattr(API, "du_lieu_kho_hang", lambda c, *a, **k: goi.append((a, k)) or that(c, *a, **k))
+    c = _khach_web(test_db_url)
+    for q in ("", "?kho=0001", "?loc=ton_chet", "?kho=1002&loc=du"):
+        r = c.get("/api/kho-hang" + q)
+        assert r.status_code == 200, r.text
+        assert r.json()["k"]["kho"] == ("0001" if "0001" in q else "1002" if "1002" in q else "")
+    assert goi and all(g == ((), {}) for g in goi), goi
+
+
 # ---------------------------------------------------------------------------
 # "Không biết" khác "bằng không", và số lượng có phần thập phân
 # ---------------------------------------------------------------------------

@@ -235,11 +235,12 @@ def du_lieu_du_bao(c) -> dict:
     }, bo=("ngay",))
 
 
-def du_lieu_kho_hang(c, kho: str = "", loc: str = "") -> dict:
-    """Dữ liệu màn /kho-hang (`SP.kho_hang`, 2 lượt hỏi) + nhãn để giao diện
-    không tự chép. Cũng là thứ `anh_chup.lam_nong` tính sẵn (không lọc)."""
+def du_lieu_kho_hang(c) -> dict:
+    """Dữ liệu màn /kho-hang KHÔNG lọc (`SP.kho_hang_tho`, 2 lượt hỏi) + nhãn để
+    giao diện không tự chép. MỘT ảnh chụp cho mọi bộ lọc kho / trạng thái (lọc ở
+    `SP.loc_kho`) — cũng là thứ `anh_chup.lam_nong` tính sẵn."""
     from kome import san_pham as SP
-    return thanh_json({"k": SP.kho_hang(c, kho=kho, loc=loc),
+    return thanh_json({"k": SP.kho_hang_tho(c),
                        "trang_thai": {a: list(b) for a, b in SP.TRANG_THAI_TON.items()},
                        "loai_han": {a: list(b) for a, b in SP.LOAI_HAN.items()},
                        "can_han_ngay": SP.CAN_HAN_NGAY})
@@ -1023,9 +1024,11 @@ def tao_api(open_app_conn) -> APIRouter:
     @r.get("/kho-hang")
     def kho_hang(request: Request, kho: str = "", loc: str = "",
                  thang: str = "", ky: str = "", tu: str = "", den: str = ""):
-        """Màn Kho hàng: `SP.kho_hang` (ĐÚNG 2 lượt hỏi, bất biến đặc tả 4b).
-        Mỗi khối theo đúng những bộ lọc nó không điều khiển — xem docstring
-        của kho_hang(); giao diện chỉ hiện, không lọc lại."""
+        """Màn Kho hàng: MỘT ảnh chụp không lọc (`du_lieu_kho_hang`, 2 lượt hỏi khi
+        trượt) rồi `SP.loc_kho` (0 lượt) — đổi chip kho / trạng thái không tính lại
+        mart.san_pham_360 (trước 2026-10-15 mỗi tổ hợp là một ảnh chụp riêng, ~5–6,5 s
+        lần đầu trên Vercel). Mỗi khối theo đúng những bộ lọc nó không điều khiển —
+        xem docstring `kho_hang_tho`; giao diện chỉ hiện, không lọc lại."""
         from kome import san_pham as SP
         loc = loc if loc in SP.TRANG_THAI_TON else ""
         try:
@@ -1033,9 +1036,21 @@ def tao_api(open_app_conn) -> APIRouter:
         except KX.LoiKhoang as e:
             return _loi(str(e), 400)
         # Tồn = ảnh chụp mới nhất ≤ MỐC (040); không có thì màn nói rõ là không có.
-        return _chup(request, _khoa("kho-hang", kho=kho, loc=loc, **ts.khoa()),
-                     _voi_moc(ts, lambda c: du_lieu_kho_hang(c, kho, loc)),
-                     "Không đọc được tồn kho.", chi_nap=True)
+        try:
+            with open_app_conn() as conn:
+                d, pb = anh_chup.lay_du_lieu(conn, _khoa("kho-hang", **ts.khoa()),
+                                             _voi_moc(ts, du_lieu_kho_hang), chi_nap=True)
+        except KX.LoiKhoang as e:
+            return _loi(str(e), 400)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được tồn kho.")
+        # BẢN SAO — `lay_du_lieu` nhớ đối tượng đã giải mã trong tiến trình, sửa tại chỗ
+        # là lần gọi sau (bộ lọc khác) đọc phải dữ liệu đã lọc.
+        ra = {**d, "k": {**d["k"], **SP.loc_kho(d["k"], kho, loc)}}
+        # ETag = phiên bản ảnh chụp + chính URL (cùng nếp danh sách khách).
+        return _json(request, anh_chup.sang_json(ra),
+                     hashlib.sha1(f"{pb}|{request.url.query}".encode()).hexdigest()[:16] if pb else "")
 
     # ---- Đợt 6: Công nợ ------------------------------------------------
     # Chỉ đọc core/mart -> phiên bản theo dữ liệu NẠP.
