@@ -7,6 +7,17 @@ from pathlib import Path
 DICH_VU_KEYRING = "kome-obc-bot"
 _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+# Trang gọi lại ngay sau khi nạp để web tính sẵn ảnh chụp (kome/web/anh_chup.py). Mỗi lần nạp làm mọi ảnh chụp cũ hết
+# hạn, mà trên Vercel `lam_nong` của web bị bỏ (luồng nền đóng băng sau khi trả lời) — đo thật 2026-10-15: lần mở đầu
+# sau khi nạp /api/ban-do 5,8 s, /api/kho-hang 5,6 s, /api/san-pham 3,4 s; lần sau 0,1 s. Tham số mặc định = đúng khoá
+# ảnh chụp người dùng mở (không khoảng xem).
+_KHOI_TONG_QUAN = ("kpi", "ns_thang", "so_sanh_sale", "theo_thang", "xu_huong", "suc_khoe_khach", "han_su_dung",
+                   "viec_hom_nay", "thang_nay_chua_mua", "cong_no", "don_hang", "danh_sach_khach", "hieu_suat_nganh",
+                   "tuong_quan", "tang_truong", "khach_moi", "bien_loi_nhuan")
+TRANG_LAM_NONG = (("/api/thong-bao",) + tuple(f"/api/tong-quan/{k}" for k in _KHOI_TONG_QUAN) + (
+    "/api/khach-hang/ds", "/api/bao-cao", "/api/du-bao", "/api/lien-he", "/api/ban-do", "/api/san-pham",
+    "/api/san-pham/khoang", "/api/kho-hang", "/api/cong-no", "/api/mua-vu", "/api/bang-gia", "/api/doi-thu/tong-quan"))
+
 
 class LoiWeb(Exception):
     pass
@@ -64,6 +75,16 @@ class KhachWeb:
         if not isinstance(j, dict) or "ket_qua" not in j:
             raise LoiWeb(f"Web trả kết quả nạp thiếu `ket_qua`: {str(j)[:200]}")
         return j["ket_qua"]
+
+    def lam_nong(self, duong) -> int:
+        """GET lần lượt `duong` (bỏ qua lỗi từng trang); trả số trang trả 200."""
+        ok = 0
+        for d in duong:
+            try:
+                ok += self._goi("get", self.base + d).status_code == 200
+            except LoiWeb:
+                pass
+        return ok
 
     @staticmethod
     def _json(r) -> dict:

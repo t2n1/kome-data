@@ -277,6 +277,41 @@ def test_khong_bat_hoi_truoc_thi_khong_hoi(tmp_path):
     assert chay(_ch(tmp_path), WebGia(), mt).loai == "xong" and "hoi" not in ghi
 
 
+# ---- Làm nóng ảnh chụp sau khi nạp (2026-10-15: trang mở lần đầu sau mỗi lần nạp mất 3–6 s trên Vercel) ----
+
+class WebNong(WebGia):
+    def __init__(self, loi_nong=False, **kw):
+        super().__init__(**kw)
+        self.da_nong, self.loi_nong = [], loi_nong
+
+    def lam_nong(self, duong):
+        if self.loi_nong:
+            raise RuntimeError("web chậm")
+        self.da_nong += list(duong)
+        return len(duong)
+
+
+def test_nap_xong_thi_lam_nong_cac_trang_chinh(tmp_path):
+    from obc_bot.web import TRANG_LAM_NONG
+    mt, _ = _mt()
+    w = WebNong()
+    kc = chay(_ch(tmp_path), w, mt)
+    assert kc.loai == "xong" and w.da_nong == list(TRANG_LAM_NONG)
+    assert "/api/kho-hang" in TRANG_LAM_NONG and "/api/tong-quan/kpi" in TRANG_LAM_NONG
+
+
+def test_khong_nap_gi_thi_khong_lam_nong(tmp_path):
+    mt, _ = _mt()
+    w = WebNong(la_ngay_kd=False)
+    chay(_ch(tmp_path), w, mt)
+    assert w.da_nong == []
+
+
+def test_lam_nong_loi_khong_doi_ket_cuc(tmp_path):
+    mt, _ = _mt()
+    assert chay(_ch(tmp_path), WebNong(loi_nong=True), mt).loai == "xong"
+
+
 def test_cau_hinh_doc_hoi_truoc(tmp_path):
     from obc_bot import cau_hinh as CH
     p = tmp_path / "c.toml"
