@@ -10,7 +10,8 @@ _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 # Trang gọi lại ngay sau khi nạp để web tính sẵn ảnh chụp (kome/web/anh_chup.py). Mỗi lần nạp làm mọi ảnh chụp cũ hết
 # hạn, mà trên Vercel `lam_nong` của web bị bỏ (luồng nền đóng băng sau khi trả lời) — đo thật 2026-10-15: lần mở đầu
 # sau khi nạp /api/ban-do 5,8 s, /api/kho-hang 5,6 s, /api/san-pham 3,4 s; lần sau 0,1 s. Tham số mặc định = đúng khoá
-# ảnh chụp người dùng mở (không khoảng xem).
+# ảnh chụp người dùng mở (không khoảng xem). BẢN CHÉP của `kome/web/anh_chup.py::DUONG_LAM_NONG` (obc_bot không nhập
+# kome) — test canh: tests/test_lam_nong_trinh_duyet.py::test_obc_bot_chep_DUNG_danh_sach_cua_web.
 _KHOI_TONG_QUAN = ("kpi", "ns_thang", "so_sanh_sale", "theo_thang", "xu_huong", "suc_khoe_khach", "han_su_dung",
                    "viec_hom_nay", "thang_nay_chua_mua", "cong_no", "don_hang", "danh_sach_khach", "hieu_suat_nganh",
                    "tuong_quan", "tang_truong", "khach_moi", "bien_loi_nhuan")

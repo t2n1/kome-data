@@ -39,6 +39,15 @@ CACH_TINH = {
                   "đủ bán = tồn ÷ tốc độ",
 }
 
+# "Mã có trong danh mục Sản phẩm 360" mà KHÔNG dựng `mart.san_pham_360`: BẢN CHÉP đúng mệnh đề FROM / WHERE quyết
+# định tập dòng của view đó (mọi JOIN khác của view là LEFT JOIN thêm cột). Đo thật 2026-10-15 trên CSDL thật:
+# `EXISTS (… FROM mart.san_pham_360 WHERE product_code = …)` 1,5–6,3 s (view tính cả danh mục rồi mới lọc) — > 90%
+# thời gian mỗi tab — còn câu này 0,01–0,03 s, cùng tập 237/237 mã. Test canh hai bản cùng tập:
+# tests/test_sp_trong_danh_muc.py. Đổi điều kiện lọc của view thì đổi CẢ ở đây. Một tham số: mã hàng.
+TRONG_DANH_MUC = """EXISTS (SELECT 1 FROM mart.dim_product p WHERE p.product_code = %s
+          AND NOT mart.khong_phai_hang(p.product_code, p.kind_code, p.food_category_name)
+          AND NOT EXISTS (SELECT 1 FROM mart.ma_ngung_ban_an a WHERE a.product_code = p.product_code))"""
+
 
 def _bien(lai_gop, doanh_thu) -> float | None:
     """Biên lãi gộp = tổng lãi gộp ÷ tổng DT thuần (tỷ số của các tổng) — tính ở MÁY CHỦ;
@@ -294,8 +303,8 @@ def tab_khach(conn, ma: str, lui: tuple = (None, None)) -> dict | None:
     2) 47 tỉnh; 3) khách đang mua / đã ngừng."""
     from kome import ban_do as BD
     lui_thang = lui[0]
-    r = conn.execute("""
-        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+    r = conn.execute(f"""
+        SELECT {TRONG_DANH_MUC},
                (SELECT coalesce(json_agg(json_build_object('ma', customer_code, 'ten', ten,
                         'doanh_thu', doanh_thu, 'ty_trong', ty_trong, 'luy_ke', luy_ke)), '[]')
                   FROM mart.sp_tap_trung_khach(%s)),
@@ -353,8 +362,8 @@ def tab_thoi_gian(conn, ma: str, lui: tuple = (None, None)) -> dict | None:
     """Tab Thời gian. 2 lượt: 1) 26 tuần (+ 26 tuần của KỲ SO, `mart.sp_theo_tuan_den` —
     057) + tồn tại mã; 2) nhịp + cỡ đơn. (Bán theo ngày vẫn là /ngay, 1 lượt riêng.)"""
     lui_tuan = lui[1]
-    r = conn.execute("""
-        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+    r = conn.execute(f"""
+        SELECT {TRONG_DANH_MUC},
                (SELECT coalesce(json_agg(json_build_object('tuan', tuan, 'so_luong', so_luong,
                         'doanh_thu', doanh_thu) ORDER BY tuan), '[]') FROM mart.sp_theo_tuan(%s)),
                -- 26 tuần của KỲ SO (057): mốc lùi `lui_tuan` tuần; chỉ khi tuần đầu của cửa
@@ -393,8 +402,8 @@ def tab_thoi_gian(conn, ma: str, lui: tuple = (None, None)) -> dict | None:
 
 def tab_gia(conn, ma: str) -> dict | None:
     """Tab Giá & lãi. 2 lượt: 1) đơn giá theo tháng + khách giá/biên + tồn tại mã; 2) bảng giá bậc."""
-    r = conn.execute("""
-        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+    r = conn.execute(f"""
+        SELECT {TRONG_DANH_MUC},
                (SELECT coalesce(json_agg(json_build_object('thang', thang, 'pack_code', pack_code,
                         'so_luong', so_luong, 'doanh_thu', doanh_thu, 'don_gia', don_gia)
                         ORDER BY thang, pack_code), '[]') FROM mart.sp_don_gia_thang(%s)),
@@ -413,9 +422,9 @@ def tab_ban_them(conn, ma: str) -> dict | None:
     """Tab Tồn & bán thêm. 2 lượt: 1) mua kèm + tồn tại mã; 2) tồn theo lô. Danh sách "khách
     nên chào" của tab đọc `/nen-chao` (`tab_nen_chao`) — chung truy vấn với cột trái."""
     # sp_mua_kem đọc hai lần -> CTE AS MATERIALIZED (bất biến CTE-trùng).
-    r = conn.execute("""
+    r = conn.execute(f"""
         WITH k AS MATERIALIZED (SELECT * FROM mart.sp_mua_kem(%s))
-        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+        SELECT {TRONG_DANH_MUC},
                (SELECT coalesce(json_agg(json_build_object('ma', product_code, 'ten', ten_hang,
                         'so_phieu', so_phieu, 'ty_le', ty_le) ORDER BY so_phieu DESC, product_code), '[]') FROM k),
                (SELECT coalesce(max(tong_phieu), 0) FROM k)
@@ -436,9 +445,9 @@ def tab_nen_chao(conn, ma: str) -> dict | None:
     một truy vấn con ĐÃ SẮP + LIMIT — LIMIT chọn đúng top-50, ORDER BY trong json_agg giữ thứ tự
     (thứ tự dòng của truy vấn con không được bảo đảm qua lớp gộp).
     """
-    r = conn.execute("""
+    r = conn.execute(f"""
         WITH c AS MATERIALIZED (SELECT * FROM mart.sp_khach_nen_chao(%s))
-        SELECT EXISTS (SELECT 1 FROM mart.san_pham_360 WHERE product_code = %s),
+        SELECT {TRONG_DANH_MUC},
                (SELECT coalesce(json_agg(x ORDER BY x.doanh_thu_nganh DESC, x.ma), '[]') FROM (
                     SELECT customer_code AS ma, ten, doanh_thu_nganh, so_ma_nganh, lan_cuoi
                       FROM c ORDER BY doanh_thu_nganh DESC, customer_code LIMIT %s) x),
