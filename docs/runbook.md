@@ -538,7 +538,7 @@ từng được thử khôi phục thì không phải bản sao lưu.
 |---|---|
 | Chương trình | `C:\KOME\app\obc_bot` — bản CHÉP từ `master` (không chạy thẳng từ repo, để sửa code không làm hỏng lịch) |
 | Cấu hình | `C:\KOME\may_b.toml` (`hoi_truoc = true`, pattern `ban = 1` / `ton = 6`) |
-| Lịch | Task Scheduler `KOME\LayDuLieuOBC` — 13:30 thứ Hai–Sáu, chỉ khi đang đăng nhập; gọi `C:\KOME\chay_obc.cmd` |
+| Lịch | Task Scheduler `KOME\LayDuLieuOBC` — 13:30 thứ Hai–Sáu, chỉ khi đang đăng nhập; gọi `C:\Python314\pythonw.exe C:\KOME\chay_obc.pyw` (bản gốc: `obc_bot/chay_obc.pyw`). **`pythonw`, KHÔNG `.cmd`**: 2026-10-15 cửa sổ đen của bản `.cmd` bị đóng lúc 13:30:06 (`task.log` = `^C`, mã `0xC000013A`) nên chương trình chết trước khi hiện hộp hỏi |
 | Tài khoản web | `obc-bot` (chỉ cờ `--kho-du-lieu`); mật khẩu chỉ nằm trong Windows Credential Manager, dịch vụ `kome-obc-bot` |
 | File đã xuất | `C:\KOME\obc_xuat\YYYY-MM\` (ảnh chụp khi lỗi: `…\_loi\`) |
 | Nhật ký | `C:\KOME\obc_xuat\log\YYYY-MM-DD.log` + `task.log` |
