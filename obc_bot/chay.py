@@ -137,12 +137,14 @@ def chay(ch: CauHinh, web, mt: MoiTruong) -> KetCuc:
                 anh.append(e.anh)
 
     xong: list[str] = []
+    co_lo_moi = False
     if files:
         try:
             ket = web.nap(files)
             _kiem_ket_qua_nap(ket)
             for k in ket:
                 if k["ok"]:
+                    co_lo_moi = co_lo_moi or not k.get("skipped")
                     xong.append(f"{k['ten_file']}: {k.get('row_count')} dòng"
                                 + (" (đã có, bỏ qua)" if k.get("skipped") else ""))
                 else:
@@ -152,6 +154,15 @@ def chay(ch: CauHinh, web, mt: MoiTruong) -> KetCuc:
                         f"{k.get('ten_file')}: web từ chối (không có lý do cổng): {k}")]
         except LoiWeb as e:
             van_de.append(("loi_web", f"{e} — file đã xuất nằm ở {thu_muc}, nạp tay được."))
+
+    if co_lo_moi and hasattr(web, "lam_nong"):
+        # Có lô MỚI ⇒ mọi ảnh chụp của web vừa hết hạn: tính sẵn để người mở trang đầu tiên không phải chờ.
+        # Phụ, không bao giờ đổi kết cục.
+        from obc_bot.web import TRANG_LAM_NONG
+        try:
+            xong.append(f"làm nóng {web.lam_nong(TRANG_LAM_NONG)}/{len(TRANG_LAM_NONG)} trang")
+        except Exception as e:
+            xong.append(f"làm nóng hỏng (không ảnh hưởng nạp): {e!r}")
 
     if not van_de:
         return KetCuc("xong", xong)
