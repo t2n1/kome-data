@@ -11,7 +11,7 @@
 // chỉ-đọc (KOME_CHI_DOC) ẩn hẳn khối nạp và khối hoàn tác. Hoàn tác nằm sau <details>: người bấm phải đọc
 // "xoá bao nhiêu dòng, khỏi bảng nào" trước. Bản Vercel (045) nạp được file hằng ngày, nhưng trần 4,5 MB
 // mỗi yêu cầu: trình duyệt chặn file quá KD.gioi_han_tai_len trước khi gửi.
-import { useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { KD } from "../khoi_dau";
 import { gio_tokyo, ngay, so, yen } from "../dinh_dang";
 import { giuKhoang } from "../khung/khoang";
@@ -41,6 +41,7 @@ type Man = {
   cho: { ma: string; ten_file: string; o: string; luc: string }[];
   kiem?: Kiem[];
   results?: Ket[];
+  lam_nong?: string[];
 };
 
 type OL = { trang_thai: "du" | "thieu" | "khong" | "moi" | "trong"; so_co: number; meisai: boolean; ngay: string };
@@ -61,6 +62,20 @@ export default function KhoDuLieu() {
     const i = p.thang.findIndex(t => t.thang === m.ngay_thang);
     return i >= 0 ? i : null;
   });
+  // Vừa nạp lô mới trên Vercel: máy chủ không tự tính sẵn được (luồng nền đóng băng) nên trình duyệt GET ngầm từng
+  // trang chính một — người mở trang đầu tiên không phải chờ 3–6 s (kome/web/anh_chup.py::DUONG_LAM_NONG). Lần lượt,
+  // nuốt lỗi, không vẽ gì: đây là việc phụ.
+  useEffect(() => {
+    if (!m.lam_nong?.length) return;
+    let dung = false;
+    (async () => {
+      for (const d of m.lam_nong!) {
+        if (dung) break;
+        try { await fetch(d, { credentials: "same-origin" }); } catch { /* bỏ qua */ }
+      }
+    })();
+    return () => { dung = true; };
+  }, []);
   const doiThang = (i: number | null, cuon = false) => {
     datChon(i);
     history.replaceState(null, "", giuKhoang(i == null ? location.pathname : `${location.pathname}?ngay_thang=${p.thang[i].thang}`));

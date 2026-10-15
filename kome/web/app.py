@@ -892,6 +892,13 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             anh_chup.lam_nong(open_app_conn)
         return ket
 
+    def _lam_nong_tu_trinh_duyet(results) -> dict:
+        """Trên Vercel `anh_chup.lam_nong` bị bỏ (luồng nền đóng băng): có lô MỚI thì đưa danh sách API cho trình
+        duyệt GET ngầm, để người mở trang đầu tiên sau khi nạp không phải chờ 3–6 s (đo thật 2026-10-15)."""
+        if bao_mat.tren_mang() and any(r.batch_id for r in results):
+            return {"lam_nong": list(anh_chup.DUONG_LAM_NONG)}
+        return {}
+
     @app.post("/upload", response_class=HTMLResponse)
     def upload(request: Request, files: list[UploadFile]):
         if chi_doc:
@@ -900,7 +907,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
             results = [r for _, r in _nap_mot_buoc(request, files)]
             with open_conn() as conn:
                 ctx = _du_lieu_nap(conn)
-            return _man_kho(request, {**ctx, "results": results})
+            return _man_kho(request, {**ctx, "results": results, **_lam_nong_tu_trinh_duyet(results)})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e)
 
@@ -1025,7 +1032,7 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
                 anh_chup.lam_nong(open_app_conn)
             with open_conn() as conn:
                 ctx = _du_lieu_nap(conn)
-            return _man_kho(request, {**ctx, "results": results})
+            return _man_kho(request, {**ctx, "results": results, **_lam_nong_tu_trinh_duyet(results)})
         except Exception as e:
             return _loi(request, "nạp file dữ liệu", e)
 

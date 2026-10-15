@@ -157,6 +157,18 @@ def lay_du_lieu(conn, khoa: str, tinh, chi_nap: bool = False) -> tuple[object, s
     return obj, pb
 
 
+# API mà TRÌNH DUYỆT gọi ngầm sau khi nạp tay trên Vercel (nơi `lam_nong` bên dưới bị bỏ) — để người mở trang đầu tiên
+# sau khi nạp không phải chờ. Đo thật 2026-10-15: lần mở đầu /api/ban-do 5,8 s, /api/kho-hang 5,6 s, /api/san-pham
+# 3,4 s; lần sau 0,1 s. Tham số mặc định = đúng khoá ảnh chụp người dùng mở. `obc_bot/web.py::TRANG_LAM_NONG` là bản
+# chép bắt buộc (bot làm nóng sau mỗi lượt nạp hằng ngày) — có test canh: tests/test_lam_nong_trinh_duyet.py.
+_KHOI_LAM_NONG = ("kpi", "ns_thang", "so_sanh_sale", "theo_thang", "xu_huong", "suc_khoe_khach", "han_su_dung",
+                  "viec_hom_nay", "thang_nay_chua_mua", "cong_no", "don_hang", "danh_sach_khach", "hieu_suat_nganh",
+                  "tuong_quan", "tang_truong", "khach_moi", "bien_loi_nhuan")
+DUONG_LAM_NONG = (("/api/thong-bao",) + tuple(f"/api/tong-quan/{k}" for k in _KHOI_LAM_NONG) + (
+    "/api/khach-hang/ds", "/api/bao-cao", "/api/du-bao", "/api/lien-he", "/api/ban-do", "/api/san-pham",
+    "/api/san-pham/khoang", "/api/kho-hang", "/api/cong-no", "/api/mua-vu", "/api/bang-gia", "/api/doi-thu/tong-quan"))
+
+
 def lam_nong(open_conn) -> None:
     """Tính sẵn mọi khối Tổng quan KHÔNG phụ thuộc người xem, ngay sau nạp /
     hoàn tác — để người đầu tiên mở trang sau 13:30 không phải chờ ~10 s cho
