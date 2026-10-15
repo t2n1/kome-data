@@ -39,6 +39,10 @@ CACH_TINH = {
                   "đủ bán = tồn ÷ tốc độ",
 }
 
+# Nhãn cặp khách–mã của MỘT mã: đọc `mart.khach_mat_hang_cua(ARRAY[mã])` (bất biến 054), KHÔNG `mart.khach_mat_hang
+# WHERE product_code = …` — đo thật 2026-10-15, mã XT07: 1,55 s → 0,07 s, cùng 345 dòng (lọc trên view không đẩy được
+# vào hàm khi cần các cột nhãn).
+#
 # "Mã có trong danh mục Sản phẩm 360" mà KHÔNG dựng `mart.san_pham_360`: BẢN CHÉP đúng mệnh đề FROM / WHERE quyết
 # định tập dòng của view đó (mọi JOIN khác của view là LEFT JOIN thêm cột). Đo thật 2026-10-15 trên CSDL thật:
 # `EXISTS (… FROM mart.san_pham_360 WHERE product_code = …)` 1,5–6,3 s (view tính cả danh mục rồi mới lọc) — > 90%
@@ -123,11 +127,13 @@ def _khach_dang_ngung(conn, ma: str) -> tuple[list[dict], list[dict]]:
     và đợt 4a đã dính đúng lỗi này. (ORDER BY … LIMIT trong nhánh vẫn cần,
     nhưng để CHỌN đúng top-N, không phải để giữ thứ tự.)
 
-    LEFT JOIN khach_360 chứ không JOIN: một khách có dòng bán thì luôn có
-    dòng ở khach_360 hôm nay, nhưng mất tên khách là mất cả DÒNG nếu dùng
+    LEFT JOIN tên chứ không JOIN: mất tên khách là mất cả DÒNG nếu dùng
     INNER — và đây là khối "ai đang mua mã này", nơi thiếu một khách nguy
-    hiểm hơn nhiều so với hiện mã thay cho tên. khach_360 ở đây CHỈ để lấy
-    TÊN: cờ ※廃業※ không còn được đọc ở chỗ này nữa, nó đã nằm trong nhãn.
+    hiểm hơn nhiều so với hiện mã thay cho tên. Tên lấy từ `mart.dim_customer`
+    hiện hành (cùng cột trái của `ho_so`), KHÔNG từ khach_360: đo thật
+    2026-10-15 dựng cả khach_360 chỉ để lấy tên mất 1,9–4,2 s; tên hai nguồn
+    trùng 1.792/1.792 khách có trong danh mục (khách chưa có trong danh mục:
+    hiện mã). Cờ ※廃業※ không đọc ở chỗ này, nó đã nằm trong nhãn.
 
     HAI CTE `AS MATERIALIZED`, ghi TƯỜNG MINH: cả hai nhánh đều đọc
     khach_mat_hang và khach_360, mà Postgres KHÔNG gộp hai truy vấn con
@@ -139,9 +145,10 @@ def _khach_dang_ngung(conn, ma: str) -> tuple[list[dict], list[dict]]:
         WITH h AS MATERIALIZED (
             SELECT customer_code, doanh_thu_thuan, so_luong, so_lan, lan_cuoi,
                    nhip_ngay, tre_ngay, trang_thai_cap
-              FROM mart.khach_mat_hang WHERE product_code = %s
+              FROM mart.khach_mat_hang_cua(ARRAY[%s]::text[]) WHERE true
         ), k AS MATERIALIZED (
-            SELECT customer_code, ten FROM mart.khach_360
+            SELECT customer_code, customer_name AS ten FROM mart.dim_customer
+             WHERE is_current AND customer_code IN (SELECT customer_code FROM h)
         )
         SELECT khoi, ma, ten, doanh_thu, so_luong, so_lan, lan_cuoi, nhip, tre
         FROM (
@@ -254,7 +261,7 @@ def ho_so(conn, ma: str) -> dict | None:
     trai = conn.execute("""
         WITH h AS MATERIALIZED (
             SELECT customer_code, du_kien_lan_toi, nhip_ngay, lan_cuoi, doanh_thu_thuan, trang_thai_cap
-              FROM mart.khach_mat_hang WHERE product_code = %s
+              FROM mart.khach_mat_hang_cua(ARRAY[%s]::text[]) WHERE true
         )
         SELECT 'lai'::text, h.customer_code, coalesce(nullif(d.customer_name, ''), h.customer_code),
                h.du_kien_lan_toi, h.nhip_ngay::numeric, h.lan_cuoi, h.doanh_thu_thuan::numeric
@@ -380,7 +387,7 @@ def tab_thoi_gian(conn, ma: str, lui: tuple = (None, None)) -> dict | None:
         return None
     r2 = conn.execute("""
         SELECT (SELECT coalesce(json_agg(nhip_ngay), '[]')
-                  FROM mart.khach_mat_hang WHERE product_code = %s
+                  FROM mart.khach_mat_hang_cua(ARRAY[%s]::text[]) WHERE true
                    AND trang_thai_cap IN ('mua', 'ngung')),
                (SELECT coalesce(json_agg(json_build_object('pack_code', pack_code, 'nhom', nhom,
                         'thu_tu', thu_tu, 'so_dong', so_dong, 'so_luong', so_luong)

@@ -14808,7 +14808,6 @@
    "ho_so",
    "khach",
    "lien_he",
-   "san_pham",
    "tong_quan"
   ],
   "mart.khach_khoang": [
@@ -14824,7 +14823,6 @@
    "ho_so",
    "khach",
    "lien_he",
-   "san_pham",
    "tong_quan"
   ],
   "mart.khach_mat_hang_cua": [
