@@ -50,13 +50,23 @@ export function chuoiKhoang(k: Khoang): string {
   return q.toString();
 }
 
-let hienTai = chuoiKhoang(docKhoang());
+/** Màn CÓ thanh chọn khoảng xem (chủ DN chốt 2026-10-16: chỉ trang Doanh thu — "phần này nên ở
+ *  báo cáo chi tiết, các trang khác cứ mặc định đúng tháng này"). Ở màn khác khoảng xem LUÔN rỗng
+ *  (= tháng hiện tại, máy chủ tự hiểu): tham số khoảng còn sót trên URL bị bỏ qua, liên kết sang
+ *  màn đó không mang khoảng theo. MỘT chỗ quyết định — main.tsx hiện thanh theo đúng hàm này. */
+export const MAN_KHOANG: readonly string[] = ["/bao-cao"];
+export function coKhoang(duong: string): boolean {
+  return MAN_KHOANG.includes(duong.split(/[?#]/)[0]);
+}
+const docTrang = () => (coKhoang(location.pathname) ? chuoiKhoang(docKhoang()) : "");
+
+let hienTai = docTrang();
 const nghe = new Set<() => void>();
 const bao = () => nghe.forEach(f => f());
 
 if (typeof window !== "undefined") {
   window.addEventListener("popstate", () => {
-    const moi = chuoiKhoang(docKhoang());
+    const moi = docTrang();
     if (moi !== hienTai) { hienTai = moi; bao(); }
   });
 }
@@ -95,12 +105,12 @@ export function useKhoang(): Khoang {
 // giữ khoảng), đăng xuất, tài nguyên tĩnh, API, nạp / hoàn tác.
 const KHONG_GIU = /^\/(giao-dien|dang-xuat|dang-nhap|static|api|upload|undo)(\/|\?|$)/;
 
-/** Gắn khoảng đang xem vào một đường dẫn nội bộ — trừ khi nó đã tự mang
- *  tham số khoảng riêng, hoặc thuộc nhóm KHONG_GIU. Dùng cho MỌI
+/** Gắn khoảng đang xem vào một đường dẫn nội bộ — chỉ khi đích là màn CÓ khoảng xem
+ *  (`coKhoang`), và trừ khi nó đã tự mang tham số khoảng riêng, hoặc thuộc nhóm KHONG_GIU. Dùng cho MỌI
  *  history.pushState / replaceState của từng màn (bộ lọc riêng của màn không
  *  được làm rơi khoảng xem). */
 export function giuKhoang(url: string): string {
-  if (!hienTai || !url.startsWith("/") || url.startsWith("//") || KHONG_GIU.test(url)) return url;
+  if (!hienTai || !url.startsWith("/") || url.startsWith("//") || KHONG_GIU.test(url) || !coKhoang(url)) return url;
   const [truocHash, hash = ""] = url.split("#");
   const [duong, q = ""] = truocHash.split("?");
   const p = new URLSearchParams(q);

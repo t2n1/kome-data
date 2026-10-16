@@ -962,6 +962,11 @@ kế, có ô nổi / bật tắt chú giải / bấm để lọc). Đặc tả:
 nằm TRÊN URL (`?thang=YYYY-MM` · `?ky=<company_fy>` · `?tu=&den=`; không tham số = tháng
 của `mart.moc_thoi_gian.hom_nay`, mùng 1 → hôm nay). Không cookie, không localStorage —
 gửi link là thấy đúng khoảng; đóng trình duyệt là về tháng hiện tại. Bốn luật:
+- **Thanh chọn chỉ ở trang Doanh thu** (chủ DN chốt 2026-10-16: "phần này nên ở báo cáo chi tiết, các trang khác
+  cứ mặc định hiện đúng tháng này"): MỘT danh sách `giao_dien/src/khung/khoang.ts::MAN_KHOANG` (= `/bao-cao`), đọc qua
+  `coKhoang`. Màn ngoài danh sách không có thanh, khoảng xem LUÔN rỗng (= tháng hiện tại, so năm trước) — tham số khoảng
+  còn sót trên URL bị bỏ qua, `giuKhoang` / bộ viết lại liên kết chỉ mang khoảng sang màn trong danh sách. API vẫn nhận
+  tham số khoảng ở mọi màn (máy chủ không đổi); muốn trả thanh về một màn thì thêm nó vào `MAN_KHOANG`.
 - **Một chỗ hiểu khoảng xem**: `kome/khoang_xem.py` (đọc tham số · cắt vào dải dữ liệu ·
   dải so sánh · câu mô tả). `so_sanh` có ĐÚNG MỘT phần tử = kỳ so đang bật (xem luật
   "Một kỳ so" bên dưới). Tháng dở dang so CÙNG DẢI NGÀY (29/2 → 28/2, đúng `mart.thang_den_hom_nay`),
