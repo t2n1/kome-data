@@ -12,12 +12,12 @@ export default function ManKhach() {
     <div className="kh">
       <div className="tieu-de-trang">
         <div><h1>Khách hàng</h1>
-          <div className="phu">Danh bạ khách mua hàng · bấm một dòng để mở hồ sơ 360° · việc gọi lại nằm ở{" "}
-            <a href="/lien-he">Cần liên hệ</a></div></div>
+          <div className="phu">Tìm một khách, bấm để mở hồ sơ · hôm nay gọi ai thì xem ở{" "}
+            <a href="/lien-he">Cần gọi</a></div></div>
       </div>
       <div className="kh-tab" role="tablist" aria-label="Cách xem">
-        <button type="button" role="tab" aria-selected={tab === "danh_sach"} onClick={() => dat({ tab: "danh_sach" }, true)}>Danh sách khách</button>
-        <button type="button" role="tab" aria-selected={tab === "ban_do"} onClick={() => dat({ tab: "ban_do" }, true)}>Bản đồ</button>
+        <button type="button" role="tab" aria-selected={tab === "danh_sach"} onClick={() => dat({ tab: "danh_sach" }, true)}>Tìm khách</button>
+        <button type="button" role="tab" aria-selected={tab === "ban_do"} onClick={() => dat({ tab: "ban_do" }, true)}>Bản đồ & phân bố</button>
       </div>
       {tab === "danh_sach" ? <DanhSach b={b} dat={dat} /> : <BanDo b={b} dat={dat} />}
     </div>

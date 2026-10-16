@@ -199,14 +199,14 @@ def test_khong_goi_ra_ngoai_mang():
 def test_sidebar_hien_du_nam_muc_va_ba_nhom(conn, test_db_url):
     """Chặn thảm hoạ: đổi khung điều hướng làm rơi mất một trang khỏi sidebar
     -> trang đó vẫn chạy nhưng không ai vào được nữa. Giai đoạn 5: MỌI trang là
-    React, thanh bên dựng từ giao_dien/src/khung/muc.ts (sáu nhóm của gói thiết kế)."""
+    React, thanh bên dựng từ giao_dien/src/khung/muc.ts (từ 2026-10-16 nhóm theo tần suất dùng)."""
     client = TestClient(create_app(db_url=test_db_url))
     assert 'id="goc"' in client.get("/nhat-ky").text
     muc = nguon("khung", "muc.ts")
     for duong_dan in ["/", "/bao-cao", "/khach-hang", "/lien-he", "/kho-du-lieu",
                       "/san-pham", "/kho-hang", "/nhat-ky", "/cai-dat"]:
         assert f'url: "{duong_dan}"' in muc, f"sidebar thiếu {duong_dan}"
-    for nhom in ["TỔNG QUAN", "KHÁCH HÀNG", "HÀNG HÓA & KHO", "HỆ THỐNG"]:
+    for nhom in ["HẰNG NGÀY", "PHÂN TÍCH", "HỆ THỐNG"]:
         assert f'ten: "{nhom}"' in muc, f"sidebar thiếu nhóm {nhom}"
 
 
@@ -361,12 +361,18 @@ def test_trang_danh_sach_co_du_bon_khoi_va_ba_bo_loc(conn, test_db_url):
     assert set(tq["nhom"]) == {"im", "tut", "moi"}
     assert [h for h, _ in tq["hang"]] == list(KH.THU_TU_HANG)
     assert "tinh" in tq and "nhan_vien" in tq and "thang" in tq
+    # 2026-10-16 (chủ DN: "1 trang nhiều chức năng quá"): tab Danh sách chỉ còn tra cứu. Nhóm việc VÀO từ trang
+    # Cần gọi (liên kết ?nhom=) và trang Danh sách vẫn gọi tên nhóm đang bật; hai khối phân tích ở tab Bản đồ.
     nguon = Path("giao_dien/src/khach/DanhSach.tsx").read_text(encoding="utf-8")
-    for ten in ("Toàn bộ danh bạ", "Lâu chưa mua", "đang tụt", "Khách mới", "Mua đều, tháng này chưa"):
-        assert ten in nguon, f"thiếu nút nhóm việc: {ten}"
-    for tieu_de in ("Phân bố theo hạng OBC", "Tập trung ở đâu", "Tải của từng nhân viên"):
-        assert tieu_de in nguon, f"thiếu khối: {tieu_de}"
-    # Bộ lọc: chip hạng (danh sách hạng OBC của máy chủ), ô chọn người phụ trách, ô chọn tỉnh.
+    for ten in ("Lâu chưa mua", "đang mua ít đi", "Khách mới", "Mua đều, tháng này chưa", "Chưa ai phụ trách"):
+        assert ten in nguon, f"thiếu tên nhóm việc: {ten}"
+    lien_he = Path("giao_dien/src/lien_he/LienHe.tsx").read_text(encoding="utf-8")
+    for lk in ("/khach-hang?nhom=tut", "/khach-hang?nhom=moi", "/khach-hang?nv=__trong"):
+        assert lk in lien_he, f"Cần gọi thiếu lối vào nhóm: {lk}"
+    ban_do = Path("giao_dien/src/khach/BanDo.tsx").read_text(encoding="utf-8")
+    for tieu_de in ("Khách theo hạng OBC", "Mỗi nhân viên phụ trách bao nhiêu khách"):
+        assert tieu_de in ban_do, f"thiếu khối: {tieu_de}"
+    # Bộ lọc: chip hạng (danh sách hạng OBC của máy chủ), ô chọn người phụ trách, ô chọn tỉnh (trong "Lọc thêm").
     assert "tq.hang.map(([h]) =>" in nguon
     assert "<span>Phụ trách</span>" in nguon and "<span>Tỉnh</span>" in nguon
 

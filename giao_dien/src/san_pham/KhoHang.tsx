@@ -18,6 +18,7 @@ import { lay } from "../api";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { ChuaCoDuLieu, ChuThich } from "../chung/Khoi";
 import { gon, ngay, so, so_luong, yen } from "../dinh_dang";
+import { KD } from "../khoi_dau";
 import type { DongKho, KhoApi, MaHang } from "./kieu";
 import { gomTheoMa } from "./kho_luoi";
 import type { TheKho } from "./kho_luoi";
@@ -28,19 +29,23 @@ import { useDanhMuc } from "./ManSanPham";
 import "./san_pham.css";
 import { tenNganh } from "../chung/nganh";
 
-type Tab = "ton" | "ve" | "can_dat";
+// 2026-10-16 (chủ DN: "1 trang nhiều chức năng quá nên khó xài"): tab MẶC ĐỊNH là "Cần xử lý" — bốn khối hạn dùng / lô
+// (trước nằm ở cột phải tab Tồn); tab Tồn chỉ còn lưới. "Hàng đang về" chỉ hiện khi công tắc man_chua_co bật.
+type Tab = "xu_ly" | "ton" | "ve" | "can_dat";
 // `xem` = cách bày tab Tồn / Cần đặt: "" = lưới thẻ hình to (mặc định, 2026-10-16), "bang" = bảng đủ cột.
 type Loc = { tab: Tab; kho: string; loc: string; tim: string; nganh: string; xem: "" | "bang" };
 
 function docUrl(): Loc {
   const q = new URLSearchParams(location.search);
   const t = q.get("tab");
-  return { tab: t === "ve" || t === "can_dat" ? t : "ton", kho: q.get("kho") ?? "", loc: q.get("loc") ?? "", tim: q.get("tim") ?? "", nganh: q.get("nganh") ?? "",
+  // Không ?tab=: link cũ mang bộ lọc tồn (?tim= / ?loc= / ?kho= …) vẫn mở tab Tồn như trước; không gì cả → Cần xử lý.
+  const coLocTon = ["kho", "loc", "tim", "nganh", "xem"].some(x => q.get(x));
+  return { tab: t === "ton" || (t === "ve" && KD.hien_chua_co) || t === "can_dat" || t === "xu_ly" ? t : coLocTon ? "ton" : "xu_ly", kho: q.get("kho") ?? "", loc: q.get("loc") ?? "", tim: q.get("tim") ?? "", nganh: q.get("nganh") ?? "",
     xem: q.get("xem") === "bang" ? "bang" : "" };
 }
 function ghiUrl(b: Loc) {
   const q = new URLSearchParams();
-  if (b.tab !== "ton") q.set("tab", b.tab);
+  if (b.tab !== "xu_ly") q.set("tab", b.tab);
   if (b.kho) q.set("kho", b.kho);
   if (b.loc) q.set("loc", b.loc);
   if (b.tim.trim()) q.set("tim", b.tim.trim());
@@ -92,6 +97,7 @@ export default function KhoHang() {
   const maxKho = Math.max(1, ...k.theo_kho.map(w => w.gia_tri));
   const maxNganh = Math.max(1, ...theoNganh.map(w => w.gia_tri));
   const tongDong = dong.reduce((s, x) => s + x.gia_tri, 0);
+  const soXuLy = k.qua_han.length + k.khong_kip.length + k.can_han.length + k.chuyen_lo.length;
   const nutXem = <div className="sp-xem" role="group" aria-label="Cách bày">
     <button type="button" aria-pressed={!b.xem} onClick={() => dat({ xem: "" })}>▦ Hình</button>
     <button type="button" aria-pressed={b.xem === "bang"} onClick={() => dat({ xem: "bang" })}>☰ Bảng</button></div>;
@@ -129,8 +135,11 @@ export default function KhoHang() {
       </div>
 
       <div className="kho-tab" role="tablist">
-        {([["ton", "Tồn hiện tại", so(k.dong.length) + " dòng"], ["ve", "Hàng đang về", "chưa có"], ["can_dat", "Cần đặt", so((o.het_hang ?? 0) + (o.sap_thieu ?? 0)) + " mã"]] as const).map(([t, nhan, sl]) => (
-          <button key={t} type="button" role="tab" aria-selected={b.tab === t} onClick={() => dat({ tab: t })}>
+        {([["xu_ly", "Cần xử lý", so(soXuLy) + " việc"], ["ton", "Tồn kho", so(k.dong.length) + " dòng"],
+          ["can_dat", "Cần đặt", so((o.het_hang ?? 0) + (o.sap_thieu ?? 0)) + " mã"],
+          ...(KD.hien_chua_co ? [["ve", "Hàng đang về", "chưa có"] as const] : [])] as const).map(([t, nhan, sl]) => (
+          // Tab Cần xử lý luôn xem CẢ HAI lô, mọi trạng thái — bỏ bộ lọc của tab Tồn khi sang đó.
+          <button key={t} type="button" role="tab" aria-selected={b.tab === t} onClick={() => dat(t === "xu_ly" ? { tab: t, kho: "", loc: "" } : { tab: t })}>
             {nhan}<span className={"kho-tab-so" + (t === "ve" ? " nhat" : "")}>{sl}</span></button>))}
       </div>
 
@@ -144,14 +153,15 @@ export default function KhoHang() {
         <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={locHopLe === "sap_thieu"} onClick={() => dat({ tab: "ton", loc: locHopLe === "sap_thieu" ? "" : "sap_thieu" })}>
           <div className="nhan">Mã sắp thiếu</div><div className={"gia" + (o.sap_thieu ? " canh-chu" : "")}>{so(o.sap_thieu ?? 0)}</div>
           <div className="dong-phu nhat-chu">cả hai lô chỉ còn đủ bán dưới 14 ngày</div></button>
-        <div className="o-kpi"><div className="nhan">Lô cận hạn (≤ {d.can_han_ngay} ngày)</div><div className={"gia" + (o.can_han ? " canh-chu" : "")}>{so(o.can_han ?? 0)}</div>
-          <div className="dong-phu nhat-chu">sắp hết hạn dùng · {so(k.qua_han.length)} lô đã quá hạn</div></div>
+        <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={b.tab === "xu_ly"} onClick={() => dat({ tab: "xu_ly", kho: "", loc: "" })}>
+          <div className="nhan">Lô cận hạn (≤ {d.can_han_ngay} ngày)</div><div className={"gia" + (o.can_han ? " canh-chu" : "")}>{so(o.can_han ?? 0)}</div>
+          <div className="dong-phu nhat-chu">sắp hết hạn dùng · {so(k.qua_han.length)} lô đã quá hạn</div></button>
         <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={locHopLe === "ton_chet"} onClick={() => dat({ tab: "ton", loc: locHopLe === "ton_chet" ? "" : "ton_chet" })}>
           <div className="nhan">Hàng bán chậm (tồn chết)</div><div className="gia">{gon(o.gia_tri_ton_chet ?? 0)}</div>
           <div className="dong-phu nhat-chu">hàng gần như không bán được · đổi theo lô / trạng thái đang chọn</div></button>
       </div>
 
-      {b.tab === "ton" && <div className="kho-hai-cot">
+      {b.tab === "ton" && <div className="kho-mot-cot">
         <section className="kh-the kho-chinh">
           <div className="sp-dm-dau">
             <h2>{b.xem ? "Tồn theo dòng" : "Tồn theo mã"}</h2>
@@ -196,8 +206,35 @@ export default function KhoHang() {
               Ngành là <span className="ten-jp">食品分類名</span> của <span className="ten-jp">商品データ</span> — mã chưa phân loại thì sửa ở OBC.
               Nhãn hạn có bốn giá trị: "Không có hạn dùng" (賞味期限なし) là lời khẳng định về hàng, còn "Không đọc được hạn" là lời thú nhận về dữ liệu.</ChuThich></p>
         </section>
+        {/* Hai khối giá trị (trước ở cột phải) gập sẵn — ít người xem hằng ngày. */}
+        <details className="kh-the kho-gia-tri">
+          <summary><b>Giá trị tồn theo ngành và theo lô</b> <span className="phu">— bấm để mở</span></summary>
+          <div className="kho-gia-tri-hai">
+          <section className="kh-the">
+            <h2>Giá trị tồn theo ngành</h2>
+            <p className="phu">Theo bộ lọc lô / trạng thái / ô tìm; không tự lọc theo ngành (bấm để lọc).</p>
+            {theoNganh.length ? theoNganh.map(w => (
+              <button key={w.ten} type="button" className="kh-thanh-dong" aria-pressed={b.nganh === w.ten} onClick={() => dat({ nganh: b.nganh === w.ten ? "" : w.ten })}>
+                <span className="kh-td-nhan"><b title={w.ten}>{tenNganh(w.ten)}</b><span>{yen(w.gia_tri)}</span></span>
+                <span className="kh-td-thanh"><i style={{ width: `${Math.max(0, w.gia_tri) / maxNganh * 100}%` }} /></span>
+                <span className="sp-khach-phu">{so(w.so_dong)} dòng tồn</span>
+              </button>)) : <p className="trong-nho">Chưa có dòng tồn nào.</p>}
+          </section>
+          <section className="kh-the">
+            <h2>Giá trị tồn theo lô</h2>
+            <p className="phu">Không tự lọc theo lô (bấm để lọc){locHopLe ? `; có theo trạng thái "${d.trang_thai[locHopLe][0]}" — lô không còn dòng nào ở trạng thái đó vắng mặt` : ""}.</p>
+            {k.theo_kho.length ? k.theo_kho.map(w => (
+              <button key={w.ma} type="button" className="kh-thanh-dong" aria-pressed={b.kho === w.ma} onClick={() => dat({ kho: b.kho === w.ma ? "" : w.ma })}>
+                <span className="kh-td-nhan"><b title={`${w.ma} ${w.ten}`}>{vaiLo(w.ma)}</b><span>{yen(w.gia_tri)}</span></span>
+                <span className="kh-td-thanh"><i style={{ width: `${w.gia_tri / maxKho * 100}%` }} /></span>
+                <span className="sp-khach-phu">{so(w.so_dong)} dòng tồn</span>
+              </button>)) : <p className="trong-nho">Chưa có dòng tồn nào.</p>}
+          </section>
+          </div>
+        </details>
+      </div>}
 
-        <div className="kho-ben">
+      {b.tab === "xu_ly" && <div className="kho-xu-ly">
           <section className="kh-the">
             <h2>Đã quá hạn</h2>
             <p className="phu">Lô đã qua 賞味期限 mà vẫn còn trong bản xuất — việc xử lý ngay, không phải theo dõi.</p>
@@ -237,27 +274,6 @@ export default function KhoHang() {
             {k.can_han.length ? <div className="kho-the-ds">{k.can_han.map((x, i) => <TheHan key={i} x={x} tenKho={tenKho} />)}</div>
               : <p className="trong-nho">Không lô nào cận hạn.</p>}
           </section>
-          <section className="kh-the">
-            <h2>Giá trị tồn theo ngành</h2>
-            <p className="phu">Theo bộ lọc lô / trạng thái / ô tìm; không tự lọc theo ngành (bấm để lọc).</p>
-            {theoNganh.length ? theoNganh.map(w => (
-              <button key={w.ten} type="button" className="kh-thanh-dong" aria-pressed={b.nganh === w.ten} onClick={() => dat({ nganh: b.nganh === w.ten ? "" : w.ten })}>
-                <span className="kh-td-nhan"><b title={w.ten}>{tenNganh(w.ten)}</b><span>{yen(w.gia_tri)}</span></span>
-                <span className="kh-td-thanh"><i style={{ width: `${Math.max(0, w.gia_tri) / maxNganh * 100}%` }} /></span>
-                <span className="sp-khach-phu">{so(w.so_dong)} dòng tồn</span>
-              </button>)) : <p className="trong-nho">Chưa có dòng tồn nào.</p>}
-          </section>
-          <section className="kh-the">
-            <h2>Giá trị tồn theo lô</h2>
-            <p className="phu">Không tự lọc theo lô (bấm để lọc){locHopLe ? `; có theo trạng thái "${d.trang_thai[locHopLe][0]}" — lô không còn dòng nào ở trạng thái đó vắng mặt` : ""}.</p>
-            {k.theo_kho.length ? k.theo_kho.map(w => (
-              <button key={w.ma} type="button" className="kh-thanh-dong" aria-pressed={b.kho === w.ma} onClick={() => dat({ kho: b.kho === w.ma ? "" : w.ma })}>
-                <span className="kh-td-nhan"><b title={`${w.ma} ${w.ten}`}>{vaiLo(w.ma)}</b><span>{yen(w.gia_tri)}</span></span>
-                <span className="kh-td-thanh"><i style={{ width: `${w.gia_tri / maxKho * 100}%` }} /></span>
-                <span className="sp-khach-phu">{so(w.so_dong)} dòng tồn</span>
-              </button>)) : <p className="trong-nho">Chưa có dòng tồn nào.</p>}
-          </section>
-        </div>
       </div>}
 
       {b.tab === "ve" && <section className="kh-the kh-chua-co">

@@ -120,6 +120,13 @@ a.sp-khach-dong:hover{background:var(--nen)}
 .kho-chinh{flex:1 1 880px;min-width:0}
 .kho-ben{flex:1 1 300px;min-width:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:.9rem;align-items:start}
 .kho-ben h2{margin:0;font-size:.9rem;font-weight:600;border:0;padding:0}
+/* 2026-10-16: tab Tồn một cột; tab Cần xử lý = lưới bốn khối hạn dùng / lô; giá trị theo ngành / lô gập trong <details>. */
+.kho-mot-cot{display:flex;flex-direction:column;gap:.9rem}
+.kho-xu-ly{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:.9rem;align-items:start}
+.kho-xu-ly h2,.kho-gia-tri h2{margin:0;font-size:.95rem;font-weight:700;border:0;padding:0}
+.kho-gia-tri summary{cursor:pointer;list-style-position:inside}
+.kho-gia-tri-hai{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:.9rem;margin-top:.7rem}
+.kho-gia-tri-hai .kh-the{border:0;padding:0;background:none}
 .kho-ten-kho{font-size:.76rem;color:var(--chu-thuong);white-space:nowrap}
 .kho-du{white-space:nowrap;font-size:.78rem;font-variant-numeric:tabular-nums}
 .kho-du-thanh{display:block;height:4px;width:76px;border-radius:99px;background:var(--nen-phu);overflow:hidden;margin-top:.2rem}

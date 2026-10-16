@@ -102,3 +102,5 @@ details.bc-khoi > summary{cursor:pointer;font-weight:600;font-size:.88rem}
 .dt-bc-thanh{height:.7rem;background:var(--nen-phu);border-radius:4px;overflow:hidden}
 .dt-bc-thanh i{display:block;height:100%;background:var(--lien-ket);opacity:.75}
 .dt-bc-dong b{text-align:right;font-variant-numeric:tabular-nums}
+/* 2026-10-16: bốn tab dưới dải ô số (Tổng · Theo người · Theo hàng · Theo khách). */
+.bc-tab{margin-top:1rem}

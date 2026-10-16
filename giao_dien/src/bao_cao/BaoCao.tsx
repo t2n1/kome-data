@@ -13,7 +13,7 @@ import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { lay } from "../api";
-import { chuoiKhoang, useKhoang, useNhanMoc, voiKhoang, type KhoangMayChu } from "../khung/khoang";
+import { chuoiKhoang, giuKhoang, useKhoang, useNhanMoc, voiKhoang, type KhoangMayChu } from "../khung/khoang";
 import { BieuDo, type Chuoi } from "../chung/BieuDo";
 import { Khoi } from "../chung/Khoi";
 import { DongNoi, ONoi } from "../chung/ONoi";
@@ -124,11 +124,23 @@ function The({ children, className = "" }: { children: ReactNode; className?: st
   return <section className={"kh-the bc-khoi " + className}>{children}</section>;
 }
 
+type XemBc = "tong" | "nguoi" | "hang" | "khach";
+const XEM_BC: [XemBc, string][] = [["tong", "Tổng"], ["nguoi", "Theo người phụ trách"], ["hang", "Theo hàng"], ["khach", "Theo khách"]];
+
 export default function BaoCao() {
   const kxs = chuoiKhoang(useKhoang());
   const nhanMoc = useNhanMoc();
   const [cs, datCs] = useState<"dt" | "lg">("dt");
   const [kb, datKb] = useState("cs");
+  // 2026-10-16 (chủ DN: "1 trang nhiều chức năng quá nên khó xài"): bốn ô số luôn ở đầu; phần dưới chia BỐN tab —
+  // Tổng · Theo người · Theo hàng · Theo khách. Tab nằm trên URL (?xem=), giữ khoảng xem như mọi bộ lọc.
+  const [xem, datXemS] = useState<XemBc>(() => { const v = new URLSearchParams(location.search).get("xem"); return XEM_BC.some(x => x[0] === v) ? v as XemBc : "tong"; });
+  const datXem = (v: XemBc) => {
+    datXemS(v);
+    const q = new URLSearchParams(location.search);
+    if (v === "tong") q.delete("xem"); else q.set("xem", v);
+    history.replaceState(null, "", giuKhoang(location.pathname + (q.toString() ? "?" + q : "")));
+  };
   const { data: d, error, isFetching } = useQuery<BaoCaoApi>({
     queryKey: ["bao-cao", kxs], queryFn: () => lay<BaoCaoApi>(voiKhoang("/api/bao-cao")), placeholderData: keepPreviousData,
   });
@@ -266,6 +278,11 @@ export default function BaoCao() {
             : <SoSanhDong ss={ss} lay_tang={s => s.chenh_ty_suat} don_vi=" điểm" />}</div></div>
       </div>
 
+      <div className="kh-tab bc-tab" role="tablist" aria-label="Xem theo">
+        {XEM_BC.map(([v, nhan]) => <button key={v} type="button" role="tab" aria-selected={xem === v} onClick={() => datXem(v)}>{nhan}</button>)}
+      </div>
+
+      {xem === "tong" && <>
       <The className="dt-chinh">
         <Khoi tieu_de={td ? "12 tháng trong năm (kỳ)" : `Theo ${theoNgay ? "ngày" : "tháng"}`}
           phu={<><MauSs />{nhanSs}</>}
@@ -280,22 +297,23 @@ export default function BaoCao() {
         </Khoi>
       </The>
 
-      <div className="bc-hai">
-        {coDuBao && (lg ? f!.ve_chot_lg : f!.ve_chot).co && <The>
+      {coDuBao && (lg ? f!.ve_chot_lg : f!.ve_chot).co && <The>
           <Khoi tieu_de={`Cộng dồn ${chot ? thNgan(chot.thang) : "tháng"}`} phu={`${chot!.e}/${chot!.n} ngày làm việc`}
             cach_tinh={<>Đường xanh: {ten} cộng dồn tới {nhanMoc}. Đường đỏ: dự báo vừa tới cuối tháng, vùng xám là khoảng thấp – cao.
               Đường xám: nhịp ngân sách theo ngày làm việc (đã trừ thứ Bảy, Chủ nhật, ngày lễ — chưa trừ ngày nghỉ riêng của công ty).</>}>
             <LuyKe v={lg ? f!.ve_chot_lg : f!.ve_chot} />
           </Khoi></The>}
-        <The>
+      </>}
+
+      {xem === "nguoi" && <The>
           <Khoi tieu_de="Người phụ trách" phu={td ? thNgan(td.thang) : undefined}
             cach_tinh={<>Mỗi thẻ một người. Thanh = ngân sách của chính người đó (đầy thanh = đạt 100%). Phần đậm: {ten} đã có; phần nhạt: dự báo thêm tới cuối tháng (cùng công thức chốt tháng). Vạch cam: mức lẽ ra phải đạt tới {nhanMoc} — ngân sách chia theo ngày làm việc đã qua.
               {ssNguoi && <> Vạch đứt: {nhanSs}.</>}</>}
             canh_bao={!td ? "Dạng Khoảng: không có ngân sách theo người." : null}>
             {td && <NguoiPhuTrach td={td} lg={lg} db={nguoiDb} ss={ssNguoi} nhan_ss={nhanSs} />}
-          </Khoi></The>
-      </div>
+          </Khoi></The>}
 
+      {xem === "hang" && <>
       {/* Cầu nối chiếm TRỌN hàng (máy chủ vẽ rộng 1160): tên danh mục dài, chia đôi thì nhãn trục
           bị cắt còn vài chữ (soát 2026-10-16). */}
       <The>
@@ -343,8 +361,10 @@ export default function BaoCao() {
             </div></> : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
         </Khoi></The>
 
+      </>}
+
       {/* Hai khối về KHÁCH đi chung một hàng — Pareto trọn hàng thì cao quá (soát 2026-10-16). */}
-      <div className="bc-hai">
+      {xem === "khach" && <div className="bc-hai">
         <The>
           <Khoi tieu_de="Khách lớn" phu={bc.tap_trung?.luy_ke_top10 != null ? `10 khách lớn nhất = ${p1(bc.tap_trung.luy_ke_top10)} doanh thu` : undefined}
             cach_tinh={<>Cột: doanh thu 20 khách lớn nhất; đường: luỹ kế % trên tổng ({so(bc.tap_trung?.so_khach ?? 0)} khách có đơn). Bấm cột mở hồ sơ khách.</>}
@@ -353,7 +373,7 @@ export default function BaoCao() {
           </Khoi></The>
         {db && <The>
           <Khoi tieu_de="Nguy cơ ngừng mua" phu={`${db.kh.so_nguy_co} khách · ${gon(db.kh.tien_nguy_co)}`} lien_ket={{ href: "/lien-he?tat_ca=1", chu: "Gọi lại" }}
-            cach_tinh={<>Khách đã lâu hơn gấp đôi bình thường mà chưa đặt hàng — cùng danh sách với trang Cần liên hệ. Xếp theo tổng doanh thu đến nay;
+            cach_tinh={<>Khách đã lâu hơn gấp đôi bình thường mà chưa đặt hàng — cùng danh sách với trang Cần gọi. Xếp theo tổng doanh thu đến nay;
               thanh càng dài = càng lâu so với thói quen mua của khách.</>} canh_bao={lg ? "Theo doanh thu." : null}>
             <div className="dt-nguy-co">
               {db.kh.nguy_co.map(k => (
@@ -368,7 +388,7 @@ export default function BaoCao() {
               {!db.kh.nguy_co.length && <p className="phu">Không khách nào lâu chưa mua.</p>}
             </div>
           </Khoi></The>}
-      </div>
+      </div>}
 
       {(bc.phi.dong.length > 0 || bc.hang_tang.dong.length > 0) && <p className="phu dt-phi">
         Đã gồm trong tổng, không vào danh mục:{" "}

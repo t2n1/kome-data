@@ -210,7 +210,7 @@ def _xep_dau(ds: list[O], co_san: list[O] = (), y0: int = 0) -> list[O]:
 # Bảng MẶC ĐỊNH chỉ HIỆN các khối trả lời "hôm nay thế nào, cần làm gì" (chủ DN 2026-10-16: "đơn giản, người
 # không rành nhìn cũng hiểu") — theo đúng thứ tự này; mọi khối khác vẫn trong bố cục nhưng ẩn sẵn (`an`), bật lại
 # bằng "+ Thêm chức năng". Bố cục đã lưu KHÔNG đổi; "Đặt lại bố cục" về bản gọn này.
-HIEN_MAC_DINH = ("kpi", "viec_hom_nay", "thang_nay_chua_mua", "ns_thang", "theo_thang", "han_su_dung", "cong_no")
+HIEN_MAC_DINH = ("kpi", "viec_hom_nay", "ns_thang", "theo_thang", "han_su_dung", "cong_no")
 
 
 def mac_dinh() -> list[O]:

@@ -2,9 +2,10 @@
 // đồ 12 tháng của hồ sơ 360° — bố cục Customer 360.dc.html thiết kế lại
 // 2026-09-26. Biểu đồ SVG tự vẽ như gói thiết kế (không thư viện). Mọi số từ
 // /api/khach-hang/{mã}.
+import { KD } from "../khoi_dau";
 import { MAC_DINH_XEM, useXemThem } from "../chung/XemThem";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
 import { BieuDo } from "../chung/BieuDo";
 import { HinhMa } from "../chung/HinhMa";
@@ -217,6 +218,13 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
   const mx = Math.max(1, ...top.map(m => m.doanh_thu));
   const thang = dsThang(h.hom_nay, 3);
   const [tatCa, datTatCa] = useState(false);
+  const [xemMh, datXemMh] = useState<"dang" | "thang" | "ngung" | "goi_y" | "khoang">("dang");
+  // Cột trái ("N mã đã ngừng mua") mở tab này rồi phát sự kiện chọn nút "Đã ngừng mua".
+  useEffect(() => {
+    const nghe = (e: Event) => datXemMh((e as CustomEvent).detail);
+    window.addEventListener("hs-mat-hang", nghe);
+    return () => window.removeEventListener("hs-mat-hang", nghe);
+  }, []);
   const { data: kh } = useKhoangKhach(h.khach.ma);
   // Lịch đầy đủ (không chỉ 10 mã của cột trái) cho nhãn đề xuất.
   const lichDu = useMemo(() => {
@@ -226,8 +234,19 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
       [m.ma, { ma: m.ma, ten: m.ten, du_kien: m.du_kien!, con: Math.round((new Date(m.du_kien!).getTime() - moc) / 864e5),
                nhip: m.nhip, lan_cuoi: m.lan_cuoi, doanh_thu: m.doanh_thu, tb_moi_lan: null }]));
   }, [h]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 2026-10-16 (chủ DN: "1 trang nhiều chức năng quá nên khó xài"): bảy khối xếp chồng → MỘT khối với nút chọn
+  // (hay mua · tháng này chưa · đã ngừng · gợi ý hàng mới · trong khoảng xem); nhịp 26 tuần, giỏ theo ngành và bảng mọi
+  // mặt hàng gập trong "Xem phân tích". Cùng số, chỉ đổi cách bày. Cột trái "Đã ngừng mua" mở thẳng nút "Đã ngừng".
   return (<>
     <p className="phu hs2-tom">{so(h.o_so.so_ma_dang_mua)} mã đang lấy · {h.o_so.so_ma_ngung ? `${h.o_so.so_ma_ngung} mã đã ngừng` : "không mã nào ngừng"}</p>
+    <div id="da-ngung-mua" className="tab-pill hs2-mh-chon" role="group" aria-label="Xem mặt hàng">
+      {/* Ba danh sách là "top N" của máy chủ (chưa mua 10 · ngừng 10 · gợi ý 8) — không in số dài danh sách; riêng
+          "Đã ngừng" in TỔNG số mã (o_so.so_ma_ngung, cùng số đầu tab) để khỏi nói "10" khi thật ra là 25. */}
+      {([["dang", "Hay mua", null], ["thang", "Tháng này chưa mua", null], ["ngung", "Đã ngừng mua", h.o_so.so_ma_ngung || null],
+        ["goi_y", "Gợi ý hàng mới", null], ["khoang", "Trong khoảng xem", null]] as const).map(([v, nhan, n]) => (
+        <button key={v} type="button" aria-pressed={xemMh === v} onClick={() => datXemMh(v)}>{nhan}{n != null && <span className="nhat-chu"> {n}</span>}</button>))}
+    </div>
+    {xemMh === "khoang" && <>
     {kh && (() => {
       // 048: phí thu hộ / phí gửi / giảm giá / làm tròn không phải mặt hàng — tách ra
       // dòng riêng, nhưng vẫn hiện (danh sách cộng lại vẫn bằng tổng khoảng).
@@ -268,6 +287,8 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
             <td className="so">—</td><td className="so">—</td><td className="so">{ngay(ngung.map(m => m.lan_cuoi).sort().pop() ?? "")}</td></tr>}</tbody></table></div>}
     </The>;
     })()}
+    </>}
+    {xemMh === "dang" && <>
     <The tieu_de="Top 10 sản phẩm hay mua" cach_tinh={<>xếp theo doanh thu luỹ kế · <span className="nhan-vien ok">◎ Đề xuất</span> đã tới ngày mua lại ·{" "}
       <span className="nhan-vien canh">○ Sắp tới</span> ≤ 7 ngày · <span className="nhan-vien nhat">△ Còn sớm</span></>}>
       <div className="hs-top">{top.map((m, i) => (
@@ -280,12 +301,10 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
         </div>))}
         {!top.length && <p className="phu">Chưa có mặt hàng nào.</p>}</div>
     </The>
-
-    {/* Hai bảng XẾP CHỒNG, không cạnh nhau: cột phải của hồ sơ đã hẹp, chia đôi nữa thì tên hàng
-        xuống dòng từng chữ và cột bị cắt (soát 2026-10-16). */}
-    <div className="hs-hang">
-      <div id="da-ngung-mua">
-      <The tieu_de="Sản phẩm đã ngừng mua" cach_tinh="từng mua đều (≥ 3 lần) nhưng im lặng ≥ 2× nhịp riêng của cặp khách–mã">
+    </>}
+    {xemMh === "ngung" && <>
+      <The tieu_de="Sản phẩm đã ngừng mua" cach_tinh="từng mua đều (≥ 3 lần) nhưng im lặng ≥ 2× nhịp riêng của cặp khách–mã"
+        phu={h.o_so.so_ma_ngung > h.da_ngung_mua.length ? `${h.da_ngung_mua.length} mã doanh thu lớn nhất trong ${h.o_so.so_ma_ngung} mã — đủ cả ở "Xem phân tích › mọi mặt hàng"` : undefined}>
         {!h.da_ngung_mua.length ? <p className="phu">Không có sản phẩm nào bị bỏ quên.</p> :
         <XemThemBang ds={h.da_ngung_mua} don_vi="mã">{hien => <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th><th className="so">Trễ</th><th className="so">Nhịp</th><th className="so">Mua cuối</th><th className="so">Doanh thu</th></tr></thead>
           <tbody>{hien.map(m => (
@@ -293,7 +312,8 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
               <td className="so giam">{m.tre != null ? `${m.tre} ngày` : "—"}</td><td className="so">{m.nhip ? Math.round(m.nhip) + " ngày" : "—"}</td>
               <td className="so">{ngay(m.lan_cuoi)}</td><td className="so">{yen(m.doanh_thu)}</td></tr>))}</tbody></table></div>}</XemThemBang>}
       </The>
-      </div>
+    </>}
+    {xemMh === "thang" && <>
       <The tieu_de="Tháng này chưa mua" phu="đã quá ngày mua lại theo nhịp của mã nhưng chưa tới mức 'ngừng' — một cuộc gọi nhắc là đủ">
         {!h.chua_mua_thang.length ? <p className="phu">Không có mã nào đang trễ.</p> :
         <XemThemBang ds={h.chua_mua_thang} don_vi="mã">{hien => <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th>{thang.map((t, i) =>
@@ -304,13 +324,8 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
               <td className="so">{m ? gon(m.t2) : "—"}</td><td className="so">{m ? gon(m.t1) : "—"}</td>
               <td className={"so " + (m && !m.t0 ? "giam" : "")}><b>{m ? (m.t0 ? gon(m.t0) : "0") : "—"}</b></td></tr>); })}</tbody></table></div>}</XemThemBang>}
       </The>
-    </div>
-
-    <div className="hs-hang hai">
-      <GioNganh h={h} />
-      <Tuan26 h={h} />
-    </div>
-
+    </>}
+    {xemMh === "goi_y" && <>
     <The tieu_de="Gợi ý hàng chưa từng mua" cach_tinh="mã khách chưa mua bao giờ, xếp theo tỷ suất lãi gộp (tỷ số của các tổng — toàn công ty)">
       {!h.goi_y.length ? <p className="phu">Không có gợi ý.</p> :
       <div className="bang-cuon"><table className="bang"><thead><tr><th>#</th><th>Mặt hàng</th><th className="so">Tỷ suất lãi gộp</th></tr></thead>
@@ -318,11 +333,19 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
           <tr key={g.ma}><td className="nhat-chu">{i + 1}</td><td className="ten-jp"><TenHinh ma={g.ma} ten={g.ten}><a href={`/san-pham/${encodeURIComponent(g.ma)}`}>{g.ten}</a>
             <div className="ma-nho"><code>{g.ma}</code></div></TenHinh></td><td className="so">{pc(g.ty_suat)}</td></tr>))}</tbody></table></div>}
     </The>
+    </>}
 
+    <details className="hs2-phan-tich">
+      <summary>Xem phân tích: nhịp đặt hàng 26 tuần · giỏ hàng theo ngành · mọi mặt hàng</summary>
+      <div className="hs-hang hai">
+        <GioNganh h={h} />
+        <Tuan26 h={h} />
+      </div>
     <The tieu_de={`Tất cả mặt hàng (${h.mat_hang.length})`} cach_tinh="mọi mã khách từng mua · 3 cột tháng gần nhất để thấy ngay tháng nào vắng"
       goc={<button type="button" className="nut-nho" onClick={() => datTatCa(x => !x)}>{tatCa ? "Thu gọn" : "Hiện bảng"}</button>}>
       {tatCa && <BangMatHang ds={h.mat_hang} thang={thang} />}
     </The>
+    </details>
   </>);
 }
 
@@ -419,13 +442,14 @@ export function TabHoSo({ h }: { h: HoSoApi }) {
       </The>
     </div>
     <NhatKy h={h} />
-    <div className="hs-hang hai">
+    {/* Khung "chưa có nguồn" theo công tắc man_chua_co (chủ DN 2026-09-28: "tạm ẩn cho bớt rối"). */}
+    {KD.hien_chua_co && <div className="hs-hang hai">
       <KhoiSapCo tieu_de="Ảnh cửa hàng" icon="🖼" hinh="anh" cong_dung="Ảnh cửa hàng của khách."
         can="nơi lưu ảnh theo mã khách." />
       <KhoiSapCo tieu_de="Chat Facebook" icon="💬" hinh="chat"
         cong_dung="Tin nhắn gần nhất với khách trên Messenger — xem khách vừa hỏi gì trước khi gọi."
         can="kết nối Messenger của trang KOME." />
-    </div>
+    </div>}
   </>);
 }
 

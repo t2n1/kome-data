@@ -57,7 +57,9 @@ function MaMuaLai({ h }: { h: HoSoApi }) {
     try { await navigator.clipboard.writeText(ban()); datDaChep(true); setTimeout(() => datDaChep(false), 1800); }
     catch { window.prompt("Chép kịch bản:", ban()); }
   };
-  const moNgung = () => { location.hash = "mat_hang"; setTimeout(() => document.getElementById("da-ngung-mua")?.scrollIntoView({ behavior: "smooth" }), 50); };
+  const moNgung = () => { location.hash = "mat_hang"; setTimeout(() => {
+    window.dispatchEvent(new CustomEvent("hs-mat-hang", { detail: "ngung" }));
+    document.getElementById("da-ngung-mua")?.scrollIntoView({ behavior: "smooth" }); }, 50); };
   return (
     <The tieu_de="Mã đến ngày mua lại" className="hs2-viec"
       goc={h.lich.tong ? <span className={h.lich.so_tre ? "giam" : "tang"}>{h.lich.so_tre}/{h.lich.tong} đã quá</span> : null}

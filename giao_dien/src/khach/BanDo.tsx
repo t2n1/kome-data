@@ -103,6 +103,28 @@ export function BanDo({ b, dat }: { b: BoLoc; dat: (s: Partial<BoLoc> & { tab?: 
         </aside>
       </div>
 
+      {/* Hai khối phân tích chuyển từ tab Danh sách sang đây (2026-10-16 — Danh sách chỉ còn tra cứu). Số từ CÙNG
+          lượt gọi danh sách ở trên (bỏ lọc tỉnh); bấm một dòng → tab Danh sách đã lọc. "Tập trung ở đâu" bỏ: trùng bản đồ. */}
+      {ds && (() => { const tq = ds.tq, maxHang = Math.max(1, ...tq.hang.map(h => h[1])), maxNv = Math.max(1, ...tq.nhan_vien.map(n => n.so_khach));
+        return (
+          <div className="kh-ba-khoi kh-bd-phan-tich">
+            <section className="kh-the"><h2>Khách theo hạng OBC</h2><p className="phu">bấm để xem danh sách khách hạng đó</p>
+              {tq.hang.map(([h, n]) => (
+                <button key={h} type="button" className="kh-thanh-dong" onClick={() => dat({ tab: "danh_sach", hang: [h] }, true)}>
+                  <span className="kh-td-nhan"><b title="hạng OBC (得意先ランク)">Hạng {h}</b><span>{so(n)} khách · {gon(tq.hang_tien[h] ?? 0)}</span></span>
+                  <span className="kh-td-thanh"><i style={{ width: `${n / maxHang * 100}%` }} /></span>
+                </button>))}
+            </section>
+            <section className="kh-the"><h2>Mỗi nhân viên phụ trách bao nhiêu khách</h2><p className="phu">phần đỏ = khách lâu chưa mua · bấm để xem danh sách</p>
+              {tq.nhan_vien.map(n => (
+                <button key={n.ma} type="button" className="kh-thanh-dong" onClick={() => dat({ tab: "danh_sach", nv: n.ma, tat_ca: false }, true)}>
+                  <span className="kh-td-nhan"><b>{n.ten}</b><span>{so(n.so_khach)} khách · {so(n.canh_bao)} lâu chưa mua · {gon(n.doanh_thu)}</span></span>
+                  <span className="kh-td-thanh mong doi" style={{ width: `${n.so_khach / maxNv * 100}%` }}>
+                    <i className="do" style={{ width: `${n.so_khach ? n.canh_bao / n.so_khach * 100 : 0}%` }} /><i /></span>
+                </button>))}
+            </section>
+          </div>); })()}
+
       <h3 className="kh-muc-nho">Bảng xếp hạng 47 tỉnh</h3>
       <div className="bang-cuon"><table className="bang">
         <thead><tr><th>Tỉnh</th><th>Vùng</th><th className="so">Số khách</th><th className="so">Doanh thu 12 tháng</th>

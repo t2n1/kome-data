@@ -6,17 +6,13 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
 import { giuKhoang } from "../khung/khoang";
-import { chuoiKhoang, useKhoang, useNhanMoc, voiKhoang } from "../khung/khoang";
+import { chuoiKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { gon, so, thay_doi, yen } from "../dinh_dang";
 import type { BoLoc } from "./loc";
 import { nhoDanhSach, thamSoDs } from "./loc";
 import type { DsApi, KhachDong } from "./kieu";
 import { lopHang } from "./ho_so_logic";
-import { TN } from "../khoi_dau";
 
-// Công nợ ghi theo BÊN NHẬN HOÁ ĐƠN (請求先), không theo từng khách — nên danh sách
-// khách không lọc / đếm được theo nợ; số nằm ở màn Công nợ (đợt 6).
-const CHUA_CO_NO = "Công nợ ghi theo bên nhận hoá đơn (請求先), không theo từng khách — xem màn Công nợ.";
 export const MAU_TT: Record<string, string> = {
   binh_thuong: "ok", canh_bao: "canh", da_roi_bo: "do", chua_du_lich_su: "nhat", ngung_giao_dich: "nhat",
 };
@@ -37,9 +33,9 @@ type Dat = (sua: Partial<BoLoc>, day?: boolean) => void;
 
 export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
   const { data: d, error, isFetching } = useDs(b);
-  const nm = useNhanMoc();
   const [tim, datTim] = useState(b.tim);
   const [chon, datChon] = useState<Record<string, boolean>>({});
+  const [moLoc, datMoLoc] = useState(false);
   // Cột phụ (hạng, bình quân/tháng) ẩn mặc định cho bảng dễ đọc — tiện nghi riêng từng máy (chủ DN 2026-10-16).
   const [du, datDuS] = useState(() => { try { return localStorage.getItem(KHOA_COT) === "1"; } catch { return false; } });
   const datDu = (v: boolean) => { datDuS(v); try { localStorage.setItem(KHOA_COT, v ? "1" : "0"); } catch { /* riêng tư */ } };
@@ -64,18 +60,13 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
   const ssp = d.so_sanh_phu;
   const tang = t.tong_dt_ss ? t.tong_dt_khoang / t.tong_dt_ss - 1 : null;
 
-  const PHAN_KHUC: { ma: string; ten: string; mo: string; so: number | null; bat: boolean; ap: Partial<BoLoc> | null }[] = [
-    { ma: "tat_ca", ten: "Toàn bộ danh bạ", mo: `${so(tq.tong)} khách${d.sale ? " của " + (d.ten_sale ?? d.sale) : " trong hệ thống"}`,
-      so: tq.tong, bat: !b.nhom && !b.thang && !b.co_mua && b.nv !== d.pt_trong, ap: { nhom: "", thang: "", co_mua: false, nv: b.nv === d.pt_trong ? "" : b.nv } },
-    { ma: "co_mua", ten: `Có mua · ${kxNhan}`, mo: "có ít nhất một phiếu trong khoảng đang xem", so: tq.co_mua, bat: b.co_mua,
-      ap: { co_mua: !b.co_mua, nhom: "", thang: "" } },
-    ...(TN.cong_no ? [{ ma: "no", ten: "Nợ quá hạn", mo: "cần thu trước khi giao đơn mới", so: null, bat: false, ap: null }] : []),
-    { ma: "im", ten: "Lâu chưa mua", mo: `đã quá chu kỳ mua thường lệ · ${nm}`, so: tq.nhom.im, bat: b.nhom === "im", ap: { nhom: "im", thang: "", co_mua: false } },
-    { ma: "tut", ten: "Hạng S·A đang tụt", mo: "30 ngày qua mua ít hơn 80% so với trước đây", so: tq.nhom.tut, bat: b.nhom === "tut", ap: { nhom: "tut", thang: "", co_mua: false } },
-    { ma: "moi", ten: "Khách mới chưa quay lại", mo: "mua lần đầu trong 90 ngày, chưa đặt lại", so: tq.nhom.moi, bat: b.nhom === "moi", ap: { nhom: "moi", thang: "", co_mua: false } },
-    { ma: "thang", ten: "Mua đều, tháng này chưa", mo: `tháng nào cũng đặt, tháng này chưa · tính ${nm}`, so: tq.thang.tre ?? 0, bat: b.thang === "tre", ap: { thang: "tre", nhom: "", co_mua: false } },
-    { ma: "chuapt", ten: "Chưa ai phụ trách", mo: "chưa giao cho nhân viên nào", so: tq.chua_pt, bat: b.nv === d.pt_trong, ap: { nv: d.pt_trong, nhom: "", thang: "", co_mua: false } },
-  ];
+  // Nhóm việc đang bật (đến từ trang Cần gọi hoặc link cũ ?nhom=) — 2026-10-16 bỏ dải 8 chip "Danh sách làm việc":
+  // trang này chỉ còn TRA CỨU; danh sách làm việc bắt đầu ở /lien-he. Bộ lọc vẫn nhận đủ tham số cũ.
+  const NHOM_TEN: Record<string, string> = { im: "Lâu chưa mua", tut: "Hạng S·A đang mua ít đi", moi: "Khách mới chưa quay lại" };
+  const dangNhom = b.nhom ? NHOM_TEN[b.nhom] ?? b.nhom : b.thang === "tre" ? "Mua đều, tháng này chưa"
+    : b.nv === d.pt_trong ? "Chưa ai phụ trách" : null;
+  const soLocThem = b.hang.length + (b.tinh ? 1 : 0) + (b.loc ? 1 : 0) + (b.thang && b.thang !== "tre" ? 1 : 0) + (b.co_mua ? 1 : 0)
+    + (b.nv && b.nv !== d.pt_trong ? 1 : 0);
 
   const sapCot = (cot: string, chu: string, cls = "", title?: string) => (
     <th className={"sap " + cls} title={title} aria-sort={t.sap === cot ? (b.giam === "0" ? "ascending" : b.giam === "1" ? "descending" : "none") : "none"}
@@ -94,9 +85,6 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
     a.download = `khach-hang-${soChon}.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
 
-  const maxHang = Math.max(1, ...tq.hang.map(h => h[1]));
-  const tinh6 = tq.tinh.slice(0, 6), maxTinh = Math.max(1, ...tinh6.map(x => x[1]));
-  const maxNv = Math.max(1, ...tq.nhan_vien.map(n => n.so_khach));
   const dau = (t.trang - 1) * t.co;
 
   return (
@@ -104,33 +92,26 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       {d.sale && <p className="kh-loc-nguoi">Đang xem khách của <strong>{d.ten_sale ?? d.sale}</strong>.{" "}
         <button type="button" className="lien-ket" onClick={() => dat({ nv: d.nv_moi_nguoi })}>Xem tất cả →</button></p>}
 
-      <div className="o-kpi-luoi kh-kpi">
-        <div className="o-kpi"><div className="nhan">Khách đang lọc</div><div className="gia">{so(t.tong)}</div>
-          <div className="dong-phu nhat-chu">trên tổng {so(tq.tong_tat_ca)} · {so(t.so_can_xu_ly)} cần xử lý</div></div>
-        <div className="o-kpi"><div className="nhan">Doanh thu · {kxNhan}</div>
-          <div className="gia">{gon(t.tong_dt_khoang)}</div>
-          <div className={"dong-phu " + (tang == null ? "nhat-chu" : tang >= 0 ? "tang" : "giam")}>
-            {!ssp?.co ? `${ssp?.nhan ?? "so sánh"}: không có dữ liệu để so` : tang == null ? `${ssp.nhan}: chưa có đơn` : `${thay_doi(tang)} so ${ssp.nhan}`}</div></div>
-        <div className="o-kpi"><div className="nhan">Lâu chưa mua · {nm}</div><div className="gia">{so(t.so_can_xu_ly)}</div>
-          <div className="dong-phu nhat-chu">đã quá chu kỳ mua thường lệ</div></div>
-        {TN.cong_no && <a className="o-kpi" href="/cong-no?tab=qua_han" title={CHUA_CO_NO}><div className="nhan">Công nợ quá hạn</div>
-          <div className="gia" style={{ fontSize: "1rem" }}>xem màn Công nợ →</div>
-          <div className="dong-phu nhat-chu">ghi theo bên nhận hoá đơn</div></a>}
-      </div>
+      <p className="kh-tom-tat">
+        <b>{so(t.tong)}</b> khách{t.tong !== tq.tong_tat_ca && <span className="nhat-chu"> (trên tổng {so(tq.tong_tat_ca)})</span>} · doanh thu {kxNhan}{" "}
+        <b title={yen(t.tong_dt_khoang)}>{gon(t.tong_dt_khoang)}</b>
+        {ssp?.co && tang != null && <span className={tang >= 0 ? "tang" : "giam"}> ({thay_doi(tang)} so {ssp.nhan})</span>}
+        {t.so_can_xu_ly > 0 && <> · <a href="/lien-he">{so(t.so_can_xu_ly)} khách lâu chưa mua — xem ở Cần gọi →</a></>}
+      </p>
 
-      <div className="kh-muc"><h2>Danh sách làm việc</h2><span className="phu">bấm một nhóm để xem đúng những khách đó</span></div>
-      <div className="kh-phan-khuc">
-        {PHAN_KHUC.map(p => (
-          <button key={p.ma} type="button" className="kh-pk" aria-pressed={p.bat} disabled={!p.ap}
-            title={p.ap ? undefined : CHUA_CO_NO} onClick={() => p.ap && dat(p.ap, true)}>
-            <span className="kh-pk-dau"><b>{p.ten}</b><span className={"kh-pk-so" + (p.so ? " co" : "")}>{p.so == null ? "chưa có" : so(p.so)}</span></span>
-            <span className="kh-pk-mo">{p.ma === "no" ? "theo bên nhận hoá đơn — màn Công nợ" : p.mo}</span>
-          </button>))}
-      </div>
+      {dangNhom && <p className="kh-dang-nhom">Đang xem nhóm <b>{dangNhom}</b>{" "}
+        <button type="button" className="nut-nho" onClick={() => dat({ nhom: "", thang: b.thang === "tre" ? "" : b.thang,
+          nv: b.nv === d.pt_trong ? "" : b.nv }, true)}>✕ Bỏ nhóm</button></p>}
 
       <div className="kh-cong-cu">
         <input type="search" className="kh-tim" placeholder={`Tìm mã, tên, điện thoại, địa chỉ, số TK chuyển khoản… (${so(tq.tong_tat_ca)} khách)`}
           value={tim} onChange={e => datTim(e.target.value)} aria-label="Tìm khách hàng" />
+        <button type="button" className="nut-nho" aria-expanded={moLoc || soLocThem > 0} aria-controls="kh-loc-them"
+          onClick={() => datMoLoc(!(moLoc || soLocThem > 0))}>Lọc thêm{soLocThem ? ` (${soLocThem})` : ""} ▾</button>
+        <button type="button" className="nut-nho" disabled={!coLoc}
+          onClick={() => { datTim(""); dat({ tim: "", loc: "", nhom: "", hang: [], tinh: "", thang: "", co_mua: false, nv: b.nv === d.pt_trong ? "" : b.nv }, true); }}>Xoá lọc</button>
+      </div>
+      {(moLoc || soLocThem > 0) && <div className="kh-cong-cu kh-loc-them" id="kh-loc-them">
         <div className="kh-hang" role="group" aria-label="Hạng OBC (得意先ランク)">
           {tq.hang.map(([h]) => (
             <button key={h} type="button" aria-pressed={b.hang.includes(h)} title={`Hạng OBC ${h}`}
@@ -163,9 +144,9 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
             <option value="">Mọi khách</option>
             {Object.entries(d.nhan_thang).filter(([k]) => k !== "khong_goi").map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select></label>
-        <button type="button" className="nut-nho" disabled={!coLoc}
-          onClick={() => { datTim(""); dat({ tim: "", loc: "", nhom: "", hang: [], tinh: "", thang: "", co_mua: false, nv: b.nv === d.pt_trong ? "" : b.nv }, true); }}>Xoá lọc</button>
-      </div>
+        <label className="kh-chon kh-co-mua"><input type="checkbox" checked={b.co_mua}
+          onChange={e => dat({ co_mua: e.target.checked })} /> <span>Có mua · {kxNhan} ({so(tq.co_mua)})</span></label>
+      </div>}
 
       {soChon > 0 && <div className="kh-thanh-chon">
         <b>{soChon} khách đã chọn</b>
@@ -215,36 +196,6 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
         </span>
       </div>
 
-      <div className="kh-ba-khoi">
-        <section className="kh-the"><h2>Phân bố theo hạng OBC</h2><p className="phu">得意先ランク trong 得意先全情報 · Z/ZZ/ZZZ không vào danh sách gọi</p>
-          {tq.hang.map(([h, n]) => (
-            <button key={h} type="button" className="kh-thanh-dong" aria-pressed={b.hang.includes(h)}
-              onClick={() => dat({ hang: b.hang.includes(h) ? b.hang.filter(x => x !== h) : [h] })}>
-              <span className="kh-td-nhan"><b title="hạng OBC (得意先ランク)">Hạng {h}</b><span>{so(n)} khách · {gon(tq.hang_tien[h] ?? 0)}</span></span>
-              <span className="kh-td-thanh"><i style={{ width: `${n / maxHang * 100}%` }} /></span>
-            </button>))}
-        </section>
-        <section className="kh-the"><h2>Tập trung ở đâu</h2><p className="phu">6 tỉnh đông khách nhất · bấm để lọc</p>
-          {tinh6.map(([ten, n]) => {
-            const v = ten === d.khong_ro ? d.tinh_trong : ten;
-            return (
-              <button key={ten} type="button" className="kh-thanh-dong" aria-pressed={b.tinh === v}
-                onClick={() => dat({ tinh: b.tinh === v ? "" : v })}>
-                <span className="kh-td-nhan"><b className="ten-jp">{ten}</b><span>{so(n)} · {gon(tq.tinh_tien[ten] ?? 0)}</span></span>
-                <span className="kh-td-thanh mong"><i style={{ width: `${n / maxTinh * 100}%` }} /></span>
-              </button>);
-          })}
-        </section>
-        <section className="kh-the"><h2>Tải của từng nhân viên</h2><p className="phu">phần đỏ = khách lâu chưa mua, nên gọi lại · bấm để lọc</p>
-          {tq.nhan_vien.map(n => (
-            <button key={n.ma} type="button" className="kh-thanh-dong" aria-pressed={nvDang === n.ma}
-              onClick={() => dat({ nv: nvDang === n.ma ? d.nv_moi_nguoi : n.ma })}>
-              <span className="kh-td-nhan"><b>{n.ten}</b><span>{so(n.so_khach)} khách · {so(n.canh_bao)} cần xử lý · {gon(n.doanh_thu)}</span></span>
-              <span className="kh-td-thanh mong doi" style={{ width: `${n.so_khach / maxNv * 100}%` }}>
-                <i className="do" style={{ width: `${n.so_khach ? n.canh_bao / n.so_khach * 100 : 0}%` }} /><i /></span>
-            </button>))}
-        </section>
-      </div>
     </div>
   );
 }

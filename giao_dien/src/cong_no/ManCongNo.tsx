@@ -13,22 +13,29 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
-import { ChuaCoDuLieu } from "../chung/Khoi";
+import { ChuaCoDuLieu, ChuThich } from "../chung/Khoi";
+import { KD } from "../khoi_dau";
 import { gon, ngay, ngay_ngan, pc, so, yen } from "../dinh_dang";
 import { nhanHan, type Ben, type CongNoApi, type Phieu } from "./kieu";
 import "../san_pham/san_pham.css";
 import "./cong_no.css";
 
+// 2026-10-16 (chủ DN: "1 trang nhiều chức năng quá nên khó xài"): mở trang là thấy VIỆC — "Việc nên làm" ở đầu, tab
+// mặc định Quá hạn; chỉ ba tab hiện. "Không suy được hạn" và "Theo bên nhận hoá đơn" vẫn là tab hợp lệ trên URL, vào
+// bằng liên kết nhỏ dưới bảng. Ba ô số phụ (không suy được hạn · đã thu · trả dư) thành một dòng chữ.
 type Tab = "tat_ca" | "qua_han" | "sap" | "khong_han" | "ben";
-const TAB: [Tab, string][] = [["tat_ca", "Tất cả phiếu còn nợ"], ["qua_han", "Quá hạn"], ["sap", "Sắp đến hạn"],
+const TAB: [Tab, string][] = [["qua_han", "Quá hạn"], ["sap", "Sắp đến hạn"], ["tat_ca", "Tất cả phiếu còn nợ"],
   ["khong_han", "Không suy được hạn"], ["ben", "Theo bên nhận hoá đơn"]];
+const TAB_HIEN: Tab[] = ["qua_han", "sap", "tat_ca"];
 const MAU_TUOI: Record<string, string> = { d30: "ok", d60: "canh", d90: "canh", d90p: "do", truoc_ky: "do" };
 const TOI_DA = 300;
 
 function docUrl() {
   const q = new URLSearchParams(location.search);
   const t = q.get("tab") as Tab | null;
-  return { tab: (t && TAB.some(x => x[0] === t) ? t : "tat_ca") as Tab, nhom: q.get("nhom") ?? "", tim: q.get("tim") ?? "" };
+  // Không ?tab=: link mang ô tìm / tuổi nợ (hồ sơ khách, Tổng quan) mở Tất cả như trước; không gì cả → Quá hạn.
+  const mac = q.get("tim") || q.get("nhom") ? "tat_ca" : "qua_han";
+  return { tab: (t && TAB.some(x => x[0] === t) ? t : mac) as Tab, nhom: q.get("nhom") ?? "", tim: q.get("tim") ?? "" };
 }
 
 function khop(p: { ten: string; ma: string; so?: string | null }, tim: string) {
@@ -42,7 +49,7 @@ export default function ManCongNo() {
   const dat = (s: Partial<typeof b>) => {
     const bb = { ...b, ...s }; datB(bb);
     const q = new URLSearchParams();
-    if (bb.tab !== "tat_ca") q.set("tab", bb.tab);
+    if (bb.tab !== "qua_han") q.set("tab", bb.tab);
     if (bb.nhom) q.set("nhom", bb.nhom);
     if (bb.tim.trim()) q.set("tim", bb.tim.trim());
     history.replaceState(null, "", giuKhoang("/cong-no" + (q.toString() ? "?" + q : "")));
@@ -98,7 +105,10 @@ export default function ManCongNo() {
       <div className="tieu-de-trang">
         <div><h1>Công nợ &amp; thu tiền</h1>
           <div className="phu">Ai còn nợ, nợ bao lâu — tính đến <b>{ngay(d.moc)}</b>, cuối kỳ sổ <b className="ten-jp">請求先元帳</b> mới nhất
-            ({ngay(d.ky_tu)} → {ngay(d.moc)}). Thu sau ngày đó chưa có ở đây cho tới khi nạp sổ kỳ sau.</div></div>
+            ({ngay(d.ky_tu)} → {ngay(d.moc)}).{" "}
+            <ChuThich>Thu sau ngày đó chưa có ở đây cho tới khi nạp sổ kỳ sau.<br /><br />
+              {Object.values(d.cach_tinh).map((c, i) => <span key={i}>{c}<br /></span>)}<br />
+              Không có nút "Ghi nhận thu": tiền thu ghi trong OBC (sổ cái chính thức), nạp lại 請求先元帳 là màn này tự cập nhật.</ChuThich></div></div>
         <div className="sp-dau-phai">
           <button type="button" className="nut-nho" onClick={xuatCsv} disabled={!phieu.length || b.tab === "ben"} title="Xuất đúng các phiếu đang hiện (theo tab, cột tuổi và ô tìm)">⤓ Xuất CSV</button>
           <button type="button" className="nut-nho" disabled title="Chưa có kênh gửi nhắc thu nào — gọi khách rồi ghi tiếp xúc ở hồ sơ khách.">Gửi nhắc thu</button>
@@ -114,37 +124,24 @@ export default function ManCongNo() {
         <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={b.tab === "sap"} onClick={() => dat({ tab: b.tab === "sap" ? "tat_ca" : "sap" })}>
           <div className="nhan">Đến hạn trong {sap} ngày sau mốc</div><div className={"gia" + (tq.sap_den_han ? " canh-chu" : "")}>{gon(tq.sap_den_han)}</div>
           <div className="dong-phu nhat-chu">{so(tq.so_phieu_sap)} phiếu cần theo</div></button>
-        <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={b.tab === "khong_han"} onClick={() => dat({ tab: b.tab === "khong_han" ? "tat_ca" : "khong_han" })}>
-          <div className="nhan">Không suy được hạn</div><div className="gia">{gon(tq.khong_suy_han)}</div>
-          <div className="dong-phu nhat-chu">代引 · その都度 · 前払い … — không tính là quá hạn</div></button>
-        <div className="o-kpi"><div className="nhan">Đã thu trong kỳ</div><div className="gia ok-chu">{gon(tq.da_thu_ky)}</div>
-          <div className="dong-phu nhat-chu">bán chịu trong kỳ {gon(tq.ban_chiu_ky)}</div></div>
-        <div className="o-kpi"><div className="nhan">Khách trả dư</div><div className="gia">{gon(-tq.tra_du)}</div>
-          <div className="dong-phu nhat-chu">{so(tq.so_ben_tra_du)} bên có số dư âm</div></div>
       </div>
+      <p className="phu cn-phu">
+        <button type="button" className="nut-chu" onClick={() => dat({ tab: "khong_han" })}>{gon(tq.khong_suy_han)} không suy được hạn</button>
+        {" "}(代引 · その都度 · 前払い … — không tính là quá hạn) · đã thu trong kỳ <b className="ok-chu">{gon(tq.da_thu_ky)}</b>
+        {" "}(bán chịu {gon(tq.ban_chiu_ky)}){tq.so_ben_tra_du ? <> · {so(tq.so_ben_tra_du)} bên trả dư {gon(-tq.tra_du)}</> : null}
+      </p>
+
+      <section className="kh-the cn-viec cn-viec-dau">
+        <h2>Việc nên làm</h2>
+        {d.viec.length ? <ul>{d.viec.map((v, i) => <li key={i}>{v}</li>)}</ul> : <p className="trong-nho">Không có gì nổi bật.</p>}
+      </section>
 
       <div className="kho-hai-cot">
         <div className="kho-chinh cn-chinh">
           <section className="kh-the">
-            <div className="sp-dm-dau"><h2>Tuổi nợ</h2><span className="phu">bấm một cột để lọc bảng · tuổi đếm từ ngày phiếu tới mốc</span>
-              <span className="phu">tổng {yen(tq.tong_phai_thu)}</span></div>
-            <div className="cn-tuoi">
-              {tq.tuoi.map(t => (
-                <button key={t.nhom} type="button" className="cn-o-tuoi" aria-pressed={b.nhom === t.nhom}
-                  onClick={() => dat({ nhom: b.nhom === t.nhom ? "" : t.nhom, tab: b.tab === "ben" ? "tat_ca" : b.tab })}>
-                  <div className="phu">{t.nhan}</div>
-                  <div className={"cn-tien " + (MAU_TUOI[t.nhom] ?? "")}>{gon(t.tien)}</div>
-                  <div className="kho-du-thanh cn-thanh"><i className={MAU_TUOI[t.nhom] === "do" ? "giam" : MAU_TUOI[t.nhom] === "canh" ? "canh-chu" : ""}
-                    style={{ width: `${Math.max(2, t.tien / maxTuoi * 100)}%` }} /></div>
-                  <div className="phu">{t.nhom === "truoc_ky" ? "không rõ phiếu" : `${so(t.dem)} phiếu`} · {pc(tq.tong_phai_thu ? t.tien / tq.tong_phai_thu : null, 0)}</div>
-                </button>))}
-            </div>
-          </section>
-
-          <section className="kh-the">
             <div className="sp-dm-dau">
               <div className="kho-tab cn-tab" role="tablist">
-                {TAB.map(([t, nhan]) => <button key={t} type="button" role="tab" aria-selected={b.tab === t} onClick={() => dat({ tab: t })}>{nhan}</button>)}
+                {TAB.filter(([t]) => TAB_HIEN.includes(t) || t === b.tab).map(([t, nhan]) => <button key={t} type="button" role="tab" aria-selected={b.tab === t} onClick={() => dat({ tab: t })}>{nhan}</button>)}
               </div>
               <input type="search" className="kh-tim sp-tim" placeholder="Tìm tên, mã bên hoặc số phiếu…" value={tim}
                 onChange={e => datTim(e.target.value)} aria-label="Tìm trong sổ công nợ" />
@@ -157,12 +154,12 @@ export default function ManCongNo() {
               ? `${so(ben.length)} bên · tổng số dư ${yen(ben.reduce((s, x) => s + x.so_du, 0))}`
               : `${so(phieu.length)} phiếu${phieu.length > TOI_DA ? ` (hiện ${TOI_DA} đầu — tìm để thu hẹp)` : ""} · tổng còn lại ${yen(tongLoc)}`
                 + (b.tim.trim() ? ` · đang tìm “${b.tim.trim()}”` : "")}</p>
-            <p className="phu sp-ghi">{d.cach_tinh.fifo} {d.cach_tinh.han}</p>
+            <p className="phu sp-ghi">{b.tab === "ben" ? <button type="button" className="nut-chu" onClick={() => dat({ tab: "tat_ca" })}>← Xem theo phiếu</button>
+              : <button type="button" className="nut-chu" onClick={() => dat({ tab: "ben" })}>Xem theo bên nhận hoá đơn →</button>}</p>
           </section>
         </div>
 
         <aside className="kho-ben">
-          <ChuaCoDuLieu tieu_de="Vượt hạn mức tín dụng" ly_do="OBC không xuất hạn mức tín dụng của khách trong file nào ta nạp — chưa có nguồn." />
           <section className="kh-the">
             <h2>Lịch thu {sap} ngày sau mốc</h2>
             <p className="phu">theo hạn suy từ điều kiện thanh toán</p>
@@ -173,15 +170,22 @@ export default function ManCongNo() {
                 <span className="so">{yen(p.con_lai)}</span></a>))}</div>
               : <p className="trong-nho">Không phiếu nào đến hạn trong {sap} ngày sau {ngay(d.moc)}.</p>}
           </section>
-          <section className="kh-the cn-viec">
-            <h2>Việc nên làm</h2>
-            {d.viec.length ? <ul>{d.viec.map((v, i) => <li key={i}>{v}</li>)}</ul> : <p className="trong-nho">Không có gì nổi bật.</p>}
-          </section>
           <section className="kh-the">
-            <h2>Cách tính</h2>
-            <ul className="cn-cach">{Object.values(d.cach_tinh).map((c, i) => <li key={i} className="phu">{c}</li>)}</ul>
-            <p className="phu">Không có nút "Ghi nhận thu": tiền thu ghi trong OBC (sổ cái chính thức), nạp lại 請求先元帳 là màn này tự cập nhật.</p>
+            <div className="sp-dm-dau"><h2>Tuổi nợ</h2><span className="phu">tổng {yen(tq.tong_phai_thu)}</span></div>
+            <div className="cn-tuoi doc">
+              {tq.tuoi.map(t => (
+                <button key={t.nhom} type="button" className="cn-o-tuoi" aria-pressed={b.nhom === t.nhom}
+                  onClick={() => dat({ nhom: b.nhom === t.nhom ? "" : t.nhom, tab: "tat_ca" })}>
+                  <div className="phu">{t.nhan}</div>
+                  <div className={"cn-tien " + (MAU_TUOI[t.nhom] ?? "")}>{gon(t.tien)}</div>
+                  <div className="kho-du-thanh cn-thanh"><i className={MAU_TUOI[t.nhom] === "do" ? "giam" : MAU_TUOI[t.nhom] === "canh" ? "canh-chu" : ""}
+                    style={{ width: `${Math.max(2, t.tien / maxTuoi * 100)}%` }} /></div>
+                  <div className="phu">{t.nhom === "truoc_ky" ? "không rõ phiếu" : `${so(t.dem)} phiếu`} · {pc(tq.tong_phai_thu ? t.tien / tq.tong_phai_thu : null, 0)}</div>
+                </button>))}
+            </div>
           </section>
+
+          {KD.hien_chua_co && <ChuaCoDuLieu tieu_de="Vượt hạn mức tín dụng" ly_do="OBC không xuất hạn mức tín dụng của khách trong file nào ta nạp — chưa có nguồn." />}
         </aside>
       </div>
     </div>

@@ -70,7 +70,7 @@ export default function LienHe() {
   return (
     <div className={"lh" + (isFetching ? " dang-tai" : "")}>
       <div className="tieu-de-trang">
-        <div><h1>Cần liên hệ</h1>
+        <div><h1>Cần gọi</h1>
           <div className="phu">Khách lâu chưa đặt hàng hơn bình thường — nên gọi hỏi thăm{" "}
             <ChuThich>Khách đang im lặng lâu hơn <b>nhịp mua riêng của chính họ</b>, chia theo lý do. Ghi lại mỗi lần gọi —
               khách vừa liên hệ tạm ẩn tới ngày hẹn (hoặc {d.an_ngay} ngày nếu không hẹn). Hồ sơ và lịch sử mua ở màn Khách hàng.
@@ -84,7 +84,7 @@ export default function LienHe() {
       </div>
 
       <div className="o-kpi-luoi lh-kpi">
-        <div className="o-kpi"><div className="nhan">Cần liên hệ</div><div className="gia">{so(ds.tong)}</div>
+        <div className="o-kpi"><div className="nhan">Cần gọi</div><div className="gia">{so(ds.tong)}</div>
           <div className="dong-phu nhat-chu">khách · {gon(tongLuyKe)} tổng doanh thu đến nay{ds.dem[d.cot_thang] ? " (chưa gồm cột tháng)" : ""}</div></div>
         {ds.cot.map(c => (
           <button key={c.ly_do} type="button" className={"o-kpi lh-o " + lopMau(c.ly_do)} aria-pressed={loc.ly_do === c.ly_do}
@@ -97,8 +97,12 @@ export default function LienHe() {
           <div className="dong-phu nhat-chu">xem danh sách ↓</div></a>
       </div>
 
-      <p className="phu lh-ghi">Hai nhóm khác của danh sách làm việc:{" "}
-        <a href="/khach-hang?nhom=tut&tat_ca=1">khách lớn đang giảm tốc</a> · <a href="/khach-hang?nhom=moi&tat_ca=1">khách mới mua một lần rồi thôi</a>.
+      {/* Ba nhóm việc KHÔNG vào cột (tut/moi dựng lại khach_360 — bất biến đợt 7): mở danh sách khách đã lọc sẵn.
+          Trước 2026-10-16 chúng là chip ở trang Khách hàng; nay mọi "danh sách làm việc" bắt đầu từ đây. */}
+      <p className="phu lh-ghi">Nhóm khác nên để ý:{" "}
+        <a href="/khach-hang?nhom=tut&tat_ca=1">khách hạng S·A đang mua ít đi</a> ·{" "}
+        <a href="/khach-hang?nhom=moi&tat_ca=1">khách mới mua một lần rồi thôi</a> ·{" "}
+        <a href="/khach-hang?nv=__trong">khách chưa ai phụ trách</a>.
         {ds.ly_do && <> <button type="button" className="lien-ket" onClick={() => dat({ ly_do: "" })}>← Mọi lý do</button></>}</p>
 
       <div className={"lh-cot" + (ds.ly_do ? " mot" : "")}>

@@ -14,20 +14,13 @@
 
 /* Tab Danh sách / Bản đồ: lớp .kh-tab/.hs-tab nay ở chung/chung.css (màn Mùa vụ dùng chung). */
 
-/* Phân khúc "Danh sách làm việc" */
-.kh-phan-khuc{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(196px,100%),1fr));gap:.5rem;margin-bottom:.8rem}
-.kh-pk{font:inherit;text-align:left;background:var(--nen-the);border:1px solid var(--vien);border-radius:10px;padding:.55rem .7rem;
-  cursor:pointer;color:var(--chu);display:flex;flex-direction:column;gap:.2rem}
-.kh-pk:hover:not(:disabled){border-color:var(--vien-dam)}
-.kh-pk[aria-pressed="true"]{border-color:var(--do);background:var(--do-nen)}
-.kh-pk:disabled{cursor:default;opacity:.62;border-style:dashed}
-.kh-pk-dau{display:flex;align-items:baseline;gap:.5rem}
-.kh-pk-dau b{font-size:.83rem;font-weight:600}
-.kh-pk-so{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;font-size:.9rem;color:var(--chu-nhat)}
-.kh-pk-so.co{color:var(--canh-chu)}
-.kh-pk[aria-pressed="true"] .kh-pk-so{color:var(--do-chu)}
-.kh-pk:disabled .kh-pk-so{font-size:.72rem;font-weight:600}
-.kh-pk-mo{font-size:.72rem;color:var(--chu-nhat);line-height:1.35}
+/* Tóm tắt một dòng + nhóm đang bật (2026-10-16: thay dải 4 ô số và 8 chip — trang chỉ còn tra cứu) */
+.kh-tom-tat{margin:0 0 .7rem;font-size:.95rem;line-height:1.5}
+.kh-tom-tat b{font-variant-numeric:tabular-nums}
+.kh-dang-nhom{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .6rem;padding:.45rem .7rem;border-radius:10px;
+  background:var(--canh-nen);color:var(--chu);font-size:.88rem}
+.kh-loc-them{margin-top:-.4rem}
+.kh-co-mua{flex-direction:row!important;align-items:center;gap:.35rem}
 
 /* Thanh công cụ lọc */
 .kh-cong-cu{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem .6rem;background:var(--nen-the);border:1px solid var(--vien);
@@ -80,6 +73,7 @@ td.trong{text-align:center;padding:1.6rem}
 .kh-phan-trang select{font:inherit;font-size:.76rem;padding:.24rem .35rem;border:1px solid var(--vien-dam);border-radius:7px;background:var(--nen-the);color:var(--chu)}
 
 /* Ba khối phân tích + thẻ chung */
+.kh-bd-phan-tich{margin:1rem 0}
 .kh-ba-khoi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:.75rem}
 /* Bản đồ */
 .kh-bd-ghi{font-size:.78rem;margin:0 0 .6rem;max-width:880px}
@@ -276,3 +270,8 @@ td.trong{text-align:center;padding:1.6rem}
 /* Ô tên mặt hàng có ảnh nhỏ (HoSoTab.tsx::TenHinh). */
 .ten-hinh{display:flex;align-items:center;gap:.45rem;min-width:0}
 .ten-hinh > div{min-width:0}
+/* 2026-10-16: tab Mặt hàng — MỘT khối với nút chọn; phân tích gập trong <details>. */
+.hs2-mh-chon{display:flex;flex-wrap:wrap;gap:.3rem;margin:.6rem 0 .7rem}
+.hs2-phan-tich{margin-top:1rem}
+.hs2-phan-tich>summary{cursor:pointer;font-size:.85rem;color:var(--chu-thuong);padding:.4rem 0}
+.hs2-phan-tich[open]>summary{margin-bottom:.6rem}
