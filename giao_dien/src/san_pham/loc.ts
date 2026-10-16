@@ -9,12 +9,14 @@
 import type { MaHang } from "./kieu";
 
 // `nganh` = ngành hàng (food_category_name; rỗng đã thành NGANH_TRONG ở máy chủ).
-export type LocSp = { tim: string; loc: string; nganh: string; sap: string; giam: "" | "0" | "1" };
+// `xem` = cách bày: "" = lưới thẻ có hình to (mặc định — để CHỌN mã), "bang" = bảng đủ cột (để so số).
+export type LocSp = { tim: string; loc: string; nganh: string; sap: string; giam: "" | "0" | "1"; xem: "" | "bang" };
 
 export function docLocSp(search: string): LocSp {
   const q = new URLSearchParams(search);
   return { tim: q.get("tim") ?? "", loc: q.get("loc") ?? "", nganh: q.get("nganh") ?? "",
-    sap: q.get("sap") ?? "dt_khoang", giam: (q.get("giam") as LocSp["giam"]) ?? "" };
+    sap: q.get("sap") ?? "dt_khoang", giam: (q.get("giam") as LocSp["giam"]) ?? "",
+    xem: q.get("xem") === "bang" ? "bang" : "" };
 }
 
 export function chuoiLocSp(b: LocSp): string {
@@ -24,6 +26,7 @@ export function chuoiLocSp(b: LocSp): string {
   if (b.nganh) q.set("nganh", b.nganh);
   if (b.sap !== "dt_khoang") q.set("sap", b.sap);
   if (b.giam) q.set("giam", b.giam);
+  if (b.xem) q.set("xem", b.xem);
   return q.toString();
 }
 
