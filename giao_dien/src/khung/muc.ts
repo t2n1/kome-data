@@ -10,6 +10,8 @@
 // 2026-09-29-thi-truong-doi-thu-design.md §0 đảo lại; dùng icon "target", TA CHỌN (gói thiết kế không có màn này).
 // "banggia" (Bảng giá KOME, 2026-09-30) — TÁCH từ mục "Báo giá & bảng giá" của gói thiết kế: phần bảng giá đã có
 // (/bang-gia, chỉ xem), phần báo giá vẫn chưa; giữ icon "quote" của mục gốc cho cả hai.
+// LỆCH CÓ CHỦ Ý khỏi gói thiết kế (2026-10-16, chủ DN thấy menu rối): bỏ "Bản đồ khách hàng" (tab của Khách hàng);
+// "Bảng giá KOME" và "Thị trường & đối thủ" về nhóm HÀNG HÓA & KHO.
 import { KD, TN } from "../khoi_dau";
 
 export type Muc = { ma: string; nhan: string; url: string | null; icon: string; ly_do?: string };
@@ -28,14 +30,15 @@ export function nhomDieuHuong(): Nhom[] {
       { ma: "baocao", nhan: "Doanh thu", url: "/bao-cao", icon: "chart" },
       { ma: "hieusuat", nhan: "Hiệu suất đội sale", url: null, icon: "team", ly_do: CHUA },
     ] },
+    // 2026-10-16 (chủ DN: "nhiều thông tin quá nên hơi loạn"): bỏ mục "Bản đồ khách hàng" — nó là TAB của màn
+    // Khách hàng (cùng trạng thái lọc), hai mục trỏ một màn; /ban-do vẫn mở được và đánh dấu mục kh360.
     { ma: "khachhang", ten: "KHÁCH HÀNG", muc: [
       { ma: "kh360", nhan: "Khách hàng & bản đồ", url: "/khach-hang", icon: "user" },
-      { ma: "bando", nhan: "Bản đồ khách hàng", url: "/ban-do", icon: "pin" },
-      { ma: "doithu", nhan: "Thị trường & đối thủ", url: "/doi-thu", icon: "target" },
       { ma: "crm", nhan: "Cần liên hệ", url: "/lien-he", icon: "crm" },
     ] },
+    // Bảng giá KOME + Thị trường & đối thủ chuyển sang nhóm hàng hoá (cùng nói về GIÁ của mã); nhóm "Bán hàng"
+    // chỉ còn mục chưa có nên tự ẩn khi công tắc man_chua_co tắt.
     { ma: "banhang", ten: "BÁN HÀNG", muc: [
-      { ma: "banggia", nhan: "Bảng giá KOME", url: "/bang-gia", icon: "quote" },
       { ma: "baogia", nhan: "Báo giá", url: null, icon: "quote", ly_do: CHUA },
       { ma: "lendon", nhan: "Lên đơn hàng", url: null, icon: "cart", ly_do: CHUA },
     ] },
@@ -46,10 +49,12 @@ export function nhomDieuHuong(): Nhom[] {
       { ma: "dongtien", nhan: "Dòng tiền & phải trả", url: null, icon: "yen", ly_do: CHUA },
     ] },
     { ma: "hanghoa", ten: "HÀNG HÓA & KHO", muc: [
-      { ma: "kho", nhan: "Kho hàng", url: "/kho-hang", icon: "box" },
-      { ma: "muahang", nhan: "Mua hàng & NCC", url: null, icon: "refill", ly_do: CHUA },
       { ma: "sanpham", nhan: "Sản phẩm", url: "/san-pham", icon: "cube" },
+      { ma: "kho", nhan: "Kho hàng", url: "/kho-hang", icon: "box" },
       { ma: "muavu", nhan: "Mùa vụ sản phẩm", url: "/mua-vu", icon: "chart" },
+      { ma: "banggia", nhan: "Bảng giá KOME", url: "/bang-gia", icon: "quote" },
+      { ma: "doithu", nhan: "Thị trường & đối thủ", url: "/doi-thu", icon: "target" },
+      { ma: "muahang", nhan: "Mua hàng & NCC", url: null, icon: "refill", ly_do: CHUA },
     ] },
     { ma: "hethong", ten: "HỆ THỐNG", muc: [
       ...(KD.hien_kho ? [{ ma: "khodl", nhan: "Kho dữ liệu", url: "/kho-du-lieu", icon: "db" }] : []),
@@ -67,6 +72,8 @@ export function nhomDieuHuong(): Nhom[] {
 export function mucDangMo(duong: string): string {
   // Màn nhập ngân sách không còn mục riêng — nó thuộc trang Doanh thu.
   if (duong === "/ngan-sach" || duong.startsWith("/ngan-sach/")) return "baocao";
+  // Bản đồ là tab của màn Khách hàng (không còn mục riêng).
+  if (duong === "/ban-do") return "kh360";
   let tot = "", dai = -1;
   for (const g of nhomDieuHuong()) for (const m of g.muc) {
     if (!m.url) continue;

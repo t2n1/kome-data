@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { lay } from "../../api";
 import { BieuDo } from "../../chung/BieuDo";
 import { LuoiTinh } from "../../chung/LuoiTinh";
+import { MAC_DINH_XEM, useXemThem } from "../../chung/XemThem";
 import { The } from "../../khach/HoSoTab";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../../khung/khoang";
 import { gon, ngay, pc, so, so_luong as soLuong, yen } from "../../dinh_dang";
@@ -58,10 +59,7 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
       </The>
     </div>
     {khoang && <The tieu_de="Khách mua trong khoảng xem" cach_tinh={ct.khoang}>
-      {!khoang.khach.length ? <p className="phu">Không khách nào mua mã này trong khoảng xem.</p> :
-        <div className="bang-cuon"><table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">SL</th><th className="so">Ngày mua</th><th>Lần cuối</th></tr></thead>
-          <tbody>{khoang.khach.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>
-            <td className="so">{yen(k.doanh_thu)}</td><td className="so">{soLuong(k.so_luong)}</td><td className="so">{so(k.so_ngay)}</td><td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table></div>}
+      {!khoang.khach.length ? <p className="phu">Không khách nào mua mã này trong khoảng xem.</p> : <BangKhachKhoang ds={khoang.khach} />}
     </The>}
     <div className="sp3-luoi-2">
       <BangKhach tieu_de="Khách đang mua" ds={t.dang_mua} rong="Chưa khách nào đang mua đều." ct={ct.khach_cap} />
@@ -70,12 +68,21 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
   </>);
 }
 
+// Bảng khách dài (30+ dòng) chỉ hiện 10 dòng đầu + "Xem thêm" (soát 2026-10-16).
+function BangKhachKhoang({ ds }: { ds: NonNullable<KhoangMaApi>["khach"] }) {
+  const { hien, nut } = useXemThem(ds, MAC_DINH_XEM, "khách");
+  return (<><div className="bang-cuon"><table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">SL</th><th className="so">Ngày mua</th><th>Lần cuối</th></tr></thead>
+    <tbody>{hien.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>
+      <td className="so">{yen(k.doanh_thu)}</td><td className="so">{soLuong(k.so_luong)}</td><td className="so">{so(k.so_ngay)}</td><td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table></div>{nut}</>);
+}
+
 function BangKhach({ tieu_de, ds, rong, ct }: { tieu_de: string; ds: KhachDong[]; rong: string; ct: string }) {
+  const { hien, nut } = useXemThem(ds, MAC_DINH_XEM, "khách");
   return (<The tieu_de={tieu_de} cach_tinh={ct}>
     {!ds.length ? <p className="phu">{rong}</p> :
-      <div className="bang-cuon"><table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">Nhịp</th><th>Lần cuối</th></tr></thead>
-        <tbody>{ds.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>
+      <><div className="bang-cuon"><table className="bang"><thead><tr><th>Khách</th><th className="so">Doanh thu</th><th className="so">Nhịp</th><th>Lần cuối</th></tr></thead>
+        <tbody>{hien.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a></td>
           <td className="so">{yen(k.doanh_thu)}</td><td className="so">{k.nhip == null ? "—" : `${Math.round(k.nhip)} ngày`}</td>
-          <td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table></div>}
+          <td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table></div>{nut}</>}
   </The>);
 }

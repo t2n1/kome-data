@@ -133,7 +133,7 @@ def dien_giai(h: KH.HoSo, lich: dict) -> str:
     if t.get("nhan") == "da_mua":
         so = t["dt_thang_truoc_den_ngay"]
         tang = _ty_so(t["dt_thang_nay"] - so, so) if so else None
-        cau.append(f"Tháng {_thang(t['thang'])} đã mua {DD.yen(t['dt_thang_nay'])}"
+        cau.append(f"Tháng {_thang(t['thang'])} đã mua {DD.gon(t['dt_thang_nay'])}"
                    + (f", {'hơn' if tang >= 0 else 'kém'} {abs(tang) * 100:.0f}% so tháng trước cùng ngày"
                       if tang is not None else ""))
     elif t.get("nhan") == "tre":
