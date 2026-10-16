@@ -7,7 +7,6 @@ import { useMemo, useState } from "react";
 import { lay } from "../api";
 import { HinhMa } from "../chung/HinhMa";
 import { ChuThich } from "../chung/Khoi";
-import { MAC_DINH_XEM } from "../chung/XemThem";
 import { gon, ngay, so, yen } from "../dinh_dang";
 import { GhiTiepXuc } from "../khach/GhiTiepXuc";
 import { dauKichBan, kichBanGoi } from "../khach/kich_ban";
@@ -38,6 +37,15 @@ export function chuViec(v: Viec): string {
   return `chưa từng mua · mua hàng cùng ngành ${gon(v.doanh_thu)}/12 tháng`;
 }
 
+/** Nhãn NGẮN cho một mã (đứng trong viên màu) — câu đầy đủ ở `chuViec`, trong title. */
+export function nhanNgan(v: Viec): string {
+  if (v.loai === "lai") return v.con == null ? "đến lúc mua" : v.con < 0 ? `trễ ${-v.con} ngày` : v.con === 0 ? "hôm nay" : `còn ${v.con} ngày`;
+  if (v.loai === "ngung") return `${v.so_ngay ?? "?"} ngày chưa mua`;
+  return "chưa mua";
+}
+
+const SO_DONG = 20;
+
 export default function TheoSanPham({ ma, datMa, locNv }: { ma: string[]; datMa: (ma: string[]) => void; locNv: string }) {
   const q = new URLSearchParams(locNv);
   if (ma.length) q.set("ma", ma.join(","));
@@ -46,36 +54,42 @@ export default function TheoSanPham({ ma, datMa, locNv }: { ma: string[]; datMa:
   const nhanh = useQuery<SpApi>({ queryKey: ["lien-he-sp", url, "nhanh"], queryFn: () => lay<SpApi>(url + "&nhanh=1"),
     enabled: coMa, placeholderData: keepPreviousData });
   const du = useQuery<SpApi>({ queryKey: ["lien-he-sp", url], queryFn: () => lay<SpApi>(url), enabled: coMa });
-  // Bản đủ có thì dùng bản đủ; chưa có thì bản nhanh (hai nhóm đầu) + khung "đang tìm" cho nhóm chào.
+  // Bản đủ có thì dùng bản đủ; chưa có thì bản nhanh (hai nhóm đầu) + "đang tìm" cho nhóm chào.
   const d = du.data ?? nhanh.data;
+  const [chon, datChon] = useState<string | null>(null);
   const [mo, datMo] = useState<string | null>(null);
-  const [moNhom, datMoNhom] = useState<Record<string, boolean>>({});
+  const [soHien, datSoHien] = useState(SO_DONG);
+
+  // Nhóm đang xem: người chọn, không thì nhóm đầu có khách (gấp nhất trước).
+  const nhom = d && (d.nhom.find(n => n.loai === chon) ?? d.nhom.find(n => n.tong > 0) ?? d.nhom[0]);
+  const chonNhom = (l: string) => { datChon(l); datSoHien(SO_DONG); datMo(null); };
 
   return (
     <div className="lh-sp">
       <ChonMa ma={ma} datMa={datMa} toi_da={d?.toi_da ?? 5} ten={Object.fromEntries((d?.san_pham ?? []).map(s => [s.ma, s.ten]))} />
       {!coMa ? null : (nhanh.error || du.error) && !d ? <div className="khoi-loi">Không tải được: {((nhanh.error || du.error) as Error).message}</div>
-        : !d ? <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div> : <>
-        <p className="lh-ghi phu">Khách cần gọi để bán {ma.length > 1 ? `${ma.length} mã đã chọn` : "mã đã chọn"}{" "}
+        : !d || !nhom ? <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div> : <>
+        {/* Ba nhóm là ba ô có số to — câu giải thích nằm trong title / ⓘ, không in ra trang. */}
+        <div className="lh-sp-nhom" role="tablist" aria-label="Nhóm khách">
+          {d.nhom.map(n => (
+            <button key={n.loai} type="button" role="tab" aria-selected={n.loai === nhom.loai} title={n.mo_ta}
+              className={"lh-sp-o " + MAU[n.loai]} onClick={() => chonNhom(n.loai)}>
+              <span className="lh-sp-so">{so(n.tong)}</span><span className="lh-sp-nhan">{n.nhan}</span></button>))}
+          {!d.du && <div className="lh-sp-o cho lh-m-thang_nay_chua_mua" aria-busy="true">
+            <span className="lh-sp-so">…</span><span className="lh-sp-nhan">Chưa mua — nên chào</span></div>}
           <ChuThich>{d.cach_tinh}</ChuThich>
-          {d.nhom.filter(n => n.loai !== "chao").map(n => <span key={n.loai}> · <b>{so(n.tong)}</b> {n.nhan.toLowerCase()}</span>)}
-          {d.du ? <> · <b>{so(d.nhom.find(n => n.loai === "chao")?.tong ?? 0)}</b> nên chào</> : " · đang tìm khách nên chào…"}</p>
-        <div className="lh-cot">
-          {d.nhom.map(n => { const hien = moNhom[n.loai] ? n.khach : n.khach.slice(0, MAC_DINH_XEM); return (
-            <section key={n.loai} className={MAU[n.loai]} aria-labelledby={"sp-" + n.loai}>
-              <div className="lh-cot-dau"><h2 id={"sp-" + n.loai}><span className="lh-nhan">{n.nhan}</span></h2>
-                <span className="phu">{so(n.tong)} khách</span></div>
-              <div className="lh-cot-mo">{n.mo_ta}</div>
-              <div className="lh-the-ds">{hien.map(k => <TheKhach key={k.ma} k={k} d={d} nhieuMa={ma.length > 1} mo={mo === k.ma}
-                datMo={v => datMo(v ? k.ma : null)} />)}</div>
-              {!n.khach.length && <p className="lh-cot-mo">Không có khách nào.</p>}
-              {n.khach.length > hien.length && <p className="lh-cot-mo"><button type="button" className="lien-ket"
-                onClick={() => datMoNhom({ ...moNhom, [n.loai]: true })}>Xem thêm {so(n.khach.length - hien.length)} khách →</button></p>}
-              {n.tong > n.khach.length && moNhom[n.loai] && <p className="lh-cot-mo">Hiện {so(n.khach.length)} khách đầu trên {so(n.tong)}.</p>}
-            </section>); })}
-          {!d.du && <section className={MAU.chao}><div className="lh-cot-dau"><h2><span className="lh-nhan">Chưa mua — nên chào</span></h2></div>
-            <div className="khoi-cho" aria-busy="true"><span /><span /></div></section>}
-        </div></>}
+        </div>
+
+        <ul className={"lh-sp-ds " + MAU[nhom.loai]}>
+          {nhom.khach.slice(0, soHien).map(k => <DongKhach key={k.ma} k={k} d={d} nhieuMa={ma.length > 1} mo={mo === k.ma}
+            datMo={v => datMo(v ? k.ma : null)} />)}
+        </ul>
+        {!nhom.khach.length && <p className="phu lh-sp-rong">Không có khách nào trong nhóm này.</p>}
+        {nhom.khach.length > soHien && <p className="lh-sp-rong"><button type="button" className="lien-ket"
+          onClick={() => datSoHien(soHien + 50)}>Xem thêm {so(Math.min(50, nhom.khach.length - soHien))} khách</button></p>}
+        {nhom.tong > nhom.khach.length && soHien >= nhom.khach.length &&
+          <p className="phu lh-sp-rong">Hiện {so(nhom.khach.length)} khách đầu trên {so(nhom.tong)}.</p>}
+      </>}
     </div>
   );
 }
@@ -125,35 +139,44 @@ function ChonMa({ ma, datMa, toi_da, ten }: { ma: string[]; datMa: (ma: string[]
 
 function kichBan(k: Khach): string {
   const ly = k.viec.map(v => ({ ten: v.ten, chi_tiet: (v.loai === "lai" ? "đến lúc mua lại — " : v.loai === "ngung" ? "đã ngừng — " : "nên chào — ") + chuViec(v) }));
-  return kichBanGoi({ dau: dauKichBan(k.ten, k.ma, k.dien_thoai), ly_do: "Gọi để bán:", tieu_de_ma: "", ma: ly,
-    cuoi: k.cuoi ? { ngay: k.cuoi.ngay, noi_dung: k.cuoi.noi_dung } : null }).replace("\n\n", "\n");
+  return kichBanGoi({ dau: dauKichBan(k.ten, k.ma, k.dien_thoai), ly_do: "Lý do gọi: chào bán theo mã hàng.", tieu_de_ma: "Mã:",
+    ma: ly, cuoi: k.cuoi ? { ngay: k.cuoi.ngay, noi_dung: k.cuoi.noi_dung } : null });
 }
 
-function TheKhach({ k, d, nhieuMa, mo, datMo }: { k: Khach; d: SpApi; nhieuMa: boolean; mo: boolean; datMo: (v: boolean) => void }) {
+// Một DÒNG mỗi khách (thay thẻ cao 5 dòng — chủ DN 2026-10-16: "nhiều chữ quá"): tên + người phụ trách · viên lý do
+// ngắn · ☎ · ✏️ · 📋. Chi tiết (nhịp, đã mua bao nhiêu, nội dung lần gọi trước) nằm trong title — rê chuột mới hiện.
+function DongKhach({ k, d, nhieuMa, mo, datMo }: { k: Khach; d: SpApi; nhieuMa: boolean; mo: boolean; datMo: (v: boolean) => void }) {
   const [daChep, datDaChep] = useState(false);
   const chep = async () => {
     try { await navigator.clipboard.writeText(kichBan(k)); datDaChep(true); setTimeout(() => datDaChep(false), 1800); }
     catch { window.prompt("Chép kịch bản:", kichBan(k)); }
   };
+  const cuoi = k.cuoi;
   return (
-    <div className={"lh-the " + MAU[k.nhom]}>
-      <div className="lh-ten"><a href={`/khach-hang/${encodeURIComponent(k.ma)}`} className="ten-jp">{k.ten}</a></div>
-      <div className="phu">{k.ma}{k.tinh ? ` · ${k.tinh}` : ""}{k.phu_trach ? ` · ${k.phu_trach}` : ""}</div>
-      <ul className="lh-viec">{k.viec.map(v => (
-        <li key={v.loai + v.ma} className={MAU[v.loai]}>
-          {nhieuMa && <HinhMa ma={v.ma} ten={v.ten} co={18} trang_tri />}
-          <div>{nhieuMa && <div className="ten-jp lh-goi-y-ten">{v.ten}</div>}
-            <span className={v.loai === "lai" && (v.con ?? 0) < 0 ? "canh-chu" : "phu"}>{chuViec(v)}</span>
-            {v.loai !== "chao" && v.doanh_thu > 0 && <span className="phu" title={yen(v.doanh_thu)}> · tổng đã mua mã này {gon(v.doanh_thu)}</span>}</div></li>))}</ul>
-      {k.dien_thoai && <div className="phu">☎ <a href={`tel:${k.dien_thoai}`}>{k.dien_thoai}</a></div>}
-      {k.cuoi && <div className="lh-cuoi">{k.da_lien_he && <b>Vừa liên hệ · </b>}Lần trước: {k.cuoi.icon} {ngay(k.cuoi.ngay)} ·{" "}
-        <span className={"nhan-vien " + k.cuoi.mau_ket_qua}>{k.cuoi.nhan_ket_qua}</span> {k.cuoi.noi_dung.slice(0, 60)}</div>}
-      <div className="lh-nut">
-        <button type="button" className="nut-nho" aria-expanded={mo} onClick={() => datMo(!mo)}>{mo ? "Đóng" : "✏️ Ghi liên hệ"}</button>
-        <button type="button" className="nut-nho" onClick={chep}>{daChep ? "✓ Đã chép" : "📋 Chép kịch bản"}</button>
+    <li className={"lh-sp-dong" + (k.da_lien_he ? " da-goi" : "")}>
+      <div className="lh-sp-ten">
+        <a href={`/khach-hang/${encodeURIComponent(k.ma)}`} className="ten-jp" title={`${k.ma}${k.tinh ? " · " + k.tinh : ""}`}>{k.ten}</a>
+        {k.phu_trach && <span className="phu">{k.phu_trach}</span>}
       </div>
-      {mo && <GhiTiepXuc ma={k.ma} kieu_tx={d.kieu_tx} ket_qua_tx={d.ket_qua_tx} gon
-        lam_moi={[["lien-he-sp"], ["lien-he"], ["kh-ho-so", k.ma]]} xong={() => datMo(false)} />}
-    </div>
+      <div className="lh-sp-ly">
+        {k.viec.map(v => (
+          <span key={v.loai + v.ma} className={"lh-sp-vien " + MAU[v.loai] + (v.loai === "lai" && (v.con ?? 0) < 0 ? " tre" : "")}
+            title={`${v.ten}: ${chuViec(v)}${v.loai !== "chao" && v.doanh_thu > 0 ? ` · đã mua ${yen(v.doanh_thu)}` : ""}`}>
+            {nhieuMa && <HinhMa ma={v.ma} ten={v.ten} co={16} trang_tri />}{nhanNgan(v)}</span>))}
+        {cuoi && <span className={"lh-sp-cuoi" + (k.da_lien_he ? " vua" : "")}
+          title={`Lần trước ${ngay(cuoi.ngay)} · ${cuoi.nhan_ket_qua}: ${cuoi.noi_dung}`}>
+          {cuoi.icon} {k.da_lien_he ? "vừa gọi" : ngay(cuoi.ngay)}</span>}
+      </div>
+      <div className="lh-sp-nut">
+        {k.dien_thoai ? <a className="nut-nho lh-sp-dt" href={`tel:${k.dien_thoai}`} title="Gọi">☎ {k.dien_thoai}</a>
+          : <span className="lh-sp-dt phu">—</span>}
+        <button type="button" className="nut-nho" aria-expanded={mo} title="Ghi liên hệ" aria-label="Ghi liên hệ"
+          onClick={() => datMo(!mo)}>{mo ? "✕" : "✏️"}</button>
+        <button type="button" className="nut-nho" title="Chép kịch bản gọi" aria-label="Chép kịch bản gọi"
+          onClick={chep}>{daChep ? "✓" : "📋"}</button>
+      </div>
+      {mo && <div className="lh-sp-ghi"><GhiTiepXuc ma={k.ma} kieu_tx={d.kieu_tx} ket_qua_tx={d.ket_qua_tx} gon
+        lam_moi={[["lien-he-sp"], ["lien-he"], ["kh-ho-so", k.ma]]} xong={() => datMo(false)} /></div>}
+    </li>
   );
 }
