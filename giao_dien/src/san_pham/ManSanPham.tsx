@@ -6,7 +6,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
-import { Spark } from "../chung/Khoi";
+import { ChuThich, Spark } from "../chung/Khoi";
 import { gon, ngay, pc, so, so_luong as soLuong, thay_doi, yen } from "../dinh_dang";
 import type { DanhMucApi, DanhMucKhoangApi, MaHang } from "./kieu";
 import { chuoiLocSp, docLocSp, locDanhMuc, nhoDanhMuc, SAP } from "./loc";
@@ -166,9 +166,11 @@ export default function ManSanPham() {
             </tbody>
           </table>
         </div>
-        <p className="phu sp-ghi">{so(kq.hang.length)} mã đang hiện. <b>Chưa rõ tồn</b> KHÁC <b>hết hàng</b>: mã không có dòng nào trong
-          在庫一覧 thì ta không biết kho còn bao nhiêu — cột Tồn hiện "—". <b>Ngừng kinh doanh</b> = tồn 0 và không bán suốt 90 ngày.
-          <b> Tồn chết</b> gộp mã không bán gì suốt 90 ngày và mã còn đủ bán trên 180 ngày; mã ra mắt trong 90 ngày không bao giờ bị gọi là tồn chết.</p>
+        <p className="phu sp-ghi">{so(kq.hang.length)} mã đang hiện{" "}
+          <ChuThich nhan="Các trạng thái"><b>Chưa rõ tồn</b> KHÁC <b>hết hàng</b>: mã CHƯA TỪNG có dòng nào trong 在庫一覧 thì ta không biết
+            kho còn bao nhiêu — cột Tồn hiện "—"; mã có ở ảnh chụp trước mà vắng ở ảnh chụp mới nhất là <b>hết hàng</b> (OBC không xuất dòng
+            tồn 0). <b>Ngừng kinh doanh</b> = tồn 0 và không bán suốt 90 ngày. <b>Tồn chết</b> gộp mã không bán gì suốt 90 ngày và mã còn đủ
+            bán trên 180 ngày; mã ra mắt trong 90 ngày không bao giờ bị gọi là tồn chết.</ChuThich></p>
       </section>
     </div>
   );

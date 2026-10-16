@@ -892,7 +892,11 @@ phẩy ngăn nghìn (¥1,234,567), chấm thập phân (62.9% · 1.5×), số ti
 ¥1,170万 · ¥1.2億 — KHÔNG K/M/B). MỘT chỗ mỗi tầng: `giao_dien/src/dinh_dang.ts` (`yen`/`gon`/`so`/`pc`/
 `thay_doi`/`so_luong`, `Intl` `ja-JP`) và bản chép bắt buộc `kome/dinh_dang.py` cho chữ máy chủ viết sẵn
 (câu tóm tắt, nhãn trục SVG của /du-bao). Không tự `toFixed().replace(".", ",")` hay `"de-DE"` ở đâu nữa.
-Ô nhập số (ngân sách) VẪN đọc cả chấm lẫn phẩy (`ngan_sach.doc_so`). Lề trái `BieuDo` co theo nhãn trục
+Ô nhập số (ngân sách) VẪN đọc cả chấm lẫn phẩy (`ngan_sach.doc_so`). **Chỗ nào dùng dạng nào (soát
+2026-10-16):** ô số / thẻ / câu tóm tắt / tổng đầu cột dùng dạng GỌN (`gon`, có `title` số đủ khi cần), BẢNG dùng số
+ĐỦ (`yen`) — một màn không trộn ¥363万 ở ô với ¥3,628,931 trong câu cạnh nó. Danh sách dài trên màn chi tiết hiện 10 dòng
+đầu + "Xem thêm" (`chung/XemThem.tsx`, chỉ cắt HIỂN THỊ — đếm / tổng vẫn trên cả danh sách); chữ giải thích dài vào nút ⓘ
+(`chung/Khoi.tsx::ChuThich`), trên trang chỉ để một câu ngắn. Lề trái `BieuDo` co theo nhãn trục
 dài nhất. Có test canh: `tests/test_dinh_dang.py`, `giao_dien/src/dinh_dang.test.ts`.
 
 **Bất biến (Tổng quan ít chữ — chủ DN chốt 2026-09-28):** màn `/` là HÌNH + tối đa một số lớn mỗi

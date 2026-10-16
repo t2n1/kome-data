@@ -905,8 +905,11 @@ def test_kho_hang_noi_ro_con_so_nao_la_cua_MOI_KHO():
     # Từ 042 hai "kho" OBC gọi là hai LÔ của một kho vật lý (CLAUDE.md bẫy #6):
     # cùng luật, từ vựng "cả hai lô" / "theo lô".
     src = _nguon("KhoHang.tsx")
-    o = src.split('className="o-kpi-luoi kho-kpi"', 1)[1].split("</p>", 1)[0]
-    assert o.count("cả hai lô") >= 3, "hai ô đếm + lời chú thích phải nói 'cả hai lô'"
+    # Từ 2026-10-16 lời chú thích dài nằm trong ⓘ đầu trang (ChuThich); mỗi ô đếm vẫn tự ghi "cả hai lô".
+    o = src.split('className="o-kpi-luoi kho-kpi"', 1)[1].split('{b.tab === "ton"', 1)[0]
+    assert o.count("cả hai lô") >= 2, "hai ô đếm phải tự nói 'cả hai lô'"
+    ct = src.split("<ChuThich>", 1)[1].split("</ChuThich>", 1)[0]
+    assert "cả hai lô" in ct and "không theo bộ lọc trạng thái" in ct, "ⓘ đầu trang phải giải thích vì sao"
     kho = src.split("<h2>Giá trị tồn theo lô</h2>", 1)[1].split("</p>", 1)[0]
     assert "Không tự lọc theo lô" in kho and "vắng mặt" in kho
     assert "luôn liệt kê mọi lô" not in src and "luôn liệt kê mọi kho" not in src

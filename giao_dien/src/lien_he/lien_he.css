@@ -59,3 +59,4 @@ button.o-kpi{font:inherit;text-align:left;cursor:pointer}
 /* Đang xem trọn MỘT lý do (?ly_do=): thẻ xếp lưới thay vì một cột dài giãn hết bề ngang. */
 .lh-cot.mot .lh-the-ds{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.5rem}
 .lh-cot.mot .lh-the{margin-bottom:0}
+.lh-goi-y-ten{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -2,6 +2,7 @@
 // đồ 12 tháng của hồ sơ 360° — bố cục Customer 360.dc.html thiết kế lại
 // 2026-09-26. Biểu đồ SVG tự vẽ như gói thiết kế (không thư viện). Mọi số từ
 // /api/khach-hang/{mã}.
+import { MAC_DINH_XEM, useXemThem } from "../chung/XemThem";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { lay } from "../api";
@@ -41,6 +42,12 @@ const trongKhoang = (k: KhoangMayChu | undefined, thang: string) =>
 
 const MAU_NGANH = ["var(--do)", "var(--ok-vien)", "var(--lien-ket)", "var(--lam-chu)", "var(--duong-ck)",
   "var(--canh-vien)", "var(--map-3)", "var(--chu-mo)"];
+
+/** Bảng dài trong hồ sơ: 10 dòng đầu + "Xem thêm" (soát 2026-10-16). Component riêng để hook không nằm sau nhánh điều kiện. */
+function XemThemBang<T>({ ds, don_vi, children }: { ds: readonly T[]; don_vi: string; children: (hien: T[]) => React.ReactNode }) {
+  const { hien, nut } = useXemThem(ds, MAC_DINH_XEM, don_vi);
+  return <>{children(hien)}{nut}</>;
+}
 
 export function The({ tieu_de, phu, cach_tinh, goc, children, className = "" }: { tieu_de: string; phu?: React.ReactNode;
   cach_tinh?: React.ReactNode; goc?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -279,22 +286,22 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
       <div id="da-ngung-mua">
       <The tieu_de="Sản phẩm đã ngừng mua" cach_tinh="từng mua đều (≥ 3 lần) nhưng im lặng ≥ 2× nhịp riêng của cặp khách–mã">
         {!h.da_ngung_mua.length ? <p className="phu">Không có sản phẩm nào bị bỏ quên.</p> :
-        <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th><th className="so">Trễ</th><th className="so">Nhịp</th><th className="so">Mua cuối</th><th className="so">Doanh thu</th></tr></thead>
-          <tbody>{h.da_ngung_mua.map(m => (
+        <XemThemBang ds={h.da_ngung_mua} don_vi="mã">{hien => <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th><th className="so">Trễ</th><th className="so">Nhịp</th><th className="so">Mua cuối</th><th className="so">Doanh thu</th></tr></thead>
+          <tbody>{hien.map(m => (
             <tr key={m.ma}><td className="ten-jp"><TenHinh ma={m.ma} ten={m.ten}><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></TenHinh></td>
               <td className="so giam">{m.tre != null ? `${m.tre} ngày` : "—"}</td><td className="so">{m.nhip ? Math.round(m.nhip) + " ngày" : "—"}</td>
-              <td className="so">{ngay(m.lan_cuoi)}</td><td className="so">{yen(m.doanh_thu)}</td></tr>))}</tbody></table></div>}
+              <td className="so">{ngay(m.lan_cuoi)}</td><td className="so">{yen(m.doanh_thu)}</td></tr>))}</tbody></table></div>}</XemThemBang>}
       </The>
       </div>
       <The tieu_de="Tháng này chưa mua" phu="đã quá ngày mua lại theo nhịp của mã nhưng chưa tới mức 'ngừng' — một cuộc gọi nhắc là đủ">
         {!h.chua_mua_thang.length ? <p className="phu">Không có mã nào đang trễ.</p> :
-        <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th>{thang.map((t, i) =>
+        <XemThemBang ds={h.chua_mua_thang} don_vi="mã">{hien => <div className="bang-cuon"><table className="bang"><thead><tr><th>Mặt hàng</th>{thang.map((t, i) =>
           <th key={t} className="so">Tháng {+t.slice(5)}{i === 2 ? " (đến nay)" : ""}</th>)}</tr></thead>
-          <tbody>{h.chua_mua_thang.map(c => { const m = mhTheoMa[c.ma]; return (
+          <tbody>{hien.map(c => { const m = mhTheoMa[c.ma]; return (
             <tr key={c.ma}><td className="ten-jp"><TenHinh ma={c.ma} ten={c.ten}><a href={`/san-pham/${encodeURIComponent(c.ma)}`}>{c.ten}</a>
               <div className="ma-nho"><code>{c.ma}</code> · trễ {c.tre ?? "—"} ngày</div></TenHinh></td>
               <td className="so">{m ? gon(m.t2) : "—"}</td><td className="so">{m ? gon(m.t1) : "—"}</td>
-              <td className={"so " + (m && !m.t0 ? "giam" : "")}><b>{m ? (m.t0 ? gon(m.t0) : "0") : "—"}</b></td></tr>); })}</tbody></table></div>}
+              <td className={"so " + (m && !m.t0 ? "giam" : "")}><b>{m ? (m.t0 ? gon(m.t0) : "0") : "—"}</b></td></tr>); })}</tbody></table></div>}</XemThemBang>}
       </The>
     </div>
 

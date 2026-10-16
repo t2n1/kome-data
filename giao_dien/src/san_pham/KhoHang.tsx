@@ -16,7 +16,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { lay } from "../api";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
-import { ChuaCoDuLieu } from "../chung/Khoi";
+import { ChuaCoDuLieu, ChuThich } from "../chung/Khoi";
 import { gon, ngay, so, so_luong, yen } from "../dinh_dang";
 import type { DongKho, KhoApi } from "./kieu";
 import { khopTim } from "./loc";
@@ -101,9 +101,13 @@ export default function KhoHang() {
     <div className={"sp kho" + (isFetching ? " dang-tai" : "")}>
       <div className="tieu-de-trang">
         <div><h1>Kho hàng</h1>
-          <div className="phu">{k.ngay_chup ? <>Ảnh chụp <b className="ten-jp">在庫一覧</b> ngày <b>{ngay(k.ngay_chup)}</b> — tồn lúc xuất file, không phải lúc này.
-            Một kho, hai lô: <b>lô đang xuất</b> bán trước, <b>lô chờ</b> (hạn mới hơn) chuyển lên khi lô kia hết.
-            Số ngày "còn"/"quá" đếm từ mốc dữ liệu (ngày bán mới nhất), có thể lệch vài ngày so với ngày chụp.</> : k.ngay_chup_dau
+          <div className="phu">{k.ngay_chup ? <>Ảnh chụp <b className="ten-jp">在庫一覧</b> ngày <b>{ngay(k.ngay_chup)}</b>{" "}
+            <ChuThich>Tồn lúc xuất file, không phải lúc này. Một kho, hai lô: <b>lô đang xuất</b> bán trước, <b>lô chờ</b> (hạn mới hơn)
+              chuyển lên khi lô kia hết. Số ngày "còn"/"quá" đếm từ mốc dữ liệu (ngày bán mới nhất), có thể lệch vài ngày so với ngày chụp.
+              <br /><br />Hai ô <b>hết hàng / sắp thiếu</b> luôn đếm trên <b>cả hai lô</b> và không theo bộ lọc trạng thái — trạng thái là
+              thuộc tính của một <em>mã</em> tính trên tổng tồn (lô chờ cũng là hàng bán được, chỉ bán sau), và chính chúng là nhãn của bộ
+              lọc đó. Các ô còn lại đi theo cả hai bộ lọc. Mã hết hàng là mã có trong ảnh chụp trước mà vắng ở ảnh chụp mới nhất
+              (OBC không xuất dòng tồn 0).</ChuThich></> : k.ngay_chup_dau
               ? <>Chưa có ảnh chụp <b className="ten-jp">在庫一覧</b> nào tới thời điểm đang xem — ảnh chụp sớm nhất trong kho là ngày <b>{ngay(k.ngay_chup_dau)}</b>. Chọn tháng từ đó trở đi để xem tồn.</>
               : "Chưa có bản xuất 在庫一覧 nào trong kho dữ liệu."}</div></div>
         <div className="sp-dau-phai">
@@ -134,8 +138,6 @@ export default function KhoHang() {
           <div className="nhan">Giá trị tồn chết</div><div className="gia">{gon(o.gia_tri_ton_chet ?? 0)}</div>
           <div className="dong-phu nhat-chu">theo cả hai bộ lọc · bấm để lọc tồn chết</div></button>
       </div>
-      <p className="phu kho-ghi">Hai ô <b>hết hàng / sắp thiếu</b> luôn đếm trên <b>cả hai lô</b> và không theo bộ lọc trạng thái — trạng thái là thuộc tính của một <em>mã</em>{" "}
-        tính trên tổng tồn (lô chờ cũng là hàng bán được, chỉ bán sau), và chính chúng là nhãn của bộ lọc đó. Các ô còn lại đi theo cả hai bộ lọc.</p>
 
       {b.tab === "ton" && <div className="kho-hai-cot">
         <section className="kh-the kho-chinh">
@@ -174,9 +176,10 @@ export default function KhoHang() {
               </tbody>
             </table>
           </div>
-          <p className="phu sp-ghi">{so(dong.length)} dòng · {yen(tongDong)}{b.tim || b.nganh ? ` (ô tìm và chip ngành chỉ lọc bảng này + khối theo ngành, không lọc các ô số phía trên)` : ""}. Xếp theo giá trị giảm dần.
-            Ngành là <span className="ten-jp">食品分類名</span> của <span className="ten-jp">商品データ</span> — mã chưa phân loại thì sửa ở OBC.
-            Nhãn hạn có bốn giá trị: "Không có hạn dùng" (賞味期限なし) là lời khẳng định về hàng, còn "Không đọc được hạn" là lời thú nhận về dữ liệu.</p>
+          <p className="phu sp-ghi">{so(dong.length)} dòng · {yen(tongDong)} · xếp theo giá trị giảm dần{" "}
+            <ChuThich>{b.tim || b.nganh ? "Ô tìm và chip ngành chỉ lọc bảng này + khối theo ngành, không lọc các ô số phía trên. " : ""}
+              Ngành là <span className="ten-jp">食品分類名</span> của <span className="ten-jp">商品データ</span> — mã chưa phân loại thì sửa ở OBC.
+              Nhãn hạn có bốn giá trị: "Không có hạn dùng" (賞味期限なし) là lời khẳng định về hàng, còn "Không đọc được hạn" là lời thú nhận về dữ liệu.</ChuThich></p>
         </section>
 
         <div className="kho-ben">

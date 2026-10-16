@@ -9,7 +9,9 @@ import { useState } from "react";
 import { lay } from "../api";
 import { HinhMa } from "../chung/HinhMa";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
-import { ngay, so, yen } from "../dinh_dang";
+import { gon, ngay, so, yen } from "../dinh_dang";
+import { MAC_DINH_XEM } from "../chung/XemThem";
+import { ChuThich } from "../chung/Khoi";
 import { KD } from "../khoi_dau";
 import { GhiTiepXuc } from "../khach/GhiTiepXuc";
 import { dauKichBan, kichBanGoi } from "../khach/kich_ban";
@@ -69,8 +71,10 @@ export default function LienHe() {
     <div className={"lh" + (isFetching ? " dang-tai" : "")}>
       <div className="tieu-de-trang">
         <div><h1>Cần liên hệ</h1>
-          <div className="phu">Khách đang im lặng lâu hơn <b>nhịp mua riêng của chính họ</b>, chia theo lý do · ghi lại mỗi lần gọi —
-            khách vừa liên hệ tạm ẩn tới ngày hẹn (hoặc {d.an_ngay} ngày nếu không hẹn) · hồ sơ và lịch sử mua ở <a href="/khach-hang">Khách hàng</a></div></div>
+          <div className="phu">Khách im lặng lâu hơn nhịp mua riêng của chính họ, chia theo lý do{" "}
+            <ChuThich>Khách đang im lặng lâu hơn <b>nhịp mua riêng của chính họ</b>, chia theo lý do. Ghi lại mỗi lần gọi —
+              khách vừa liên hệ tạm ẩn tới ngày hẹn (hoặc {d.an_ngay} ngày nếu không hẹn). Hồ sơ và lịch sử mua ở màn Khách hàng.
+              <br /><br />“Nên chào” trên mỗi thẻ: {d.cach_tinh_goi_y}</ChuThich></div></div>
         <label className="kh-chon lh-loc"><span>担当者</span>
           <select value={nvDang} onChange={e => dat({ nv: e.target.value, tat_ca: false })}>
             <option value={d.nv_moi_nguoi}>— mọi người phụ trách —</option>
@@ -81,7 +85,7 @@ export default function LienHe() {
 
       <div className="o-kpi-luoi lh-kpi">
         <div className="o-kpi"><div className="nhan">Cần liên hệ</div><div className="gia">{so(ds.tong)}</div>
-          <div className="dong-phu nhat-chu">khách · {yen(tongLuyKe)} doanh thu luỹ kế{ds.dem[d.cot_thang] ? " (chưa gồm cột tháng)" : ""}</div></div>
+          <div className="dong-phu nhat-chu">khách · {gon(tongLuyKe)} doanh thu luỹ kế{ds.dem[d.cot_thang] ? " (chưa gồm cột tháng)" : ""}</div></div>
         {ds.cot.map(c => (
           <button key={c.ly_do} type="button" className={"o-kpi lh-o " + lopMau(c.ly_do)} aria-pressed={loc.ly_do === c.ly_do}
             onClick={() => dat({ ly_do: loc.ly_do === c.ly_do ? "" : c.ly_do })}>
@@ -95,22 +99,22 @@ export default function LienHe() {
 
       <p className="phu lh-ghi">Hai nhóm khác của danh sách làm việc:{" "}
         <a href="/khach-hang?nhom=tut&tat_ca=1">khách lớn đang giảm tốc</a> · <a href="/khach-hang?nhom=moi&tat_ca=1">khách mới đã im lặng</a>.
-        {ds.ly_do && <> <button type="button" className="lien-ket" onClick={() => dat({ ly_do: "" })}>← Mọi lý do</button></>}
-        <br />“Nên chào” trên mỗi thẻ: {d.cach_tinh_goi_y}</p>
+        {ds.ly_do && <> <button type="button" className="lien-ket" onClick={() => dat({ ly_do: "" })}>← Mọi lý do</button></>}</p>
 
       <div className={"lh-cot" + (ds.ly_do ? " mot" : "")}>
-        {ds.cot.map(c => (
+        {ds.cot.map(c => { const hien = ds.ly_do ? c.the : c.the.slice(0, MAC_DINH_XEM); return (
           <section key={c.ly_do} className={lopMau(c.ly_do)} aria-labelledby={"cot-" + c.ly_do}>
             <div className="lh-cot-dau"><h2 id={"cot-" + c.ly_do}><span className="lh-nhan">{c.nhan}</span></h2>
               <span className="phu">{so(c.tong)} khách</span>
-              <span className="lh-tong">{yen(c.doanh_thu)}{laThang(c.ly_do) ? "/tháng" : ""}</span></div>
+              <span className="lh-tong" title={yen(c.doanh_thu)}>{gon(c.doanh_thu)}{laThang(c.ly_do) ? "/tháng" : ""}</span></div>
             <div className="lh-cot-mo">{c.mo_ta}</div>
-            <div className="lh-the-ds">{c.the.map(t => <The key={t.ma} t={t} d={d} gy={d.goi_y[t.ma] ?? []} laThang={laThang(c.ly_do)} mo={mo === t.ma}
+            {/* Xem cả bốn cột: mỗi cột 10 thẻ đầu (soát 2026-10-16 — trang dài ~6.000px); "Xem cả N khách" mở riêng cột. */}
+            <div className="lh-the-ds">{hien.map(t => <The key={t.ma} t={t} d={d} gy={d.goi_y[t.ma] ?? []} laThang={laThang(c.ly_do)} mo={mo === t.ma}
               datMo={v => datMo(v ? t.ma : null)} />)}</div>
             {!c.the.length && <p className="lh-cot-mo">Không còn khách nào ở cột này.</p>}
             {c.trung > 0 && <p className="lh-cot-mo">+{c.trung} khách cũng thuộc nhóm này nhưng đã nằm ở cột khác hoặc đang tạm ẩn.</p>}
-            {c.tong > c.the.length && <p className="lh-cot-mo"><button type="button" className="lien-ket" onClick={() => dat({ ly_do: c.ly_do })}>Xem cả {so(c.tong)} khách →</button></p>}
-          </section>))}
+            {c.tong > hien.length && <p className="lh-cot-mo"><button type="button" className="lien-ket" onClick={() => dat({ ly_do: c.ly_do })}>Xem cả {so(c.tong)} khách →</button></p>}
+          </section>); })}
       </div>
 
       <div className="lh-hai">
@@ -176,17 +180,17 @@ function The({ t, d, gy, laThang, mo, datMo }: { t: The; d: LienHeApi; gy: GoiY[
       <div className="lh-ten"><a href={`/khach-hang/${encodeURIComponent(t.ma)}`} className="ten-jp">{t.ten}</a></div>
       <div className="phu">{t.ma}{t.tinh ? ` · ${t.tinh}` : ""}{t.phu_trach ? ` · ${t.phu_trach}` : ""}</div>
       <div className="lh-so">{laThang ? <>
-        <b>{yen(t.doanh_thu)}/tháng</b><span className="phu">mua {t.so_thang}/3 tháng trước · tháng trước {yen(t.dt_thang_truoc ?? 0)}</span></> : <>
-        <b>{yen(t.doanh_thu)}</b>
+        <b>{gon(t.doanh_thu)}/tháng</b><span className="phu">mua {t.so_thang}/3 tháng trước · tháng trước {gon(t.dt_thang_truoc ?? 0)}</span></> : <>
+        <b title={yen(t.doanh_thu)}>{gon(t.doanh_thu)}</b>
         <span className={(t.ty_le ?? 0) >= 4 ? "giam" : (t.ty_le ?? 0) >= 2 ? "canh-chu" : "phu"}>
           im {t.so_ngay_im_lang} ngày{t.ty_le ? ` · ${t.ty_le.toFixed(1)}× nhịp ${Math.round(t.nhip_ngay ?? 0)} ngày` : ""}</span></>}</div>
       {t.dien_thoai && <div className="phu">☎ <a href={`tel:${t.dien_thoai}`}>{t.dien_thoai}</a></div>}
       {t.cuoi && <div className="lh-cuoi">Lần trước: {t.cuoi.icon} {ngay(t.cuoi.ngay)} · <span className={"nhan-vien " + t.cuoi.mau_ket_qua}>{t.cuoi.nhan_ket_qua}</span> {t.cuoi.noi_dung.slice(0, 60)}</div>}
       {gy.length > 0 && <div className="lh-goi-y" title={d.cach_tinh_goi_y}>
         <div className="lh-goi-y-dau">Nên chào</div>
-        <ul>{gy.map(g => <li key={g.ma}><HinhMa ma={g.ma} ten={g.ten} co={28} trang_tri />
-          <div><a href={`/san-pham/${encodeURIComponent(g.ma)}`} className="ten-jp">{g.ten}</a>
-          <span className="phu">{nhip(g)}</span></div></li>)}</ul></div>}
+        {/* Gọn (soát 2026-10-16): mỗi mã một dòng, nhịp / lần cuối trong title — thẻ cao gấp đôi vì dòng chi tiết. */}
+        <ul>{gy.map(g => <li key={g.ma} title={nhip(g)}><HinhMa ma={g.ma} ten={g.ten} co={22} trang_tri />
+          <a href={`/san-pham/${encodeURIComponent(g.ma)}`} className="ten-jp lh-goi-y-ten">{g.ten}</a></li>)}</ul></div>}
       <div className="lh-nut">
         <button type="button" className="nut-nho" aria-expanded={mo} onClick={() => datMo(!mo)}>{mo ? "Đóng" : "✏️ Ghi liên hệ"}</button>
         <button type="button" className="nut-nho" onClick={chep}>{daChep ? "✓ Đã chép" : "📋 Chép kịch bản"}</button>

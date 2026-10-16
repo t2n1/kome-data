@@ -46,6 +46,12 @@ export function Khoi({ tieu_de, phu, nhan, mau_nhan = "do", lien_ket, children, 
 
 /** Khối của gói thiết kế chưa có nguồn dữ liệu thật: giữ khung, nói rõ thiếu gì.
  *  `gon` (Tổng quan): chỉ tiêu đề + nhãn "chưa có", lý do trong ⓘ. */
+/** Nút ⓘ cho chữ giải thích DÀI ở đầu trang / dưới bảng (soát 2026-10-16: chữ giải thích vào ô nổi, trên
+ *  trang chỉ còn một câu ngắn) — cùng ô nổi với `cach_tinh` của khối. */
+export function ChuThich({ children, nhan = "Giải thích" }: { children: React.ReactNode; nhan?: string }) {
+  return <ONoi noi_dung={<div className="o-noi-chu">{children}</div>} nhan={nhan} className="khoi-i">ⓘ</ONoi>;
+}
+
 export function ChuaCoDuLieu({ tieu_de, ly_do, gon = false }: { tieu_de: string; ly_do: string; gon?: boolean }) {
   if (gon) return <Khoi tieu_de={tieu_de} nhan="chưa có dữ liệu" mau_nhan="nhat"
     cach_tinh={<>{ly_do}<br />Không hiện số mẫu: khối này sẽ tự có số khi nguồn được nạp.</>} />;

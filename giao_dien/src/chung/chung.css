@@ -208,3 +208,8 @@ a.tng-dong:hover,.tng-dong:focus-visible{background:var(--nen-phu)}
 .kh-td-thanh i{display:block;height:100%;background:var(--ok-vien);border-radius:5px}
 .kh-td-thanh.doi{background:var(--ok-vien)}
 .kh-td-thanh.doi i{border-radius:0}.kh-td-thanh.doi i.do{background:var(--do)}.kh-td-thanh.doi i:not(.do){flex:1}
+
+/* Nút "Xem thêm" của danh sách dài (chung/XemThem.tsx). */
+.nut-xem-them{font:inherit;font-size:.76rem;font-weight:600;color:var(--lien-ket);background:none;border:1px dashed var(--vien-dam);
+  border-radius:8px;padding:.3rem .7rem;margin-top:.5rem;cursor:pointer;display:block;width:100%}
+.nut-xem-them:hover{background:var(--nen)}
