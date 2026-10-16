@@ -16,6 +16,7 @@ import { KD } from "../khoi_dau";
 import { GhiTiepXuc } from "../khach/GhiTiepXuc";
 import { dauKichBan, kichBanGoi } from "../khach/kich_ban";
 import "../khach/khach.css";
+import TheoSanPham from "./TheoSanPham";
 import "./lien_he.css";
 
 type Ltx = { kieu: string; ket_qua: string; noi_dung: string; thoi_diem: string; hen_lai: string | null; nguoi: string | null;
@@ -40,7 +41,10 @@ const lopMau = (ly_do: string) => "lh-m-" + ly_do;
 
 function docLoc() {
   const q = new URLSearchParams(location.search);
-  return { nv: q.get("nv") ?? "", tat_ca: q.get("tat_ca") === "1", ly_do: q.get("ly_do") ?? "" };
+  const ma = (q.get("ma") ?? "").split(",").map(x => x.trim()).filter(Boolean);
+  // Tab "Theo sản phẩm" (2026-10-16): ?xem=sp, hoặc có ?ma= (link từ trang sản phẩm).
+  return { nv: q.get("nv") ?? "", tat_ca: q.get("tat_ca") === "1", ly_do: q.get("ly_do") ?? "",
+           xem: q.get("xem") === "sp" || ma.length ? "sp" : "", ma };
 }
 
 export default function LienHe() {
@@ -50,7 +54,9 @@ export default function LienHe() {
     const q = new URLSearchParams();
     if (b.nv) q.set("nv", b.nv);
     if (b.tat_ca) q.set("tat_ca", "1");
-    if (b.ly_do) q.set("ly_do", b.ly_do);
+    if (b.xem === "sp") {
+      if (b.ma.length) q.set("ma", b.ma.join(",")); else q.set("xem", "sp");
+    } else if (b.ly_do) q.set("ly_do", b.ly_do);
     history.pushState(null, "", giuKhoang("/lien-he" + (q.toString() ? "?" + q : "")));
     datLoc(b);
   };
@@ -66,15 +72,17 @@ export default function LienHe() {
   const ds = d.ds, laThang = (c: string) => c === d.cot_thang;
   const tongLuyKe = ds.cot.filter(c => !laThang(c.ly_do)).reduce((s, c) => s + c.doanh_thu, 0);
   const nvDang = loc.nv || d.sale || d.nv_moi_nguoi;
+  const locNv = new URLSearchParams(Object.entries({ nv: loc.nv, tat_ca: loc.tat_ca ? "1" : "" }).filter(([, v]) => v)).toString();
 
   return (
     <div className={"lh" + (isFetching ? " dang-tai" : "")}>
       <div className="tieu-de-trang">
         <div><h1>Cần gọi</h1>
+          {loc.xem === "sp" ? <div className="phu">Chọn mã hàng muốn bán — xem khách nào nên gọi</div> :
           <div className="phu">Khách lâu chưa đặt hàng hơn bình thường — nên gọi hỏi thăm{" "}
             <ChuThich>Khách đang im lặng lâu hơn <b>nhịp mua riêng của chính họ</b>, chia theo lý do. Ghi lại mỗi lần gọi —
               khách vừa liên hệ tạm ẩn tới ngày hẹn (hoặc {d.an_ngay} ngày nếu không hẹn). Hồ sơ và lịch sử mua ở màn Khách hàng.
-              <br /><br />“Nên chào” trên mỗi thẻ: {d.cach_tinh_goi_y}</ChuThich></div></div>
+              <br /><br />“Nên chào” trên mỗi thẻ: {d.cach_tinh_goi_y}</ChuThich></div>}</div>
         <label className="kh-chon lh-loc"><span>Người phụ trách</span>
           <select value={nvDang} onChange={e => dat({ nv: e.target.value, tat_ca: false })}>
             <option value={d.nv_moi_nguoi}>— mọi người phụ trách —</option>
@@ -83,6 +91,12 @@ export default function LienHe() {
           </select></label>
       </div>
 
+      <div className="kh-tab" role="tablist" aria-label="Cách xem">
+        <button type="button" role="tab" aria-selected={loc.xem !== "sp"} onClick={() => dat({ xem: "" })}>Theo lý do</button>
+        <button type="button" role="tab" aria-selected={loc.xem === "sp"} onClick={() => dat({ xem: "sp" })}>Theo sản phẩm</button>
+      </div>
+
+      {loc.xem === "sp" ? <TheoSanPham ma={loc.ma} datMa={ma => dat({ xem: "sp", ma })} locNv={locNv} /> : <>
       <div className="o-kpi-luoi lh-kpi">
         <div className="o-kpi"><div className="nhan">Cần gọi</div><div className="gia">{so(ds.tong)}</div>
           <div className="dong-phu nhat-chu">khách · {gon(tongLuyKe)} tổng doanh thu đến nay{ds.dem[d.cot_thang] ? " (chưa gồm cột tháng)" : ""}</div></div>
@@ -157,6 +171,7 @@ export default function LienHe() {
               <td className="so">{yen(t.doanh_thu)}{laThang(t.ly_do) ? "/tháng" : ""}</td></tr>))}</tbody>
         </table></div>}
       </section>
+      </>}
     </div>
   );
 }

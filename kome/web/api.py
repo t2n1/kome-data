@@ -566,6 +566,31 @@ def tao_api(open_app_conn) -> APIRouter:
             return _loi("Không đọc được danh sách cần liên hệ.")
         return _json(request, du_lieu, pb)
 
+    @r.get("/lien-he/san-pham")
+    def lien_he_san_pham(request: Request, ma: str = "", tat_ca: int = 0, nv: str = "", nhanh: int = 0):
+        """Cần gọi theo SẢN PHẨM (`?ma=A,B`, ≤ 5 mã): khách đến lúc mua lại / đã ngừng / nên chào — 1 lượt hỏi.
+        Endpoint riêng: `/lien-he` giữ 4 lượt. Theo mốc dữ liệu hiện tại (không khoảng xem — luật MAN_KHOANG)."""
+        from kome import lien_he as LH
+        from kome.tuoi_du_lieu import hom_nay_o_nhat
+        sale, ten_sale = sale_dang_loc(request, tat_ca, nv)
+        mas = LH.doc_ma_sp(ma)
+        hom_nay = hom_nay_o_nhat()
+
+        def tinh_(c):
+            return thanh_json({**LH.theo_san_pham(c, mas, hom_nay, sale=sale, chao=not nhanh), "sale": sale, "ten_sale": ten_sale,
+                               "toi_da": LH.SP_TOI_DA, "cach_tinh": LH.CACH_TINH_SP,
+                               "kieu_tx": {k: list(v) for k, v in LH.KIEU.items()},
+                               "ket_qua_tx": {k: list(v) for k, v in LH.KET_QUA.items()}})
+        # Đọc nhật ký tiếp xúc + "đã liên hệ" theo đồng hồ thật -> phiên bản đầy đủ, theo ngày.
+        try:
+            with open_app_conn() as conn:
+                du_lieu, pb = anh_chup.lay(conn, _khoa("lien-he-sp", ma=",".join(mas), sale=sale or "*", nhanh=nhanh or ""),
+                                           tinh_, theo_ngay=True)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được danh sách khách theo sản phẩm.")
+        return _json(request, du_lieu, pb)
+
     @r.get("/ban-do")
     def ban_do(request: Request, tat_ca: int = 0, nv: str = "", chi_so: str = "khach",
                thang: str = "", ky: str = "", tu: str = "", den: str = ""):
