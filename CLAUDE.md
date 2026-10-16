@@ -906,6 +906,10 @@ tab đang xem (chuột phải cũng mở). Đặc tả: `docs/superpowers/specs/
 - `kome.css` từng có `.tang{display:flex}` (tài liệu sống) TRÙNG lớp màu `.tang` → mọi dòng "▲… so với …" bị dàn flex, chữ cách xa:
   lớp kia nay là `.tl-tang`. Đặt tên lớp bố cục KHÔNG trùng lớp màu (`tang` / `giam` / `canh-chu` / `nhat-chu`). `index.html` nạp
   `kome.css?v=…` — sửa `kome.css` thì đổi số `v` để trình duyệt lấy bản mới.
+- **Dáng admin sale1.komejapan.com** (2026-10-16): chữ giao diện là **Be Vietnam Pro** TỰ HOST (`static/fonts/BeVietnamPro-{latin,vietnamese}-{400..800}.woff2`
+  + `OFL-BeVietnamPro.txt`, theo `unicode-range`; IBM Plex Sans đứng sau cho ký tự ngoài hai bộ — vẫn không gọi Google Fonts). Bảng màu
+  sáng kem / mực nâu của sale1; thanh bên: mục đang mở là viên nền `--nav-on-nen` chữ `--nav-on-chu` icon `--vang` (ba biến có ở bản sáng
+  và HAI khối tối giống hệt), ô nhắc 13:30 (`.knav-nhac`, chỉ người có quyền nạp).
 
 **Bất biến (định dạng số chuẩn Nhật — chủ DN chốt 2026-09-29):** mọi số trên web theo chuẩn Nhật:
 phẩy ngăn nghìn (¥1,234,567), chấm thập phân (62.9% · 1.5×), số tiền rút gọn theo **万/億** (¥9.8万 ·

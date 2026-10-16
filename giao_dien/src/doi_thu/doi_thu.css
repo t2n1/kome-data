@@ -2,7 +2,7 @@
 .man-doi-thu{display:flex;flex-direction:column;gap:12px;min-width:0}
 .dt-luoi-khoi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:16px}
 .dt-rong{grid-column:1 / -1}
-.dt-khoi{background:var(--nen-the);border:1px solid var(--vien);border-radius:12px;padding:.9rem 1rem;min-width:0}
+.dt-khoi{background:var(--nen-the);border:1px solid var(--vien);border-radius:16px;padding:.9rem 1rem;min-width:0}
 .dt-khoi .khoi-dau{cursor:auto}
 .dt-cuon{overflow-x:auto;max-width:100%}
 .dt-bang{font-variant-numeric:tabular-nums}
