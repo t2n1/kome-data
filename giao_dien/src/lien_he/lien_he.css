@@ -80,3 +80,32 @@ button.o-kpi{font:inherit;text-align:left;cursor:pointer}
 .lh-viec li > div{min-width:0}
 .lh-viec .ten-jp{font-weight:600;font-size:.76rem}
 .lh-chon-dong .lien-ket{font-size:.8rem;margin-bottom:.55rem}
+/* Theo sản phẩm — bản gọn (2026-10-16, chủ DN: "nhiều chữ quá"): 3 ô số chọn nhóm + MỘT danh sách dòng. */
+.lh-sp-nhom{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:.2rem 0 .7rem}
+.lh-sp-o{display:flex;flex-direction:column;align-items:flex-start;min-width:150px;font:inherit;text-align:left;cursor:pointer;
+  padding:.5rem .8rem;border-radius:10px;border:1px solid var(--vien);border-top:3px solid var(--lh-mau);background:var(--nen-the);color:var(--chu)}
+.lh-sp-o[aria-selected="true"]{background:var(--lh-mau-nen);border-color:var(--lh-mau)}
+.lh-sp-o.cho{cursor:default;opacity:.6}
+.lh-sp-so{font-size:1.5rem;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.lh-sp-nhan{font-size:.78rem;font-weight:600;color:var(--lh-mau-chu)}
+.lh-sp-ds{list-style:none;margin:0;padding:0;border:1px solid var(--vien);border-left:4px solid var(--lh-mau);border-radius:10px;background:var(--nen-the)}
+.lh-sp-dong{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;align-items:center;gap:.4rem .9rem;padding:.45rem .75rem}
+.lh-sp-dong + .lh-sp-dong{border-top:1px solid var(--vien-phu)}
+.lh-sp-dong:hover{background:var(--nen-phu)}
+.lh-sp-dong.da-goi{opacity:.65}
+.lh-sp-ten{display:flex;flex-direction:column;min-width:0}
+.lh-sp-ten a{font-weight:600;font-size:.86rem;color:var(--chu);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lh-sp-ten a:hover{color:var(--lien-ket);text-decoration:underline}
+.lh-sp-ten .phu{font-size:.72rem}
+.lh-sp-ly{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.lh-sp-vien{display:inline-flex;align-items:center;gap:.25rem;font-size:.74rem;font-weight:600;padding:.1rem .5rem;border-radius:999px;
+  color:var(--lh-mau-chu);background:color-mix(in srgb,var(--lh-mau) 14%,var(--nen-the))}
+.lh-sp-vien.tre{background:color-mix(in srgb,var(--lh-mau) 28%,var(--nen-the))}
+.lh-sp-cuoi{font-size:.72rem;color:var(--chu-nhat)}
+.lh-sp-cuoi.vua{font-weight:600;color:var(--ok-chu)}
+.lh-sp-nut{display:flex;gap:.3rem;align-items:center}
+.lh-sp-nut .nut-nho{padding:.2rem .5rem;text-decoration:none;white-space:nowrap}
+.lh-sp-dt{font-size:.76rem;font-variant-numeric:tabular-nums;min-width:9.5em;text-align:center}
+.lh-sp-ghi{grid-column:1 / -1}
+.lh-sp-rong{margin:.5rem .2rem}
+@media (max-width:760px){.lh-sp-dong{grid-template-columns:minmax(0,1fr) auto}.lh-sp-ly{grid-column:1 / -1;grid-row:2}}
