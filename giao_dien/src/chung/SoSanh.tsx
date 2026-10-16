@@ -20,7 +20,7 @@ export function DongSoSanh({ nhan, co, nay, ss, dinh_dang, className = "dong-phu
   const td = nay != null && ss ? nay / ss - 1 : null;
   return (
     <div className={`${className} ss-dong ${td == null ? "nhat-chu" : td >= 0 ? "tang" : "giam"}`}>
-      <b>{td != null ? thay_doi(td) : "—"}</b> so <MauSs />{nhan}
+      <b>{td != null ? thay_doi(td) : "—"}</b> so với <MauSs />{nhan}
       {ss != null && dinh_dang && <span className="ss-gia"> {dinh_dang(ss)}</span>}
     </div>
   );

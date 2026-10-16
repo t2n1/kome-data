@@ -32,7 +32,7 @@ SO_THANG_KIEM = 6
 # đâu" kiểm cách tính ở mốc GIỮA tháng này thay vì ở mốc "hôm nay".
 MOC_KIEM_GIUA_THANG = 10
 
-KICH_BAN = {"thap": "Thận trọng", "cs": "Cơ sở", "cao": "Lạc quan"}
+KICH_BAN = {"thap": "Dự báo thấp", "cs": "Dự báo vừa", "cao": "Dự báo cao"}
 
 
 @dataclass

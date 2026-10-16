@@ -21,10 +21,12 @@ const CHUA = "chưa có dữ liệu";
 // Màn có sẵn nhưng công ty chưa dùng nguồn của nó (kome/nguon_dung.py): mờ như màn chưa có.
 const CHUA_DUNG = "công ty chưa dùng nguồn này";
 
+const laQuanTri = () => !KD.nguoi || KD.nguoi.duoc_quan_tri;
+
 export function nhomDieuHuong(): Nhom[] {
   const nhom: Nhom[] = [
     { ma: "tongquan", ten: "TỔNG QUAN", muc: [
-      { ma: "dashboard", nhan: "Dashboard", url: "/", icon: "dashboard" },
+      { ma: "dashboard", nhan: "Tổng quan", url: "/", icon: "dashboard" },
       // 2026-09-30: Báo cáo · Dự báo · Ngân sách gộp thành MỘT trang "Doanh thu" (/du-bao → 301;
       // màn nhập /ngan-sach vào bằng nút "✎ Sửa ngân sách" trên trang, vẫn đánh dấu mục này).
       { ma: "baocao", nhan: "Doanh thu", url: "/bao-cao", icon: "chart" },
@@ -57,9 +59,11 @@ export function nhomDieuHuong(): Nhom[] {
       { ma: "muahang", nhan: "Mua hàng & NCC", url: null, icon: "refill", ly_do: CHUA },
     ] },
     { ma: "hethong", ten: "HỆ THỐNG", muc: [
-      ...(KD.hien_kho ? [{ ma: "khodl", nhan: "Kho dữ liệu", url: "/kho-du-lieu", icon: "db" }] : []),
-      { ma: "nhatky", nhan: "Nhật ký thao tác", url: "/nhat-ky", icon: "cal" },
-      { ma: "caidat", nhan: "Cài đặt", url: "/cai-dat", icon: "gear" },
+      ...(KD.hien_kho ? [{ ma: "khodl", nhan: "Nạp dữ liệu", url: "/kho-du-lieu", icon: "db" }] : []),
+      // 2026-10-16 (chủ DN: "đơn giản cho người không rành"): Nhật ký / Cài đặt chỉ hiện cho người có cờ quản trị
+      // (máy chưa bật đăng nhập: ai cũng thấy). Địa chỉ vẫn mở được — đây là bớt rối, không phải phân quyền.
+      ...(laQuanTri() ? [{ ma: "nhatky", nhan: "Nhật ký thao tác", url: "/nhat-ky", icon: "cal" },
+        { ma: "caidat", nhan: "Cài đặt", url: "/cai-dat", icon: "gear" }] : []),
     ] },
   ];
   // Màn chưa làm tạm ẩn (kome/man_chua_co.py, chủ DN 2026-09-28): bỏ mục không có `url`,

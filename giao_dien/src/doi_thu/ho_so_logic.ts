@@ -4,7 +4,7 @@
 import { yen, so } from "../dinh_dang";
 import type { DaBo, GiaoHang, QuanSat, TongQuan } from "./kieu";
 import { LECH_NGANG, NGAY_CU, laBatThuong, phanTram } from "./mau";
-import { tenNganh } from "./nganh";
+import { tenNganh } from "../chung/nganh";
 import { lienKetAnToan, timTrongDrive } from "./nguon";
 
 export type QsHs = QuanSat & { hien_hanh: boolean };

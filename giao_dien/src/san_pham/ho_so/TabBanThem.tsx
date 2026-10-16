@@ -6,6 +6,7 @@ import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../../khung/khoang
 import { ngay, pc, so, so_luong as soLuong, yen } from "../../dinh_dang";
 import type { TabBanThemApi } from "./kieu";
 import { useNenChao } from "./ViecVoiMa";
+import { tenNganh } from "../../chung/nganh";
 
 export function TabBanThem({ ma, ngungBan, nganh }: { ma: string; ngungBan: boolean; nganh: string }) {
   const kx = chuoiKhoang(useKhoang());
@@ -39,7 +40,7 @@ export function TabBanThem({ ma, ngungBan, nganh }: { ma: string; ngungBan: bool
         {ngungBan ? <p className="phu">Không chào hàng đã ngừng kinh doanh (※終売※).</p> :
           nc.error ? <div className="khoi-loi">Không tải được khách nên chào: {(nc.error as Error).message}</div> :
           !nc.data ? <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div> :
-          !nc.data.t.nen_chao.length ? <p className="phu">Chưa có khách mua đều mã cùng ngành ({nganh}) mà chưa mua mã này.</p> :
+          !nc.data.t.nen_chao.length ? <p className="phu">Chưa có khách mua đều mã cùng ngành ({tenNganh(nganh)}) mà chưa mua mã này.</p> :
           <div className="bang-cuon"><table className="bang"><thead><tr><th>Khách</th><th className="so">DT ngành 12 tháng</th><th className="so">Mã cùng ngành</th><th>Mua cuối</th></tr></thead>
             <tbody>{nc.data.t.nen_chao.map(k => (<tr key={k.ma}><td><a className="ten-jp" href={giuKhoang(`/khach-hang/${encodeURIComponent(k.ma)}`)}>{k.ten}</a></td>
               <td className="so">{yen(k.doanh_thu_nganh)}</td><td className="so">{so(k.so_ma_nganh)}</td><td>{ngay(k.lan_cuoi)}</td></tr>))}</tbody></table></div>}

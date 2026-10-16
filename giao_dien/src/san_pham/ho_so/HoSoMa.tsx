@@ -22,6 +22,7 @@ import { TabBanThem } from "./TabBanThem";
 import "../../khach/khach.css";
 import "../san_pham.css";
 import "./ho_so.css";
+import { tenNganh } from "../../chung/nganh";
 
 const TAB = [["khach", "Khách hàng"], ["thoi_gian", "Thời gian"], ["gia", "Giá & lãi"], ["ban_them", "Tồn & bán thêm"]] as const;
 type MaTab = (typeof TAB)[number][0];
@@ -75,7 +76,7 @@ export default function HoSoMa({ ma }: { ma: string }) {
         <HinhMa ma={sp.ma} ten={sp.ten} co={112} className="sp3-hinh" />
         <div className="hs2-dau-chu">
         <h1><span className="ten-jp">{sp.ten}</span>
-          <span className="nhan-vien nhat">{h.nganh}</span>
+          <span className="nhan-vien nhat" title={h.nganh}>{tenNganh(h.nganh)}</span>
           {h.ngung_ban && <span className="nhan-vien canh">bán nốt tồn</span>}</h1>
         <div className="phu"><code>{sp.ma}</code> · bán lần đầu {ngay(sp.lan_dau)} · lần cuối {ngay(sp.lan_cuoi)}
           {h.hom_nay && <> · dữ liệu {nhanMoc} {ngay(h.hom_nay)}</>}</div>
@@ -152,7 +153,7 @@ function ChuyenMa({ ds }: { ds: { ma: string; ten: string; nganh: string; nhan_t
         <div className="phu">{ds ? `${so(khop.length)} mã khớp "${tim}"` : "Đang tải danh mục…"}</div>
         {kq.map(m => (
           <a key={m.ma} href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)} role="option">
-            <span className="ten-jp">{m.ten}</span><span className="phu">{m.ma} · {m.nganh}</span></a>))}
+            <span className="ten-jp">{m.ten}</span><span className="phu">{m.ma} · {tenNganh(m.nganh)}</span></a>))}
       </div>}
     </div>
   );

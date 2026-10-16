@@ -26,6 +26,7 @@ import { useXemThem } from "../chung/XemThem";
 import { khopTim } from "./loc";
 import { useDanhMuc } from "./ManSanPham";
 import "./san_pham.css";
+import { tenNganh } from "../chung/nganh";
 
 type Tab = "ton" | "ve" | "can_dat";
 // `xem` = cách bày tab Tồn / Cần đặt: "" = lưới thẻ hình to (mặc định, 2026-10-16), "bang" = bảng đủ cột.
@@ -135,19 +136,19 @@ export default function KhoHang() {
 
       <div className="o-kpi-luoi kho-kpi">
         <div className="o-kpi"><div className="nhan">Giá trị tồn{b.kho || locHopLe ? " (đang lọc)" : ""}</div><div className="gia">{gon(k.gia_tri_ton)}</div>
-          <div className="dong-phu nhat-chu">{so(k.dong.length)} dòng tồn · theo cả hai bộ lọc</div></div>
+          <div className="dong-phu nhat-chu">tiền hàng trong kho · đổi theo lô / trạng thái đang chọn</div></div>
         {/* Mã hết hàng KHÔNG có dòng nào trong bảng tồn (073: vắng ở ảnh chụp mới nhất) — ô này mở tab Cần đặt. */}
         <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={b.tab === "can_dat"} onClick={() => dat({ tab: "can_dat", loc: "" })}>
           <div className="nhan">Mã hết hàng</div><div className={"gia" + (o.het_hang ? " giam" : "")}>{so(o.het_hang ?? 0)}</div>
-          <div className="dong-phu nhat-chu">cả hai lô · không còn trong ảnh chụp mới nhất · bấm xem Cần đặt</div></button>
+          <div className="dong-phu nhat-chu">hết sạch cả hai lô · bấm để xem cần đặt</div></button>
         <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={locHopLe === "sap_thieu"} onClick={() => dat({ tab: "ton", loc: locHopLe === "sap_thieu" ? "" : "sap_thieu" })}>
           <div className="nhan">Mã sắp thiếu</div><div className={"gia" + (o.sap_thieu ? " canh-chu" : "")}>{so(o.sap_thieu ?? 0)}</div>
-          <div className="dong-phu nhat-chu">cả hai lô · đủ bán &lt; 14 ngày</div></button>
+          <div className="dong-phu nhat-chu">cả hai lô chỉ còn đủ bán dưới 14 ngày</div></button>
         <div className="o-kpi"><div className="nhan">Lô cận hạn (≤ {d.can_han_ngay} ngày)</div><div className={"gia" + (o.can_han ? " canh-chu" : "")}>{so(o.can_han ?? 0)}</div>
-          <div className="dong-phu nhat-chu">theo bộ lọc · {so(k.qua_han.length)} lô đã quá hạn</div></div>
+          <div className="dong-phu nhat-chu">sắp hết hạn dùng · {so(k.qua_han.length)} lô đã quá hạn</div></div>
         <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={locHopLe === "ton_chet"} onClick={() => dat({ tab: "ton", loc: locHopLe === "ton_chet" ? "" : "ton_chet" })}>
-          <div className="nhan">Giá trị tồn chết</div><div className="gia">{gon(o.gia_tri_ton_chet ?? 0)}</div>
-          <div className="dong-phu nhat-chu">theo cả hai bộ lọc · bấm để lọc tồn chết</div></button>
+          <div className="nhan">Hàng bán chậm (tồn chết)</div><div className="gia">{gon(o.gia_tri_ton_chet ?? 0)}</div>
+          <div className="dong-phu nhat-chu">hàng gần như không bán được · đổi theo lô / trạng thái đang chọn</div></button>
       </div>
 
       {b.tab === "ton" && <div className="kho-hai-cot">
@@ -165,20 +166,20 @@ export default function KhoHang() {
           <div className="sp-chip" role="group" aria-label="Ngành hàng">
             <button type="button" className="chip" aria-pressed={!b.nganh} onClick={() => dat({ nganh: "" })}>Mọi ngành <span className="nhat-chu">{so(theoTim.length)}</span></button>
             {theoNganh.map(w => (
-              <button key={w.ten} type="button" className="chip ten-jp" aria-pressed={b.nganh === w.ten} onClick={() => dat({ nganh: b.nganh === w.ten ? "" : w.ten })}>{w.ten} <span className="nhat-chu">{so(w.so_dong)}</span></button>))}
+              <button key={w.ten} type="button" className="chip ten-jp" aria-pressed={b.nganh === w.ten} onClick={() => dat({ nganh: b.nganh === w.ten ? "" : w.ten })}>{tenNganh(w.ten)} <span className="nhat-chu">{so(w.so_dong)}</span></button>))}
             {b.nganh && !theoNganh.some(w => w.ten === b.nganh) &&
-              <button type="button" className="chip" aria-pressed onClick={() => dat({ nganh: "" })}>{b.nganh} (0 dòng)</button>}
+              <button type="button" className="chip" aria-pressed onClick={() => dat({ nganh: "" })}>{tenNganh(b.nganh)} (0 dòng)</button>}
           </div>
           <div className="sp-chip" role="group" aria-label="Lô">
             <button type="button" className="chip" aria-pressed={!b.kho} onClick={() => dat({ kho: "" })}>Cả hai lô</button>
             {[...k.ds_kho].sort((x, y) => Number(y[0] === k.kho_dang_xuat) - Number(x[0] === k.kho_dang_xuat)).map(([m, ten]) => (
               <button key={m} type="button" className="chip" aria-pressed={b.kho === m} onClick={() => dat({ kho: b.kho === m ? "" : m })} title={`${m} ${ten}`}>
-                {vaiLo(m)} <span className="nhat-chu ten-jp">{m} {ten}</span></button>))}
+                {vaiLo(m)}</button>))}
             {b.kho && !k.ds_kho.some(w => w[0] === b.kho) &&
               <button type="button" className="chip" aria-pressed onClick={() => dat({ kho: "" })}>{b.kho} (không có trong danh sách kho OBC)</button>}
           </div>
           {!b.xem ? <LuoiTon the={theMa} tenKho={tenKho} vaiLo={vaiLo}
-            trong={b.tim ? `Không dòng tồn nào khớp "${b.tim}"${b.nganh ? ` trong ngành ${b.nganh}` : ""}.` : "Không dòng tồn nào khớp bộ lọc."} /> :
+            trong={b.tim ? `Không dòng tồn nào khớp "${b.tim}"${b.nganh ? ` trong ngành ${tenNganh(b.nganh)}` : ""}.` : "Không dòng tồn nào khớp bộ lọc."} /> :
           <div className="bang-cuon sp-bang-khung">
             <table className="bang kho-bang">
               <thead><tr><th>Mặt hàng</th><th>Lô</th><th>Hạn sử dụng</th><th className="so">Số lượng</th>
@@ -186,7 +187,7 @@ export default function KhoHang() {
                 <th className="so">Giá trị</th><th>Trạng thái</th></tr></thead>
               <tbody>
                 {dong.map((x, i) => <DongTon key={x.ma + x.kho + i} x={x} tenKho={tenKho} vaiLo={vaiLo} />)}
-                {!dong.length && <tr><td colSpan={7} className="trong">{b.tim ? `Không dòng tồn nào khớp "${b.tim}"${b.nganh ? ` trong ngành ${b.nganh}` : ""}.` : "Không dòng tồn nào khớp bộ lọc."}</td></tr>}
+                {!dong.length && <tr><td colSpan={7} className="trong">{b.tim ? `Không dòng tồn nào khớp "${b.tim}"${b.nganh ? ` trong ngành ${tenNganh(b.nganh)}` : ""}.` : "Không dòng tồn nào khớp bộ lọc."}</td></tr>}
               </tbody>
             </table>
           </div>}
@@ -241,7 +242,7 @@ export default function KhoHang() {
             <p className="phu">Theo bộ lọc lô / trạng thái / ô tìm; không tự lọc theo ngành (bấm để lọc).</p>
             {theoNganh.length ? theoNganh.map(w => (
               <button key={w.ten} type="button" className="kh-thanh-dong" aria-pressed={b.nganh === w.ten} onClick={() => dat({ nganh: b.nganh === w.ten ? "" : w.ten })}>
-                <span className="kh-td-nhan"><b className="ten-jp">{w.ten}</b><span>{yen(w.gia_tri)}</span></span>
+                <span className="kh-td-nhan"><b title={w.ten}>{tenNganh(w.ten)}</b><span>{yen(w.gia_tri)}</span></span>
                 <span className="kh-td-thanh"><i style={{ width: `${Math.max(0, w.gia_tri) / maxNganh * 100}%` }} /></span>
                 <span className="sp-khach-phu">{so(w.so_dong)} dòng tồn</span>
               </button>)) : <p className="trong-nho">Chưa có dòng tồn nào.</p>}
@@ -251,7 +252,7 @@ export default function KhoHang() {
             <p className="phu">Không tự lọc theo lô (bấm để lọc){locHopLe ? `; có theo trạng thái "${d.trang_thai[locHopLe][0]}" — lô không còn dòng nào ở trạng thái đó vắng mặt` : ""}.</p>
             {k.theo_kho.length ? k.theo_kho.map(w => (
               <button key={w.ma} type="button" className="kh-thanh-dong" aria-pressed={b.kho === w.ma} onClick={() => dat({ kho: b.kho === w.ma ? "" : w.ma })}>
-                <span className="kh-td-nhan"><b>{vaiLo(w.ma)} <span className="nhat-chu ten-jp">{w.ma} {w.ten}</span></b><span>{yen(w.gia_tri)}</span></span>
+                <span className="kh-td-nhan"><b title={`${w.ma} ${w.ten}`}>{vaiLo(w.ma)}</b><span>{yen(w.gia_tri)}</span></span>
                 <span className="kh-td-thanh"><i style={{ width: `${w.gia_tri / maxKho * 100}%` }} /></span>
                 <span className="sp-khach-phu">{so(w.so_dong)} dòng tồn</span>
               </button>)) : <p className="trong-nho">Chưa có dòng tồn nào.</p>}
@@ -275,7 +276,7 @@ export default function KhoHang() {
             <thead><tr><th>Mặt hàng</th><th>Trạng thái</th><th className="so">Tồn</th><th className="so">Bán/ngày</th><th className="so">Còn đủ bán</th>
               <th className="so">DT 12 tháng</th><th className="so">Khách</th><th className="so">Bán gần nhất</th><th>Đặt hàng</th></tr></thead>
             <tbody>{canDat.map(m => (
-              <tr key={m.ma}><td><a className="ten-jp" href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code> · <span className="ten-jp">{m.nganh}</span></div></td>
+              <tr key={m.ma}><td><a className="ten-jp" href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code> · <span title={m.nganh}>{tenNganh(m.nganh)}</span></div></td>
                 <td><span className={"nhan-vien " + m.mau}>{m.nhan_trang_thai}</span></td>
                 <td className="so">{so_luong(m.ton)}</td><td className="so">{so_luong(m.toc_do_ngay_theo_tuoi)}</td>
                 <td className={"so " + (m.du_ban_ngay != null && m.du_ban_ngay < 7 ? "giam" : "canh-chu")}>{m.du_ban_ngay == null ? "—" : `${Math.round(m.du_ban_ngay)} ngày`}</td>
@@ -310,7 +311,7 @@ function LuoiTon({ the, tenKho, vaiLo, trong }: {
             </div>
             <div className="sp-the-than">
               <div className="sp-the-ten ten-jp" title={t.ten}>{t.ten}</div>
-              <div className="ma-nho"><code>{t.ma}</code> · <span className="ten-jp">{t.nganh}</span></div>
+              <div className="ma-nho"><code>{t.ma}</code> · <span title={t.nganh}>{tenNganh(t.nganh)}</span></div>
               <div className="sp-the-so"><b>{so_luong(t.so_luong)}</b><span className="nhat-chu" title={yen(t.gia_tri)}>{gon(t.gia_tri)}</span></div>
               <ul className="kho-the-lo">
                 {t.lo.map((x, i) => {
@@ -348,7 +349,7 @@ function LuoiCanDat({ ds }: { ds: MaHang[] }) {
             </div>
             <div className="sp-the-than">
               <div className="sp-the-ten ten-jp" title={m.ten}>{m.ten}</div>
-              <div className="ma-nho"><code>{m.ma}</code> · <span className="ten-jp">{m.nganh}</span></div>
+              <div className="ma-nho"><code>{m.ma}</code> · <span title={m.nganh}>{tenNganh(m.nganh)}</span></div>
               <div className="sp-the-so"><b className={m.du_ban_ngay != null && m.du_ban_ngay < 7 ? "giam" : "canh-chu"}>
                 {m.ton === 0 ? "Đã hết" : m.du_ban_ngay == null ? "—" : `còn ${Math.round(m.du_ban_ngay)} ngày`}</b></div>
               <div className="sp-the-ton">Tồn {m.ton == null ? "—" : so_luong(m.ton)} · bán {so_luong(m.toc_do_ngay_theo_tuoi)}/ngày</div>
@@ -366,7 +367,7 @@ function DongTon({ x, tenKho, vaiLo }: { x: DongKho; tenKho: (m: string) => stri
   return (
     <tr>
       <td className="sp-ten"><a className="ten-jp" href={`/san-pham/${encodeURIComponent(x.ma)}`}>{x.ten}</a>
-        <div className="ma-nho"><code>{x.ma}</code> · <span className="ten-jp">{x.nganh}</span></div></td>
+        <div className="ma-nho"><code>{x.ma}</code> · <span title={x.nganh}>{tenNganh(x.nganh)}</span></div></td>
       <td className="kho-ten-kho"><b>{vaiLo(x.kho)}</b><div className="ma-nho ten-jp">{tenKho(x.kho)}</div></td>
       <td><span className={"nhan-vien " + x.mau_han}>{x.nhan_han}</span>
         <div className={"ma-nho " + (x.han_con_lai != null && x.han_con_lai < 0 ? "giam" : x.han_con_lai != null && x.han_con_lai <= 90 ? "canh-chu" : "")}>

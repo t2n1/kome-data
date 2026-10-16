@@ -200,7 +200,7 @@ def test_trang_bao_cao_in_ro_thang_va_ngay_moc(client, conn, batch):
     assert td["hom_nay"] == "2026-07-31"
     src = _src()
     assert '<div className="nhan">Ngân sách {td ? thNgan(td.thang) : ""}</div>' in src
-    assert "mốc {nhanMoc}" in src
+    assert "lẽ ra đạt {moc != null ? p1(moc / 100) : \"—\"} {nhanMoc}" in src
 
 
 def test_trang_bao_cao_khong_co_chi_tieu_thi_moi_sang_man_ngan_sach(client, conn, batch):
@@ -430,7 +430,8 @@ def test_trang_bao_cao_khong_ve_thanh_am_khi_thuc_te_am(client, conn, batch):
     assert _nguoi(td, "0104")["rong_thanh"] == 0.0
     src = _src()
     assert "const r = Math.max(0, Math.min(1, rong)) * 100;" in src
-    assert "`${Math.max(0, Math.min(100, v / to * 100))}%`" in src
+    # Thẻ từng người (2026-10-01) chia theo ngân sách của CHÍNH người đó (`mt`), vẫn kẹp về 0.
+    assert "`${Math.max(0, Math.min(100, v / (mt as number) * 100))}%`" in src
 
 
 def test_trang_bao_cao_khong_ve_thanh_khi_chi_tieu_bang_0(client, conn, batch):

@@ -7,6 +7,7 @@ import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../../khung/khoang
 import { ngay, so, so_luong as soLuong, yen } from "../../dinh_dang";
 import type { HoSoMaApi, NenChaoApi } from "./kieu";
 import { KhoiDoiThu } from "./KhoiDoiThu";
+import { tenNganh } from "../../chung/nganh";
 
 const lk = (ma: string) => giuKhoang(`/khach-hang/${encodeURIComponent(ma)}`);
 
@@ -59,7 +60,7 @@ export function ViecVoiMa({ h, moTab }: { h: HoSoMaApi["h"]; moTab: (t: string) 
         {h.ngung_ban ? <p className="phu">Không chào hàng đã ngừng kinh doanh (※終売※).</p> :
           nc.error ? <div className="khoi-loi">Không tải được khách nên chào: {(nc.error as Error).message}</div> :
           !nc.data ? <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div> :
-          !nc.data.t.nen_chao.length ? <p className="phu">Chưa có khách mua đều mã cùng ngành ({h.nganh}) mà chưa mua mã này.</p> :
+          !nc.data.t.nen_chao.length ? <p className="phu">Chưa có khách mua đều mã cùng ngành ({tenNganh(h.nganh)}) mà chưa mua mã này.</p> :
           <ul className="hs2-ds">{nc.data.t.nen_chao.slice(0, 5).map(k => (
             <li key={k.ma} className="hs2-dong"><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a>
               <span className="phu" title={`${k.so_ma_nganh} mã cùng ngành · mua cuối ${ngay(k.lan_cuoi)}`}>{yen(k.doanh_thu_nganh)}</span></li>))}</ul>}

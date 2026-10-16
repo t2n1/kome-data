@@ -48,7 +48,7 @@ export function TaiLieuLuong() {
         <p className="ghi-chu">Sơ đồ luồng dữ liệu OBC → web app: bảng nào lấy từ đâu, bao lâu một lần, khoá chính là gì, đối chiếu thế nào.</p>
         <section id="bon-tang">
           <h2>Bốn tầng</h2>
-          <div className="tang">{m.tang.map(t => (
+          <div className="tl-tang">{m.tang.map(t => (
             <div key={t.ma} className={"tang-o " + t.mau}>
               <div className="tang-dau"><span className="tang-ma">{t.ma}</span> <span className="tang-ten">{t.ten}</span> <span className="khong-ap-dung">· {t.muc.length}</span></div>
               <div className="tang-mo">{t.mo_ta}</div>

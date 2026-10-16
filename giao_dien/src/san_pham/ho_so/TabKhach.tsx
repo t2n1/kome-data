@@ -26,7 +26,7 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
         phu={t.top10_ty_trong == null ? "Chưa có doanh thu 12 tháng." : `10 khách lớn nhất chiếm ${pc(t.top10_ty_trong)} doanh thu 12 tháng của mã (${so(t.tap_trung.length)} khách).`}>
         {top.length > 0 && <BieuDo nhan={top.map((_, i) => String(i + 1))} nhan_day_du={top.map(k => k.ten)} cao={200}
           chuoi={[{ ten: "Doanh thu", kieu: "cot", gia_tri: top.map(k => k.doanh_thu), mau: "var(--ok-vien)" },
-                  { ten: "Luỹ kế %", kieu: "duong", gia_tri: top.map(k => k.luy_ke == null ? null : k.luy_ke * 100), mau: "var(--lien-ket)", truc_phai: true }]}
+                  { ten: "Cộng dồn %", kieu: "duong", gia_tri: top.map(k => k.luy_ke == null ? null : k.luy_ke * 100), mau: "var(--lien-ket)", truc_phai: true }]}
           dinh_dang={(v, c) => c.truc_phai ? (v == null ? "—" : `${v.toFixed(1)}%`) : yen(v)} dinh_dang_truc={v => gon(v)}
           onBam={i => { location.href = lk(top[i].ma); }} mo_ta="Doanh thu 12 tháng theo khách xếp giảm dần, đường luỹ kế phần trăm" />}
       </The>
@@ -40,7 +40,7 @@ export function TabKhach({ ma, khoang }: { ma: string; khoang: KhoangMaApi }) {
     <div className="sp3-luoi-2">
       <The tieu_de="Theo người phụ trách" cach_tinh={ct.nguoi}>
         {!t.nguoi.length ? <p className="phu">Chưa bán trong 12 tháng.</p> :
-          <div className="bang-cuon"><table className="bang"><thead><tr><th>Người phụ trách</th><th className="so">Doanh thu</th><th className="so">Biên</th><th className="so">Khách</th></tr></thead>
+          <div className="bang-cuon"><table className="bang"><thead><tr><th>Người phụ trách</th><th className="so">Doanh thu</th><th className="so">Tỷ lệ lãi</th><th className="so">Khách</th></tr></thead>
             <tbody>{t.nguoi.map(n => (<tr key={n.ma}>
               <td>{n.ten ?? `(mã ${n.ma || "trống"} không có trong danh sách phụ trách)`}</td>
               <td className="so">{yen(n.doanh_thu)}</td><td className="so">{pc(n.bien)}</td>

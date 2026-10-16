@@ -103,19 +103,19 @@ def the_tu_dong(h: KH.HoSo, hang: str | None) -> list[dict]:
     if hang in ("S", "A"):
         the.append({"chu": f"⭐ Hạng {hang}", "vi": k.hang_ten or "hạng OBC (得意先ランク)"})
     if k.trang_thai == "da_roi_bo":
-        the.append({"chu": "💤 Lâu không mua", "vi": "im lặng ≥ 4× nhịp mua riêng", "mau": "do"})
+        the.append({"chu": "💤 Lâu không mua", "vi": "lâu gấp 4 lần bình thường chưa mua", "mau": "do"})
     elif k.trang_thai == "canh_bao":
-        the.append({"chu": "⏰ Quá nhịp mua", "vi": "im lặng 2–4× nhịp mua riêng", "mau": "canh"})
+        the.append({"chu": "⏰ Quá nhịp mua", "vi": "lâu gấp 2–4 lần bình thường chưa mua", "mau": "canh"})
     t = h.thang_nay or {}
     if t.get("nhan") == "tre":
         the.append({"chu": "📅 Mua đều, tháng này chưa", "vi": KT.CACH_TINH, "mau": "canh"})
     elif t.get("nhan") == "da_mua":
         the.append({"chu": "✅ Tháng này đã mua", "vi": f"tháng {_thang(t.get('thang'))}", "mau": "ok"})
     if k.nhip_ngay is not None and k.nhip_ngay <= 7:
-        the.append({"chu": "🔁 Tần suất cao", "vi": f"nhịp mua {round(k.nhip_ngay)} ngày"})
+        the.append({"chu": "🔁 Tần suất cao", "vi": f"thường {round(k.nhip_ngay)} ngày mua một lần"})
     ngung = sum(1 for m in h.tat_ca_mat_hang if m["trang_thai_cap"] == "ngung")
     if ngung:
-        the.append({"chu": f"📉 {ngung} mã đã ngừng mua", "vi": "im lặng ≥ 2× nhịp riêng của cặp khách–mã", "mau": "canh"})
+        the.append({"chu": f"📉 {ngung} mã đã ngừng mua", "vi": "từng mua đều, nay lâu chưa mua lại", "mau": "canh"})
     return the
 
 
@@ -141,8 +141,8 @@ def dien_giai(h: KH.HoSo, lich: dict) -> str:
     elif t.get("nhan") == "chua_toi_ngay":
         cau.append(f"Tháng {_thang(t['thang'])} chưa có đơn — khách thường mua muộn hơn trong tháng")
     if k.trang_thai in KH.TRANG_THAI_CAN_XU_LY and k.so_ngay_im_lang is not None:
-        cau.append(f"im lặng {k.so_ngay_im_lang} ngày"
-                   + (f" ({k.ty_le_im_lang:.1f}× nhịp {round(k.nhip_ngay)} ngày)"
+        cau.append(f"{k.so_ngay_im_lang} ngày chưa mua"
+                   + (f" (bình thường {round(k.nhip_ngay)} ngày mua một lần)"
                       if k.ty_le_im_lang and k.nhip_ngay else ""))
     ngung = sum(1 for m in h.tat_ca_mat_hang if m["trang_thai_cap"] == "ngung")
     if ngung:

@@ -138,15 +138,15 @@ export function TongQuan() {
       <DaiTuoi />
       <TomTat />
       <div className="thanh-bo-cuc">
-        {KD.sap_xep_duoc
-          ? <span className="phu">⠿ kéo đầu khối vào ô lưới · kéo góc phải dưới để đổi cỡ · Esc huỷ</span>
-          : <span className="phu">Máy này chưa bật đăng nhập — sắp xếp chỉ giữ tới khi tải lại trang.</span>}
-        <span className="phu mo">{hienIds.size}/{khoi.length} chức năng đang hiện</span>
+        {/* Gọn (2026-10-16): hướng dẫn kéo thả vào title, không chiếm một dòng chữ. */}
+        <span className="phu mo" title={KD.sap_xep_duoc ? "Kéo tên khối để đổi chỗ · kéo góc phải dưới để đổi cỡ · Esc huỷ"
+          : "Máy này chưa bật đăng nhập — sắp xếp chỉ giữ tới khi tải lại trang."}>Đang hiện {hienIds.size}/{khoi.length} khối</span>
         <button type="button" className="nut-nho luoi-bat" aria-pressed={hienLuoi} onClick={() => datHienLuoi(h => !h)}
-          title="Hiện ô lưới 12 cột (khi kéo, lưới luôn hiện)">▦ Lưới</button>
-        <button type="button" className="nut-nho" onClick={() => datBoCuc(macDinh())}>Đặt lại bố cục</button>
+          title="Hiện ô lưới (khi kéo, lưới luôn hiện)">▦</button>
+        <button type="button" className="nut-nho" onClick={() => datBoCuc(macDinh())}
+          title="Về bảng gọn: chỉ các khối chính">Về mặc định</button>
         {loiLuu && <span className="giam phu" role="alert">{loiLuu}</span>}
-        <button type="button" className="nut-chinh them" onClick={() => datChon(true)}>＋ Thêm chức năng</button>
+        <button type="button" className="nut-chinh them" onClick={() => datChon(true)}>＋ Thêm / bớt khối</button>
       </div>
       <Luoi bo_cuc={bo_cuc} datBoCuc={datBoCuc} sua_duoc={true} hien_luoi={hienLuoi} nhan={id => nhanCua[id] ?? id}
         ve={o => veKhoi(o.id, nhanCua[o.id] ?? o.id, o.xem ?? null,
@@ -157,22 +157,33 @@ export function TongQuan() {
   );
 }
 
-/** Dải tóm tắt đầu trang — ghép từ ĐÚNG hai khối đã tải (không truy vấn riêng). */
+/** Dải tóm tắt đầu trang — ghép từ khối Chỉ số đã tải (không truy vấn riêng). Viết thành CÂU bằng lời
+ *  thường (chủ DN 2026-10-16: "người không rành nhìn cũng hiểu"): bán được bao nhiêu, so năm trước, ngân sách,
+ *  việc cần làm — mỗi ý một dòng, kèm liên kết tới màn làm việc đó. */
 function TomTat() {
   const { data: k } = useKhoi<any>("kpi");
   if (!k) return <div className="tom-tat cho">Đang tính…</div>;
-  const cau: string[] = [];
-  const cg = k.khach.can_goi + k.khach.roi_bo;
-  if (cg) cau.push(`${cg} khách cần gọi lại`);
+  const dt = k.doanh_thu, ss = dt.so_sanh?.[0];
+  const ky = (k.khoang?.nhan ?? "tháng này").replace(/^./, (c: string) => c.toLowerCase());
+  const td = ss?.co && dt.cung_ky ? dt.gia_tri / dt.cung_ky - 1 : null;
+  const y: React.ReactNode[] = [];
+  y.push(<>Đã bán <b>{gon(dt.gia_tri)}</b> trong {ky}
+    {td != null && <> — <b className={td >= 0 ? "tang" : "giam"}>{td >= 0 ? "nhiều hơn" : "ít hơn"} {pc(Math.abs(td), 0)}</b> so với {ss.nhan}</>}.</>);
   const ns = k.ngan_sach;
   if (ns?.muc_tieu_den_hom_nay != null) {
     const lech = ns.thuc_te - ns.muc_tieu_den_hom_nay;
-    cau.push(lech < 0 ? `ngân sách tháng chậm ${gon(-lech)} so mốc ${pc(ns.moc)}` : `ngân sách tháng vượt mốc ${gon(lech)}`);
-  } else if (!k.ngan_sach_chi_theo_thang) cau.push(`chưa đặt chỉ tiêu ${k.khoang?.nhan?.toLowerCase() ?? "tháng này"}`);
-  if (k.kho.qua_han) cau.push(`${k.kho.qua_han} lô đã quá hạn dùng`);
-  if (k.kho.het_hang) cau.push(`${k.kho.het_hang} mã hết hàng`);
+    y.push(<>Ngân sách: đạt <b>{pc(ns.tien_do, 0)}</b> — {lech < 0
+      ? <span className="giam">đang chậm {gon(-lech)} so với kế hoạch đến hôm nay</span>
+      : <span className="tang">đang vượt kế hoạch {gon(lech)}</span>}.</>);
+  } else if (!k.ngan_sach_chi_theo_thang) y.push(<>Chưa đặt ngân sách {ky}.</>);
+  const cg = k.khach.can_goi + k.khach.roi_bo;
+  const viec: React.ReactNode[] = [];
+  if (cg) viec.push(<a key="g" href="/lien-he?tat_ca=1">{cg} khách nên gọi lại</a>);
+  if (k.kho.het_hang) viec.push(<a key="h" href="/kho-hang?tab=can_dat">{k.kho.het_hang} mã hết hàng</a>);
+  if (k.kho.qua_han) viec.push(<a key="q" href="/kho-hang">{k.kho.qua_han} lô đã quá hạn dùng</a>);
+  if (viec.length) y.push(<>Cần làm: {viec.map((v, i) => <span key={i}>{i ? " · " : ""}{v}</span>)}.</>);
   const gap = k.kho.qua_han || k.kho.het_hang || k.khach.roi_bo;
-  return <div className={"tom-tat" + (gap ? " canh" : "")}>{cau.length ? cau.join(" · ").replace(/^./, c => c.toUpperCase()) + "." : "Mọi thứ ổn."}</div>;
+  return <div className={"tom-tat" + (gap ? " canh" : "")}>{y.map((x, i) => <div key={i}>{x}</div>)}</div>;
 }
 
 function BangThem({ bo_cuc, suaBoCuc, dong }: { bo_cuc: OBoCuc[]; suaBoCuc: (f: (b: OBoCuc[]) => OBoCuc[]) => void; dong: () => void }) {

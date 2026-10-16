@@ -152,4 +152,4 @@ def test_trang_lien_he_hien_cot_thang(conn, batch, test_db_url):
     m = re.search(r"\{laThang \? <>(.*?)</> : <>(.*?)</>\}", src, re.S)
     assert m, "thẻ phải tách nhánh cột tháng / cột nhịp"
     assert "/tháng" in m.group(1) and "so_ngay_im_lang" not in m.group(1)
-    assert "im {t.so_ngay_im_lang} ngày" in m.group(2)
+    assert "{t.so_ngay_im_lang} ngày chưa mua" in m.group(2)

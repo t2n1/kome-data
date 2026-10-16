@@ -58,14 +58,14 @@ _KHOI_DAY_DU = (
     ("mua_hang", "Đơn đặt nhà cung cấp", 4, 3, "hang_hoa", "PO đang mở, đơn trễ hẹn và đơn chờ duyệt"),
     ("khieu_nai", "Trả hàng & khiếu nại", 4, 3, "hang_hoa", "Phiếu đang mở, quá hạn xử lý và chi phí bồi hoàn"),
     ("suc_khoe_khach", "Sức khoẻ khách hàng", 4, 3, "khach_hang", "Bao nhiêu khách khoẻ, cần theo dõi, đang rời bỏ"),
-    ("danh_sach_khach", "Danh sách khách hàng", 12, 6, "khach_hang", "Doanh thu, nhịp mua và việc cần làm"),
+    ("danh_sach_khach", "Danh sách khách hàng", 12, 6, "khach_hang", "Doanh thu và việc cần làm"),
     ("hang_sap_ve", "Sản phẩm sắp về kho", 12, 3, "hang_hoa", "Container đang trên đường và lô nào trễ hẹn"),
     ("han_su_dung", "Sản phẩm sắp hết hạn", 12, 6, "hang_hoa", "Lô cận date và giá trị tồn đang có rủi ro"),
-    ("hieu_suat_nganh", "Hiệu suất theo ngành hàng", 8, 6, "thi_truong", "Tỷ trọng doanh thu và biên lãi gộp từng nhóm"),
+    ("hieu_suat_nganh", "Doanh thu theo ngành hàng", 8, 6, "thi_truong", "Mỗi ngành hàng chiếm bao nhiêu doanh thu và lãi bao nhiêu"),
     ("so_sanh_sale", "Doanh thu theo sale", 4, 6, "khach_hang", "Ai đang đạt, ai đang hụt ngân sách cá nhân"),
-    ("tuong_quan", "Doanh thu × tần suất mua", 8, 6, "khach_hang", "Mỗi chấm một khách, thấy ngay ai to mà thưa đơn"),
-    ("nhip_mua", "Tỷ lệ im lặng theo tuần", 4, 3, "khach_hang", "Khoảng cách giữa các đơn đang giãn ra hay thu lại"),
-    ("bien_loi_nhuan", "Biên lợi nhuận theo quý", 8, 6, "tien", "Biên lãi gộp sáu quý gần nhất"),
+    ("tuong_quan", "Khách mua nhiều hay mua đều", 8, 6, "khach_hang", "Mỗi chấm một khách, thấy ngay ai to mà thưa đơn"),
+    ("nhip_mua", "Khách lâu chưa mua theo tuần", 4, 3, "khach_hang", "Khoảng cách giữa các đơn đang giãn ra hay thu lại"),
+    ("bien_loi_nhuan", "Tỷ lệ lãi theo quý", 8, 6, "tien", "Mỗi ¥100 bán ra lãi bao nhiêu, sáu quý gần nhất"),
     ("tang_truong", "Số khách đang mua", 4, 6, "khach_hang", "Số khách có đơn theo từng kỳ kế toán"),
     ("thoi_tiet", "Thời tiết 7 ngày tới", 8, 3, "thi_truong", "Nắng nóng đẩy bia và nước, mưa to ảnh hưởng lịch xe"),
     ("don_hang", "Nạp dữ liệu / phiếu gần nhất", 12, 6, "tong_quan", "Nhật ký nạp và các phiếu bán mới nhất"),
@@ -108,12 +108,12 @@ MA_CU = {"chi_so": "kpi", "ngan_sach": "ns_thang", "suc_khoe": "suc_khoe_khach",
 # đây phải có nhánh vẽ trong giao_dien/src/tong_quan/khoi.tsx (tests/test_cach_xem.py).
 CACH_XEM: dict[str, tuple[tuple[str, str], ...]] = {
     # 2026-09-29 (chủ DN): Doanh thu · Lãi gộp · Khách mới; "bien" cũ gộp vào "lai_gop" (XEM_CU).
-    "theo_thang": (("cot", "Doanh thu"), ("lai_gop", "Lãi gộp"), ("khach_moi", "Khách mới"), ("luy_ke", "Luỹ kế")),
-    "xu_huong": (("doanh_thu", "Doanh thu"), ("luy_ke", "Luỹ kế"), ("lai_gop", "Lãi gộp"), ("so_khach", "Số khách")),
+    "theo_thang": (("cot", "Doanh thu"), ("lai_gop", "Lãi gộp"), ("khach_moi", "Khách mới"), ("luy_ke", "Cộng dồn")),
+    "xu_huong": (("doanh_thu", "Doanh thu"), ("luy_ke", "Cộng dồn"), ("lai_gop", "Lãi gộp"), ("so_khach", "Số khách")),
     "ns_thang": (("doanh_thu", "Doanh thu"), ("lai_gop", "Lãi gộp")),
     "so_sanh_sale": (("tien_do", "Tiến độ"), ("doanh_thu", "Doanh thu"), ("lai_gop", "Lãi gộp")),
-    "hieu_suat_nganh": (("ty_trong", "Tỷ trọng"), ("doanh_thu", "Doanh thu"), ("bien", "Biên gộp")),
-    "danh_sach_khach": (("doanh_thu", "Doanh thu"), ("im_lang", "Im lặng")),
+    "hieu_suat_nganh": (("ty_trong", "Tỷ trọng"), ("doanh_thu", "Doanh thu"), ("bien", "Tỷ lệ lãi")),
+    "danh_sach_khach": (("doanh_thu", "Doanh thu"), ("im_lang", "Lâu chưa mua")),
     "suc_khoe_khach": (("thanh", "Thanh"), ("vong", "Vòng")),
     "tang_truong": (("so_khach", "Số khách"), ("doanh_thu", "Doanh thu")),
     "cong_no": (("tuoi", "Tuổi nợ"), ("lau_nhat", "Nợ lâu nhất")),
@@ -207,7 +207,20 @@ def _xep_dau(ds: list[O], co_san: list[O] = (), y0: int = 0) -> list[O]:
     return ra
 
 
+# Bảng MẶC ĐỊNH chỉ HIỆN các khối trả lời "hôm nay thế nào, cần làm gì" (chủ DN 2026-10-16: "đơn giản, người
+# không rành nhìn cũng hiểu") — theo đúng thứ tự này; mọi khối khác vẫn trong bố cục nhưng ẩn sẵn (`an`), bật lại
+# bằng "+ Thêm chức năng". Bố cục đã lưu KHÔNG đổi; "Đặt lại bố cục" về bản gọn này.
+HIEN_MAC_DINH = ("kpi", "viec_hom_nay", "thang_nay_chua_mua", "ns_thang", "theo_thang", "han_su_dung", "cong_no")
+
+
 def mac_dinh() -> list[O]:
+    hien = [O(k[0], k[2], k[3]) for m in HIEN_MAC_DINH for k in KHOI if k[0] == m]
+    an = [O(k[0], k[2], k[3], an=True) for k in KHOI if k[0] not in HIEN_MAC_DINH]
+    return nen(_xep_dau(hien + an))
+
+
+def day_du() -> list[O]:
+    """Mọi khối hiện, xếp theo thứ tự danh mục — chỗ xuất phát của mẫu "theo vai trò"."""
     return nen(_xep_dau([O(k[0], k[2], k[3]) for k in KHOI]))
 
 
@@ -258,6 +271,8 @@ def chuan_hoa(tho) -> list[O]:
             continue
         tho_ds.append((ma, x))
         da_co.add(ma)
+    if not tho_ds:      # không có khối nào đọc được = chưa từng lưu / rác → bảng mặc định (gọn)
+        return mac_dinh()
     cu = any(not (_la_toa_do(x.get("x")) and _la_toa_do(x.get("y"))) for _, x in tho_ds)
     ds = []
     for ma, x in tho_ds:

@@ -10,6 +10,7 @@ import type { BangGiaApi, DongGia, MaGia } from "./kieu";
 import { chuoiLocBg, CO, coCua, docLocBg, giaiO, locBangGia } from "./loc";
 import type { LocBg } from "./loc";
 import "./bang_gia.css";
+import { tenNganh } from "../chung/nganh";
 
 export default function ManBangGia() {
   const { data: d, error } = useQuery<BangGiaApi>({ queryKey: ["bang-gia"], queryFn: () => lay<BangGiaApi>("/api/bang-gia") });
@@ -62,7 +63,7 @@ export default function ManBangGia() {
           <button type="button" className="chip" aria-pressed={!b.nganh} onClick={() => dat({ nganh: "" })}>Mọi ngành ({so(kq.tong_nganh)})</button>
           {kq.dem_nganh.map(([n, c]) => (
             <button key={n} type="button" className="chip ten-jp" aria-pressed={b.nganh === n} onClick={() => dat({ nganh: b.nganh === n ? "" : n })}>
-              {n} ({so(c)})</button>))}
+              {tenNganh(n)} ({so(c)})</button>))}
           {b.nganh && !kq.dem_nganh.some(([n]) => n === b.nganh) &&
             <button type="button" className="chip ten-jp" aria-pressed onClick={() => dat({ nganh: "" })}>{b.nganh} (0)</button>}
         </div>
@@ -94,7 +95,7 @@ function Ma({ m, bac }: { m: MaGia; bac: string[] }) {
   const ten = (
     <td className="bg-ten" rowSpan={Math.max(1, m.dong.length)}>
       <a href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)} className="ten-jp">{m.ten}</a>
-      <div className="ma-nho"><code>{m.ma}</code> · <span className="ten-jp">{m.nganh}</span>
+      <div className="ma-nho"><code>{m.ma}</code> · <span title={m.nganh}>{tenNganh(m.nganh)}</span>
         {m.ngung_ban && <> · <span className="nhan-vien canh" title="Đã ngừng kinh doanh (※終売※) — chỉ còn bán nốt tồn">bán nốt tồn</span></>}
         {m.thieu_kg && <> · <span className="nhan-vien canh" title="Không biết kg mỗi gói / thùng — giá này không vào phần so với đối thủ. Sửa quy cách ở Thị trường & đối thủ › Giá KOME lệch">thiếu kg</span></>}
       </div></td>);

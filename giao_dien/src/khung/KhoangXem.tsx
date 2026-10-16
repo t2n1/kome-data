@@ -63,7 +63,7 @@ export function KhoangXem({ mo }: { mo?: string }) {
           <div className="tab-pill" role="group" aria-label="Dạng khoảng xem">
             {(["thang", "ky", "khoang"] as const).map(l => (
               <button key={l} type="button" aria-pressed={loai === l} onClick={() => doiLoai(l)}>
-                {l === "thang" ? "Tháng" : l === "ky" ? "Kỳ" : "Khoảng"}</button>))}
+                {l === "thang" ? "Tháng" : l === "ky" ? "Cả năm (kỳ)" : "Tự chọn ngày"}</button>))}
           </div>
         </div>
         <div className="kx-giua">
@@ -172,7 +172,7 @@ function SoVoi({ k, pv, kx }: { k: Khoang; pv: PhamVi; kx: KhoangMayChu | null }
         <div className="tab-pill" role="group" aria-label="Dạng kỳ so sánh">
           {(["thang", "ky", "khoang"] as const).map(l => (
             <button key={l} type="button" aria-pressed={loai === l} onClick={() => datLoai(l)}>
-              {l === "thang" ? "Tháng" : l === "ky" ? "Kỳ" : "Khoảng"}</button>))}
+              {l === "thang" ? "Tháng" : l === "ky" ? "Cả năm (kỳ)" : "Tự chọn ngày"}</button>))}
         </div>
         {loai === "thang" && <input type="month" className="kx-o" min={tDau} max={tCuoi}
           defaultValue={k.ss_thang ?? ""} aria-label="Tháng để so"

@@ -9,6 +9,7 @@ import { DongNoi, ONoi } from "../chung/ONoi";
 import { ngay_ngan, pc, thang_nhan } from "../dinh_dang";
 import { CAU_SO_LUONG, MUA, inSo, ngayCua, type ChiSo, type DuLieuMV, type LuyKe } from "./du_lieu";
 import { bac, bangNhiet, buocPhim, catTen, cungThangNamTruoc, thangCaoDiem, thangCuaKy, xepHang, type KieuXep, type Thang } from "./nhiet";
+import { tenNganh } from "../chung/nganh";
 
 export type KieuTo = "ma" | "bang";
 const CAO_HANG = 16;
@@ -187,7 +188,7 @@ const HangNhiet = memo(function HangNhiet({ i, m, hoat, ctx }: { i: number; m: n
   const { bang, thang, C, CW, to, cs, dl, L, onChon } = ctx;
   const ma = dl.ma[m], mh = bang.max_hang[i], ms = to === "ma" ? mh : bang.max_bang, cd = bang.cao_diem[i];
   // Thông tin của cột nhãn (không phải điểm dừng Tab) đi vào nhãn đọc của từng ô.
-  const them = `ngành ${ma.nganh ?? "—"} · tổng cả kỳ ${inSo(cs, bang.tong[i])} · cao điểm ${cd === null ? "—" : `tháng ${cd}`}`;
+  const them = `ngành ${ma.nganh ? tenNganh(ma.nganh) : "—"} · tổng cả kỳ ${inSo(cs, bang.tong[i])} · cao điểm ${cd === null ? "—" : `tháng ${cd}`}`;
   return (
     <g>
       {thang.map((t, k) => {
@@ -226,7 +227,7 @@ const NhanHang = memo(function NhanHang({ i, m, anh, ctx }: { i: number; m: numb
         <HinhMa ma={ma.ma} ten={ma.ten} co={64} trang_tri />
         <div>
           <b>{ma.ten}</b> <span className="mo">{ma.ma}</span>
-          <DongNoi nhan="Ngành" gia={ma.nganh} />
+          <DongNoi nhan="Ngành" gia={tenNganh(ma.nganh)} />
           <DongNoi nhan="Tổng cả kỳ" gia={inSo(cs, bang.tong[i])} />
           <DongNoi nhan="Tháng cao điểm" gia={cd === null ? "—" : `tháng ${cd}`} />
         </div>
