@@ -17,7 +17,36 @@ button.o-kpi,a.o-kpi{font:inherit;text-align:left;cursor:pointer}
 .sp-dm-dau{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .8rem;margin-bottom:.6rem}
 .sp-dm-dau h2{margin:0;font-size:.95rem;font-weight:600;border:0;padding:0}
 .sp-tim{flex:0 1 300px}
-.sp-dm-dau .phu{margin-left:auto;font-size:.74rem}
+.sp-dm-phai{margin-left:auto;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.sp-sap{display:inline-flex;gap:.3rem;align-items:center;font-size:.76rem;color:var(--chu-thuong)}
+.sp-sap select{font:inherit;font-size:.78rem;padding:.26rem .4rem;border:1px solid var(--vien-dam);border-radius:7px;background:var(--nen-the);color:var(--chu)}
+.sp-sap .nut-nho{padding:.2rem .45rem}
+.sp-xem{display:inline-flex;border:1px solid var(--vien-dam);border-radius:8px;overflow:hidden}
+.sp-xem button{font:inherit;font-size:.76rem;padding:.28rem .65rem;border:0;background:var(--nen-the);color:var(--chu-thuong);cursor:pointer}
+.sp-xem button+button{border-left:1px solid var(--vien-dam)}
+.sp-xem button[aria-pressed="true"]{background:var(--do-nen);color:var(--do-chu);font-weight:600}
+
+/* Lưới thẻ hình to (2026-10-16 — chủ DN: "block hình sản phẩm to hơn để chọn"). Bảng đủ cột vẫn ở ?xem=bang. */
+.sp-luoi{list-style:none;margin:.5rem 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:.7rem}
+.sp-luoi-trong{border:1px dashed var(--vien-dam);border-radius:12px;padding:1.2rem;font-size:.84rem;color:var(--chu-nhat);text-align:center;margin-top:.5rem}
+a.sp-the{display:flex;flex-direction:column;height:100%;border:1px solid var(--vien);border-radius:12px;overflow:hidden;
+  background:var(--nen-the);color:var(--chu);text-decoration:none;transition:border-color .12s,box-shadow .12s,transform .12s}
+a.sp-the:hover,a.sp-the:focus-visible{border-color:var(--do);box-shadow:0 4px 14px color-mix(in srgb,var(--chu) 12%,transparent);transform:translateY(-1px)}
+/* Nền trắng cố ý (cả chế độ tối) — cùng lý lẽ .hinh-ma: ảnh sản phẩm chụp trên nền trắng. */
+.sp-the-hinh{position:relative;height:170px;background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--vien-phu)}
+.sp-the-hinh .hinh-ma{border:0;border-radius:0}
+.sp-the-hinh .hinh-ma-cho{border-radius:12px}
+.sp-the-tt{position:absolute;top:.45rem;left:.45rem;font-size:.66rem}
+.sp-the-ngung{position:absolute;top:.45rem;right:.45rem;font-size:.66rem}
+.sp-the-than{display:flex;flex-direction:column;gap:.18rem;padding:.55rem .65rem .6rem;flex:1;min-width:0}
+.sp-the-ten{font-size:.84rem;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+.sp-the .ma-nho{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-the-so{display:flex;align-items:baseline;gap:.45rem;margin-top:.2rem;font-variant-numeric:tabular-nums}
+.sp-the-so b{font-size:1.02rem}
+.sp-the-so span{font-size:.74rem}
+.sp-the-ton{font-size:.74rem;color:var(--chu-thuong);font-variant-numeric:tabular-nums}
+.sp-the-spark{margin-top:auto;padding-top:.25rem;font-size:.7rem;min-height:22px}
+.sp-the-spark svg{margin-top:0 !important;width:100%}
 .sp-chip{display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.45rem}
 .sp-chip .chip{font-size:.74rem;padding:.24rem .6rem}
 .sp-bang-khung{border:1px solid var(--vien);border-radius:10px;max-height:520px;overflow:auto;margin-top:.3rem}
@@ -102,4 +131,4 @@ a.sp-khach-dong:hover{background:var(--nen)}
 .kho-the-han a{color:var(--chu);text-decoration:none}
 .kho-the-han .phu{font-size:.72rem;margin:.15rem 0}
 a.kho-the-lk{display:inline-block;margin-top:.3rem;font-size:.72rem;color:var(--lien-ket)}
-@media (max-width:700px){.sp-dm-dau .phu{margin-left:0}.sp-thang-chon{margin-left:0}}
+@media (max-width:700px){.sp-dm-phai{margin-left:0}.sp-luoi{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.sp-the-hinh{height:140px}.sp-thang-chon{margin-left:0}}

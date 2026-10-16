@@ -1,4 +1,4 @@
-// Màn "Sản phẩm" (Sản phẩm.dc.html): /san-pham là danh mục; bấm một dòng mở
+// Màn "Sản phẩm" (Sản phẩm.dc.html): /san-pham là danh mục; bấm một thẻ (lưới hình — mặc định) hoặc một dòng (?xem=bang) mở
 // trang riêng /san-pham/{mã} (ho_so/HoSoMa.tsx). Cả danh mục là MỘT ảnh chụp
 // (/api/san-pham), nên lọc / sắp / tìm chạy ở trình duyệt, không hỏi lại máy chủ.
 import { HinhMa } from "../chung/HinhMa";
@@ -83,6 +83,8 @@ export default function ManSanPham() {
   const coBanKx = tatCa.filter(m => m.dt_khoang).length;
   const ten12 = d.thang.length ? `${d.thang[0].slice(5)}/${d.thang[0].slice(2, 4)} → ${d.thang[11].slice(5)}/${d.thang[11].slice(2, 4)}` : "";
 
+  const trong = `Không có mã hàng nào khớp${b.tim ? ` với "${b.tim}"` : ""}. Thử bỏ bớt bộ lọc.`;
+  const tangDan = b.giam === "" ? !!SAP[b.sap]?.tang : b.giam === "0";
   const cot = (k: string, chu: string, cls = "", title?: string) => {
     const dang = b.sap === k, tang = b.giam === "" ? SAP[k]?.tang : b.giam === "0";
     return <th className={"sap " + cls} title={title} aria-sort={dang ? (tang ? "ascending" : "descending") : "none"}
@@ -126,7 +128,18 @@ export default function ManSanPham() {
           <h2>Danh mục mã hàng</h2>
           <input type="search" className="kh-tim sp-tim" placeholder="Tìm mã, tên hàng, ngành…" value={tim}
             onChange={e => datTim(e.target.value)} aria-label="Tìm mã hàng" />
-          <span className="phu">bấm một dòng để mở trang hồ sơ 360°</span>
+          <div className="sp-dm-phai">
+            {!b.xem && <label className="sp-sap">Sắp theo{" "}
+              <select value={b.sap in SAP_LUOI ? b.sap : "dt_khoang"} onChange={e => dat({ sap: e.target.value, giam: "" })}>
+                {Object.entries(SAP_LUOI).map(([k, chu]) => <option key={k} value={k}>{k === "dt_khoang" ? `Doanh thu ${kxNhan}` : chu}</option>)}
+              </select>
+              <button type="button" className="nut-nho" title="Đảo chiều sắp" aria-label={tangDan ? "Đang tăng dần — bấm để giảm dần" : "Đang giảm dần — bấm để tăng dần"}
+                onClick={() => dat({ giam: tangDan ? "1" : "0" })}>{tangDan ? "▲" : "▼"}</button></label>}
+            <div className="sp-xem" role="group" aria-label="Cách bày danh mục">
+              <button type="button" aria-pressed={!b.xem} onClick={() => dat({ xem: "" })}>▦ Hình</button>
+              <button type="button" aria-pressed={b.xem === "bang"} onClick={() => dat({ xem: "bang" })}>☰ Bảng</button>
+            </div>
+          </div>
         </div>
         <div className="sp-chip" role="group" aria-label="Ngành hàng">
           <button type="button" className="chip" aria-pressed={!b.nganh} onClick={() => dat({ nganh: "" })}>Mọi ngành ({so(tongNganh)})</button>
@@ -143,6 +156,7 @@ export default function ManSanPham() {
               {nhan} ({so(kq.dem_trang_thai[k] ?? 0)})</button>))}
         </div>
 
+        {!b.xem ? <LuoiThe hang={kq.hang} ss={!!ss?.co} nhanSs={ss?.nhan} onChon={moMa} trong={trong} /> :
         <div className="bang-cuon sp-bang-khung">
           <table className="bang sp-bang">
             <thead><tr>
@@ -162,10 +176,10 @@ export default function ManSanPham() {
             </tr></thead>
             <tbody>
               {kq.hang.map(m => <Dong key={m.ma} m={m} onChon={() => moMa(m.ma)} />)}
-              {!kq.hang.length && <tr><td colSpan={15} className="trong">Không có mã hàng nào khớp{b.tim ? ` với "${b.tim}"` : ""}. Thử bỏ bớt bộ lọc.</td></tr>}
+              {!kq.hang.length && <tr><td colSpan={15} className="trong">{trong}</td></tr>}
             </tbody>
           </table>
-        </div>
+        </div>}
         <p className="phu sp-ghi">{so(kq.hang.length)} mã đang hiện{" "}
           <ChuThich nhan="Các trạng thái"><b>Chưa rõ tồn</b> KHÁC <b>hết hàng</b>: mã CHƯA TỪNG có dòng nào trong 在庫一覧 thì ta không biết
             kho còn bao nhiêu — cột Tồn hiện "—"; mã có ở ảnh chụp trước mà vắng ở ảnh chụp mới nhất là <b>hết hàng</b> (OBC không xuất dòng
@@ -173,6 +187,54 @@ export default function ManSanPham() {
             bán trên 180 ngày; mã ra mắt trong 90 ngày không bao giờ bị gọi là tồn chết.</ChuThich></p>
       </section>
     </div>
+  );
+}
+
+// Các cách sắp của lưới (bảng sắp bằng tiêu đề cột). Khoá là khoá của SAP — một luật sắp, không chép.
+const SAP_LUOI: Record<string, string> = {
+  dt_khoang: "Doanh thu khoảng xem", dt_12t: "Doanh thu 12 tháng", so_khoang: "Tăng / giảm so kỳ so",
+  du_ban: "Sắp hết trước", ton: "Tồn nhiều", ten: "Tên hàng", lan_cuoi: "Bán gần nhất",
+};
+
+/** Lưới thẻ: hình to để nhận ra mã bằng mắt, dưới là đúng ba điều cần để chọn — đang bán bao nhiêu,
+ *  còn bao nhiêu, xu hướng 12 tháng. Mọi cột còn lại ở chế độ Bảng. Thẻ là <a> thật (Ctrl+bấm mở tab mới). */
+function LuoiThe({ hang, ss, nhanSs, onChon, trong }: {
+  hang: MaHang[]; ss: boolean; nhanSs?: string; onChon: (ma: string) => void; trong: string;
+}) {
+  if (!hang.length) return <div className="sp-luoi-trong">{trong}</div>;
+  return (
+    <ul className="sp-luoi" aria-label="Danh mục mã hàng">
+      {hang.map(m => {
+        const tl = ss && m.dt_ss ? (m.dt_khoang ?? 0) / m.dt_ss - 1 : null;
+        return (
+          <li key={m.ma}>
+            <a className="sp-the" href={`/san-pham/${encodeURIComponent(m.ma)}`}
+              onClick={e => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return; e.preventDefault(); onChon(m.ma); }}>
+              <div className="sp-the-hinh">
+                <HinhMa ma={m.ma} ten={m.ten} co={150} trang_tri />
+                <span className={"nhan-vien sp-the-tt " + m.mau}>{m.nhan_trang_thai}</span>
+                {m.ngung_ban && <span className="nhan-vien canh sp-the-ngung" title="Đã ngừng kinh doanh (※終売※) — chỉ còn bán nốt tồn, không đặt thêm">bán nốt tồn</span>}
+              </div>
+              <div className="sp-the-than">
+                <div className="sp-the-ten ten-jp" title={m.ten}>{m.ten}</div>
+                <div className="ma-nho"><code>{m.ma}</code> · <span className="ten-jp">{m.nganh}</span></div>
+                <div className="sp-the-so">
+                  <b title={m.dt_khoang ? yen(m.dt_khoang) : undefined}>{m.dt_khoang ? gon(m.dt_khoang) : <span className="nhat-chu">¥0</span>}</b>
+                  {tl != null && <span className={tl >= 0 ? "tang" : "giam"} title={nhanSs ? `so ${nhanSs}` : undefined}>{thay_doi(tl, 0)}</span>}
+                </div>
+                <div className="sp-the-ton">
+                  {m.ton == null ? <span className="nhat-chu" title="chưa rõ tồn — không có dòng nào trong 在庫一覧">Tồn —</span>
+                    : <>Tồn {soLuong(m.ton)}{m.du_ban_ngay != null &&
+                      <span className={m.du_ban_ngay < 14 ? "giam" : "nhat-chu"}> · đủ {Math.round(m.du_ban_ngay)} ngày</span>}</>}
+                </div>
+                <div className="sp-the-spark" title="Doanh thu 12 tháng theo tháng">
+                  {m.thang_dt.some(v => v) ? <Spark gia_tri={m.thang_dt} cao={22} mau="var(--lien-ket)" /> : <span className="nhat-chu">12 tháng không bán</span>}
+                </div>
+              </div>
+            </a>
+          </li>);
+      })}
+    </ul>
   );
 }
 
