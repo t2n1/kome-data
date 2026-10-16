@@ -32,3 +32,8 @@ a.cn-lich-dong:hover{background:var(--nen)}
 table.cn-bang td{white-space:nowrap}
 table.cn-bang td.sp-ten{white-space:normal;min-width:210px;max-width:320px}
 table.cn-bang td.sp-ten .ma-nho{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 2026-10-16: "Việc nên làm" lên đầu trang; tuổi nợ ở cột phải xếp dọc; ba số phụ thành một dòng chữ. */
+.cn-viec-dau{margin-bottom:.9rem}
+.cn-viec-dau ul{font-size:.86rem}
+.cn-tuoi.doc{grid-template-columns:repeat(auto-fit,minmax(min(130px,100%),1fr))}
+.cn-phu{margin:-.3rem 0 .8rem;font-size:.8rem}

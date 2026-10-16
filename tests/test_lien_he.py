@@ -255,13 +255,13 @@ def test_can_xu_ly_chuyen_ve_lien_he(client):
 
 
 def test_sidebar_tro_toi_lien_he(client, conn):
-    """Giai đoạn 3: /lien-he là React — thanh bên React có mục "Cần liên hệ"
+    """Giai đoạn 3: /lien-he là React — thanh bên React có mục "Cần gọi" (trước 2026-10-16: "Cần liên hệ")
     trỏ /lien-he (được đánh dấu khi đang mở: Nav.tsx đặt aria-current theo
     mucDangMo), và không nơi nào còn trỏ /can-xu-ly — cả thanh bên Jinja của
     các trang còn lại."""
     assert client.get("/lien-he").status_code == 200
     muc = (NGUON / "khung" / "muc.ts").read_text(encoding="utf-8")
-    assert '{ ma: "crm", nhan: "Cần liên hệ", url: "/lien-he", icon: "crm" }' in muc
+    assert '{ ma: "crm", nhan: "Cần gọi", url: "/lien-he", icon: "crm" }' in muc
     assert "/can-xu-ly" not in muc
     assert 'aria-current={m.ma === dangMo ? "page" : undefined}' in         (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")
     assert "/can-xu-ly" not in (NGUON / "khung" / "Nav.tsx").read_text(encoding="utf-8")

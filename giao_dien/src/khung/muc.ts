@@ -1,5 +1,5 @@
-// Mục điều hướng — ĐÚNG sáu nhóm, thứ tự, nhãn và icon của `NHOM` trong
-// kome-nav.js (gói thiết kế). `url: null` = màn chưa có (nhóm C / thiếu nguồn
+// Mục điều hướng — nhãn và icon theo `NHOM` trong kome-nav.js (gói thiết kế); từ 2026-10-16 NHÓM theo
+// tần suất dùng (xem chú thích trong nhomDieuHuong). `url: null` = màn chưa có (nhóm C / thiếu nguồn
 // dữ liệu, lộ trình §4.1): hiện mờ, không bấm được — không giả vờ có. Bốn màn
 // bị cắt khỏi phạm vi (lộ trình §4.2: web đặt hàng khách, mẫu chứng từ,
 // sale mobile) KHÔNG hiện. Từ 2026-09-28 mục `url: null` cũng
@@ -24,38 +24,35 @@ const CHUA_DUNG = "công ty chưa dùng nguồn này";
 const laQuanTri = () => !KD.nguoi || KD.nguoi.duoc_quan_tri;
 
 export function nhomDieuHuong(): Nhom[] {
+  // 2026-10-16 (chủ DN: "1 trang có nhiều chức năng quá nên khó xài"): nhóm theo TẦN SUẤT DÙNG thay sáu nhóm nghiệp vụ
+  // của gói thiết kế — nhân viên sale chỉ cần nhìn nhóm đầu. Màn chưa có (url null) gom vào "SẮP CÓ", chỉ hiện khi
+  // công tắc man_chua_co bật.
   const nhom: Nhom[] = [
-    { ma: "tongquan", ten: "TỔNG QUAN", muc: [
+    { ma: "hangngay", ten: "HẰNG NGÀY", muc: [
       { ma: "dashboard", nhan: "Tổng quan", url: "/", icon: "dashboard" },
+      // Cần gọi (trước 2026-10-16: "Cần liên hệ") = MỌI danh sách làm việc; Khách hàng chỉ còn tra cứu + bản đồ.
+      { ma: "crm", nhan: "Cần gọi", url: "/lien-he", icon: "crm" },
+      // Bản đồ là TAB của màn Khách hàng (cùng trạng thái lọc); /ban-do vẫn mở được và đánh dấu mục kh360.
+      { ma: "kh360", nhan: "Khách hàng", url: "/khach-hang", icon: "user" },
+      { ma: "kho", nhan: "Kho hàng", url: "/kho-hang", icon: "box" },
+      { ma: "congno", nhan: "Công nợ & thu tiền", url: TN.cong_no ? "/cong-no" : null, icon: "yen", ...(TN.cong_no ? {} : { ly_do: CHUA_DUNG }) },
+    ] },
+    { ma: "phantich", ten: "PHÂN TÍCH", muc: [
       // 2026-09-30: Báo cáo · Dự báo · Ngân sách gộp thành MỘT trang "Doanh thu" (/du-bao → 301;
       // màn nhập /ngan-sach vào bằng nút "✎ Sửa ngân sách" trên trang, vẫn đánh dấu mục này).
       { ma: "baocao", nhan: "Doanh thu", url: "/bao-cao", icon: "chart" },
-      { ma: "hieusuat", nhan: "Hiệu suất đội sale", url: null, icon: "team", ly_do: CHUA },
-    ] },
-    // 2026-10-16 (chủ DN: "nhiều thông tin quá nên hơi loạn"): bỏ mục "Bản đồ khách hàng" — nó là TAB của màn
-    // Khách hàng (cùng trạng thái lọc), hai mục trỏ một màn; /ban-do vẫn mở được và đánh dấu mục kh360.
-    { ma: "khachhang", ten: "KHÁCH HÀNG", muc: [
-      { ma: "kh360", nhan: "Khách hàng & bản đồ", url: "/khach-hang", icon: "user" },
-      { ma: "crm", nhan: "Cần liên hệ", url: "/lien-he", icon: "crm" },
-    ] },
-    // Bảng giá KOME + Thị trường & đối thủ chuyển sang nhóm hàng hoá (cùng nói về GIÁ của mã); nhóm "Bán hàng"
-    // chỉ còn mục chưa có nên tự ẩn khi công tắc man_chua_co tắt.
-    { ma: "banhang", ten: "BÁN HÀNG", muc: [
-      { ma: "baogia", nhan: "Báo giá", url: null, icon: "quote", ly_do: CHUA },
-      { ma: "lendon", nhan: "Lên đơn hàng", url: null, icon: "cart", ly_do: CHUA },
-    ] },
-    { ma: "giaothu", ten: "GIAO & THU TIỀN", muc: [
-      { ma: "giaohang", nhan: "Giao hàng & điều phối", url: null, icon: "truck", ly_do: CHUA },
-      { ma: "congno", nhan: "Công nợ & thu tiền", url: TN.cong_no ? "/cong-no" : null, icon: "yen", ...(TN.cong_no ? {} : { ly_do: CHUA_DUNG }) },
-      { ma: "trahang", nhan: "Trả hàng & khiếu nại", url: null, icon: "back", ly_do: CHUA },
-      { ma: "dongtien", nhan: "Dòng tiền & phải trả", url: null, icon: "yen", ly_do: CHUA },
-    ] },
-    { ma: "hanghoa", ten: "HÀNG HÓA & KHO", muc: [
       { ma: "sanpham", nhan: "Sản phẩm", url: "/san-pham", icon: "cube" },
-      { ma: "kho", nhan: "Kho hàng", url: "/kho-hang", icon: "box" },
       { ma: "muavu", nhan: "Mùa vụ sản phẩm", url: "/mua-vu", icon: "chart" },
       { ma: "banggia", nhan: "Bảng giá KOME", url: "/bang-gia", icon: "quote" },
       { ma: "doithu", nhan: "Thị trường & đối thủ", url: "/doi-thu", icon: "target" },
+    ] },
+    { ma: "sapco", ten: "SẮP CÓ", muc: [
+      { ma: "hieusuat", nhan: "Hiệu suất đội sale", url: null, icon: "team", ly_do: CHUA },
+      { ma: "baogia", nhan: "Báo giá", url: null, icon: "quote", ly_do: CHUA },
+      { ma: "lendon", nhan: "Lên đơn hàng", url: null, icon: "cart", ly_do: CHUA },
+      { ma: "giaohang", nhan: "Giao hàng & điều phối", url: null, icon: "truck", ly_do: CHUA },
+      { ma: "trahang", nhan: "Trả hàng & khiếu nại", url: null, icon: "back", ly_do: CHUA },
+      { ma: "dongtien", nhan: "Dòng tiền & phải trả", url: null, icon: "yen", ly_do: CHUA },
       { ma: "muahang", nhan: "Mua hàng & NCC", url: null, icon: "refill", ly_do: CHUA },
     ] },
     { ma: "hethong", ten: "HỆ THỐNG", muc: [
