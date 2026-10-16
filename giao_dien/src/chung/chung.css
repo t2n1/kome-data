@@ -194,3 +194,17 @@ a.tng-dong:hover,.tng-dong:focus-visible{background:var(--nen-phu)}
 .o-noi-hinh{display:flex;gap:.55rem;align-items:flex-start}
 .bd-noi .o-noi-hinh > div{display:block;flex:1;min-width:0}
 .bd-noi .o-noi-hinh{align-items:flex-start}
+
+/* Thanh ngang có nhãn (dòng bấm được) — dùng ở Khách hàng VÀ Kho hàng, nên ở file chung
+   (trước 2026-10-16 nằm trong khach.css: mở thẳng /kho-hang thì khối theo ngành / theo lô vỡ khung). */
+.kh-thanh-dong{font:inherit;display:block;width:100%;text-align:left;background:none;border:0;padding:.3rem .2rem;border-radius:7px;
+  cursor:pointer;color:var(--chu)}
+.kh-thanh-dong:hover{background:var(--nen)}
+.kh-thanh-dong[aria-pressed="true"]{background:var(--do-nen)}
+.kh-td-nhan{display:flex;justify-content:space-between;gap:.6rem;font-size:.78rem;margin-bottom:.25rem}
+.kh-td-nhan span{color:var(--chu-nhat);font-variant-numeric:tabular-nums;white-space:nowrap}
+.kh-td-thanh{display:flex;height:10px;border-radius:5px;background:var(--nen-phu);overflow:hidden}
+.kh-td-thanh.mong{height:7px}
+.kh-td-thanh i{display:block;height:100%;background:var(--ok-vien);border-radius:5px}
+.kh-td-thanh.doi{background:var(--ok-vien)}
+.kh-td-thanh.doi i{border-radius:0}.kh-td-thanh.doi i.do{background:var(--do)}.kh-td-thanh.doi i:not(.do){flex:1}

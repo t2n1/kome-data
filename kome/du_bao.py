@@ -384,7 +384,7 @@ def khach(conn, gioi_han_kv: int = 10, gioi_han_rr: int = 8) -> Khach:
     rows = conn.execute(
         """WITH k AS MATERIALIZED (
                SELECT customer_code, ten, doanh_thu_thuan, gia_tri_tb_moi_lan, lan_cuoi,
-                      nhip_ngay, so_ngay_im_lang, ty_le_im_lang, trang_thai
+                      nhip_ngay, so_ngay_im_lang, ty_le_im_lang, trang_thai, khong_goi
                FROM mart.khach_360
                WHERE trang_thai IN ('binh_thuong', 'canh_bao', 'da_roi_bo')),
            kv AS (
@@ -401,9 +401,12 @@ def khach(conn, gioi_han_kv: int = 10, gioi_han_rr: int = 8) -> Khach:
                FROM mart.khoang_cach_mua c JOIN kv USING (customer_code)
                WHERE c.so_ngay_cach IS NOT NULL
                GROUP BY c.customer_code),
+           -- Nguy cơ ngừng mua = ĐÚNG nhóm 'im' của mart.khach_nhom_viec (trạng thái VÀ cổng
+           -- khong_goi, 055) — màn ghi "cùng định nghĩa với Cần liên hệ". Trước 2026-10-16 thiếu cổng:
+           -- đo thật 295 khách ở đây cạnh 82 ở Cần liên hệ.
            rr AS (
                SELECT k.*, count(*) OVER () AS so, sum(k.doanh_thu_thuan) OVER () AS tong
-               FROM k WHERE k.trang_thai IN ('canh_bao', 'da_roi_bo'))
+               FROM k WHERE k.trang_thai IN ('canh_bao', 'da_roi_bo') AND NOT k.khong_goi)
            (SELECT 'kv', kv.customer_code, kv.ten, kv.du_kien, kv.gia_tri_tb_moi_lan,
                    coalesce(d.dung, 0), coalesce(d.tong, 0), NULL::numeric, NULL::int,
                    NULL::text, kv.so, kv.tong

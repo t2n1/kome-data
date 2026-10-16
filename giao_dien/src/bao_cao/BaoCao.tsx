@@ -149,6 +149,8 @@ export default function BaoCao() {
   const ss = bc.so_sanh ?? [];
   const nhanSs = kx?.so_sanh[0]?.nhan ?? "cùng kỳ năm trước";
   const lechSs = kx?.so_sanh[0]?.lech_thang ?? 12;
+  // Tháng CHƯA TỚI của kỳ (mọi ô 'chua_toi') không vẽ — 9/12 cột "·" chỉ làm bảng rối (soát 2026-10-16).
+  const nhThang = d.nh.thang.filter(t => d.nh.hang.some(h => h.o.some(o => o.thang === t && o.bac !== "chua_toi")));
   const theoNgay = bc.thang.length > 0 && bc.thang[0].thang.length === 10;
 
   // Dự báo chỉ áp khi tháng của mốc nằm trong khoảng đang xem (dạng Tháng: đúng tháng đó; dạng Kỳ:
@@ -293,15 +295,18 @@ export default function BaoCao() {
           </Khoi></The>
       </div>
 
+      {/* Cầu nối chiếm TRỌN hàng (máy chủ vẽ rộng 1160): tên danh mục dài, chia đôi thì nhãn trục
+          bị cắt còn vài chữ (soát 2026-10-16). */}
+      <The>
+        <Khoi tieu_de="Vì sao tăng / giảm" phu={<><MauSs />{nhanSs}</>}
+          cach_tinh={<>Từ doanh thu {nhanSs} (cột viền đứt), mỗi danh mục cộng hoặc trừ phần chênh, ra kỳ này — cùng dải
+            {theoKy && ck ? ` ${ck.so_thang} tháng đối chiếu` : " ngày so"}. Trục không bắt đầu từ 0.</>}
+          canh_bao={cb(lg && "Cầu nối theo doanh thu (chưa có lãi gộp kỳ so theo danh mục).",
+            !!d.cau_noi.co && !!d.cau_noi.khong_so && d.cau_noi.khong_so.so > 0 && `${d.cau_noi.khong_so.so} danh mục không có số so (${yen(d.cau_noi.khong_so.tien)}) — không vào cầu.`)}>
+          <CauNoi v={d.cau_noi} nhan_ss={nhanSs} />
+        </Khoi></The>
+
       <div className="bc-hai">
-        <The>
-          <Khoi tieu_de="Vì sao tăng / giảm" phu={<><MauSs />{nhanSs}</>}
-            cach_tinh={<>Từ doanh thu {nhanSs} (cột viền đứt), mỗi danh mục cộng hoặc trừ phần chênh, ra kỳ này — cùng dải
-              {theoKy && ck ? ` ${ck.so_thang} tháng đối chiếu` : " ngày so"}. Trục không bắt đầu từ 0.</>}
-            canh_bao={cb(lg && "Cầu nối theo doanh thu (chưa có lãi gộp kỳ so theo danh mục).",
-              !!d.cau_noi.co && !!d.cau_noi.khong_so && d.cau_noi.khong_so.so > 0 && `${d.cau_noi.khong_so.so} danh mục không có số so (${yen(d.cau_noi.khong_so.tien)}) — không vào cầu.`)}>
-            <CauNoi v={d.cau_noi} nhan_ss={nhanSs} />
-          </Khoi></The>
         <The>
           <Khoi tieu_de="Danh mục" phu="tăng/giảm × biên"
             cach_tinh={<>Mỗi bóng một danh mục (食品分類). Ngang: tăng / giảm doanh thu so {nhanSs}; dọc: biên lãi gộp;
@@ -311,9 +316,6 @@ export default function BaoCao() {
               mau={b => b.x >= 0 && (bn.y_moc == null || b.cy <= bn.y_moc) ? "var(--ok-vien)" : b.x < 0 && bn.y_moc != null && b.cy > bn.y_moc ? "var(--loi-vien)" : "var(--lien-ket)"}
               noi={b => <><DongNoi nhan={hoa(ten)} gia={yen(b.kich)} />{dongBong.tang(b, nhanSs)}{dongBong.bien(b)}</>} />
           </Khoi></The>
-      </div>
-
-      <div className="bc-hai">
         <The>
           <Khoi tieu_de="Mặt hàng" phu={`top ${bm.so_ma ?? 0} theo doanh thu`}
             cach_tinh={<>Mỗi bóng một mã. Ngang: số khách mua; dọc: biên lãi gộp; cỡ bóng: {ten}. Bóng bên phải mà thấp = nhiều người mua nhưng lãi
@@ -322,12 +324,6 @@ export default function BaoCao() {
             <Bong v={bm} nhan_x={x => so(Math.round(x))} ten_x="khách mua" ten_y="biên" mo_ta={`Mặt hàng theo số khách mua và biên lãi gộp, cỡ theo ${ten}`}
               mau={() => "var(--lien-ket)"} href={b => `/san-pham/${encodeURIComponent(b.ma)}`} so_nhan={6}
               noi={(b: BongDiem) => <><DongNoi nhan={hoa(ten)} gia={yen(b.kich)} />{dongBong.khach(b)}{dongBong.bien(b)}</>} />
-          </Khoi></The>
-        <The>
-          <Khoi tieu_de="Khách lớn" phu={bc.tap_trung?.luy_ke_top10 != null ? `10 khách = ${p1(bc.tap_trung.luy_ke_top10)}` : undefined}
-            cach_tinh={<>Cột: doanh thu 20 khách lớn nhất; đường: luỹ kế % trên tổng ({so(bc.tap_trung?.so_khach ?? 0)} khách có đơn). Bấm cột mở hồ sơ khách.</>}
-            canh_bao={lg ? "Theo doanh thu (Pareto chưa có lãi gộp)." : null}>
-            <Pareto pa={d.pa} />
           </Khoi></The>
       </div>
 
@@ -338,8 +334,8 @@ export default function BaoCao() {
             lg && "Theo doanh thu.")}>
           {d.nh.co ? <>
             <div className="bang-cuon"><table className="nhiet-bang">
-              <thead><tr><th scope="col" />{d.nh.thang.map(t => <th key={t} scope="col">{t.slice(5)}</th>)}</tr></thead>
-              <tbody>{d.nh.hang.map(h => <tr key={h.nganh}><th scope="row">{h.nganh}</th>{h.o.map(o => <ONhiet key={o.thang} o={o} dau_du_lieu={d.nh.thang_dau_du_lieu} nhan_ss={nhanSs} />)}</tr>)}</tbody>
+              <thead><tr><th scope="col" />{nhThang.map(t => <th key={t} scope="col">{t.slice(5)}</th>)}</tr></thead>
+              <tbody>{d.nh.hang.map(h => <tr key={h.nganh}><th scope="row">{h.nganh}</th>{h.o.filter(o => nhThang.includes(o.thang)).map(o => <ONhiet key={o.thang} o={o} dau_du_lieu={d.nh.thang_dau_du_lieu} nhan_ss={nhanSs} />)}</tr>)}</tbody>
             </table></div>
             <div className="chu-giai bc-cg">
               <span><i className="mau bac-g2" /> ≤ −20%</span><span><i className="mau bac-g1" /> −20…−5%</span><span><i className="mau bac-0" /> ±5%</span>
@@ -348,23 +344,32 @@ export default function BaoCao() {
             </div></> : <p className="phu">Chưa có dữ liệu để vẽ khối này.</p>}
         </Khoi></The>
 
-      {db && <The>
-        <Khoi tieu_de="Nguy cơ ngừng mua" phu={`${db.kh.so_nguy_co} khách · ${gon(db.kh.tien_nguy_co)}`} lien_ket={{ href: "/lien-he?tat_ca=1", chu: "Gọi lại" }}
-          cach_tinh={<>Khách đang im lặng quá 2 lần nhịp mua riêng — cùng định nghĩa "khách đang rời đi" với Cần liên hệ. Xếp theo doanh thu luỹ kế;
-            thanh = số lần nhịp đã im lặng.</>} canh_bao={lg ? "Theo doanh thu." : null}>
-          <div className="dt-nguy-co">
-            {db.kh.nguy_co.map(k => (
-              <ONoi key={k.ma} href={`/khach-hang/${encodeURIComponent(k.ma)}`} nhan={k.ten} className="dt-nc-dong"
-                noi_dung={<><b>{k.ten}</b><DongNoi nhan="Im lặng" gia={`${k.so_ngay_im_lang} ngày`} />
-                  <DongNoi nhan="So nhịp mua riêng" gia={`${k.ty_le.toFixed(1)}×`} /><DongNoi nhan="Doanh thu luỹ kế" gia={yen(k.doanh_thu)} /></>}>
-                <span className="ten-jp">{k.ten}</span>
-                <span className={"thanh-nho " + (k.trang_thai === "da_roi_bo" ? "loi" : "canh")}><span className="thanh-nho-nen">
-                  <span style={{ display: "block", height: "100%", width: `${(Math.min(k.ty_le / 4, 1) * 100).toFixed(1)}%` }} /></span></span>
-                <b className="so">{gon(k.doanh_thu)}</b>
-              </ONoi>))}
-            {!db.kh.nguy_co.length && <p className="phu">Không khách nào đang im lặng quá 2 lần nhịp.</p>}
-          </div>
-        </Khoi></The>}
+      {/* Hai khối về KHÁCH đi chung một hàng — Pareto trọn hàng thì cao quá (soát 2026-10-16). */}
+      <div className="bc-hai">
+        <The>
+          <Khoi tieu_de="Khách lớn" phu={bc.tap_trung?.luy_ke_top10 != null ? `10 khách = ${p1(bc.tap_trung.luy_ke_top10)}` : undefined}
+            cach_tinh={<>Cột: doanh thu 20 khách lớn nhất; đường: luỹ kế % trên tổng ({so(bc.tap_trung?.so_khach ?? 0)} khách có đơn). Bấm cột mở hồ sơ khách.</>}
+            canh_bao={lg ? "Theo doanh thu (Pareto chưa có lãi gộp)." : null}>
+            <Pareto pa={d.pa} />
+          </Khoi></The>
+        {db && <The>
+          <Khoi tieu_de="Nguy cơ ngừng mua" phu={`${db.kh.so_nguy_co} khách · ${gon(db.kh.tien_nguy_co)}`} lien_ket={{ href: "/lien-he?tat_ca=1", chu: "Gọi lại" }}
+            cach_tinh={<>Khách đang im lặng quá 2 lần nhịp mua riêng — cùng định nghĩa "khách đang rời đi" với Cần liên hệ. Xếp theo doanh thu luỹ kế;
+              thanh = số lần nhịp đã im lặng.</>} canh_bao={lg ? "Theo doanh thu." : null}>
+            <div className="dt-nguy-co">
+              {db.kh.nguy_co.map(k => (
+                <ONoi key={k.ma} href={`/khach-hang/${encodeURIComponent(k.ma)}`} nhan={k.ten} className="dt-nc-dong"
+                  noi_dung={<><b>{k.ten}</b><DongNoi nhan="Im lặng" gia={`${k.so_ngay_im_lang} ngày`} />
+                    <DongNoi nhan="So nhịp mua riêng" gia={`${k.ty_le.toFixed(1)}×`} /><DongNoi nhan="Doanh thu luỹ kế" gia={yen(k.doanh_thu)} /></>}>
+                  <span className="ten-jp">{k.ten}</span>
+                  <span className={"thanh-nho " + (k.trang_thai === "da_roi_bo" ? "loi" : "canh")}><span className="thanh-nho-nen">
+                    <span style={{ display: "block", height: "100%", width: `${(Math.min(k.ty_le / 4, 1) * 100).toFixed(1)}%` }} /></span></span>
+                  <b className="so">{gon(k.doanh_thu)}</b>
+                </ONoi>))}
+              {!db.kh.nguy_co.length && <p className="phu">Không khách nào đang im lặng quá 2 lần nhịp.</p>}
+            </div>
+          </Khoi></The>}
+      </div>
 
       {(bc.phi.dong.length > 0 || bc.hang_tang.dong.length > 0) && <p className="phu dt-phi">
         Đã gồm trong tổng, không vào danh mục:{" "}

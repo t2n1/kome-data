@@ -602,9 +602,19 @@ trị chữ làm cả truy vấn nổ và trang trắng, mà nó chỉ nổ khi 
 khớp regex ngày và không đúng y hệt `賞味期限なし` — "không đọc được", KHÁC "không có
 hạn dùng").
 
-**Bất biến:** `mart.san_pham_360.ton` là **NULL** khi mã không có dòng tồn nào, không
-phải `0`. 90/232 mã chưa từng có dòng trong `在庫一覧`. "Không biết" khác "bằng không" —
-hiện `0` là nói kho đã hết, và người đọc sẽ đi đặt hàng.
+**Bất biến:** `mart.san_pham_360.ton` là **NULL** khi mã CHƯA TỪNG có dòng trong ảnh chụp
+`在庫一覧` nào ≤ mốc, không phải `0`. 90/232 mã chưa từng có dòng trong `在庫一覧`. "Không biết"
+khác "bằng không" — hiện `0` là nói kho đã hết, và người đọc sẽ đi đặt hàng. **Từ 073 (chủ DN chốt
+2026-10-16):** mã CÓ ở một ảnh chụp trước mà VẮNG ở ảnh chụp đang dùng là `ton = 0` → `het_hang` —
+OBC KHÔNG xuất dòng tồn 0 (đo thật: 0 dòng `在庫残数 = 0` trong mọi bản xuất), nên mã vừa bán hết
+biến mất khỏi file (đo thật 15/10: 16 mã đang bán, vd BS04, hiện "chưa rõ tồn" và ô "Mã hết hàng"
+luôn 0). Luật viết ĐÚNG MỘT chỗ, CTE `ton` của view (`NOT IN` băm `mart.ton_hien_tai` một lần —
+`NOT EXISTS` dựng lại view cho từng mã, đo thật 6,3 s). Mã hết hàng không có dòng tồn, nên hai ô
+hết hàng / sắp thiếu của `/kho-hang` đếm từ `san_pham_360` (nhánh `'tt'` của `kho_hang_tho`), và ô
+"Mã hết hàng" mở tab Cần đặt. Có test canh:
+`tests/test_san_pham.py::test_073_ma_VANG_o_anh_chup_moi_la_HET_HANG_chua_tung_co_la_CHUA_RO`.
+**Migration 073 phải chạy TRƯỚC khi triển khai** (code chạy được cả khi chưa chạy — chỉ là mã hết
+hàng vẫn hiện "chưa rõ tồn").
 
 **Bất biến (042, tồn theo LÔ):** hai "kho" OBC là hai lô của MỘT kho vật lý (bẫy #6).
 Vai trò lô theo **MÃ KHO**, viết ĐÚNG MỘT LẦN: `mart.kho_dang_xuat()` (= `0001`); thứ tự

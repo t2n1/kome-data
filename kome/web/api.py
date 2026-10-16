@@ -198,7 +198,8 @@ def du_lieu_bao_cao(c, ts: "KX.ThamSo | None" = None) -> dict:
         "td_phu_lg": chi_so_phu(td, lg=True) if td else None,
         # Trang Doanh thu (2026-09-30): hình học tính trên số đã có — 0 lượt hỏi thêm.
         "ss_thang": {"thang": ss_thang or {}, "co_lg": ss_co_lg},
-        "cau_noi": VDT.ve_cau_noi(bc.nganh_ky),
+        # Khối chiếm trọn hàng (2026-10-16): vẽ rộng 1160 để chữ giữ cỡ thường và tên danh mục có chỗ.
+        "cau_noi": VDT.ve_cau_noi(bc.nganh_ky, rong=1160, cao=280),
         "bong_nganh": {"dt": VDT.bong_danh_muc(bc.nganh_ky, ts_), "lg": VDT.bong_danh_muc(bc.nganh_ky, ts_, lg=True)},
         "bong_ma": {"dt": VDT.bong_mat_hang(bc.hang_theo_nganh, ts_), "lg": VDT.bong_mat_hang(bc.hang_theo_nganh, ts_, lg=True)},
     })

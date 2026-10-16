@@ -505,6 +505,13 @@ def kho_hang_tho(conn) -> Kho:
                     row_number() OVER (ORDER BY t.lo_xuat_du_ban NULLS FIRST, t.product_code)
                {_TU_LO}
               WHERE t.sap_chuyen_lo)
+            UNION ALL
+            -- Hai ô hết hàng / sắp thiếu: MÃ của san_pham_360 ở trạng thái đó — đếm từ `s`, KHÔNG
+            -- từ các dòng tồn: từ 073 mã hết hàng là mã VẮNG ở ảnh chụp mới nhất, nên nó không có
+            -- dòng tồn nào. Chỉ `ma` + `trang_thai` có nghĩa, các cột khác NULL.
+            (SELECT 'tt', s.product_code, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                    s.trang_thai, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0
+               FROM s WHERE s.trang_thai IN ('het_hang', 'sap_thieu'))
         ) u ORDER BY khoi, xep
     """, [CAN_HAN_NGAY]).fetchall()
 
@@ -539,12 +546,9 @@ def kho_hang_tho(conn) -> Kho:
                 "sap_chuyen_lo": bool(r[23])}
 
     dong = [_dong(r) for r in rows if r[0] == "dong"]
-    # Hai ô hết hàng / sắp thiếu = số MÃ của san_pham_360 ở trạng thái đó. Đếm
-    # trên các dòng tồn là ĐỦ, không phải xấp xỉ: cả hai trạng thái đòi `ton`
-    # không NULL (023), tức mã có ít nhất một dòng ở mart.ton_hien_tai — và
-    # ton_theo_lo có đúng một dòng cho mỗi dòng đó (042). Có test canh
+    # Hai ô hết hàng / sắp thiếu = số MÃ của san_pham_360 ở trạng thái đó (nhánh 'tt'). Có test canh
     # (`tests/test_san_pham.py::test_o_het_hang_sap_thieu_BANG_dem_tren_san_pham_360`).
-    o_tong_quan = {tt: len({d["ma"] for d in dong if d["trang_thai"] == tt})
+    o_tong_quan = {tt: sum(1 for r in rows if r[0] == "tt" and r[10] == tt)
                    for tt in ("het_hang", "sap_thieu")}
     k = Kho(ngay_chup=ngay_chup, o_tong_quan=o_tong_quan, dong=dong, theo_kho=[],
             can_han=[_dong(r) for r in rows if r[0] == "han"],

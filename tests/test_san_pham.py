@@ -138,6 +138,29 @@ def test_o_het_hang_sap_thieu_BANG_dem_tren_san_pham_360(conn, batch):
             assert (o["het_hang"], o["sap_thieu"]) == (1, 1), (kho, loc, o)
 
 
+def test_073_ma_VANG_o_anh_chup_moi_la_HET_HANG_chua_tung_co_la_CHUA_RO(conn, batch):
+    """[CRITICAL] OBC 在庫一覧 không xuất dòng tồn 0 (đo thật), nên mã vừa bán hết BIẾN MẤT khỏi
+    file. Có ở ảnh chụp trước mà vắng ở ảnh chụp mới nhất = tồn 0 (hết hàng); chưa từng có trong
+    ảnh chụp nào = NULL (chưa rõ tồn) như cũ. Ô "Mã hết hàng" của Kho hàng đếm được mã đó dù nó
+    không có dòng tồn nào. Đo thật 15/10: 16 mã đang bán (vd BS04) hiện "chưa rõ tồn"."""
+    for ma in ("P070", "P071", "P072"):
+        _san_pham(conn, batch, ma)
+        _ho_so_khach(conn, batch, "K" + ma, "Quán " + ma)
+        _mua(conn, batch, "K" + ma, HOM_NAY - timedelta(days=3), hang=ma)
+    _ton_ngay(conn, batch, "P070", HOM_NAY - timedelta(days=1))   # có hôm qua, vắng hôm nay
+    _ton_ngay(conn, batch, "P071", HOM_NAY - timedelta(days=1))
+    _ton_ngay(conn, batch, "P071", HOM_NAY)                       # có cả hôm nay
+    _neo(conn, batch)                                             # P072: chưa từng có ảnh chụp
+    sp = {r[0]: r[1:] for r in conn.execute(
+        "SELECT product_code, ton, trang_thai FROM mart.san_pham_360 WHERE product_code LIKE 'P07%'").fetchall()}
+    assert sp["P070"] == (0, "het_hang")
+    assert sp["P071"][1] != "het_hang" and sp["P071"][0] == 100
+    assert sp["P072"] == (None, "chua_ro_ton")
+    k = SP.kho_hang(conn)
+    assert k.o_tong_quan["het_hang"] == 1
+    assert "P070" not in {d["ma"] for d in k.dong}, "mã hết hàng không có dòng tồn giả"
+
+
 def test_loc_kho_tren_anh_chup_GIONG_kho_hang_co_loc_va_khong_sua_anh_chup(conn, batch):
     """API lọc MỘT ảnh chụp không lọc (`loc_kho` trên dict JSON đã giải mã, thứ
     `anh_chup.lay_du_lieu` nhớ trong tiến trình). Hai điều: ra đúng như
