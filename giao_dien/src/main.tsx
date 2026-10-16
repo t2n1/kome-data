@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Nav } from "./khung/Nav";
 import { KhoangXem } from "./khung/KhoangXem";
 import { ThanhTai } from "./khung/ThanhTai";
-import { ganVietLaiLienKet } from "./khung/khoang";
+import { coKhoang, ganVietLaiLienKet } from "./khung/khoang";
 import { TongQuan } from "./tong_quan/TongQuan";
 import { KD } from "./khoi_dau";
 import "./khung/khung.css";
@@ -83,17 +83,11 @@ function man(duong: string): (() => React.ReactElement) | null {
   return null;
 }
 
-// Bộ chọn khoảng xem (đặc tả khoảng xem §3): màn doanh số -> bật; màn luôn
-// tính theo hôm nay -> hiện MỜ kèm lý do; màn hệ thống -> không hiện. Tham số
-// khoảng vẫn nằm trên URL ở mọi màn, nên quay lại màn doanh số không mất lựa chọn.
+// Bộ chọn khoảng xem: CHỈ ở màn có khoảng xem (`khoang.ts::coKhoang` — từ 2026-10-16 chỉ trang
+// Doanh thu); mọi màn khác luôn tính theo tháng hiện tại, không có thanh.
 function boChon(duong: string): { hien: boolean; mo?: string } {
   if (KD.thong_bao || !KD.nguoi && KD.co_dang_nhap) return { hien: false };
-  if (duong === "/" || duong === "/bao-cao") return { hien: true };
-  // Từ migration 040 ("mọi thứ quay về tháng đó") cả bốn màn này cũng theo mốc của khoảng.
-  if (["/cong-no", "/kho-hang", "/lien-he", "/doi-thu"].includes(duong)) return { hien: true };
-  if (duong === "/khach-hang" || duong === "/ban-do" || /^\/khach-hang\//.test(duong)) return { hien: true };
-  if (/^\/san-pham(\/|$)/.test(duong)) return { hien: true };
-  return { hien: false };
+  return { hien: coKhoang(duong) };
 }
 
 function Ung() {
