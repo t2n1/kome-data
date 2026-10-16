@@ -132,3 +132,12 @@ a.sp-khach-dong:hover{background:var(--nen)}
 .kho-the-han .phu{font-size:.72rem;margin:.15rem 0}
 a.kho-the-lk{display:inline-block;margin-top:.3rem;font-size:.72rem;color:var(--lien-ket)}
 @media (max-width:700px){.sp-dm-phai{margin-left:0}.sp-luoi{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.sp-the-hinh{height:140px}.sp-thang-chon{margin-left:0}}
+
+/* Kho hàng — lưới thẻ (cùng khung .sp-luoi / .sp-the của danh mục Sản phẩm), một thẻ mỗi mã, lô ở trong thẻ. */
+.kho-luoi{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.kho-luoi .sp-the-hinh{height:150px}
+.kho-the-lo{list-style:none;margin:.3rem 0 0;padding:.35rem 0 0;border-top:1px solid var(--vien-phu);display:flex;flex-direction:column;gap:.22rem}
+.kho-the-lo li{display:grid;grid-template-columns:auto 1fr;column-gap:.4rem;font-size:.7rem;line-height:1.35;font-variant-numeric:tabular-nums}
+.kho-lo-ten{font-weight:600;color:var(--chu-thuong)}
+.kho-lo-sl{text-align:right;font-weight:600}
+.kho-lo-han,.kho-lo-du{grid-column:1 / -1}

@@ -18,18 +18,24 @@ import { lay } from "../api";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { ChuaCoDuLieu, ChuThich } from "../chung/Khoi";
 import { gon, ngay, so, so_luong, yen } from "../dinh_dang";
-import type { DongKho, KhoApi } from "./kieu";
+import type { DongKho, KhoApi, MaHang } from "./kieu";
+import { gomTheoMa } from "./kho_luoi";
+import type { TheKho } from "./kho_luoi";
+import { HinhMa } from "../chung/HinhMa";
+import { useXemThem } from "../chung/XemThem";
 import { khopTim } from "./loc";
 import { useDanhMuc } from "./ManSanPham";
 import "./san_pham.css";
 
 type Tab = "ton" | "ve" | "can_dat";
-type Loc = { tab: Tab; kho: string; loc: string; tim: string; nganh: string };
+// `xem` = cách bày tab Tồn / Cần đặt: "" = lưới thẻ hình to (mặc định, 2026-10-16), "bang" = bảng đủ cột.
+type Loc = { tab: Tab; kho: string; loc: string; tim: string; nganh: string; xem: "" | "bang" };
 
 function docUrl(): Loc {
   const q = new URLSearchParams(location.search);
   const t = q.get("tab");
-  return { tab: t === "ve" || t === "can_dat" ? t : "ton", kho: q.get("kho") ?? "", loc: q.get("loc") ?? "", tim: q.get("tim") ?? "", nganh: q.get("nganh") ?? "" };
+  return { tab: t === "ve" || t === "can_dat" ? t : "ton", kho: q.get("kho") ?? "", loc: q.get("loc") ?? "", tim: q.get("tim") ?? "", nganh: q.get("nganh") ?? "",
+    xem: q.get("xem") === "bang" ? "bang" : "" };
 }
 function ghiUrl(b: Loc) {
   const q = new URLSearchParams();
@@ -38,6 +44,7 @@ function ghiUrl(b: Loc) {
   if (b.loc) q.set("loc", b.loc);
   if (b.tim.trim()) q.set("tim", b.tim.trim());
   if (b.nganh) q.set("nganh", b.nganh);
+  if (b.xem) q.set("xem", b.xem);
   const s = q.toString();
   history.replaceState(null, "", giuKhoang("/kho-hang" + (s ? "?" + s : "")));
 }
@@ -73,6 +80,7 @@ export default function KhoHang() {
   }, [theoTim]);
   const canDat = useMemo(() => (dm.data?.ma ?? []).filter(m => m.trang_thai === "het_hang" || m.trang_thai === "sap_thieu")
     .sort((x, y) => (x.du_ban_ngay ?? -1) - (y.du_ban_ngay ?? -1) || y.dt_12t - x.dt_12t), [dm.data]);
+  const theMa = useMemo(() => gomTheoMa(dong), [dong]);
 
   if (error) return <div className="sp"><h1>Kho hàng</h1><div className="khoi-loi">Không tải được tồn kho: {(error as Error).message}</div></div>;
   if (!d) return <div className="sp"><h1>Kho hàng</h1><div className="khoi-cho" aria-busy="true"><span /><span /><span /></div></div>;
@@ -83,6 +91,9 @@ export default function KhoHang() {
   const maxKho = Math.max(1, ...k.theo_kho.map(w => w.gia_tri));
   const maxNganh = Math.max(1, ...theoNganh.map(w => w.gia_tri));
   const tongDong = dong.reduce((s, x) => s + x.gia_tri, 0);
+  const nutXem = <div className="sp-xem" role="group" aria-label="Cách bày">
+    <button type="button" aria-pressed={!b.xem} onClick={() => dat({ xem: "" })}>▦ Hình</button>
+    <button type="button" aria-pressed={b.xem === "bang"} onClick={() => dat({ xem: "bang" })}>☰ Bảng</button></div>;
 
   const xuatCsv = () => {
     const cot = ["Mã", "Tên hàng", "Ngành", "Lô", "Kho OBC", "Số lượng", "Giá trị", "Hạn sử dụng", "Loại hạn", "Còn hạn (ngày)",
@@ -142,8 +153,9 @@ export default function KhoHang() {
       {b.tab === "ton" && <div className="kho-hai-cot">
         <section className="kh-the kho-chinh">
           <div className="sp-dm-dau">
-            <h2>Tồn theo dòng</h2>
+            <h2>{b.xem ? "Tồn theo dòng" : "Tồn theo mã"}</h2>
             <input type="search" className="kh-tim sp-tim" placeholder="Tìm mã, tên hàng hoặc ngành…" value={tim} onChange={e => datTim(e.target.value)} aria-label="Tìm trong bảng tồn" />
+            <div className="sp-dm-phai">{nutXem}</div>
           </div>
           <div className="sp-chip" role="group" aria-label="Trạng thái tồn">
             <button type="button" className="chip" aria-pressed={!locHopLe} onClick={() => dat({ loc: "" })}>Mọi trạng thái</button>
@@ -165,6 +177,8 @@ export default function KhoHang() {
             {b.kho && !k.ds_kho.some(w => w[0] === b.kho) &&
               <button type="button" className="chip" aria-pressed onClick={() => dat({ kho: "" })}>{b.kho} (không có trong danh sách kho OBC)</button>}
           </div>
+          {!b.xem ? <LuoiTon the={theMa} tenKho={tenKho} vaiLo={vaiLo}
+            trong={b.tim ? `Không dòng tồn nào khớp "${b.tim}"${b.nganh ? ` trong ngành ${b.nganh}` : ""}.` : "Không dòng tồn nào khớp bộ lọc."} /> :
           <div className="bang-cuon sp-bang-khung">
             <table className="bang kho-bang">
               <thead><tr><th>Mặt hàng</th><th>Lô</th><th>Hạn sử dụng</th><th className="so">Số lượng</th>
@@ -175,8 +189,8 @@ export default function KhoHang() {
                 {!dong.length && <tr><td colSpan={7} className="trong">{b.tim ? `Không dòng tồn nào khớp "${b.tim}"${b.nganh ? ` trong ngành ${b.nganh}` : ""}.` : "Không dòng tồn nào khớp bộ lọc."}</td></tr>}
               </tbody>
             </table>
-          </div>
-          <p className="phu sp-ghi">{so(dong.length)} dòng · {yen(tongDong)} · xếp theo giá trị giảm dần{" "}
+          </div>}
+          <p className="phu sp-ghi">{b.xem ? "" : `${so(theMa.length)} mã · `}{so(dong.length)} dòng · {yen(tongDong)} · xếp theo giá trị giảm dần{" "}
             <ChuThich>{b.tim || b.nganh ? "Ô tìm và chip ngành chỉ lọc bảng này + khối theo ngành, không lọc các ô số phía trên. " : ""}
               Ngành là <span className="ten-jp">食品分類名</span> của <span className="ten-jp">商品データ</span> — mã chưa phân loại thì sửa ở OBC.
               Nhãn hạn có bốn giá trị: "Không có hạn dùng" (賞味期限なし) là lời khẳng định về hàng, còn "Không đọc được hạn" là lời thú nhận về dữ liệu.</ChuThich></p>
@@ -251,10 +265,12 @@ export default function KhoHang() {
       </section>}
 
       {b.tab === "can_dat" && <section className="kh-the">
-        <div className="kh-the-dau"><h2>Cần đặt</h2><span className="kh-the-goc nhat-chu">{so(canDat.length)} mã hết hàng hoặc sắp thiếu · cả hai lô</span></div>
+        <div className="kh-the-dau"><h2>Cần đặt</h2><span className="kh-the-goc nhat-chu">{so(canDat.length)} mã hết hàng hoặc sắp thiếu · cả hai lô</span>
+          <div className="sp-dm-phai">{nutXem}</div></div>
         <p className="phu">Xếp theo "còn đủ bán" tăng dần. <b>Chưa đề xuất số lượng đặt</b>: cần lead time, MOQ và nhà cung cấp — OBC chưa xuất các dữ liệu đó.
           Tốc độ bán là trung bình 90 ngày chia cho tuổi thật của mã — cùng con số đã xếp trạng thái.</p>
         {dm.error ? <div className="khoi-loi">{(dm.error as Error).message}</div> : !dm.data ? <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div> :
+          !b.xem ? <LuoiCanDat ds={canDat} /> :
           <div className="bang-cuon"><table className="bang">
             <thead><tr><th>Mặt hàng</th><th>Trạng thái</th><th className="so">Tồn</th><th className="so">Bán/ngày</th><th className="so">Còn đủ bán</th>
               <th className="so">DT 12 tháng</th><th className="so">Khách</th><th className="so">Bán gần nhất</th><th>Đặt hàng</th></tr></thead>
@@ -269,6 +285,78 @@ export default function KhoHang() {
           </table></div>}
       </section>}
     </div>
+  );
+}
+
+const lkMa = (ma: string) => `/san-pham/${encodeURIComponent(ma)}`;
+
+/** Lưới thẻ tab Tồn: một thẻ mỗi MÃ (các lô của mã ở trong thẻ, theo thứ tự bán). Số lượng / giá trị
+ *  là tổng các lô ĐANG HIỆN theo bộ lọc; "hết sau" và cờ không kịp bán là của từng lô (mart.ton_theo_lo). */
+function LuoiTon({ the, tenKho, vaiLo, trong }: {
+  the: TheKho[]; tenKho: (m: string) => string; vaiLo: (m: string) => string; trong: string;
+}) {
+  // 20 thẻ đầu (giá trị lớn nhất) + "Xem thêm": không để hơn trăm thẻ đẩy các khối hạn dùng xuống cuối trang.
+  const { hien, nut } = useXemThem(the, 20, "mã");
+  if (!the.length) return <div className="sp-luoi-trong">{trong}</div>;
+  return (<>
+    <ul className="sp-luoi kho-luoi" aria-label="Tồn theo mã">
+      {hien.map(t => (
+        <li key={t.ma}>
+          <a className="sp-the" href={lkMa(t.ma)}>
+            <div className="sp-the-hinh">
+              <HinhMa ma={t.ma} ten={t.ten} co={130} trang_tri />
+              <span className={"nhan-vien sp-the-tt " + t.mau}>{t.nhan_trang_thai}</span>
+              {t.khong_kip && <span className="nhan-vien do sp-the-ngung" title="Có lô dự kiến bán hết SAU hạn sử dụng">⚠ không kịp bán</span>}
+            </div>
+            <div className="sp-the-than">
+              <div className="sp-the-ten ten-jp" title={t.ten}>{t.ten}</div>
+              <div className="ma-nho"><code>{t.ma}</code> · <span className="ten-jp">{t.nganh}</span></div>
+              <div className="sp-the-so"><b>{so_luong(t.so_luong)}</b><span className="nhat-chu" title={yen(t.gia_tri)}>{gon(t.gia_tri)}</span></div>
+              <ul className="kho-the-lo">
+                {t.lo.map((x, i) => {
+                  const du = x.ban_het_sau;
+                  return (
+                    <li key={x.kho + i} title={`${tenKho(x.kho)}${x.best_before ? " · " + x.best_before : ""}`}>
+                      <span className="kho-lo-ten">{vaiLo(x.kho)}</span>
+                      <span className="kho-lo-sl">{so_luong(x.so_luong)}</span>
+                      <span className={"kho-lo-han " + (x.han_con_lai != null && x.han_con_lai < 0 ? "giam" : x.han_con_lai != null && x.han_con_lai <= 90 ? "canh-chu" : "nhat-chu")}>
+                        {x.han_con_lai != null ? conHan(x) : x.nhan_han}</span>
+                      {du != null && <span className={"kho-lo-du " + (x.khong_kip_ban ? "giam" : du < 14 ? "giam" : "nhat-chu")}>
+                        {x.vai_tro_lo === "cho" && x.bat_dau_ban_sau != null ? `bán từ ~${Math.round(x.bat_dau_ban_sau)} → hết ~${Math.round(du)} ngày` : `hết ~${Math.round(du)} ngày`}</span>}
+                    </li>);
+                })}
+              </ul>
+            </div>
+          </a>
+        </li>))}
+    </ul>
+    {nut}
+  </>);
+}
+
+/** Lưới thẻ tab Cần đặt: điều cần để quyết đặt — còn đủ bán bao lâu (số lớn), tồn, tốc độ, doanh thu 12 tháng. */
+function LuoiCanDat({ ds }: { ds: MaHang[] }) {
+  if (!ds.length) return <div className="sp-luoi-trong">Không mã nào hết hàng hay sắp thiếu.</div>;
+  return (
+    <ul className="sp-luoi kho-luoi" aria-label="Mã cần đặt">
+      {ds.map(m => (
+        <li key={m.ma}>
+          <a className="sp-the" href={lkMa(m.ma)}>
+            <div className="sp-the-hinh">
+              <HinhMa ma={m.ma} ten={m.ten} co={130} trang_tri />
+              <span className={"nhan-vien sp-the-tt " + m.mau}>{m.nhan_trang_thai}</span>
+            </div>
+            <div className="sp-the-than">
+              <div className="sp-the-ten ten-jp" title={m.ten}>{m.ten}</div>
+              <div className="ma-nho"><code>{m.ma}</code> · <span className="ten-jp">{m.nganh}</span></div>
+              <div className="sp-the-so"><b className={m.du_ban_ngay != null && m.du_ban_ngay < 7 ? "giam" : "canh-chu"}>
+                {m.ton === 0 ? "Đã hết" : m.du_ban_ngay == null ? "—" : `còn ${Math.round(m.du_ban_ngay)} ngày`}</b></div>
+              <div className="sp-the-ton">Tồn {m.ton == null ? "—" : so_luong(m.ton)} · bán {so_luong(m.toc_do_ngay_theo_tuoi)}/ngày</div>
+              <div className="sp-the-ton nhat-chu">12 tháng <span title={yen(m.dt_12t)}>{gon(m.dt_12t)}</span> · {so(m.so_khach)} khách · bán gần nhất {ngay(m.lan_cuoi)}</div>
+            </div>
+          </a>
+        </li>))}
+    </ul>
   );
 }
 
