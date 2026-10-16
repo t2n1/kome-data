@@ -53,6 +53,8 @@ export function ViecVoiMa({ h, moTab }: { h: HoSoMaApi["h"]; moTab: (t: string) 
           <ul className="hs2-ds">{h.mua_lai.map(k => { const n = nhanCon(k.con); return (
             <li key={k.ma} className="hs2-dong"><a className="ten-jp" href={lk(k.ma)}>{k.ten}</a>
               <b className={n.lop}>{n.chu}</b></li>); })}</ul>}
+        {/* Danh sách gọi đầy đủ (mua lại · đã ngừng · nên chào) của mã này ở Cần gọi › Theo sản phẩm. */}
+        {!h.ngung_ban && <a className="hs2-lien-ket" href={`/lien-he?ma=${encodeURIComponent(sp.ma)}`}>📞 Danh sách khách nên gọi để bán mã này ›</a>}
       </The>
 
       <The tieu_de="Khách nên chào" className="hs2-viec" cach_tinh={h.cach_tinh.nen_chao}

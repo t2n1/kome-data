@@ -60,3 +60,23 @@ button.o-kpi{font:inherit;text-align:left;cursor:pointer}
 .lh-cot.mot .lh-the-ds{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.5rem}
 .lh-cot.mot .lh-the{margin-bottom:0}
 .lh-goi-y-ten{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Theo sản phẩm (2026-10-16): ô chọn mã + chip mã đã chọn + dòng lý do theo từng mã trên thẻ. */
+.lh-chon-ma{margin-bottom:.8rem;padding:.75rem .9rem}
+.lh-chon-dong{display:flex;align-items:flex-end;gap:.8rem;flex-wrap:wrap}
+.lh-tim-ma{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:240px;max-width:520px;font-size:.8rem;font-weight:600}
+.lh-tim-ma input{font:inherit;font-weight:400;font-size:.9rem;padding:.45rem .6rem;border:1px solid var(--vien);border-radius:8px;background:var(--nen-the);color:var(--chu)}
+.lh-goi-y-ma{list-style:none;margin:.35rem 0 0;padding:.25rem;max-width:520px;border:1px solid var(--vien);border-radius:8px;background:var(--nen-the)}
+.lh-goi-y-ma button{display:flex;align-items:center;gap:.5rem;width:100%;font:inherit;font-size:.82rem;text-align:left;background:none;border:0;border-radius:6px;padding:.3rem .4rem;cursor:pointer;color:var(--chu)}
+.lh-goi-y-ma button:hover,.lh-goi-y-ma button:focus-visible{background:var(--nen-phu)}
+.lh-goi-y-ma .ten-jp{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lh-da-chon{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin-top:.55rem}
+.lh-chip-ma{display:inline-flex;align-items:center;gap:.35rem;font:inherit;font-size:.8rem;padding:.2rem .3rem .2rem .25rem;border:1px solid var(--vien);border-radius:999px;background:var(--nen-phu);color:var(--chu);max-width:320px}
+.lh-chip-ma a,.lh-chip-ma > .ten-jp{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--chu);text-decoration:none;font-weight:600}
+.lh-chip-ma button{font:inherit;background:none;border:0;cursor:pointer;color:var(--chu-nhat);padding:0 .25rem}
+.lh-chip-ma.goi-y{cursor:pointer;font-weight:400}
+.lh-chip-ma.goi-y > .ten-jp{font-weight:400}
+.lh-viec{list-style:none;margin:.1rem 0 .35rem;padding:0}
+.lh-viec li{display:flex;align-items:flex-start;gap:.4rem;font-size:.74rem;line-height:1.35;padding:.2rem 0 .2rem .4rem;border-left:3px solid var(--lh-mau);margin-bottom:.2rem}
+.lh-viec li > div{min-width:0}
+.lh-viec .ten-jp{font-weight:600;font-size:.76rem}
+.lh-chon-dong .lien-ket{font-size:.8rem;margin-bottom:.55rem}

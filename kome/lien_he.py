@@ -325,6 +325,124 @@ def hen_goi_lai(conn, hom_nay: date, sale: str | None = None) -> list[LanTiepXuc
             ORDER BY n.hen_lai, n.thoi_diem""", [hom_nay] + ts).fetchall()]
 
 
+# ---- Gọi theo SẢN PHẨM (2026-10-16, chủ DN: "sale sản phẩm đó thì có những khách nào cần gọi") ----
+# Không chỉ số mới: ba nhóm ĐỌC đúng định nghĩa có sẵn của cặp khách–mã —
+#   'lai'   = trang_thai_cap = 'mua' AND du_kien_lan_toi ≤ mốc + SAP_DEN_NGAY (vị từ "đến ngày mua lại" của
+#             ho_so_khach.lich_mua / Sản phẩm 360, cắt cửa sổ "đã tới hoặc sắp tới" vì đây là danh sách GỌI);
+#   'ngung' = trang_thai_cap = 'ngung' (024);
+#   'chao'  = mart.sp_khach_nen_chao (053/054).
+# 'khong_goi' (※廃業※, hạng Z/ZZ/ZZZ — 055) tự rơi ra ở cả ba (so bằng nhãn, không NOT).
+SAP_DEN_NGAY = 7
+SP_TOI_DA = 5            # số mã chọn cùng lúc — mỗi mã một lượt sp_khach_nen_chao (~0,3 s)
+KHACH_MOI_NHOM = 150     # số khách trả về mỗi nhóm (đếm vẫn trên cả nhóm)
+NHOM_SP = {
+    "lai": ("Đến lúc mua lại", f"Khách mua đều mã này, đã tới (hoặc còn ≤ {SAP_DEN_NGAY} ngày nữa là tới) lúc thường đặt lại"),
+    "ngung": ("Đã ngừng mua mã này", "Từng mua đều, nay đã lâu gấp 2 lần bình thường chưa mua lại — gọi hỏi lý do"),
+    "chao": ("Chưa mua — nên chào", "Đang mua đều hàng CÙNG NGÀNH nhưng chưa từng mua mã này"),
+}
+CACH_TINH_SP = ("Đến lúc mua lại: ngày dự kiến = lần mua cuối + nhịp mua riêng của khách với mã đó (cần ≥ 3 lần mua), "
+                "cùng cách tính khối \"Mã đến ngày mua lại\" của hồ sơ khách. Đã ngừng: im lặng ≥ 2× nhịp riêng của cặp "
+                "khách–mã. Nên chào: khách đang mua đều ≥ 1 mã cùng ngành, chưa từng mua mã này — cùng khối \"Khách nên "
+                "chào\" của trang sản phẩm. Khách chọn nhiều mã thì xếp vào nhóm khẩn nhất (mua lại → ngừng → chào). "
+                "Bỏ khách OBC đánh dấu ※廃業※ / hạng Z·ZZ·ZZZ.")
+
+
+def doc_ma_sp(chuoi: str) -> list[str]:
+    """`?ma=A,B` → danh sách mã (giữ thứ tự, bỏ trùng, ≤ SP_TOI_DA). Mã là CHỮ (bẫy #1)."""
+    ra: list[str] = []
+    for m in (chuoi or "").split(","):
+        m = m.strip()
+        if m and m not in ra:
+            ra.append(m)
+    return ra[:SP_TOI_DA]
+
+
+def theo_san_pham(conn, mas: list[str], hom_nay: date, sale: str | None = None, chao: bool = True) -> dict:
+    """MỘT lượt hỏi: khách nên gọi cho các mã `mas`, gom theo KHÁCH — mỗi khách vào nhóm khẩn nhất,
+    mang mọi lý do (theo từng mã). Kèm lần tiếp xúc mới nhất (KHÔNG ẩn khách vừa gọi ở đây — sale chủ động
+    chọn mã để đi chào, nên chỉ in "đã liên hệ" để khỏi gọi trùng).
+
+    `chao=False` bỏ nhánh "nên chào": `mart.sp_khach_nen_chao` đo thật 2026-10-16 ~1,4 s MỖI mã (hai nhóm kia
+    ~0,15 s cho cả 3 mã) — màn hỏi bản nhanh trước để hiện ngay, rồi bản đầy đủ thay vào. CÙNG một hàm, chỉ
+    bỏ một nhánh UNION, nên hai bản không bao giờ xếp một khách vào hai nhóm khác nhau ngoài nhóm "chào"."""
+    if not mas:
+        return {"san_pham": [], "nhom": [], "hom_nay_du_lieu": None}
+    dk, ts = _loc_sale(sale, "d.salesperson_code")
+    rows = conn.execute(
+        f"""WITH m AS (SELECT hom_nay FROM mart.moc_thoi_gian),
+            h AS MATERIALIZED (
+                SELECT customer_code, product_code, doanh_thu_thuan, so_lan, lan_cuoi, nhip_ngay,
+                       du_kien_lan_toi, trang_thai_cap
+                  FROM mart.khach_mat_hang_cua(%s::text[]) WHERE trang_thai_cap IN ('mua', 'ngung')),
+            u AS (
+                SELECT 'lai'::text AS loai, h.customer_code, h.product_code, h.doanh_thu_thuan::numeric AS dt,
+                       h.nhip_ngay::float8 AS nhip, h.lan_cuoi, (h.du_kien_lan_toi - m.hom_nay) AS con
+                  FROM h CROSS JOIN m
+                 WHERE h.trang_thai_cap = 'mua' AND h.du_kien_lan_toi <= m.hom_nay + {SAP_DEN_NGAY}
+                UNION ALL
+                SELECT 'ngung', h.customer_code, h.product_code, h.doanh_thu_thuan, h.nhip_ngay, h.lan_cuoi, NULL
+                  FROM h WHERE h.trang_thai_cap = 'ngung'
+                UNION ALL
+                SELECT 'chao', c.customer_code, p.ma, c.doanh_thu_nganh, NULL, c.lan_cuoi, NULL
+                  FROM unnest(%s::text[]) p(ma) CROSS JOIN LATERAL mart.sp_khach_nen_chao(p.ma) c
+                 WHERE %s)
+            SELECT u.loai, u.customer_code, u.product_code, u.dt, u.nhip, u.lan_cuoi, u.con,
+                   coalesce(nullif(d.customer_name, ''), u.customer_code), d.prefecture, d.phone,
+                   coalesce(sp.ten, d.salesperson_code),
+                   n.kieu, n.ket_qua, n.noi_dung, n.thoi_diem, n.hen_lai,
+                   (SELECT hom_nay FROM m)
+              FROM u
+              LEFT JOIN mart.dim_customer d ON d.customer_code = u.customer_code AND d.is_current
+              LEFT JOIN core.dim_salesperson sp ON sp.salesperson_code = d.salesperson_code
+              LEFT JOIN LATERAL (
+                  SELECT kieu, ket_qua, noi_dung, thoi_diem, hen_lai FROM app.nhat_ky_tiep_xuc x
+                   WHERE x.customer_code = u.customer_code
+                   ORDER BY x.thoi_diem DESC, x.id DESC LIMIT 1) n ON true
+             WHERE true {dk}
+            UNION ALL
+            SELECT 'ten', NULL, p.product_code, NULL, NULL, NULL, NULL,
+                   coalesce(nullif(p.product_name, ''), p.product_code),
+                   NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+              FROM mart.dim_product p WHERE p.product_code = ANY(%s::text[])""",
+        [mas, mas, chao] + ts + [mas]).fetchall()
+    ten = {r[2]: r[7] for r in rows if r[0] == "ten"}
+    thu = {k: i for i, k in enumerate(NHOM_SP)}
+    khach: dict[str, dict] = {}
+    moc = None
+    for r in rows:
+        if r[0] == "ten":
+            continue
+        moc = r[16]
+        k = khach.get(r[1])
+        if k is None:
+            cuoi = (LanTiepXuc(kieu=r[11], ket_qua=r[12], noi_dung=r[13], thoi_diem=r[14], hen_lai=r[15])
+                    if r[14] else None)
+            k = khach[r[1]] = {"ma": r[1], "ten": r[7], "tinh": r[8], "dien_thoai": r[9], "phu_trach": r[10],
+                               "cuoi": cuoi, "da_lien_he": dang_an(cuoi, hom_nay), "viec": [], "nhom": r[0]}
+        k["viec"].append({"loai": r[0], "ma": r[2], "ten": ten.get(r[2], r[2]), "doanh_thu": int(r[3] or 0),
+                          "nhip": float(r[4]) if r[4] is not None else None, "lan_cuoi": r[5],
+                          "so_ngay": (moc - r[5]).days if moc and r[5] else None, "con": r[6]})
+        if thu[r[0]] < thu[k["nhom"]]:
+            k["nhom"] = r[0]
+    nhom = []
+    for loai, (nhan, mo_ta) in NHOM_SP.items():
+        if loai == "chao" and not chao:
+            continue
+        ds = [k for k in khach.values() if k["nhom"] == loai]
+        for k in ds:
+            k["viec"].sort(key=lambda v: (thu[v["loai"]], mas.index(v["ma"]) if v["ma"] in mas else 99))
+        if loai == "lai":   # trễ nhất trước, rồi doanh thu mã đó
+            ds.sort(key=lambda k: (min(v["con"] for v in k["viec"] if v["loai"] == "lai"),
+                                   -sum(v["doanh_thu"] for v in k["viec"])))
+        else:
+            ds.sort(key=lambda k: (-len(k["viec"]), -sum(v["doanh_thu"] for v in k["viec"]), k["ma"]))
+        # Khách vừa liên hệ xuống cuối nhóm (vẫn hiện — "đã liên hệ" để khỏi gọi trùng).
+        ds.sort(key=lambda k: k["da_lien_he"])
+        nhom.append({"loai": loai, "nhan": nhan, "mo_ta": mo_ta, "tong": len(ds), "khach": ds[:KHACH_MOI_NHOM]})
+    return {"san_pham": [{"ma": m, "ten": ten.get(m, m), "co": m in ten} for m in mas],
+            "nhom": nhom, "hom_nay_du_lieu": moc, "du": chao}
+
+
 def nhat_ky_khach(conn, ma: str, gioi_han: int = 30) -> list[LanTiepXuc]:
     """Khối "Nhật ký tiếp xúc" của hồ sơ khách — MỘT lượt hỏi."""
     return [_ltx(r) for r in conn.execute(
