@@ -196,10 +196,11 @@ class TrangKhach:
     co_mua: bool = False
     tong_dt_khoang: int = 0
     tong_dt_ss: int | None = None
-    # = số khách nhóm 'im' của mart.khach_nhom_viec: nhánh đó của view ĐÚNG là
-    # `trang_thai IN TRANG_THAI_CAN_XU_LY` (020), nên đếm thẳng bằng hằng này
-    # thay vì EXISTS trên view (dựng lại khach_360 ba lần). Ô KPI "Im lặng >=
-    # 2x nhịp" đọc con số này. Có test canh hai con số bằng nhau.
+    # = số khách nhóm 'im' của mart.khach_nhom_viec: đếm trên cột `nhom` của danh bạ
+    # (`danh_ba` đã tính nhánh 'im' = trạng thái VÀ cổng khong_goi, 055). Ô KPI "Im lặng
+    # >= 2x nhịp" đọc con số này. Trước 2026-10-16 nó đếm thẳng `trang_thai IN
+    # TRANG_THAI_CAN_XU_LY` (luật 020, trước cổng khong_goi) — đo thật 295 ở ô KPI cạnh
+    # 82 ở chip cùng tên. Có test canh hai con số bằng nhau.
     so_can_xu_ly: int = 0
 
 
@@ -462,7 +463,7 @@ def trang_danh_sach(db: dict, tim: str = "", loc: str = "", sap: str = "doanh_th
         tong_dt_khoang=sum(k.get("dt_khoang") or 0 for k in ds),
         tong_dt_ss=(sum(k.get("dt_ss") or 0 for k in ds)
                     if ds and ds[0].get("dt_ss") is not None else None),
-        so_can_xu_ly=sum(1 for k in ds if k["trang_thai"] in TRANG_THAI_CAN_XU_LY))
+        so_can_xu_ly=sum(1 for k in ds if "im" in (k["nhom"] or [])))
 
 
 def danh_sach(conn, tim: str = "", loc: str = "", sap: str = "doanh_thu",

@@ -273,7 +273,9 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
         {!top.length && <p className="phu">Chưa có mặt hàng nào.</p>}</div>
     </The>
 
-    <div className="hs-hang hai">
+    {/* Hai bảng XẾP CHỒNG, không cạnh nhau: cột phải của hồ sơ đã hẹp, chia đôi nữa thì tên hàng
+        xuống dòng từng chữ và cột bị cắt (soát 2026-10-16). */}
+    <div className="hs-hang">
       <div id="da-ngung-mua">
       <The tieu_de="Sản phẩm đã ngừng mua" cach_tinh="từng mua đều (≥ 3 lần) nhưng im lặng ≥ 2× nhịp riêng của cặp khách–mã">
         {!h.da_ngung_mua.length ? <p className="phu">Không có sản phẩm nào bị bỏ quên.</p> :

@@ -60,7 +60,7 @@ table.kh-bang td{height:46px;padding-top:.3rem;padding-bottom:.3rem}
 .kh-ten a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82rem}
 .kh-ten code{font-size:.68rem;background:none;padding:0}
 .kh-pt{white-space:nowrap;font-size:.78rem}
-.kh-hang-nhan{display:inline-block;min-width:22px;text-align:center;font-size:.72rem;font-weight:700;border-radius:5px;padding:.1rem .35rem;
+.kh-hang-nhan{display:inline-block;white-space:nowrap;min-width:22px;text-align:center;font-size:.72rem;font-weight:700;border-radius:5px;padding:.1rem .35rem;
   background:var(--nen-phu);color:var(--chu-thuong)}
 .kh-hang-nhan.hS{background:var(--ok-nen);color:var(--ok-chu)}
 .kh-hang-nhan.hZ{background:var(--loi-nen);color:var(--loi-chu)}
@@ -79,18 +79,6 @@ td.trong{text-align:center;padding:1.6rem}
 
 /* Ba khối phân tích + thẻ chung */
 .kh-ba-khoi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:.75rem}
-.kh-thanh-dong{font:inherit;display:block;width:100%;text-align:left;background:none;border:0;padding:.3rem .2rem;border-radius:7px;
-  cursor:pointer;color:var(--chu)}
-.kh-thanh-dong:hover{background:var(--nen)}
-.kh-thanh-dong[aria-pressed="true"]{background:var(--do-nen)}
-.kh-td-nhan{display:flex;justify-content:space-between;gap:.6rem;font-size:.78rem;margin-bottom:.25rem}
-.kh-td-nhan span{color:var(--chu-nhat);font-variant-numeric:tabular-nums;white-space:nowrap}
-.kh-td-thanh{display:flex;height:10px;border-radius:5px;background:var(--nen-phu);overflow:hidden}
-.kh-td-thanh.mong{height:7px}
-.kh-td-thanh i{display:block;height:100%;background:var(--ok-vien);border-radius:5px}
-.kh-td-thanh.doi{background:var(--ok-vien)}
-.kh-td-thanh.doi i{border-radius:0}.kh-td-thanh.doi i.do{background:var(--do)}.kh-td-thanh.doi i:not(.do){flex:1}
-
 /* Bản đồ */
 .kh-bd-ghi{font-size:.78rem;margin:0 0 .6rem;max-width:880px}
 .kh-bd-dk{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.6rem 1rem;margin-bottom:.7rem}

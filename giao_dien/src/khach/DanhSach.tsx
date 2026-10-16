@@ -158,8 +158,6 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
             <option value="">Mọi khách</option>
             {Object.entries(d.nhan_thang).filter(([k]) => k !== "khong_goi").map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select></label>
-        <label className="kh-chon" title="OBC chỉ xuất MÃ phân loại khách, không xuất tên — chưa hiện được loại hình.">
-          <span>Loại hình</span><select disabled><option>chưa có tên loại hình</option></select></label>
         <button type="button" className="nut-nho" disabled={!coLoc}
           onClick={() => { datTim(""); dat({ tim: "", loc: "", nhom: "", hang: [], tinh: "", thang: "", co_mua: false, nv: b.nv === d.pt_trong ? "" : b.nv }, true); }}>Xoá lọc</button>
       </div>

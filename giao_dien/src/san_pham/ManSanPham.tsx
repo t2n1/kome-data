@@ -104,7 +104,8 @@ export default function ManSanPham() {
       </div>
 
       <div className="o-kpi-luoi sp-kpi">
-        <div className="o-kpi"><div className="nhan">Doanh thu · {kxNhan}</div><div className="gia">{gon(dtKx)}</div>
+        <div className="o-kpi" title="Chỉ cộng các mã trong danh mục — không gồm phí giao / giảm giá, hàng tặng POSM, hàng ※終売※ đã hết tồn — nên thấp hơn Doanh thu ở Dashboard / trang Doanh thu.">
+          <div className="nhan">Doanh thu hàng hoá · {kxNhan}</div><div className="gia">{gon(dtKx)}</div>
           <div className={"dong-phu " + (!dtSs ? "nhat-chu" : dtKx >= dtSs ? "tang" : "giam")}>
             {!ss ? "…" : !ss.co ? `${ss.nhan}: không có dữ liệu để so` : dtSs ? `${thay_doi(dtKx / dtSs - 1)} so ${ss.nhan}` : `${ss.nhan}: không bán`}
             {" "}· {so(coBanKx)} mã có bán</div></div>

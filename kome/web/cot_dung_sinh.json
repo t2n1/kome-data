@@ -14845,6 +14845,7 @@
   ],
   "mart.khach_nhom_viec": [
    "ban_do",
+   "du_bao",
    "ho_so",
    "khach",
    "tong_quan"

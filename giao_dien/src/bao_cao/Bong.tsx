@@ -49,6 +49,9 @@ export const dongBong = { tang: (b: BongDiem, nhan_ss: string) => <DongNoi nhan=
   bien: (b: BongDiem) => <DongNoi nhan="Biên lãi gộp" gia={p1(b.y)} />,
   khach: (b: BongDiem) => <DongNoi nhan="Khách mua" gia={so(b.x)} /> };
 
+// Cắt nhãn trục theo bề rộng ô cột (~11 đơn vị mỗi ký tự) — tên đủ nằm trong ô nổi.
+const catNhan = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+
 export function CauNoi({ v, nhan_ss }: { v: CauNoiVe; nhan_ss: string }) {
   if (!v.co) return <p className="phu">{nhan_ss}: không có số để so theo danh mục.</p>;
   const mau = (l: string) => l === "tang" ? "var(--ok-vien)" : l === "giam" ? "var(--loi-vien)" : "var(--lien-ket)";
@@ -68,7 +71,7 @@ export function CauNoi({ v, nhan_ss }: { v: CauNoiVe; nhan_ss: string }) {
             fill={c.loai === "dau" ? "none" : mau(c.loai)} opacity={c.loai === "dau" ? 1 : 0.8}
             stroke={c.loai === "dau" ? "var(--vien-dam)" : "none"} strokeWidth={1.4} strokeDasharray={c.loai === "dau" ? "4 3" : undefined} />
           <text x={c.cx} y={c.y - 4} textAnchor="middle" className="chu-truc">{c.loai === "dau" || c.loai === "cuoi" ? gon(c.gia) : (c.gia >= 0 ? "+" : "") + gon(c.gia)}</text>
-          <text x={c.cx} y={v.day_truc + 14} textAnchor="middle" className="chu-truc">{c.nhan.length > 6 ? c.nhan.slice(0, 5) + "…" : c.nhan}</text>
+          <text x={c.cx} y={v.day_truc + 14} textAnchor="middle" className="chu-truc">{catNhan(c.nhan, Math.max(4, Math.floor(c.w / 0.64 / 11)))}</text>
         </ONoi>))}
     </svg>
   );

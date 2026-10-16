@@ -77,6 +77,13 @@ def test_khach_Z_ZZ_ZZZ_KHONG_vao_bat_ky_danh_sach_goi_nao(conn, batch):
     assert conn.execute("SELECT sum(can_goi) FROM mart.khach_theo_tinh").fetchone()[0] == 1
     db = KH.danh_ba(conn)
     assert {k["ma"] for k in db["khach"] if "im" in k["nhom"]} == goi
+    # Ô KPI "Im lặng ≥ 2× nhịp" của danh sách (KHÔNG lọc nhóm) = chip cùng tên. Trước
+    # 2026-10-16 nó đếm trạng thái trần: 295 ở ô cạnh 82 ở chip trên dữ liệu thật.
+    assert KH.trang_danh_sach(db).so_can_xu_ly == len(goi)
+    # Khối "Nguy cơ ngừng mua" của trang Doanh thu ghi "cùng định nghĩa với Cần liên hệ".
+    from kome import du_bao as DB
+    nc = DB.khach(conn)
+    assert nc.so_nguy_co == len(goi) and {k.ma for k in nc.nguy_co} == goi
     # Nhãn cặp khách–mã và nhãn tháng: 'khong_goi' cho cả ba hạng Z.
     assert {r[0] for r in conn.execute(
         "SELECT DISTINCT customer_code FROM mart.khach_mat_hang WHERE trang_thai_cap = 'khong_goi'"

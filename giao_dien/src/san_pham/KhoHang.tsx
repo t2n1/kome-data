@@ -121,9 +121,10 @@ export default function KhoHang() {
       <div className="o-kpi-luoi kho-kpi">
         <div className="o-kpi"><div className="nhan">Giá trị tồn{b.kho || locHopLe ? " (đang lọc)" : ""}</div><div className="gia">{gon(k.gia_tri_ton)}</div>
           <div className="dong-phu nhat-chu">{so(k.dong.length)} dòng tồn · theo cả hai bộ lọc</div></div>
-        <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={locHopLe === "het_hang"} onClick={() => dat({ tab: "ton", loc: locHopLe === "het_hang" ? "" : "het_hang" })}>
+        {/* Mã hết hàng KHÔNG có dòng nào trong bảng tồn (073: vắng ở ảnh chụp mới nhất) — ô này mở tab Cần đặt. */}
+        <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={b.tab === "can_dat"} onClick={() => dat({ tab: "can_dat", loc: "" })}>
           <div className="nhan">Mã hết hàng</div><div className={"gia" + (o.het_hang ? " giam" : "")}>{so(o.het_hang ?? 0)}</div>
-          <div className="dong-phu nhat-chu">cả hai lô · tồn 0, 90 ngày qua vẫn có đơn</div></button>
+          <div className="dong-phu nhat-chu">cả hai lô · không còn trong ảnh chụp mới nhất · bấm xem Cần đặt</div></button>
         <button type="button" className="o-kpi sp-kpi-nut" aria-pressed={locHopLe === "sap_thieu"} onClick={() => dat({ tab: "ton", loc: locHopLe === "sap_thieu" ? "" : "sap_thieu" })}>
           <div className="nhan">Mã sắp thiếu</div><div className={"gia" + (o.sap_thieu ? " canh-chu" : "")}>{so(o.sap_thieu ?? 0)}</div>
           <div className="dong-phu nhat-chu">cả hai lô · đủ bán &lt; 14 ngày</div></button>
