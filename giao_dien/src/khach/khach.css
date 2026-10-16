@@ -51,7 +51,7 @@
 
 /* Bảng danh sách */
 .kh-cot-them{display:flex;justify-content:flex-end;margin:-.2rem 0 .4rem}
-.kh-bang-khung{background:var(--nen-the);border:1px solid var(--vien);border-radius:11px}
+.kh-bang-khung{background:var(--nen-the);border:1px solid var(--vien);border-radius:16px}
 table.kh-bang{min-width:820px}
 table.kh-bang thead th{white-space:normal;vertical-align:bottom;line-height:1.25;max-width:9rem}
 table.kh-bang td{height:46px;padding-top:.3rem;padding-bottom:.3rem}

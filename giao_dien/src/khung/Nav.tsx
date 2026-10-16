@@ -1,4 +1,4 @@
-// Thanh bên — chép kome-nav.js của gói thiết kế: logo, chuông, "Tìm nhanh ⌘K",
+// Thanh bên — chép kome-nav.js của gói thiết kế (dáng mục / logo / ô nhắc theo admin sale1.komejapan.com, 2026-10-16): logo, chuông, "Tìm nhanh ⌘K",
 // sáu nhóm gập được, đăng xuất. Khác gói thiết kế: mục chưa có màn hiện mờ
 // (không giả vờ có), mục Kho dữ liệu / Ngân sách ẩn theo cờ quyền, cuối thanh
 // có bốn chế độ giao diện (cookie + render máy chủ, KHÔNG localStorage —
@@ -51,7 +51,8 @@ export function Nav() {
   return (
     <nav className="knav" aria-label="Điều hướng chính">
       <div className="knav-dau">
-        <a href="/" className="knav-logo"><img src="/static/kome-logo.png" alt="" /><span>KOME</span></a>
+        <a href="/" className="knav-logo"><img src="/static/kome-logo.png" alt="" />
+          <span><b>KOME</b><small>Dữ liệu bán sỉ</small></span></a>
         <Chuong mo={chuong} datMo={datChuong} />
         <button type="button" className="knav-menu" aria-expanded={menu} aria-controls="knav-than"
           aria-label={menu ? "Đóng menu" : "Mở menu"} onClick={() => datMenu(m => !m)}>{menu ? "✕" : "☰"}</button>
@@ -82,6 +83,8 @@ export function Nav() {
       })}
 
       <div className="knav-cuoi">
+        {KD.hien_kho && <a href="/kho-du-lieu" className="knav-nhac">
+          <strong>Nhắc 13:30 mỗi ngày</strong>Xem 3 file OBC hôm nay đã nạp chưa.</a>}
         {KD.nguoi && <div className="knav-toi" title={KD.nguoi.ten_sale ?? undefined}>
           <Icon ten="user" /><span>{KD.nguoi.ten_sale || KD.nguoi.ten_dang_nhap}</span></div>}
         <div className="knav-che-do" role="group" aria-label="Giao diện">

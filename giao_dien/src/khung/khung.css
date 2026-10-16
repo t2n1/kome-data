@@ -3,19 +3,21 @@
    hai khối tối giống hệt nhau — biến tự đổi theo chế độ). */
 #goc{flex:1;min-width:0;display:flex;min-height:100vh}
 .khung{flex:1;min-width:0;display:flex;font-family:var(--font-ui)}
-.khung-than{flex:1;min-width:0;padding:1.2rem 1.25rem 3rem;max-width:1500px}
+.khung-than{flex:1;min-width:0;padding:1.5rem 1.75rem 3rem;max-width:1500px}
 
-.knav{width:196px;flex-shrink:0;background:var(--nen-the);border-right:1px solid var(--vien);
-  padding:1rem .7rem;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;
+.knav{width:236px;flex-shrink:0;background:var(--nen-the);border-right:1px solid var(--vien);
+  padding:1rem .75rem;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;
   flex-direction:column;gap:1.05rem;font-size:.85rem}
 .knav a{text-decoration:none}
 .knav-dau{display:flex;align-items:center;gap:.4rem}
 .knav-than{display:flex;flex-direction:column;gap:1.05rem;flex:1}
 .knav-menu{display:none;flex-shrink:0;width:32px;height:32px;border-radius:9px;cursor:pointer;font:inherit;
   border:1px solid var(--vien);background:var(--nen-the);color:var(--chu-thuong)}
-.knav-logo{flex:1;min-width:0;display:flex;align-items:center;gap:.5rem;font-weight:700;
-  letter-spacing:.08em;font-size:.84rem;color:var(--chu);padding:0 .3rem}
-.knav-logo img{width:26px;height:26px;border-radius:50%;object-fit:cover}
+.knav-logo{flex:1;min-width:0;display:flex;align-items:center;gap:.6rem;color:var(--chu);padding:0 .3rem}
+.knav-logo img{width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.knav-logo span{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+.knav-logo b{font-size:.95rem;font-weight:800;letter-spacing:-.01em}
+.knav-logo small{font-size:.7rem;color:var(--chu-nhat);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .knav-chuong{position:relative;flex-shrink:0;width:32px;height:32px;border-radius:9px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;border:1px solid var(--vien);
   background:var(--nen-the);color:var(--chu-thuong)}
@@ -23,19 +25,27 @@
 .knav-dem{position:absolute;top:-5px;right:-5px;font-size:.62rem;font-weight:700;min-width:16px;height:16px;
   border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 .2rem;
   background:var(--do);color:var(--nen-the)}
-.knav-tim{display:flex;align-items:center;gap:.45rem;width:100%;font:inherit;font-size:.78rem;cursor:pointer;
-  padding:.38rem .55rem;border-radius:9px;border:1px solid var(--vien);background:var(--nen-phu);color:var(--chu-nhat)}
+.knav-tim{display:flex;align-items:center;gap:.45rem;width:100%;font:inherit;font-size:.8rem;cursor:pointer;
+  padding:.5rem .7rem;border-radius:12px;border:1px solid var(--vien);background:var(--nen-phu);color:var(--chu-nhat)}
 .knav-tim kbd{margin-left:auto;font:inherit;font-size:.68rem;opacity:.75}
 .knav-nhom-ten{width:100%;font:inherit;cursor:pointer;background:transparent;border:0;display:flex;
-  align-items:center;gap:.35rem;padding:.1rem .5rem;margin-bottom:.35rem;font-size:.68rem;font-weight:600;
-  letter-spacing:.1em;color:var(--chu-nhat);text-align:left}
+  align-items:center;gap:.35rem;padding:.1rem .6rem;margin-bottom:.35rem;font-size:.66rem;font-weight:800;
+  letter-spacing:.08em;color:var(--chu-mo);text-align:left}
 .knav-mui{display:inline-block;width:8px;flex-shrink:0;transition:transform .12s}
 .knav-mui.dong{transform:rotate(-90deg)}
 .knav-ds{display:flex;flex-direction:column;gap:.12rem}
-.knav-muc{padding:.42rem .55rem;border-radius:8px;font-size:.85rem;display:flex;align-items:center;
-  gap:.55rem;color:var(--chu-thuong);font:inherit;border:0;background:transparent;width:100%;cursor:pointer;text-align:left}
-a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
-.knav-muc.on{background:var(--do-nen);color:var(--do-chu);font-weight:600}
+.knav-muc{min-height:38px;box-sizing:border-box;padding:.45rem .75rem;border-radius:12px;font-size:.86rem;display:flex;align-items:center;
+  gap:.65rem;color:var(--chu-nhat);font:inherit;font-weight:600;border:0;background:transparent;width:100%;cursor:pointer;text-align:left}
+a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu);color:var(--chu)}
+/* Mục đang mở theo admin sale1: viên nền đậm, icon vàng. */
+.knav-muc.on,a.knav-muc.on:hover{background:var(--nav-on-nen);color:var(--nav-on-chu);font-weight:700}
+.knav-muc.on svg{color:var(--vang)}
+/* Ô nhắc nạp file (dưới cùng thanh bên, chỉ người có quyền nạp). */
+.knav-nhac{display:block;border-radius:14px;padding:.6rem .75rem;background:var(--vang-nen);color:var(--vang-chu);
+  font-size:.74rem;line-height:1.45;text-decoration:none}
+.knav-nhac strong{display:block;color:var(--chu);font-size:.78rem}
+.knav-nhac:hover{filter:brightness(.97)}
+@media (max-height:760px){.knav-nhac{display:none}}
 .knav-muc > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .knav-muc.chua{color:var(--chu-mo);cursor:default}
 .knav-muc.chua em{margin-left:auto;flex-shrink:0;font-style:normal;font-size:.58rem;border:1px solid var(--vien);
@@ -46,9 +56,9 @@ a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .knav-thoat{font-size:.8rem;color:var(--chu-nhat)}
 .knav-che-do{display:grid;grid-template-columns:repeat(2,1fr);gap:.2rem;background:var(--nen-phu);
-  border-radius:9px;padding:.2rem}
-.knav-che-do a{font-size:.7rem;text-align:center;padding:.22rem 0;border-radius:7px;color:var(--chu-nhat)}
-.knav-che-do a.on{background:var(--nen-the);color:var(--do-chu);font-weight:600;box-shadow:0 0 0 1px var(--vien)}
+  border-radius:12px;padding:.22rem}
+.knav-che-do a{font-size:.74rem;text-align:center;padding:.3rem 0;border-radius:9px;color:var(--chu-nhat);font-weight:600}
+.knav-che-do a.on{background:var(--nen-the);color:var(--chu);font-weight:700;box-shadow:0 0 0 1px var(--vien)}
 
 /* Lớp phủ + bảng tìm nhanh + bảng thông báo */
 .lop-phu{position:fixed;inset:0;z-index:60;background:color-mix(in srgb, var(--chu) 30%, transparent);
@@ -122,7 +132,7 @@ a.knav-muc:hover,.knav-thoat:hover{background:var(--nen-phu)}
    nét liền / nét đứt của mọi biểu đồ. Hẹp thì xếp chồng. */
 .kx-hai{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:stretch;gap:.6rem;
   padding:0;background:transparent;border:0}
-.kx-the{display:flex;flex-direction:column;gap:.35rem;padding:.6rem .8rem .65rem;border-radius:12px;
+.kx-the{display:flex;flex-direction:column;gap:.35rem;padding:.6rem .8rem .65rem;border-radius:16px;
   background:var(--nen-the);min-width:0}
 .kx-xem{border:1.5px solid color-mix(in srgb, var(--chu) 55%, var(--vien))}
 .kx-ss{border:1.5px dashed var(--vien-dam);background:color-mix(in srgb, var(--nen-phu) 55%, var(--nen-the))}

@@ -37,13 +37,37 @@
 @font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:600;
   font-display:swap;src:url("/static/fonts/IBMPlexMono-SemiBold.woff2") format("woff2")}
 
+/* Be Vietnam Pro (2026-10-16, theo giao diện admin sale1.komejapan.com) — chữ giao diện. Tự host như IBM Plex
+   (không gọi Google Fonts); hai bộ con latin + vietnamese theo unicode-range, giấy phép OFL ở
+   static/fonts/OFL-BeVietnamPro.txt. Ký tự ngoài hai bộ (▲ ▼ ⓘ …) rơi về IBM Plex Sans ở sau trong ngăn xếp. */
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:400;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-latin-400.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:400;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-vietnamese-400.woff2") format("woff2");unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:500;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-latin-500.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:500;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-vietnamese-500.woff2") format("woff2");unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:600;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-latin-600.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:600;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-vietnamese-600.woff2") format("woff2");unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:700;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-latin-700.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:700;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-vietnamese-700.woff2") format("woff2");unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:800;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-latin-800.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Be Vietnam Pro";font-style:normal;font-weight:800;font-display:swap;
+  src:url("/static/fonts/BeVietnamPro-vietnamese-800.woff2") format("woff2");unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+
 /* Ngăn xếp: chữ Latin đi qua IBM Plex, chữ Nhật rơi xuống font hệ thống
    (Yu Gothic UI trên Windows, Hiragino Sans trên macOS). Trình duyệt tự
    chọn theo từng ký tự, nên một tên 得意先 lẫn chữ Latin vẫn đúng cả hai.
    Biến font KHÔNG đổi theo chế độ sáng/tối -> đặt ở :root RIÊNG, trước
    khối màu, để không lọt vào test parity sáng/tối (soi biến MÀU). */
  :root{
-   --font-ui:"IBM Plex Sans","Yu Gothic UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+   --font-ui:"Be Vietnam Pro","IBM Plex Sans","Yu Gothic UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
    --font-so:"IBM Plex Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
  }
 
@@ -52,9 +76,9 @@
    /* Nền: trang là giấy ấm, thẻ/bảng mới là trắng. Hệ cũ dùng chung một
       màu cho cả hai — thiết kế phân tầng bằng chính sự chênh lệch này,
       vì nó không dùng đổ bóng. */
-   --nen:#FBF9F5; --nen-the:#FFFFFF; --nen-phu:#F6F3EC;
-   --vien:#E6E2D9; --vien-phu:#F0EDE6; --vien-dam:#D8D3C8;
-   --chu:#1A1714; --chu-thuong:#474139; --chu-nhat:#6E6A63; --chu-mo:#8E8A82;
+   --nen:#FBF8F3; --nen-the:#FFFFFF; --nen-phu:#F3EDE3;
+   --vien:#E6DED1; --vien-phu:#EFE9DF; --vien-dam:#D6CCBD;
+   --chu:#221A14; --chu-thuong:#463B32; --chu-nhat:#6B5F55; --chu-mo:#8E8277;
    --lien-ket:#8A5E06;
    /* Đỏ công ty: CHỈ dành cho hành động chính và trạng thái được chọn.
       Không dùng để tô cho đẹp. --do là nét/nền, --do-chu là chữ (đỏ đậm
@@ -148,6 +172,7 @@
       hướng đổi màu thông thường — cố ý, vì logo cần một nền SÁNG bất kể
       đang ở bảng màu nào để không chìm vào --nen-the tối. */
    --logo-nen:#FFFFFF;
+   --nav-on-nen:#221A14; --nav-on-chu:#FFFFFF; --vang:#F5B82E; --vang-nen:#FDF0D2; --vang-chu:#5C3D06;
  }
  /* Đợt 4d (Task 2) — nút đổi giao diện sáng/tối, KHÔNG JS: máy chủ render
     thuộc tính data-theme lên <html> theo cookie kome_giao_dien (xem
@@ -195,6 +220,7 @@
    --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
    --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
    --logo-nen:#FBF9F5;
+   --nav-on-nen:#3A3128; --nav-on-chu:#F4EFE6; --vang:#F5B82E; --vang-nen:#2E2713; --vang-chu:#E9C877;
    /* [Đợt 5b Task 4] Bậc màu tăng trưởng — bản tối, cùng công thức đảo
       đậm/nhạt như --map-* ở trên (bậc cực trị phải NỔI trên nền sẫm). */
    --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
@@ -241,6 +267,7 @@
    --map-0:#2B251D; --map-1:#4A3D14; --map-2:#6B5518; --map-3:#96741C;
    --map-4:#C79A2C; --map-5:#E8C25A; --map-chu-alt:#1A1714;
    --logo-nen:#FBF9F5;
+   --nav-on-nen:#3A3128; --nav-on-chu:#F4EFE6; --vang:#F5B82E; --vang-nen:#2E2713; --vang-chu:#E9C877;
    /* [Đợt 5b Task 4] Bậc màu tăng trưởng — bản tối, cùng công thức đảo
       đậm/nhạt như --map-* ở trên (bậc cực trị phải NỔI trên nền sẫm). */
    --nhiet-g2:#7A2E28; --nhiet-g1:#4A2620; --nhiet-0:#342E26;
