@@ -10,7 +10,6 @@ import { lay } from "../api";
 import { HinhMa } from "../chung/HinhMa";
 import { chuoiKhoang, giuKhoang, useKhoang, voiKhoang } from "../khung/khoang";
 import { gon, ngay, so, yen } from "../dinh_dang";
-import { MAC_DINH_XEM } from "../chung/XemThem";
 import { ChuThich } from "../chung/Khoi";
 import { KD } from "../khoi_dau";
 import { GhiTiepXuc } from "../khach/GhiTiepXuc";
@@ -30,7 +29,7 @@ type LienHeApi = {
   goi_y: Record<string, GoiY[]>; nhan_vien: { ma: string; ten: string }[]; cach_tinh_goi_y: string;
   ds: { cot: Cot[]; da_lien_he: The[]; hom_nay: string; ly_do: string | null; dem: Record<string, number>; tong: number };
   hoat_dong: Ltx[]; hen: Ltx[]; hom_nay: string; sale: string | null; ten_sale: string | null; cot_thang: string;
-  an_ngay: number; kieu_tx: Record<string, [string, string]>; ket_qua_tx: Record<string, [string, string]>; nv_moi_nguoi: string;
+  an_ngay: number; ly_do_ds: Record<string, [string, string, string]>; thu_tu_ly_do: string[]; kieu_tx: Record<string, [string, string]>; ket_qua_tx: Record<string, [string, string]>; nv_moi_nguoi: string;
 };
 
 // Mỗi LÝ DO một màu (đỏ → cam → vàng theo mức khẩn; xanh dương cho cột theo tháng,
@@ -66,12 +65,18 @@ export default function LienHe() {
     queryKey: ["lien-he", q, chuoiKhoang(useKhoang())], queryFn: () => lay<LienHeApi>(voiKhoang(`/api/lien-he${q ? "?" + q : ""}`)), placeholderData: keepPreviousData,
   });
   const [mo, datMo] = useState<string | null>(null);
+  const [soHien, datSoHien] = useState(30);
 
   if (error) return <div className="khoi-loi">Không tải được danh sách: {(error as Error).message}</div>;
   if (!d) return <div className="khoi-cho" aria-busy="true"><span /><span /><span /></div>;
   const ds = d.ds, laThang = (c: string) => c === d.cot_thang;
   const tongLuyKe = ds.cot.filter(c => !laThang(c.ly_do)).reduce((s, c) => s + c.doanh_thu, 0);
   const nvDang = loc.nv || d.sale || d.nv_moi_nguoi;
+  // Bốn ô lý do đọc nhãn / mô tả từ máy chủ (LH.LY_DO) và số đếm của CẢ bốn (ds.dem) — kể cả khi đang mở một lý do (?ly_do=).
+  const nhomLyDo = (d.thu_tu_ly_do ?? Object.keys(d.ly_do_ds)).map(ly_do => ({ ly_do, nhan: d.ly_do_ds[ly_do][0], mo_ta: d.ly_do_ds[ly_do][1], dem: ds.dem[ly_do] ?? 0 }));
+  const lyDoDang = ds.ly_do ?? (nhomLyDo.find(c => c.dem > 0) ?? nhomLyDo[0])?.ly_do;
+  const cot = ds.cot.find(c => c.ly_do === lyDoDang);
+  const hien = cot ? (ds.ly_do ? cot.the.slice(0, soHien) : cot.the) : [];
   const locNv = new URLSearchParams(Object.entries({ nv: loc.nv, tat_ca: loc.tat_ca ? "1" : "" }).filter(([, v]) => v)).toString();
 
   return (
@@ -97,80 +102,76 @@ export default function LienHe() {
       </div>
 
       {loc.xem === "sp" ? <TheoSanPham ma={loc.ma} datMa={ma => dat({ xem: "sp", ma })} locNv={locNv} /> : <>
-      <div className="o-kpi-luoi lh-kpi">
-        <div className="o-kpi"><div className="nhan">Cần gọi</div><div className="gia">{so(ds.tong)}</div>
-          <div className="dong-phu nhat-chu">khách · {gon(tongLuyKe)} tổng doanh thu đến nay{ds.dem[d.cot_thang] ? " (chưa gồm cột tháng)" : ""}</div></div>
-        {ds.cot.map(c => (
-          <button key={c.ly_do} type="button" className={"o-kpi lh-o " + lopMau(c.ly_do)} aria-pressed={loc.ly_do === c.ly_do}
-            onClick={() => dat({ ly_do: loc.ly_do === c.ly_do ? "" : c.ly_do })}>
-            <div className="nhan">{c.nhan}</div><div className="gia">{so(ds.dem[c.ly_do] ?? 0)}</div>
-            <div className="dong-phu nhat-chu">{c.mo_ta}</div></button>))}
-        <div className="o-kpi"><div className="nhan">Hẹn gọi lại hôm nay</div><div className="gia">{so(d.hen.length)}</div>
-          <div className="dong-phu nhat-chu">{ngay(d.hom_nay)} (giờ Nhật)</div></div>
-        <a className="o-kpi" href="#da-lien-he"><div className="nhan">Đã liên hệ, đang tạm ẩn</div><div className="gia">{so(ds.da_lien_he.length)}</div>
-          <div className="dong-phu nhat-chu">xem danh sách ↓</div></a>
+      {/* Gọn lại 2026-10-16 (chủ DN: "nhiều chữ quá"): 4 ô số chọn lý do + MỘT danh sách dòng (cùng kiểu tab Theo sản phẩm).
+          Câu mô tả từng lý do nằm trong title / ⓘ. Mặc định mở lý do đầu tiên có khách (gấp nhất trước). */}
+      <div className="lh-sp-nhom" role="tablist" aria-label="Lý do cần gọi">
+        {nhomLyDo.map(c => (
+          <button key={c.ly_do} type="button" role="tab" aria-selected={c.ly_do === lyDoDang} title={c.mo_ta}
+            className={"lh-sp-o " + lopMau(c.ly_do)} onClick={() => dat({ ly_do: c.ly_do })}>
+            <span className="lh-sp-so">{so(c.dem)}</span><span className="lh-sp-nhan">{c.nhan}</span></button>))}
+        <ChuThich>{nhomLyDo.map(c => <span key={c.ly_do}><b>{c.nhan}</b>: {c.mo_ta}.<br /></span>)}
+          <br />Tổng {so(ds.tong)} khách · {gon(tongLuyKe)} tổng doanh thu đến nay{ds.dem[d.cot_thang] ? " (chưa gồm cột tháng)" : ""}.</ChuThich>
+        <div className="lh-phu-o">
+          <a href="#viec-hom-nay">📞 Hẹn hôm nay <b>{so(d.hen.length)}</b></a>
+          <a href="#da-lien-he">Đang tạm ẩn <b>{so(ds.da_lien_he.length)}</b></a>
+        </div>
       </div>
 
-      {/* Ba nhóm việc KHÔNG vào cột (tut/moi dựng lại khach_360 — bất biến đợt 7): mở danh sách khách đã lọc sẵn.
-          Trước 2026-10-16 chúng là chip ở trang Khách hàng; nay mọi "danh sách làm việc" bắt đầu từ đây. */}
-      <p className="phu lh-ghi">Nhóm khác nên để ý:{" "}
-        <a href="/khach-hang?nhom=tut&tat_ca=1">khách hạng S·A đang mua ít đi</a> ·{" "}
-        <a href="/khach-hang?nhom=moi&tat_ca=1">khách mới mua một lần rồi thôi</a> ·{" "}
-        <a href="/khach-hang?nv=__trong">khách chưa ai phụ trách</a>.
-        {ds.ly_do && <> <button type="button" className="lien-ket" onClick={() => dat({ ly_do: "" })}>← Mọi lý do</button></>}</p>
+      {cot && <>
+        <ul className={"lh-sp-ds " + lopMau(cot.ly_do)}>
+          <li className="lh-sp-dong lh-ld-dong lh-ld-dau" aria-hidden="true"><span>Khách · phụ trách</span>
+            <span>{laThang(cot.ly_do) ? "Lý do · trung bình/tháng" : "Lý do · tổng doanh thu"}</span><span>Nên chào</span><span>Gọi · ghi · chép</span></li>
+          {hien.map(t => <DongLyDo key={t.ma} t={t} d={d} gy={d.goi_y[t.ma] ?? []} laThang={laThang(cot.ly_do)} mo={mo === t.ma}
+            datMo={v => datMo(v ? t.ma : null)} />)}
+        </ul>
+        {!cot.the.length && <p className="phu lh-sp-rong">Không còn khách nào ở nhóm này.</p>}
+        {cot.tong > hien.length && <p className="lh-sp-rong">{ds.ly_do
+          ? <button type="button" className="lien-ket" onClick={() => datSoHien(soHien + 50)}>Xem thêm {so(Math.min(50, cot.the.length - hien.length))} khách</button>
+          : <button type="button" className="lien-ket" onClick={() => dat({ ly_do: cot.ly_do })}>Xem cả {so(cot.tong)} khách</button>}</p>}
+        {cot.trung > 0 && <p className="phu lh-sp-rong">+{cot.trung} khách cũng thuộc nhóm này nhưng đã nằm ở nhóm khác hoặc đang tạm ẩn.</p>}
+      </>}
 
-      <div className={"lh-cot" + (ds.ly_do ? " mot" : "")}>
-        {ds.cot.map(c => { const hien = ds.ly_do ? c.the : c.the.slice(0, MAC_DINH_XEM); return (
-          <section key={c.ly_do} className={lopMau(c.ly_do)} aria-labelledby={"cot-" + c.ly_do}>
-            <div className="lh-cot-dau"><h2 id={"cot-" + c.ly_do}><span className="lh-nhan">{c.nhan}</span></h2>
-              <span className="phu">{so(c.tong)} khách</span>
-              <span className="lh-tong" title={yen(c.doanh_thu)}>{gon(c.doanh_thu)}{laThang(c.ly_do) ? "/tháng" : ""}</span></div>
-            <div className="lh-cot-mo">{c.mo_ta}</div>
-            {/* Xem cả bốn cột: mỗi cột 10 thẻ đầu (soát 2026-10-16 — trang dài ~6.000px); "Xem cả N khách" mở riêng cột. */}
-            <div className="lh-the-ds">{hien.map(t => <The key={t.ma} t={t} d={d} gy={d.goi_y[t.ma] ?? []} laThang={laThang(c.ly_do)} mo={mo === t.ma}
-              datMo={v => datMo(v ? t.ma : null)} />)}</div>
-            {!c.the.length && <p className="lh-cot-mo">Không còn khách nào ở cột này.</p>}
-            {c.trung > 0 && <p className="lh-cot-mo">+{c.trung} khách cũng thuộc nhóm này nhưng đã nằm ở cột khác hoặc đang tạm ẩn.</p>}
-            {c.tong > hien.length && <p className="lh-cot-mo"><button type="button" className="lien-ket" onClick={() => dat({ ly_do: c.ly_do })}>Xem cả {so(c.tong)} khách →</button></p>}
-          </section>); })}
-      </div>
+      {/* Ba nhóm việc KHÔNG vào cột (tut/moi dựng lại khach_360 — bất biến đợt 7): mở danh sách khách đã lọc sẵn. */}
+      <p className="phu lh-ghi">Nhóm khác:{" "}
+        <a href="/khach-hang?nhom=tut&tat_ca=1">khách S·A mua ít đi</a> ·{" "}
+        <a href="/khach-hang?nhom=moi&tat_ca=1">mua một lần rồi thôi</a> ·{" "}
+        <a href="/khach-hang?nv=__trong">chưa ai phụ trách</a></p>
 
-      <div className="lh-hai">
-        <section className="kh-the"><div className="kh-the-dau"><h2>Hoạt động gần đây</h2></div>
-          <ul className="lh-ds">{d.hoat_dong.map((n, i) => (
-            <li key={n.thoi_diem + i}><span className="lh-icon" aria-hidden="true">{n.icon}</span>
-              <div><div><a href={`/khach-hang/${encodeURIComponent(n.ma_khach ?? "")}#ho_so`} className="ten-jp">{n.ten_khach || n.ma_khach}</a>{" "}
-                <span className={"nhan-vien " + n.mau_ket_qua}>{n.nhan_ket_qua}</span></div>
-                <div className="lh-nd">{n.noi_dung}</div>
-                <div className="phu">{n.nhan_kieu} · {ngay(n.ngay)} · {n.nguoi || "(không rõ người ghi)"}</div></div></li>))}
-            {!d.hoat_dong.length && <li className="phu">Chưa có lần tiếp xúc nào được ghi.</li>}</ul>
-        </section>
-        <section className="kh-the"><div className="kh-the-dau"><h2>Việc cần làm hôm nay</h2><span className="kh-the-goc phu">hẹn gọi lại tới hạn</span></div>
-          <ul className="lh-ds">{d.hen.map((n, i) => (
-            <li key={n.thoi_diem + i}><span className="lh-icon" aria-hidden="true">📞</span>
-              <div><div><a href={`/khach-hang/${encodeURIComponent(n.ma_khach ?? "")}#ho_so`} className="ten-jp">{n.ten_khach || n.ma_khach}</a>{" "}
-                {n.hen_lai && n.hen_lai < d.hom_nay ? <span className="nhan-vien do">trễ hẹn · {ngay(n.hen_lai)}</span> : <span className="nhan-vien canh">hôm nay</span>}</div>
-                <div className="lh-nd">{n.noi_dung}</div>
-                <div className="phu">{n.icon} {n.nhan_kieu} ngày {ngay(n.ngay)} · {n.nguoi || "(không rõ người ghi)"}</div></div></li>))}
-            {!d.hen.length && <li className="phu">Không có lời hẹn nào tới hạn.</li>}</ul>
-          <p className="phu">Gọi xong thì ghi lại ở thẻ của khách — lời hẹn cũ được trả, việc tự rời danh sách.</p>
-        </section>
-      </div>
+      {/* Không có lời hẹn tới hạn thì không vẽ khối (ô "Hẹn hôm nay 0" ở trên đã nói). */}
+      {d.hen.length > 0 && <section id="viec-hom-nay" className="kh-the lh-gap">
+        <div className="kh-the-dau"><h2>Hẹn gọi lại hôm nay ({so(d.hen.length)})</h2><span className="kh-the-goc phu">{ngay(d.hom_nay)} (giờ Nhật)</span></div>
+        {!d.hen.length ? <p className="phu">Không có lời hẹn nào tới hạn.</p> :
+        <ul className="lh-ds">{d.hen.map((n, i) => (
+          <li key={n.thoi_diem + i}><span className="lh-icon" aria-hidden="true">📞</span>
+            <div><div><a href={`/khach-hang/${encodeURIComponent(n.ma_khach ?? "")}#ho_so`} className="ten-jp">{n.ten_khach || n.ma_khach}</a>{" "}
+              {n.hen_lai && n.hen_lai < d.hom_nay ? <span className="nhan-vien do">trễ hẹn · {ngay(n.hen_lai)}</span> : <span className="nhan-vien canh">hôm nay</span>}</div>
+              <div className="lh-nd">{n.noi_dung}</div></div></li>))}</ul>}
+      </section>}
 
-      <section id="da-lien-he" className="kh-the lh-an">
-        <div className="kh-the-dau"><h2>Đã liên hệ gần đây — đang tạm ẩn ({ds.da_lien_he.length})</h2></div>
+      <details className="kh-the lh-gap">
+        <summary><h2>Hoạt động gần đây</h2></summary>
+        <ul className="lh-ds">{d.hoat_dong.map((n, i) => (
+          <li key={n.thoi_diem + i}><span className="lh-icon" aria-hidden="true">{n.icon}</span>
+            <div><div><a href={`/khach-hang/${encodeURIComponent(n.ma_khach ?? "")}#ho_so`} className="ten-jp">{n.ten_khach || n.ma_khach}</a>{" "}
+              <span className={"nhan-vien " + n.mau_ket_qua}>{n.nhan_ket_qua}</span></div>
+              <div className="lh-nd">{n.noi_dung}</div>
+              <div className="phu">{ngay(n.ngay)} · {n.nguoi || "(không rõ người ghi)"}</div></div></li>))}
+          {!d.hoat_dong.length && <li className="phu">Chưa có lần tiếp xúc nào được ghi.</li>}</ul>
+      </details>
+
+      <details id="da-lien-he" className="kh-the lh-gap">
+        <summary><h2>Đã liên hệ gần đây — đang tạm ẩn ({ds.da_lien_he.length})</h2></summary>
+        <p className="phu">Khách vừa liên hệ tạm ẩn tới ngày hẹn (hoặc {d.an_ngay} ngày nếu không hẹn).</p>
         {!ds.da_lien_he.length ? <p className="phu">Chưa có khách nào đang tạm ẩn.</p> :
         <div className="bang-cuon"><table className="bang">
-          <thead><tr><th>Khách hàng</th><th>Lý do</th><th>Lần tiếp xúc cuối</th><th>Kết quả</th><th>Hiện lại</th><th className="so">Doanh thu</th></tr></thead>
+          <thead><tr><th>Khách hàng</th><th>Lý do</th><th>Lần tiếp xúc cuối</th><th>Hiện lại</th></tr></thead>
           <tbody>{ds.da_lien_he.map(t => (
             <tr key={t.ma}><td className="ten-jp"><a href={`/khach-hang/${encodeURIComponent(t.ma)}#ho_so`}>{t.ten}</a></td>
               <td><span className={"lh-nhan " + lopMau(t.ly_do)}>{t.nhan_ly_do}</span></td>
-              <td>{t.cuoi?.icon} {ngay(t.cuoi?.ngay)} — {(t.cuoi?.noi_dung ?? "").slice(0, 60)}</td>
-              <td><span className={"nhan-vien " + (t.cuoi?.mau_ket_qua ?? "nhat")}>{t.cuoi?.nhan_ket_qua}</span></td>
-              <td>{t.cuoi?.hen_lai ? ngay(t.cuoi.hen_lai) : `sau ${d.an_ngay} ngày`}</td>
-              <td className="so">{yen(t.doanh_thu)}{laThang(t.ly_do) ? "/tháng" : ""}</td></tr>))}</tbody>
+              <td title={t.cuoi?.noi_dung}>{t.cuoi?.icon} {ngay(t.cuoi?.ngay)} · <span className={"nhan-vien " + (t.cuoi?.mau_ket_qua ?? "nhat")}>{t.cuoi?.nhan_ket_qua}</span></td>
+              <td>{t.cuoi?.hen_lai ? ngay(t.cuoi.hen_lai) : `sau ${d.an_ngay} ngày`}</td></tr>))}</tbody>
         </table></div>}
-      </section>
+      </details>
       </>}
     </div>
   );
@@ -188,33 +189,44 @@ function kichBan(t: The, gy: GoiY[], laThang: boolean): string {
   });
 }
 
-function The({ t, d, gy, laThang, mo, datMo }: { t: The; d: LienHeApi; gy: GoiY[]; laThang: boolean; mo: boolean; datMo: (v: boolean) => void }) {
+// Một DÒNG mỗi khách (thay thẻ cao ~10 dòng — chủ DN 2026-10-16: "nhiều chữ quá"): tên + người phụ trách · viên lý do ·
+// doanh thu · hình các mã "Nên chào" (tên trong title) · ☎ · ✏️ · 📋. Nhịp mua, mã khách, tỉnh, lần gọi trước: trong title.
+function DongLyDo({ t, d, gy, laThang, mo, datMo }: { t: The; d: LienHeApi; gy: GoiY[]; laThang: boolean; mo: boolean; datMo: (v: boolean) => void }) {
   const [daChep, datDaChep] = useState(false);
   const chep = async () => {
     try { await navigator.clipboard.writeText(kichBan(t, gy, laThang)); datDaChep(true); setTimeout(() => datDaChep(false), 1800); }
     catch { window.prompt("Chép kịch bản:", kichBan(t, gy, laThang)); }
   };
+  const nhipChu = t.nhip_ngay ? `bình thường ${Math.round(t.nhip_ngay)} ngày mua một lần` : "";
   return (
-    <div className={"lh-the " + lopMau(t.ly_do)}>
-      <div className="lh-ten"><a href={`/khach-hang/${encodeURIComponent(t.ma)}`} className="ten-jp">{t.ten}</a></div>
-      <div className="phu">{t.ma}{t.tinh ? ` · ${t.tinh}` : ""}{t.phu_trach ? ` · ${t.phu_trach}` : ""}</div>
-      <div className="lh-so">{laThang ? <>
-        <b>{gon(t.doanh_thu)}/tháng</b><span className="phu">mua {t.so_thang}/3 tháng trước · tháng trước {gon(t.dt_thang_truoc ?? 0)}</span></> : <>
-        <b title={yen(t.doanh_thu)}>{gon(t.doanh_thu)}</b>
-        <span className={(t.ty_le ?? 0) >= 4 ? "giam" : (t.ty_le ?? 0) >= 2 ? "canh-chu" : "phu"}>
-          {t.so_ngay_im_lang} ngày chưa mua{t.nhip_ngay ? ` · thường ${Math.round(t.nhip_ngay)} ngày/lần` : ""}</span></>}</div>
-      {t.dien_thoai && <div className="phu">☎ <a href={`tel:${t.dien_thoai}`}>{t.dien_thoai}</a></div>}
-      {t.cuoi && <div className="lh-cuoi">Lần trước: {t.cuoi.icon} {ngay(t.cuoi.ngay)} · <span className={"nhan-vien " + t.cuoi.mau_ket_qua}>{t.cuoi.nhan_ket_qua}</span> {t.cuoi.noi_dung.slice(0, 60)}</div>}
-      {gy.length > 0 && <div className="lh-goi-y" title={d.cach_tinh_goi_y}>
-        <div className="lh-goi-y-dau">Nên chào</div>
-        {/* Gọn (soát 2026-10-16): mỗi mã một dòng, nhịp / lần cuối trong title — thẻ cao gấp đôi vì dòng chi tiết. */}
-        <ul>{gy.map(g => <li key={g.ma} title={nhip(g)}><HinhMa ma={g.ma} ten={g.ten} co={22} trang_tri />
-          <a href={`/san-pham/${encodeURIComponent(g.ma)}`} className="ten-jp lh-goi-y-ten">{g.ten}</a></li>)}</ul></div>}
-      <div className="lh-nut">
-        <button type="button" className="nut-nho" aria-expanded={mo} onClick={() => datMo(!mo)}>{mo ? "Đóng" : "✏️ Ghi liên hệ"}</button>
-        <button type="button" className="nut-nho" onClick={chep}>{daChep ? "✓ Đã chép" : "📋 Chép kịch bản"}</button>
+    <li className="lh-sp-dong lh-ld-dong">
+      <div className="lh-sp-ten">
+        <a href={`/khach-hang/${encodeURIComponent(t.ma)}`} className="ten-jp" title={`${t.ma}${t.tinh ? " · " + t.tinh : ""}`}>{t.ten}</a>
+        {t.phu_trach && <span className="phu">{t.phu_trach}</span>}
       </div>
-      {mo && <GhiTiepXuc ma={t.ma} kieu_tx={d.kieu_tx} ket_qua_tx={d.ket_qua_tx} gon lam_moi={[["lien-he"], ["kh-ho-so", t.ma]]} xong={() => datMo(false)} />}
-    </div>
+      <div className="lh-sp-ly">
+        {laThang ? <>
+          <span className={"lh-sp-vien " + lopMau(t.ly_do)} title={`mua ${t.so_thang}/3 tháng trước · tháng trước ${yen(t.dt_thang_truoc ?? 0)}`}>tháng này chưa mua</span>
+          <span className="lh-ld-dt" title={yen(t.doanh_thu) + "/tháng (trung bình 3 tháng trước)"}>{gon(t.doanh_thu)}/tháng</span></> : <>
+          <span className={"lh-sp-vien " + lopMau(t.ly_do) + ((t.ty_le ?? 0) >= 4 ? " tre" : "")} title={nhipChu}>{t.so_ngay_im_lang} ngày chưa mua</span>
+          <span className="lh-ld-dt" title={yen(t.doanh_thu) + " tổng doanh thu đến nay"}>{gon(t.doanh_thu)}</span></>}
+        {t.cuoi && <span className="lh-sp-cuoi" title={`Lần trước ${ngay(t.cuoi.ngay)} · ${t.cuoi.nhan_ket_qua}: ${t.cuoi.noi_dung}`}>{t.cuoi.icon} {ngay(t.cuoi.ngay)}</span>}
+      </div>
+      {/* "Nên chào": chỉ HÌNH mã, tên + nhịp trong title (d.cach_tinh_goi_y trong ⓘ của tiêu đề trang). */}
+      <div className="lh-ld-chao" aria-label="Nên chào">
+        {gy.map(g => <a key={g.ma} href={`/san-pham/${encodeURIComponent(g.ma)}`} title={`Nên chào: ${g.ten} — ${nhip(g)}`}>
+          <HinhMa ma={g.ma} ten={g.ten} co={26} trang_tri /></a>)}
+      </div>
+      <div className="lh-sp-nut">
+        {t.dien_thoai ? <a className="nut-nho lh-sp-dt" href={`tel:${t.dien_thoai}`} title="Gọi">☎ {t.dien_thoai}</a>
+          : <span className="lh-sp-dt phu">—</span>}
+        <button type="button" className="nut-nho" aria-expanded={mo} title="Ghi liên hệ" aria-label="Ghi liên hệ"
+          onClick={() => datMo(!mo)}>{mo ? "✕" : "✏️"}</button>
+        <button type="button" className="nut-nho" title="Chép kịch bản gọi" aria-label="Chép kịch bản gọi"
+          onClick={chep}>{daChep ? "✓" : "📋"}</button>
+      </div>
+      {mo && <div className="lh-sp-ghi"><GhiTiepXuc ma={t.ma} kieu_tx={d.kieu_tx} ket_qua_tx={d.ket_qua_tx} gon
+        lam_moi={[["lien-he"], ["lien-he-sp"], ["kh-ho-so", t.ma]]} xong={() => datMo(false)} /></div>}
+    </li>
   );
 }

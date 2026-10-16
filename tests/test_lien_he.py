@@ -191,7 +191,7 @@ def test_trang_lien_he_ve_ba_cot(client, conn, batch):
     assert "hoat_dong" in d and "hen" in d
     src = (NGUON / "lien_he" / "LienHe.tsx").read_text(encoding="utf-8")
     assert "<h2>Hoạt động gần đây</h2>" in src
-    assert '<div className="nhan">Hẹn gọi lại hôm nay</div>' in src
+    assert "<h2>Hẹn gọi lại hôm nay (" in src
     # Nhãn cột đọc từ API (một định nghĩa ở kome/lien_he.py), không chép tay.
     assert "{c.nhan}" in src and "Lâu không mua" not in src
 

@@ -551,6 +551,7 @@ def tao_api(open_app_conn) -> APIRouter:
                 "hen": LH.hen_goi_lai(c, hom_nay, sale=sale), "hom_nay": hom_nay,
                 "sale": sale, "ten_sale": ten_sale, "cot_thang": LH.COT_THANG,
                 "an_ngay": LH.AN_KHI_KHONG_HEN, "ly_do_ds": {k: list(v) for k, v in LH.LY_DO.items()},
+                "thu_tu_ly_do": list(LH.LY_DO),  # JSON không giữ thứ tự khoá — thứ tự ô = thứ tự LY_DO (gấp nhất trước)
                 "kieu_tx": {k: list(v) for k, v in LH.KIEU.items()},
                 "ket_qua_tx": {k: list(v) for k, v in LH.KET_QUA.items()},
                 "nv_moi_nguoi": KH.NV_MOI_NGUOI,
