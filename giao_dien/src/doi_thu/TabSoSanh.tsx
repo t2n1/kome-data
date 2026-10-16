@@ -18,7 +18,7 @@ import { DaBoNhom } from "./DaBoNhom";
 import type { GiaoHang, Nhom, SoSanhApi } from "./kieu";
 import { dongMoSan } from "./loc";
 import { mauKomeSoTT } from "./mau";
-import { tenNganh } from "./nganh";
+import { tenNganh } from "../chung/nganh";
 import { batTat, demThieu, dongTrai, khoaNhom, LUA_CHON_GK, locDanhSach, macDinhSp, NHAN_SL, nhomChon, pcDau,
   type NutNhanh, type SoLuong } from "./so_sanh_logic";
 import { SuaMatHang } from "./SuaMatHang";

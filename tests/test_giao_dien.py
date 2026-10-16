@@ -362,7 +362,7 @@ def test_trang_danh_sach_co_du_bon_khoi_va_ba_bo_loc(conn, test_db_url):
     assert [h for h, _ in tq["hang"]] == list(KH.THU_TU_HANG)
     assert "tinh" in tq and "nhan_vien" in tq and "thang" in tq
     nguon = Path("giao_dien/src/khach/DanhSach.tsx").read_text(encoding="utf-8")
-    for ten in ("Toàn bộ danh bạ", "Im lặng ≥ 2× nhịp", "đang tụt", "Khách mới", "Mua đều, tháng này chưa"):
+    for ten in ("Toàn bộ danh bạ", "Lâu chưa mua", "đang tụt", "Khách mới", "Mua đều, tháng này chưa"):
         assert ten in nguon, f"thiếu nút nhóm việc: {ten}"
     for tieu_de in ("Phân bố theo hạng OBC", "Tập trung ở đâu", "Tải của từng nhân viên"):
         assert tieu_de in nguon, f"thiếu khối: {tieu_de}"
@@ -536,13 +536,16 @@ def test_ban_sang_chon_tay_thang_he_thong_dang_toi():
 
 
 def test_nut_doi_giao_dien_hien_KE_CA_khong_co_cong_dang_nhap():
-    # Máy trong công ty để trống KOME_SESSION_SECRET vẫn phải thấy bốn nút này --
+    # Máy trong công ty để trống KOME_SESSION_SECRET vẫn phải thấy các nút này --
     # khối giao diện của Nav.tsx KHÔNG nằm trong `KD.co_dang_nhap && …`.
+    # Từ 2026-10-16 (chủ DN: "đơn giản") chỉ HIỆN hai nút Sáng / Tối; "he-thong" / "theo-gio" vẫn là
+    # chế độ hợp lệ ở máy chủ (cookie cũ) — Nav tô nút theo màu đang thật sự hiện.
     nav = nguon("khung", "Nav.tsx")
-    for nhan in ("Sáng", "Tối", "Hệ thống", "Theo giờ"):
+    for nhan in ("☀ Sáng", "☾ Tối"):
         assert f'"{nhan}"' in nav, f"thiếu nút đổi giao diện: {nhan}"
-    for che_do in ("sang", "toi", "he-thong", "theo-gio"):
+    for che_do in ("sang", "toi"):
         assert f'"{che_do}"' in nav
+    assert "KD.co_dang_nhap && <div className=\"knav-che-do\"" not in nav
     assert "href={`/giao-dien?che_do=${ma}`}" in nav
     khoi = nav.split('<div className="knav-che-do"', 1)[0]
     assert "KD.co_dang_nhap &&" not in khoi.split('<div className="knav-cuoi">', 1)[1]

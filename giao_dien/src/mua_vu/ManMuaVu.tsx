@@ -20,6 +20,7 @@ import { CAU_SO_LUONG, LuyKe, cuaSo, inGon, inSo, namTruoc, ngayCua, type ChiSo,
 import type { KieuXep } from "./nhiet";
 import { ThanhThoiGian } from "./ThanhThoiGian";
 import "./mua_vu.css";
+import { tenNganh } from "../chung/nganh";
 
 const CHI_SO: { ma: ChiSo; nhan: string }[] = [
   { ma: "dt", nhan: "Doanh thu" }, { ma: "lg", nhan: "Lãi gộp" }, { ma: "sl", nhan: "Số lượng" }];
@@ -152,7 +153,7 @@ export default function ManMuaVu() {
         {thuTu.map(k => (
           <button key={k} type="button" className="chip mv-chip-n" aria-pressed={!tat.has(k)}
             onClick={() => datTat(s => { const t = new Set(s); t.has(k) ? t.delete(k) : t.add(k); return t; })}>
-            <i className={"mv-n" + (k % 12)} /> {dl.nganh[k]}
+            <i className={"mv-n" + (k % 12)} /> {tenNganh(dl.nganh[k])}
           </button>))}
       </div>
 
@@ -170,7 +171,7 @@ export default function ManMuaVu() {
                 <g key={"n" + g.n}>
                   <rect x={g.x} y={g.y} width={g.w} height={g.h} className={"mv-o-nganh mv-n" + (g.n % 12)} />
                   {g.h >= 40 && g.w >= 60 && <text x={g.x + 4} y={g.y + CAO_NHAN - 4} className="mv-chu-nganh">
-                    {dl.nganh[g.n]} · {inGon(cs, g.v)}</text>}
+                    {tenNganh(dl.nganh[g.n])} · {inGon(cs, g.v)}</text>}
                   {g.ma.map(o => {
                     const m = dl.ma[o.m];
                     const nt = truoc ? L.tong(cs, o.m, truoc.a, truoc.b) : null;
@@ -182,7 +183,7 @@ export default function ManMuaVu() {
                           <HinhMa ma={m.ma} ten={m.ten} co={64} trang_tri />
                           <div>
                             <b>{m.ten}</b> <span className="mo">{m.ma}</span>
-                            <DongNoi nhan="Ngành" gia={m.nganh} />
+                            <DongNoi nhan="Ngành" gia={tenNganh(m.nganh)} />
                             <DongNoi nhan={`${n} ngày này`} gia={inSo(cs, o.v)} />
                             <DongNoi nhan="Cùng kỳ năm trước" gia={nt === null ? "—" : inSo(cs, nt)} />
                             <DongNoi nhan="Hạng trong ngành" gia={`${hang}/${g.ma.length} · ${pc(o.v / g.v)}`} />

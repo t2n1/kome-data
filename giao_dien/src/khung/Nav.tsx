@@ -16,7 +16,15 @@ function docThu(): Record<string, boolean> {
   try { return JSON.parse(localStorage.getItem(KHOA_THU) || "{}") || {}; } catch { return {}; }
 }
 
-const CHE_DO = [["sang", "Sáng"], ["toi", "Tối"], ["he-thong", "Hệ thống"], ["theo-gio", "Theo giờ"]] as const;
+// Chỉ hai lựa chọn hiện ra (2026-10-16, bớt rối): Sáng / Tối. "Hệ thống" / "Theo giờ" vẫn là chế độ hợp lệ
+// (cookie cũ giữ nguyên) — khi đang ở đó, nút sáng hay tối được tô theo màu đang thật sự hiện.
+const CHE_DO = [["sang", "☀ Sáng"], ["toi", "☾ Tối"]] as const;
+function dangToi(): boolean {
+  const c = KD.che_do_giao_dien;
+  if (c === "toi" || c === "sang") return c === "toi";
+  const t = document.documentElement.dataset.theme;
+  return t ? t === "toi" : matchMedia("(prefers-color-scheme: dark)").matches;
+}
 
 export function Nav() {
   const dangMo = mucDangMo(location.pathname);
@@ -77,11 +85,11 @@ export function Nav() {
         {KD.nguoi && <div className="knav-toi" title={KD.nguoi.ten_sale ?? undefined}>
           <Icon ten="user" /><span>{KD.nguoi.ten_sale || KD.nguoi.ten_dang_nhap}</span></div>}
         <div className="knav-che-do" role="group" aria-label="Giao diện">
-          {CHE_DO.map(([ma, nhan]) => (
-            <a key={ma} href={`/giao-dien?che_do=${ma}`}
-               className={KD.che_do_giao_dien === ma ? "on" : ""}
-               aria-current={KD.che_do_giao_dien === ma ? "true" : undefined}>{nhan}</a>
-          ))}
+          {CHE_DO.map(([ma, nhan]) => {
+            const on = (ma === "toi") === dangToi();
+            return <a key={ma} href={`/giao-dien?che_do=${ma}`} className={on ? "on" : ""}
+               aria-current={on ? "true" : undefined}>{nhan}</a>;
+          })}
         </div>
         {KD.co_dang_nhap && <form method="post" action="/dang-xuat">
           <button type="submit" className="knav-muc knav-thoat"><Icon ten="out" /><span>Đăng xuất</span></button>

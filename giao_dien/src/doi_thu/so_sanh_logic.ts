@@ -2,7 +2,7 @@
 // Giá đã là ¥/kg chưa thuế; gia_1/5/10 máy chủ đã lấy min(giá lẻ, bậc áp dụng). Khách kể KHÔNG vẽ ở đây.
 import { boDau } from "./loc";
 import { NGAY_CU, laBatThuong, phanTram } from "./mau";
-import { tenNganh } from "./nganh";
+import { tenNganh } from "../chung/nganh";
 import { so, so_luong } from "../dinh_dang";
 import { TOI_DA_SP } from "./url";
 import { nhanDonVi, type Bac, type Nhom, type QuanSat } from "./kieu";

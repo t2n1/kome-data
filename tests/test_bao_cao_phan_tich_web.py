@@ -103,7 +103,8 @@ def test_kho_hai_nam_tra_200_va_hien_khoi_moi(client, conn, batch):
         assert d[khoi]["co"] is True, f"khối {khoi} không có gì để vẽ"
     assert d["bong_nganh"]["dt"]["co"] is True and d["bong_ma"]["dt"]["co"] is True
     src = _src()
-    for tieu_de in ("Vì sao tăng / giảm", "Danh mục", "Mặt hàng", "Danh mục × tháng", "Khách lớn"):
+    # 2026-10-16: hai khối bong bóng thành danh sách xếp hạng (chủ DN: "người không rành nhìn cũng hiểu").
+    for tieu_de in ("Vì sao tăng / giảm", "Danh mục nào tăng, nào giảm", "Mặt hàng bán chạy", "Danh mục × tháng", "Khách lớn"):
         assert f'<Khoi tieu_de="{tieu_de}"' in src, tieu_de
 
 
@@ -151,8 +152,8 @@ def test_ty_suat_so_bang_diem_khong_bang_phan_tram(client, conn, batch):
     ck = _api(client)["bc"]["cung_ky"]
     assert ck["chenh_ty_suat"] is not None
     assert ck["chenh_ty_suat"] == pytest.approx(ck["ty_suat"] - ck["ty_suat_ck"])
-    m = re.search(r'<div className="nhan">Biên lãi gộp</div>(.*?)<The className="dt-chinh">', _src(), re.S)
-    assert m, "không tìm thấy ô chỉ số Biên lãi gộp"
+    m = re.search(r'<div className="nhan">Tỷ lệ lãi gộp</div>(.*?)<The className="dt-chinh">', _src(), re.S)
+    assert m, "không tìm thấy ô chỉ số Tỷ lệ lãi gộp"
     khoi = m.group(1)
     assert 'tang={ck?.chenh_ty_suat ?? null} don_vi=" điểm"' in khoi
     assert 'don_vi="%"' not in khoi, "tỷ suất phải so bằng ĐIỂM, không phải %"
@@ -198,7 +199,7 @@ def test_khong_ve_hien_dung_cau_khi_co_doanh_thu_am(client, conn, batch):
     tong = sum(n["doanh_thu"] for n in d["bc"]["nganh_ky"])
     assert sum(x["tien"] for x in b.get("bong", [])) + b["khong_ve"] == tong
     assert b["so_khong_ve"] >= 1 and b["khong_ve"] <= 100_000 - 4_500
-    assert ("Không vẽ: ${yen(bn.khong_ve)} của ${bn.so_khong_ve} danh mục (${ten} ≤ 0 hoặc không có số so).") in _src()
+    assert ("Không có trong danh sách: ${yen(bn.khong_ve)} của ${bn.so_khong_ve} danh mục (${ten} ≤ 0 hoặc không có số so).") in _src()
 
 
 def test_khong_hien_khong_ve_khi_khong_co_am(client, conn, batch):
@@ -206,7 +207,7 @@ def test_khong_hien_khong_ve_khi_khong_co_am(client, conn, batch):
     `so_khong_ve > 0`."""
     _hai_nam(conn, batch)
     assert _api(client)["bong_nganh"]["dt"]["khong_ve"] == 0
-    assert "canh_bao={bn.so_khong_ve > 0 ? `Không vẽ:" in _src()
+    assert "canh_bao={bn.so_khong_ve > 0 ? `Không có trong danh sách:" in _src()
 
 
 def test_pareto_cau_tom_tat(client, conn, batch):
@@ -220,7 +221,7 @@ def test_pareto_cau_tom_tat(client, conn, batch):
     tt = _api(client)["bc"]["tap_trung"]
     assert tt["so_khach"] == 12 and 0 < tt["luy_ke_top10"] < 1
     src = _src()
-    assert "`10 khách = ${p1(bc.tap_trung.luy_ke_top10)}`" in src
+    assert "`10 khách lớn nhất = ${p1(bc.tap_trung.luy_ke_top10)} doanh thu`" in src
     assert "({so(bc.tap_trung?.so_khach ?? 0)} khách có đơn)" in src
     assert "khách có doanh thu" not in src
 
@@ -283,7 +284,7 @@ def test_moi_rect_circle_du_lieu_co_title(client, conn, batch):
     assert dem, "SVG Pareto không có <rect>/<circle> dữ liệu nào — regex hỏng?"
     bong = (THU_MUC_GD / "Bong.tsx").read_text(encoding="utf-8")
     assert re.search(r"<ONoi key=\{b\.ma\} svg href=\{href\?\.\(b\)\} nhan=\{b\.ten\}.*?<circle", bong, re.S)
-    assert re.search(r"<ONoi key=\{i\} svg nhan=\{c\.nhan\}.*?<rect", bong, re.S)
+    assert re.search(r"<ONoi key=\{i\} svg nhan=\{tenNganh\(c\.nhan\)\}.*?<rect", bong, re.S)
 
 
 def _hai_nam_do_dang(conn, batch, ma="AA01", ngành="Đồ khô"):
@@ -513,9 +514,9 @@ def test_khong_ve_hien_du_khi_khong_co_gi_de_ve(client, conn, batch):
     assert b["co"] is False
     assert b["khong_ve"] == -4_500 and b["so_khong_ve"] == 1
     src = _src()
-    i_canh = src.index("canh_bao={bn.so_khong_ve > 0 ? `Không vẽ:")
-    i_bong = src.index("<Bong v={bn}")
-    assert i_canh < i_bong, "câu 'Không vẽ' phải là prop của Khoi, không phải con của nhánh vẽ"
+    i_canh = src.index("canh_bao={bn.so_khong_ve > 0 ? `Không có trong danh sách:")
+    i_bong = src.index("<TangGiam v={bn}")
+    assert i_canh < i_bong, "câu 'Không có trong danh sách' phải là prop của Khoi, không phải con của nhánh vẽ"
 
 
 

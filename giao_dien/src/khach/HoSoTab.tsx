@@ -15,6 +15,7 @@ import type { DongBan, HoSoApi, LichMa, MatHang } from "./kieu";
 import { GhiTiepXuc } from "./GhiTiepXuc";
 import { chuoiKhoang, useKhoang, useNhanMoc, voiKhoang, type KhoangMayChu } from "../khung/khoang";
 import { KhoiSapCo } from "./KhoiSapCo";
+import { tenNganh } from "../chung/nganh";
 
 /** Số trong KHOẢNG XEM của một khách (/api/khach-hang/{mã}/khoang — đợt B;
  *  endpoint riêng vì hồ sơ đã chạm trần 8 lượt hỏi). Nhiều khối gọi chung —
@@ -93,7 +94,7 @@ export function OSoSucKhoe({ h }: { h: HoSoApi }) {
         <div className="nhan">Nhịp mua</div><div className="gia">{k.nhip_ngay == null ? "—" : `${Math.round(k.nhip_ngay)} ngày`}</div>
         <div className={"dong-phu " + (k.ty_le_im_lang == null ? "nhat-chu" : im >= 2 ? "giam" : im >= 1 ? "canh-chu" : "tang")}>
           {k.nhip_ngay == null ? "chưa đủ 3 lần mua" : `im ${k.so_ngay_im_lang} ngày · ${im.toFixed(1)}× nhịp`}</div></div>
-      <div className="o-kpi"><div className="nhan">Biên lãi gộp</div><div className="gia">{pc(k.ty_suat)}</div>
+      <div className="o-kpi"><div className="nhan">Tỷ lệ lãi gộp</div><div className="gia">{pc(k.ty_suat)}</div>
         <div className="dong-phu nhat-chu">lãi gộp ÷ doanh thu thuần, luỹ kế</div></div>
     </div>);
 }
@@ -183,19 +184,19 @@ function GioNganh({ h }: { h: HoSoApi }) {
   const ds = h.nganh.nganh, r = 40, C = 2 * Math.PI * r;
   let luy = 0;
   return (
-    <The tieu_de="Giỏ hàng theo ngành" cach_tinh="tỷ trọng doanh thu luỹ kế theo ngành hàng (food_category của OBC)">
+    <The tieu_de="Giỏ hàng theo ngành" cach_tinh="mỗi ngành hàng chiếm bao nhiêu phần trong tổng tiền khách này đã mua">
       {!ds.length ? <p className="phu">Chưa có doanh thu dương để vẽ.</p> :
       <div className="hs-donut">
         <svg viewBox="0 0 108 108" role="img" aria-label="Tỷ trọng doanh thu theo ngành">
           <circle cx={54} cy={54} r={r} fill="none" stroke="var(--nen-phu)" strokeWidth={17} />
           {ds.map((x, i) => { const dai = x.ty_trong * C; const el = <circle key={x.nganh} cx={54} cy={54} r={r} fill="none"
             stroke={MAU_NGANH[i % MAU_NGANH.length]} strokeWidth={17} strokeDasharray={`${dai} ${C - dai}`} strokeDashoffset={-luy}
-            transform="rotate(-90 54 54)"><title>{x.nganh}: {pc(x.ty_trong)}</title></circle>; luy += dai; return el; })}
+            transform="rotate(-90 54 54)"><title>{tenNganh(x.nganh)}: {pc(x.ty_trong)}</title></circle>; luy += dai; return el; })}
           <text x={54} y={52} textAnchor="middle" fontSize={17} fontWeight={700} fill="var(--chu)">{ds.length}</text>
           <text x={54} y={66} textAnchor="middle" fontSize={8.5} fill="var(--chu-nhat)">ngành hàng</text>
         </svg>
         <ul className="hs-chu-giai">{ds.map((x, i) => (
-          <li key={x.nganh}><i style={{ background: MAU_NGANH[i % MAU_NGANH.length] }} /><span className="ten-jp">{x.nganh}</span><b>{pc(x.ty_trong, 0)}</b></li>))}</ul>
+          <li key={x.nganh}><i style={{ background: MAU_NGANH[i % MAU_NGANH.length] }} /><span title={x.nganh}>{tenNganh(x.nganh)}</span><b>{pc(x.ty_trong, 0)}</b></li>))}</ul>
       </div>}
       {h.nganh.so_nganh_khong_ve > 0 && <p className="phu">Không vẽ: {yen(h.nganh.khong_ve)} của {h.nganh.so_nganh_khong_ve} ngành doanh thu ≤ 0 (phiếu đỏ).</p>}
     </The>);
@@ -272,7 +273,7 @@ export function TabMatHang({ h }: { h: HoSoApi }) {
       <div className="hs-top">{top.map((m, i) => (
         <div key={m.ma} className="hs-top-dong">
           <span className="hs-top-so">{i + 1}</span>
-          <TenHinh ma={m.ma} ten={m.ten}><a className="ten-jp" href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code> · {m.nganh}</div></TenHinh>
+          <TenHinh ma={m.ma} ten={m.ten}><a className="ten-jp" href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code> · {tenNganh(m.nganh)}</div></TenHinh>
           <span><span className="kh-td-thanh"><i style={{ width: `${Math.max(0, m.doanh_thu) / mx * 100}%` }} /></span>
             <span className="ma-nho">{yen(m.doanh_thu)} · {so(m.so_lan)} lần · nhịp {m.nhip ? Math.round(m.nhip) + " ngày" : "—"} · cuối {ngay(m.lan_cuoi)}</span></span>
           <span className="hs-top-nhan">{badgeDeXuat(lichDu[m.ma])}</span>
@@ -335,10 +336,10 @@ function BangMatHang({ ds, thang }: { ds: MatHang[]; thang: string[] }) {
   return (
     <div className="bang-cuon" style={{ maxHeight: 460 }}><table className="bang">
       <thead><tr><th>Mặt hàng</th><th>Ngành</th>{thang.map(t => <th key={t} className="so">T{+t.slice(5)}</th>)}
-        <th className="so">Luỹ kế</th><th className="so">Lần</th><th className="so">Nhịp</th><th>Trạng thái</th></tr></thead>
+        <th className="so">Cộng dồn</th><th className="so">Lần</th><th className="so">Nhịp</th><th>Trạng thái</th></tr></thead>
       <tbody>{ds.map(m => (
         <tr key={m.ma}><td className="ten-jp"><TenHinh ma={m.ma} ten={m.ten}><a href={`/san-pham/${encodeURIComponent(m.ma)}`}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code></div></TenHinh></td>
-          <td className="phu ten-jp">{m.nganh}</td>
+          <td className="phu" title={m.nganh}>{tenNganh(m.nganh)}</td>
           {[m.t2, m.t1, m.t0].map((v, i) => <td key={i} className={"so" + (v ? "" : " nhat-chu")}>{v ? gon(v) : "·"}</td>)}
           <td className="so">{gon(m.doanh_thu)}</td><td className="so">{so(m.so_lan)}</td>
           <td className="so">{m.nhip ? Math.round(m.nhip) + "n" : "—"}</td>

@@ -887,6 +887,26 @@ endpoint / chỉ số mới; cách nào không có kỳ so thì nói ở `canh_b
 canh: `tests/test_bo_cuc.py`, `tests/test_cach_xem.py`, `luoi_logic.test.ts`. ⋯ của bảng nằm TRONG viên
 tab đang xem (chuột phải cũng mở). Đặc tả: `docs/superpowers/specs/2026-09-29-tong-quan-luoi-12-cot-design.md`.
 
+**Bất biến (đơn giản cho người không rành — chủ DN chốt 2026-10-16: "người không rành nhìn cũng hiểu"):**
+- **Tổng quan mặc định GỌN**: `bo_cuc.HIEN_MAC_DINH` (kpi · việc hôm nay · tháng này chưa mua · ngân sách · theo tháng · sắp hết hạn ·
+  công nợ) hiện, mọi khối khác vẫn trong bố cục nhưng `an` — bật lại qua "+ Thêm / bớt khối". `chuan_hoa` của bố cục rác / rỗng
+  trả `mac_dinh()`; mẫu "theo vai trò" xuất phát từ `bo_cuc.day_du()` (mọi khối hiện). Bố cục ĐÃ LƯU không đổi — "Về mặc định" về bản gọn.
+- **Dải tóm tắt đầu Tổng quan là CÂU** (đã bán · so kỳ so · ngân sách · việc cần làm có liên kết), ghép từ khối `kpi` đã tải.
+- **Chữ thường thay chữ chuyên môn** trên nhãn: "nhịp mua" → "bình thường N ngày mua một lần", "im lặng N× nhịp" → "N ngày chưa mua",
+  "biên" → "tỷ lệ lãi", "luỹ kế" → "cộng dồn", "mốc" → "lẽ ra đạt đến hôm nay" / "kế hoạch". Câu định nghĩa chính xác vẫn trong ⓘ.
+  Tên kịch bản dự báo: `du_bao.KICH_BAN` = Dự báo thấp / vừa / cao. Thanh chọn khoảng: Tháng · Cả năm (kỳ) · Tự chọn ngày.
+- **Tên ngành tiếng Việt ở mọi màn** qua `giao_dien/src/chung/nganh.ts::tenNganh` (tên OBC gốc trong `title`); bộ lọc / khoá vẫn
+  là tên OBC.
+- **Trang Doanh thu không còn biểu đồ bong bóng**: "Danh mục nào tăng, nào giảm" (`Bong.tsx::TangGiam`) và "Mặt hàng bán chạy"
+  (`BanChay`) — CÙNG số của `ve_bong` (bóng + "Không có trong danh sách"), chỉ đổi cách bày.
+- **Bảng Khách hàng** mặc định 6 cột (khách · phụ trách · doanh thu · so kỳ so · lần mua cuối "N ngày trước" tô theo số lần so với
+  bình thường · trạng thái); "＋ Thêm cột" mở hạng + bình quân/tháng (nhớ theo máy, `localStorage`).
+- Thanh bên: "Nạp dữ liệu" (= `/kho-du-lieu`); Nhật ký / Cài đặt chỉ hiện cho người có `duoc_quan_tri` (máy không đăng nhập: hiện) —
+  bớt rối, KHÔNG phải phân quyền. Nút giao diện chỉ còn Sáng / Tối (cookie `he-thong` / `theo-gio` cũ vẫn hợp lệ).
+- `kome.css` từng có `.tang{display:flex}` (tài liệu sống) TRÙNG lớp màu `.tang` → mọi dòng "▲… so với …" bị dàn flex, chữ cách xa:
+  lớp kia nay là `.tl-tang`. Đặt tên lớp bố cục KHÔNG trùng lớp màu (`tang` / `giam` / `canh-chu` / `nhat-chu`). `index.html` nạp
+  `kome.css?v=…` — sửa `kome.css` thì đổi số `v` để trình duyệt lấy bản mới.
+
 **Bất biến (định dạng số chuẩn Nhật — chủ DN chốt 2026-09-29):** mọi số trên web theo chuẩn Nhật:
 phẩy ngăn nghìn (¥1,234,567), chấm thập phân (62.9% · 1.5×), số tiền rút gọn theo **万/億** (¥9.8万 ·
 ¥1,170万 · ¥1.2億 — KHÔNG K/M/B). MỘT chỗ mỗi tầng: `giao_dien/src/dinh_dang.ts` (`yen`/`gon`/`so`/`pc`/
@@ -1173,7 +1193,7 @@ Có test canh: `tests/test_doi_thu_bang.py`, `tests/test_mart_doi_thu.py`, `test
   mốc = trung vị nhóm ≥ 3 bên, không thì giá chuẩn KOME của nhóm (¥/kg; `moc_bat_thuong` / `_la` để màn in lý do; không mốc → không bao giờ bất thường).
   Khối "KOME của nhóm" nay ở view đó (cột `nhom_*`), `so_sanh_nhom` đọc lại. Giao diện chỉ đọc cờ (`mau.ts::laBatThuong`): không `mauLech`,
   không vào ô số, vẽ xám "⚠" + lý do (`lyDoBatThuong`) ở tab Đối thủ / cột / chấm / bản đồ nhiệt / ô nổi, vẫn bấm được mở pop-up.
-- **Nhãn thương hiệu** `kieu.ts::NHAN_GHEP` (`cung_hang` "cùng thương hiệu" / `thay_the`); `nganh.ts::tenNganh` CHỈ để hiển thị
+- **Nhãn thương hiệu** `kieu.ts::NHAN_GHEP` (`cung_hang` "cùng thương hiệu" / `thay_the`); `chung/nganh.ts::tenNganh` (từ 2026-10-16 dùng ở MỌI màn) CHỈ để hiển thị
   (tên ngành trống → "(chưa phân loại)"), không khoá nối, không lọc.
 - **Trình duyệt chỉ CHỌN cột giá, không tự quy đổi** — `gia_1/5/10/pallet`, `kg_thung_dt`… đến từ `mart.gia_doi_thu_quan_sat` (067, `mart.gia_bac_kg`). Hai ngoại lệ:
   bảng bậc ¥/kg trong `ONoiGia` là BẢN CHÉP HIỂN THỊ của `mart.gia_bac_kg` (không quyết định gì), và `phi_giao.ts` ↔ `kome/phi_giao.py`

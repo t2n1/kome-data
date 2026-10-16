@@ -71,11 +71,11 @@ export default function LienHe() {
     <div className={"lh" + (isFetching ? " dang-tai" : "")}>
       <div className="tieu-de-trang">
         <div><h1>Cần liên hệ</h1>
-          <div className="phu">Khách im lặng lâu hơn nhịp mua riêng của chính họ, chia theo lý do{" "}
+          <div className="phu">Khách lâu chưa đặt hàng hơn bình thường — nên gọi hỏi thăm{" "}
             <ChuThich>Khách đang im lặng lâu hơn <b>nhịp mua riêng của chính họ</b>, chia theo lý do. Ghi lại mỗi lần gọi —
               khách vừa liên hệ tạm ẩn tới ngày hẹn (hoặc {d.an_ngay} ngày nếu không hẹn). Hồ sơ và lịch sử mua ở màn Khách hàng.
               <br /><br />“Nên chào” trên mỗi thẻ: {d.cach_tinh_goi_y}</ChuThich></div></div>
-        <label className="kh-chon lh-loc"><span>担当者</span>
+        <label className="kh-chon lh-loc"><span>Người phụ trách</span>
           <select value={nvDang} onChange={e => dat({ nv: e.target.value, tat_ca: false })}>
             <option value={d.nv_moi_nguoi}>— mọi người phụ trách —</option>
             {d.nhan_vien.map(n => <option key={n.ma} value={n.ma}>{n.ten}{n.ma === KD.nguoi?.sale ? " (tôi)" : ""}</option>)}
@@ -85,7 +85,7 @@ export default function LienHe() {
 
       <div className="o-kpi-luoi lh-kpi">
         <div className="o-kpi"><div className="nhan">Cần liên hệ</div><div className="gia">{so(ds.tong)}</div>
-          <div className="dong-phu nhat-chu">khách · {gon(tongLuyKe)} doanh thu luỹ kế{ds.dem[d.cot_thang] ? " (chưa gồm cột tháng)" : ""}</div></div>
+          <div className="dong-phu nhat-chu">khách · {gon(tongLuyKe)} tổng doanh thu đến nay{ds.dem[d.cot_thang] ? " (chưa gồm cột tháng)" : ""}</div></div>
         {ds.cot.map(c => (
           <button key={c.ly_do} type="button" className={"o-kpi lh-o " + lopMau(c.ly_do)} aria-pressed={loc.ly_do === c.ly_do}
             onClick={() => dat({ ly_do: loc.ly_do === c.ly_do ? "" : c.ly_do })}>
@@ -98,7 +98,7 @@ export default function LienHe() {
       </div>
 
       <p className="phu lh-ghi">Hai nhóm khác của danh sách làm việc:{" "}
-        <a href="/khach-hang?nhom=tut&tat_ca=1">khách lớn đang giảm tốc</a> · <a href="/khach-hang?nhom=moi&tat_ca=1">khách mới đã im lặng</a>.
+        <a href="/khach-hang?nhom=tut&tat_ca=1">khách lớn đang giảm tốc</a> · <a href="/khach-hang?nhom=moi&tat_ca=1">khách mới mua một lần rồi thôi</a>.
         {ds.ly_do && <> <button type="button" className="lien-ket" onClick={() => dat({ ly_do: "" })}>← Mọi lý do</button></>}</p>
 
       <div className={"lh-cot" + (ds.ly_do ? " mot" : "")}>
@@ -157,14 +157,14 @@ export default function LienHe() {
   );
 }
 
-const nhip = (g: GoiY) => `${g.so_lan} lần · nhịp ${Math.round(g.nhip_ngay)} ngày · lần cuối ${g.so_ngay} ngày trước`;
+const nhip = (g: GoiY) => `đã mua ${g.so_lan} lần · thường ${Math.round(g.nhip_ngay)} ngày/lần · lần cuối ${g.so_ngay} ngày trước`;
 
 // Kịch bản gọi — văn bản thuần để dán vào LINE / Zalo / ghi chú (khach/kich_ban.ts).
 function kichBan(t: The, gy: GoiY[], laThang: boolean): string {
   return kichBanGoi({
     dau: dauKichBan(t.ten, t.ma, t.dien_thoai),
     ly_do: laThang ? `Mua đều (${t.so_thang}/3 tháng trước), tháng này chưa có đơn.`
-      : `Lý do gọi: ${t.nhan_ly_do} — im ${t.so_ngay_im_lang} ngày${t.nhip_ngay ? ` (nhịp thường ${Math.round(t.nhip_ngay)} ngày)` : ""}.`,
+      : `Lý do gọi: ${t.nhan_ly_do} — ${t.so_ngay_im_lang} ngày chưa mua${t.nhip_ngay ? ` (bình thường ${Math.round(t.nhip_ngay)} ngày/lần)` : ""}.`,
     tieu_de_ma: "Nên chào:", ma: gy.map(g => ({ ten: g.ten, chi_tiet: nhip(g) })), cuoi: t.cuoi,
   });
 }
@@ -183,7 +183,7 @@ function The({ t, d, gy, laThang, mo, datMo }: { t: The; d: LienHeApi; gy: GoiY[
         <b>{gon(t.doanh_thu)}/tháng</b><span className="phu">mua {t.so_thang}/3 tháng trước · tháng trước {gon(t.dt_thang_truoc ?? 0)}</span></> : <>
         <b title={yen(t.doanh_thu)}>{gon(t.doanh_thu)}</b>
         <span className={(t.ty_le ?? 0) >= 4 ? "giam" : (t.ty_le ?? 0) >= 2 ? "canh-chu" : "phu"}>
-          im {t.so_ngay_im_lang} ngày{t.ty_le ? ` · ${t.ty_le.toFixed(1)}× nhịp ${Math.round(t.nhip_ngay ?? 0)} ngày` : ""}</span></>}</div>
+          {t.so_ngay_im_lang} ngày chưa mua{t.nhip_ngay ? ` · thường ${Math.round(t.nhip_ngay)} ngày/lần` : ""}</span></>}</div>
       {t.dien_thoai && <div className="phu">☎ <a href={`tel:${t.dien_thoai}`}>{t.dien_thoai}</a></div>}
       {t.cuoi && <div className="lh-cuoi">Lần trước: {t.cuoi.icon} {ngay(t.cuoi.ngay)} · <span className={"nhan-vien " + t.cuoi.mau_ket_qua}>{t.cuoi.nhan_ket_qua}</span> {t.cuoi.noi_dung.slice(0, 60)}</div>}
       {gy.length > 0 && <div className="lh-goi-y" title={d.cach_tinh_goi_y}>

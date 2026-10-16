@@ -11,7 +11,7 @@ export function BangMoi({ hien, ds, dong, tao }: {
   const LUA_CHON = [
     { tu: "chep", nhan: `Chép "${hien.ten}"`, ten: `${hien.ten} (bản chép)` },
     ...KD.danh_muc.vai_tro.map(v => ({ tu: `vai:${v.id}`, nhan: `Vai trò: ${v.nhan}`, ten: v.nhan })),
-    { tu: "mac_dinh", nhan: "Đầy đủ (mọi chức năng)", ten: "Bảng mới" },
+    { tu: "mac_dinh", nhan: "Gọn — chỉ các khối chính", ten: "Bảng mới" },
   ];
   const khongTrung = (t: string) => {
     const co = new Set(ds.map(b => b.ten.trim().toLowerCase()));

@@ -22,6 +22,8 @@ export const MAU_TT: Record<string, string> = {
 };
 export const MAU_THANG: Record<string, string> = { da_mua: "ok", tre: "canh", chua_toi_ngay: "nhat", khac: "nhat" };
 
+const KHOA_COT = "kome_kh_cot_du_v1";
+
 export function useDs(b: BoLoc) {
   const q = thamSoDs(b);
   const kx = chuoiKhoang(useKhoang());
@@ -38,6 +40,9 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
   const nm = useNhanMoc();
   const [tim, datTim] = useState(b.tim);
   const [chon, datChon] = useState<Record<string, boolean>>({});
+  // Cột phụ (hạng, bình quân/tháng) ẩn mặc định cho bảng dễ đọc — tiện nghi riêng từng máy (chủ DN 2026-10-16).
+  const [du, datDuS] = useState(() => { try { return localStorage.getItem(KHOA_COT) === "1"; } catch { return false; } });
+  const datDu = (v: boolean) => { datDuS(v); try { localStorage.setItem(KHOA_COT, v ? "1" : "0"); } catch { /* riêng tư */ } };
   useEffect(() => { datTim(b.tim); }, [b.tim]);
   useEffect(() => {
     const h = setTimeout(() => { if (tim !== b.tim) dat({ tim }); }, 280);
@@ -65,11 +70,11 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
     { ma: "co_mua", ten: `Có mua · ${kxNhan}`, mo: "có ít nhất một phiếu trong khoảng đang xem", so: tq.co_mua, bat: b.co_mua,
       ap: { co_mua: !b.co_mua, nhom: "", thang: "" } },
     ...(TN.cong_no ? [{ ma: "no", ten: "Nợ quá hạn", mo: "cần thu trước khi giao đơn mới", so: null, bat: false, ap: null }] : []),
-    { ma: "im", ten: "Im lặng ≥ 2× nhịp", mo: `đã quá chu kỳ mua thường lệ · ${nm}`, so: tq.nhom.im, bat: b.nhom === "im", ap: { nhom: "im", thang: "", co_mua: false } },
-    { ma: "tut", ten: "Hạng S·A đang tụt", mo: "30 ngày < 80% TB ba kỳ 30 ngày trước", so: tq.nhom.tut, bat: b.nhom === "tut", ap: { nhom: "tut", thang: "", co_mua: false } },
-    { ma: "moi", ten: "Khách mới chưa quay lại", mo: "đơn đầu trong 90 ngày, đã im ≥ 1.2× nhịp", so: tq.nhom.moi, bat: b.nhom === "moi", ap: { nhom: "moi", thang: "", co_mua: false } },
-    { ma: "thang", ten: "Mua đều, tháng này chưa", mo: `≥ 2/3 tháng trước có đơn đến ngày này · tính ${nm}`, so: tq.thang.tre ?? 0, bat: b.thang === "tre", ap: { thang: "tre", nhom: "", co_mua: false } },
-    { ma: "chuapt", ten: "Chưa ai phụ trách", mo: "mã phụ trách không có trong danh sách 担当者 · cả công ty", so: tq.chua_pt, bat: b.nv === d.pt_trong, ap: { nv: d.pt_trong, nhom: "", thang: "", co_mua: false } },
+    { ma: "im", ten: "Lâu chưa mua", mo: `đã quá chu kỳ mua thường lệ · ${nm}`, so: tq.nhom.im, bat: b.nhom === "im", ap: { nhom: "im", thang: "", co_mua: false } },
+    { ma: "tut", ten: "Hạng S·A đang tụt", mo: "30 ngày qua mua ít hơn 80% so với trước đây", so: tq.nhom.tut, bat: b.nhom === "tut", ap: { nhom: "tut", thang: "", co_mua: false } },
+    { ma: "moi", ten: "Khách mới chưa quay lại", mo: "mua lần đầu trong 90 ngày, chưa đặt lại", so: tq.nhom.moi, bat: b.nhom === "moi", ap: { nhom: "moi", thang: "", co_mua: false } },
+    { ma: "thang", ten: "Mua đều, tháng này chưa", mo: `tháng nào cũng đặt, tháng này chưa · tính ${nm}`, so: tq.thang.tre ?? 0, bat: b.thang === "tre", ap: { thang: "tre", nhom: "", co_mua: false } },
+    { ma: "chuapt", ten: "Chưa ai phụ trách", mo: "chưa giao cho nhân viên nào", so: tq.chua_pt, bat: b.nv === d.pt_trong, ap: { nv: d.pt_trong, nhom: "", thang: "", co_mua: false } },
   ];
 
   const sapCot = (cot: string, chu: string, cls = "", title?: string) => (
@@ -78,8 +83,8 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
       {chu}{t.sap === cot ? (b.giam === "0" ? " ▲" : " ▼") : ""}</th>);
 
   const xuatCsv = () => {
-    const cot = ["Mã", "Tên", "Tỉnh", "Điện thoại", "Phụ trách", "Hạng OBC", `DT ${kxNhan}`, ssp ? `DT ${ssp.nhan}` : "So sánh", "TB 3 tháng",
-      "Doanh thu luỹ kế", "Im lặng (× nhịp)", "Đơn cuối", "Trạng thái"];
+    const cot = ["Mã", "Tên", "Tỉnh", "Điện thoại", "Phụ trách", "Hạng OBC", `DT ${kxNhan}`, ssp ? `DT ${ssp.nhan}` : "So sánh", "Bình quân/tháng",
+      "Tổng doanh thu đến nay", "Lâu chưa mua (so bình thường)", "Đơn cuối", "Trạng thái"];
     const dong = dongChon.map(k => [k.ma, k.ten, k.tinh ?? "", k.dien_thoai ?? "", tenNv[k.nguoi_phu_trach ?? ""] ?? k.nguoi_phu_trach ?? "",
       k.hang ?? "", k.dt_khoang ?? "", k.dt_ss ?? "", k.tb_3_thang ?? "", k.doanh_thu,
       k.ty_le_im_lang ?? "", k.lan_cuoi ?? "", d.nhan_trang_thai[k.trang_thai] ?? k.trang_thai]);
@@ -106,14 +111,14 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
           <div className="gia">{gon(t.tong_dt_khoang)}</div>
           <div className={"dong-phu " + (tang == null ? "nhat-chu" : tang >= 0 ? "tang" : "giam")}>
             {!ssp?.co ? `${ssp?.nhan ?? "so sánh"}: không có dữ liệu để so` : tang == null ? `${ssp.nhan}: chưa có đơn` : `${thay_doi(tang)} so ${ssp.nhan}`}</div></div>
-        <div className="o-kpi"><div className="nhan">Im lặng ≥ 2× nhịp · {nm}</div><div className="gia">{so(t.so_can_xu_ly)}</div>
+        <div className="o-kpi"><div className="nhan">Lâu chưa mua · {nm}</div><div className="gia">{so(t.so_can_xu_ly)}</div>
           <div className="dong-phu nhat-chu">đã quá chu kỳ mua thường lệ</div></div>
         {TN.cong_no && <a className="o-kpi" href="/cong-no?tab=qua_han" title={CHUA_CO_NO}><div className="nhan">Công nợ quá hạn</div>
           <div className="gia" style={{ fontSize: "1rem" }}>xem màn Công nợ →</div>
           <div className="dong-phu nhat-chu">ghi theo bên nhận hoá đơn</div></a>}
       </div>
 
-      <div className="kh-muc"><h2>Danh sách làm việc</h2><span className="phu">chọn một nhóm để lọc danh bạ · số đếm theo người phụ trách đang xem</span></div>
+      <div className="kh-muc"><h2>Danh sách làm việc</h2><span className="phu">bấm một nhóm để xem đúng những khách đó</span></div>
       <div className="kh-phan-khuc">
         {PHAN_KHUC.map(p => (
           <button key={p.ma} type="button" className="kh-pk" aria-pressed={p.bat} disabled={!p.ap}
@@ -173,21 +178,25 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
         </span>
       </div>}
 
+      <div className="kh-cot-them">
+        <button type="button" className="nut-nho" aria-pressed={du} onClick={() => datDu(!du)}>
+          {du ? "− Bớt cột" : "＋ Thêm cột (hạng OBC, bình quân/tháng)"}</button>
+      </div>
       <div className="bang-cuon kh-bang-khung">
         <table className="bang kh-bang">
           <thead><tr>
             <th className="kh-o-chon"><input type="checkbox" aria-label="Chọn cả trang"
               checked={t.khach.length > 0 && t.khach.every(k => chon[k.ma])}
               onChange={e => datChon(e.target.checked ? Object.fromEntries(t.khach.map(k => [k.ma, true])) : {})} /></th>
-            {sapCot("ten", "Khách hàng")}{sapCot("hang", "Hạng", "", "hạng OBC (得意先ランク)")}{sapCot("pt", "Phụ trách")}
-            {sapCot("dt_khoang", `DT ${kxNhan}`, "so", "doanh thu thuần trong khoảng đang xem")}{sapCot("so_khoang", ssp ? `So ${ssp.nhan}` : "So sánh", "", ssp ? `${ssp.tu} → ${ssp.den}` : undefined)}
-            {sapCot("tb3", "TB 3 tháng", "so")}{sapCot("im_lang", "Im lặng", "so")}{sapCot("don_cuoi", "Đơn cuối", "so")}
+            {sapCot("ten", "Khách hàng")}{du && sapCot("hang", "Hạng", "", "hạng OBC (得意先ランク)")}{sapCot("pt", "Phụ trách")}
+            {sapCot("dt_khoang", "Doanh thu", "so", `doanh thu thuần ${kxNhan}`)}{sapCot("so_khoang", ssp ? `So với ${ssp.nhan}` : "So sánh", "", ssp ? `${ssp.tu} → ${ssp.den}` : undefined)}
+            {du && sapCot("tb3", "Bình quân/tháng", "so")}{sapCot("don_cuoi", "Lần mua cuối", "so", "số ngày từ lần đặt hàng cuối; đỏ = lâu hơn nhiều so với bình thường của khách")}
             {sapCot("trang_thai", "Trạng thái")}
           </tr></thead>
           <tbody>
-            {t.khach.map(k => <Dong key={k.ma} k={k} d={d} tenNv={tenNv} chon={!!chon[k.ma]}
+            {t.khach.map(k => <Dong key={k.ma} k={k} d={d} du={du} tenNv={tenNv} chon={!!chon[k.ma]}
               datChon={v => datChon(c => ({ ...c, [k.ma]: v }))} />)}
-            {!t.khach.length && <tr><td colSpan={10} className="trong">Không có khách hàng nào khớp bộ lọc. Thử bỏ bớt điều kiện hoặc xoá ô tìm kiếm.</td></tr>}
+            {!t.khach.length && <tr><td colSpan={du ? 9 : 7} className="trong">Không có khách hàng nào khớp bộ lọc. Thử bỏ bớt điều kiện hoặc xoá ô tìm kiếm.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -226,7 +235,7 @@ export function DanhSach({ b, dat }: { b: BoLoc; dat: Dat }) {
               </button>);
           })}
         </section>
-        <section className="kh-the"><h2>Tải của từng nhân viên</h2><p className="phu">đỏ = cần gọi lại (nhóm im lặng ≥ 2× nhịp) · bấm để lọc</p>
+        <section className="kh-the"><h2>Tải của từng nhân viên</h2><p className="phu">phần đỏ = khách lâu chưa mua, nên gọi lại · bấm để lọc</p>
           {tq.nhan_vien.map(n => (
             <button key={n.ma} type="button" className="kh-thanh-dong" aria-pressed={nvDang === n.ma}
               onClick={() => dat({ nv: nvDang === n.ma ? d.nv_moi_nguoi : n.ma })}>
@@ -247,7 +256,7 @@ function cacTrang(tr: number, tong: number): number[] {
   return ra;
 }
 
-function Dong({ k, d, tenNv, chon, datChon }: { k: KhachDong; d: DsApi; tenNv: Record<string, string>;
+function Dong({ k, d, du, tenNv, chon, datChon }: { k: KhachDong; d: DsApi; du: boolean; tenNv: Record<string, string>;
   chon: boolean; datChon: (v: boolean) => void }) {
   const ss = k.dt_ss ? (k.dt_khoang ?? 0) / k.dt_ss - 1 : null;
   const mo = () => { location.href = giuKhoang(`/khach-hang/${encodeURIComponent(k.ma)}`); };
@@ -256,18 +265,17 @@ function Dong({ k, d, tenNv, chon, datChon }: { k: KhachDong; d: DsApi; tenNv: R
       <td className="kh-o-chon"><input type="checkbox" checked={chon} onChange={e => datChon(e.target.checked)} aria-label={`Chọn ${k.ten}`} /></td>
       <td className="kh-ten"><a href={`/khach-hang/${encodeURIComponent(k.ma)}`} className="ten-jp">{k.ten}</a>
         <div className="ma-nho"><code>{k.ma}</code>{k.tinh ? ` · ${k.tinh}` : ""}{k.dau_hieu_obc ? ` · ※${k.dau_hieu_obc}※` : ""}</div></td>
-      <td>{k.hang ? <span className={"kh-hang-nhan " + lopHang(k.hang)} title={k.hang_ten ?? undefined}>{k.hang}</span> : <span className="nhat-chu">—</span>}</td>
+      {du && <td>{k.hang ? <span className={"kh-hang-nhan " + lopHang(k.hang)} title={k.hang_ten ?? undefined}>{k.hang}</span> : <span className="nhat-chu">—</span>}</td>}
       <td className="kh-pt">{k.nguoi_phu_trach ? (tenNv[k.nguoi_phu_trach] ?? k.nguoi_phu_trach) : <span className="nhat-chu">— chưa giao —</span>}</td>
       <td className="so"><b>{k.dt_khoang == null ? "—" : yen(k.dt_khoang)}</b></td>
       <td className="kh-ss">{ss == null ? <span className="nhat-chu">{k.dt_ss == null ? "—" : k.dt_khoang ? "kỳ so chưa mua" : "—"}</span> : <>
         <span className="kh-ss-thanh"><i className={ss >= 0 ? "tang" : ss > -0.2 ? "canh" : "giam"}
           style={{ width: `${Math.min(50, Math.abs(ss) * 50)}%`, [ss >= 0 ? "left" : "right"]: "50%" } as React.CSSProperties} /></span>
         <span className={ss >= 0 ? "tang" : ss > -0.2 ? "canh-chu" : "giam"}>{thay_doi(ss, 0)}</span></>}</td>
-      <td className="so">{k.tb_3_thang == null ? "—" : gon(k.tb_3_thang)}</td>
-      <td className={"so " + ((k.ty_le_im_lang ?? 0) >= 3 ? "giam" : (k.ty_le_im_lang ?? 0) >= 1.5 ? "canh-chu" : "")}
-        title={k.nhip_ngay ? `im ${k.so_ngay_im_lang} ngày · nhịp ${Math.round(k.nhip_ngay)} ngày` : "chưa đủ 3 lần mua để có nhịp"}>
-        {k.ty_le_im_lang == null ? "—" : `${k.ty_le_im_lang.toFixed(1)}×`}</td>
-      <td className="so nhat-chu">{k.so_ngay_im_lang == null ? "—" : `${k.so_ngay_im_lang}n`}</td>
+      {du && <td className="so">{k.tb_3_thang == null ? "—" : gon(k.tb_3_thang)}</td>}
+      <td className={"so " + ((k.ty_le_im_lang ?? 0) >= 3 ? "giam" : (k.ty_le_im_lang ?? 0) >= 1.5 ? "canh-chu" : "nhat-chu")}
+        title={k.nhip_ngay ? `bình thường ${Math.round(k.nhip_ngay)} ngày mua một lần` : "mua chưa đủ 3 lần, chưa biết thói quen"}>
+        {k.so_ngay_im_lang == null ? "—" : k.so_ngay_im_lang === 0 ? "mới mua" : `${k.so_ngay_im_lang} ngày trước`}</td>
       <td><span className={"nhan-vien " + (MAU_TT[k.trang_thai] ?? "nhat")}>{d.nhan_trang_thai[k.trang_thai] ?? k.trang_thai}</span>
         {k.nhan_thang === "tre" && <span className="nhan-vien canh kh-nhan-thang" title={d.nhan_thang.tre}>tháng này chưa</span>}</td>
     </tr>

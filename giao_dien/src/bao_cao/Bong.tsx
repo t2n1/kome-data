@@ -2,9 +2,10 @@
 // kome/ve_doanh_thu.py (đối soát có test ở tests/test_ve_doanh_thu.py) — ở đây chỉ vẽ,
 // ô nổi và liên kết. Kỳ so = VIỀN ĐỨT (cột "Kỳ so" của cầu nối); nét đứt không dùng
 // cho thứ gì khác.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { DongNoi, ONoi } from "../chung/ONoi";
 import { gon, so, yen } from "../dinh_dang";
+import { tenNganh } from "../chung/nganh";
 
 export type BongDiem = { ma: string; ten: string; x: number; y: number; kich: number; tien: number | null; kep: boolean;
   cx: number; cy: number; r: number };
@@ -46,7 +47,7 @@ export function Bong({ v, nhan_x, ten_x, ten_y, mau, noi, href, mo_ta, so_nhan =
 }
 
 export const dongBong = { tang: (b: BongDiem, nhan_ss: string) => <DongNoi nhan={`So ${nhan_ss}`} gia={pc(b.x) + (b.kep ? " (ngoài trục)" : "")} />,
-  bien: (b: BongDiem) => <DongNoi nhan="Biên lãi gộp" gia={p1(b.y)} />,
+  bien: (b: BongDiem) => <DongNoi nhan="Tỷ lệ lãi gộp" gia={p1(b.y)} />,
   khach: (b: BongDiem) => <DongNoi nhan="Khách mua" gia={so(b.x)} /> };
 
 // Cắt nhãn trục theo bề rộng ô cột (~11 đơn vị mỗi ký tự) — tên đủ nằm trong ô nổi.
@@ -61,7 +62,7 @@ export function CauNoi({ v, nhan_ss }: { v: CauNoiVe; nhan_ss: string }) {
         <text x={v.trai - 4} y={t.y + 3} textAnchor="end" className="chu-truc">{t.nhan}</text></g>)}
       {v.noi.map((n, i) => <line key={i} x1={n.x1} x2={n.x2} y1={n.y} y2={n.y} className="dt-noi" />)}
       {v.cot.map((c, i) => (
-        <ONoi key={i} svg nhan={c.nhan} noi_dung={<><b>{c.nhan}</b>
+        <ONoi key={i} svg nhan={tenNganh(c.nhan)} noi_dung={<><b>{tenNganh(c.nhan)}</b>
           {c.loai === "dau" ? <DongNoi nhan={nhan_ss} gia={yen(c.gia)} />
             : c.loai === "cuoi" ? <DongNoi nhan="Kỳ này (cùng dải so)" gia={yen(c.gia)} />
             : <><DongNoi nhan={c.gia >= 0 ? "Kéo lên" : "Kéo xuống"} gia={yen(c.gia)} />
@@ -71,8 +72,59 @@ export function CauNoi({ v, nhan_ss }: { v: CauNoiVe; nhan_ss: string }) {
             fill={c.loai === "dau" ? "none" : mau(c.loai)} opacity={c.loai === "dau" ? 1 : 0.8}
             stroke={c.loai === "dau" ? "var(--vien-dam)" : "none"} strokeWidth={1.4} strokeDasharray={c.loai === "dau" ? "4 3" : undefined} />
           <text x={c.cx} y={c.y - 4} textAnchor="middle" className="chu-truc">{c.loai === "dau" || c.loai === "cuoi" ? gon(c.gia) : (c.gia >= 0 ? "+" : "") + gon(c.gia)}</text>
-          <text x={c.cx} y={v.day_truc + 14} textAnchor="middle" className="chu-truc">{catNhan(c.nhan, Math.max(4, Math.floor(c.w / 0.64 / 11)))}</text>
+          <text x={c.cx} y={v.day_truc + 14} textAnchor="middle" className="chu-truc">{catNhan(tenNganh(c.nhan), Math.max(4, Math.floor(c.w / 0.64 / 11)))}</text>
         </ONoi>))}
     </svg>
+  );
+}
+
+// ---- Danh sách thay cho bong bóng (2026-10-16, chủ DN: "người không rành nhìn cũng hiểu") -------------------
+// Cùng số của `ve_bong` (bóng đã vẽ + "Không vẽ"), chỉ đổi cách bày: thanh ngang xếp hạng, không trục đôi.
+
+/** Danh mục tăng / giảm so kỳ so: thanh lệch hai phía quanh 0 (xanh tăng, đỏ giảm), xếp tăng nhiều nhất trước. */
+export function TangGiam({ v, ten, nhan_ss }: { v: BongVe; ten: string; nhan_ss: string }) {
+  if (!v.co) return <p className="phu">Chưa có số để so.</p>;
+  const ds = [...v.bong].sort((a, b) => b.x - a.x);
+  const max = Math.max(0.05, ...ds.map(b => Math.min(Math.abs(b.x), 1)));
+  return (
+    <div className="dt-tg">
+      {ds.map(b => {
+        const w = Math.min(Math.abs(b.x), 1) / max * 50;
+        return (
+          <ONoi key={b.ma} className="dt-tg-dong" nhan={tenNganh(b.ten)} noi_dung={<><b>{tenNganh(b.ten)}</b>
+            <DongNoi nhan={ten.replace(/^./, c => c.toUpperCase())} gia={yen(b.kich)} />
+            <DongNoi nhan={`So với ${nhan_ss}`} gia={pc(b.x)} /><DongNoi nhan="Tỷ lệ lãi gộp" gia={p1(b.y)} /></>}>
+            <span className="dt-tg-ten" title={b.ten}>{tenNganh(b.ten)}</span>
+            <span className="dt-tg-thanh"><i className={b.x >= 0 ? "tang" : "giam"}
+              style={{ width: `${w}%`, [b.x >= 0 ? "left" : "right"]: "50%" } as React.CSSProperties} /></span>
+            <b className={b.x >= 0 ? "tang" : "giam"}>{pc(b.x)}</b>
+            <span className="so nhat-chu">{gon(b.kich)}</span>
+          </ONoi>);
+      })}
+    </div>
+  );
+}
+
+/** Mặt hàng bán chạy: thanh theo doanh thu, kèm số khách mua và tỷ lệ lãi — bấm mở trang mã. */
+export function BanChay({ v, ten, n = 10 }: { v: BongVe; ten: string; n?: number }) {
+  if (!v.co) return <p className="phu">Chưa có dữ liệu.</p>;
+  const ds = [...v.bong].sort((a, b) => b.kich - a.kich);
+  const max = Math.max(1, ...ds.map(b => b.kich));
+  const [mo, datMo] = useState(false);
+  const hien = mo ? ds : ds.slice(0, n);
+  return (
+    <div className="dt-bc">
+      {hien.map((b, i) => (
+        <a key={b.ma} className="dt-bc-dong" href={`/san-pham/${encodeURIComponent(b.ma)}`}
+          title={`${b.ten} · ${ten} ${yen(b.kich)} · ${so(b.x)} khách mua · tỷ lệ lãi ${p1(b.y)}`}>
+          <span className="nhat-chu">{i + 1}</span>
+          <span className="dt-bc-ten ten-jp">{b.ten}</span>
+          <span className="dt-bc-thanh"><i style={{ width: `${b.kich / max * 100}%` }} /></span>
+          <b className="so">{gon(b.kich)}</b>
+          <span className="nhat-chu">{so(b.x)} khách · lãi {p1(b.y)}</span>
+        </a>))}
+      {ds.length > n && <button type="button" className="nut-xem-them" onClick={() => datMo(!mo)} aria-expanded={mo}>
+        {mo ? "Thu gọn ▴" : `Xem thêm ${so(ds.length - n)} mã ▾`}</button>}
+    </div>
   );
 }

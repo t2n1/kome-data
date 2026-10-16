@@ -32,14 +32,14 @@ KET_QUA = {"tot": ("Tích cực", "ok"), "binh": ("Bình thường", "nhat"),
 
 # Ba lý do, theo thứ tự cột trên màn. Nhãn + mô tả + lớp màu (.vien.<lớp>).
 LY_DO = {
-    "lau_khong_mua": ("Lâu không mua", "Im lặng ≥ 4 lần nhịp mua riêng — đang mất khách", "loi"),
-    "qua_han": ("Quá hạn mua lại", "Im lặng 2–4 lần nhịp mua riêng", "canh"),
-    "sap_den_han": ("Sắp đến hạn", "Im lặng 1–2 lần nhịp — gọi trước khi khách trễ hẳn", "ok"),
+    "lau_khong_mua": ("Lâu không mua", "Đã lâu gấp 4 lần bình thường mà chưa mua — sắp mất khách", "loi"),
+    "qua_han": ("Quá hạn mua lại", "Đã lâu gấp 2–4 lần bình thường mà chưa mua", "canh"),
+    "sap_den_han": ("Sắp đến hạn", "Sắp tới lúc khách thường đặt hàng — gọi trước", "ok"),
     # Cột thứ tư (036) — nhìn theo THÁNG, không theo nhịp. Nguồn DUY NHẤT:
     # mart.khach_thang_nay.nhan = 'tre' (kome.khach_thang). Khách đã ở ba
     # cột trên thì không lặp lại ở đây (đếm vào Cot.trung).
     "thang_nay_chua_mua": ("Mua đều, tháng này chưa",
-                           "Mua ≥ 2/3 tháng trước, mọi khi đến ngày này đã có đơn — tháng này chưa", "canh"),
+                           "Tháng nào cũng đặt (≥ 2/3 tháng trước), tới ngày này thường đã có đơn — tháng này chưa", "canh"),
 }
 # Cột theo tháng: số tiền trên thẻ là TB/tháng của 3 tháng trước, không phải
 # doanh thu luỹ kế — ô tổng đầu trang không được cộng lẫn hai loại số.

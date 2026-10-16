@@ -617,9 +617,9 @@ def thong_bao(conn, sale=None) -> dict:
             """SELECT customer_code, ten, so_ngay_im_lang, ty_le_im_lang, ly_do, doanh_thu_thuan
                  FROM mart.uu_tien_lien_he WHERE ly_do IN ('lau_khong_mua', 'qua_han')
                 ORDER BY doanh_thu_thuan DESC NULLS LAST LIMIT 4""").fetchall():
-        nhip = f" — {float(r[3]):.1f}× nhịp mua riêng" if r[3] is not None else ""
+        nhip = f" — lâu gấp {float(r[3]):.1f} lần bình thường" if r[3] is not None else ""
         tb.append({"ma": f"khach-{r[0]}-{r[2]}", "muc": "canh", "loai": "KHÁCH HÀNG",
-                   "tieu_de": f"{r[1]} im lặng {r[2]} ngày",
+                   "tieu_de": f"{r[1]} — {r[2]} ngày chưa mua",
                    "noi_dung": ("Lâu không mua" if r[4] == "lau_khong_mua" else "Quá hạn mua lại") + nhip,
                    "lien_ket": f"/khach-hang/{r[0]}"})
     for r in conn.execute(

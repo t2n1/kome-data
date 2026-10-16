@@ -12,6 +12,7 @@ import type { DanhMucApi, DanhMucKhoangApi, MaHang } from "./kieu";
 import { chuoiLocSp, docLocSp, locDanhMuc, nhoDanhMuc, SAP } from "./loc";
 import type { LocSp } from "./loc";
 import "./san_pham.css";
+import { tenNganh } from "../chung/nganh";
 
 export function useDanhMuc() {
   const kx = chuoiKhoang(useKhoang());
@@ -145,9 +146,9 @@ export default function ManSanPham() {
           <button type="button" className="chip" aria-pressed={!b.nganh} onClick={() => dat({ nganh: "" })}>Mọi ngành ({so(tongNganh)})</button>
           {kq.dem_nganh.map(([n, c]) => (
             <button key={n} type="button" className="chip ten-jp" aria-pressed={b.nganh === n} onClick={() => dat({ nganh: b.nganh === n ? "" : n })}>
-              {n} ({so(c)})</button>))}
+              {tenNganh(n)} ({so(c)})</button>))}
           {b.nganh && !kq.dem_nganh.some(([n]) => n === b.nganh) &&
-            <button type="button" className="chip ten-jp" aria-pressed onClick={() => dat({ nganh: "" })}>{b.nganh} (0)</button>}
+            <button type="button" className="chip ten-jp" aria-pressed onClick={() => dat({ nganh: "" })}>{tenNganh(b.nganh)} (0)</button>}
         </div>
         <div className="sp-chip" role="group" aria-label="Trạng thái tồn">
           <button type="button" className="chip" aria-pressed={!locHopLe} onClick={() => dat({ loc: "" })}>Mọi trạng thái ({so(tongTT)})</button>
@@ -217,7 +218,7 @@ function LuoiThe({ hang, ss, nhanSs, onChon, trong }: {
               </div>
               <div className="sp-the-than">
                 <div className="sp-the-ten ten-jp" title={m.ten}>{m.ten}</div>
-                <div className="ma-nho"><code>{m.ma}</code> · <span className="ten-jp">{m.nganh}</span></div>
+                <div className="ma-nho"><code>{m.ma}</code> · <span title={m.nganh}>{tenNganh(m.nganh)}</span></div>
                 <div className="sp-the-so">
                   <b title={m.dt_khoang ? yen(m.dt_khoang) : undefined}>{m.dt_khoang ? gon(m.dt_khoang) : <span className="nhat-chu">¥0</span>}</b>
                   {tl != null && <span className={tl >= 0 ? "tang" : "giam"} title={nhanSs ? `so ${nhanSs}` : undefined}>{thay_doi(tl, 0)}</span>}
@@ -245,7 +246,7 @@ function Dong({ m, onChon }: { m: MaHang; onChon: () => void }) {
         <div className="sp-ten-chu"><a href={`/san-pham/${encodeURIComponent(m.ma)}`} className="ten-jp"
         onClick={e => { e.preventDefault(); onChon(); }}>{m.ten}</a><div className="ma-nho"><code>{m.ma}</code>
         {m.ngung_ban && <> · <span className="nhan-vien canh" title="Đã ngừng kinh doanh (※終売※) — chỉ còn bán nốt tồn, không đặt thêm">bán nốt tồn</span></>}</div></div></div></td>
-      <td className="sp-nhom ten-jp" title={m.nganh}>{m.nganh}</td>
+      <td className="sp-nhom" title={m.nganh}>{tenNganh(m.nganh)}</td>
       <td><span className={"nhan-vien " + m.mau}>{m.nhan_trang_thai}</span></td>
       <td className="so">{m.ton == null ? <span className="nhat-chu" title="chưa rõ tồn — không có dòng nào trong 在庫一覧">—</span> : soLuong(m.ton)}</td>
       <td className="so">{soLuong(m.toc_do_ngay_theo_tuoi)}</td>

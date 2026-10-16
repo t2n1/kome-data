@@ -113,7 +113,7 @@ def _xuat_phat(conn, nguoi_id: int, tu) -> list | None:
             raise LoiBang(422, "Không có vai trò này.")
         # ĐÚNG phép "Xem theo vai trò" cũ (apVai): bố cục mặc định, ẩn khối ngoài vai —
         # rồi nén lại để khối ẩn không để lỗ (lưới toạ độ 2026-09-29).
-        return BC.nen([replace(o, an=o.id not in vai) for o in BC.mac_dinh()])
+        return BC.nen([replace(o, an=o.id not in vai) for o in BC.day_du()])
     if isinstance(tu, str) and tu.startswith("chep:") and tu[5:].isdigit():
         return list(_doc(conn, nguoi_id, int(tu[5:])).bo_cuc)
     raise LoiBang(422, "Không rõ bảng mới bắt đầu từ đâu.")

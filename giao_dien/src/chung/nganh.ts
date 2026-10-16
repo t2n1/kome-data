@@ -1,0 +1,19 @@
+// Tên ngành tiếng Việt — CHỈ để hiển thị (từ 2026-10-16 dùng ở MỌI màn, không riêng Đối thủ — chủ DN: "người không
+// rành nhìn cũng hiểu"; tên OBC gốc để trong `title`). Bộ lọc vẫn gửi tên OBC (`food_category_name`).
+// So bằng startsWith: OBC có khi dùng "_" thường, có khi "＿" toàn chiều trước hậu tố nước (VNM / THA).
+const NGANH: [string, string][] = [
+  ["インスタント食品", "Mì & ăn liền"], ["冷凍食品", "Đông lạnh"], ["冷蔵食品", "Đồ mát"], ["調味料", "Gia vị"],
+  ["食材（常温）", "Đồ khô"], ["青果物", "Rau củ quả"], ["雑貨", "Hàng tặng (POSM)"],
+  // "以外" nằm trong ngoặc nên hai ngành đồ uống không là tiền tố của nhau; vẫn xét dài trước cho chắc.
+  ["飲料（アルコール以外）", "Nước uống"], ["飲料（アルコール）", "Bia rượu"],
+];
+export const NGANH_TRONG = "(chưa phân loại)";
+
+export function tenNganh(food_category_name: string | null | undefined): string {
+  const s = (food_category_name ?? "").trim();
+  if (!s) return NGANH_TRONG;
+  for (const [obc, vi] of NGANH) {
+    if (s.startsWith(obc)) return /[_＿]THA$/.test(s) ? `${vi} (Thái)` : /[_＿]JPN$/.test(s) ? `${vi} (Nhật)` : vi;
+  }
+  return s;   // "Phí & điều chỉnh", "Hàng tặng (POSM)", "(chưa phân loại)" và mã lạ giữ nguyên
+}

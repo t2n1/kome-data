@@ -4,7 +4,7 @@
 import type { Ben, Nhom, TongQuan } from "./kieu";
 import { boDau } from "./loc";
 import { LECH_NGANG, mauKomeSoTT, type MauLech } from "./mau";
-import { tenNganh } from "./nganh";
+import { tenNganh } from "../chung/nganh";
 
 const NGUONG = LECH_NGANG / 100;   // ±5% — cùng ngưỡng xám của mau.ts
 

@@ -32,9 +32,10 @@
 .hop-bang-moi .nut-dong{margin-left:auto}
 .hop-bang-moi .nut-hop{display:flex;justify-content:flex-end;gap:.5rem;margin-top:.3rem}
 .nhan-nho{font-size:.71rem;color:var(--chu-nhat);letter-spacing:.05em;margin-right:.15rem}
-.tom-tat{font-size:.84rem;line-height:1.5;padding:.6rem .85rem;border-radius:10px;background:var(--nen-the);
-  border:1px solid var(--vien);color:var(--chu-thuong)}
-.tom-tat.canh{background:var(--canh-nen);border-color:var(--canh-vien);color:var(--canh-chu)}
+.tom-tat{font-size:.95rem;line-height:1.6;padding:.7rem .95rem;border-radius:10px;background:var(--nen-the);
+  border:1px solid var(--vien);color:var(--chu)}
+.tom-tat b{font-weight:700}
+.tom-tat.canh{background:var(--canh-nen);border-color:var(--canh-vien)}
 .tom-tat.cho{color:var(--chu-mo)}
 .thanh-bo-cuc{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .8rem;margin:.9rem 0 .8rem}
 .thanh-bo-cuc .phu{font-size:.72rem}.thanh-bo-cuc .mo{color:var(--chu-mo)}
