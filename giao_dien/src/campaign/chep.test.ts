@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chepAB, chepF, chepGia, gioTu, macDinh, md, theoNhom, thieuDong } from "./chep";
+import { chepAB, chepF, chepGia, gioTu, macDinh, md, soSheet, theoNhom, theoSheet, thieuDong } from "./chep";
 import type { TuanKeHoach } from "./kieu";
 
 const t: TuanKeHoach = {
@@ -32,5 +32,11 @@ describe("chuỗi chép", () => {
     expect(md("2026-01-05")).toBe("1/5");
     expect(md(null)).toBe("—");
     expect(gioTu("2026-10-23T00:00:00+09:00", new Date("2026-10-24T12:00:00+09:00"))).toBe(36);
+  });
+  it("so với sheet: thêm / bỏ; tuần chưa có trên sheet → null", () => {
+    expect(soSheet(t, macDinh(t))).toBeNull();
+    const s = { ...t, tren_sheet: ["DK06", "NT01", "ZZ09"] };
+    expect(soSheet(s, macDinh(s))).toEqual({ them: ["BA07"], bo: ["DK06", "ZZ09"] });
+    expect([...theoSheet(s)].sort()).toEqual(["DK06", "NT01", "ZZ09"]);
   });
 });

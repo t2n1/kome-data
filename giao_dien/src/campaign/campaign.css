@@ -7,6 +7,8 @@
 .cp-cu { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--canh-nen); color: var(--canh-chu); font-size: .86rem; }
 .cp-tuan-dau { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .cp-nut { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 10px; }
+.cp-sheet { margin: 0 0 6px; padding: 6px 10px; border-radius: 8px; background: var(--lam-nen); font-size: .84rem; }
+.cp-ma .nhan-vien { align-self: flex-start; margin-top: 2px; }
 .cp-bao { font-size: .82rem; color: var(--ok-chu); }
 .cp-nhom { margin-top: 10px; }
 .cp-nhom > summary, .cp-nhom-ten { font-size: .88rem; cursor: default; }

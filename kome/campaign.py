@@ -63,6 +63,8 @@ def kiem(d) -> None:
             _chu(t, k, ten, rong=False)
         if not isinstance(t.get("tuan_so"), int):
             raise LoiDuLieu(f"`{ten}.tuan_so` phải là số nguyên.")
+        if t.get("tren_sheet") is not None:          # tuần đã có trên sheet: mã đang có (tuỳ chọn)
+            _ds(t, "tren_sheet", ten, kieu=str)
         for j, m in enumerate(_ds(t, "ma", ten)):
             tm = f"{ten}.ma[{j}]"
             _chu(m, "ma", tm, rong=False)
@@ -70,8 +72,8 @@ def kiem(d) -> None:
             _chu(m, "ly", tm)
             if m.get("nhom") not in NHOM:
                 raise LoiDuLieu(f"`{tm}.nhom` phải là một trong {', '.join(NHOM)}.")
-            if not isinstance(m.get("chon"), bool):
-                raise LoiDuLieu(f"`{tm}.chon` phải là true / false.")
+            if not isinstance(m.get("chon"), bool) or not isinstance(m.get("tren_sheet", False), bool):
+                raise LoiDuLieu(f"`{tm}.chon` / `{tm}.tren_sheet` phải là true / false.")
     s = d.get("soat")
     if not isinstance(s, dict):
         raise LoiDuLieu("`soat` phải là đối tượng.")

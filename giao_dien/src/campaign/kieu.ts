@@ -1,7 +1,11 @@
 // Dạng bản campaign do máy công ty gửi lên (kome/campaign.py::kiem, phien_ban 1). Ngày là chuỗi ISO YYYY-MM-DD.
 export type Nhom = "uu_tien" | "day_han" | "thuong" | "can_nhip" | "loai" | "nghi";
-export type MaKeHoach = { ma: string; ten: string; nhom: Nhom; ly: string; chon: boolean };
-export type TuanKeHoach = { tu: string; den: string; tab: string; tuan_so: number; ky: string; ma: MaKeHoach[] };
+// `tren_sheet` (thêm 2026-10-23, có thể vắng ở bản cũ): mã đang có trên tab tháng của tuần đó.
+export type MaKeHoach = { ma: string; ten: string; nhom: Nhom; ly: string; chon: boolean; tren_sheet?: boolean };
+export type TuanKeHoach = {
+  tu: string; den: string; tab: string; tuan_so: number; ky: string; ma: MaKeHoach[];
+  tren_sheet?: string[] | null;   // null = tuần chưa có trên sheet
+};
 export type DongSoat = { ma: string; ten: string; pd: string; ly: string; moi: boolean; off: string };
 export type TuanSoat = { tu: string; den: string; so_ma: number; dong: DongSoat[] };
 export type LichDoi = { kieu: string; ngay: string; trang_thai: string; tieu_de: string; truoc: string | null; ma: string[] };
