@@ -21,6 +21,7 @@ def _ban(**sua):
         "thu_tu_gia": ["BA07", "", "DK06"],
         "ke_hoach": [{"tu": "2026-11-27", "den": "2026-12-03", "tab": "2026/12", "tuan_so": 1, "ky": "11/27 ~ 12/3",
                       "ma": [{"ma": "BA07", "ten": "Barona", "nhom": "uu_tien", "ly": "đẩy lô cũ", "chon": True},
+                             {"ma": "NT03", "ten": "Nem", "nhom": "hoan", "ly": "lãi thấp, tuần sau", "chon": False},
                              {"ma": "DK06", "ten": "Duong Kien", "nhom": "nghi", "ly": "", "chon": False}]}],
         "soat": {"lan_truoc": "2026-10-23T0830",
                  "lich_doi": [], "lo_qua_han": [], "lo_lech": [], "khong_cybozu": [], "goi_y": [],

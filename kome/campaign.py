@@ -12,7 +12,7 @@ from datetime import date, timedelta
 PHIEN_BAN = 1
 CO_TOI_DA = 2_000_000           # byte JSON — dưới trần 4,5 MB mỗi yêu cầu của Vercel, dư cho 5 tuần × ~160 mã
 GIU_NGAY = 30
-NHOM = ("uu_tien", "day_han", "thuong", "can_nhip", "loai", "nghi")
+NHOM = ("uu_tien", "day_han", "thuong", "can_nhip", "hoan", "loai", "nghi")
 PD = ("THIẾU HÀNG", "PHỤ THUỘC LÔ CHƯA CHỐT", "?")
 TUAN_TOI = 8                    # chuông: tuần đang chạy + tuần bắt đầu trong chừng này ngày
 CHUONG_TOI_DA = 6
