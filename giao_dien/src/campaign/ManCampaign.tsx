@@ -115,7 +115,9 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
         <div>
           <h2>Tuần {t.ky} <ChuThich nhan="Cách dùng">
             Đề xuất từ tuần sau, nhịp xen kẽ đều nối từ tuần đầu (kể cả tuần đã có trên sheet). Lãi của một lần sale = tuần sale +
-            tuần ngay sau, so với tuần thường cùng mùa, đo trên lịch sử sale từ 2025/6; mã sale lỗ ổn định không chạy. Trong mỗi
+            tuần ngay sau, so với tuần thường cùng mùa, đo trên lịch sử sale từ 2025/6; mã sale lỗ ổn định không chạy, mã đo được lỗ
+            (lãi âm) không chọn sẵn. Mỗi tuần chạy khoảng nửa số mã chạy được: thiếu thì Cân nhịp kéo thêm, dư thì mã lãi thấp
+            nhất sang Hoãn sang tuần sau (tuần sau không bị hoãn lại lần nữa). Trong mỗi
             nhóm, mã xếp theo lãi thêm × mùa cùng kỳ năm trước; bấm tiêu đề cột để xếp lại.
             Rê chuột lên một dòng để xem lý do đầy đủ.<br /><br />
             Tick để bỏ / thêm mã rồi bấm <b>Chép ▾</b>. Tab tháng: dán <b>cột A–B</b> và <b>cột F</b> vào các dòng ngay dưới dòng

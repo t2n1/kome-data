@@ -32,7 +32,12 @@ và ra file trên OneDrive. Người dùng muốn xem và lấy dữ liệu đó
      trên lịch sử sale đầy đủ — 値段管理 + tab tháng từ 2025/6): một LẦN sale = tuần sale + tuần ngay sau, so với tuần
      thường cùng mùa (±8 tuần); mã lỗ ổn định (≥ 4 lần đo, ≥ 75% lần lỗ) vào Không chạy; lúc lời lúc lỗ vẫn chạy, ghi
      "chưa chắc" (`so.lan_loi`, `so.on_dinh`); Ưu tiên / Đẩy hạn lỗ ổn định ở nhóm của nó nhưng không chọn sẵn; Cân nhịp
-     chỉ kéo mã mà tuần thứ hai chạy liền còn lời (đo: tuần đầu +38%, tuần thứ hai liền +36% lãi gộp so tuần thường). Ô tick đổi phần sẽ chép — KHÔNG lưu
+     chỉ kéo mã mà tuần thứ hai chạy liền còn lời (đo: tuần đầu +38%, tuần thứ hai liền +36% lãi gộp so tuần thường).
+     Sau đó (グエン 2026-10-23, "tuần 10/30 vẫn 96 à?"): mã ĐO ĐƯỢC lỗ (lãi một lần sale < 0, kể cả "chưa chắc") ở nhóm
+     của nó nhưng KHÔNG chọn sẵn và không tính vào số mã chạy được; cân HAI CHIỀU — mỗi tuần ~nửa số mã chạy được, dư thì
+     mã Theo nhịp lãi × mùa thấp nhất sang nhóm **Hoãn sang tuần sau** (`hoan`, bỏ chọn; mã đã hoãn tuần trước không hoãn
+     lại, ※終売※ bán nốt không hoãn). Đo trên bản 10/23: 96·63·71·65·68·57 mã → 51·50·47·47·46·46, tổng lãi thêm 6 tuần
+     ¥765万 → ¥775万. Ô tick đổi phần sẽ chép — KHÔNG lưu
      (đổi trang là về đề xuất). Ba nút chép: **cột A–B** (週目 · 期間, mỗi mã một dòng) · **cột F** (商品コード) ·
      **cột tuần của 値段管理** (đúng thứ tự dòng 3→ của 値段管理, ô trống = không chạy). Không chép cột C–E (hình /
      công thức) — dán đè là mất công thức.

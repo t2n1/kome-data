@@ -1,5 +1,5 @@
 // Dạng bản campaign do máy công ty gửi lên (kome/campaign.py::kiem, phien_ban 1). Ngày là chuỗi ISO YYYY-MM-DD.
-export type Nhom = "uu_tien" | "day_han" | "thuong" | "can_nhip" | "loai" | "nghi";
+export type Nhom = "uu_tien" | "day_han" | "thuong" | "can_nhip" | "hoan" | "loai" | "nghi";   // hoan: thêm 2026-10-23
 // `tren_sheet` (thêm 2026-10-23, có thể vắng ở bản cũ): mã đang có trên tab tháng của tuần đó.
 // `so` (thêm 2026-10-23, kome/campaign.py::_kiem_so): CÙNG nội dung `ly` tách thành ô cho bảng — mọi khoá tuỳ chọn;
 // vắng `so` (bản cũ) thì dòng in nguyên câu `ly`.
