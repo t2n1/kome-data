@@ -13,6 +13,9 @@ export type SoMa = {
   lai?: number; uoc?: boolean; tuan_do?: number; lan_loi?: number; on_dinh?: string;
   mua?: number;                         // cùng kỳ năm trước ÷ bình thường — chỉ có khi lệch rõ
   ngan?: string; canh?: string; ngung?: boolean;   // lý do ngắn (nhóm Không chạy) · cảnh báo lô · ※終売※ bán nốt tồn
+  // 目玉商品 (2026-10-23): trang campaign "kho" (hangkho) / "lanh" (hanglanh) · khách mua 90 ngày · giá 標準 / セール · %OFF
+  // (0.079) · ngày bán kể cả lô về trong 4 tuần · medama = hạng 目玉 trong trang (1 = đầu trang; vắng = mã phụ)
+  trang?: string; khach?: number; gia_std?: number; gia_san?: number; off?: number; ngay_lo?: number; medama?: number;
 };
 export type MaKeHoach = { ma: string; ten: string; nhom: Nhom; ly: string; chon: boolean; tren_sheet?: boolean; so?: SoMa };
 export type TuanKeHoach = {

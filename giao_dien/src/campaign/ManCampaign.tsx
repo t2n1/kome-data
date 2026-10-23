@@ -7,8 +7,8 @@ import { lay } from "../api";
 import { giuKhoang } from "../khung/khoang";
 import { HinhMa } from "../chung/HinhMa";
 import { ChuThich } from "../chung/Khoi";
-import { gon, pc, so } from "../dinh_dang";
-import { chepAB, chepF, chepGia, CU_GIO, demSheet, gioTu, macDinh, md, NHOM, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
+import { gon, pc, so, yen } from "../dinh_dang";
+import { chepAB, chepF, chepGia, chepMedama, CU_GIO, demSheet, gioTu, macDinh, md, medama, NHOM, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
 import type { CotXep, TrangSheet } from "./chep";
 import type { BanCampaign, CampaignApi, MaKeHoach, Nhom, Soat, TuanKeHoach } from "./kieu";
 import "./campaign.css";
@@ -109,6 +109,8 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
     void chep(ten, van);
   };
   const so_cot = t.tren_sheet ? 8 : 7;
+  const mdm = medama(t);
+  const co_medama = mdm.kho.length + mdm.lanh.length > 0;
   return (
     <section className="kh-the cp-tuan" aria-label={`Tuần ${t.ky}`}>
       <div className="cp-dau">
@@ -141,6 +143,7 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
               <button type="button" onClick={menu("cột A–B", chepAB(t, chon))}>Cột A–B<small><span className="ten-jp">週目 · 期間</span> — {so(chon.size)} dòng</small></button>
               <button type="button" onClick={menu("cột F", chepF(chon))}>Cột F<small><span className="ten-jp">商品コード</span> — mỗi dòng một mã</small></button>
               <button type="button" onClick={menu("cột 値段管理", chepGia(thu_tu, chon))}>Cột tuần của <span className="ten-jp">値段管理</span><small>dán từ dòng 3</small></button>
+              {co_medama && <button type="button" onClick={menu("mã 目玉", chepMedama(t, chon))}>Mã <span className="ten-jp">目玉商品</span><small>đang chọn, hàng khô trước — đặt đầu trang campaign</small></button>}
             </div>
           </details>
           <span className="cp-bao" role="status">{bao}</span>
@@ -149,6 +152,7 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
       {thieu.length > 0 && <p className="cp-cu">Chưa có dòng trên <span className="ten-jp">値段管理</span> (cột tuần sẽ thiếu): {thieu.join(", ")}</p>}
       {loc_sheet === "bo" && d && d.ngoai.length > 0 &&
         <p className="cp-ghi">Sheet còn có (không nằm trong danh sách đề xuất): {d.ngoai.join(", ")}</p>}
+      {co_medama && <Medama mdm={mdm} chon={chon} bat={bat} />}
       <div className="cp-loc" role="group" aria-label="Lọc nhóm">
         <button type="button" aria-pressed={!loc_nhom} onClick={() => datLocNhom(null)}>Tất cả <i>{t.ma.length}</i></button>
         {NHOM.filter(n => nhom.get(n.ma)?.length).map(n =>
@@ -185,6 +189,45 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
   );
 }
 
+/** Dải 目玉商品 — mã mồi kéo khách, đặt đầu trang campaign (script chọn: khách mua 90 ngày × %OFF). */
+function Medama({ mdm, chon, bat }: {
+  mdm: ReturnType<typeof medama>; chon: Set<string>; bat: (ma: string) => void;
+}) {
+  const cot = (ten: string, trang: string, ds: MaKeHoach[]) => <div className={"cp-md-cot cp-md-" + trang}>
+    <h3>{ten}</h3>
+    {ds.length ? <div className="cp-md-the-ds">{ds.map(m => <TheMedama key={m.ma} m={m} chon={chon.has(m.ma)} bat={bat} />)}</div>
+      : <p className="cp-md-trong">Không có mã nào đủ điều kiện tuần này.</p>}
+  </div>;
+  return <section className="cp-medama" aria-label="目玉商品">
+    <h2><span className="cp-md-nhan ten-jp">目玉商品</span> đặt đầu trang campaign, làm nổi bật <ChuThich nhan="Cách chọn">
+      目玉 là mã mồi kéo khách đặt đơn: nhiều khách đang mua và giảm giá thấy rõ. Script chọn trong các mã đã chọn chạy tuần này
+      theo <b>số khách mua 90 ngày × %OFF</b> (giá セール so với 標準 của 値段管理). Điều kiện: lãi ở giá sàn &gt; 0, giảm ≥ 5%, đủ bán
+      ≥ 28 ngày kể cả lô về, không phải mã đo được sale lỗ, và không làm 目玉 hai tuần liền. Mỗi tuần 3 mã hàng khô + 1 mã hàng
+      lạnh (冷凍 / 冷蔵). Các mã đang chọn còn lại là mã phụ — mang lãi. Bỏ tick một mã 目玉 thì thẻ mờ đi; mã khác không tự
+      lên thay.</ChuThich></h2>
+    <div className="cp-md-hai">{cot("Hàng khô (hangkho)", "kho", mdm.kho)}{cot("Hàng lạnh (hanglanh)", "lanh", mdm.lanh)}</div>
+  </section>;
+}
+
+function TheMedama({ m, chon, bat }: { m: MaKeHoach; chon: boolean; bat: (ma: string) => void }) {
+  const s = m.so!;
+  return <div className={"cp-md-the" + (chon ? "" : " bo")}>
+    <div className="cp-md-anh"><HinhMa ma={m.ma} ten={m.ten} co={132} trang_tri />
+      {s.off != null && <span className="cp-md-off">−{pc(s.off, 0)}</span>}</div>
+    <div className="cp-md-than">
+      <div className="phu">#{s.medama} · <a href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)}><code>{m.ma}</code></a></div>
+      <div className="cp-md-ten ten-jp">{m.ten}</div>
+      {s.gia_san != null && <div className="cp-md-gia">{s.gia_std != null && <s>{yen(s.gia_std)}</s>} <b>{yen(s.gia_san)}</b></div>}
+      <div className="cp-md-chi">
+        {s.khach != null && <span><b>{so(s.khach)}</b> khách đang mua</span>}
+        {s.ngay_lo != null && <span title="tồn đầu tuần + lô về trong 4 tuần, theo tốc độ bán thường">đủ bán <b>{s.ngay_lo >= 999 ? "rất lâu" : `${so(s.ngay_lo)} ngày`}</b></span>}
+        {s.lai != null && <span>lãi/lần <b>{s.uoc ? "~" : ""}{s.lai >= 0 ? "+" : ""}{gon(s.lai)}</b></span>}
+      </div>
+      <label className="cp-md-chon"><input type="checkbox" checked={chon} onChange={() => bat(m.ma)} /> chạy</label>
+    </div>
+  </div>;
+}
+
 function ThXep({ c, cot, dat }: { c: (typeof COT)[number]; cot: CotXep | null; dat: (c: CotXep | null) => void }) {
   return <th className={c.cot === "mua" ? undefined : "so"} aria-sort={cot === c.cot ? "descending" : "none"}>
     <button type="button" className="cp-xep" title={c.giai} onClick={() => dat(cot === c.cot ? null : c.cot)}>
@@ -207,6 +250,7 @@ function DongMa({ m, chon, bat, sh, co_sheet }: {
       <td><input type="checkbox" checked={chon} onChange={() => bat(m.ma)} aria-label={`Chọn ${m.ma}`} /></td>
       <td><span className="cp-ma-o"><HinhMa ma={m.ma} ten={m.ten} co={32} trang_tri />
         <span className="cp-ma"><a href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)}><code>{m.ma}</code></a>
+          {s?.medama && <span className="cp-md-dau ten-jp" title="目玉商品 — đặt đầu trang campaign">目玉</span>}
           <span className="ten-jp">{m.ten}</span>
           {s?.ngan && <span className="cp-ngan">{s.ngan}</span>}</span></span></td>
       {!s ? <td colSpan={5} className="cp-ly">{m.ly}</td> : <>

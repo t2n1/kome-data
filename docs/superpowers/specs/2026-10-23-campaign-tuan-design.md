@@ -79,6 +79,12 @@ phương án được vẽ thử trên dữ liệu thật (A bảng một tuần
 - Chip lọc nhóm; MỘT bảng: tick · mã (hình, tên, lý do ngắn) · Còn bán (thanh ngày) · Lô về / lô hạn · Lãi giá sàn ·
   Sale thêm/tuần (~ = ước) · Mùa (▲/▼, chỉ khi lệch rõ) · Sheet (✓ / + / −). Không chạy / Nghỉ nhịp gập sẵn (mở khi
   đang lọc). Bấm tiêu đề cột xếp giảm dần trong từng nhóm; câu `ly` đầy đủ vẫn ở `title` của dòng.
+- **目玉商品** (グエン chốt 2026-10-23: "sản phẩm main đặt lên đầu, nổi bật" — mã mồi kéo khách; mã chọn còn lại là mã phụ, mang
+  lãi): script chọn trong các mã ĐÃ CHỌN của tuần theo số khách mua 90 ngày × %OFF (セール so 標準 của 値段管理); cần lãi ở giá
+  sàn > 0, giảm ≥ 5%, đủ bán ≥ 28 ngày kể cả lô về trong 4 tuần, không sale lỗ đo được, không làm 目玉 hai tuần liền; 3 mã hàng
+  khô + 1 mã hàng lạnh (ngành 冷凍 / 冷蔵, `mart.dim_product`). Màn: dải vàng thẻ hình to ở đầu tuần (hai cột hangkho / hanglanh),
+  nhãn 目玉 trong bảng, "Chép ▾ → Mã 目玉商品". Khoá tuỳ chọn của `so`: `trang`, `khach`, `gia_std`, `gia_san`, `off`, `ngay_lo`,
+  `medama` (hạng). Bỏ tick một mã 目玉 thì thẻ mờ — mã khác KHÔNG tự lên thay (web không tính).
 - Dữ liệu: khoá tuỳ chọn `so` của từng mã (`kome/campaign.py::_kiem_so`, `giao_dien/src/campaign/kieu.ts::SoMa`) do
   `lap_tuan.xet` tách từ CÙNG các số làm nên câu `ly`; web không tính thêm gì ngoài ngưỡng tô màu. `phien_ban` vẫn 1:
   bản không có `so` in câu `ly` trong một ô.

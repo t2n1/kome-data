@@ -37,6 +37,18 @@ export function thieuDong(thu_tu: string[], chon: Set<string>): string[] {
   return xep(chon).filter(m => !co.has(m));
 }
 
+/** 目玉商品 của tuần (script chọn, `so.medama`): hàng khô trước rồi hàng lạnh, mỗi trang theo hạng. */
+export function medama(t: TuanKeHoach): { kho: MaKeHoach[]; lanh: MaKeHoach[] } {
+  const ds = t.ma.filter(m => m.so?.medama).sort((a, b) => a.so!.medama! - b.so!.medama!);
+  return { kho: ds.filter(m => m.so!.trang !== "lanh"), lanh: ds.filter(m => m.so!.trang === "lanh") };
+}
+
+/** Mã 目玉 đang chọn — mỗi dòng một mã, hàng khô trước. */
+export function chepMedama(t: TuanKeHoach, chon: Set<string>): string {
+  const { kho, lanh } = medama(t);
+  return [...kho, ...lanh].filter(m => chon.has(m.ma)).map(m => m.ma).join("\n");
+}
+
 export function theoNhom(ds: MaKeHoach[]): Map<Nhom, MaKeHoach[]> {
   const ra = new Map<Nhom, MaKeHoach[]>(NHOM.map(n => [n.ma, []]));
   for (const m of ds) ra.get(m.nhom)?.push(m);   // GIỮ thứ tự của bản gửi: script đã xếp theo lãi gộp thêm × mùa

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chepAB, chepF, chepGia, demSheet, gioTu, macDinh, md, soSheet, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
+import { chepAB, chepF, chepGia, chepMedama, demSheet, medama, gioTu, macDinh, md, soSheet, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
 import type { TuanKeHoach } from "./kieu";
 
 const t: TuanKeHoach = {
@@ -10,6 +10,20 @@ const t: TuanKeHoach = {
     { ma: "DK06", ten: "", nhom: "nghi", ly: "", chon: false },
   ],
 };
+
+describe("目玉商品", () => {
+  const m = (ma: string, trang: string, medama?: number) => ({ ma, ten: "", nhom: "thuong" as const, ly: "", chon: true, so: { trang, medama } });
+  const tm: TuanKeHoach = { ...t, ma: [m("A", "lanh", 1), m("B", "kho", 2), m("C", "kho"), m("D", "kho", 1)] };
+  it("tách theo trang, xếp theo hạng; mã không có hạng là mã phụ", () => {
+    const r = medama(tm);
+    expect(r.kho.map(x => x.ma)).toEqual(["D", "B"]);
+    expect(r.lanh.map(x => x.ma)).toEqual(["A"]);
+  });
+  it("chép mã 目玉 đang chọn, hàng khô trước", () => {
+    expect(chepMedama(tm, new Set(["A", "B", "C", "D"]))).toBe("D\nB\nA");
+    expect(chepMedama(tm, new Set(["A", "C"]))).toBe("A");
+  });
+});
 
 describe("chuỗi chép", () => {
   it("mặc định = mã được chọn sẵn", () => expect([...macDinh(t)].sort()).toEqual(["BA07", "NT01"]));

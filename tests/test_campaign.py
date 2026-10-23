@@ -70,11 +70,13 @@ def test_kiem_tu_choi_nhom_va_phan_dinh_la_ngay_nguoc():
     m = d["ke_hoach"][0]["ma"][0]
     m["so"] = {"ton": 89, "ngay": 15, "bien": 0.38, "lai": 10000, "uoc": False, "tuan_do": 13, "lan_loi": 10, "on_dinh": "loi", "mua": 1.5,
                "lo": {"ngay": "2026-11-12", "sl": 500, "tt": "仮登録"}, "han": {"ngay": "2027-04-15", "sl": 195},
-               "canh": "phụ thuộc lô 11/02", "ngung": True, "khoa_la": [1]}
+               "canh": "phụ thuộc lô 11/02", "ngung": True, "khoa_la": [1],
+               "trang": "kho", "khach": 311, "off": 0.079, "gia_std": 127, "gia_san": 117, "ngay_lo": 40, "medama": 1}
     CP.kiem(d)                                          # ô số của bảng — tuỳ chọn, khoá lạ bỏ qua
     for sai, chu in (({"ton": "89"}, "so.ton"), ({"lai": float("nan")}, "so.lai"), ({"uoc": 1}, "so.uoc"),
                      ({"lo": {"ngay": "11/12"}}, "so.lo"), ({"ngan": 3}, "so.ngan"), ({"lan_loi": "4"}, "so.lan_loi"),
-                     ({"on_dinh": False}, "so.on_dinh"), ([], "so")):
+                     ({"on_dinh": False}, "so.on_dinh"), ({"medama": "1"}, "so.medama"), ({"trang": 0}, "so.trang"),
+                     ({"off": "8%"}, "so.off"), ([], "so")):
         m["so"] = sai
         with pytest.raises(CP.LoiDuLieu, match=chu):
             CP.kiem(d)
