@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chepAB, chepF, chepGia, gioTu, macDinh, md, soSheet, theoNhom, theoSheet, thieuDong } from "./chep";
+import { chepAB, chepF, chepGia, demSheet, gioTu, macDinh, md, soSheet, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
 import type { TuanKeHoach } from "./kieu";
 
 const t: TuanKeHoach = {
@@ -39,5 +39,24 @@ describe("chuỗi chép", () => {
     const s = { ...t, tren_sheet: ["DK06", "NT01", "ZZ09"] };
     expect(soSheet(s, macDinh(s))).toEqual({ them: ["BA07"], bo: ["DK06", "ZZ09"] });
     expect([...theoSheet(s)].sort()).toEqual(["DK06", "NT01", "ZZ09"]);
+  });
+  it("ba ô so với sheet và trạng thái từng mã; mã sheet có mà ngoài danh sách vẫn đếm vào bỏ", () => {
+    const s = { ...t, tren_sheet: ["DK06", "NT01", "ZZ09"] };
+    const c = macDinh(s);
+    expect(demSheet(t, c)).toBeNull();
+    expect(demSheet(s, c)).toEqual({ giu: 1, them: 1, bo: 2, ngoai: ["ZZ09"] });
+    expect(s.ma.map(m => trangSheet(s, c, m))).toEqual(["giu", "them", "bo"]);
+    expect(trangSheet(t, c, t.ma[0])).toBeNull();
+  });
+  it("xếp theo cột số giảm dần, mã không có số xuống cuối, bằng nhau giữ thứ tự gửi", () => {
+    const ds = [
+      { ma: "A", ten: "", nhom: "thuong" as const, ly: "", chon: true, so: { lai: 100 } },
+      { ma: "B", ten: "", nhom: "thuong" as const, ly: "", chon: true },
+      { ma: "C", ten: "", nhom: "thuong" as const, ly: "", chon: true, so: { lai: -5 } },
+      { ma: "D", ten: "", nhom: "thuong" as const, ly: "", chon: true, so: { lai: 100 } },
+      { ma: "E", ten: "", nhom: "thuong" as const, ly: "", chon: true, so: { lai: 900 } },
+    ];
+    expect(xepMa(ds, "lai").map(m => m.ma)).toEqual(["E", "A", "D", "C", "B"]);
+    expect(xepMa(ds, null)).toBe(ds);
   });
 });

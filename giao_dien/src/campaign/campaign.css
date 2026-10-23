@@ -5,26 +5,89 @@
 .cp code { display: inline; background: none; padding: 0; margin: 0; white-space: nowrap; font-family: var(--font-so); font-size: .9em; }
 .cp-ghi { margin: 0; padding: 8px 12px; border: 1px solid var(--vien); border-radius: 8px; background: var(--nen-phu); color: var(--chu-nhat); font-size: .86rem; }
 .cp-cu { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--canh-nen); color: var(--canh-chu); font-size: .86rem; }
-.cp-tuan-dau { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.cp-nut { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 10px; }
-.cp-sheet { margin: 0 0 6px; padding: 6px 10px; border-radius: 8px; background: var(--lam-nen); font-size: .84rem; }
-.cp-ma .nhan-vien { align-self: flex-start; margin-top: 2px; }
 .cp-bao { font-size: .82rem; color: var(--ok-chu); }
-.cp-nhom { margin-top: 10px; }
-.cp-nhom > summary, .cp-nhom-ten { font-size: .88rem; cursor: default; }
-.cp-nhom > summary { cursor: pointer; }
-.cp-nhom .phu { font-size: .78rem; }
-.cp-ds { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; }
-.cp-ds li { border-top: 1px solid var(--vien); }
-.cp-ds li.cp-chon { background: var(--ok-nen); }
-.cp-ds label { display: grid; grid-template-columns: auto auto minmax(160px, 260px) 1fr; gap: 8px; align-items: center; padding: 4px 6px; cursor: pointer; }
-.cp-ma { display: flex; flex-direction: column; min-width: 0; font-size: .82rem; }
-.cp-ma .ten-jp { color: var(--chu-nhat); font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-an { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Kế hoạch — thanh chọn tuần */
+.cp-tuan-chon { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.cp-tuan-chon button { flex: 0 0 auto; min-width: 118px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; text-align: left;
+  font: inherit; padding: 7px 12px; border: 1px solid var(--vien); border-radius: 10px; background: var(--nen-the); color: var(--chu); cursor: pointer; }
+.cp-tuan-chon button b { font-size: 1rem; }
+.cp-tuan-chon button small { flex-basis: 100%; color: var(--chu-nhat); font-size: .78rem; }
+.cp-tuan-chon button[aria-selected="true"] { border: 2px solid var(--chu); padding: 6px 11px; }
+.cp-moi { font-size: .7rem; padding: 0 5px; border-radius: 5px; background: var(--nen-phu); color: var(--chu-nhat); }
+
+/* Kế hoạch — đầu tuần */
+.cp-dau { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 10px; }
+.cp-dau h2 { margin: 0; font-size: 1.15rem; }
+.cp-dau .phu { font-size: .82rem; }
+.cp-so-sheet { display: flex; gap: 6px; }
+.cp-so-sheet button { font: inherit; display: flex; flex-direction: column; align-items: flex-start; padding: 4px 11px; cursor: pointer;
+  border: 1px solid var(--vien); border-radius: 9px; background: var(--nen-phu); color: var(--chu); }
+.cp-so-sheet b { font-size: 1.05rem; line-height: 1.15; font-family: var(--font-so); }
+.cp-so-sheet small { font-size: .74rem; color: var(--chu-nhat); }
+.cp-so-sheet .cp-sh-them b { color: var(--ok-chu); }
+.cp-so-sheet .cp-sh-bo b { color: var(--do-chu); }
+.cp-so-sheet button[aria-pressed="true"] { border-color: var(--chu); box-shadow: inset 0 0 0 1px var(--chu); }
+.cp-nut { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: auto; }
+.cp-chep { position: relative; }
+.cp-chep > summary { list-style: none; cursor: pointer; }
+.cp-chep > summary::-webkit-details-marker { display: none; }
+.cp-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; width: 270px; padding: 4px; display: flex; flex-direction: column;
+  background: var(--nen-the); border: 1px solid var(--vien); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / .14); }
+.cp-menu button { font: inherit; font-size: .86rem; font-weight: 600; text-align: left; padding: 7px 10px; border: 0; border-radius: 7px;
+  background: none; color: var(--chu); cursor: pointer; }
+.cp-menu button:hover, .cp-menu button:focus-visible { background: var(--nen-phu); }
+.cp-menu small { display: block; font-weight: 400; color: var(--chu-nhat); font-size: .76rem; }
+.cp-loc { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.cp-loc button { font: inherit; font-size: .82rem; padding: 3px 11px; border: 1px solid var(--vien); border-radius: 999px;
+  background: var(--nen-the); color: var(--chu-thuong); cursor: pointer; }
+.cp-loc button i { font-style: normal; color: var(--chu-mo); margin-left: 2px; }
+.cp-loc button[aria-pressed="true"] { background: var(--chu); border-color: var(--chu); color: var(--nen-the); }
+.cp-loc button[aria-pressed="true"] i { color: inherit; opacity: .7; }
+
+/* Kế hoạch — bảng một tuần. Màu nhóm: một biến --cp-m mỗi tbody. */
+.cp-bang { font-size: .84rem; }
+.cp-bang th, .cp-bang td { padding: 5px 7px; vertical-align: middle; }
+.cp-bang th { white-space: nowrap; }
+.cp-xep { font: inherit; font-weight: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+.cp-n-uu_tien { --cp-m: var(--do); } .cp-n-day_han { --cp-m: var(--canh-chu); } .cp-n-thuong { --cp-m: var(--ok-vien); }
+.cp-n-can_nhip { --cp-m: var(--lam-chu); } .cp-n-loai, .cp-n-nghi { --cp-m: var(--vien-dam); }
+.cp-nhom-dong td { background: var(--nen-phu); border-left: 4px solid var(--cp-m); padding: 0; }
+.cp-nhom-dong button { font: inherit; width: 100%; text-align: left; padding: 6px 8px; border: 0; background: none; color: var(--chu); cursor: pointer; }
+.cp-nhom-dong button:disabled { cursor: default; }
+.cp-nhom-dong .phu { font-size: .78rem; }
+.cp-bang tr.cp-tat td { color: var(--chu-mo); }
+.cp-bang tr.cp-tat .hinh-ma { opacity: .5; }
+.cp-bang tbody tr:not(.cp-nhom-dong) { cursor: pointer; }
+.cp-ma-o { display: flex; gap: 8px; align-items: center; }
+.cp-ma { display: flex; flex-direction: column; min-width: 0; }
+.cp-ma .ten-jp { color: var(--chu-nhat); font-size: .75rem; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-ngan { font-size: .76rem; color: var(--do-chu); }
 .cp-ly { font-size: .8rem; color: var(--chu-thuong); }
+.cp-con { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.cp-thanh { width: 40px; height: 7px; border-radius: 4px; background: var(--nen-phu); overflow: hidden; }
+.cp-thanh i { display: block; height: 100%; }
+.cp-thanh i.do { background: var(--do); } .cp-thanh i.canh { background: var(--canh-vien); } .cp-thanh i.ok { background: var(--ok-vien); }
+.cp-lo { font-size: .78rem; white-space: nowrap; }
+.cp-lo > div + div { margin-top: 1px; }
+.cp-tt { font-size: .72rem; margin-left: 5px; padding: 0 5px; border-radius: 5px; background: var(--canh-nen); color: var(--canh-chu); }
+.cp-tt.do { background: var(--do-nen); color: var(--do-chu); }
+.cp-canh { color: var(--canh-chu); font-size: .76rem; white-space: normal; }
+.cp-mua { font-size: .76rem; padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
+.cp-mua.cao { background: var(--ok-nen); color: var(--ok-chu); } .cp-mua.thap { background: var(--do-nen); color: var(--do-chu); }
+.cp-sh { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font-weight: 700; }
+.cp-sh.giu { background: var(--nen-phu); color: var(--chu-nhat); }
+.cp-sh.them { background: var(--ok-nen); color: var(--ok-chu); }
+.cp-sh.bo { background: var(--do-nen); color: var(--do-chu); }
+
+/* Soát hằng ngày */
+.cp-nhom { margin-top: 10px; }
+.cp-nhom-ten { font-size: .88rem; }
 .cp-ds-gon { list-style: none; margin: 4px 0 8px; padding: 0; font-size: .84rem; }
 .cp-ds-gon li { padding: 3px 0; border-top: 1px solid var(--vien); display: block; }
 .cp-ds-gon .hinh-ma { vertical-align: middle; }
 .cp-sao { display: inline-block; width: 1.1em; color: var(--canh-chu); }
 .cp-muc .bang-cuon { margin-bottom: 10px; }
 .cp-nguon { font-size: .78rem; }
-@media (max-width: 700px) { .cp-ds label { grid-template-columns: auto auto 1fr; } .cp-ly { grid-column: 3; } }
+@media (max-width: 700px) { .cp-nut { margin-left: 0; } .cp-ma .ten-jp { max-width: 160px; } }

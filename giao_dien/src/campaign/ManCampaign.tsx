@@ -6,9 +6,11 @@ import { useEffect, useState } from "react";
 import { lay } from "../api";
 import { giuKhoang } from "../khung/khoang";
 import { HinhMa } from "../chung/HinhMa";
-import { so } from "../dinh_dang";
-import { chepAB, chepF, chepGia, CU_GIO, gioTu, macDinh, md, NHOM, soSheet, theoNhom, theoSheet, thieuDong } from "./chep";
-import type { BanCampaign, CampaignApi, MaKeHoach, Soat, TuanKeHoach } from "./kieu";
+import { ChuThich } from "../chung/Khoi";
+import { gon, pc, so } from "../dinh_dang";
+import { chepAB, chepF, chepGia, CU_GIO, demSheet, gioTu, macDinh, md, NHOM, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
+import type { CotXep, TrangSheet } from "./chep";
+import type { BanCampaign, CampaignApi, MaKeHoach, Nhom, Soat, TuanKeHoach } from "./kieu";
 import "./campaign.css";
 
 type Tab = "ke_hoach" | "soat";
@@ -57,73 +59,175 @@ export default function ManCampaign() {
 }
 
 function KeHoach({ b }: { b: BanCampaign }) {
+  // Phần chọn của MỖI tuần sống ở đây (đổi tuần không mất tick); không lưu — tải lại trang là về đề xuất.
+  const [o, datO] = useState(0);
+  const [chon, datChonTat] = useState<Record<string, Set<string>>>({});
   if (!b.ke_hoach.length) return <p className="cp-ghi">Bản này chưa có tuần nào.</p>;
+  const cua = (t: TuanKeHoach) => chon[t.tu] ?? macDinh(t);
+  const t = b.ke_hoach[Math.min(o, b.ke_hoach.length - 1)];
   return <>
-    <p className="cp-ghi">Đề xuất từ tuần sau. Tuần đã có trên sheet được đề xuất lại theo nhịp của sheet (khác sheet chỉ vì tồn, lô về,
-      lãi gộp) kèm so sánh thêm / bỏ. Trong mỗi nhóm, mã xếp theo lãi gộp thêm một tuần sale × mùa cùng kỳ năm trước. Mỗi tuần: bỏ / thêm mã bằng ô tick, rồi bấm chép và dán vào sheet. Tab tháng: dán <b>cột A–B</b> và <b>cột F</b> vào
-      các dòng ngay dưới dòng <span className="ten-jp">合計</span> của tuần (không dán đè cột C–E — công thức).
-      <span className="ten-jp"> 値段管理</span>: dán vào cột của tuần, bắt đầu ở <b>dòng 3</b>. Lựa chọn không được lưu — tải lại trang là về đề xuất.</p>
-    {b.ke_hoach.map(t => <KhoiTuan key={t.tu} t={t} thu_tu={b.thu_tu_gia} />)}
+    <div className="cp-tuan-chon" role="tablist" aria-label="Chọn tuần">
+      {b.ke_hoach.map((x, i) => {
+        const c = cua(x), d = demSheet(x, c);
+        return <button key={x.tu} type="button" role="tab" aria-selected={x === t} onClick={() => datO(i)}>
+          <b>{md(x.tu)}</b>{!x.tren_sheet && <span className="cp-moi">mới</span>}
+          <small>{so(c.size)} mã{d && <> · <span className="tang">+{d.them}</span> <span className="giam">−{d.bo}</span></>}</small>
+        </button>;
+      })}
+    </div>
+    <KhoiTuan key={t.tu} t={t} thu_tu={b.thu_tu_gia} chon={cua(t)}
+      datChon={c => datChonTat(x => ({ ...x, [t.tu]: c }))} />
   </>;
 }
 
-function KhoiTuan({ t, thu_tu }: { t: TuanKeHoach; thu_tu: string[] }) {
-  const [chon, datChon] = useState<Set<string>>(() => macDinh(t));
+const COT: { cot: CotXep; nhan: string; giai: string }[] = [
+  { cot: "ngay", nhan: "Còn bán", giai: "Tồn đầu tuần đủ bán bao nhiêu ngày (theo tốc độ bán, tuần sale × hệ số riêng của mã)" },
+  { cot: "bien", nhan: "Lãi giá sàn", giai: "(giá sàn chưa thuế − giá vốn) ÷ giá sàn — đúng công thức cột 粗利額 của tab tháng" },
+  { cot: "lai", nhan: "Sale thêm/tuần", giai: "Lãi gộp một tuần sale hơn tuần thường bao nhiêu (đo trên các tuần đã sale; ~ = ước vì chưa đo được)" },
+  { cot: "mua", nhan: "Mùa", giai: "Cùng kỳ năm trước bán gấp mấy lần bình thường — chỉ hiện khi lệch rõ" },
+];
+
+function KhoiTuan({ t, thu_tu, chon, datChon }: {
+  t: TuanKeHoach; thu_tu: string[]; chon: Set<string>; datChon: (c: Set<string>) => void;
+}) {
   const [bao, datBao] = useState("");
+  const [loc_nhom, datLocNhom] = useState<Nhom | null>(null);
+  const [loc_sheet, datLocSheet] = useState<TrangSheet | null>(null);
+  const [cot, datCot] = useState<CotXep | null>(null);
+  const [mo, datMo] = useState<Set<Nhom>>(new Set());
   const nhom = theoNhom(t.ma);
   const thieu = thieuDong(thu_tu, chon);
-  const ss = soSheet(t, chon);
-  const bat = (ma: string) => datChon(c => { const n = new Set(c); if (n.has(ma)) n.delete(ma); else n.add(ma); return n; });
+  const d = demSheet(t, chon);
+  const bat = (ma: string) => { const n = new Set(chon); if (n.has(ma)) n.delete(ma); else n.add(ma); datChon(n); };
   const chep = async (ten: string, van: string) => {
     try { await navigator.clipboard.writeText(van); datBao(`Đã chép ${ten}.`); }
     catch { window.prompt(`Chép ${ten}:`, van); }
     setTimeout(() => datBao(""), 2500);
   };
+  const menu = (ten: string, van: string) => (e: React.MouseEvent) => {
+    e.currentTarget.closest("details")?.removeAttribute("open");
+    void chep(ten, van);
+  };
+  const so_cot = t.tren_sheet ? 8 : 7;
   return (
     <section className="kh-the cp-tuan" aria-label={`Tuần ${t.ky}`}>
-      <div className="cp-tuan-dau">
-        <h2>Tuần {t.ky} <small>tab <span className="ten-jp">{t.tab}</span> · <span className="ten-jp">週目</span> {t.tuan_so}</small></h2>
-        <b>{so(chon.size)} mã</b>
+      <div className="cp-dau">
+        <div>
+          <h2>Tuần {t.ky} <ChuThich nhan="Cách dùng">
+            Đề xuất từ tuần sau. Tuần đã có trên sheet được đề xuất lại theo nhịp của sheet (khác sheet chỉ vì tồn, lô về, lãi
+            gộp). Trong mỗi nhóm, mã xếp theo lãi gộp thêm một tuần sale × mùa cùng kỳ năm trước; bấm tiêu đề cột để xếp lại.
+            Rê chuột lên một dòng để xem lý do đầy đủ.<br /><br />
+            Tick để bỏ / thêm mã rồi bấm <b>Chép ▾</b>. Tab tháng: dán <b>cột A–B</b> và <b>cột F</b> vào các dòng ngay dưới dòng
+            合計 của tuần (không dán đè cột C–E — công thức). 値段管理: dán vào cột của tuần, bắt đầu ở <b>dòng 3</b>.
+            Lựa chọn không được lưu — tải lại trang là về đề xuất.</ChuThich></h2>
+          <div className="phu">tab <span className="ten-jp">{t.tab}</span> · <span className="ten-jp">週目</span> {t.tuan_so} ·
+            đang chọn <b>{so(chon.size)}</b> mã{!t.tren_sheet && " · sheet chưa có tuần này"}</div>
+        </div>
+        {d && <div className="cp-so-sheet" role="group" aria-label="So với sheet">
+          {([["giu", d.giu, "giống sheet"], ["them", d.them, "mình thêm"], ["bo", d.bo, "mình bỏ"]] as const).map(([k, n, nhan]) =>
+            <button key={k} type="button" className={"cp-sh-" + k} aria-pressed={loc_sheet === k}
+              onClick={() => datLocSheet(loc_sheet === k ? null : k)}>
+              <b>{k === "them" ? "+" : k === "bo" ? "−" : ""}{so(n)}</b><small>{nhan}</small></button>)}
+        </div>}
+        <div className="cp-nut">
+          <button type="button" className="nut-nap" onClick={() => datChon(macDinh(t))}>Về đề xuất</button>
+          {t.tren_sheet && <button type="button" className="nut-nap" onClick={() => datChon(theoSheet(t))}>Theo sheet</button>}
+          <details className="cp-chep">
+            <summary className="nut-chinh">Chép ▾</summary>
+            <div className="cp-menu">
+              <button type="button" onClick={menu("cột A–B", chepAB(t, chon))}>Cột A–B<small><span className="ten-jp">週目 · 期間</span> — {so(chon.size)} dòng</small></button>
+              <button type="button" onClick={menu("cột F", chepF(chon))}>Cột F<small><span className="ten-jp">商品コード</span> — mỗi dòng một mã</small></button>
+              <button type="button" onClick={menu("cột 値段管理", chepGia(thu_tu, chon))}>Cột tuần của <span className="ten-jp">値段管理</span><small>dán từ dòng 3</small></button>
+            </div>
+          </details>
+          <span className="cp-bao" role="status">{bao}</span>
+        </div>
       </div>
-      <div className="cp-nut">
-        <button type="button" className="nut-chinh" onClick={() => chep("cột A–B", chepAB(t, chon))}>Chép cột A–B (<span className="ten-jp">週目 · 期間</span>)</button>
-        <button type="button" className="nut-chinh" onClick={() => chep("cột F", chepF(chon))}>Chép cột F (<span className="ten-jp">商品コード</span>)</button>
-        <button type="button" className="nut-chinh" onClick={() => chep("cột 値段管理", chepGia(thu_tu, chon))}>Chép cột <span className="ten-jp">値段管理</span></button>
-        <button type="button" className="nut-nap" onClick={() => datChon(macDinh(t))}>Về đề xuất</button>
-        {t.tren_sheet && <button type="button" className="nut-nap" onClick={() => datChon(theoSheet(t))}>Chọn theo sheet</button>}
-        <span className="cp-bao" role="status">{bao}</span>
-      </div>
-      {ss && <p className="cp-sheet">Sheet đã có tuần này ({so(t.tren_sheet!.length)} mã). So với phần đang chọn:{" "}
-        {!ss.them.length && !ss.bo.length ? <b>khớp sheet</b> : <>
-          <b className="tang">thêm {ss.them.length}</b>{ss.them.length > 0 && `: ${ss.them.join(", ")}`} ·{" "}
-          <b className="giam">bỏ {ss.bo.length}</b>{ss.bo.length > 0 && `: ${ss.bo.join(", ")}`}</>}</p>}
       {thieu.length > 0 && <p className="cp-cu">Chưa có dòng trên <span className="ten-jp">値段管理</span> (cột tuần sẽ thiếu): {thieu.join(", ")}</p>}
-      {NHOM.map(n => {
-        const ds = nhom.get(n.ma) ?? [];
-        if (!ds.length) return null;
-        const so_chon = ds.filter(m => chon.has(m.ma)).length;
-        const tieu_de = <><b>{n.nhan}</b> · {ds.length} mã{n.gap && so_chon ? ` (đang chọn ${so_chon})` : ""} <span className="phu">— {n.giai}</span></>;
-        const bang = <ul className="cp-ds">{ds.map(m => <DongMa key={m.ma} m={m} chon={chon.has(m.ma)} bat={bat} />)}</ul>;
-        return n.gap
-          ? <details key={n.ma} className="cp-nhom"><summary>{tieu_de}</summary>{bang}</details>
-          : <div key={n.ma} className="cp-nhom"><div className="cp-nhom-ten">{tieu_de}</div>{bang}</div>;
-      })}
+      {loc_sheet === "bo" && d && d.ngoai.length > 0 &&
+        <p className="cp-ghi">Sheet còn có (không nằm trong danh sách đề xuất): {d.ngoai.join(", ")}</p>}
+      <div className="cp-loc" role="group" aria-label="Lọc nhóm">
+        <button type="button" aria-pressed={!loc_nhom} onClick={() => datLocNhom(null)}>Tất cả <i>{t.ma.length}</i></button>
+        {NHOM.filter(n => nhom.get(n.ma)?.length).map(n =>
+          <button key={n.ma} type="button" aria-pressed={loc_nhom === n.ma} onClick={() => datLocNhom(loc_nhom === n.ma ? null : n.ma)}>
+            {n.nhan} <i>{nhom.get(n.ma)!.length}</i></button>)}
+      </div>
+      <div className="bang-cuon"><table className="bang cp-bang">
+        <thead><tr>
+          <th><span className="cp-an">Chọn</span></th><th>Mã</th>
+          <ThXep c={COT[0]} cot={cot} dat={datCot} />
+          <th>Lô về / lô hạn</th>
+          {COT.slice(1).map(c => <ThXep key={c.cot} c={c} cot={cot} dat={datCot} />)}
+          {t.tren_sheet && <th title="✓ sheet có, mình cũng chọn · + mình thêm · − sheet có, mình bỏ">Sheet</th>}
+        </tr></thead>
+        {NHOM.map(n => {
+          if (loc_nhom && loc_nhom !== n.ma) return null;
+          const ds = xepMa((nhom.get(n.ma) ?? []).filter(m => !loc_sheet || trangSheet(t, chon, m) === loc_sheet), cot);
+          if (!ds.length) return null;
+          const so_chon = ds.filter(m => chon.has(m.ma)).length;
+          const ep = loc_nhom === n.ma || loc_sheet != null;     // đang lọc: luôn mở
+          const mo_ra = !n.gap || ep || mo.has(n.ma);
+          return <tbody key={n.ma} className={"cp-n-" + n.ma}>
+            <tr className="cp-nhom-dong"><td colSpan={so_cot}>
+              <button type="button" aria-expanded={mo_ra} disabled={!n.gap || ep}
+                onClick={() => datMo(x => { const y = new Set(x); if (y.has(n.ma)) y.delete(n.ma); else y.add(n.ma); return y; })}>
+                {n.gap && !ep && <span aria-hidden="true">{mo_ra ? "▾ " : "▸ "}</span>}<b>{n.nhan}</b> ({ds.length}
+                {n.gap && so_chon > 0 ? ` · đang chọn ${so_chon}` : ""})<span className="phu"> — {n.giai}</span></button></td></tr>
+            {mo_ra && ds.map(m => <DongMa key={m.ma} m={m} chon={chon.has(m.ma)} bat={bat}
+              sh={trangSheet(t, chon, m)} co_sheet={!!t.tren_sheet} />)}
+          </tbody>;
+        })}
+      </table></div>
     </section>
   );
 }
 
-function DongMa({ m, chon, bat }: { m: MaKeHoach; chon: boolean; bat: (ma: string) => void }) {
+function ThXep({ c, cot, dat }: { c: (typeof COT)[number]; cot: CotXep | null; dat: (c: CotXep | null) => void }) {
+  return <th className={c.cot === "mua" ? undefined : "so"} aria-sort={cot === c.cot ? "descending" : "none"}>
+    <button type="button" className="cp-xep" title={c.giai} onClick={() => dat(cot === c.cot ? null : c.cot)}>
+      {c.nhan}{cot === c.cot ? " ↓" : ""}</button></th>;
+}
+
+const KY_SHEET: Record<TrangSheet, [string, string]> = {
+  giu: ["✓", "sheet có, mình cũng chọn"], them: ["+", "mình thêm (sheet chưa có)"], bo: ["−", "sheet có, mình bỏ"],
+};
+/** Hạn dùng ISO → "4/15/27"; dạng lạ (chữ OBC) giữ nguyên. */
+const hanNgan = (iso: string) => (/^\d{4}-\d\d-\d\d$/.test(iso) ? `${md(iso)}/${iso.slice(2, 4)}` : iso);
+
+function DongMa({ m, chon, bat, sh, co_sheet }: {
+  m: MaKeHoach; chon: boolean; bat: (ma: string) => void; sh: TrangSheet | null; co_sheet: boolean;
+}) {
+  const s = m.so;
   return (
-    <li className={chon ? "cp-chon" : undefined}>
-      <label>
-        <input type="checkbox" checked={chon} onChange={() => bat(m.ma)} />
-        <HinhMa ma={m.ma} ten={m.ten} co={32} trang_tri />
+    <tr className={chon ? "cp-chon" : "cp-tat"} title={m.ly}
+      onClick={e => { if (!(e.target as HTMLElement).closest("a, input")) bat(m.ma); }}>
+      <td><input type="checkbox" checked={chon} onChange={() => bat(m.ma)} aria-label={`Chọn ${m.ma}`} /></td>
+      <td><span className="cp-ma-o"><HinhMa ma={m.ma} ten={m.ten} co={32} trang_tri />
         <span className="cp-ma"><a href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)}><code>{m.ma}</code></a>
           <span className="ten-jp">{m.ten}</span>
-          {m.tren_sheet && <span className="nhan-vien lam">trên sheet</span>}</span>
-        <span className="cp-ly">{m.ly}</span>
-      </label>
-    </li>
+          {s?.ngan && <span className="cp-ngan">{s.ngan}</span>}</span></span></td>
+      {!s ? <td colSpan={5} className="cp-ly">{m.ly}</td> : <>
+        <td className="so">{s.ngay == null ? "—" :
+          <span className="cp-con" title={s.ton != null ? `đầu tuần ~${so(s.ton)} thùng` : undefined}>
+            <span className="cp-thanh" aria-hidden="true"><i className={s.ngay < 14 ? "do" : s.ngay <= 30 ? "canh" : "ok"}
+              style={{ width: `${Math.min(100, s.ngay / 90 * 100)}%` }} /></span>
+            {s.ngay >= 999 ? "rất lâu" : `${so(s.ngay)} ngày`}</span>}</td>
+        <td className="cp-lo">
+          {s.lo && <div>{md(s.lo.ngay)} · {so(s.lo.sl)} thùng{s.lo.tt && <span className="cp-tt ten-jp">{s.lo.tt}</span>}</div>}
+          {s.han && <div>hạn {hanNgan(s.han.ngay)} · ~{so(s.han.sl)} thùng <span className="cp-tt do">không kịp bán</span></div>}
+          {s.canh && <div className="cp-canh">⚠ {s.canh}</div>}
+          {s.ngung && <div><span className="cp-tt">※終売※ bán nốt tồn</span></div>}</td>
+        <td className="so">{s.bien == null ? "—" : pc(s.bien, 0)}</td>
+        <td className="so">{s.lai == null ? "—" : <span className={s.lai < 0 ? "giam" : s.uoc ? "phu" : undefined}
+          title={s.uoc ? "ước — chưa đo được (chưa đủ tuần sale, hoặc ngày thường bán quá ít)" : `đo trên ${s.tuan_do} tuần sale`}>
+          {s.uoc ? "~" : ""}{s.lai >= 0 ? "+" : ""}{gon(s.lai)}</span>}
+          {!s.uoc && s.tuan_do != null && s.lai != null && <small className="phu"> {s.tuan_do}t</small>}</td>
+        <td>{s.mua == null ? null : s.mua < 0.2
+          ? <span className="cp-mua thap" title="cùng kỳ năm trước gần như không bán (có thể khi đó hết hàng)">≈0</span>
+          : <span className={"cp-mua " + (s.mua >= 1 ? "cao" : "thap")} title={`cùng kỳ năm trước bán ×${s.mua} bình thường`}>
+            {s.mua >= 1 ? "▲" : "▼"}×{s.mua}</span>}</td></>}
+      {co_sheet && <td>{sh && <span className={"cp-sh " + sh} title={KY_SHEET[sh][1]}>{KY_SHEET[sh][0]}</span>}</td>}
+    </tr>
   );
 }
 

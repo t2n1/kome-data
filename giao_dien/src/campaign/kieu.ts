@@ -1,7 +1,18 @@
 // Dạng bản campaign do máy công ty gửi lên (kome/campaign.py::kiem, phien_ban 1). Ngày là chuỗi ISO YYYY-MM-DD.
 export type Nhom = "uu_tien" | "day_han" | "thuong" | "can_nhip" | "loai" | "nghi";
 // `tren_sheet` (thêm 2026-10-23, có thể vắng ở bản cũ): mã đang có trên tab tháng của tuần đó.
-export type MaKeHoach = { ma: string; ten: string; nhom: Nhom; ly: string; chon: boolean; tren_sheet?: boolean };
+// `so` (thêm 2026-10-23, kome/campaign.py::_kiem_so): CÙNG nội dung `ly` tách thành ô cho bảng — mọi khoá tuỳ chọn;
+// vắng `so` (bản cũ) thì dòng in nguyên câu `ly`.
+export type LoVe = { ngay: string; sl: number; tt?: string };
+export type SoMa = {
+  ton?: number; ngay?: number;          // thùng đầu tuần · số ngày bán còn lại (script kẹp ≤ 999)
+  lo?: LoVe; han?: LoVe;                // lô sắp về gần nhất · lô không kịp bán trước hạn (ngày = hạn dùng)
+  bien?: number;                        // tỷ lệ lãi ở giá sàn (0.27)
+  lai?: number; uoc?: boolean; tuan_do?: number;   // ¥ lãi gộp thêm một tuần sale; uoc = chưa đo được
+  mua?: number;                         // cùng kỳ năm trước ÷ bình thường — chỉ có khi lệch rõ
+  ngan?: string; canh?: string; ngung?: boolean;   // lý do ngắn (nhóm Không chạy) · cảnh báo lô · ※終売※ bán nốt tồn
+};
+export type MaKeHoach = { ma: string; ten: string; nhom: Nhom; ly: string; chon: boolean; tren_sheet?: boolean; so?: SoMa };
 export type TuanKeHoach = {
   tu: string; den: string; tab: string; tuan_so: number; ky: string; ma: MaKeHoach[];
   tren_sheet?: string[] | null;   // null = tuần chưa có trên sheet

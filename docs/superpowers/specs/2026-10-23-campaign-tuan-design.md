@@ -57,3 +57,17 @@ và ra file trên OneDrive. Người dùng muốn xem và lấy dữ liệu đó
 `tests/test_campaign.py`: kiểm hình dạng (thiếu khoá / sai kiểu / quá cỡ → 400) · gửi cần cờ kho dữ liệu (403) ·
 GET trả bản mới nhất, chưa có → `du_lieu: null` · giữ 30 ngày nhưng không xoá dòng mới nhất · chuông chỉ lấy tuần
 đang chạy / sắp chạy · trang + mục thanh bên có mặt. `giao_dien/src/campaign/chep.test.ts`: ba chuỗi chép.
+
+## Bố cục tab Kế hoạch — phương án A (グエン chọn 2026-10-23)
+Bản đầu khó xem (đoạn giải thích dài, ô so với sheet liệt kê 52 + 19 mã, mỗi mã một câu lý do dài, 6 tuần xếp chồng). Ba
+phương án được vẽ thử trên dữ liệu thật (A bảng một tuần · B lưới thẻ hình · C lịch 6 tuần); chọn **A**:
+- Thanh chọn tuần (ngày đầu tuần · số mã đang chọn · +thêm −bỏ so với sheet · "mới" nếu sheet chưa có tuần đó); phần chọn
+  nhớ theo từng tuần tới khi tải lại trang.
+- Đầu tuần: ⓘ "Cách dùng" (chữ hướng dẫn dán cũ) · ba ô số **giống sheet / mình thêm / mình bỏ** — bấm để lọc bảng · Về đề
+  xuất · Theo sheet · **Chép ▾** (ba chuỗi chép cũ).
+- Chip lọc nhóm; MỘT bảng: tick · mã (hình, tên, lý do ngắn) · Còn bán (thanh ngày) · Lô về / lô hạn · Lãi giá sàn ·
+  Sale thêm/tuần (~ = ước) · Mùa (▲/▼, chỉ khi lệch rõ) · Sheet (✓ / + / −). Không chạy / Nghỉ nhịp gập sẵn (mở khi
+  đang lọc). Bấm tiêu đề cột xếp giảm dần trong từng nhóm; câu `ly` đầy đủ vẫn ở `title` của dòng.
+- Dữ liệu: khoá tuỳ chọn `so` của từng mã (`kome/campaign.py::_kiem_so`, `giao_dien/src/campaign/kieu.ts::SoMa`) do
+  `lap_tuan.xet` tách từ CÙNG các số làm nên câu `ly`; web không tính thêm gì ngoài ngưỡng tô màu. `phien_ban` vẫn 1:
+  bản không có `so` in câu `ly` trong một ô.
