@@ -12,6 +12,8 @@
 // (/bang-gia, chỉ xem), phần báo giá vẫn chưa; giữ icon "quote" của mục gốc cho cả hai.
 // LỆCH CÓ CHỦ Ý khỏi gói thiết kế (2026-10-16, chủ DN thấy menu rối): bỏ "Bản đồ khách hàng" (tab của Khách hàng);
 // "Bảng giá KOME" và "Thị trường & đối thủ" về nhóm HÀNG HÓA & KHO.
+// "campaign" (Campaign tuần, 2026-10-23, 074) — gói thiết kế không có màn này; icon "cal" (lịch theo tuần) TA CHỌN
+// trong bộ 24 icon.
 import { KD, TN } from "../khoi_dau";
 
 export type Muc = { ma: string; nhan: string; url: string | null; icon: string; ly_do?: string };
@@ -35,6 +37,7 @@ export function nhomDieuHuong(): Nhom[] {
       // Bản đồ là TAB của màn Khách hàng (cùng trạng thái lọc); /ban-do vẫn mở được và đánh dấu mục kh360.
       { ma: "kh360", nhan: "Khách hàng", url: "/khach-hang", icon: "user" },
       { ma: "kho", nhan: "Kho hàng", url: "/kho-hang", icon: "box" },
+      { ma: "campaign", nhan: "Campaign tuần", url: "/campaign", icon: "cal" },
       { ma: "congno", nhan: "Công nợ & thu tiền", url: TN.cong_no ? "/cong-no" : null, icon: "yen", ...(TN.cong_no ? {} : { ly_do: CHUA_DUNG }) },
     ] },
     { ma: "phantich", ten: "PHÂN TÍCH", muc: [

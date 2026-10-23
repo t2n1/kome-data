@@ -859,6 +859,11 @@ def create_app(db_url: str | None = None, db_url_app: str | None = None) -> Fast
     def man_bang_gia(request: Request):
         return _man_khach(request)
 
+    # Campaign tuần — dữ liệu qua /api/campaign (kome/campaign.py -> app.campaign_soat, 074); máy công ty gửi lên.
+    @app.get("/campaign", response_class=HTMLResponse)
+    def man_campaign(request: Request):
+        return _man_khach(request)
+
     # Thị trường & đối thủ — dữ liệu qua /api/doi-thu/* (kome/doi_thu.py -> mart, 059–060). NGOÀI
     # DUONG_KHO_DU_LIEU: mọi người đăng nhập vào và sửa được (đặc tả §2 "Ai sửa được": A).
     @app.get("/doi-thu", response_class=HTMLResponse)

@@ -31,6 +31,8 @@ const KhoHang = lazy(() => import("./san_pham/KhoHang"));
 const ManMuaVu = lazy(() => import("./mua_vu/ManMuaVu"));
 const ManDoiThu = lazy(() => import("./doi_thu/ManDoiThu"));
 const ManBangGia = lazy(() => import("./bang_gia/ManBangGia"));
+// Campaign tuần (074) — bản kế hoạch + soát do máy công ty gửi lên.
+const ManCampaign = lazy(() => import("./campaign/ManCampaign"));
 // Đợt 6.
 const ManCongNo = lazy(() => import("./cong_no/ManCongNo"));
 // Giai đoạn 5 — nhóm HỆ THỐNG. Máy chủ tính sẵn dữ liệu vào window.__KOME__.man.
@@ -63,6 +65,7 @@ function man(duong: string): (() => React.ReactElement) | null {
   if (duong === "/mua-vu") return () => <ManMuaVu />;
   if (duong === "/doi-thu") return () => <ManDoiThu />;
   if (duong === "/bang-gia") return () => <ManBangGia />;
+  if (duong === "/campaign") return () => <ManCampaign />;
   if (duong === "/cong-no") return () => <ManCongNo />;
   if (KD.man != null) {
     if (duong === "/kho-du-lieu") return () => <KhoDuLieu />;
