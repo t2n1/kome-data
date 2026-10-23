@@ -25,7 +25,9 @@ và ra file trên OneDrive. Người dùng muốn xem và lấy dữ liệu đó
      phải tính lại vì một thứ chúng không đọc).
 4. **Trang `/campaign` "Campaign tuần"** (nhóm HẰNG NGÀY, mọi người đăng nhập xem được):
    - Tab **Kế hoạch đề xuất** (mặc định): 6 tuần TỪ TUẦN SAU (グエン 2026-10-23), mỗi tuần một khối — tuần đã có trên sheet
-     vẫn đề xuất lại theo nhịp của sheet, kèm so sánh thêm / bỏ và nút "Chọn theo sheet"; mã chia nhóm Ưu tiên · Đẩy hạn ·
+     vẫn đề xuất lại, kèm so sánh thêm / bỏ. Nhịp XEN KẼ ĐỀU (グエン chốt 2026-10-23): lịch của sheet chỉ đọc cho tuần
+     TRƯỚC tuần đầu đề xuất; từ tuần đầu "tuần trước đã chạy" nối chuỗi bằng chính đề xuất, kể cả tuần đã có trên sheet
+     (sheet để 10/23 và 10/30 đều là tuần nhỏ — theo sheet thì nhóm lớn nhận ở 10/30 lại chạy liền 11/6) và nút "Chọn theo sheet"; mã chia nhóm Ưu tiên · Đẩy hạn ·
      Theo nhịp · Cân nhịp (được chọn sẵn) · Không chạy · Nghỉ nhịp (bỏ chọn). Ô tick đổi phần sẽ chép — KHÔNG lưu
      (đổi trang là về đề xuất). Ba nút chép: **cột A–B** (週目 · 期間, mỗi mã một dòng) · **cột F** (商品コード) ·
      **cột tuần của 値段管理** (đúng thứ tự dòng 3→ của 値段管理, ô trống = không chạy). Không chép cột C–E (hình /
