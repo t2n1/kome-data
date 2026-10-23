@@ -9,7 +9,7 @@ export const NHOM: { ma: Nhom; nhan: string; giai: string; gap?: boolean }[] = [
   { ma: "uu_tien", nhan: "Ưu tiên", giai: "Sắp hết mà có lô sắp về — chạy để đẩy hết lô cũ" },
   { ma: "day_han", nhan: "Đẩy hạn", giai: "Có lô không kịp bán trước hạn dùng" },
   { ma: "thuong", nhan: "Theo nhịp", giai: "Đến lượt chạy (tuần trước nghỉ)" },
-  { ma: "can_nhip", nhan: "Cân nhịp", giai: "Tuần trước đã chạy, kéo thêm để hai nhịp đều nhau (lãi gộp khi sale cao nhất)" },
+  { ma: "can_nhip", nhan: "Cân nhịp", giai: "Tuần trước đã chạy, kéo thêm để hai nhịp đều nhau (lãi gộp thêm × mùa cao nhất)" },
   { ma: "loai", nhan: "Không chạy", giai: "Thiếu hàng, sắp hết mà không có lô về, giá sàn dưới giá vốn, hoặc sale làm giảm lãi gộp", gap: true },
   { ma: "nghi", nhan: "Nghỉ nhịp", giai: "Đã chạy tuần trước — tuần này nghỉ", gap: true },
 ];
@@ -38,8 +38,7 @@ export function thieuDong(thu_tu: string[], chon: Set<string>): string[] {
 
 export function theoNhom(ds: MaKeHoach[]): Map<Nhom, MaKeHoach[]> {
   const ra = new Map<Nhom, MaKeHoach[]>(NHOM.map(n => [n.ma, []]));
-  for (const m of ds) ra.get(m.nhom)?.push(m);
-  for (const v of ra.values()) v.sort((a, b) => a.ma.localeCompare(b.ma));
+  for (const m of ds) ra.get(m.nhom)?.push(m);   // GIỮ thứ tự của bản gửi: script đã xếp theo lãi gộp thêm × mùa
   return ra;
 }
 

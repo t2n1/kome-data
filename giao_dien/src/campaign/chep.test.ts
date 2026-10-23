@@ -23,9 +23,10 @@ describe("chuỗi chép", () => {
     expect(chepGia(["BA07", "", "DK06", "NT01"], c)).toBe("\n\nDK06\nNT01");
   });
   it("báo mã đã chọn mà 値段管理 không có dòng", () => expect(thieuDong(["BA07"], macDinh(t))).toEqual(["NT01"]));
-  it("theo nhóm, xếp mã", () => {
-    const g = theoNhom(t.ma);
+  it("theo nhóm, giữ thứ tự của bản gửi (script đã xếp theo điểm)", () => {
+    const g = theoNhom([...t.ma, { ma: "AA01", ten: "", nhom: "thuong", ly: "", chon: true }]);
     expect(g.get("uu_tien")!.map(m => m.ma)).toEqual(["BA07"]);
+    expect(g.get("thuong")!.map(m => m.ma)).toEqual(["NT01", "AA01"]);
     expect(g.get("loai")).toEqual([]);
   });
   it("ngày ngắn và tuổi bản soát", () => {

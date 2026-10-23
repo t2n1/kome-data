@@ -59,8 +59,8 @@ export default function ManCampaign() {
 function KeHoach({ b }: { b: BanCampaign }) {
   if (!b.ke_hoach.length) return <p className="cp-ghi">Bản này chưa có tuần nào.</p>;
   return <>
-    <p className="cp-ghi">Đề xuất từ tuần sau. Tuần đã có trên sheet vẫn được đề xuất lại (độc lập với sheet) kèm so sánh
-      thêm / bỏ. Mỗi tuần: bỏ / thêm mã bằng ô tick, rồi bấm chép và dán vào sheet. Tab tháng: dán <b>cột A–B</b> và <b>cột F</b> vào
+    <p className="cp-ghi">Đề xuất từ tuần sau. Tuần đã có trên sheet được đề xuất lại theo nhịp của sheet (khác sheet chỉ vì tồn, lô về,
+      lãi gộp) kèm so sánh thêm / bỏ. Trong mỗi nhóm, mã xếp theo lãi gộp thêm một tuần sale × mùa cùng kỳ năm trước. Mỗi tuần: bỏ / thêm mã bằng ô tick, rồi bấm chép và dán vào sheet. Tab tháng: dán <b>cột A–B</b> và <b>cột F</b> vào
       các dòng ngay dưới dòng <span className="ten-jp">合計</span> của tuần (không dán đè cột C–E — công thức).
       <span className="ten-jp"> 値段管理</span>: dán vào cột của tuần, bắt đầu ở <b>dòng 3</b>. Lựa chọn không được lưu — tải lại trang là về đề xuất.</p>
     {b.ke_hoach.map(t => <KhoiTuan key={t.tu} t={t} thu_tu={b.thu_tu_gia} />)}
