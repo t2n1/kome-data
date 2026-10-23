@@ -8,7 +8,9 @@ export type SoMa = {
   ton?: number; ngay?: number;          // thùng đầu tuần · số ngày bán còn lại (script kẹp ≤ 999)
   lo?: LoVe; han?: LoVe;                // lô sắp về gần nhất · lô không kịp bán trước hạn (ngày = hạn dùng)
   bien?: number;                        // tỷ lệ lãi ở giá sàn (0.27)
-  lai?: number; uoc?: boolean; tuan_do?: number;   // ¥ lãi gộp thêm một tuần sale; uoc = chưa đo được
+  // ¥ lãi gộp thêm của MỘT LẦN sale (tuần sale + tuần ngay sau, so tuần thường cùng mùa); uoc = chưa đo được (ước);
+  // tuan_do = số lần đo · lan_loi = số lần lời · on_dinh "loi"/"lo" = ≥ 4 lần, ≥ 75% cùng dấu, "" = lúc lời lúc lỗ
+  lai?: number; uoc?: boolean; tuan_do?: number; lan_loi?: number; on_dinh?: string;
   mua?: number;                         // cùng kỳ năm trước ÷ bình thường — chỉ có khi lệch rõ
   ngan?: string; canh?: string; ngung?: boolean;   // lý do ngắn (nhóm Không chạy) · cảnh báo lô · ※終売※ bán nốt tồn
 };

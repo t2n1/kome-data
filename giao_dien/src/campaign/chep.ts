@@ -9,8 +9,8 @@ export const NHOM: { ma: Nhom; nhan: string; giai: string; gap?: boolean }[] = [
   { ma: "uu_tien", nhan: "Ưu tiên", giai: "Sắp hết mà có lô sắp về — chạy để đẩy hết lô cũ" },
   { ma: "day_han", nhan: "Đẩy hạn", giai: "Có lô không kịp bán trước hạn dùng" },
   { ma: "thuong", nhan: "Theo nhịp", giai: "Đến lượt chạy (tuần trước nghỉ)" },
-  { ma: "can_nhip", nhan: "Cân nhịp", giai: "Tuần trước đã chạy, kéo thêm để hai nhịp đều nhau (lãi gộp thêm × mùa cao nhất)" },
-  { ma: "loai", nhan: "Không chạy", giai: "Thiếu hàng, sắp hết mà không có lô về, giá sàn dưới giá vốn, hoặc sale làm giảm lãi gộp", gap: true },
+  { ma: "can_nhip", nhan: "Cân nhịp", giai: "Tuần trước đã chạy, kéo thêm để hai nhịp đều nhau — chỉ mã mà tuần thứ hai chạy liền còn lời (lãi tuần thứ hai × mùa cao nhất)" },
+  { ma: "loai", nhan: "Không chạy", giai: "Thiếu hàng, sắp hết mà không có lô về, giá sàn dưới giá vốn, hoặc sale lỗ ổn định (≥ 4 lần đo, ≥ 75% lần lỗ)", gap: true },
   { ma: "nghi", nhan: "Nghỉ nhịp", giai: "Đã chạy tuần trước — tuần này nghỉ", gap: true },
 ];
 
