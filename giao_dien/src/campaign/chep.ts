@@ -58,3 +58,30 @@ export function soSheet(t: TuanKeHoach, chon: Set<string>): { them: string[]; bo
 
 /** Phần chọn y như sheet (mã sheet có mà không còn trong danh sách 値段管理 thì vẫn giữ — chép ra đúng sheet). */
 export const theoSheet = (t: TuanKeHoach): Set<string> => new Set(t.tren_sheet ?? []);
+
+/** Một mã so với sheet: `giu` = sheet có và đang chọn · `them` = chọn mà sheet chưa có · `bo` = sheet có mà bỏ.
+ *  null = tuần chưa có trên sheet, hoặc mã không chọn và sheet không có. */
+export type TrangSheet = "giu" | "them" | "bo";
+export function trangSheet(t: TuanKeHoach, chon: Set<string>, m: MaKeHoach): TrangSheet | null {
+  if (!t.tren_sheet) return null;
+  const c = chon.has(m.ma), s = t.tren_sheet.includes(m.ma);
+  return c && s ? "giu" : c ? "them" : s ? "bo" : null;
+}
+
+/** Ba ô số so với sheet — `bo` đếm cả mã sheet có mà không nằm trong danh sách đề xuất (`ngoai`). */
+export function demSheet(t: TuanKeHoach, chon: Set<string>): { giu: number; them: number; bo: number; ngoai: string[] } | null {
+  const ss = soSheet(t, chon);
+  if (!ss) return null;
+  const co = new Set(t.ma.map(m => m.ma));
+  return { giu: t.tren_sheet!.filter(m => chon.has(m)).length, them: ss.them.length, bo: ss.bo.length,
+           ngoai: ss.bo.filter(m => !co.has(m)) };
+}
+
+export type CotXep = "ngay" | "bien" | "lai" | "mua";
+/** Xếp giảm dần theo một cột số của `so` (mã không có số xuống cuối, giữ thứ tự gửi khi bằng); null = thứ tự gửi. */
+export function xepMa(ds: MaKeHoach[], cot: CotXep | null): MaKeHoach[] {
+  if (!cot) return ds;
+  return ds.map((m, i) => ({ m, i, v: m.so?.[cot] }))
+    .sort((a, b) => (a.v == null ? 1 : 0) - (b.v == null ? 1 : 0) || (b.v ?? 0) - (a.v ?? 0) || a.i - b.i)
+    .map(x => x.m);
+}

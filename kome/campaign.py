@@ -46,6 +46,37 @@ def _chu(d: dict, k: str, ten: str, rong: bool = True) -> str:
     return v
 
 
+SO_SO = ("ton", "ngay", "bien", "lai", "tuan_do", "mua")     # `so` của một mã: ô số của bảng (cùng nội dung `ly`)
+SO_CHU = ("ngan", "canh")
+SO_CO = ("uoc", "ngung")
+
+
+def _so_that(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) != float("inf")
+
+
+def _kiem_so(s, ten: str) -> None:
+    """`so` (tuỳ chọn, thêm 2026-10-23 — bản không có thì màn rơi về câu `ly`): mọi khoá đều tuỳ chọn, khoá lạ bỏ qua."""
+    if not isinstance(s, dict):
+        raise LoiDuLieu(f"`{ten}` phải là đối tượng.")
+    for k in SO_SO:
+        if s.get(k) is not None and not _so_that(s[k]):
+            raise LoiDuLieu(f"`{ten}.{k}` phải là số.")
+    for k in SO_CHU:
+        if not isinstance(s.get(k, ""), str):
+            raise LoiDuLieu(f"`{ten}.{k}` phải là chuỗi.")
+    for k in SO_CO:
+        if not isinstance(s.get(k, False), bool):
+            raise LoiDuLieu(f"`{ten}.{k}` phải là true / false.")
+    for k in ("lo", "han"):
+        x = s.get(k)
+        if x is None:
+            continue
+        if not isinstance(x, dict) or not isinstance(x.get("ngay"), str) or not _so_that(x.get("sl")) \
+                or not isinstance(x.get("tt", ""), str):
+            raise LoiDuLieu(f"`{ten}.{k}` phải là {{ngay: chuỗi, sl: số, tt?: chuỗi}}.")
+
+
 def kiem(d) -> None:
     """Kiểm HÌNH DẠNG bản gửi lên (đủ để màn vẽ không vỡ) — không kiểm nghiệp vụ. Sai → LoiDuLieu (400)."""
     if not isinstance(d, dict):
@@ -74,6 +105,8 @@ def kiem(d) -> None:
                 raise LoiDuLieu(f"`{tm}.nhom` phải là một trong {', '.join(NHOM)}.")
             if not isinstance(m.get("chon"), bool) or not isinstance(m.get("tren_sheet", False), bool):
                 raise LoiDuLieu(f"`{tm}.chon` / `{tm}.tren_sheet` phải là true / false.")
+            if m.get("so") is not None:
+                _kiem_so(m["so"], tm + ".so")
     s = d.get("soat")
     if not isinstance(s, dict):
         raise LoiDuLieu("`soat` phải là đối tượng.")
