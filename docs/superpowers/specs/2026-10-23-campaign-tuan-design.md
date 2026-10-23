@@ -24,7 +24,8 @@ và ra file trên OneDrive. Người dùng muốn xem và lấy dữ liệu đó
      KHÔNG cần vào `anh_chup._PHIEN_BAN` (không ảnh chụp nào đọc nó; thêm vào thì 2 lần/ngày mọi ảnh chụp nặng
      phải tính lại vì một thứ chúng không đọc).
 4. **Trang `/campaign` "Campaign tuần"** (nhóm HẰNG NGÀY, mọi người đăng nhập xem được):
-   - Tab **Kế hoạch đề xuất** (mặc định): mỗi tuần chưa có trên 値段管理 một khối; mã chia nhóm Ưu tiên · Đẩy hạn ·
+   - Tab **Kế hoạch đề xuất** (mặc định): 6 tuần TỪ TUẦN SAU (グエン 2026-10-23), mỗi tuần một khối — tuần đã có trên sheet
+     vẫn đề xuất lại theo nhịp của sheet, kèm so sánh thêm / bỏ và nút "Chọn theo sheet"; mã chia nhóm Ưu tiên · Đẩy hạn ·
      Theo nhịp · Cân nhịp (được chọn sẵn) · Không chạy · Nghỉ nhịp (bỏ chọn). Ô tick đổi phần sẽ chép — KHÔNG lưu
      (đổi trang là về đề xuất). Ba nút chép: **cột A–B** (週目 · 期間, mỗi mã một dòng) · **cột F** (商品コード) ·
      **cột tuần của 値段管理** (đúng thứ tự dòng 3→ của 値段管理, ô trống = không chạy). Không chép cột C–E (hình /

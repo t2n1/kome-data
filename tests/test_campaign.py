@@ -56,6 +56,16 @@ def test_kiem_tu_choi_nhom_va_phan_dinh_la_ngay_nguoc():
     with pytest.raises(CP.LoiDuLieu, match="pd"):
         CP.kiem(d)
     d = _ban()
+    d["ke_hoach"][0]["tren_sheet"] = ["BA07", 3]
+    with pytest.raises(CP.LoiDuLieu, match="tren_sheet"):
+        CP.kiem(d)
+    d["ke_hoach"][0]["tren_sheet"] = ["BA07"]
+    d["ke_hoach"][0]["ma"][0]["tren_sheet"] = True
+    CP.kiem(d)                                          # trường tuỳ chọn của tuần đã có trên sheet
+    d["ke_hoach"][0]["ma"][0]["tren_sheet"] = "co"
+    with pytest.raises(CP.LoiDuLieu, match="tren_sheet"):
+        CP.kiem(d)
+    d = _ban()
     d["ke_hoach"][0]["den"] = "2026-11-01"
     with pytest.raises(CP.LoiDuLieu, match="ngày cuối"):
         CP.kiem(d)

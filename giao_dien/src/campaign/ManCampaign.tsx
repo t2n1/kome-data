@@ -7,7 +7,7 @@ import { lay } from "../api";
 import { giuKhoang } from "../khung/khoang";
 import { HinhMa } from "../chung/HinhMa";
 import { so } from "../dinh_dang";
-import { chepAB, chepF, chepGia, CU_GIO, gioTu, macDinh, md, NHOM, theoNhom, thieuDong } from "./chep";
+import { chepAB, chepF, chepGia, CU_GIO, gioTu, macDinh, md, NHOM, soSheet, theoNhom, theoSheet, thieuDong } from "./chep";
 import type { BanCampaign, CampaignApi, MaKeHoach, Soat, TuanKeHoach } from "./kieu";
 import "./campaign.css";
 
@@ -57,9 +57,10 @@ export default function ManCampaign() {
 }
 
 function KeHoach({ b }: { b: BanCampaign }) {
-  if (!b.ke_hoach.length) return <p className="cp-ghi">Không có tuần nào chưa lên 値段管理.</p>;
+  if (!b.ke_hoach.length) return <p className="cp-ghi">Bản này chưa có tuần nào.</p>;
   return <>
-    <p className="cp-ghi">Mỗi tuần: bỏ / thêm mã bằng ô tick, rồi bấm chép và dán vào sheet. Tab tháng: dán <b>cột A–B</b> và <b>cột F</b> vào
+    <p className="cp-ghi">Đề xuất từ tuần sau. Tuần đã có trên sheet vẫn được đề xuất lại (độc lập với sheet) kèm so sánh
+      thêm / bỏ. Mỗi tuần: bỏ / thêm mã bằng ô tick, rồi bấm chép và dán vào sheet. Tab tháng: dán <b>cột A–B</b> và <b>cột F</b> vào
       các dòng ngay dưới dòng <span className="ten-jp">合計</span> của tuần (không dán đè cột C–E — công thức).
       <span className="ten-jp"> 値段管理</span>: dán vào cột của tuần, bắt đầu ở <b>dòng 3</b>. Lựa chọn không được lưu — tải lại trang là về đề xuất.</p>
     {b.ke_hoach.map(t => <KhoiTuan key={t.tu} t={t} thu_tu={b.thu_tu_gia} />)}
@@ -71,6 +72,7 @@ function KhoiTuan({ t, thu_tu }: { t: TuanKeHoach; thu_tu: string[] }) {
   const [bao, datBao] = useState("");
   const nhom = theoNhom(t.ma);
   const thieu = thieuDong(thu_tu, chon);
+  const ss = soSheet(t, chon);
   const bat = (ma: string) => datChon(c => { const n = new Set(c); if (n.has(ma)) n.delete(ma); else n.add(ma); return n; });
   const chep = async (ten: string, van: string) => {
     try { await navigator.clipboard.writeText(van); datBao(`Đã chép ${ten}.`); }
@@ -88,8 +90,13 @@ function KhoiTuan({ t, thu_tu }: { t: TuanKeHoach; thu_tu: string[] }) {
         <button type="button" className="nut-chinh" onClick={() => chep("cột F", chepF(chon))}>Chép cột F (<span className="ten-jp">商品コード</span>)</button>
         <button type="button" className="nut-chinh" onClick={() => chep("cột 値段管理", chepGia(thu_tu, chon))}>Chép cột <span className="ten-jp">値段管理</span></button>
         <button type="button" className="nut-nap" onClick={() => datChon(macDinh(t))}>Về đề xuất</button>
+        {t.tren_sheet && <button type="button" className="nut-nap" onClick={() => datChon(theoSheet(t))}>Chọn theo sheet</button>}
         <span className="cp-bao" role="status">{bao}</span>
       </div>
+      {ss && <p className="cp-sheet">Sheet đã có tuần này ({so(t.tren_sheet!.length)} mã). So với phần đang chọn:{" "}
+        {!ss.them.length && !ss.bo.length ? <b>khớp sheet</b> : <>
+          <b className="tang">thêm {ss.them.length}</b>{ss.them.length > 0 && `: ${ss.them.join(", ")}`} ·{" "}
+          <b className="giam">bỏ {ss.bo.length}</b>{ss.bo.length > 0 && `: ${ss.bo.join(", ")}`}</>}</p>}
       {thieu.length > 0 && <p className="cp-cu">Chưa có dòng trên <span className="ten-jp">値段管理</span> (cột tuần sẽ thiếu): {thieu.join(", ")}</p>}
       {NHOM.map(n => {
         const ds = nhom.get(n.ma) ?? [];
@@ -112,7 +119,8 @@ function DongMa({ m, chon, bat }: { m: MaKeHoach; chon: boolean; bat: (ma: strin
         <input type="checkbox" checked={chon} onChange={() => bat(m.ma)} />
         <HinhMa ma={m.ma} ten={m.ten} co={32} trang_tri />
         <span className="cp-ma"><a href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)}><code>{m.ma}</code></a>
-          <span className="ten-jp">{m.ten}</span></span>
+          <span className="ten-jp">{m.ten}</span>
+          {m.tren_sheet && <span className="nhan-vien lam">trên sheet</span>}</span>
         <span className="cp-ly">{m.ly}</span>
       </label>
     </li>

@@ -49,3 +49,13 @@ export const md = (iso: string | null | undefined) => (iso ? `${+iso.slice(5, 7)
 /** Số giờ từ lúc gửi tới `bay_gio` — bản soát cũ hơn 36 giờ (quá một ngày làm việc) thì màn cảnh báo. */
 export const gioTu = (iso: string, bay_gio: Date) => (bay_gio.getTime() - new Date(iso).getTime()) / 3_600_000;
 export const CU_GIO = 36;
+
+/** Tuần đã có trên sheet: so phần đang chọn với sheet — `them` = chọn mà sheet chưa có, `bo` = sheet có mà không chọn. */
+export function soSheet(t: TuanKeHoach, chon: Set<string>): { them: string[]; bo: string[] } | null {
+  if (!t.tren_sheet) return null;
+  const s = new Set(t.tren_sheet);
+  return { them: xep(chon).filter(m => !s.has(m)), bo: [...s].sort().filter(m => !chon.has(m)) };
+}
+
+/** Phần chọn y như sheet (mã sheet có mà không còn trong danh sách 値段管理 thì vẫn giữ — chép ra đúng sheet). */
+export const theoSheet = (t: TuanKeHoach): Set<string> => new Set(t.tren_sheet ?? []);
