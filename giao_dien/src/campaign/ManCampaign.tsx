@@ -7,9 +7,10 @@ import { lay } from "../api";
 import { giuKhoang } from "../khung/khoang";
 import { HinhMa } from "../chung/HinhMa";
 import { ChuThich } from "../chung/Khoi";
+import { useXemThem } from "../chung/XemThem";
 import { gon, pc, so, yen } from "../dinh_dang";
-import { chepAB, chepF, chepGia, chepMedama, CU_GIO, demSheet, gioTu, macDinh, md, medama, NHOM, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
-import type { CotXep, TrangSheet } from "./chep";
+import { chepAB, chepF, chepGia, chepMedama, CU_GIO, demSheet, docMuc, gioTu, macDinh, md, medamaTuan, NHOM, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
+import type { CotXep, MedamaTuan, MucMedama, Trang, TrangSheet } from "./chep";
 import type { BanCampaign, CampaignApi, MaKeHoach, Nhom, Soat, TuanKeHoach } from "./kieu";
 import "./campaign.css";
 
@@ -62,9 +63,16 @@ function KeHoach({ b }: { b: BanCampaign }) {
   // Phần chọn của MỖI tuần sống ở đây (đổi tuần không mất tick); không lưu — tải lại trang là về đề xuất.
   const [o, datO] = useState(0);
   const [chon, datChonTat] = useState<Record<string, Set<string>>>({});
+  // Mức giảm tối thiểu của 目玉 — người dùng tự đặt, nhớ theo máy (không phải dữ liệu của bản gửi).
+  const [muc, datMucS] = useState<MucMedama>(() => { try { return docMuc(localStorage.getItem(KHOA_MUC)); } catch { return docMuc(null); } });
+  const datMuc = (tr: Trang, v: number) => {
+    const n = { ...muc, [tr]: v };
+    datMucS(n); try { localStorage.setItem(KHOA_MUC, JSON.stringify(n)); } catch { /* riêng tư */ }
+  };
+  const mdm = medamaTuan(b.ke_hoach, muc);
   if (!b.ke_hoach.length) return <p className="cp-ghi">Bản này chưa có tuần nào.</p>;
   const cua = (t: TuanKeHoach) => chon[t.tu] ?? macDinh(t);
-  const t = b.ke_hoach[Math.min(o, b.ke_hoach.length - 1)];
+  const i_t = Math.min(o, b.ke_hoach.length - 1), t = b.ke_hoach[i_t];
   return <>
     <div className="cp-tuan-chon" role="tablist" aria-label="Chọn tuần">
       {b.ke_hoach.map((x, i) => {
@@ -72,13 +80,16 @@ function KeHoach({ b }: { b: BanCampaign }) {
         return <button key={x.tu} type="button" role="tab" aria-selected={x === t} onClick={() => datO(i)}>
           <b>{md(x.tu)}</b>{!x.tren_sheet && <span className="cp-moi">mới</span>}
           <small>{so(c.size)} mã{d && <> · <span className="tang">+{d.them}</span> <span className="giam">−{d.bo}</span></>}</small>
+          <small><span className="ten-jp">目玉</span> {so(mdm[i].kho.length)} khô · {so(mdm[i].lanh.length)} lạnh</small>
         </button>;
       })}
     </div>
-    <KhoiTuan key={t.tu} t={t} thu_tu={b.thu_tu_gia} chon={cua(t)}
+    <KhoiTuan key={t.tu} t={t} thu_tu={b.thu_tu_gia} chon={cua(t)} mdm={mdm[i_t]} muc={muc} datMuc={datMuc}
       datChon={c => datChonTat(x => ({ ...x, [t.tu]: c }))} />
   </>;
 }
+
+const KHOA_MUC = "kome.campaign.muc_medama";
 
 const COT: { cot: CotXep; nhan: string; giai: string }[] = [
   { cot: "ngay", nhan: "Còn bán", giai: "Tồn đầu tuần đủ bán bao nhiêu ngày (theo tốc độ bán, tuần sale × hệ số riêng của mã)" },
@@ -87,8 +98,9 @@ const COT: { cot: CotXep; nhan: string; giai: string }[] = [
   { cot: "mua", nhan: "Mùa", giai: "Cùng kỳ năm trước bán gấp mấy lần bình thường — chỉ hiện khi lệch rõ" },
 ];
 
-function KhoiTuan({ t, thu_tu, chon, datChon }: {
+function KhoiTuan({ t, thu_tu, chon, datChon, mdm, muc, datMuc }: {
   t: TuanKeHoach; thu_tu: string[]; chon: Set<string>; datChon: (c: Set<string>) => void;
+  mdm: MedamaTuan; muc: MucMedama; datMuc: (tr: Trang, v: number) => void;
 }) {
   const [bao, datBao] = useState("");
   const [loc_nhom, datLocNhom] = useState<Nhom | null>(null);
@@ -109,8 +121,7 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
     void chep(ten, van);
   };
   const so_cot = t.tren_sheet ? 8 : 7;
-  const mdm = medama(t);
-  const co_medama = mdm.kho.length + mdm.lanh.length > 0;
+  const la_md = new Set([...mdm.kho, ...mdm.lanh].map(m => m.ma));
   return (
     <section className="kh-the cp-tuan" aria-label={`Tuần ${t.ky}`}>
       <div className="cp-dau">
@@ -143,7 +154,8 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
               <button type="button" onClick={menu("cột A–B", chepAB(t, chon))}>Cột A–B<small><span className="ten-jp">週目 · 期間</span> — {so(chon.size)} dòng</small></button>
               <button type="button" onClick={menu("cột F", chepF(chon))}>Cột F<small><span className="ten-jp">商品コード</span> — mỗi dòng một mã</small></button>
               <button type="button" onClick={menu("cột 値段管理", chepGia(thu_tu, chon))}>Cột tuần của <span className="ten-jp">値段管理</span><small>dán từ dòng 3</small></button>
-              {co_medama && <button type="button" onClick={menu("mã 目玉", chepMedama(t, chon))}>Mã <span className="ten-jp">目玉商品</span><small>đang chọn, hàng khô trước — đặt đầu trang campaign</small></button>}
+              {mdm.kho.length > 0 && <button type="button" onClick={menu("mã 目玉 hàng khô", chepMedama(mdm.kho, chon))}>Mã <span className="ten-jp">目玉商品</span> hàng khô<small>đang chọn — đầu trang hangkho</small></button>}
+              {mdm.lanh.length > 0 && <button type="button" onClick={menu("mã 目玉 hàng lạnh", chepMedama(mdm.lanh, chon))}>Mã <span className="ten-jp">目玉商品</span> hàng lạnh<small>đang chọn — đầu trang hanglanh</small></button>}
             </div>
           </details>
           <span className="cp-bao" role="status">{bao}</span>
@@ -152,7 +164,8 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
       {thieu.length > 0 && <p className="cp-cu">Chưa có dòng trên <span className="ten-jp">値段管理</span> (cột tuần sẽ thiếu): {thieu.join(", ")}</p>}
       {loc_sheet === "bo" && d && d.ngoai.length > 0 &&
         <p className="cp-ghi">Sheet còn có (không nằm trong danh sách đề xuất): {d.ngoai.join(", ")}</p>}
-      {co_medama && <Medama mdm={mdm} chon={chon} bat={bat} />}
+      {(["kho", "lanh"] as const).map(tr => <Medama key={tr} tr={tr} ds={mdm[tr]} muc={muc[tr]} datMuc={v => datMuc(tr, v)}
+        chon={chon} bat={bat} chep={(ten, van) => void chep(ten, van)} />)}
       <div className="cp-loc" role="group" aria-label="Lọc nhóm">
         <button type="button" aria-pressed={!loc_nhom} onClick={() => datLocNhom(null)}>Tất cả <i>{t.ma.length}</i></button>
         {NHOM.filter(n => nhom.get(n.ma)?.length).map(n =>
@@ -180,7 +193,7 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
                 onClick={() => datMo(x => { const y = new Set(x); if (y.has(n.ma)) y.delete(n.ma); else y.add(n.ma); return y; })}>
                 {n.gap && !ep && <span aria-hidden="true">{mo_ra ? "▾ " : "▸ "}</span>}<b>{n.nhan}</b> ({ds.length}
                 {n.gap && so_chon > 0 ? ` · đang chọn ${so_chon}` : ""})<span className="phu"> — {n.giai}</span></button></td></tr>
-            {mo_ra && ds.map(m => <DongMa key={m.ma} m={m} chon={chon.has(m.ma)} bat={bat}
+            {mo_ra && ds.map(m => <DongMa key={m.ma} m={m} chon={chon.has(m.ma)} bat={bat} md={la_md.has(m.ma)}
               sh={trangSheet(t, chon, m)} co_sheet={!!t.tren_sheet} />)}
           </tbody>;
         })}
@@ -189,38 +202,48 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
   );
 }
 
-/** Dải 目玉商品 — mã mồi kéo khách, đặt đầu trang campaign (script chọn: khách mua 90 ngày × %OFF). */
-function Medama({ mdm, chon, bat }: {
-  mdm: ReturnType<typeof medama>; chon: Set<string>; bat: (ma: string) => void;
+const TRANG: Record<Trang, [string, string]> = { kho: ["Hàng khô", "hangkho"], lanh: ["Hàng lạnh", "hanglanh"] };
+
+/** Khối 目玉商品 của MỘT trang campaign (hàng khô / hàng lạnh) — mã mồi kéo khách, đặt đầu trang. Không giới hạn số mã;
+ *  mức giảm tối thiểu người dùng tự đặt (ô "Giảm từ"). */
+function Medama({ tr, ds, muc, datMuc, chon, bat, chep }: {
+  tr: Trang; ds: MaKeHoach[]; muc: number; datMuc: (v: number) => void;
+  chon: Set<string>; bat: (ma: string) => void; chep: (ten: string, van: string) => void;
 }) {
-  const cot = (ten: string, trang: string, ds: MaKeHoach[]) => <div className={"cp-md-cot cp-md-" + trang}>
-    <h3>{ten}</h3>
-    {ds.length ? <div className="cp-md-the-ds">{ds.map(m => <TheMedama key={m.ma} m={m} chon={chon.has(m.ma)} bat={bat} />)}</div>
-      : <p className="cp-md-trong">Không có mã nào đủ điều kiện tuần này.</p>}
-  </div>;
-  return <section className="cp-medama" aria-label="目玉商品">
-    <h2><span className="cp-md-nhan ten-jp">目玉商品</span> đặt đầu trang campaign, làm nổi bật <ChuThich nhan="Cách chọn">
-      目玉 là mã mồi kéo khách đặt đơn: nhiều khách đang mua và giảm giá thấy rõ. Script chọn trong các mã đã chọn chạy tuần này
-      theo <b>số khách mua 90 ngày × %OFF</b> (giá セール so với 標準 của 値段管理). Điều kiện: lãi ở giá sàn &gt; 0, giảm ≥ 5%, đủ bán
-      ≥ 28 ngày kể cả lô về, không phải mã đo được sale lỗ, và không làm 目玉 hai tuần liền. Mỗi tuần 3 mã hàng khô + 1 mã hàng
-      lạnh (冷凍 / 冷蔵). Các mã đang chọn còn lại là mã phụ — mang lãi. Bỏ tick một mã 目玉 thì thẻ mờ đi; mã khác không tự
-      lên thay.</ChuThich></h2>
-    <div className="cp-md-hai">{cot("Hàng khô (hangkho)", "kho", mdm.kho)}{cot("Hàng lạnh (hanglanh)", "lanh", mdm.lanh)}</div>
+  const [ten, trang] = TRANG[tr];
+  const { hien, nut } = useXemThem(ds, 12, "mã");
+  return <section className={"cp-medama cp-md-" + tr} aria-label={`目玉商品 ${ten}`}>
+    <div className="cp-md-dau-khoi">
+      <h2><span className="cp-md-nhan ten-jp">目玉商品</span> {ten} <small className="phu">({trang})</small>
+        <span className="cp-md-dem"><b>{so(ds.length)}</b> mã</span>
+        <ChuThich nhan="Cách chọn">
+          目玉 là mã mồi kéo khách đặt đơn, đặt đầu trang campaign {trang}. Lấy trong các mã đang chạy tuần này: giảm giá (giá
+          セール so với 標準 của 値段管理) <b>từ mức bạn đặt trở lên</b>, có khách mua trong 90 ngày, lãi ở giá sàn &gt; 0, đủ bán ≥ 28
+          ngày kể cả lô về, không phải mã đo được sale lỗ, và không làm 目玉 hai tuần liền (theo đúng mức đang đặt). Không giới hạn
+          số mã; xếp theo <b>số khách × %OFF</b>. Mức giảm nhớ theo máy này. Các mã đang chọn còn lại là mã phụ — mang lãi. Bỏ tick
+          một mã 目玉 thì thẻ mờ đi.</ChuThich></h2>
+      <label className="cp-md-muc">Giảm từ ≥ <input type="number" min={0} max={100} step={1} defaultValue={muc}
+        onChange={e => { const v = e.currentTarget.valueAsNumber; if (Number.isFinite(v) && v >= 0 && v <= 100) datMuc(v); }} /> %</label>
+      {ds.length > 0 && <button type="button" className="nut-nap"
+        onClick={() => chep(`mã 目玉 ${ten.toLowerCase()}`, chepMedama(ds, chon))}>Chép mã {ten.toLowerCase()}</button>}
+    </div>
+    {ds.length ? <><div className="cp-md-the-ds">{hien.map((m, k) => <TheMedama key={m.ma} m={m} hang={k + 1} chon={chon.has(m.ma)} bat={bat} />)}</div>{nut}</>
+      : <p className="cp-md-trong">Không có mã {ten.toLowerCase()} nào giảm ≥ {so(muc)}% đủ điều kiện tuần này.</p>}
   </section>;
 }
 
-function TheMedama({ m, chon, bat }: { m: MaKeHoach; chon: boolean; bat: (ma: string) => void }) {
+function TheMedama({ m, hang, chon, bat }: { m: MaKeHoach; hang: number; chon: boolean; bat: (ma: string) => void }) {
   const s = m.so!;
   return <div className={"cp-md-the" + (chon ? "" : " bo")}>
-    <div className="cp-md-anh"><HinhMa ma={m.ma} ten={m.ten} co={132} trang_tri />
+    <div className="cp-md-anh"><HinhMa ma={m.ma} ten={m.ten} co={88} trang_tri />
       {s.off != null && <span className="cp-md-off">−{pc(s.off, 0)}</span>}</div>
     <div className="cp-md-than">
-      <div className="phu">#{s.medama} · <a href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)}><code>{m.ma}</code></a></div>
+      <div className="phu">#{hang} · <a href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)}><code>{m.ma}</code></a></div>
       <div className="cp-md-ten ten-jp">{m.ten}</div>
       {s.gia_san != null && <div className="cp-md-gia">{s.gia_std != null && <s>{yen(s.gia_std)}</s>} <b>{yen(s.gia_san)}</b></div>}
       <div className="cp-md-chi">
-        {s.khach != null && <span><b>{so(s.khach)}</b> khách đang mua</span>}
-        {s.ngay_lo != null && <span title="tồn đầu tuần + lô về trong 4 tuần, theo tốc độ bán thường">đủ bán <b>{s.ngay_lo >= 999 ? "rất lâu" : `${so(s.ngay_lo)} ngày`}</b></span>}
+        {s.khach != null && <span><b>{so(s.khach)}</b> khách</span>}
+        {s.ngay_lo != null && <span title="tồn đầu tuần + lô về trong 4 tuần, theo tốc độ bán thường">đủ <b>{s.ngay_lo >= 999 ? "rất lâu" : `${so(s.ngay_lo)} ngày`}</b></span>}
         {s.lai != null && <span>lãi/lần <b>{s.uoc ? "~" : ""}{s.lai >= 0 ? "+" : ""}{gon(s.lai)}</b></span>}
       </div>
       <label className="cp-md-chon"><input type="checkbox" checked={chon} onChange={() => bat(m.ma)} /> chạy</label>
@@ -240,8 +263,8 @@ const KY_SHEET: Record<TrangSheet, [string, string]> = {
 /** Hạn dùng ISO → "4/15/27"; dạng lạ (chữ OBC) giữ nguyên. */
 const hanNgan = (iso: string) => (/^\d{4}-\d\d-\d\d$/.test(iso) ? `${md(iso)}/${iso.slice(2, 4)}` : iso);
 
-function DongMa({ m, chon, bat, sh, co_sheet }: {
-  m: MaKeHoach; chon: boolean; bat: (ma: string) => void; sh: TrangSheet | null; co_sheet: boolean;
+function DongMa({ m, chon, bat, md: la_md, sh, co_sheet }: {
+  m: MaKeHoach; chon: boolean; bat: (ma: string) => void; md: boolean; sh: TrangSheet | null; co_sheet: boolean;
 }) {
   const s = m.so;
   return (
@@ -250,7 +273,7 @@ function DongMa({ m, chon, bat, sh, co_sheet }: {
       <td><input type="checkbox" checked={chon} onChange={() => bat(m.ma)} aria-label={`Chọn ${m.ma}`} /></td>
       <td><span className="cp-ma-o"><HinhMa ma={m.ma} ten={m.ten} co={32} trang_tri />
         <span className="cp-ma"><a href={giuKhoang(`/san-pham/${encodeURIComponent(m.ma)}`)}><code>{m.ma}</code></a>
-          {s?.medama && <span className="cp-md-dau ten-jp" title="目玉商品 — đặt đầu trang campaign">目玉</span>}
+          {la_md && <span className="cp-md-dau ten-jp" title="目玉商品 — đặt đầu trang campaign">目玉</span>}
           <span className="ten-jp">{m.ten}</span>
           {s?.ngan && <span className="cp-ngan">{s.ngan}</span>}</span></span></td>
       {!s ? <td colSpan={5} className="cp-ly">{m.ly}</td> : <>

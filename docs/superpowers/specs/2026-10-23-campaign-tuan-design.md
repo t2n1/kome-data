@@ -85,6 +85,13 @@ phương án được vẽ thử trên dữ liệu thật (A bảng một tuần
   khô + 1 mã hàng lạnh (ngành 冷凍 / 冷蔵, `mart.dim_product`). Màn: dải vàng thẻ hình to ở đầu tuần (hai cột hangkho / hanglanh),
   nhãn 目玉 trong bảng, "Chép ▾ → Mã 目玉商品". Khoá tuỳ chọn của `so`: `trang`, `khach`, `gia_std`, `gia_san`, `off`, `ngay_lo`,
   `medama` (hạng). Bỏ tick một mã 目玉 thì thẻ mờ — mã khác KHÔNG tự lên thay (web không tính).
+  **Sửa cùng ngày** (グエン: "目玉 riêng cho hàng khô và riêng cho hàng lạnh", "số lượng không bị giới hạn", "mức giảm thì tôi tự
+  set"): HAI khối riêng (vàng = hangkho, xanh = hanglanh), không giới hạn số mã. Script chỉ đánh dấu ỨNG VIÊN — `so.medama` = hạng
+  trong trang theo khách × %OFF, mọi điều kiện cũ trừ ngưỡng %OFF (chỉ cần > 0) và luật hai tuần liền. Web (`chep.ts::medamaTuan`,
+  ngoại lệ có chủ ý của "web không tính") áp **mức giảm tối thiểu người dùng đặt** ở ô "Giảm từ ≥ %" của từng khối (nhớ theo máy,
+  `localStorage` `kome.campaign.muc_medama`, mặc định 5%) và luật "không 目玉 hai tuần liền" nối chuỗi trên cả 6 tuần theo đúng mức
+  đó. Mỗi khối 12 thẻ + "Xem thêm"; "Chép ▾" và nút trong khối chép riêng mã khô / mã lạnh; thanh chọn tuần ghi số 目玉 khô · lạnh.
+  Bản gửi cũ (`medama` chỉ trên 3 + 1 mã) vẫn đọc được — chỉ ít ứng viên hơn.
 - Dữ liệu: khoá tuỳ chọn `so` của từng mã (`kome/campaign.py::_kiem_so`, `giao_dien/src/campaign/kieu.ts::SoMa`) do
   `lap_tuan.xet` tách từ CÙNG các số làm nên câu `ly`; web không tính thêm gì ngoài ngưỡng tô màu. `phien_ban` vẫn 1:
   bản không có `so` in câu `ly` trong một ô.
