@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chepAB, chepF, chepGia, chepMedama, demSheet, medama, gioTu, macDinh, md, soSheet, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
+import { chepAB, chepF, chepGia, chepMedama, demSheet, docMuc, medamaTuan, gioTu, macDinh, md, soSheet, theoNhom, theoSheet, thieuDong, trangSheet, xepMa } from "./chep";
 import type { TuanKeHoach } from "./kieu";
 
 const t: TuanKeHoach = {
@@ -12,16 +12,34 @@ const t: TuanKeHoach = {
 };
 
 describe("目玉商品", () => {
-  const m = (ma: string, trang: string, medama?: number) => ({ ma, ten: "", nhom: "thuong" as const, ly: "", chon: true, so: { trang, medama } });
-  const tm: TuanKeHoach = { ...t, ma: [m("A", "lanh", 1), m("B", "kho", 2), m("C", "kho"), m("D", "kho", 1)] };
-  it("tách theo trang, xếp theo hạng; mã không có hạng là mã phụ", () => {
-    const r = medama(tm);
-    expect(r.kho.map(x => x.ma)).toEqual(["D", "B"]);
+  const m = (ma: string, trang: string, off: number, medama?: number) =>
+    ({ ma, ten: "", nhom: "thuong" as const, ly: "", chon: true, so: { trang, off, medama } });
+  const t1: TuanKeHoach = { ...t, tu: "2026-10-30", ma: [m("A", "lanh", 0.05, 1), m("B", "kho", 0.06, 2), m("C", "kho", 0.3), m("D", "kho", 0.12, 1), m("E", "kho", 0.079, 3)] };
+  const t2: TuanKeHoach = { ...t, tu: "2026-11-06", ma: [m("D", "kho", 0.12, 1), m("F", "kho", 0.1, 2), m("B", "kho", 0.09, 3)] };
+  it("tách theo trang, xếp theo hạng, không giới hạn số; mã không phải ứng viên là mã phụ dù giảm sâu", () => {
+    const [r] = medamaTuan([t1], { kho: 5, lanh: 5 });
+    expect(r.kho.map(x => x.ma)).toEqual(["D", "B", "E"]);
     expect(r.lanh.map(x => x.ma)).toEqual(["A"]);
   });
-  it("chép mã 目玉 đang chọn, hàng khô trước", () => {
-    expect(chepMedama(tm, new Set(["A", "B", "C", "D"]))).toBe("D\nB\nA");
-    expect(chepMedama(tm, new Set(["A", "C"]))).toBe("A");
+  it("mức giảm riêng từng trang, so trên %OFF đã làm tròn (7.9% < 8%)", () => {
+    const [r] = medamaTuan([t1], { kho: 8, lanh: 6 });
+    expect(r.kho.map(x => x.ma)).toEqual(["D"]);
+    expect(r.lanh).toEqual([]);
+  });
+  it("không làm 目玉 hai tuần liền — theo đúng mức đang đặt", () => {
+    expect(medamaTuan([t1, t2], { kho: 5, lanh: 5 })[1].kho.map(x => x.ma)).toEqual(["F"]);
+    expect(medamaTuan([t1, t2], { kho: 10, lanh: 5 })[1].kho.map(x => x.ma)).toEqual(["F"]);
+    expect(medamaTuan([t1, t2], { kho: 7, lanh: 5 })[1].kho.map(x => x.ma)).toEqual(["F", "B"]);
+  });
+  it("chép mã 目玉 đang chọn của một trang", () => {
+    const [r] = medamaTuan([t1], { kho: 5, lanh: 5 });
+    expect(chepMedama(r.kho, new Set(["B", "C", "D"]))).toBe("D\nB");
+  });
+  it("đọc mức đã lưu: hỏng / thiếu / ngoài khoảng → mặc định", () => {
+    expect(docMuc(null)).toEqual({ kho: 5, lanh: 5 });
+    expect(docMuc("{x")).toEqual({ kho: 5, lanh: 5 });
+    expect(docMuc('{"kho":8,"lanh":-1}')).toEqual({ kho: 8, lanh: 5 });
+    expect(docMuc("null")).toEqual({ kho: 5, lanh: 5 });
   });
 });
 

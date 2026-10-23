@@ -37,16 +37,38 @@ export function thieuDong(thu_tu: string[], chon: Set<string>): string[] {
   return xep(chon).filter(m => !co.has(m));
 }
 
-/** 目玉商品 của tuần (script chọn, `so.medama`): hàng khô trước rồi hàng lạnh, mỗi trang theo hạng. */
-export function medama(t: TuanKeHoach): { kho: MaKeHoach[]; lanh: MaKeHoach[] } {
-  const ds = t.ma.filter(m => m.so?.medama).sort((a, b) => a.so!.medama! - b.so!.medama!);
-  return { kho: ds.filter(m => m.so!.trang !== "lanh"), lanh: ds.filter(m => m.so!.trang === "lanh") };
+// 目玉商品 (グエン 2026-10-23): hàng khô / hàng lạnh riêng, KHÔNG giới hạn số mã, mức giảm tối thiểu người dùng tự đặt.
+// Script đánh dấu ỨNG VIÊN (`so.medama` = hạng trong trang theo khách × %OFF — mọi điều kiện khác đã xét ở script);
+// ở đây chỉ áp mức giảm và luật "không làm 目玉 hai tuần liền" (nối chuỗi từ tuần đầu của bản, nên phải tính cả 6 tuần).
+export type Trang = "kho" | "lanh";
+export type MucMedama = Record<Trang, number>;
+export type MedamaTuan = Record<Trang, MaKeHoach[]>;
+export const MUC_MEDAMA_MAC_DINH: MucMedama = { kho: 5, lanh: 5 };
+
+export function medamaTuan(ds: TuanKeHoach[], muc: MucMedama): MedamaTuan[] {
+  let truoc = new Set<string>();
+  return ds.map(t => {
+    const r: MedamaTuan = { kho: [], lanh: [] };
+    for (const m of t.ma.filter(m => m.so?.medama).sort((a, b) => a.so!.medama! - b.so!.medama!)) {
+      const tr: Trang = m.so!.trang === "lanh" ? "lanh" : "kho";
+      if ((m.so!.off ?? 0) * 100 >= muc[tr] - 1e-9 && !truoc.has(m.ma)) r[tr].push(m);
+    }
+    truoc = new Set([...r.kho, ...r.lanh].map(m => m.ma));
+    return r;
+  });
 }
 
-/** Mã 目玉 đang chọn — mỗi dòng một mã, hàng khô trước. */
-export function chepMedama(t: TuanKeHoach, chon: Set<string>): string {
-  const { kho, lanh } = medama(t);
-  return [...kho, ...lanh].filter(m => chon.has(m.ma)).map(m => m.ma).join("\n");
+/** Mức giảm đã lưu trên máy (`localStorage`) — chuỗi hỏng / thiếu / ngoài 0–100 thì về mặc định từng trang. */
+export function docMuc(tho: string | null): MucMedama {
+  let o: Partial<Record<Trang, unknown>> = {};
+  try { o = JSON.parse(tho ?? "{}") ?? {}; } catch { /* về mặc định */ }
+  const lay = (tr: Trang) => { const v = o[tr]; return typeof v === "number" && v >= 0 && v <= 100 ? v : MUC_MEDAMA_MAC_DINH[tr]; };
+  return { kho: lay("kho"), lanh: lay("lanh") };
+}
+
+/** Mã 目玉 đang chọn của một trang — mỗi dòng một mã, theo hạng. */
+export function chepMedama(ds: MaKeHoach[], chon: Set<string>): string {
+  return ds.filter(m => chon.has(m.ma)).map(m => m.ma).join("\n");
 }
 
 export function theoNhom(ds: MaKeHoach[]): Map<Nhom, MaKeHoach[]> {
