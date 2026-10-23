@@ -319,13 +319,59 @@ def tao_api(open_app_conn) -> APIRouter:
 
     @r.get("/thong-bao")
     def thong_bao(request: Request):
+        # Mục campaign (074) ghép NGOÀI ảnh chụp: bảng app.campaign_soat không ở anh_chup._PHIEN_BAN (đặc tả
+        # 2026-10-23-campaign-tuan §3) — +1 lượt hỏi; phiên bản = ảnh chụp + id bản campaign mới nhất.
+        from kome import campaign as CP
+        from kome.tuoi_du_lieu import hom_nay_o_nhat
         try:
             with open_app_conn() as conn:
                 du_lieu, pb = anh_chup.lay(conn, "thong-bao", lambda c: KTQ.thong_bao(c), theo_ngay=True)
+                ban = CP.moi_nhat(conn)
         except Exception:
             traceback.print_exc()
             return JSONResponse({"loi": "Không đọc được thông báo."}, status_code=500)
-        return _json(request, du_lieu, pb)
+        them = CP.thong_bao(ban, hom_nay_o_nhat())
+        if them:
+            d = json.loads(du_lieu)
+            d["tb"] = d.get("tb", []) + them
+            du_lieu = anh_chup.sang_json(d)
+        return _json(request, du_lieu, f"{pb}|c{ban['id']}" if pb else "")
+
+    # ---- Campaign tuần (074) --------------------------------------------
+    # Bản kế hoạch + soát do máy công ty gửi lên (kome/campaign.py). Đọc thẳng, không ảnh chụp (bảng nhỏ, 1 lượt).
+
+    @r.get("/campaign")
+    def campaign(request: Request):
+        from kome import campaign as CP
+        try:
+            with open_app_conn() as conn:
+                ban = CP.moi_nhat(conn)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không đọc được bản campaign.")
+        return _json(request, anh_chup.sang_json(ban), f"campaign-{ban['id']}")
+
+    @r.post("/kho-du-lieu/campaign")
+    async def campaign_nop(request: Request):
+        """Máy công ty gửi bản mới (tài khoản obc-bot). Dưới /api/kho-du-lieu → middleware gác duoc_vao_kho_du_lieu."""
+        from kome import campaign as CP
+        if not request.headers.get("content-type", "").startswith("application/json"):
+            return _loi("Chỉ nhận JSON.", 415)
+        try:
+            b = await request.json()
+        except Exception:
+            return _loi("Thân yêu cầu không phải JSON.", 400)
+        nguoi = getattr(request.state, "nguoi", None)
+        try:
+            with open_app_conn() as conn:
+                id_ = CP.nop(conn, b, nguoi.id if nguoi else None)
+                conn.commit()
+        except CP.LoiDuLieu as e:
+            return _loi(str(e), 400)
+        except Exception:
+            traceback.print_exc()
+            return _loi("Không lưu được bản campaign.")
+        return JSONResponse({"id": id_})
 
     # ---- Khách hàng (giai đoạn 2) --------------------------------------
     # Ngân sách lượt hỏi của màn danh sách = 3 (bất biến /khach-hang): tong-quan

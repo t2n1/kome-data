@@ -1,0 +1,28 @@
+/* Campaign tuần (/campaign). Tiền tố cp- — dùng token của kome.css và lớp chung (.kh-the, .kh-tab, .nhan-vien, table.bang). */
+.cp { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.cp h2 { font-size: 1.02rem; margin: 0 0 .5rem; }
+.cp h2 small { font-weight: 400; color: var(--chu-nhat); font-size: .8rem; }
+.cp code { display: inline; background: none; padding: 0; margin: 0; white-space: nowrap; font-family: var(--font-so); font-size: .9em; }
+.cp-ghi { margin: 0; padding: 8px 12px; border: 1px solid var(--vien); border-radius: 8px; background: var(--nen-phu); color: var(--chu-nhat); font-size: .86rem; }
+.cp-cu { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--canh-nen); color: var(--canh-chu); font-size: .86rem; }
+.cp-tuan-dau { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.cp-nut { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 10px; }
+.cp-bao { font-size: .82rem; color: var(--ok-chu); }
+.cp-nhom { margin-top: 10px; }
+.cp-nhom > summary, .cp-nhom-ten { font-size: .88rem; cursor: default; }
+.cp-nhom > summary { cursor: pointer; }
+.cp-nhom .phu { font-size: .78rem; }
+.cp-ds { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; }
+.cp-ds li { border-top: 1px solid var(--vien); }
+.cp-ds li.cp-chon { background: var(--ok-nen); }
+.cp-ds label { display: grid; grid-template-columns: auto auto minmax(160px, 260px) 1fr; gap: 8px; align-items: center; padding: 4px 6px; cursor: pointer; }
+.cp-ma { display: flex; flex-direction: column; min-width: 0; font-size: .82rem; }
+.cp-ma .ten-jp { color: var(--chu-nhat); font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-ly { font-size: .8rem; color: var(--chu-thuong); }
+.cp-ds-gon { list-style: none; margin: 4px 0 8px; padding: 0; font-size: .84rem; }
+.cp-ds-gon li { padding: 3px 0; border-top: 1px solid var(--vien); display: block; }
+.cp-ds-gon .hinh-ma { vertical-align: middle; }
+.cp-sao { display: inline-block; width: 1.1em; color: var(--canh-chu); }
+.cp-muc .bang-cuon { margin-bottom: 10px; }
+.cp-nguon { font-size: .78rem; }
+@media (max-width: 700px) { .cp-ds label { grid-template-columns: auto auto 1fr; } .cp-ly { grid-column: 3; } }
