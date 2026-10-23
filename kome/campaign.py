@@ -46,8 +46,8 @@ def _chu(d: dict, k: str, ten: str, rong: bool = True) -> str:
     return v
 
 
-SO_SO = ("ton", "ngay", "bien", "lai", "tuan_do", "mua")     # `so` của một mã: ô số của bảng (cùng nội dung `ly`)
-SO_CHU = ("ngan", "canh")
+SO_SO = ("ton", "ngay", "bien", "lai", "tuan_do", "lan_loi", "mua")   # `so` của một mã: ô số của bảng (cùng nội dung `ly`)
+SO_CHU = ("ngan", "canh", "on_dinh")
 SO_CO = ("uoc", "ngung")
 
 

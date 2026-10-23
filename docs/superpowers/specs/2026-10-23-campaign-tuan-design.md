@@ -28,7 +28,11 @@ và ra file trên OneDrive. Người dùng muốn xem và lấy dữ liệu đó
      vẫn đề xuất lại, kèm so sánh thêm / bỏ. Nhịp XEN KẼ ĐỀU (グエン chốt 2026-10-23): lịch của sheet chỉ đọc cho tuần
      TRƯỚC tuần đầu đề xuất; từ tuần đầu "tuần trước đã chạy" nối chuỗi bằng chính đề xuất, kể cả tuần đã có trên sheet
      (sheet để 10/23 và 10/30 đều là tuần nhỏ — theo sheet thì nhóm lớn nhận ở 10/30 lại chạy liền 11/6) và nút "Chọn theo sheet"; mã chia nhóm Ưu tiên · Đẩy hạn ·
-     Theo nhịp · Cân nhịp (được chọn sẵn) · Không chạy · Nghỉ nhịp (bỏ chọn). Ô tick đổi phần sẽ chép — KHÔNG lưu
+     Theo nhịp · Cân nhịp (được chọn sẵn) · Không chạy · Nghỉ nhịp (bỏ chọn). Lãi gộp (グエン chốt 2026-10-23, sau khi đo
+     trên lịch sử sale đầy đủ — 値段管理 + tab tháng từ 2025/6): một LẦN sale = tuần sale + tuần ngay sau, so với tuần
+     thường cùng mùa (±8 tuần); mã lỗ ổn định (≥ 4 lần đo, ≥ 75% lần lỗ) vào Không chạy; lúc lời lúc lỗ vẫn chạy, ghi
+     "chưa chắc" (`so.lan_loi`, `so.on_dinh`); Ưu tiên / Đẩy hạn lỗ ổn định ở nhóm của nó nhưng không chọn sẵn; Cân nhịp
+     chỉ kéo mã mà tuần thứ hai chạy liền còn lời (đo: tuần đầu +38%, tuần thứ hai liền +36% lãi gộp so tuần thường). Ô tick đổi phần sẽ chép — KHÔNG lưu
      (đổi trang là về đề xuất). Ba nút chép: **cột A–B** (週目 · 期間, mỗi mã một dòng) · **cột F** (商品コード) ·
      **cột tuần của 値段管理** (đúng thứ tự dòng 3→ của 値段管理, ô trống = không chạy). Không chép cột C–E (hình /
      công thức) — dán đè là mất công thức.

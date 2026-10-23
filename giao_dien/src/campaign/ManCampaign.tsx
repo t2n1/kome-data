@@ -83,7 +83,7 @@ function KeHoach({ b }: { b: BanCampaign }) {
 const COT: { cot: CotXep; nhan: string; giai: string }[] = [
   { cot: "ngay", nhan: "Còn bán", giai: "Tồn đầu tuần đủ bán bao nhiêu ngày (theo tốc độ bán, tuần sale × hệ số riêng của mã)" },
   { cot: "bien", nhan: "Lãi giá sàn", giai: "(giá sàn chưa thuế − giá vốn) ÷ giá sàn — đúng công thức cột 粗利額 của tab tháng" },
-  { cot: "lai", nhan: "Sale thêm/tuần", giai: "Lãi gộp một tuần sale hơn tuần thường bao nhiêu (đo trên các tuần đã sale; ~ = ước vì chưa đo được)" },
+  { cot: "lai", nhan: "Lãi thêm/lần sale", giai: "Một lần sale (tuần sale + tuần ngay sau) làm lãi gộp hơn hai tuần thường cùng mùa bao nhiêu — đo trên lịch sử sale từ 2025/6; ~ = ước vì chưa đủ 2 lần đo; \"chưa chắc\" = lúc lời lúc lỗ" },
   { cot: "mua", nhan: "Mùa", giai: "Cùng kỳ năm trước bán gấp mấy lần bình thường — chỉ hiện khi lệch rõ" },
 ];
 
@@ -114,8 +114,9 @@ function KhoiTuan({ t, thu_tu, chon, datChon }: {
       <div className="cp-dau">
         <div>
           <h2>Tuần {t.ky} <ChuThich nhan="Cách dùng">
-            Đề xuất từ tuần sau. Tuần đã có trên sheet được đề xuất lại theo nhịp của sheet (khác sheet chỉ vì tồn, lô về, lãi
-            gộp). Trong mỗi nhóm, mã xếp theo lãi gộp thêm một tuần sale × mùa cùng kỳ năm trước; bấm tiêu đề cột để xếp lại.
+            Đề xuất từ tuần sau, nhịp xen kẽ đều nối từ tuần đầu (kể cả tuần đã có trên sheet). Lãi của một lần sale = tuần sale +
+            tuần ngay sau, so với tuần thường cùng mùa, đo trên lịch sử sale từ 2025/6; mã sale lỗ ổn định không chạy. Trong mỗi
+            nhóm, mã xếp theo lãi thêm × mùa cùng kỳ năm trước; bấm tiêu đề cột để xếp lại.
             Rê chuột lên một dòng để xem lý do đầy đủ.<br /><br />
             Tick để bỏ / thêm mã rồi bấm <b>Chép ▾</b>. Tab tháng: dán <b>cột A–B</b> và <b>cột F</b> vào các dòng ngay dưới dòng
             合計 của tuần (không dán đè cột C–E — công thức). 値段管理: dán vào cột của tuần, bắt đầu ở <b>dòng 3</b>.
@@ -219,9 +220,11 @@ function DongMa({ m, chon, bat, sh, co_sheet }: {
           {s.ngung && <div><span className="cp-tt">※終売※ bán nốt tồn</span></div>}</td>
         <td className="so">{s.bien == null ? "—" : pc(s.bien, 0)}</td>
         <td className="so">{s.lai == null ? "—" : <span className={s.lai < 0 ? "giam" : s.uoc ? "phu" : undefined}
-          title={s.uoc ? "ước — chưa đo được (chưa đủ tuần sale, hoặc ngày thường bán quá ít)" : `đo trên ${s.tuan_do} tuần sale`}>
+          title={s.uoc ? "ước — chưa đủ 2 lần sale đo được" : `lời ${s.lan_loi ?? "?"}/${s.tuan_do} lần sale`
+            + (s.on_dinh === "" ? " — lúc lời lúc lỗ, chưa chắc" : "")}>
           {s.uoc ? "~" : ""}{s.lai >= 0 ? "+" : ""}{gon(s.lai)}</span>}
-          {!s.uoc && s.tuan_do != null && s.lai != null && <small className="phu"> {s.tuan_do}t</small>}</td>
+          {!s.uoc && s.tuan_do != null && s.lai != null && <small className="phu"> {s.lan_loi != null ? `${s.lan_loi}/` : ""}{s.tuan_do}
+            {s.on_dinh === "" && " chưa chắc"}</small>}</td>
         <td>{s.mua == null ? null : s.mua < 0.2
           ? <span className="cp-mua thap" title="cùng kỳ năm trước gần như không bán (có thể khi đó hết hàng)">≈0</span>
           : <span className={"cp-mua " + (s.mua >= 1 ? "cao" : "thap")} title={`cùng kỳ năm trước bán ×${s.mua} bình thường`}>
